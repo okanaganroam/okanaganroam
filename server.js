@@ -19981,7 +19981,7 @@ const MAP_GROUPS = [
   { key: 'outdoor', label: 'Outdoors', types: ['outdoor'] },
   { key: 'golf', label: 'Golf', types: ['golf'] },
   // Shops & Outfitters (2026-10-23) pin with the things to do (same group, so the map's chips and legend are unchanged).
-  { key: 'do', label: 'Tours, sports & indoor', types: ['tour', 'sport', 'indoor', 'shop'] },
+  { key: 'do', label: 'Tours, sports & indoor', types: ['tour', 'sport', 'indoor', 'shop', 'outdoor', 'beach'] },
 ];
 const MAP_GROUP_BY_TYPE = Object.fromEntries(MAP_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 function mapPlaces() {
@@ -20720,7 +20720,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function nameHit(p){ return !!(nameQ && p.key.indexOf(nameQ) !== -1); }
   // The search words as the visitor reads them: "open mic" (« scène ouverte »), never the map's own "openmic" token.
   function termShown(t){ return String(t || '').replace(/\\bopenmic\\b/g, T.openMicWords); }
-  function matchesPlace(p){
+  var includeUnlistedHours = false;
+  function matchesPlace(p, allowUnlisted){
     // A named venue still has to meet the visitor’s selected needs.
     var tk = onTags(), byDeal = dealHit(p);
     // What it serves: all of them (or, when no place has all, any of them).
@@ -20741,7 +20742,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Specials today (2026-10-27): from today's specials ([17]), not a stored feature bit.
     // Weekly nights tonight (2026-10-27): from tonight's nights ([19]).
     for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
-    if (openOnly && !(p.st && p.st.state === 'open')) return false;
+    if (openOnly && !(p.st && p.st.state === 'open') && !(!p.st && (includeUnlistedHours || allowUnlisted === true))) return false;
     return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
   // Open first, then closed, then closed for the season (2026-10-18).
@@ -20881,7 +20882,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</a>'
+        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + (x.st ? statusHtml(x.st) : includeUnlistedHours && openOnly ? '<span class="pm-st">' + esc(FR ? 'Horaires non indiqués' : 'Hours not listed') + '</span>' : '') + featHtml(x) + '</a>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -21344,6 +21345,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if (eventPeriod) q += '&when=' + eventPeriod;
         if (freeEventsOnly) q += '&free=1';
       }
+      if (openOnly && includeUnlistedHours) q += '&unlisted=1';
       q=q.replace(/^&/,'');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '?f=') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
@@ -21354,7 +21356,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (town !== lastTown) { lastTown = town; if (town && CONF.c[town]) map.setView(CONF.c[town], 13); }
     tagAny = false;
     if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
-    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(termShown(term))); term = ''; }
+    if (term && !tags.skatepark && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(termShown(term))); term = ''; }
     syncChips(); limit = 25;
     // Round 13: a search that opened the Events tab keeps the distance its events picked (pickEventRadius).
     if (me && !radiusFixed && !town && !(evBySearch && tab === 'events')) {
@@ -21368,8 +21370,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     render(!!me || !!town);
   }
   kindChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-kind'); kinds[k] = !kinds[k]; track('map_filter', { filter: k, on: kinds[k] }); changed(); }); });
+  $('rnOutdoorShortcuts').addEventListener('click', function(e){
+    var shortcut = e.target.closest('[data-outdoor-search]');
+    if (!shortcut) return;
+    runSearch(shortcut.dataset.outdoorSearch, 'shortcut');
+  });
   featChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-feat'); feats[k] = !feats[k]; track('map_filter', { filter: k, on: feats[k] }); if (feats[k] && (k === 'specials' || k === 'nights' || k === 'happy')) searchFit = true; changed(); }); });
-  openBtns.forEach(function(c){ c.addEventListener('click', function(){ openOnly = !openOnly; track('map_filter', { filter: 'open', on: openOnly }); changed(); }); });
+  openBtns.forEach(function(c){ c.addEventListener('click', function(){ openOnly = !openOnly; includeUnlistedHours = false; track('map_filter', { filter: 'open', on: openOnly }); changed(); }); });
   topBtns.forEach(function(c){ c.addEventListener('click', function(){ topOnly = !topOnly; track('map_filter', { filter: 'top', on: topOnly }); changed(); }); });
   tagHolder.addEventListener('click', function(e){
     var b = e.target.closest('[data-pm-x]'); if (!b) return;
@@ -21384,7 +21391,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ eventPeriod = ''; freeEventsOnly = false; updateEventChips(); kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; nameQ = ''; dealQuery = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ includeUnlistedHours = false; eventPeriod = ''; freeEventsOnly = false; updateEventChips(); kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; nameQ = ''; dealQuery = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -21409,6 +21416,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function relaxHtml(){
+    if (openOnly && !includeUnlistedHours && places.some(function(p){
+      return !p.st && matchesPlace(p, true) && (!me || !radiusFixed || !radiusKm || town || p.d <= radiusKm);
+    })) {
+      return esc(FR ? 'Aucun résultat ouvert maintenant.' : 'No matching places are listed as open now.') +
+        ' <button type="button" class="pm-relax" data-relax="unlisted">' +
+        esc(FR ? 'Afficher les lieux sans horaires' : 'Show places with unlisted hours') + '</button>';
+    }
+    if (tags.skatepark) return esc(FR ? 'Aucun parc de planche à roulettes trouvé dans cette zone.' : 'No skateparks found in this area. Try a wider distance or another town.');
     var best = null, base = snapshot(), t0 = term, cs = candidates();
     // Round 10 (2026-10-19): "farmers market" over Kelowna said "Nothing called ... here" while Penticton's and
     // Vernon's markets matched outside the view. Without a location, say how many match elsewhere and offer to show them.
@@ -21426,6 +21441,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(T.dropIt) + '</button>';
   }
   listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return;
+    if (b.getAttribute('data-relax') === 'unlisted') { includeUnlistedHours = true; searchFit = true; changed(); return; }
     if (b.getAttribute('data-relax') === 'fit') { var ms = places.filter(matchesPlace).slice(0, 300); if (ms.length) { fitTo(L.latLngBounds(ms.map(function(p){ return [p.lat, p.lng]; })), 15); } return; }
     dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
   function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '') : k; }
@@ -21820,6 +21836,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
+    includeUnlistedHours = false;
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
     // Round 9 (2026-10-19): each search starts from the usual 5 km and clears the last search's message, so "Not much
     // right nearby, so this shows up to 25 km away" never stays on for a search that fits close by.
@@ -21993,6 +22010,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Happy hour now always requires current researched times.
     try {
       var qs = new URLSearchParams(location.search);
+      includeUnlistedHours = qs.get('unlisted') === '1';
       eventPeriod = ['today','weekend'].includes(qs.get('when')) ? qs.get('when') : '';
       freeEventsOnly = qs.get('free') === '1';
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
@@ -22041,7 +22059,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 17; // 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 18; // 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -22157,6 +22175,8 @@ const MAP_TAGS = [
     // Fintry, Kalamalka Lake ...).
     (v, name, text) => (v.hikeList || (v.type === 'outdoor' && MAP_HIKE_TEXT_RE.test(text))
       || (v.type === 'beach' && /\b(?:regional|provincial) park\b/.test(name) && /\b(?:trails?|trailhead|hik(?:e|es|ing))\b/.test(text))) && !MAP_NOT_HIKE_NAME_RE.test(name)],
+  ['parks', 'Parks', 'Parcs', 'tree', /\bparks?\b/, 'parks|parcs', [], (v, name) => ['outdoor','beach','sport'].includes(v.type) && /\bpark\b/.test(name)],
+  ['skatepark', 'Skateparks', 'Parcs de planche à roulettes', 'target', /\bskate[ -]?(?:board(?:ing)?[ -]?)?parks?\b/, 'skatepark|skateparks|skate park|skate parks|skateboard park|skateboard parks|skateboarding park|skateboarding parks', [], (v, name) => /\bskate[ -]?(?:board(?:ing)?[ -]?)?parks?\b/.test(name)],
 ].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: uiIcon('leaf') }, { key: 'vegan', label: 'Vegan', icon: uiIcon('sprout') }, { key: 'gf', label: 'Gluten-free', icon: uiIcon('wheat') },
@@ -22467,6 +22487,12 @@ ${renderGolfHeaderHtml()}
           const first = ['happy', 'specials', 'nights', 'patio', 'dogs'];
           return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_DIETARY.map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
         })()}
+        <div class="rn-outdoor-shortcuts" id="rnOutdoorShortcuts" role="group" aria-label="${R('Outdoor activities','Activités de plein air')}">
+          <button type="button" class="pm-chip" data-outdoor-search="parks"><span aria-hidden="true">🌳</span> ${R('Parks','Parcs')}</button>
+          <button type="button" class="pm-chip" data-outdoor-search="dog beaches"><span aria-hidden="true">🐾</span> ${R('Dog beaches','Plages pour chiens')}</button>
+          <button type="button" class="pm-chip" data-outdoor-search="hiking trails"><span aria-hidden="true">🥾</span> ${R('Hiking trails','Sentiers de randonnée')}</button>
+          <button type="button" class="pm-chip" data-outdoor-search="skateparks"><span aria-hidden="true">🛹</span> ${R('Skateparks','Parcs de planche à roulettes')}</button>
+        </div>
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
       <div class="pm-quick rn-event-filters" id="rnEventFilters" role="group" aria-label="${R('Event filters','Filtres des événements')}" hidden>

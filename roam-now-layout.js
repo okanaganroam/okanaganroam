@@ -182,6 +182,18 @@ body.pm-app-page [data-event-filter="free"]:not([aria-pressed="true"]) { backgro
   body.pm-app-page .pm-quick [data-pm-kind="indoor"]:not([aria-pressed="true"]) { background: #e5edf7; }
 }
 body.pm-app-page .rn-filter-emoji { margin-inline-end: 3px; }
+body.pm-app-page .rn-outdoor-shortcuts { display: none; }
+body.pm-app-page .pm-quick:has([data-pm-kind="do"][aria-pressed="true"]) .rn-outdoor-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-basis: 100%;
+  order: 3;
+}
+body.pm-app-page .rn-outdoor-shortcuts .pm-chip {
+  display: inline-flex;
+  background: #e6eee3;
+}
 body.pm-app-page .rn-event-copy,
 body.pm-app-page .rn-events-mode .rn-place-copy { display: none; }
 body.pm-app-page .rn-events-mode .rn-event-copy { display: block; }

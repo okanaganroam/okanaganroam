@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const src = fs.readFileSync(require.resolve('../server.js'),'utf8');
 function matches(overrides={},place={}) {
-  const fn=src.slice(src.indexOf('  function matchesPlace(p){'),src.indexOf('  // Open first, then closed',src.indexOf('  function matchesPlace(p){')));
-  const ctx={nameHit:()=>true,onTags:()=>[],dealHit:()=>false,anyOn:o=>Object.values(o).some(Boolean),kinds:{},CONF:{k:{},f:{gf:1,music:2}},topOnly:false,town:'',price:'',atMin:null,atDay:'',notTypes:{},notTags:{},notKinds:{},notFeats:{},feats:{gf:true},hhKnown:true,hhAnyNow:false,openOnly:false,term:'',TAGIX:{},nightHit:()=>false,...overrides};
+  const fn=src.slice(src.indexOf('  function matchesPlace(p, allowUnlisted){'),src.indexOf('  // Open first, then closed',src.indexOf('  function matchesPlace(p, allowUnlisted){')));
+  const ctx={includeUnlistedHours:false,nameHit:()=>true,onTags:()=>[],dealHit:()=>false,anyOn:o=>Object.values(o).some(Boolean),kinds:{},CONF:{k:{},f:{gf:1,music:2}},topOnly:false,town:'',price:'',atMin:null,atDay:'',notTypes:{},notTags:{},notKinds:{},notFeats:{},feats:{gf:true},hhKnown:true,hhAnyNow:false,openOnly:false,term:'',TAGIX:{},nightHit:()=>false,...overrides};
   ctx.place={type:'cafe',region:'kelowna',f:0,tg:[],hhs:null,st:null,...place};vm.createContext(ctx);vm.runInContext(fn+';result=matchesPlace(place)',ctx);return ctx.result;
 }
 test('an exact venue name cannot bypass gluten-free or other selected requirements',()=>assert.equal(matches(),false));
