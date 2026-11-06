@@ -280,3 +280,23 @@ test('plain times: "between 2 and 5", "home by 6", "free after 4pm", "avoid crow
     assert.deepEqual(leftovers(i).filter((w) => /avoid|crowd|possible|^as$|exactly/i.test(w)), [], text);
   }
 });
+
+test('Server: places named in a short outing are its stops, in the order named', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'lunch at Frankie We Salute You and then a tasting at Sandhill Wines Saturday' });
+  const names = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.deepEqual(names, ['Frankie We Salute You!', 'Sandhill Wines'], JSON.stringify(names));
+  assert.ok(!(p.warnings || []).some((w) => /No selected stop meets/.test(w)), JSON.stringify(p.warnings));
+  const q = app.runTripPlan({ text: 'a tasting at Sandhill Wines and then dinner Saturday' });
+  const q1 = (q.itinerary && q.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.equal(q1[0], 'Sandhill Wines', JSON.stringify(q1));
+});
+
+test('Server: a place named by the front of its name is that place ("Home Block", "Waterfront Wines")', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'dinner at Home Block then a walk tonight' });
+  const names = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.ok(names.includes('Home Block at CedarCreek Estate Winery'), JSON.stringify(names));
+});

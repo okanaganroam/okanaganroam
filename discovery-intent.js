@@ -219,7 +219,7 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:a )?(?:group|party|crew|gang|bunch) of (\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:guys|girls|ladies|gals|boys|men|women|people|folks|adults|friends|colleagues|coworkers|seniors|retirees|students|kids|teens|teenagers|members|guests)\b/g, ' $1 friends ');
   s = plainClockTimes(s);
   // Plain phrases: "cheap as possible", "avoid crowds", "exactly 3".
-  s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy|touristy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
+  s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
   // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
