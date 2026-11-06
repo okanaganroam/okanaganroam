@@ -24,6 +24,8 @@ const searchTerms = require('./search-terms');
 const searchTermCounter = searchTerms.createSearchTermCounter(db);
 const funnelsReport = require('./funnels').createFunnels(db);
 const notFoundCounter = require('./not-found').createNotFoundCounter(db);
+const whatsChanged = require('./whats-changed');
+const whatsChangedPage = require('./whats-changed-page');
 const { renderErrorsPage } = require('./errors-page');
 const { renderFunnelsPage } = require('./funnels-page');
 const { renderSearchTermsPage } = require('./search-terms-page');
@@ -57444,7 +57446,12 @@ const server = http.createServer(async (req, res) => {
           } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
         }
       }
-      return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '' }));
+      let topHtml = '';
+      try {
+        const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
+        topHtml = whatsChangedPage.cardHtml(await weeklyDigestSites(), { notice });
+      } catch (e) { topHtml = ''; }
+      return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '', topHtml }));
     }
     // Business activity (2026-11-05). GET /api/admin/venue-activity?q=name  -> matching businesses on this site;
     // ?id=123&days=30 -> that business's views, link clicks and Build My Trip demand. Admin token.
@@ -57586,6 +57593,23 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
       }
       return res.end(renderErrorsPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: notFoundCounter.report(days, 100) }, whistler] }));
+    }
+    // What changed (2026-11-06). GET /api/admin/whats-changed -> the last complete 7 days against the 7 before. Admin token.
+    if (pathname === '/api/admin/whats-changed' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, await ownWhatsChanged());
+    }
+    // "Email me this now" on the dashboard card: sends the same summary as the Monday email. Signed-in admin, same site, 3 an hour.
+    if (pathname === '/admin/dashboard/digest-send' && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      const nowMs = Date.now();
+      while (digestManual.length && nowMs - digestManual[0] > 3600000) digestManual.shift();
+      let result = 'rate';
+      if (digestManual.length < 3) { digestManual.push(nowMs); result = await sendWeeklyDigest(); }
+      res.writeHead(303, { Location: `/admin/dashboard?digest=${result}`, 'Cache-Control': 'no-store' });
+      return res.end();
     }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
@@ -58270,10 +58294,69 @@ function installShutdownHandlers() {
   process.once('SIGINT', () => stop('SIGINT'));
 }
 
+// What changed (2026-11-06): this site's last complete 7 days against the 7 before, plus Search Console when connected.
+async function ownWhatsChanged(now = new Date()) {
+  const d = whatsChanged.summarize(db, now);
+  try { d.google = whatsChanged.googleSection(await gscReport.report(7, now)); } catch (e) { d.google = null; }
+  return d;
+}
+// Both sites' summaries for the dashboard card and the Monday email.
+async function weeklyDigestSites(now = new Date()) {
+  const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
+  try { sites[0].data = await ownWhatsChanged(now); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+  const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+  if (!wToken) sites[1].error = 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.';
+  else {
+    try {
+      const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/whats-changed`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(10000) });
+      if (r.status === 200) sites[1].data = await r.json();
+      else sites[1].error = r.status === 404 ? 'Whistler Roam doesn’t have this summary yet.' : `Whistler Roam answered ${r.status}.`;
+    } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
+  }
+  return sites;
+}
+// The Monday email (Brevo, same sender as owner emails). Returns 'sent', 'email_off' (no BREVO_API_KEY) or 'failed'.
+async function sendWeeklyDigest(now = new Date()) {
+  const send = ownerDirectEmail();
+  if (!send) return 'email_off';
+  try {
+    const sites = await weeklyDigestSites(now);
+    const w = whatsChanged.windows(now);
+    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites), html: whatsChangedPage.emailHtml(sites) });
+    return 'sent';
+  } catch (e) { console.error('[digest] send failed:', e.message); return 'failed'; }
+}
+function pacificNow(now) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', weekday: 'short', hour: 'numeric', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now).map((x) => [x.type, x.value]));
+  return { weekday: p.weekday, hour: Number(p.hour), date: `${p.year}-${p.month}-${p.day}` };
+}
+let digestBusy = false;
+// Checked every 15 minutes; on Monday from 7 AM Pacific it sends once per week (retrying a failure up to 4 times).
+async function digestTick(now = new Date()) {
+  const p = pacificNow(now);
+  if (p.weekday !== 'Mon' || p.hour < 7 || digestBusy) return null;
+  const row = db.prepare('SELECT * FROM digest_log WHERE week = ?').get(p.date);
+  if (row && (row.result === 'sent' || row.result === 'email_off' || row.attempts >= 4)) return row.result;
+  digestBusy = true;
+  try {
+    db.prepare("INSERT INTO digest_log (week, attempts, result) VALUES (?, 1, 'pending') ON CONFLICT(week) DO UPDATE SET attempts = attempts + 1").run(p.date);
+    const result = await sendWeeklyDigest(now);
+    db.prepare("UPDATE digest_log SET result = ?, sent_at = CASE WHEN ? = 'sent' THEN CURRENT_TIMESTAMP ELSE sent_at END WHERE week = ?").run(result, result, p.date);
+    return result;
+  } finally { digestBusy = false; }
+}
+function startDigestTimer() {
+  if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
+  const t = setInterval(() => { digestTick().catch((e) => console.error('[digest]', e.message)); }, 15 * 60 * 1000);
+  t.unref();
+}
+const digestManual = [];
+
 function startServer() {
   installShutdownHandlers();
   server.listen(PORT, () => {
     console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
+    startDigestTimer(); // Monday email (2026-11-06)
 
     // Slug backfill runs AFTER the server is already listening and serving
     // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
@@ -58526,6 +58609,7 @@ module.exports = {
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
   setOwnerEmailTransport,
+  digestTick, sendWeeklyDigest, pacificNow,
   createOwnerPasswordReset,
   setContactTransport,
   resetContactLimits,
