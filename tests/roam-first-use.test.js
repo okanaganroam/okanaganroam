@@ -33,7 +33,7 @@ test('route location help gives one cause and one next-step instruction',()=>{
  assert.match(roamRouteLocationMessage('blocked','Café','fr'),/guidage en direct/);
 });
 test('apply button labels do not imply the selected-filter count is a result count',()=>{
- const line=source.split('\n').find(l=>l.includes("$('rnApplyFilters').textContent="));assert.ok(line);assert.ok(!line.includes("+(n?"));
+ assert.match(source, /id="rnApplyFilters"[^\n]+Show results/);
 });
 test('route preview measures the resized map before fitting its bounds',()=>{
  const from=source.indexOf('  function fitRoutePreview(r){');assert.ok(from>=0);

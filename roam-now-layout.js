@@ -113,6 +113,10 @@ body.pm-app-page #rnEditSearch { display: none; }
 body.pm-app-page .is-route .rn-search-area,
 body.pm-app-page .is-route .pm-pinbtn { display: none; }
 body.pm-app-page .rn-route-start { margin: 0 0 8px; }
+body.pm-app-page .rn-location small { display: block; font-size: 13px; font-weight: 700; }
+body.pm-app-page #rnApplyFilters,
+body.pm-app-page #rnShowResults,
+body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
 @media (max-width: 899px) {
   body.pm-app-page .pm-list-view:not(.is-route):not(.is-route-origin) .rn-results-toolbar {
     display: flex;
