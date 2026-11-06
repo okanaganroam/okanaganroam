@@ -200,6 +200,10 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
   s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
   s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
+  // "six year olds", "a group of 6 guys", "bus tour group": ages and head counts, not places.
+  s = s.replace(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen) (?:years? old|year olds?|yo)\b/g, ' kids ');
+  s = s.replace(/\b(?:coach|bus|motorcoach) (?:tour )?(?:group|trip)\b/g, ' ');
+  s = s.replace(/\b(?:a )?(?:group|party|crew|gang|bunch) of (\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:guys|girls|ladies|gals|boys|men|women|people|folks|adults|friends|colleagues|coworkers|seniors|retirees|students|kids|teens|teenagers|members|guests)\b/g, ' $1 friends ');
   // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
@@ -976,6 +980,8 @@ const NEVER_CORRECT = new Set([
   'flashing', 'flushing', 'koran', 'lunge', 'longe', 'lounger', 'outsider', 'padding', 'streak', 'tumbling', 'whisk',
   'toddle', 'germane', 'germanic', 'polis', 'celia', 'blinking', 'circling', 'skidding', 'skinning', 'boasting',
   'bloating', 'exacting', 'easting', 'divining', 'bridging', 'westland',
+  // 2026-11-05: "shopping" was read as the typo "sipping" (a winery) while the shops list is empty.
+  'shopping',
   // real words used in the site's own venue / event text
   'badly', 'drinking', 'eater', 'finishing', 'olive', 'outsized', 'polished', 'skipping', 'skirting', 'trial',
   // implementation review of the site's own text: a correction would change

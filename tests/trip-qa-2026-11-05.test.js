@@ -247,3 +247,14 @@ test('French: "quelle journée parfaite", "de la France", "glaces", "personnes" 
   const i = parse(t('je visite de la France, une semaine en juillet, vins et plages'));
   assert.ok(!leftovers(i).includes('france'), JSON.stringify(leftovers(i)));
 });
+
+test('"six year olds", "a group of 6 guys", "bus tour group" and "shopping" are not misread', () => {
+  for (const text of ['kids birthday party in Kelowna for 8 six year olds, Saturday afternoon', 'nightlife in Kelowna for a group of 6 guys Friday night', 'bus tour group of 40 seniors, one day, wineries and lunch, Kelowna']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /^(?:year|olds?|group|bus|tour)$/.test(w)), [], text + ' ' + JSON.stringify(leftovers(i)));
+  }
+  // "shopping" is never "corrected" to "sipping" (a winery).
+  const i = parse('shopping in Penticton');
+  assert.deepEqual(i.types, []);
+  assert.deepEqual(i.corrections, []);
+});
