@@ -256,6 +256,8 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from|with) (?:a|an|the|some) (italian|thai|sushi|japanese|chinese|indian|mexican|greek|french|korean|vietnamese|pizza|steak|seafood|vegan|vegetarian|mediterranean|middle eastern|bbq|burger|ramen|tapas)(?: food)? (?:restaurants?|places?|spots?|joints?|eateries|eatery)\b/g, ' $2 $1 ');
   s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|the|some) (nice|good|great|fancy|romantic|cozy|casual|local|lovely|decent|quiet|upscale|special|favourite|favorite) (?:restaurants?|places?|spots?)\b/g, ' $2 $1 ');
   s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|some) (?:restaurants?|places?|spots?|eateries|eatery)\b/g, ' $1 ');
+  // "10 girls", "8 guys", "a crew of 12 ladies": head counts of friends, not places.
+  s = s.replace(/\b(\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:girls|guys|ladies|gals|boys|women|men)\b/g, ' $1 friends ');
   s = plainRelativeDates(s);
   // "two weeks": 14 days (the planner covers seven and says so).
   s = s.replace(/\b(2|3|4|5|two|three|four|five)[ -]weeks?(?: long)?\b(?! (?:from now|ago|away))/g, (m, n, off) => (/\b(?:in|within|after|for the next) $/.test(s.slice(Math.max(0, off - 16), off)) && !/^ (?:in|around|at|for) /.test(s.slice(off + m.length, off + m.length + 5)) ? m : ` ${({ two: 2, three: 3, four: 4, five: 5 }[n] || Number(n)) * 7} days `));

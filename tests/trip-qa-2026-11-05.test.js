@@ -348,3 +348,10 @@ test('"dinner at a Thai restaurant" is one dinner stop, not a dinner plus a rest
     assert.equal(stops.filter(s => s.venue.type === 'restaurant').length, 1, text);
   }
 });
+
+test('"10 girls" is a head count, not an unknown place word', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'bachelorette weekend in Kelowna, 10 girls, wineries' });
+  assert.ok(!(p.unsupported || []).includes('girls'));
+});
