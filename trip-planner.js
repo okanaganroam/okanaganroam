@@ -957,7 +957,7 @@ function publicVenue(v, ctx) {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
-    rating: v.rating, reviews: v.reviews, price: v.price, address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (Okanagan Roam's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
