@@ -6,7 +6,7 @@
 const { isBot, isInternal, dayOf, enabled: demandEnabled } = require('./trip-demand');
 const { rateLimited } = require('./site-events');
 
-const SOURCES = new Set(['site', 'trip']);
+const SOURCES = new Set(['site', 'trip', 'map']);
 const MAX_LEN = 80;
 const MAX_WORDS = 10;
 const NEW_TERMS_PER_DAY = 600; // a runaway guard on how many different words one day can add
@@ -44,7 +44,7 @@ function createSearchTermCounter(db) {
     limit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 300);
     const list = []; for (let i = days - 1; i >= 0; i -= 1) list.push(dayOf(new Date(now.getTime() - i * 86400000)));
     const rows = db.prepare('SELECT day, source, term, found, n FROM search_term_counts WHERE day >= ?').all(list[0]);
-    const terms = new Map(); const perDay = new Map(); const totals = { site: 0, trip: 0, found: 0, none: 0 };
+    const terms = new Map(); const perDay = new Map(); const totals = { site: 0, trip: 0, map: 0, found: 0, none: 0 };
     for (const r of rows) {
       const k = `${r.source}|${r.term}`;
       const e = terms.get(k) || { term: r.term, source: r.source, found: 0, none: 0 };

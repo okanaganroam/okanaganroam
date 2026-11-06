@@ -12,7 +12,7 @@ function siteCard(g, days) {
     <h4>Most searched on the site</h4>
     ${table(['Words', 'Searches', 'Found nothing'], d.top.map((r) => [searchLink(r.term), `<b>${num(r.n)}</b>`, r.none ? `<b>${num(r.none)}</b>` : '0']))}
     <h4>Searches that found nothing <small>places or topics to add</small></h4>
-    ${table(['Words', 'Where', 'Found nothing'], d.missing.map((r) => [esc(r.term), r.source === 'trip' ? 'Build My Trip' : 'Site search', `<b>${num(r.none)}</b>`]))}
+    ${table(['Words', 'Where', 'Found nothing'], d.missing.map((r) => [esc(r.term), r.source === 'trip' ? 'Build My Trip' : r.source === 'map' ? 'Roam Now' : 'Site search', `<b>${num(r.none)}</b>`]))}
     <h4>What people asked Build My Trip</h4>
     ${table(['Words', 'Requests'], d.trip.map((r) => [esc(r.term), `<b>${num(r.n)}</b>`]))}
     <p class="empty">Counting started ${d.counting_since ? esc(d.counting_since) : 'today'}, so earlier days show zero. Only the cleaned words are kept, with a number: nothing about who typed them. Anything that looks like an email, web address, phone number or a long sentence is dropped. Build My Trip requests are counted once they are read, so “found nothing” there stays 0; check the site-search list for gaps. Your own visits (internal cookie) are left out.</p></div></section>`;

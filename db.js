@@ -1370,6 +1370,16 @@ CREATE TABLE IF NOT EXISTS health_alert_log (
 
 // Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
 db.exec(`
+CREATE TABLE IF NOT EXISTS page_counts (
+  day TEXT NOT NULL,
+  page TEXT NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, page, name)
+);
+`);
+
+db.exec(`
 CREATE TABLE IF NOT EXISTS not_found_counts (
   day TEXT NOT NULL,
   kind TEXT NOT NULL,
