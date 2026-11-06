@@ -108,4 +108,30 @@ async function report(days = 28, now = new Date()) {
   }
 }
 
-module.exports = { report, creds, buildTrends, movers, sumRows };
+// Non-brand impressions per day (queries that do not contain the brand name), averaged over the last `days` days. This is
+// the same count Search Console's own "queries not containing" filter gives (it leaves out anonymised queries). Cached 30 min.
+const BRAND = ['okanagan roam', 'okanaganroam'];
+async function nonBrand(days = 28, now = new Date()) {
+  const c = creds();
+  if (!c) return null;
+  const key = `nb|${c.site}|${days}|${ymd(now)}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
+  try {
+    const t = await accessToken(c);
+    const end = new Date(now.getTime() - 2 * 86400000); const start = new Date(end.getTime() - (days - 1) * 86400000);
+    const body = { startDate: ymd(start), endDate: ymd(end), dimensions: ['date'], rowLimit: 400,
+      dimensionFilterGroups: [{ groupType: 'and', filters: BRAND.map((e) => ({ dimension: 'query', operator: 'notContains', expression: e })) }] };
+    const r = await fetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(c.site)}/searchAnalytics/query`, {
+      method: 'POST', headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return { error: 'Couldn’t read Search Console right now.' };
+    const rows = (await r.json()).rows || [];
+    const last7 = rows.filter((x) => x.keys[0] >= ymd(new Date(end.getTime() - 6 * 86400000)));
+    const sum = (a) => a.reduce((n, x) => n + (x.impressions || 0), 0);
+    const data = { days, start: ymd(start), end: ymd(end), per_day: Math.round((sum(rows) / days) * 10) / 10, last7_per_day: Math.round((sum(last7) / 7) * 10) / 10 };
+    cache.set(key, { at: Date.now(), data });
+    return data;
+  } catch (e) { return { error: 'Couldn’t read Search Console right now.' }; }
+}
+
+module.exports = { report, creds, buildTrends, movers, sumRows, nonBrand };

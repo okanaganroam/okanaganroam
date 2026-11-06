@@ -1358,6 +1358,16 @@ CREATE TABLE IF NOT EXISTS digest_log (
 );
 `);
 
+// Daily tracking-health check (2026-11-06): one row per day so an outage email is sent once.
+db.exec(`
+CREATE TABLE IF NOT EXISTS health_alert_log (
+  day TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  result TEXT NOT NULL DEFAULT 'pending',
+  signature TEXT
+);
+`);
+
 // Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
 db.exec(`
 CREATE TABLE IF NOT EXISTS not_found_counts (
