@@ -225,6 +225,13 @@ body.pm-app-page .rn-location small { display: block; font-size: 13px; font-weig
 body.pm-app-page #rnApplyFilters,
 body.pm-app-page #rnShowResults,
 body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
+body.pm-app-page #rnShowResults {
+  background: #1b303c;
+  border-color: #1b303c;
+  color: #fff;
+  font-weight: 800;
+}
+body.pm-app-page #rnShowResults:hover { background: #284858; }
 @media (max-width: 899px) {
   body.pm-app-page .pm-filters-btn:has(.rn-open-badge:not([hidden])) {
     flex-direction: column-reverse;
