@@ -21032,7 +21032,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
     stage.classList.toggle('is-route',!!r);
     if (!r) { routeEl.innerHTML = ''; drawNav(); showLook(); return; }
-    var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(r.started ? T.endRoute : (FR ? 'Retour aux résultats' : 'Back to results')) + '</button></div>';
+    var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2>';
+    if (!r.started) html += '<button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(FR ? 'Retour aux résultats' : 'Back to results') + '</button>';
+    html += '</div>';
     html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
     if (r.arrived) html += '<p class="pm-route-sum is-arrived">' + esc(T.arrived) + '</p>';
     else if (r.loading && !r.data) html += '<p class="pm-route-sum">' + esc(T.routing) + '</p>';
@@ -22482,6 +22484,7 @@ ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 <link rel="preconnect" href="https://a.tile.openstreetmap.org">
 <link rel="preconnect" href="https://b.tile.openstreetmap.org">
 <link rel="preconnect" href="https://c.tile.openstreetmap.org">
+<link rel="preload" as="fetch" href="/map/data.json?v=${ver}" crossorigin="anonymous" type="application/json">
 <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"/>

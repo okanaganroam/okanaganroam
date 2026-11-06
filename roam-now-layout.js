@@ -248,6 +248,14 @@ body.pm-app-page #rnShowResults {
   color: #fff;
   font-weight: 800;
 }
+body.pm-app-page #rnShowResults,
+body.pm-app-page #rnApplyFilters {
+  justify-content: center;
+  text-align: center;
+}
+body.pm-app-page .pm-float:has(.rn-open-badge:not([hidden])) #pmPlaceFilters [data-pm-open] {
+  display: none;
+}
 body.pm-app-page #rnShowResults:hover { background: #284858; }
 @media (max-width: 899px) {
   body.pm-app-page .pm-filters-btn:has(.rn-open-badge:not([hidden])) {
