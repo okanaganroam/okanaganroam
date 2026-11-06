@@ -21288,7 +21288,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var n = parts.length;
     $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
-    badge.hidden = tab === 'events' || !n; badge.textContent = String(n);
+    badge.hidden = tab === 'events' || !n;
+    badge.textContent = openOnly && n === 1 ? (FR ? 'Ouvert maintenant' : 'Open now') : String(n);
+    badge.className = openOnly && n === 1 ? 'pm-badge rn-open-badge' : 'pm-badge';
     quickClear.hidden = !n && !term;
     // Keep the quick chips that are on in view.
     var row = $('pmPlaceFilters'), ons = row.querySelectorAll('[aria-pressed="true"]'), activeChip = ons[ons.length - 1];
