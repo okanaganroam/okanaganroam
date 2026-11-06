@@ -20719,6 +20719,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function render(fit){
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
+    if (watching && !me && !town && !pendingRoute) {
+      countEl.textContent = FR ? 'Recherche de votre position…' : 'Finding your location…';
+      listItems = [];
+      listOn = false;
+      listEl.innerHTML = '';
+      moreBtn.hidden = true;
+      return;
+    }
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap, sf = searchFit; searchFit = false;
     if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
@@ -21121,6 +21129,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (!OK_BOUNDS.pad(0.1).contains([pos.coords.latitude, pos.coords.longitude])) {
         watching = false; stopWatch(); nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe;
         showLocationHelp(T.outside);
+        if (!pendingRoute) render(false);
         setStatus(''); track('map_outside', {}); return;
       }
       if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); me = null; }
@@ -21148,6 +21157,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     watching = false; stopWatch(); nearBtn.classList.remove('is-finding');
     if (!me) { nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; }
     setStatus('');showLocationHelp(err && err.code === 1 ? T.denied : T.failed);
+    if (!pendingRoute && !me) render(false);
   }
   function startWatch(){
     if (!navigator.geolocation) { showLocationHelp(T.unsupported); return; }
@@ -21169,6 +21179,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     setPinMode(false);
     if (watching) return;
     nearLabel.textContent = T.finding; nearBtn.classList.add('is-finding'); startWatch();
+    if (watching && !me && !town && !pendingRoute) render(false);
   });
   var stopLoc = $('pmStopLoc');
   stopLoc.addEventListener('click', function(){ var wasPin = me && me.pin; stopLocation(); setStatus(wasPin ? T.pinRemoved : T.stopped); closePanel(); });
@@ -21880,7 +21891,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if(CONF.dest){var dest=places.concat(events).filter(function(x){return x.url===CONF.dest.url})[0];if(!dest){dest=CONF.dest;dest.m=L.marker([dest.lat,dest.lng],{icon:iconFor('event'),title:dest.name});}if(!startRoute(dest))setStatusHtml(esc(T.routeFailed)+' <a '+hrefAttr(dirUrl(dest.lat,dest.lng,dest.venue||dest.name))+' target="_blank" rel="noopener">'+esc(IOS?T.openApple:T.openGoogle)+'</a>',15000);}
     else if(CONF.directionRequested){showLocationHelp(FR?'Ce lieu n’a pas de point de navigation. Choisissez un autre lieu.':'This place has no navigation point. Choose another place.');}
     else if (initialHash === '#near-me') nearBtn.click();
-    else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching) nearBtn.click(); }).catch(function(){});
+    else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching && !town) nearBtn.click(); }).catch(function(){});
     if(returnContext&&!CONF.dest){setCompactResults(!!returnContext.compact);roamView(returnContext.view==='map'?'map':'list');requestAnimationFrame(function(){requestAnimationFrame(function(){$('pmSheetBody').scrollTop=Math.max(0,Number(returnContext.listY)||0);window.scrollTo(0,Math.max(0,Number(returnContext.y)||0));})});}
   }).catch(function(){ countEl.textContent = T.loadFailed; });
   // Opening times move on: refresh every minute.
