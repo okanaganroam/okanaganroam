@@ -14,7 +14,14 @@ function renderRoamFilterGroups({must,diet,lang='en'}) {
   const translations={'Dietary':'Régimes alimentaires','Patios, music, views & sports':'Terrasses, musique, vues et sports','Dogs, kids & groups':'Chiens, enfants et groupes','Right now':'En ce moment','More options':'Autres options'};
   const titleLabel=t=>lang==='fr'?(translations[t]||t):t;
   const chips=items=>items.map(f=>`<button type="button" class="pm-chip" data-pm-feat="${esc(f.key)}" aria-pressed="false">${f.icon?'<span aria-hidden="true">'+f.icon+'</span> ':''}${esc(f.label)}</button>`).join('');
-  const group=(title,content)=>`<details class="rn-filter-group"><summary>${titleLabel(title)}<span data-rn-count></span></summary><div class="pm-chips" role="group" aria-label="${titleLabel(title)}">${content}</div></details>`;
+  const groupEmoji = {
+    Dietary: '🥗',
+    'Patios, music, views & sports': '🎶',
+    'Dogs, kids & groups': '🐾',
+    'Right now': '⏰',
+    'More options': '✨',
+  };
+  const group=(title,content)=>`<details class="rn-filter-group"><summary><span class="rn-filter-emoji" aria-hidden="true">${groupEmoji[title]}</span> ${titleLabel(title)}<span data-rn-count></span></summary><div class="pm-chips" role="group" aria-label="${titleLabel(title)}">${content}</div></details>`;
   return group('Dietary',chips(diet))+group('Patios, music, views & sports',chips(must.filter(f=>['patio','music','lake','sports'].includes(f.key))))+group('Dogs, kids & groups',chips(must.filter(f=>['dogs','kids','groups'].includes(f.key))))+group('Right now','<button type="button" class="pm-chip" data-pm-open aria-pressed="false">'+(lang==='fr'?'Ouvert maintenant':'Open now')+'</button>'+chips(must.filter(f=>['happy','specials','nights'].includes(f.key))))+group('More options',chips(must.filter(f=>['late','early','nonalc','free'].includes(f.key))))+'<button type="button" class="pm-chip" data-pm-top aria-pressed="false">'+(lang==='fr'?'Les mieux notés':'Top rated')+'</button>';
 }
 const ROAM_LAYOUT_STYLE=`<style id="roam-now-layout">
@@ -108,6 +115,73 @@ body.pm-app-page .is-route-origin.is-pinning .rn-route-pin-hint {
 body.pm-app-page .is-route-origin .leaflet-marker-pane .leaflet-interactive {
   pointer-events: none;
 }
+body.pm-app-page .rn-intro h1 { color: #573b32; }
+body.pm-app-page .rn-location {
+  background: #fff4df;
+  border-color: #e8cf9e;
+  border-radius: 16px;
+}
+body.pm-app-page .rn-location > span:first-child {
+  background: #f5dfb3;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+body.pm-app-page .pm-quick [data-pm-kind="drinks"]:not([aria-pressed="true"]) { background: #f4e8f3; }
+body.pm-app-page .pm-quick [data-pm-kind="food"]:not([aria-pressed="true"]) { background: #fae8df; }
+body.pm-app-page .pm-quick [data-pm-kind="coffee"]:not([aria-pressed="true"]) { background: #fff0d2; }
+body.pm-app-page .pm-quick [data-pm-kind="do"]:not([aria-pressed="true"]) { background: #e6eee3; }
+body.pm-app-page .pm-item { border-radius: 18px; }
+body.pm-app-page .pm-name { color: #253b43; }
+body.pm-app-page .rn-filter-group summary::marker { color: #986540; }
+body.pm-app-page #okMap {
+  background: #f3eee4;
+  border: 1px solid #ded2bd;
+  border-radius: 18px;
+}
+body.pm-app-page #okMap .leaflet-tile-pane {
+  filter: sepia(15%) saturate(78%) contrast(96%);
+}
+body.pm-app-page #okMap .pm-pin:not(.pm-pin-event) span {
+  border-radius: 50% 50% 50% 18%;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 5px #253b4355;
+}
+body.pm-app-page #okMap .pm-pin:not(.pm-pin-event) span::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin: 4px auto;
+  border-radius: 50%;
+  background: #fff;
+}
+body.pm-app-page #okMap .marker-cluster,
+body.pm-app-page #okMap .marker-cluster div { background: #f5dfb3; }
+body.pm-app-page #okMap .marker-cluster:not(:focus-visible) {
+  outline: 2px solid #fffdf8;
+  box-shadow: 0 2px 8px #253b4344;
+}
+body.pm-app-page #okMap .marker-cluster div {
+  color: #573b32;
+  font-weight: 800;
+}
+body.pm-app-page .rn-event-filters .pm-chip { display: inline-flex; }
+body.pm-app-page [data-event-filter="today"]:not([aria-pressed="true"]) { background: #fff0d2; }
+body.pm-app-page [data-event-filter="weekend"]:not([aria-pressed="true"]) { background: #f4e8f3; }
+body.pm-app-page [data-event-filter="free"]:not([aria-pressed="true"]) { background: #e6eee3; }
+@media (max-width: 899px) {
+  body.pm-app-page .pm-quick [data-pm-kind="indoor"] {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+  body.pm-app-page .pm-quick [data-pm-kind="indoor"]:not([aria-pressed="true"]) { background: #e5edf7; }
+}
+body.pm-app-page .rn-filter-emoji { margin-inline-end: 3px; }
 body.pm-app-page .rn-event-copy,
 body.pm-app-page .rn-events-mode .rn-place-copy { display: none; }
 body.pm-app-page .rn-events-mode .rn-event-copy { display: block; }

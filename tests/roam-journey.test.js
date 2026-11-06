@@ -3,14 +3,14 @@ const source=fs.readFileSync(require.resolve('../server'),'utf8');
 function syncContext(tab='places'){
  const node=()=>({hidden:false,textContent:'',innerHTML:'',value:'',scrollLeft:0,clientWidth:600,setAttribute(){},querySelectorAll(){return []}});const nodes={};const $=id=>nodes[id]||(nodes[id]=node());
  const chip=(key,label,attr)=>({textContent:label,setAttribute(){},getAttribute(n){return n===attr?key:null}});
- const ctx={$ ,kindChips:[chip('coffee','Coffee','data-pm-kind')],featChips:[chip('dogs','Dogs OK','data-pm-feat'),chip('gf','Gluten-free','data-pm-feat')],openBtns:[chip('','Open now','')],topBtns:[],kinds:{coffee:true},feats:{dogs:true,gf:true},onTags:()=>[],extras:()=>[],esc:String,T:{clear:'Clear'},on:o=>Object.keys(o).filter(k=>o[k]),notTypes:{},notTags:{},notKinds:{},notFeats:{},openOnly:false,topOnly:false,price:'',town:'kelowna',atMin:null,atDay:'',atUntil:false,tagOr:false,term:'',radiusKm:5,radiusFixed:false,searchEl:{value:''},tagHolder:node(),activeEl:node(),badge:node(),quickClear:node(),roamLocationLabel:()=>'',FR:false,tab,navigator:{},location:{pathname:'/map'},history:{replaceState(a,b,url){ctx.saved=url}}};
+ const ctx={$ ,kindChips:[chip('coffee','Coffee','data-pm-kind')],featChips:[chip('dogs','Dogs OK','data-pm-feat'),chip('gf','Gluten-free','data-pm-feat')],openBtns:[chip('','Open now','')],topBtns:[],kinds:{coffee:true},feats:{dogs:true,gf:true},onTags:()=>[],extras:()=>[],esc:String,T:{clear:'Clear'},on:o=>Object.keys(o).filter(k=>o[k]),notTypes:{},notTags:{},notKinds:{},notFeats:{},openOnly:false,topOnly:false,price:'',town:'kelowna',atMin:null,atDay:'',atUntil:false,tagOr:false,term:'',radiusKm:5,radiusFixed:false,searchEl:{value:''},tagHolder:node(),activeEl:node(),badge:node(),quickClear:node(),roamLocationLabel:()=>'',FR:false,tab,eventPeriod:'',freeEventsOnly:false,navigator:{},location:{pathname:'/map'},history:{replaceState(a,b,url){ctx.saved=url}}};
  const fn=source.slice(source.indexOf('  function syncChips(){'),source.indexOf('  // With location on,',source.indexOf('  function syncChips(){')));vm.createContext(ctx);vm.runInContext(fn+';syncChips()',ctx);return ctx;
 }
 test('filter changes save all choices to a URL that survives venue Back',()=>{const c=syncContext();assert.match(c.saved||'',/f=coffee,dogs,gf,in.kelowna/)});
 test('event tab is preserved in the return URL',()=>assert.match(syncContext('events').saved||'',/#events$/));
 test('event town filtering includes only the chosen town, even with GPS available',()=>{
  const from=source.indexOf('      items = events.filter(function(e)');const to=source.indexOf('\n        .sort',from);const expr=source.slice(from,to).trim();
- const c={events:[{g:'later',region:'kelowna',d:99},{g:'later',region:'vernon',d:0.1}],town:'kelowna',evTerm:'',evKinds:[],me:{},radiusKm:5,nearTown:()=>true};vm.createContext(c);vm.runInContext(expr,c);assert.deepEqual(Array.from(c.items,e=>e.region),['kelowna']);
+ const c={events:[{g:'later',region:'kelowna',d:99},{g:'later',region:'vernon',d:0.1}],town:'kelowna',evTerm:'',evKinds:[],me:{},radiusKm:5,nearTown:()=>true,matchesEventFilters:()=>true,today:'2026-11-05'};vm.createContext(c);vm.runInContext(expr,c);assert.deepEqual(Array.from(c.items,e=>e.region),['kelowna']);
 });
 test('detail directions link to the built-in map and retain French routing',()=>{
  const {roamDirectionsHref}=require('../roam-now-layout');
@@ -31,7 +31,7 @@ test('changing distance updates the saved results URL immediately',()=>{
 });
 test('town-scoped event counts do not claim a GPS radius',()=>{
  const a=source.indexOf('      countEl.textContent = aheadOn && aheadState');const b=source.indexOf('\n    }',a);const block=source.slice(a,b);
- const c={aheadOn:false,items:[{}],me:{},radiusKm:5,town:'vernon',FR:false,CONF:{r:{vernon:'Vernon'}},countEl:{},T:{eventsNear:(n,r)=>n+' events within '+r+' km',eventsCount:n=>n+' events'}};vm.createContext(c);vm.runInContext(block,c);assert.equal(c.countEl.textContent,'1 events · In Vernon');
+ const c={eventPeriod:'',aheadOn:false,items:[{}],me:{},radiusKm:5,town:'vernon',FR:false,CONF:{r:{vernon:'Vernon'}},countEl:{},T:{eventsNear:(n,r)=>n+' events within '+r+' km',eventsCount:n=>n+' events'}};vm.createContext(c);vm.runInContext(block,c);assert.equal(c.countEl.textContent,'1 events · In Vernon');
 });
 test('return URLs keep the original search text alongside selected needs',()=>{const c=syncContext();c.searchEl.value='  Bohemian Café  ';vm.runInContext('syncChips()',c);assert.match(c.saved,/q=Bohemian%20Caf%C3%A9/);assert.match(c.saved,/dogs,gf/)});
 test('restoring an event search reapplies its event words and kinds',()=>{

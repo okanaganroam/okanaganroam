@@ -8,7 +8,7 @@ test('fresh Roam Now entry starts open, while saved searches and events keep int
 test('filter groups are expandable and expose selected-count slots',()=>{
  const html=renderRoamFilterGroups({must:[{key:'dogs',label:'Dogs OK'},{key:'patio',label:'Patio'}],diet:[{key:'gf',label:'Gluten-free'}]});
  assert.equal((html.match(/<details class="rn-filter-group"/g)||[]).length,5);
- assert.ok(html.includes('<summary>Dietary'));assert.ok(html.includes('data-rn-count'));
+ assert.ok(html.includes('> Dietary'));assert.ok(html.includes('data-rn-count'));
  assert.ok(html.includes('data-pm-feat="dogs"'));assert.ok(html.includes('data-pm-open'));
 });
 
