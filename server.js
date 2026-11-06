@@ -20501,7 +20501,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
   else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
-  function openPanel(){ $('rnBackdrop').hidden=false;panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
+  function openPanel(){ $('rnBackdrop').hidden=false;panel.hidden = false; panel.querySelector('.rn-panel-body').scrollTop = 0; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus({preventScroll:true}); }
   function closePanel(){ choosingTown = false; if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
@@ -22362,6 +22362,14 @@ ${renderGolfHeaderHtml()}
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
       <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">${R('Close filters','Fermer les filtres')}</button></div>
       <div class="rn-panel-body">
+      <p class="rn-panel-note">${R('Tap a filter group below to see its options. For events, use your town and search.','Touchez un groupe de filtres ci-dessous pour voir ses options. Pour les événements, choisissez une ville et utilisez la recherche.')}</p>
+      <p class="pm-active" id="pmActive" hidden></p>
+      <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
+      <div class="pm-chips" role="group" aria-label="What are you after?">
+        ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
+      </div>
+      </details>
+      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
       <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
       <div class="pm-panel-row">
         <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
@@ -22372,14 +22380,6 @@ ${renderGolfHeaderHtml()}
           <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select></label>
       </div>
       <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
-      <p class="rn-panel-note">${R('Open a section to choose what matters to you. Place filters apply to Places; Events use your town and search.','Ouvrez une section pour choisir vos critères. Les filtres de lieux concernent les lieux; les événements utilisent la ville et la recherche.')}</p>
-      <p class="pm-active" id="pmActive" hidden></p>
-      <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
-      <div class="pm-chips" role="group" aria-label="What are you after?">
-        ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
-      </div>
-      </details>
-      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
       <h3>What the pins mean</h3>
       <ul class="pm-key" aria-label="What the pins mean">
         ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
