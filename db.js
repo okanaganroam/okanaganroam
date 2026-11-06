@@ -1348,6 +1348,18 @@ CREATE TABLE IF NOT EXISTS event_click_counts (
 );
 `);
 
+// What people search for on our own site (2026-11-06): per day, where (site / trip), cleaned words and found-or-not. Counts only.
+db.exec(`
+CREATE TABLE IF NOT EXISTS search_term_counts (
+  day TEXT NOT NULL,
+  source TEXT NOT NULL,
+  term TEXT NOT NULL,
+  found INTEGER NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, source, term, found)
+);
+`);
+
 // How people find us (2026-11-06): per day, kind (visit / ai_fetch / crawl), source and page. Counts only, no visitor id.
 db.exec(`
 CREATE TABLE IF NOT EXISTS referral_counts (

@@ -20,6 +20,10 @@ const portalActivity = require('./portal-activity');
 const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
+const searchTerms = require('./search-terms');
+const searchTermCounter = searchTerms.createSearchTermCounter(db);
+const { renderSearchTermsPage } = require('./search-terms-page');
+const { renderOutboundPage } = require('./outbound-page');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -41375,7 +41379,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, and which website or AI assistant (such as Google or ChatGPT) sent a visit to which page, as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, and which website or AI assistant (such as Google or ChatGPT) sent a visit to which page, the words typed into search and Build My Trip (leaving out anything that looks like an email, web address or number), as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -54478,6 +54482,7 @@ const server = http.createServer(async (req, res) => {
       // where the guide is offered beside any places.
       const direct = smartSearchPlan(searchText, interpretDiscoveryText(searchText));
       if (direct && direct.url && direct.key !== 'guide') {
+        try { searchTermCounter.record(req, 'site', q, true, requestClientIp(req)); } catch (e) { /* counting must never break search */ }
         res.writeHead(302, { Location: direct.url, 'Cache-Control': 'no-store' });
         return res.end();
       }
@@ -54500,6 +54505,7 @@ const server = http.createServer(async (req, res) => {
         const typo = [...searchTypoFix(q).corrections, ...shortFix];
         if (typo.length && run.presentation) run.presentation.corrections = [...typo, ...(run.presentation.corrections || []).filter((c) => !typo.some((t) => t.from === c.from))];
       } catch (e) { /* no correction line */ }
+      try { searchTermCounter.record(req, 'site', q, !searchRunEmpty(run), requestClientIp(req)); } catch (e) { /* counting must never break search */ }
       const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(html);
@@ -56842,6 +56848,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 502, { error: 'Could not process that request right now.', reason: parsed.reason });
       }
 
+      try { searchTermCounter.record(req, 'trip', body.text, true, requestClientIp(req)); } catch (e) { /* counting must never break the planner */ }
       return sendJSON(res, 200, parsed.value);
     }
 
@@ -57470,6 +57477,58 @@ const server = http.createServer(async (req, res) => {
       }
       const ownSc = await gscReport.report(days === 7 ? 7 : days === 90 ? 90 : 28);
       return res.end(renderReferralsPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: { referrals: referralCounter.report(days), search_console: ownSc } }, whistler] }));
+    }
+    // What people search for (2026-11-06). GET /api/admin/search-terms?days=30 -> this site's search words. Admin token.
+    if (pathname === '/api/admin/search-terms' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, searchTermCounter.report(query.days, query.limit));
+    }
+    // Outbound clicks per business (2026-11-06). GET /api/admin/outbound?days=30&limit=100. Admin token.
+    if (pathname === '/api/admin/outbound' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, venueActivityCounter.outbound(query.days, query.limit));
+    }
+    // The page: /admin/dashboard/searches (both sites side by side).
+    if ((pathname === '/admin/dashboard/searches' || pathname === '/admin/dashboard/searches/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('What people search for', '<h1>What people search for</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      let whistler;
+      if (!wToken) whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.' };
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/search-terms?days=${days}&limit=100`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          whistler = r.status === 200 ? { key: 'whistler', name: 'Whistler Roam', data: await r.json() }
+            : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have this report yet.' : `Whistler Roam answered ${r.status}.` };
+        } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
+      }
+      return res.end(renderSearchTermsPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: searchTermCounter.report(days, 100) }, whistler] }));
+    }
+    // The page: /admin/dashboard/outbound (both sites side by side).
+    if ((pathname === '/admin/dashboard/outbound' || pathname === '/admin/dashboard/outbound/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Outbound clicks', '<h1>Outbound clicks</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      let whistler;
+      if (!wToken) whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.' };
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/outbound?days=${days}&limit=100`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          whistler = r.status === 200 ? { key: 'whistler', name: 'Whistler Roam', data: await r.json() }
+            : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have this report yet.' : `Whistler Roam answered ${r.status}.` };
+        } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
+      }
+      return res.end(renderOutboundPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: venueActivityCounter.outbound(days, 100) }, whistler] }));
     }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
