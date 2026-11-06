@@ -28,41 +28,70 @@ function sections(d) {
   return out.filter((s) => s.rows.length);
 }
 
-function cardHtml(sites, { notice = '' } = {}) {
+// Tracking health lines for one site: the problems, or a short all-clear. Counters that are still learning say so.
+function healthLines(d) {
+  const h = d.health; if (!h) return [];
+  const lines = [...h.problems];
+  const sc = d.connections && d.connections.google_search;
+  if (sc && sc !== 'ok' && sc !== 'not connected') lines.push(`Search Console: ${sc}`);
+  if (!lines.length) lines.push(h.counters.some((c) => c.status === 'learning') ? 'Tracking looks fine so far; some counters are still collecting enough history to judge.' : 'Tracking looks healthy: every counter is reporting normally.');
+  return lines;
+}
+const healthBad = (d) => !!(d.health && d.health.problems.length) || !!(d.connections && d.connections.google_search && !['ok', 'not connected'].includes(d.connections.google_search));
+
+function goalsHtml(g) {
+  if (!g) return '';
+  const bar = (x) => `<div style="background:#e5e7eb;border-radius:4px;height:10px;position:relative;margin:4px 0"><div style="background:${x.status === 'behind' || x.status === 'below the starting point' ? '#b42318' : '#1a7f37'};width:${x.progress || 0}%;height:10px;border-radius:4px"></div>${x.expected ? `<div title="where we should be by now" style="position:absolute;left:${x.expected}%;top:-2px;height:14px;border-left:2px solid #667"></div>` : ''}</div>`;
+  return `<h2 style="margin:18px 16px 0">Goals for ${esc(g.deadline)} <small class="empty">${num(g.days_left)} days left. Marker: where we should be by now.</small></h2>
+    <main><section class="col"><div class="card"><table>${g.goals.map((x) => `<tr><td style="vertical-align:top"><b>${esc(x.label)}</b><br><small class="empty">${x.measured ? `Measured: ${esc(x.measured)}. ` : ''}${esc(x.extra || '')} ${esc(x.note || '')}</small></td>
+      <td style="min-width:200px">${x.current === null ? '<span class="empty">not measured</span>' : `<b>${num(x.current)}</b> of ${num(x.target)} ${esc(x.unit)} <small class="empty">(started at ${num(x.baseline)})</small>${bar(x)}<small>${esc(x.status)}</small>`}</td></tr>`).join('')}</table></div></section></main>`;
+}
+function goalsLines(g) {
+  if (!g) return [];
+  return [`Goals for ${g.deadline} (${g.days_left} days left)`, ...g.goals.map((x) => `  ${x.label}: ${x.current === null ? 'not measured' : `${x.current} of ${x.target} ${x.unit} (started at ${x.baseline}), ${x.status}`}`), ''];
+}
+
+function cardHtml(sites, { notice = '', goals = null } = {}) {
   const col = (s) => {
     if (s.error || !s.data) return `<section class="col"><h2>${esc(s.name)}</h2><p class="warn">${esc(s.error || 'No data.')}</p></section>`;
     const d = s.data;
     return `<section class="col"><h2>${esc(s.name)} <small>${esc(label(d.range.cur))}, against ${esc(label(d.range.prev))}</small></h2><div class="card">
+      <p class="${healthBad(d) ? 'warn' : 'empty'}">${healthLines(d).map(esc).join('<br>')}</p>
       ${d.headlines.length ? `<ul>${d.headlines.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : '<p class="empty">A quiet week: nothing moved much.</p>'}
       <details><summary>Everything that changed</summary>${sections(d).map((x) => `<h4>${esc(x.h)}</h4><table>${x.rows.map((r) => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>`).join('')}</details></div></section>`;
   };
   return `<h2 style="margin:18px 16px 0">What changed this week</h2>${notice ? `<p class="empty" style="margin:4px 16px">${esc(notice)}</p>` : ''}<main>${sites.map(col).join('')}</main>
+    ${goalsHtml(goals)}
     <form method="post" action="/admin/dashboard/digest-send" style="margin:0 16px 12px"><button type="submit">Email me this now</button> <small class="empty">It also arrives by itself every Monday morning.</small></form>`;
 }
 
-function emailText(sites) {
+function emailText(sites, { goals = null } = {}) {
   const lines = ['Okanagan Roam and Whistler Roam: what changed this week', ''];
   for (const s of sites) {
     lines.push(s.name.toUpperCase());
     if (s.error || !s.data) { lines.push(`  (${s.error || 'no data'})`, ''); continue; }
     const d = s.data;
     lines.push(`  ${label(d.range.cur)}, against ${label(d.range.prev)}`, '');
+    for (const h of healthLines(d)) lines.push(`  ${healthBad(d) ? '!! ' : ''}${h}`);
+    lines.push('');
     lines.push(...(d.headlines.length ? d.headlines.map((h) => `  * ${h}`) : ['  A quiet week: nothing moved much.']), '');
     for (const x of sections(d)) { lines.push(`  ${x.h}`); for (const r of x.rows) lines.push(`    ${r[0]}: ${r[1]}`); lines.push(''); }
   }
+  lines.push(...goalsLines(goals));
   lines.push(`Full dashboard: ${ABS}/admin/dashboard`);
   return lines.join('\n');
 }
 
-function emailHtml(sites) {
+function emailHtml(sites, { goals = null } = {}) {
   const body = sites.map((s) => {
     if (s.error || !s.data) return `<h2 style="margin:24px 0 4px">${esc(s.name)}</h2><p style="color:#b42318">${esc(s.error || 'No data.')}</p>`;
     const d = s.data;
     return `<h2 style="margin:24px 0 2px">${esc(s.name)}</h2><p style="margin:0 0 8px;color:#667">${esc(label(d.range.cur))}, against ${esc(label(d.range.prev))}</p>
+      <p style="color:${healthBad(d) ? '#b42318' : '#667'}">${healthLines(d).map(esc).join('<br>')}</p>
       ${d.headlines.length ? `<ul style="padding-left:18px">${d.headlines.map((h) => `<li style="margin:3px 0"><b>${esc(h)}</b></li>`).join('')}</ul>` : '<p>A quiet week: nothing moved much.</p>'}
       ${sections(d).map((x) => `<h3 style="margin:14px 0 4px;font-size:14px">${esc(x.h)}</h3><table style="border-collapse:collapse;width:100%">${x.rows.map((r) => `<tr><td style="padding:2px 8px 2px 0;border-bottom:1px solid #eee">${esc(r[0])}</td><td style="padding:2px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${esc(r[1])}</td></tr>`).join('')}</table>`).join('')}`;
   }).join('');
-  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1c1c1c;font-size:14px;line-height:1.45"><h1 style="font-size:20px">What changed this week</h1>${body}<p style="margin-top:24px"><a href="${ABS}/admin/dashboard">Open the full dashboard</a></p></div>`;
+  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1c1c1c;font-size:14px;line-height:1.45"><h1 style="font-size:20px">What changed this week</h1>${body}${goals ? `<h2 style="margin:24px 0 4px">Goals for ${esc(goals.deadline)}</h2><table style="border-collapse:collapse;width:100%">${goals.goals.map((x) => `<tr><td style="padding:3px 8px 3px 0;border-bottom:1px solid #eee">${esc(x.label)}</td><td style="padding:3px 0;border-bottom:1px solid #eee;text-align:right">${x.current === null ? 'not measured' : `${esc(String(x.current))} of ${esc(String(x.target))} (${esc(x.status)})`}</td></tr>`).join('')}</table>` : ''}<p style="margin-top:24px"><a href="${ABS}/admin/dashboard">Open the full dashboard</a></p></div>`;
 }
 
-module.exports = { sections, cardHtml, emailText, emailHtml };
+module.exports = { sections, healthLines, goalsHtml, cardHtml, emailText, emailHtml };

@@ -25,6 +25,8 @@ const searchTermCounter = searchTerms.createSearchTermCounter(db);
 const funnelsReport = require('./funnels').createFunnels(db);
 const notFoundCounter = require('./not-found').createNotFoundCounter(db);
 const whatsChanged = require('./whats-changed');
+const trackingHealth = require('./health');
+const seoGoals = require('./seo-goals');
 const whatsChangedPage = require('./whats-changed-page');
 const { renderErrorsPage } = require('./errors-page');
 const { renderFunnelsPage } = require('./funnels-page');
@@ -57449,7 +57451,7 @@ const server = http.createServer(async (req, res) => {
       let topHtml = '';
       try {
         const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
-        topHtml = whatsChangedPage.cardHtml(await weeklyDigestSites(), { notice });
+        topHtml = whatsChangedPage.cardHtml(await weeklyDigestSites(), { notice, goals: await goalsData() });
       } catch (e) { topHtml = ''; }
       return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '', topHtml }));
     }
@@ -58297,8 +58299,20 @@ function installShutdownHandlers() {
 // What changed (2026-11-06): this site's last complete 7 days against the 7 before, plus Search Console when connected.
 async function ownWhatsChanged(now = new Date()) {
   const d = whatsChanged.summarize(db, now);
-  try { d.google = whatsChanged.googleSection(await gscReport.report(7, now)); } catch (e) { d.google = null; }
+  let sc = null;
+  try { sc = await gscReport.report(7, now); d.google = whatsChanged.googleSection(sc); } catch (e) { d.google = null; }
+  d.health = trackingHealth.check(db, now);
+  d.connections = { google_search: sc === null ? 'not connected' : sc.error ? sc.error : 'ok' };
   return d;
+}
+// Jan 31 goals: live numbers from Search Console and Google Analytics, typed-in ones from data/seo-goals.json.
+async function goalsData(now = new Date()) {
+  try {
+    const cfg = seoGoals.load();
+    if (!cfg) return null;
+    const [gsc, ga] = await Promise.all([gscReport.nonBrand(28, now).catch(() => null), gaReport.sourceSessions('chatgpt', 28).catch(() => null)]);
+    return seoGoals.evaluate(cfg, { gsc_nonbrand: gsc, ga_chatgpt: ga }, now);
+  } catch (e) { return null; }
 }
 // Both sites' summaries for the dashboard card and the Monday email.
 async function weeklyDigestSites(now = new Date()) {
@@ -58321,8 +58335,9 @@ async function sendWeeklyDigest(now = new Date()) {
   if (!send) return 'email_off';
   try {
     const sites = await weeklyDigestSites(now);
+    const goals = await goalsData(now);
     const w = whatsChanged.windows(now);
-    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites), html: whatsChangedPage.emailHtml(sites) });
+    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites, { goals }), html: whatsChangedPage.emailHtml(sites, { goals }) });
     return 'sent';
   } catch (e) { console.error('[digest] send failed:', e.message); return 'failed'; }
 }
@@ -58345,9 +58360,43 @@ async function digestTick(now = new Date()) {
     return result;
   } finally { digestBusy = false; }
 }
+// Daily outage check (from 9 AM Pacific): if any counter on either site recorded nothing yesterday, email once, and not
+// again for the same problem within 2 days. Counters still learning, or too quiet to judge, never trigger it.
+let healthBusy = false;
+async function healthAlertTick(now = new Date()) {
+  const p = pacificNow(now);
+  if (p.hour < 9 || healthBusy) return null;
+  const row = db.prepare('SELECT * FROM health_alert_log WHERE day = ?').get(p.date);
+  if (row && (row.result !== 'failed' || row.attempts >= 3)) return row.result;
+  healthBusy = true;
+  try {
+    db.prepare("INSERT INTO health_alert_log (day, attempts, result) VALUES (?, 1, 'pending') ON CONFLICT(day) DO UPDATE SET attempts = attempts + 1").run(p.date);
+    const sites = await weeklyDigestSites(now);
+    const silent = sites.filter((s) => s.data && s.data.health && s.data.health.silent.length).map((s) => ({ name: s.name, health: s.data.health }));
+    const signature = silent.map((s) => `${s.name}:${s.health.silent.join(',')}`).sort().join('|');
+    let result = 'ok';
+    if (silent.length) {
+      const recent = db.prepare("SELECT 1 FROM health_alert_log WHERE result = 'sent' AND signature = ? AND day >= date(?, '-2 day')").get(signature, p.date);
+      if (recent) result = 'repeat';
+      else {
+        const send = ownerDirectEmail();
+        if (!send) result = 'email_off';
+        else {
+          try {
+            const text = `Some of the site's own counters recorded nothing yesterday (${silent[0].health.day}). Usually that means a script stopped working after a change.\n\n${silent.map((s) => `${s.name}\n${s.health.problems.map((x) => `  - ${x}`).join('\n')}`).join('\n\n')}\n\nWhat to check: that the site loads, and the most recent deploy in Railway. Full dashboard: https://okanaganroam.com/admin/dashboard`;
+            await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `Tracking problem: ${silent.map((s) => s.name).join(' and ')}`, text, html: `<pre style="font-family:inherit;white-space:pre-wrap">${text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>` });
+            result = 'sent';
+          } catch (e) { console.error('[health] alert failed:', e.message); result = 'failed'; }
+        }
+      }
+    }
+    db.prepare('UPDATE health_alert_log SET result = ?, signature = ? WHERE day = ?').run(result, signature, p.date);
+    return result;
+  } finally { healthBusy = false; }
+}
 function startDigestTimer() {
   if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
-  const t = setInterval(() => { digestTick().catch((e) => console.error('[digest]', e.message)); }, 15 * 60 * 1000);
+  const t = setInterval(() => { digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message)); }, 15 * 60 * 1000);
   t.unref();
 }
 const digestManual = [];
@@ -58609,7 +58658,7 @@ module.exports = {
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
   setOwnerEmailTransport,
-  digestTick, sendWeeklyDigest, pacificNow,
+  digestTick, sendWeeklyDigest, pacificNow, healthAlertTick, goalsData,
   createOwnerPasswordReset,
   setContactTransport,
   resetContactLimits,

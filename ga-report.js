@@ -78,4 +78,24 @@ async function report(days = 30, now = Date.now()) {
   }
 }
 
-module.exports = { report, shape, creds };
+// Sessions whose source contains `match` (for example "chatgpt") over the last `days` days. Cached 10 minutes.
+async function sourceSessions(match, days = 28, now = Date.now()) {
+  const c = creds();
+  if (!c) return null;
+  const key = `src|${match}|${days}`;
+  const hit = cache.get(key);
+  if (hit && hit.exp > now) return hit.value;
+  try {
+    const body = { dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }], metrics: [{ name: 'sessions' }],
+      dimensionFilter: { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'CONTAINS', value: String(match), caseSensitive: false } } } };
+    const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${c.property}:runReport`, {
+      method: 'POST', headers: { authorization: `Bearer ${await accessToken(c, now)}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(8000) });
+    if (r.status !== 200) return { error: `Google Analytics answered ${r.status}.` };
+    const j = await r.json();
+    const value = { days, sessions: num((j.rows && j.rows[0] && j.rows[0].metricValues[0].value) || 0) };
+    cache.set(key, { value, exp: now + TTL_MS });
+    return value;
+  } catch (e) { return { error: 'Couldn’t reach Google Analytics right now.' }; }
+}
+
+module.exports = { report, shape, creds, sourceSessions };

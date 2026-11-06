@@ -1,0 +1,12 @@
+{
+  "start": "2026-11-03",
+  "deadline": "2027-01-31",
+  "note": "Goals from the Nov 3 2026 SEO + AI plan. Live ones come from Search Console and Google Analytics; the rest are typed in here with the date they were last measured. Update a manual value whenever it is re-measured.",
+  "goals": [
+    { "key": "nonbrand_impressions", "label": "Search impressions that don't use our name, per day", "unit": "a day", "baseline": 55, "target": 300, "source": "gsc_nonbrand" },
+    { "key": "chatgpt_sessions", "label": "Visits from chatgpt.com, last 28 days", "unit": "visits", "baseline": 99, "target": 300, "source": "ga_chatgpt" },
+    { "key": "linking_sites", "label": "Real websites linking to us", "unit": "sites", "baseline": 12, "target": 30, "source": "manual", "manual": { "value": 12, "as_of": "2026-10-23", "note": "Oct 23 re-scan; badge adoption re-scan was planned for about Nov 5" } },
+    { "key": "venues_linking", "label": "Venues that link to us (badge)", "unit": "venues", "baseline": 1, "target": 15, "source": "manual", "manual": { "value": 2, "as_of": "2026-10-23", "note": "Armstrong museum and Copper Brewing" } },
+    { "key": "ai_citations", "label": "Test questions (of 30) where an AI answer cites us", "unit": "of 30", "baseline": 3, "target": 5, "source": "manual", "manual": { "value": 3, "as_of": "2026-11-03", "note": "Nov 3 baseline: Google 3 of 30. Re-run monthly with memory off." } }
+  ]
+}
