@@ -484,6 +484,7 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     const text = listedHoursText(v, null, fit.days);
     if (text) reasons.push({ code: 'hours', text, weight: 2 });
     caveats.push(`Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
+    if (!weekday && Array.isArray(fit.days) && fit.days.length <= 2) score -= 6; // 2026-11-05: open for this slot one or two days a week
     // 2026-10-25: a plan with no date is timed from a Saturday, so a place closed that day (a winery open Mon-Fri on
     // day 1, a Tue-Sat sushi lunch on day 2, a Sunday) comes after places that are open.
     // Day 1 of an undated plan is a Saturday, day 2 a Sunday, and so on.
@@ -1314,7 +1315,7 @@ function requestedTimeFit(v, ctx) {
     const role = cafeRole(v);
     if (role && CAFE_SLOT_ADJUST[role]) score += CAFE_SLOT_ADJUST[role][part] || 0;
     if (fit.status === 'verified') { score += 6; const t = listedHoursText(v, weekday, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 6 }); }
-    else if (fit.status === 'partial') { score += 2; const t = listedHoursText(v, null, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 2 }); caveats.push(`Its listed hours only fit the ${SLOT_WINDOWS[part].label} on ${dayListText(fit.days)} \u2014 check the day you go`); }
+    else if (fit.status === 'partial') { score += 2; if (!weekday && Array.isArray(fit.days) && fit.days.length <= 2) score -= 6; /* 2026-11-05: open for this slot only one or two days a week (a lunch on Fridays) */ const t = listedHoursText(v, null, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 2 }); caveats.push(`Its listed hours only fit the ${SLOT_WINDOWS[part].label} on ${dayListText(fit.days)} \u2014 check the day you go`); }
     else if (fit.status === 'short') { score -= 3; const t = listedHoursText(v, weekday); if (t) reasons.push({ code: 'hours', text: t, weight: 1 }); caveats.push(`Its listed hours only overlap part of the ${SLOT_WINDOWS[part].label} \u2014 check before you go`); }
     else { score -= 2; caveats.push(UNKNOWN_HOURS_CAVEAT); }
   } else {
