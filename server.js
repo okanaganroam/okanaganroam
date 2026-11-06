@@ -20391,7 +20391,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
-  function roamLocationLabel(){return town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location')}
+  function roamLocationLabel(){return town?(CONF.r[town]):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna':'Kelowna map area')}
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
   document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,compact:stage.classList.contains('rn-results-compact'),y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
@@ -20928,7 +20928,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (r.data) {
       html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
       if (me && !me.pin && !r.started && !r.loading) {
-        html += '<button type="button" class="pm-panel-done rn-route-start" id="rnStartRoute">' + esc(FR ? 'Démarrer' : 'Start') + '</button>';
+        html += '<button type="button" class="pm-panel-done rn-route-start" id="rnStartRoute">' + esc(FR ? 'Démarrer le guidage' : 'Start directions') + '</button>';
       }
       if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Le guidage en direct utilise votre position.':'Live guidance uses your location.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
@@ -21219,7 +21219,6 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
     var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
-    $('rnApplyFilters').textContent=(tab==='events'?(FR?'Voir les événements':'Show events'):(FR?'Voir les lieux':'Show places'));
     $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
     badge.hidden = !n; badge.textContent = String(n);
@@ -21747,12 +21746,6 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
   searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); runSearch(searchEl.value); });
-  // The search hint cycles through real examples the search understands (each fits beside the microphone on a phone),
-  // and stops while the visitor is typing or the box has words in it.
-  var HINTS = FR ? ['Ex. « terrasse, chiens acceptés »', 'Ex. « glace près de moi »', 'Ex. « sushi à Penticton »', 'Ex. « happy hour »', 'Ex. « brunch demain »', 'Ex. « vignobles à Oliver »', 'Ex. « pizza et bière »', 'Ex. « végane près de moi »']
-    : ['Try “dog-friendly patio”', 'Try “ice cream near me”', 'Try “sushi in Penticton”', 'Try “happy hour now”', 'Try “brunch tomorrow”', 'Try “cheap eats open late”', 'Try “wineries in Oliver”', 'Try “live music tonight”', 'Try “pizza and craft beer”', 'Try “vegan food near me”'];
-  var hintAt = 0;
-  setInterval(function(){ if (document.hidden || searchEl.value || document.activeElement === searchEl) return; hintAt = (hintAt + 1) % HINTS.length; searchEl.placeholder = HINTS[hintAt]; }, 3500);
   // ---- Search by voice: the browser's own speech service types what the visitor says, then it is searched ----
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, micBtn = $('pmMic'), rec = null, listening = false;
   if (SR && micBtn) {
@@ -22300,7 +22293,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Find places to go and events happening nearby.','Trouvez des lieux à visiter et des événements à proximité.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
+      <div class="rn-intro"><div><h1>${R('Find a place near you','Trouvez un lieu près de vous')}</h1><p>${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Kelowna map area','Zone de Kelowna')}</b></span></button></div>
       <div class="rn-route-origin-heading">
         <h2 id="rnRouteOriginTitle"></h2>
         <button type="button" id="rnRouteCancel" class="pm-chip">${R('Back to results','Retour aux résultats')}</button>
@@ -22312,8 +22305,8 @@ ${renderGolfHeaderHtml()}
         </div>
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
-        <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
-        <input type="search" id="pmSearch" class="pm-search" placeholder="Try “dog-friendly patio”" autocomplete="off" enterkeyhint="search">
+        <label class="visually-hidden" for="pmSearch">${R('Search places or events','Rechercher des lieux ou des événements')}</label>
+        <input type="search" id="pmSearch" class="pm-search" placeholder="${R('Search places or events','Rechercher des lieux ou des événements')}" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="pm-badge" id="pmBadge" hidden></span><span>Filters</span></button>
       </div>
@@ -22382,7 +22375,7 @@ ${renderGolfHeaderHtml()}
       </ul>
       <p class="pm-panel-links">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/whats-on">see everything that’s on</a>.</p>
       </div>
-      <div class="rn-panel-footer"><button type="button" class="rn-clear" id="rnClear">${R('Clear all','Tout effacer')}</button><button type="button" class="pm-panel-done" id="rnApplyFilters">${R('Show places','Voir les lieux')}</button></div>
+      <div class="rn-panel-footer"><button type="button" class="rn-clear" id="rnClear">${R('Clear all','Tout effacer')}</button><button type="button" class="pm-panel-done" id="rnApplyFilters">${R('Show results','Afficher les résultats')}</button></div>
     </div>
   </div>
   </main>
