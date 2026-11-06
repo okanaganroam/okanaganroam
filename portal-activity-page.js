@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: business portal activity (clicks on Business login, sign-ins, what is done inside the portal).
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 function siteCard(g, days) {
   if (g.error || !g.data) return `<section class="col"><h2>${esc(g.name)}</h2><p class="warn">${esc(g.error || 'No data.')}</p></section>`;
@@ -18,14 +19,7 @@ function siteCard(g, days) {
 
 function renderPortalPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/portal?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Business portal activity – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>Business portal</h1><p class="sub">How often people click Business login, whether they get in, and what they do once they are inside. Totals only; nothing about individual people or businesses.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'portal', title: 'Business portal', ask: askFor('portal'), tells: 'How often people try to log in, whether they get in, and what owners do once inside. Totals only.', use: 'If many people click login but few get in, the sign-in step needs fixing.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderPortalPage };

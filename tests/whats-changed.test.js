@@ -77,7 +77,7 @@ test('renderers: the card and the email escape text and show both sites', () => 
   const data = wc.summarize(db, NOW);
   data.google = wc.googleSection({ trends: { current: { start: '2026-10-30', end: '2026-11-05', clicks: 5, impressions: 50 }, previous: { clicks: 9, impressions: 90 }, queries: { rising: [{ key: 'a <i>', clicks: 1, d_clicks: 1, d_impressions: 5 }], falling: [] } } });
   const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet' }];
-  const html = page.cardHtml(sites, { notice: 'Sent.' }); const mail = page.emailHtml(sites); const text = page.emailText(sites);
+  const home = page.homeHtml(sites, { notice: 'Sent.' }); const html = home.top + home.body; const mail = page.emailHtml(sites); const text = page.emailText(sites);
   for (const out of [html, mail]) { assert.match(out, /Okanagan Roam/); assert.match(out, /Not connected yet/); assert.doesNotMatch(out, /<b>Brewing/); assert.doesNotMatch(out, /<i>/); }
   assert.match(html, /digest-send/); assert.match(text, /OKANAGAN ROAM/); assert.match(text, /Alpha <b>Brewing<\/b>/);
   assert.match(text, /Google/);

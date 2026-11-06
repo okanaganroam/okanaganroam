@@ -32,7 +32,7 @@ const seoGoals = require('./seo-goals');
 const whatsChangedPage = require('./whats-changed-page');
 const { renderErrorsPage } = require('./errors-page');
 const { renderFunnelsPage } = require('./funnels-page');
-const { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage } = require('./pages-page');
+const { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage, renderHelpPage } = require('./pages-page');
 const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const gscReport = require('./gsc-report');
@@ -57635,8 +57635,9 @@ const server = http.createServer(async (req, res) => {
       if (!signedIn) return res.end(renderAdminReviewLoginPage());
       const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
       const site = ['okanagan', 'whistler'].includes(query.site) ? query.site : 'both';
+      const view = query.view === 'all' ? 'all' : 'home';
       const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
-      try { sites[0].data = dashboardData.collect(db, { site: 'okanagan', days }); sites[0].data.traffic = await gaReport.report(days); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+      try { sites[0].data = dashboardData.collect(db, { site: 'okanagan', days }); if (view === 'all') sites[0].data.traffic = await gaReport.report(days); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
       if (site !== 'okanagan') {
         const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
         if (!wToken) sites[1].error = 'Not connected yet: add the Whistler Roam admin key to this site as WHISTLER_ADMIN_TOKEN.';
@@ -57648,12 +57649,15 @@ const server = http.createServer(async (req, res) => {
           } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
         }
       }
-      let topHtml = '';
-      try {
-        const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
-        topHtml = whatsChangedPage.cardHtml(await weeklyDigestSites(), { notice, goals: await goalsData() });
-      } catch (e) { topHtml = ''; }
-      return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '', topHtml }));
+      let home = null;
+      if (view === 'home') {
+        try {
+          const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
+          const inboxes = Object.fromEntries(sites.map((x) => [x.key, x.data && x.data.inbox]));
+          home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes });
+        } catch (e) { home = null; }
+      }
+      return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '', view, home }));
     }
     // Business activity (2026-11-05). GET /api/admin/venue-activity?q=name  -> matching businesses on this site;
     // ?id=123&days=30 -> that business's views, link clicks and Build My Trip demand. Admin token.
@@ -57763,6 +57767,13 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, pathname === '/api/admin/roam-now' ? pageStats.roamNow(query.days) : pageStats.pages(query.days));
     }
     // The pages: /admin/dashboard/pages and /admin/dashboard/roam-now (both sites side by side).
+    // Plain-words help for the dashboard.
+    if ((pathname === '/admin/dashboard/help' || pathname === '/admin/dashboard/help/') && (method === 'GET' || method === 'HEAD')) {
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN || !adminSessionValid(req)) return res.end(renderAdminReviewLoginPage());
+      return res.end(renderHelpPage());
+    }
     const pageStatsView = /^\/admin\/dashboard\/(pages|roam-now|events|email)\/?$/.exec(pathname);
     if (pageStatsView && (method === 'GET' || method === 'HEAD')) {
       const view = { pages: { label: 'Guides and pages', api: 'page-stats', own: (d) => pageStats.pages(d), render: renderPagesPage }, 'roam-now': { label: 'Roam Now detail', api: 'roam-now', own: (d) => pageStats.roamNow(d), render: renderRoamNowPage }, events: { label: 'Event performance', api: 'event-stats', own: (d) => venueActivityCounter.eventStats(d), render: renderEventsPage }, email: { label: 'Email results', api: 'email-stats', own: (d) => emailStats.report(d), render: renderEmailPage } }[pageStatsView[1]];

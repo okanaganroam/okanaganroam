@@ -82,5 +82,5 @@ test('the event page draws, with a site that is not connected', () => {
   const { renderEventsPage } = require('../pages-page');
   const data = va.createCounter(memDb()).eventStats(30, 100, NOW);
   const html = renderEventsPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet.' }] });
-  assert.match(html, /Event performance/); assert.match(html, />Big Show</); assert.match(html, /Not connected yet/);
+  assert.match(html, /Which What’s On events get opened/); assert.match(html, />Big Show</); assert.match(html, /Not connected yet/);
 });
