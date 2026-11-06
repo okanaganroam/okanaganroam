@@ -124,6 +124,7 @@ function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', 
     '<a href="https://analytics.google.com/" target="_blank" rel="noopener">Traffic and events (Google Analytics)</a>',
     '<a href="/admin/dashboard/business"><b>Search a business</b> (views and clicks)</a>',
     '<a href="/admin/dashboard/portal"><b>Business portal</b> (logins and what owners do)</a>',
+    '<a href="/admin/dashboard/search"><b>How people find us</b> (AI assistants, search engines, Google words)</a>',
     '<a href="/admin/review">Review inbox</a>',
   ].filter(Boolean).map((l) => `<li>${l}</li>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
