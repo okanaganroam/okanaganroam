@@ -117,3 +117,11 @@ test('the two dashboard pages draw, with a site that is not connected', () => {
   assert.match(a, /Guides and pages/); assert.match(a, /Not connected yet/);
   assert.match(b, /Roam Now detail/); assert.match(b, /Filters turned on/);
 });
+
+test('every Roam Now filter on the page is on the counted list, so a new chip cannot go uncounted', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const block = (name) => { const i = src.indexOf(`const ${name} = [`); return src.slice(i, src.indexOf('\n];', i)); };
+  const keys = [...block('MAP_KINDS').matchAll(/key: '([a-z_]+)'/g), ...block('MAP_MUST_HAVES').matchAll(/key: '([a-z_]+)'/g)].map((m) => m[1]);
+  assert.ok(keys.length > 15);
+  assert.deepEqual(keys.filter((k) => !EVENTS.has(`map_filter:${k}`)), []);
+});
