@@ -68,4 +68,25 @@ function renderRoamNowPage({ days = 30, sites = [] }) {
   return shell('Roam Now detail', 'What people do on the map: filters, words, towns and the businesses they open or get directions to.', range('/admin/dashboard/roam-now', days), sites.map((g) => roamCol(g, days)).join(''));
 }
 
-module.exports = { renderPagesPage, renderRoamNowPage };
+function eventsCol(g, days) {
+  if (!g.data) return errorCol(g);
+  const d = g.data; const t = d.totals;
+  const when = (e) => `${esc(e.start)}${e.upcoming ? '' : ' <small>over</small>'}`;
+  return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card">
+    <div class="stats">${stat(t.views, 'event page views')}${stat(t.tickets, 'tickets and info clicks')}${stat(t.calendar, 'added to a calendar')}${stat(t.directions, 'directions')}</div>
+    <div class="stats" style="margin-top:10px">${stat(d.with_views, `events opened, of ${num(d.listed)} listed`)}${stat(d.upcoming, 'still to come')}${stat(t.trip, 'added to a trip')}${stat(t.favorite, 'favourited')}</div>
+    <h4>People acted on these <small>tickets, calendar, directions, trip, favourite</small></h4>
+    ${table(['Event', 'Date', 'Views', 'Actions'], d.most_action.map((e) => [link(e.path).replace(`>${esc(e.path)}<`, `>${esc(e.name)}<`), when(e), num(e.views), `<b>${num(e.actions)}</b>`]))}
+    <h4>Coming in the next 30 days, nobody has opened <small>${num(d.unseen_soon_count)} in all, soonest first</small></h4>
+    ${table(['Event', 'Date'], d.unseen_soon.map((e) => [link(e.path).replace(`>${esc(e.path)}<`, `>${esc(e.name)}<`), when(e)]))}
+    <h4>All events opened</h4>
+    ${table(['Event', 'Date', 'Views', 'Tickets', 'Calendar', 'Directions', 'Trip'], d.events.map((e) => [link(e.path).replace(`>${esc(e.path)}<`, `>${esc(e.name)}<`), when(e), `<b>${num(e.views)}</b>`, num(e.tickets), num(e.calendar), num(e.directions), num(e.trip)]))}
+    <p class="empty">Counting started ${d.counting_since ? esc(d.counting_since) : 'today'}, so earlier days show zero. Repeating events show their first date. Plain daily totals.</p>
+  </div></section>`;
+}
+
+function renderEventsPage({ days = 30, sites = [] }) {
+  return shell('Event performance', 'Which What’s On events get opened, what people do on them, and which coming events nobody has found.', range('/admin/dashboard/events', days), sites.map((g) => eventsCol(g, days)).join(''));
+}
+
+module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage };

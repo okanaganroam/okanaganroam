@@ -180,7 +180,43 @@ function createCounter(db) {
     const first = db.prepare('SELECT MIN(day) AS d FROM venue_event_counts').get().d;
     return { days, since, counting_since: first || null, totals, businesses: list.slice(0, limit), with_clicks: list.length };
   }
-  return { record, search, detail, recordEvent, searchEvents, detailEvent, top, outbound };
+  // Event performance (2026-11-06): each event's views and what people did on its page, and coming events nobody has opened.
+  const EV_OUT = { tickets: ['tickets_info'], calendar: ['add_to_calendar', 'add_to_google_calendar'], directions: ['directions'], trip: ['add_to_trip'], favorite: ['favorite'] };
+  function eventStats(days = 30, limit = 100, now = new Date()) {
+    days = [7, 30, 90].includes(Number(days)) ? Number(days) : 30;
+    limit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 300);
+    const since = dayList(days, now)[0];
+    const today = dayOf(now);
+    const soon = dayOf(new Date(now.getTime() + 30 * 86400000));
+    const keyTo = {}; for (const [o, keys] of Object.entries(EV_OUT)) for (const k of keys) keyTo[`click:${k}`] = o;
+    const by = new Map();
+    const blank = () => ({ views: 0, tickets: 0, calendar: 0, directions: 0, trip: 0, favorite: 0 });
+    for (const r of db.prepare('SELECT event_id AS id, name, SUM(n) AS n FROM event_click_counts WHERE day >= ? GROUP BY event_id, name').all(since)) {
+      const e = by.get(r.id) || blank();
+      if (r.name === 'event_view') e.views += r.n; else if (keyTo[r.name]) e[keyTo[r.name]] += r.n;
+      by.set(r.id, e);
+    }
+    const all = db.prepare('SELECT id, name, slug, region, start_datetime, end_datetime, recurrence_rule FROM events').all().map((v) => {
+      const last = String(v.end_datetime || v.start_datetime).slice(0, 10);
+      const start = String(v.start_datetime).slice(0, 10);
+      const c = by.get(v.id) || blank();
+      return { id: v.id, name: v.name, region: v.region, path: `/${v.region}/events/${v.slug}`, start, upcoming: last >= today || !!v.recurrence_rule, ...c, actions: c.tickets + c.calendar + c.directions + c.trip + c.favorite };
+    });
+    const seen = all.filter((e) => e.views || e.actions);
+    const totals = { views: 0, tickets: 0, calendar: 0, directions: 0, trip: 0, favorite: 0 };
+    for (const e of seen) for (const k of Object.keys(totals)) totals[k] += e[k];
+    const nameSort = (a, b) => a.name.localeCompare(b.name);
+    const unseen = all.filter((e) => e.upcoming && !e.views && e.start <= soon && !e.actions).sort((a, b) => (a.start < today ? today : a.start).localeCompare(b.start < today ? today : b.start) || nameSort(a, b));
+    const first = db.prepare('SELECT MIN(day) AS d FROM event_click_counts').get().d;
+    return {
+      days, since, counting_since: first || null, totals,
+      listed: all.length, upcoming: all.filter((e) => e.upcoming).length, with_views: seen.length,
+      events: [...seen].sort((a, b) => b.views - a.views || b.actions - a.actions || nameSort(a, b)).slice(0, limit),
+      most_action: seen.filter((e) => e.actions > 0).sort((a, b) => b.actions - a.actions || b.views - a.views || nameSort(a, b)).slice(0, 15),
+      unseen_soon: unseen.slice(0, 40), unseen_soon_count: unseen.length,
+    };
+  }
+  return { record, search, detail, recordEvent, searchEvents, detailEvent, top, outbound, eventStats };
 }
 
 module.exports = { applyInventory, NAME_RE, nameOk, eventNameOk, RATE_PER_HOUR, createCounter, rateLimited };
