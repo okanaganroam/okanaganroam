@@ -9,6 +9,7 @@ const dashboardData = require('./dashboard-data');
 const gaReport = require('./ga-report');
 const venueActivity = require('./venue-activity');
 const clickLabels = require('./click-labels');
+const pageInventory = require('./page-inventory');
 const venueActivityCounter = venueActivity.createCounter(db);
 const { renderBusinessPage } = require('./venue-activity-page');
 const { renderPortalPage } = require('./portal-activity-page');
@@ -16,6 +17,28 @@ const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
 const portalCounter = portalActivity.createPortalCounter(db);
+// What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
+// own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
+const pageInventoryCache = new Map();
+async function clickableOnPage(kind, id) {
+  try {
+    const row = kind === 'event'
+      ? db.prepare('SELECT region, slug FROM events WHERE id = ?').get(Number(id))
+      : db.prepare('SELECT region, type, slug FROM venues WHERE id = ? AND redirect_to IS NULL').get(Number(id));
+    if (!row || !row.slug) return null;
+    const pagePath = kind === 'event' ? `/${row.region}/events/${row.slug}` : (CATEGORY_SLUGS[row.type] ? `/${row.region}/${CATEGORY_SLUGS[row.type]}/${row.slug}` : null);
+    if (!pagePath) return null;
+    const hit = pageInventoryCache.get(pagePath);
+    if (hit && Date.now() - hit.at < 600000) return hit.inv;
+    const r = await fetch(`http://127.0.0.1:${PORT}${pagePath}`, { headers: { 'User-Agent': 'roam-page-inventory' }, signal: AbortSignal.timeout(8000) });
+    if (r.status !== 200) return null;
+    const inv = pageInventory.inventory(await r.text(), kind);
+    if (pageInventoryCache.size > 500) pageInventoryCache.clear();
+    pageInventoryCache.set(pagePath, { at: Date.now(), inv });
+    return inv;
+  } catch (e) { return null; }
+}
+async function sheetWithPage(kind, d) { return d ? venueActivity.applyInventory(d, kind, await clickableOnPage(kind, d.venue.id)) : d; }
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
 const tripDemandLog = tripDemand.createLogger(db);
@@ -57357,7 +57380,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/venue-activity' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       res.setHeader('Cache-Control', 'no-store');
-      if (query.id) return sendJSON(res, 200, { detail: query.kind === 'event' ? venueActivityCounter.detailEvent(query.id, query.days) : venueActivityCounter.detail(query.id, query.days) });
+      if (query.id) { const ev = query.kind === 'event'; return sendJSON(res, 200, { detail: await sheetWithPage(ev ? 'event' : 'venue', ev ? venueActivityCounter.detailEvent(query.id, query.days) : venueActivityCounter.detail(query.id, query.days)) }); }
       return sendJSON(res, 200, { matches: [...venueActivityCounter.search(query.q), ...venueActivityCounter.searchEvents(query.q)] });
     }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
@@ -57408,7 +57431,7 @@ const server = http.createServer(async (req, res) => {
       const id = /^[1-9][0-9]*$/.test(String(query.id || '')) ? String(query.id) : '';
       if (id) {
         if (query.site === 'whistler') { const w = await wFetch(`id=${id}&days=${days}${query.kind === 'event' ? '&kind=event' : ''}`); detail = { key: 'whistler', name: 'Whistler Roam', data: w.data && w.data.detail, error: w.error || (w.data && w.data.detail ? null : 'Business not found.') }; }
-        else { const dd = query.kind === 'event' ? venueActivityCounter.detailEvent(id, days) : venueActivityCounter.detail(id, days); detail = { key: 'okanagan', name: 'Okanagan Roam', data: dd, error: dd ? null : 'Business not found.' }; }
+        else { const dd = await sheetWithPage(query.kind === 'event' ? 'event' : 'venue', query.kind === 'event' ? venueActivityCounter.detailEvent(id, days) : venueActivityCounter.detail(id, days)); detail = { key: 'okanagan', name: 'Okanagan Roam', data: dd, error: dd ? null : 'Business not found.' }; }
       } else if (q.trim().length >= 2) {
         const w = await wFetch(`q=${encodeURIComponent(q)}`);
         results = [{ key: 'okanagan', name: 'Okanagan Roam', matches: venueActivityCounter.search(q), error: null }, { key: 'whistler', name: 'Whistler Roam', matches: (w.data && w.data.matches) || [], error: w.error || null }];
