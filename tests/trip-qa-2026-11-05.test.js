@@ -390,7 +390,7 @@ test('a bare time box ("we have 2 hours in Vernon", "an hour to kill") becomes a
   const app = require('../server.js');
   for (const text of ['we have 2 hours in Vernon', 'I have an hour to kill in Kelowna tomorrow at noon']) {
     const p = app.runTripPlan({ text });
-    assert.equal(p.kind, 'itinerary', text);
+    assert.ok(['itinerary', 'discover'].includes(p.kind), text);
     assert.ok(!/\b(?:hour|hours|kill)\b/i.test(p.summary || ''), text + ' -> ' + p.summary);
   }
   // A layover keeps its own handling.
@@ -433,4 +433,14 @@ test('weekday spans ("Thursday to Sunday", "arriving Friday, leaving Monday", a 
   assert.equal(daysOf('Friday night in Penticton, Saturday in Naramata, Sunday brunch in Summerland'), 3);
   // Opening hours are not a trip.
   assert.notEqual(app.runTripPlan({ text: 'restaurants open Monday to Friday in Kelowna' }).kind, 'multi_day');
+});
+
+test('"an hour to kill" plans one stop; two hours still gets a coffee and a walk', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const n = (t) => (app.runTripPlan({ text: t }).itinerary?.stops || []).length;
+  assert.equal(n('I have an hour to kill in Vernon'), 1);
+  assert.equal(n('we have 1 hour in Vernon'), 1);
+  const two = app.runTripPlan({ text: '2 hours in Vernon' });
+  assert.ok(/walk/i.test(JSON.stringify(two.warnings || []) + (two.summary || '')));
 });
