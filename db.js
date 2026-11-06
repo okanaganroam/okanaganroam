@@ -1348,4 +1348,16 @@ CREATE TABLE IF NOT EXISTS event_click_counts (
 );
 `);
 
+// How people find us (2026-11-06): per day, kind (visit / ai_fetch / crawl), source and page. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS referral_counts (
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  page TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, kind, source, page)
+);
+`);
+
 module.exports = db;
