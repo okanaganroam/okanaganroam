@@ -1395,7 +1395,7 @@ const VENUE_DELETE_CHILDREN = [
   ['visitor_contribution_photos', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
   ['visitor_contribution_notes', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
   ['venue_seasons', 'venue_id = ?'], ['venue_owner_links', 'venue_id = ?'], ['owner_change_requests', 'venue_id = ?'],
-  ['owner_photos', 'venue_id = ?'], ['owner_videos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
+  ['owner_photos', 'venue_id = ?'], ['owner_videos', 'venue_id = ?'], ['venue_arrival_points', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
   ['venue_visit_info', 'venue_id = ?'],
@@ -44659,6 +44659,14 @@ async function handleOwnerPhotoUpload(req, res, token) {
   return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
 }
 
+// Storefront arrival points (arrival-points.js): photos sit with the owner photos on the volume.
+const arrivalPoints = require('./arrival-points').createArrivalPoints({
+  db, respond: sendSubmissionResponse, sameOrigin: isSameOriginSubmission, readJson: readLimitedJsonBody, clientIp: requestClientIp, rateLimited: (ip) => ownerPhotoRateLimited(ip),
+  venueForToken: (t) => venueForOwnerToken(t), strip: (b) => stripJpegMetadata(b), dimensions: (b) => jpegDimensions(b),
+  write: (buf) => { const file = `${crypto.randomBytes(12).toString('hex')}.jpg`; fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true }); fs.writeFileSync(ownerPhotoPath(file), buf, { flag: 'wx' }); return file; },
+  remove: (file) => { try { fs.unlinkSync(ownerPhotoPath(file)); } catch (e) { /* already gone */ } },
+});
+
 // ---------- Owner videos (2026-11-05) ----------
 // A business shares a short clip; Dayton edits it into a reel for Instagram/Facebook. The browser uploads the file straight
 // to Cloudflare R2 with a short-lived presigned URL (the site's own disk is far too small for video), so this server only
@@ -51570,6 +51578,7 @@ const ADMIN_REVIEW_ERRORS = {
 async function adminReviewAction(kind, id, action, body) {
   if (action === 'dismiss' && kind !== 'photo') return { status: 400, body: { error: 'Unknown action.' } };
   if (kind === 'video') return adminVideoAction(id, action, body);
+  if (kind === 'arrival') return arrivalPoints.action(id, action, body, ADMIN_REVIEWER);
   if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
@@ -51986,6 +51995,7 @@ function renderAdminReviewPage() {
   const photos = listOwnerPhotos('pending');
   const videos = ownerVideoEnabled() ? listOwnerVideos('pending') : [];
   const videosOk = ownerVideoEnabled() ? listOwnerVideos('approved') : [];
+  const arrivals = arrivalPoints.pending();
   const live = recentLiveOwnerPhotos();
   const events = listEventSubmissions('pending');
   const eventChanges = listOwnerEventChanges('pending');
@@ -52002,7 +52012,7 @@ function renderAdminReviewPage() {
   const staleSpecials = staleVenueSpecials();
   const staleNights = staleVenueWeeklyNights();
   const nightsMusic = weeklyNightsLiveMusicWithoutBadge();
-  const total = changes.length + photos.length + videos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
+  const total = changes.length + photos.length + arrivals.length + videos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -52013,9 +52023,10 @@ function renderAdminReviewPage() {
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
     ${renderAdminOwnerStats(ownerSignupStats())}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a>${ownerVideoEnabled() ? `<a href="#videos">Videos (${videos.length})</a>` : ''}<a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a>${arrivals.length ? `<a href="#arrivals">Storefront spots (${arrivals.length})</a>` : ''}${ownerVideoEnabled() ? `<a href="#videos">Videos (${videos.length})</a>` : ''}<a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
+    ${arrivals.length ? section('arrivals', 'Storefront spots to check', arrivals, (a) => arrivalPoints.cardHtml(a, adminReviewEsc, adminReviewActions('arrival', a.id, { approveLabel: 'Looks right', reasonPlaceholder: 'Reason if rejecting (the photo is deleted)' })), '') : ''}
     ${ownerVideoEnabled() ? section('videos', 'Videos to review', videos, (v) => renderAdminVideoCard(v, false), 'No videos waiting.') : ''}
     ${videosOk.length ? section('videosok', 'Videos approved for reels (delete once posted)', videosOk, (v) => renderAdminVideoCard(v, true), '') : ''}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
@@ -53008,6 +53019,7 @@ ${renderGolfHeaderHtml()}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone'))}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
@@ -53015,8 +53027,8 @@ ${renderGolfHeaderHtml()}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
       </section>
-      <div class="op-taskbar" id="opTaskBar" data-task="hours photos video events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
-      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos video events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
+      <div class="op-taskbar" id="opTaskBar" data-task="hours photos arrival video events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
+      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos arrival video events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
       })()}
       <div data-task="all">
       ${instantOn
@@ -53202,6 +53214,7 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="ofSubmit">${L('Upload photos', 'Téléverser les photos')}</button>
     </form>
     </details>
+    ${arrivalPoints.sectionHtml(venue, L, escapeHtml, 'Okanagan Roam')}
     ${ownerVideoEnabled() ? `<details class="op-fold op-sec" id="video" data-task="video" open>
     <summary><h2 class="lyv-section-label">${L('Share a video', 'Partager une vidéo')}</h2></summary>
     <p class="op-hint">${L('Film 10 to 60 seconds of your business: your space, a dish or drink being made, your team, or the view. Any phone video is fine, and it can be held up or sideways. We&rsquo;ll edit it into a short reel and share it on our Instagram and Facebook, naming and tagging your business.', 'Filmez de 10 à 60 secondes de votre entreprise : votre espace, un plat ou une boisson en préparation, votre équipe ou la vue. N’importe quelle vidéo de téléphone convient, à la verticale ou à l’horizontale. Nous la monterons en un court reel et le partagerons sur notre Instagram et notre Facebook, en nommant et en identifiant votre entreprise.')}</p>
@@ -53367,7 +53380,7 @@ ${ownerFooterHtml(fr)}
       if (el.hasAttribute('hidden') && showIt && /^op(Tasks|TaskBar|HelpMe)$/.test(el.id)) el.hidden = false;
     });
     var bar = document.getElementById('opTaskBar'); if (bar) bar.hidden = !(t && t !== 'all');
-    if (fm && (t === 'photos' || t === 'video' || t === 'events')) fm.classList.add('op-hide'); else if (fm) fm.classList.remove('op-hide');
+    if (fm && (t === 'photos' || t === 'arrival' || t === 'video' || t === 'events')) fm.classList.add('op-hide'); else if (fm) fm.classList.remove('op-hide');
     if (t && t !== 'all') Array.prototype.forEach.call(document.querySelectorAll('details[data-task~="' + t + '"]'), function(d){ d.open = true; });
     if (!t || t === 'all') window.scrollTo(0, 0);
     else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
@@ -55134,6 +55147,13 @@ const server = http.createServer(async (req, res) => {
         if (!buf) { res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('Not found'); }
         res.writeHead(200, { 'Content-Type': 'image/jpeg', ...cache });
         return res.end(buf);
+      }
+      // Storefront photos: private to anyone holding the unguessable link until Roam Now shows them.
+      const ap = /^\/owner-photos\/arrival\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
+      if (ap && method === 'GET') {
+        const file = arrivalPoints.previewFile(ap[1]);
+        if (!file) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
       }
       // Visitor photos (2026-10-17): private previews while waiting for review, public once approved.
       const vp = /^\/visitor-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
@@ -57523,7 +57543,7 @@ const server = http.createServer(async (req, res) => {
           base: ownerPath(`/owner/account/venue/${id}/menu`, res.ownerLang), back: ownerPath(`/owner/account/venue/${id}`, res.ownerLang),
         });
       }
-      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|video\/start|video\/done))?$/.exec(pathname);
+      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|arrival|video\/start|video\/done))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
         if (vm[2] && method === 'POST') {
@@ -57531,6 +57551,7 @@ const server = http.createServer(async (req, res) => {
           if (vm[2] === 'changes') return await handleOwnerChangeSubmission(req, res, resolve);
           if (vm[2] === 'events') return await handleOwnerEventSubmission(req, res, resolve);
           if (vm[2].startsWith('video/')) return await handleOwnerVideo(req, res, resolve, vm[2].slice(6));
+          if (vm[2] === 'arrival') return await arrivalPoints.submit(req, res, resolve, res.ownerLang);
           return await handleOwnerPhotoUpload(req, res, resolve);
         }
         if (!vm[2] && method === 'GET') {
@@ -57555,6 +57576,8 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const arrivalMatch = /^([A-Za-z0-9_-]+)\/arrival$/.exec(rest);
+      if (arrivalMatch && method === 'POST') return await arrivalPoints.submit(req, res, arrivalMatch[1], res.ownerLang);
       const videoMatch = /^([A-Za-z0-9_-]+)\/video\/(start|done)$/.exec(rest);
       if (videoMatch && method === 'POST') return await handleOwnerVideo(req, res, videoMatch[1], videoMatch[2]);
       const menuMatch = /^([A-Za-z0-9_-]+)\/menu(\/[a-z0-9/]*)?$/.exec(rest);
@@ -57991,7 +58014,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: r2.url('GET', v.object_key, { expires: 3600, query: query3 }), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
         return res.end();
       }
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim|video)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim|video|arrival)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });

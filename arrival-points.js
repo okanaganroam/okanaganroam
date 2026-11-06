@@ -1,0 +1,169 @@
+'use strict';
+// Storefront arrival points (2026-11-06): an owner stands outside, takes a photo of the storefront, and the phone's
+// location is saved with it. Roam Now can then show "Look for this" and route to that spot. This is separate from the
+// listing's map pin, which is never changed here. Location is read only after the owner taps, and the photo keeps no
+// hidden data. A point goes live straight away only when a signed-in owner's phone gave a good reading near the
+// listing; anything else waits in the review inbox.
+const crypto = require('node:crypto');
+
+const LIMITS = { near_pin_m: 150, accuracy_m: 40, nudge_m: 50, too_far_m: 3000, min_edge: 800, max_edge: 2400, max_bytes: 3 * 1024 * 1024, max_body: 5 * 1024 * 1024 };
+const KEYS = new Set(['image', 'lat', 'lng', 'device_lat', 'device_lng', 'accuracy', 'rights', 'company_website']);
+
+// Metres between two points.
+function distanceMeters(a, b) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat); const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+const validPoint = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+
+// Live or review, with the plain reasons Dayton sees. point = the final spot; device = the phone's own reading, if any.
+function decide({ point, device, accuracy, pin, signedIn }) {
+  const reasons = [];
+  const distance = pin ? Math.round(distanceMeters(pin, point)) : null;
+  const nudged = device ? Math.round(distanceMeters(device, point)) : null;
+  if (!signedIn) reasons.push('Sent from an edit link, not a login');
+  if (!device) reasons.push('The phone gave no location, so the spot was picked on the map');
+  else if (!Number.isFinite(accuracy) || accuracy > LIMITS.accuracy_m) reasons.push(`Rough phone reading (${Number.isFinite(accuracy) ? `about ${Math.round(accuracy)} m` : 'unknown'})`);
+  if (nudged !== null && nudged > LIMITS.nudge_m) reasons.push(`Pin moved ${nudged} m from the phone’s reading`);
+  if (distance === null) reasons.push('The listing has no map pin to compare with');
+  else if (distance > LIMITS.near_pin_m) reasons.push(`${distance} m from the listing’s map pin`);
+  return { status: reasons.length ? 'pending' : 'approved', reasons, distance, nudged };
+}
+
+const ERR = {
+  en: { generic: 'Sorry, something went wrong. Please try again.', photo: 'That photo could not be read. Please take it again.', small: 'That photo is too small. Please take it again with your phone’s camera.', rights: 'Please confirm you took this photo or have permission to share it.', spot: 'We need a spot on the map. Please try again.', far: 'That spot is too far from your listing. Please stand outside your business and try again.', rate: 'Too many tries. Please wait a while and try again.', gone: 'This link is not valid any more.' },
+  fr: { generic: 'Désolé, une erreur est survenue. Veuillez réessayer.', photo: 'Cette photo est illisible. Veuillez la reprendre.', small: 'Cette photo est trop petite. Veuillez la reprendre avec l’appareil photo de votre téléphone.', rights: 'Veuillez confirmer que vous avez pris cette photo ou que vous avez la permission de la partager.', spot: 'Il nous faut un endroit sur la carte. Veuillez réessayer.', far: 'Cet endroit est trop loin de votre fiche. Placez-vous devant votre commerce et réessayez.', rate: 'Trop d’essais. Veuillez patienter un moment et réessayer.', gone: 'Ce lien n’est plus valide.' },
+};
+
+const CLIENT = `(function(){
+  var box=document.getElementById('arrivalBox');if(!box)return;var T=JSON.parse(box.getAttribute('data-t')),pin=JSON.parse(box.getAttribute('data-pin')||'null');
+  var file=document.getElementById('arFile'),step=document.getElementById('arStep2'),img=document.getElementById('arPreview'),msg=document.getElementById('arGps'),send=document.getElementById('arSend'),err=document.getElementById('arError'),rights=document.getElementById('arRights'),done=document.getElementById('arDone'),mapEl=document.getElementById('arMap');
+  var best=null,watch=null,photo=null,map=null,marker=null,spot=null;
+  function say(t){msg.textContent=t;}
+  function stop(){if(watch!==null&&navigator.geolocation)navigator.geolocation.clearWatch(watch);watch=null;}
+  function gps(){if(watch!==null||!navigator.geolocation)return;watch=navigator.geolocation.watchPosition(function(p){var c=p.coords;if(!best||c.accuracy<best.accuracy){best={lat:c.latitude,lng:c.longitude,accuracy:c.accuracy};show();}},function(){if(!best){say(T.noGps);show();}},{enableHighAccuracy:true,maximumAge:0,timeout:20000});}
+  function leaflet(cb){if(window.L)return cb();var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(l);var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';s.onload=cb;s.onerror=function(){mapEl.hidden=true;};document.head.appendChild(s);}
+  function show(){if(!photo)return;var at=best||pin;if(best)say(best.accuracy<=40?T.good.replace('{m}',Math.round(best.accuracy)):T.rough.replace('{m}',Math.round(best.accuracy)));if(!at)return;spot=spot&&marker?spot:{lat:at.lat,lng:at.lng};leaflet(function(){if(!map){mapEl.hidden=false;map=L.map(mapEl,{zoomControl:true}).setView([at.lat,at.lng],19);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);marker=L.marker([at.lat,at.lng],{draggable:true,autoPan:true}).addTo(map);marker.on('dragend',function(){var m=marker.getLatLng();spot={lat:m.lat,lng:m.lng,moved:true};});}else if(!spot.moved){marker.setLatLng([at.lat,at.lng]);map.setView([at.lat,at.lng]);}});}
+  function shrink(f,cb){var u=URL.createObjectURL(f),i=new Image();i.onload=function(){var k=Math.min(1,1600/Math.max(i.naturalWidth,i.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(i.naturalWidth*k);c.height=Math.round(i.naturalHeight*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);cb(c.toDataURL('image/jpeg',0.85));};i.onerror=function(){URL.revokeObjectURL(u);cb(null);};i.src=u;}
+  document.getElementById('arTake').addEventListener('click',gps);
+  file.addEventListener('change',function(){var f=file.files&&file.files[0];if(!f)return;err.hidden=true;gps();say(T.finding);shrink(f,function(d){if(!d){err.textContent=T.bad;err.hidden=false;return;}photo=d;img.src=d;step.hidden=false;show();setTimeout(stop,15000);step.scrollIntoView({block:'start'});});});
+  send.addEventListener('click',function(){err.hidden=true;if(!rights.checked){err.textContent=T.needRights;err.hidden=false;return;}if(!spot){err.textContent=T.needSpot;err.hidden=false;return;}stop();send.disabled=true;send.textContent=T.sending;
+    var body={image:photo,lat:spot.lat,lng:spot.lng,rights:true};if(best){body.device_lat=best.lat;body.device_lng=best.lng;body.accuracy=best.accuracy;}
+    fetch(location.pathname+'/arrival',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};});}).then(function(x){if(x.ok&&x.j.ok){step.hidden=true;document.getElementById('arStart').hidden=true;done.textContent=x.j.live?T.live:T.review;done.hidden=false;return;}send.disabled=false;send.textContent=T.send;err.textContent=x.j.error||T.bad;err.hidden=false;}).catch(function(){send.disabled=false;send.textContent=T.send;err.textContent=T.bad;err.hidden=false;});});
+})();`;
+
+// deps: db, write(buf) -> file name, remove(file), strip, dimensions, respond, sameOrigin, readJson, rateLimited, clientIp
+function createArrivalPoints(deps) {
+  const { db } = deps;
+  const latest = (venueId, status) => db.prepare('SELECT * FROM venue_arrival_points WHERE venue_id = ? AND status = ? ORDER BY id DESC LIMIT 1').get(venueId, status) || null;
+  function retire(venueId, keepId) {
+    for (const r of db.prepare("SELECT id, file FROM venue_arrival_points WHERE venue_id = ? AND id != ? AND status IN ('pending', 'approved')").all(venueId, keepId)) {
+      db.prepare("UPDATE venue_arrival_points SET status = 'replaced', reviewed_at = CURRENT_TIMESTAMP WHERE id = ?").run(r.id);
+      deps.remove(r.file);
+    }
+  }
+
+  async function submit(req, res, token, lang = 'en') {
+    const E = ERR[lang === 'fr' ? 'fr' : 'en'];
+    if (!deps.sameOrigin(req)) return deps.respond(res, 403, { ok: false, error: E.generic });
+    const ip = deps.clientIp(req);
+    if (deps.rateLimited(ip)) return deps.respond(res, 429, { ok: false, error: E.rate });
+    const signedIn = typeof token === 'function';
+    const found = signedIn ? token() : deps.venueForToken(token);
+    if (!found) return deps.respond(res, 404, { ok: false, error: E.gone });
+    let body;
+    try { body = await deps.readJson(req, LIMITS.max_body); } catch (e) { return deps.respond(res, e.status === 413 ? 413 : 400, { ok: false, error: E.photo }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !KEYS.has(k))) return deps.respond(res, 400, { ok: false, error: E.generic });
+    if (typeof body.company_website === 'string' && body.company_website.trim()) return deps.respond(res, 201, { ok: true });
+    if (body.rights !== true) return deps.respond(res, 400, { ok: false, error: E.rights });
+    const point = { lat: Number(body.lat), lng: Number(body.lng) };
+    if (!validPoint(point.lat, point.lng)) return deps.respond(res, 400, { ok: false, error: E.spot });
+    const dLat = Number(body.device_lat); const dLng = Number(body.device_lng);
+    const device = body.device_lat != null && validPoint(dLat, dLng) ? { lat: dLat, lng: dLng } : null;
+    const accuracy = device ? Number(body.accuracy) : NaN;
+    const m = typeof body.image === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(body.image) : null;
+    const raw = m ? Buffer.from(m[1], 'base64') : null;
+    const dims = raw ? deps.dimensions(raw) : null;
+    if (!raw || !dims || raw.length > LIMITS.max_bytes) return deps.respond(res, 400, { ok: false, error: E.photo });
+    const edge = Math.max(dims.width, dims.height);
+    if (edge < LIMITS.min_edge) return deps.respond(res, 400, { ok: false, error: E.small });
+    if (edge > LIMITS.max_edge) return deps.respond(res, 400, { ok: false, error: E.photo });
+    const { venue } = found;
+    const pin = venue.latitude != null && validPoint(Number(venue.latitude), Number(venue.longitude)) ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
+    const d = decide({ point, device, accuracy, pin, signedIn });
+    if (d.distance !== null && d.distance > LIMITS.too_far_m) return deps.respond(res, 400, { ok: false, error: E.far });
+    let file;
+    try { file = deps.write(deps.strip(raw) || raw); } catch (e) { return deps.respond(res, 500, { ok: false, error: E.generic }); }
+    const key = crypto.randomBytes(18).toString('base64url');
+    const id = Number(db.prepare(`INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, device_lat, device_lng, accuracy_m, distance_m, status, review_reasons, submitted_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(venue.id, file, key, point.lat, point.lng, device ? device.lat : null, device ? device.lng : null, Number.isFinite(accuracy) ? accuracy : null, d.distance, d.status, d.reasons.join('; ') || null, signedIn && found.account ? found.account.email : null).lastInsertRowid);
+    if (d.status === 'approved') { db.prepare("UPDATE venue_arrival_points SET reviewed_at = CURRENT_TIMESTAMP, reviewed_by = 'automatic' WHERE id = ?").run(id); retire(venue.id, id); } else {
+      for (const r of db.prepare("SELECT id, file FROM venue_arrival_points WHERE venue_id = ? AND id != ? AND status = 'pending'").all(venue.id, id)) { db.prepare("UPDATE venue_arrival_points SET status = 'replaced' WHERE id = ?").run(r.id); deps.remove(r.file); }
+    }
+    return deps.respond(res, 201, { ok: true, id, live: d.status === 'approved' });
+  }
+
+  // The portal section. L(en, fr) is the page's own language helper.
+  function sectionHtml(venue, L, esc, siteName) {
+    const live = latest(venue.id, 'approved'); const waiting = latest(venue.id, 'pending');
+    const now = waiting || live;
+    const T = { noGps: L('We couldn’t get your location. Drag the pin to your storefront, and we’ll check it.', 'Impossible d’obtenir votre position. Glissez l’épingle sur votre devanture, et nous la vérifierons.'), finding: L('Finding your location…', 'Recherche de votre position…'), good: L('Location saved, accurate to about {m} m. Drag the pin if it’s a little off.', 'Position enregistrée, précise à environ {m} m. Glissez l’épingle si elle est un peu décalée.'), rough: L('Your location is only accurate to about {m} m. Drag the pin to the right spot, and we’ll check it.', 'Votre position est précise à environ {m} m seulement. Glissez l’épingle au bon endroit, et nous la vérifierons.'), bad: L('That didn’t work. Please try again.', 'Cela n’a pas fonctionné. Veuillez réessayer.'), needRights: L('Please tick the box to confirm you can share this photo.', 'Veuillez cocher la case pour confirmer que vous pouvez partager cette photo.'), needSpot: L('Please wait for the map, or drag the pin to your storefront.', 'Veuillez attendre la carte, ou glisser l’épingle sur votre devanture.'), sending: L('Sending…', 'Envoi…'), send: L('Save my storefront', 'Enregistrer ma devanture'), live: L('Saved! Thank you. Your storefront spot is in.', 'Enregistré! Merci. L’emplacement de votre devanture est ajouté.'), review: L('Thanks! We’ll check it and add it soon.', 'Merci! Nous allons le vérifier et l’ajouter bientôt.') };
+    const pin = venue.latitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
+    return `<details class="op-fold op-sec" id="arrival" data-task="arrival" open>
+    <summary><h2 class="lyv-section-label">${L('Help people find your door', 'Aidez les gens à trouver votre porte')}</h2></summary>
+    <div id="arrivalBox" data-t="${esc(JSON.stringify(T))}" data-pin="${esc(JSON.stringify(pin))}">
+    <p class="op-hint">${L(`Show visitors exactly what to look for. Stand on the sidewalk or street, facing your storefront, the way someone arriving would see it. Do this on your phone, while you’re there.`, `Montrez aux visiteurs exactement quoi chercher. Placez-vous sur le trottoir ou dans la rue, face à votre devanture, comme quelqu’un qui arrive. Faites-le avec votre téléphone, sur place.`)}</p>
+    ${now ? `<figure style="margin:0 0 12px"><img src="/owner-photos/arrival/${esc(now.preview_key)}.jpg" alt="${L('Your storefront photo', 'La photo de votre devanture')}" style="width:100%;max-width:420px;border-radius:12px;display:block"><figcaption class="op-hint">${waiting ? L('Waiting for us to check it.', 'En attente de notre vérification.') : L('This is your storefront spot. Take a new one any time to replace it.', 'Voici l’emplacement de votre devanture. Prenez-en une nouvelle à tout moment pour la remplacer.')}</figcaption></figure>` : ''}
+    <div id="arStart"><label class="venue-form-submit" id="arTake" style="display:inline-block;cursor:pointer;text-align:center">${L('Take the storefront photo', 'Prendre la photo de la devanture')}<input type="file" id="arFile" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0"></label>
+    <p class="op-hint">${L('Your phone will ask to share your location. It’s read only now, to mark this spot, and never tracked.', 'Votre téléphone demandera de partager votre position. Elle n’est lue que maintenant, pour marquer cet endroit, et n’est jamais suivie.')}</p></div>
+    <div id="arStep2" hidden>
+      <img id="arPreview" alt="" style="width:100%;max-width:420px;border-radius:12px;display:block;margin-bottom:10px">
+      <p class="op-hint" id="arGps" role="status"></p>
+      <div id="arMap" hidden style="height:260px;border-radius:12px;margin-bottom:10px"></div>
+      <label class="op-closed" style="width:auto;align-items:flex-start"><input type="checkbox" id="arRights" style="margin-top:4px"> <span>${L(`I took this photo or have permission to share it, and ${esc(siteName)} may show it to help visitors find this business.`, `J’ai pris cette photo ou j’ai la permission de la partager, et ${esc(siteName)} peut l’afficher pour aider les visiteurs à trouver ce commerce.`)}</span></label>
+      <button type="button" class="venue-form-submit" id="arSend">${T.send}</button>
+    </div>
+    <p class="lyv-error" id="arError" hidden></p><p class="op-hint" id="arDone" role="status" hidden style="font-weight:700"></p>
+    </div>
+    <script>${CLIENT}</script>
+    </details>`;
+  }
+
+  const pending = () => db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all();
+
+  function cardHtml(a, esc, actions) {
+    return `<article class="rv-card" data-kind="arrival" data-id="${a.id}">
+      <h3>${esc(a.venue_name)}</h3>
+      <p class="rv-meta">Storefront spot #${a.id}${a.distance_m != null ? ` · ${a.distance_m} m from the map pin` : ''}${a.accuracy_m != null ? ` · phone accurate to about ${Math.round(a.accuracy_m)} m` : ''}</p>
+      ${a.review_reasons ? `<p class="rv-meta">Why it’s here: ${esc(a.review_reasons)}</p>` : ''}
+      <p><img src="/owner-photos/arrival/${esc(a.preview_key)}.jpg" alt="" loading="lazy" style="max-width:320px;width:100%;border-radius:10px"></p>
+      <p><a class="rv-btn" href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">See this spot on a map</a></p>
+      ${actions}
+    </article>`;
+  }
+
+  function action(id, act, body, reviewer) {
+    const row = db.prepare('SELECT * FROM venue_arrival_points WHERE id = ?').get(id);
+    if (!row) return { status: 404, body: { error: 'That storefront spot was not found.' } };
+    if (row.status !== 'pending') return { status: 409, body: { error: 'This was already dealt with.' } };
+    if (act === 'approve') {
+      db.prepare("UPDATE venue_arrival_points SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
+      retire(row.venue_id, id);
+      return { status: 200, body: { ok: true, emailed: 'not_told' } };
+    }
+    if (act === 'reject') {
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+      db.prepare("UPDATE venue_arrival_points SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?").run(reviewer, reason || null, id);
+      deps.remove(row.file);
+      return { status: 200, body: { ok: true, emailed: 'not_told' } };
+    }
+    return { status: 400, body: { error: 'Unknown action.' } };
+  }
+
+  const previewFile = (key) => { const r = db.prepare("SELECT file FROM venue_arrival_points WHERE preview_key = ? AND status IN ('pending', 'approved')").get(key); return r ? r.file : null; };
+  return { submit, sectionHtml, pending, cardHtml, action, previewFile, latest };
+}
+
+module.exports = { LIMITS, distanceMeters, decide, createArrivalPoints };

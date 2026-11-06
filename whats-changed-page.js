@@ -108,13 +108,13 @@ const listHtml = (rows, none) => (rows.length ? `<ul class="list">${rows.map((r)
 
 function todoHtml(inbox) {
   if (!inbox) return '';
-  const rows = [['New businesses to review', inbox.venue_submissions_pending], ['Events to review', inbox.event_submissions_pending], ['Listing claims to approve', inbox.claims_pending], ['Visitor photos and tips', inbox.visitor_contributions_pending]].filter((r) => r[1]);
+  const rows = [['New businesses to review', inbox.venue_submissions_pending], ['Events to review', inbox.event_submissions_pending], ['Listing claims to approve', inbox.claims_pending], ['Storefront spots to check', inbox.arrival_pending], ['Visitor photos and tips', inbox.visitor_contributions_pending]].filter((r) => r[1]);
   return `<div class="card"><h3>Waiting on you</h3>${rows.length ? `<ul class="list">${rows.map((r) => `<li><a class="todo" href="/admin/review"><span>${esc(r[0])}</span><b>${num(r[1])}</b></a></li>`).join('')}</ul>` : '<p class="empty">All clear. Nothing needs you right now.</p>'}</div>`;
 }
 
 // One clear job for the week, taken from this site's real numbers.
 function mission(d, inbox) {
-  const L = d.lists || {}; const waiting = inbox ? (inbox.venue_submissions_pending || 0) + (inbox.event_submissions_pending || 0) + (inbox.claims_pending || 0) + (inbox.visitor_contributions_pending || 0) : 0;
+  const L = d.lists || {}; const waiting = inbox ? (inbox.venue_submissions_pending || 0) + (inbox.event_submissions_pending || 0) + (inbox.claims_pending || 0) + (inbox.arrival_pending || 0) + (inbox.visitor_contributions_pending || 0) : 0;
   if (L.broken_pages && L.broken_pages[0]) return { d: `Fix a dead end: ${L.broken_pages[0].path}`, href: '/admin/dashboard/errors', go: 'See broken pages' };
   if (L.no_results && L.no_results[0]) return { d: `People want “${L.no_results[0].term}”. Can you add it?`, href: '/admin/dashboard/searches', go: 'See searches' };
   if (waiting) return { d: `${num(waiting)} ${waiting === 1 ? 'item needs' : 'items need'} your approval`, href: '/admin/review', go: 'Open review inbox' };
