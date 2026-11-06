@@ -1348,6 +1348,16 @@ CREATE TABLE IF NOT EXISTS event_click_counts (
 );
 `);
 
+// The Monday "what changed" email (2026-11-06): one row per Monday so it is sent once.
+db.exec(`
+CREATE TABLE IF NOT EXISTS digest_log (
+  week TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  result TEXT NOT NULL DEFAULT 'pending',
+  sent_at TEXT
+);
+`);
+
 // Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
 db.exec(`
 CREATE TABLE IF NOT EXISTS not_found_counts (

@@ -115,7 +115,7 @@ main{max-width:1280px;margin:0 auto;padding:0 16px 40px;display:grid;gap:16px;gr
 .empty{color:var(--mute);margin:4px 0}.warn{color:var(--warn)}footer{max-width:1280px;margin:0 auto;padding:0 16px 24px;color:var(--mute);font-size:.8rem}
 </style>`;
 
-function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', generatedAt = new Date() }) {
+function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', generatedAt = new Date(), topHtml = '' }) {
   const shown = site === 'both' ? sites : sites.filter((s) => s.key === site);
   const tab = (key, label) => `<a class="tab${site === key ? ' on' : ''}" href="/admin/dashboard?site=${key}&days=${days}">${esc(label)}</a>`;
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard?site=${esc(site)}&days=${n}">${n}d</a>`).join('');
@@ -137,6 +137,7 @@ ${STYLE}</head><body>
 <header><h1>Dashboard</h1><p class="sub">Both sites in one place. Numbers from each site’s own records; traffic and recordings open in their own tools.</p>
 <div class="bar"><div class="tabs">${tab('both', 'Both')}${tab('okanagan', 'Okanagan Roam')}${tab('whistler', 'Whistler Roam')}</div><div class="tabs">${range}</div></div>
 <ul class="links">${links}</ul></header>
+${topHtml}
 <main>${shown.map((s) => siteColumn(s, days)).join('')}</main>
 <footer>Updated ${esc(generatedAt.toISOString().replace('T', ' ').slice(0, 16))} UTC. Visitor numbers are anonymous and change daily, so “visitor-days” counts a person once per day.</footer>
 </body></html>`;
