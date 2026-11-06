@@ -20,6 +20,7 @@ const portalActivity = require('./portal-activity');
 const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
+const pageStats = require('./page-stats').createPageStats(db);
 const searchTerms = require('./search-terms');
 const searchTermCounter = searchTerms.createSearchTermCounter(db);
 const funnelsReport = require('./funnels').createFunnels(db);
@@ -30,6 +31,7 @@ const seoGoals = require('./seo-goals');
 const whatsChangedPage = require('./whats-changed-page');
 const { renderErrorsPage } = require('./errors-page');
 const { renderFunnelsPage } = require('./funnels-page');
+const { renderPagesPage, renderRoamNowPage } = require('./pages-page');
 const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const gscReport = require('./gsc-report');
@@ -14880,7 +14882,7 @@ function renderAnalyticsHeadHtml(pageType) {
   function gtag(){ dataLayer.push(arguments); }
 ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
   // Site event counts (2026-11-05): a per-day count of fixed-list feature events on our own server (no visitor id, nothing typed).
-  var ROAM_EV = ${JSON.stringify([...siteEvents.EVENTS].filter((n) => !n.startsWith('page_view:')))};
+  var ROAM_EV = ${JSON.stringify([...siteEvents.EVENTS].filter((n) => !n.startsWith('page_view:') && !n.startsWith('map_filter:')))};
   function roamCount(n){
     try {
       if (!navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
@@ -14911,6 +14913,11 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       if (typeof gtag === 'function') gtag('event', name, p);
       // Build My Trip demand log (Stage 1): tell our own server which business was added/removed. Anonymous.
       if (ROAM_EV.indexOf(name) !== -1) roamCount(name);
+      // Roam Now detail: which filter went on, and the words typed (spoken words are not kept).
+      if (name === 'map_filter' && p.on && p.filter) roamCount('map_filter:' + String(p.filter).replace(/[^a-z_]/g, '').slice(0, 24));
+      if (name === 'map_search' && p.search_term && p.how !== 'voice' && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) {
+        navigator.sendBeacon('/api/map-search', new Blob([JSON.stringify({ term: String(p.search_term).slice(0, 120), found: p.results !== '0' })], { type: 'application/json' }));
+      }
       if (name === 'venue_view' || name === 'outbound_click' || name === 'event_view' || name === 'page_click') roamVenue(p, name);
       if ((name === 'add_to_trip' || name === 'remove_from_trip') && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) {
         navigator.sendBeacon('/api/trip/signal', new Blob([JSON.stringify({ kind: name === 'add_to_trip' ? 'add' : 'remove', ref: p.venue_ref || p.ref || null, name: p.venue_name || null, region: p.region || p.venue_region || null })], { type: 'application/json' }));
@@ -20884,6 +20891,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var d = e.target.closest && e.target.closest('[data-dir]');
     if (!d) return;
     var k = d.getAttribute('data-k') || '', x = k.charAt(0) === 'p' ? places[Number(k.slice(1))] : k.charAt(0) === 'e' ? events[Number(k.slice(1))] : null;
+    // Which business people want directions to (its address only), for the dashboard's Roam Now page.
+    try { if (k.charAt(0) === 'p' && x && x.url && navigator.sendBeacon) navigator.sendBeacon('/api/map-place', new Blob([JSON.stringify({ path: x.url })], { type: 'application/json' })); } catch (err) { /* counting must never break the map */ }
     if (x && x.lat != null && startRoute(x)) { e.preventDefault(); return; }
     track('map_directions', { kind: d.getAttribute('data-dir'), located: !!me, on_site: false });
   });
@@ -41466,7 +41475,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search and Build My Trip (leaving out anything that looks like an email, web address or number), as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -54283,6 +54292,7 @@ const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
   referralCounter.watch(req, res, requestClientIp(req)); // how people find us (referrals.js)
   notFoundCounter.watch(req, res, requestClientIp(req)); // broken pages (2026-11-06)
+  pageStats.watch(req, res, requestClientIp(req)); // pages opened and where they lead (2026-11-06)
   if ((req.method === 'GET' || req.method === 'HEAD') && String(req.url).split('?')[0] === '/healthz') return handleHealthz(req, res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
   // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
@@ -57220,6 +57230,28 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
+    // POST /api/map-search -- the words typed into Roam Now. Same-origin only, small body, always 204. Cleaned and counted
+    // like the site search (search-terms.js); anything that could identify someone is dropped.
+    if (pathname === '/api/map-search' && method === 'POST') {
+      if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
+      try {
+        const b = await readLimitedJsonBody(req, 512);
+        if (b && typeof b.term === 'string') searchTermCounter.record(req, 'map', b.term, b.found !== false, requestClientIp(req));
+      } catch (e) { /* ignore: counting only */ }
+      res.writeHead(204);
+      return res.end();
+    }
+    // POST /api/map-place -- directions asked for on Roam Now. Body { path } (a business page address). Same-origin only.
+    if (pathname === '/api/map-place' && method === 'POST') {
+      if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
+      try {
+        const b = await readLimitedJsonBody(req, 512);
+        if (b && typeof b.path === 'string') pageStats.recordMapDirections(req, b.path, requestClientIp(req));
+      } catch (e) { /* ignore: counting only */ }
+      res.writeHead(204);
+      return res.end();
+    }
+
     // POST /api/venue-event -- counts one business page view or link click. Body { venue_id, name }. Same-origin only,
     // 512-byte cap, always 204. Stores a per-day count for that business and nothing else.
     if (pathname === '/api/venue-event' && method === 'POST') {
@@ -57622,6 +57654,36 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
       }
       return res.end(renderOutboundPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: venueActivityCounter.outbound(days, 100) }, whistler] }));
+    }
+    // Guides and pages, Roam Now detail (2026-11-06). GET /api/admin/page-stats?days=30, /api/admin/roam-now?days=30. Admin token.
+    if ((pathname === '/api/admin/page-stats' || pathname === '/api/admin/roam-now') && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, pathname === '/api/admin/roam-now' ? pageStats.roamNow(query.days) : pageStats.pages(query.days));
+    }
+    // The pages: /admin/dashboard/pages and /admin/dashboard/roam-now (both sites side by side).
+    const pageStatsView = /^\/admin\/dashboard\/(pages|roam-now)\/?$/.exec(pathname);
+    if (pageStatsView && (method === 'GET' || method === 'HEAD')) {
+      const isRoam = pageStatsView[1] === 'roam-now';
+      const label = isRoam ? 'Roam Now detail' : 'Guides and pages';
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage(label, `<h1>${label}</h1><p>The admin key is not set up on this server.</p>`));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      let whistler;
+      if (!wToken) whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.' };
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/${isRoam ? 'roam-now' : 'page-stats'}?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          whistler = r.status === 200 ? { key: 'whistler', name: 'Whistler Roam', data: await r.json() }
+            : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have this report yet.' : `Whistler Roam answered ${r.status}.` };
+        } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
+      }
+      const own = { key: 'okanagan', name: 'Okanagan Roam', data: isRoam ? pageStats.roamNow(days) : pageStats.pages(days) };
+      return res.end((isRoam ? renderRoamNowPage : renderPagesPage)({ days, sites: [own, whistler] }));
     }
     // Funnels (2026-11-06). GET /api/admin/funnels?days=30 -> Build My Trip steps and the claim / portal funnel. Admin token.
     if (pathname === '/api/admin/funnels' && method === 'GET') {

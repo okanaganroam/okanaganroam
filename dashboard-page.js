@@ -66,7 +66,7 @@ function siteColumn(s, days) {
     parts.push(`<div class="card"><h3>Roam Now (the map)</h3>
       <div class="stats">${stat(e.roam_now.opens, 'opens')}${stat(e.roam_now.near_me, 'Near me taps')}${stat(e.roam_now.searches, 'searches', `${num(e.roam_now.empty_searches)} found nothing`)}${stat(e.roam_now.directions, 'directions')}</div>
       ${bars(e.roam_now_per_day, 'Opens per day')}
-      <div class="stats" style="margin-top:10px">${stat(e.roam_now.filters, 'filter changes')}${stat(e.roam_now.pins, 'pins tapped')}${stat(e.roam_now.voice, 'voice searches')}${stat(e.roam_now.shares, 'shares')}</div></div>
+      <div class="stats" style="margin-top:10px">${stat(e.roam_now.filters, 'filter changes')}${stat(e.roam_now.pins, 'start pins dropped')}${stat(e.roam_now.voice, 'voice searches')}${stat(e.roam_now.shares, 'shares')}</div></div>
       <div class="card"><h3>Build My Trip activity</h3>
       <div class="stats">${stat(e.trip.page_views, 'page views')}${stat(e.trip.plans_started, 'plans started')}${stat(e.trip.plans_completed, 'plans finished')}${stat(e.trip.shared, 'shared')}</div>
       ${bars(e.trip_per_day, 'Page views per day')}
@@ -125,6 +125,8 @@ function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', 
     '<a href="/admin/dashboard/business"><b>Search a business</b> (views and clicks)</a>',
     '<a href="/admin/dashboard/portal"><b>Business portal</b> (logins and what owners do)</a>',
     '<a href="/admin/dashboard/searches"><b>What people search for</b> (words typed into our search and Build My Trip)</a>',
+    '<a href="/admin/dashboard/roam-now"><b>Roam Now detail</b> (filters, words, towns, businesses)</a>',
+    '<a href="/admin/dashboard/pages"><b>Guides and pages</b> (what gets opened and what sends people on)</a>',
     '<a href="/admin/dashboard/funnels"><b>Funnels</b> (Build My Trip drop-off, claim emails to logins)</a>',
     '<a href="/admin/dashboard/errors"><b>Broken pages</b> (missing addresses and the links to them)</a>',
     '<a href="/admin/dashboard/outbound"><b>Outbound clicks</b> (website, book, call, directions per business)</a>',

@@ -12,6 +12,8 @@ const EVENTS = new Set([
   'open_my_trip', 'add_to_trip', 'remove_from_trip', 'shared_trip_view', 'shared_trip_save', 'shared_trip_cta_click',
   'hotel_page_click', 'bio_link_click', 'listing_submit', 'outbound_click', 'search',
   'portal_login_click_menu', 'portal_login_click_venue_page', 'portal_login_click_footer', 'portal_login_click_other', 'portal_claim_click',
+  // Which Roam Now filter was turned on (fixed keys; the map sends these when a filter goes on).
+  'map_filter:open', 'map_filter:top', 'map_filter:drinks', 'map_filter:food', 'map_filter:coffee', 'map_filter:wine', 'map_filter:beach', 'map_filter:outdoor', 'map_filter:golf', 'map_filter:do', 'map_filter:patio', 'map_filter:dogs', 'map_filter:happy', 'map_filter:specials', 'map_filter:nights', 'map_filter:music', 'map_filter:lake', 'map_filter:kids', 'map_filter:veg', 'map_filter:vegan', 'map_filter:gf', 'map_filter:late', 'map_filter:early', 'map_filter:groups', 'map_filter:sports', 'map_filter:nonalc', 'map_filter:free',
   'page_view:home', 'page_view:map', 'page_view:trip', 'page_view:whats_on', 'page_view:browse', 'page_view:hidden_gems',
 ]);
 
