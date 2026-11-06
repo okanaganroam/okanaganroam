@@ -398,7 +398,9 @@ test('Customer dates: valid cross-month and leap-day dates stay exact',()=>{
  assert.ok(r.tripCalendar('February 29, 2026').conflict);
 });
 test('Customer dates: reversed and overlong ranges cannot be silently planned',()=>{
- for(const text of ['October 18–17, 2026','October 1–20, 2026'])assert.ok(r.tripCalendar(text).conflict,text);
+ for(const text of ['October 18–17, 2026','October 1, 2026 to December 20, 2026'])assert.ok(r.tripCalendar(text).conflict,text);
+ // 2026-11-05: a range of a few weeks plans its first seven days and says so (trimmed), never silently.
+ const t=r.tripCalendar('October 1–20, 2026');assert.equal(t.days,7);assert.equal(t.trimmed,20);assert.equal(t.conflict,null);
 });
 
 test('Customer dates: French du/au range preserves both endpoints through translation',()=>{
@@ -417,7 +419,8 @@ test('Customer dates: fully specified endpoints preserve both years and enforce 
   const c=r.tripCalendar(text);assert.equal(c.startDate,'2026-10-17');assert.equal(c.endDate,'2026-10-18');assert.equal(c.days,2);
  }
  assert.equal(r.tripCalendar('December 31, 2026 to January 1, 2027').days,2);
- assert.ok(r.tripCalendar('October 1, 2026 to October 20, 2026').conflict);
+ assert.ok(r.tripCalendar('October 1, 2026 to December 20, 2026').conflict);
+ assert.equal(r.tripCalendar('October 1, 2026 to October 20, 2026').trimmed,20);
 });
 
 test('Customer coffee: explicit coffee excludes higher-rated dessert and tea-only cafes',()=>{

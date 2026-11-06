@@ -176,3 +176,261 @@ test('"for my sister\'s wedding" and "we have the Friday free" are not search wo
   assert.deepEqual(leftovers(i), []);
   assert.deepEqual(i.when, { weekday: 'friday' });
 });
+
+test('holiday weekends are the dates of that long weekend', () => {
+  const now = new Date('2026-11-05T12:00:00Z');
+  assert.match(d.holidayWeekendDates('thanksgiving', now), /october 9 to october 11 2027/);
+  assert.match(d.holidayWeekendDates('canada day', now), /july 1 to july 4 2027/);
+  assert.match(d.holidayWeekendDates('easter', now), /march 27 to march 29 2027/);
+  assert.equal(d.holidayWeekendDates('nonsense', now), null);
+});
+
+test('Server: "Canada Day weekend in Penticton" plans the four days of that break', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'Canada Day weekend in Penticton' });
+  assert.equal(p.kind, 'multi_day');
+  assert.equal(p.days.length, 4);
+});
+
+test('"remote worker", "solo", "bachelor party" and "cold and rainy" are not search words', () => {
+  for (const text of ['remote worker, 5 days in Vernon, a good cafe to work from', 'solo trip to Kelowna, 2 days, good coffee', 'bachelor party in Penticton, 3 days', 'cold and rainy weekend in Kelowna']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i), [], text + ' -> ' + JSON.stringify(leftovers(i)));
+  }
+});
+
+test('"we don\'t drive" and "relying on transit" are a car-free trip, not search words', () => {
+  const cal = (text) => { const i = parse(text); return tr.extractTripRequirements({ text, intent: i, trip: {}, taxonomy: TAXONOMY, referenceDate: '2026-11-05' }); };
+  for (const text of ["we don't drive, 3 days in Kelowna", '4 days in Kelowna, relying on transit']) {
+    const r = cal(text);
+    assert.ok(r.items.some((i) => i.kind === 'transport'), text + ' ' + JSON.stringify(r.items.map((i) => i.kind)));
+  }
+});
+
+test('"before our flight", "spending 2 nights", "beginners", "colours" and "spring break" are not search words', () => {
+  for (const text of ['3 afternoon hours in Penticton before our flight', 'road trip stopping for lunch in Vernon and spending 2 nights in Kelowna', 'first time wine tasting in Naramata for beginners', 'fall colours weekend in Kelowna, wine']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /flight|spending|stopping|beginner|first|colou?r/i.test(w)), [], text);
+  }
+});
+
+test('"two days Kelowna and one day Vernon" is one trip of the total length', () => {
+  assert.equal(d.mergeSegmentStays('two days kelowna and one day vernon wine and food couple'), '3 days in kelowna and vernon wine and food couple');
+  assert.equal(d.mergeSegmentStays('2 nights penticton then 2 nights vernon, hiking'), '5 days in penticton and vernon, hiking');
+  assert.equal(d.mergeSegmentStays('2 days in kelowna and 1 day hiking'), '2 days in kelowna and 1 day hiking');
+  const i = parse('two days Kelowna and one day Vernon, wine and food, couple');
+  assert.equal(i.days, 3);
+});
+
+test('"Instagrammable", "locals only", "3 generations", "I have a car with a bike rack" and "a snowy day" are read, not searched', () => {
+  for (const text of ['the most Instagrammable spots in Kelowna for a day', 'we are 3 generations, 6 people, 2 days in Vernon, mostly outdoors', 'I have a car with a bike rack, 3 days cycling, Penticton', 'dinner in Kelowna for kids on a snowy day']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /instagram|generation|^car$|^rack$|snowy/i.test(w)), [], text);
+  }
+  assert.equal(parse('dinner in Kelowna for kids on a snowy day').occasion, 'rainy_day');
+});
+
+test('a sunrise hike is a morning hike', () => {
+  const i = parse('sunrise hike then breakfast in Kelowna tomorrow');
+  assert.ok(!leftovers(i).includes('sunrise'), JSON.stringify(leftovers(i)));
+  assert.equal(i.when && i.when.daypart, 'morning');
+});
+
+test('French: "quelle journée parfaite", "de la France", "glaces", "personnes" are read', () => {
+  const fr = require('../trip-planner-fr.js');
+  const t = (q) => fr.tripPlannerText(q, TAXONOMY);
+  assert.equal(t('Quelle journée parfaite à Kelowna avec deux enfants, demain'), 'a day in kelowna with two kids, tomorrow');
+  assert.match(t('je visite de la France, une semaine en juillet'), /from france/);
+  assert.match(t('plage et glaces'), /ice cream/);
+  assert.match(t('deux personnes'), /two people/);
+  const i = parse(t('je visite de la France, une semaine en juillet, vins et plages'));
+  assert.ok(!leftovers(i).includes('france'), JSON.stringify(leftovers(i)));
+});
+
+test('"six year olds", "a group of 6 guys", "bus tour group" and "shopping" are not misread', () => {
+  for (const text of ['kids birthday party in Kelowna for 8 six year olds, Saturday afternoon', 'nightlife in Kelowna for a group of 6 guys Friday night', 'bus tour group of 40 seniors, one day, wineries and lunch, Kelowna']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /^(?:year|olds?|group|bus|tour)$/.test(w)), [], text + ' ' + JSON.stringify(leftovers(i)));
+  }
+  // "shopping" is never "corrected" to "sipping" (a winery).
+  const i = parse('shopping in Penticton');
+  assert.deepEqual(i.types, []);
+  assert.deepEqual(i.corrections, []);
+});
+
+test('Server: "3 hours between flights, stuck at Kelowna airport" is a 3-hour window in Kelowna', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: '3 hours between flights, stuck at Kelowna airport, what is close by' });
+  const text = JSON.stringify([p.summary, p.warnings, p.unsupported, p.understood]);
+  assert.ok(/180 minutes|3 hours/.test(text) && !/stuck|flights|airport/i.test(JSON.stringify(p.unsupported || [])), text.slice(0, 400));
+  assert.ok(/Kelowna/.test(JSON.stringify(p.understood || p.summary)), text.slice(0, 300));
+});
+
+test('plain times: "between 2 and 5", "home by 6", "free after 4pm", "avoid crowds", "cheap as possible"', () => {
+  assert.equal(d.plainClockTimes('free between 2 and 5 tomorrow in Vernon').trim(), 'from 2pm to 5pm tomorrow in Vernon');
+  assert.equal(d.plainClockTimes('home by 6'), 'home by 6pm');
+  assert.equal(d.plainClockTimes('home by 6:30'), 'home by 6:30pm');
+  assert.equal(d.plainClockTimes('back by 9pm'), 'back by 9pm');
+  assert.equal(d.plainClockTimes('between 9am and 12 pm').trim(), 'from 9am to 12pm');
+  assert.equal(d.plainClockTimes('we are free after 4pm today').replace(/\s+/g, ' '), 'we are after 4pm today');
+  for (const text of ['avoid crowds, 2 days Kelowna', 'cheap as possible, 1 day Kelowna', 'a day in Penticton with exactly 3 wineries']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /avoid|crowd|possible|^as$|exactly/i.test(w)), [], text);
+  }
+});
+
+test('Server: places named in a short outing are its stops, in the order named', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'lunch at Frankie We Salute You and then a tasting at Sandhill Wines Saturday' });
+  const names = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.deepEqual(names, ['Frankie We Salute You!', 'Sandhill Wines'], JSON.stringify(names));
+  assert.ok(!(p.warnings || []).some((w) => /No selected stop meets/.test(w)), JSON.stringify(p.warnings));
+  const q = app.runTripPlan({ text: 'a tasting at Sandhill Wines and then dinner Saturday' });
+  const q1 = (q.itinerary && q.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.equal(q1[0], 'Sandhill Wines', JSON.stringify(q1));
+});
+
+test('Server: a place named by the front of its name is that place ("Home Block", "Waterfront Wines")', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'dinner at Home Block then a walk tonight' });
+  const names = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
+  assert.ok(names.includes('Home Block at CedarCreek Estate Winery'), JSON.stringify(names));
+});
+
+test('a named holiday with a fixed date is that date (Canada Day, Remembrance Day, Valentine\'s Day, New Year\'s Eve)', () => {
+  assert.equal(d.fixedHolidayDates('fireworks in Kelowna on Canada Day').trim(), 'fireworks in Kelowna on july 1');
+  assert.match(d.fixedHolidayDates("Valentine's Day dinner in Penticton"), /on february 14/);
+  assert.match(d.fixedHolidayDates('Remembrance Day lunch'), /on november 11/);
+  assert.match(d.fixedHolidayDates("New Year's Eve in Kelowna"), /on december 31/);
+  assert.equal(d.fixedHolidayDates('Canada Day weekend in Penticton'), 'Canada Day weekend in Penticton');
+  assert.equal(d.fixedHolidayDates('a Christmas market in Vernon'), 'a Christmas market in Vernon');
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: "Valentine's Day dinner in Penticton" });
+  assert.equal(p.listDate, '2027-02-14');
+});
+
+test('Server: a trip to Hawaii or Paris says the Okanagan Valley is the only area covered', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const [text, place] of [['trip to Hawaii', 'Hawaii'], ['3 days in Paris', 'Paris']]) {
+    const p = app.runTripPlan({ text });
+    assert.ok((p.notes || []).some((n) => n.includes(`${place} isn’t included`)), text + ' ' + JSON.stringify(p.notes));
+  }
+});
+
+test('"in 2 weeks" is a date, and week phrases are read as days', () => {
+  const di = require('../discovery-intent.js');
+  const now = new Date('2026-11-06T09:00:00Z');
+  assert.match(di.plainRelativeDates('a trip in 2 weeks to Kelowna', now), /on november 20/);
+  assert.equal(di.plainRelativeDates('in 3 months', now), 'in 3 months');
+});
+
+test('"wine and a sunset dinner" keeps the wine and does not add a separate lookout', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'romantic Saturday in Kelowna with wine and a sunset dinner' });
+  const stops = (p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || [];
+  assert.ok(stops.some(s => s.venue && s.venue.type === 'winery'), 'a winery stop');
+  assert.ok(!(p.warnings || []).some(w => /viewpoint/i.test(w)), 'no lookout warning');
+});
+
+test('"dinner at a Thai restaurant" is one dinner stop, not a dinner plus a restaurant', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['lunch at a sushi place then a winery in Kelowna tomorrow', 'dinner at a restaurant then a winery in Kelowna on Saturday']) {
+    const p = app.runTripPlan({ text });
+    const stops = ((p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []).filter(s => s && s.venue);
+    assert.equal(stops.filter(s => s.venue.type === 'restaurant').length, 1, text);
+  }
+});
+
+test('"10 girls" is a head count, not an unknown place word', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'bachelorette weekend in Kelowna, 10 girls, wineries' });
+  assert.ok(!(p.unsupported || []).includes('girls'));
+});
+
+test('golf wording ("4 players", "one round", "foursome") and "a round of drinks" leave no stray words', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['guys golf trip to Vernon, 4 players, one round and beers after', 'a round of drinks in Kelowna']) {
+    const p = app.runTripPlan({ text });
+    const said = JSON.stringify([p.summary, p.warnings, p.unsupported]);
+    assert.ok(!/\bround\b|\bplayers\b/i.test(said), text + ' -> ' + said);
+  }
+});
+
+test('two-word places outside the Okanagan ("Salmon Arm", "Las Vegas") are reported as not covered', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const [text, name] of [['things to do in Salmon Arm', 'Salmon Arm'], ['a weekend in Las Vegas', 'Las Vegas']]) {
+    const p = app.runTripPlan({ text });
+    assert.ok((p.unsupported || []).includes(name), text);
+    assert.ok(!/seafood|salmon/i.test(p.summary || ''), text + ' -> ' + p.summary);
+  }
+});
+
+test('"no early mornings" is a relaxed pace, and "between a meeting and my flight" is a layover', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  let p = app.runTripPlan({ text: 'retired couple, 5 days, wine tour Kelowna to Osoyoos, no early mornings' });
+  assert.ok(!(p.unsupported || []).some(u => /early/i.test(u)));
+  p = app.runTripPlan({ text: 'I have 3 hours between a meeting in Kelowna and my flight, something near the airport' });
+  assert.ok(!/between|meeting|flight/i.test(p.summary || ''), p.summary);
+});
+
+test('a bare time box ("we have 2 hours in Vernon", "an hour to kill") becomes a short plan, not a list of ideas', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['we have 2 hours in Vernon', 'I have an hour to kill in Kelowna tomorrow at noon']) {
+    const p = app.runTripPlan({ text });
+    assert.equal(p.kind, 'itinerary', text);
+    assert.ok(!/\b(?:hour|hours|kill)\b/i.test(p.summary || ''), text + ' -> ' + p.summary);
+  }
+  // A layover keeps its own handling.
+  assert.equal(app.runTripPlan({ text: '3 hours between flights in Kelowna' }).kind, 'discover');
+});
+
+test('"Christmas week" is a date, not an unknown word', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'Christmas week in the Okanagan, ski and cozy dinners' });
+  const said = JSON.stringify([p.warnings, p.unsupported]);
+  assert.ok(!/\bweek\b/i.test(said), said);
+});
+
+test('"a winery then lunch" and "lunch then a winery" keep the order asked', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const order = (text) => ((app.runTripPlan({ text }).itinerary || {}).stops || []).map(s => s.venue && s.venue.type);
+  assert.deepEqual(order('a winery then lunch in Kelowna tomorrow'), ['winery', 'restaurant']);
+  assert.deepEqual(order('lunch then a winery in Kelowna tomorrow'), ['restaurant', 'winery']);
+});
+
+test('"can\'t walk much" / "bad knees" does not plan a walk and says access is not listed', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: "something for a 70 year old who can't walk much, Vernon, Saturday" });
+  assert.ok(!/outdoor/i.test(p.summary || ''), p.summary);
+  assert.ok((p.warnings || []).some(w => /access isn.t listed/i.test(w)));
+});
+
+test('weekday spans ("Thursday to Sunday", "arriving Friday, leaving Monday", a town per weekday) are multi-day trips', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const daysOf = (text) => (app.runTripPlan({ text }).days || []).length;
+  assert.equal(daysOf('Thursday to Sunday in Kelowna'), 4);
+  assert.equal(daysOf('Friday to Sunday in Penticton'), 3);
+  assert.equal(daysOf('we arrive Thursday and leave Sunday, Kelowna'), 4);
+  assert.equal(daysOf('arriving Friday, leaving Monday, Vernon'), 4);
+  assert.equal(daysOf('Friday night to Sunday brunch in Penticton'), 3);
+  assert.equal(daysOf('Friday night in Penticton, Saturday in Naramata, Sunday brunch in Summerland'), 3);
+  // Opening hours are not a trip.
+  assert.notEqual(app.runTripPlan({ text: 'restaurants open Monday to Friday in Kelowna' }).kind, 'multi_day');
+});

@@ -484,6 +484,7 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     const text = listedHoursText(v, null, fit.days);
     if (text) reasons.push({ code: 'hours', text, weight: 2 });
     caveats.push(`Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
+    if (!weekday && Array.isArray(fit.days) && fit.days.length <= 2) score -= 6; // 2026-11-05: open for this slot one or two days a week
     // 2026-10-25: a plan with no date is timed from a Saturday, so a place closed that day (a winery open Mon-Fri on
     // day 1, a Tue-Sat sushi lunch on day 2, a Sunday) comes after places that are open.
     // Day 1 of an undated plan is a Saturday, day 2 a Sunday, and so on.
@@ -1314,7 +1315,7 @@ function requestedTimeFit(v, ctx) {
     const role = cafeRole(v);
     if (role && CAFE_SLOT_ADJUST[role]) score += CAFE_SLOT_ADJUST[role][part] || 0;
     if (fit.status === 'verified') { score += 6; const t = listedHoursText(v, weekday, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 6 }); }
-    else if (fit.status === 'partial') { score += 2; const t = listedHoursText(v, null, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 2 }); caveats.push(`Its listed hours only fit the ${SLOT_WINDOWS[part].label} on ${dayListText(fit.days)} \u2014 check the day you go`); }
+    else if (fit.status === 'partial') { score += 2; if (!weekday && Array.isArray(fit.days) && fit.days.length <= 2) score -= 6; /* 2026-11-05: open for this slot only one or two days a week (a lunch on Fridays) */ const t = listedHoursText(v, null, fit.days); if (t) reasons.push({ code: 'hours', text: t, weight: 2 }); caveats.push(`Its listed hours only fit the ${SLOT_WINDOWS[part].label} on ${dayListText(fit.days)} \u2014 check the day you go`); }
     else if (fit.status === 'short') { score -= 3; const t = listedHoursText(v, weekday); if (t) reasons.push({ code: 'hours', text: t, weight: 1 }); caveats.push(`Its listed hours only overlap part of the ${SLOT_WINDOWS[part].label} \u2014 check before you go`); }
     else { score -= 2; caveats.push(UNKNOWN_HOURS_CAVEAT); }
   } else {
@@ -3844,6 +3845,35 @@ function leadUpToDinner(result, input, requirements) {
   }
   return false;
 }
+// 2026-11-05: a café and a lunch under 75 minutes apart (10:45 coffee, 11:30 lunch) is two meals in a row. Days whose start was
+// slid later are slid back, a quarter hour at a time, until the two are apart; if nothing works the slide is dropped.
+function separateBackToBackMeals(result, input, requirements) {
+  if (!result || !(result.days || []).length || !(result.schedule || []).length || !requirements || !requirements.dayStartMinutes) return false;
+  let changed = false;
+  for (const day of result.days) {
+    const set = requirements.dayStartMinutes[day.day];
+    if (set == null) continue;
+    const typeOf = new Map(day.stops.filter((st) => st.venue).map((st) => [st.venue.id, st.venue.type]));
+    const eats = (r) => ['cafe', 'restaurant'].includes(typeOf.get(r.venueId));
+    const tooClose = (rows) => rows.some((r, i) => i > 0 && eats(r) && eats(rows[i - 1]) && Number.isFinite(r.startMinutes) && Number.isFinite(rows[i - 1].startMinutes) && r.startMinutes - rows[i - 1].startMinutes < 75);
+    const rows = result.schedule.filter((r) => r.day === day.day);
+    if (!tooClose(rows)) continue;
+    const ids = rows.map((r) => r.venueId).join(',');
+    let fixed = null;
+    for (let m = set - 15; m >= Math.max(0, set - 180); m -= 15) {
+      const probe = JSON.parse(JSON.stringify(result));
+      scheduleTripByHours(probe, input, { ...requirements, dayStartMinutes: { ...requirements.dayStartMinutes, [day.day]: m } }, { probe: true });
+      const cand = probe.schedule.filter((r) => r.day === day.day);
+      if (cand.map((r) => r.venueId).join(',') !== ids || cand.some((r) => !Number.isFinite(r.startMinutes) || (r.daylight && r.daylight.status === 'conflict')) || tooClose(cand)) continue;
+      fixed = m; break;
+    }
+    if (fixed != null) requirements.dayStartMinutes = { ...requirements.dayStartMinutes, [day.day]: fixed };
+    else { requirements.dayStartMinutes = { ...requirements.dayStartMinutes }; delete requirements.dayStartMinutes[day.day]; }
+    changed = true;
+  }
+  if (changed) scheduleTripByHours(result, input, requirements);
+  return changed;
+}
 function startLaterOnMorningGaps(result, input, requirements) {
   if (!result || !(result.days || []).length || !(result.schedule || []).length || input.swap || !requirements) return false;
   if (requirements.startMinutes != null || requirements.windowClock || requirements.windowToday) return false;
@@ -5336,6 +5366,7 @@ function planTripUnchecked(input) {
   leadUpToDinner(result, { ...input, intent }, requirements);
   // Planner (2026-10-27): no wait of more than 90 minutes between stops is left unexplained (see closeIdleGaps).
   closeIdleGaps(result, { ...input, intent }, requirements, { userTimed: namedTimes });
+  separateBackToBackMeals(result, { ...input, intent }, requirements);
   if (eveningWalk && result.days.length) {
     // 2026-10-19: the rule is applied, not only stated. A dinner reached by car after the cut-off is said, day by day.
     const late = eveningWalkLateDrives(result, eveningWalk);
@@ -6866,7 +6897,9 @@ function planItinerary(input) {
     if (s.timed || !firstEvent) return windowStart(s.daypart);
     return firstEvent.start >= 17 * 60 ? firstEvent.start - 1 : firstEvent.start + 1;
   };
+  const asAsked = !route && stops.length > 1 && stops.every((s) => s.kind === 'venue' && s.component && s.component.sequenced);
   stops.sort((a, b) => {
+    if (asAsked) return a.index - b.index;
     if (route && a.kind === 'venue' && b.kind === 'venue') {
       const ra = routeIndex.get(a.venue.region) ?? 99, rb = routeIndex.get(b.venue.region) ?? 99;
       if (ra !== rb) return ra - rb;

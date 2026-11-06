@@ -220,7 +220,25 @@
   "Princeton",
   "Hope",
   "Kaslo",
-  "Golden"
+  "Golden",
+  "Hawaii",
+  "Maui",
+  "Mexico",
+  "Cancun",
+  "Las Vegas",
+  "Los Angeles",
+  "San Francisco",
+  "Portland",
+  "Spokane",
+  "Lake Louise",
+  "Cranbrook",
+  "Nanaimo",
+  "Prince George",
+  "Paris",
+  "London",
+  "Tokyo",
+  "Rome",
+  "New York"
  ],
  "tests": [
   {

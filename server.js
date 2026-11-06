@@ -7489,15 +7489,19 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: a beer, cider or distillery "tour" is a run of breweries, cideries or distilleries ("craft beer tour in Kelowna"
   // was one farm tour); the requirements see the same words.
-  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy)
+  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
+  // 2026-11-05: the same words with trip-length, holiday-weekend and tour wording made plain (the French layer's own text is kept above).
+  const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(/\bsunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/gi, ' dinner with a lake view ')))
+    .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
+    .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');
   // Calendar dates are handled by requirements, not mistaken for a day count.
   const requirementModule = require('./trip-requirements');
-  const calendar = requirementModule.tripCalendar(planText, todayLocal(now));
+  const calendar = requirementModule.tripCalendar(planTextPlain, todayLocal(now));
   // Round 9 (2026-10-19): « soirée spectacle » / "a show on Saturday night" is dinner and a show, like "dinner and a show".
   const showEvening = tripPlannerModule().showEveningText;
   let interpretationText = requirementModule.sportsVenueInterpretationText(showEvening(calendar.cleanText), taxonomy);
-  let requirementsText = showEvening(planText);
+  let requirementsText = showEvening(planTextPlain);
   let namedEventAmbiguity = null;
   const eventChoiceDate = overrides?.startDate || calendar.startDate;
   let namedEventCandidates = [];
@@ -7509,7 +7513,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     interpretationText = detected.text;
     namedEventAmbiguity = detected.ambiguity;
     namedEventCandidates = detected.ambiguity ? listed.filter(e => detected.ambiguity.candidateIds.includes(e.id)) : [];
-    requirementsText = requirementModule.namedEventInterpretationText(showEvening(planText), listed);
+    requirementsText = requirementModule.namedEventInterpretationText(showEvening(planTextPlain), listed);
   }
   let selectedNamedEvent = null;
   if (overrides?.eventId !== undefined) {

@@ -26,7 +26,7 @@ const KINDS = {
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
 };
 const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
-const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
+const WALKING_TRANSPORT = /\b(?:no car|(?:we |i )?(?:do not|don t|dont) drive|(?:rely|relying) on (?:public )?(?:transit|buses|the bus)|public transit|no vehicle|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
 const EVENING_NO_DRIVE = /\b(?:no|not|don t|do not|won t|will not|avoid|without)\s+(?:want to\s+)?(?:driving|drive|car)\s+(?:after|past|once it s|at|in the)\s+(?:(2[0-3]|1\d|0?[1-9])(?:\s*h)?(?:\s*([0-5]\d))?\s*(am|pm|h)?|dark|night|nightfall|sunset|dinner|evening|the evening)\b/;
@@ -40,6 +40,31 @@ const venueNames = new Map();
 function venueName(name) {
   if (!venueNames.has(name)) { if (venueNames.size >= 4096) venueNames.clear(); venueNames.set(name, norm(name)); }
   return venueNames.get(name);
+}
+// Front-of-name aliases, only when exactly one listing has them (and no listing's full name equals one).
+const ALIAS_TRAILING = new Set(['restaurant','restaurants','winery','wines','wine','estate','estates','family','vineyard','vineyards','cellars','cellar','brewing','brewery','co','company','kitchen','bar','grill','bistro','cafe','pub','lounge','taphouse','distillery','distilling','and','the','at']);
+const aliasCache = new WeakMap();
+function venueAliases(venues) {
+  if (aliasCache.has(venues)) return aliasCache.get(venues);
+  const count = new Map(), owner = new Map(), full = new Set();
+  for (const v of venues) { if (v.redirect_to || !v.name) continue; full.add(venueName(v.name)); }
+  for (const v of venues) {
+    if (v.redirect_to || !v.name) continue;
+    const words = venueName(v.name).split(' ').filter(Boolean);
+    let alias = null;
+    const at = words.indexOf('at');
+    if (at >= 2) alias = words.slice(0, at).join(' ');
+    else {
+      let end = words.length;
+      while (end > 2 && ALIAS_TRAILING.has(words[end - 1])) end--;
+      if (end < words.length && end >= 2) alias = words.slice(0, end).join(' ');
+    }
+    if (!alias || alias.length < 8 || full.has(alias)) continue;
+    count.set(alias, (count.get(alias) || 0) + 1); owner.set(alias, v);
+  }
+  const out = new Map([...owner].filter(([a]) => count.get(a) === 1));
+  aliasCache.set(venues, out);
+  return out;
 }
 // Interpret a uniquely named sports destination as its sport, not words within its name.
 // Keep the original request for named-venue requirements and quoted customer text.
@@ -57,7 +82,12 @@ function sportsVenueInterpretationText(text,taxonomy){
   const phrase=kind?kind.replace(/_/g,' '):'sports venues';
   clean=clean.split(' '+name+' ').join(' '+phrase+' ');changed=true;
  }
- return changed?clean.trim():text;
+ // 2026-11-05: a place named by the front of its name ("Waterfront Wines") is that place, not the words "wines" and "waterfront".
+ for(const [alias]of venueAliases(taxonomy.venues||[])){
+  if(!clean.includes(' '+alias+' '))continue;
+  clean=clean.split(' '+alias+' ').join('  ');changed=true;
+ }
+ return changed?clean.replace(/\s+/g,' ').trim():text;
 }
 // "Pizza one night", "sushi once": a food asked for one time; onceEvening are the ones asked for at night.
 function onceFoods(normalizedText){
@@ -377,6 +407,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     if(!mention)continue;
     if(!names.has(name))names.set(name,[]);names.get(name).push({...v,scopeText:mention.scopeText});
   }
+  // 2026-11-05: a place named by the front of its name -- "Waterfront Wines" for Waterfront Wines Restaurant, "Home Block" for
+  // Home Block at CedarCreek Estate Winery -- is that place when no other listing shares those words (never a guess between two).
+  const matchedIds=new Set([...names.values()].flatMap(vs=>vs.map(v=>v.id)));
+  for(const [alias,v] of venueAliases(taxonomy.venues||[])) {
+    if(matchedIds.has(v.id)||names.has(alias))continue;
+    const mention=clauses.find(({c})=>` ${c} `.includes(` ${alias} `)&&!/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,c.indexOf(alias))));
+    if(!mention)continue;
+    names.set(alias,[{...v,scopeText:mention.scopeText}]);
+  }
   for(const [name,vs] of names){if(vs.length===1)add('venue',vs[0].id,vs[0].scopeText,{venueType:vs[0].type,venueName:vs[0].name});else conflicts.push(`More than one listing is named “${vs[0].name}”; choose a specific venue.`);}
   // Budget bands guide suggestions; they never verify a total dollar cost.
   if (/\b(?:under|budget of|maximum|max)\s*\$\s*(?:100|[1-9]\d?)\b/i.test(original) || /\b(?:easy|simple|casual) (?:food|meals|dining)\b/.test(normalizedText)) add('price_limit',2,'Prefer lower price bands; total cost remains unverified.');
@@ -523,6 +562,26 @@ function consumedTerms(requirements) {
 
 // A constrained single-day outing schedules requested components, rather than
 // filling unrelated breakfast/lunch/dinner slots. Multi-day plans stay intact.
+// 2026-11-05: places named in a short outing ("lunch at Frankie We Salute You, then Kasugai Garden") are those stops, in the
+// order they were named; they were looked for and then replaced by other places.
+function bindNamedVenues(trip,requirements) {
+  const named=(requirements.items||[]).filter(i=>i.kind==='venue'&&i.strength==='must'&&Number.isInteger(i.value)&&i.venueType&&i.venueName);
+  if(!named.length||!trip?.multi||!(trip.components||[]).length)return trip;
+  const text=' '+norm(requirements.text||'')+' ',comps=trip.components.map(c=>({...c}));
+  const where=(s)=>{const n=text.indexOf(' '+norm(s||'')+' ');return n<0?-1:n;};
+  let changed=false;
+  for(const item of named) {
+    if(comps.some(c=>c.venueId===item.value))continue;
+    const at=where(item.venueName);
+    const idx=comps.findIndex(c=>c.kind==='venue'&&!c.venueId&&(c.types||[]).includes(item.venueType));
+    if(idx>=0){comps[idx].venueId=item.value;comps[idx].phrase=item.venueName;changed=true;continue;}
+    const part={kind:'venue',types:[item.venueType],phrase:item.venueName,activities:[],features:[],collections:[],cuisines:[],dog:!!trip.party?.dog,kids:!!trip.party?.kids,meal:null,daypart:requirements.daypart||null,generic:false,venueId:item.value};
+    let insertAt=comps.length;
+    if(at>=0)for(let n=0;n<comps.length;n++){const w=where(comps[n].phrase);if(w>at){insertAt=n;break;}}
+    comps.splice(insertAt,0,part);changed=true;
+  }
+  return changed?{...trip,components:comps,explicitStops:true}:trip;
+}
 function explicitOutingComponents(trip,requirements) {
   const items=requirements.items||[],days=items.find(i=>i.kind==='days')?.value||requirements.planDays;
   if(days>1 || items.some(i=>i.dayIndex>1))return trip;
@@ -530,7 +589,7 @@ function explicitOutingComponents(trip,requirements) {
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
   const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
-  if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
+  if(!scoped)return bindNamedVenues(requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip,requirements);
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';
   const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false,...extra});
@@ -569,7 +628,9 @@ function explicitOutingComponents(trip,requirements) {
   return {...trip,multi:true,components:parts,leftoverTerms:[],explicitStops:true,outingOccasion:trip?.outingOccasion,regions:trip?.regions||[],party:trip?.party||{dog:false,kids:false},when:trip?.when||null,route:trip?.route||null,unknownPlaces:trip?.unknownPlaces||[]};
 }
 
-function expandTripComponents(trip,requirements) {
+// A place named in a short outing is its stop (bindNamedVenues), whichever way the components were built.
+function expandTripComponents(trip,requirements) { return bindNamedVenues(expandTripComponentsInner(trip,requirements),requirements); }
+function expandTripComponentsInner(trip,requirements) {
   // Round 15b (2026-10-20): a crawl keeps its three stops ("winery hopping in Oliver this afternoon" became one winery:
   // the afternoon's explicit-outing rebuild merged the crawl's copies into its one "winery" item).
   if (!(trip?.multi && trip.crawl) && (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport'))) trip=explicitOutingComponents(trip,requirements);

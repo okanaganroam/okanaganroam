@@ -86,9 +86,148 @@ function normalizeDiscoveryText(text) {
 // Only on the visitor's own words, after an exact venue-name match, so "Kelowna Airport" the venue still resolves.
 const ORIGIN_PLACES = require('./vocabulary.js').sharedList('originPlaces').map((p) => normalizeDiscoveryText(String(p))).filter(Boolean).sort((a, b) => b.length - a.length);
 const ORIGIN_RE = ORIGIN_PLACES.length ? new RegExp(`\\bfrom (?:the )?(?:${ORIGIN_PLACES.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g') : null;
+
+// "two days Kelowna and one day Vernon", "2 nights Penticton then 2 nights Vernon": one trip of the total length through both towns.
+const STAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+function mergeSegmentStays(text) {
+  const num = '(\\d|one|two|three|four|five|six|seven)', unit = '(days?|nights?)', place = "((?:[a-z]+ ){0,1}[a-z]+)";
+  const re = new RegExp(`\\b${num} ${unit} (?:in |at |around |near )?${place} (?:and|then|followed by|and then|after that|plus) ${num} ${unit} (?:in |at |around |near )?${place}\\b`, 'i');
+  return String(text).replace(re, (m, n1, u1, p1, n2, u2, p2) => {
+    // A town, not an activity: "2 days in Kelowna and 1 day hiking" is one town and a hike.
+    const ACTIVITY = /^(?:hik\w*|bik\w*|cycl\w*|wine\w*|vineyards?|beer|brew\w*|food|golf\w*|beach\w*|lunch|dinner|brunch|breakfast|coffee|cafes?|spa|ski\w*|relax\w*|rest|shopping|sightseeing|exploring|fun|swim\w*|boat\w*|kayak\w*|couple|family|kids|friends|with|for|wineries|winery)$/;
+    const town = (w) => { const out = []; for (const x of w.split(' ')) { if (ACTIVITY.test(x)) break; out.push(x); } return out.join(' '); };
+    const rest2 = p2; p1 = town(p1); p2 = town(p2);
+    if (!p1 || !p2 || p1 === p2) return m;
+    const tail = rest2.slice(p2.length);
+    const a = STAY_WORDS[n1.toLowerCase()] || Number(n1), b = STAY_WORDS[n2.toLowerCase()] || Number(n2);
+    const nights = /^night/i.test(u1) || /^night/i.test(u2);
+    const total = nights ? a + b + 1 : a + b;
+    if (!(total >= 2 && total <= 7)) return m;
+    return `${total} days in ${p1} and ${p2}${tail}`;
+  });
+}
+
+// Times said plainly: "free between 2 and 5" is from 2pm to 5pm; "home by 6" is by 6pm; "free after 4pm" is after 4pm.
+// (Used on the normalised words and on the request's own text.)
+function plainClockTimes(text) {
+  const clockPart = (h, ap) => (ap ? `${h}${ap}` : (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 8 ? `${h}pm` : `${h}`));
+  return String(text)
+    .replace(/\b(?:(?:free|available|around|out) )?between (\d{1,2}(?::30| ?30)?) ?(am|pm)? (?:and|to|-) (\d{1,2}(?::30| ?30)?) ?(am|pm)?(?![\d:])/gi, (m, a, ap1, b, ap2) => ` from ${clockPart(a, ap1 || ap2)} to ${clockPart(b, ap2)} `)
+    .replace(/\b(home|back|done|finished|finish|return|back at the hotel|back to the hotel) by (\d{1,2}(?::30)?)(?! ?(?:am|pm|a m|p m|o clock|:))\b/gi, (m, w, h) => `${w} by ${clockPart(h, '')}`)
+    .replace(/\b(?:free|available) (?=(?:after|before|from|until|till|at|between) \d)/gi, ' ');
+}
+
+// A named holiday with a fixed date ("fireworks on Canada Day", "dinner on Valentine's Day") is that date.
+function fixedHolidayDates(text, keepName = false) {
+  const dateOf = (h) => {
+    const k = h.toLowerCase().replace(/[’']/g, '').replace(/\s+/g, ' ');
+    if (k === 'remembrance day') return 'november 11';
+    if (k === 'canada day') return 'july 1';
+    if (k === 'christmas eve') return 'december 24';
+    if (k === 'christmas day') return 'december 25';
+    if (k === 'christmas week') return 'december 27'; // Dec 25 itself is mostly closed
+    if (k === 'boxing day') return 'december 26';
+    if (/^new ?years? ?s? eve$/.test(k)) return 'december 31';
+    if (/^new ?years? ?s? day$/.test(k)) return 'january 1';
+    if (/^valentines? ?s? day$/.test(k)) return 'february 14';
+    return null;
+  };
+  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|christmas week|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?: week)?(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? (keepName ? ` ${h} on ${dateOf(h)} ` : ` on ${dateOf(h)} `) : m)).replace(/\s+/g, ' ');
+}
+
+// "in 2 weeks", "in ten days", "a week from Friday" is not read by the date reader; "in N days/weeks" becomes that date.
+function plainRelativeDates(text, now = new Date()) {
+  // "can't walk much", "bad knees", "limited mobility": step-free access is not listed (it is said so), and trails are out.
+  text = String(text).replace(/\b(?:(?:can['’ ]?t|cannot|can not|doesn['’ ]?t|does not|don['’ ]?t|do not|won['’ ]?t) (?:walk|hike) (?:much|far|well|long)|(?:trouble|difficulty|problems?) (?:with )?walking|bad (?:knees|hips|back|legs)|(?:limited|reduced) mobility|mobility (?:issues?|limitations?|problems?|challenges?)|(?:uses|using|with) a (?:walker|cane|rollator)|walks? slowly|slow walkers?)\b/g, ' accessible no hiking ');
+  // "an hour to kill", "time to kill", "kill some time": a stretch of free time, not words to search for.
+  text = String(text).replace(/\b(an|one|1) hour (?:to|2) kill\b/g, ' 1 hours ').replace(/\b(\d{1,2}|two|three|four|five) hours? (?:to )?kill\b/g, ' $1 hours ').replace(/\b(?:some |a little |a bit of |extra )?time to kill\b|\bkill(?:ing)? (?:some |a little |an? )?(?:time|hour|afternoon|morning|evening)\b/g, ' ');
+  // A bare time box ("we have 2 hours in Vernon") with nothing to do in it: a coffee and an easy walk fill it.
+  if (/^\W*(?:(?:we|i)(?: only| just)? (?:have|got) )?(?:about |around )?(?:\d{1,2}|an?|one|two|three|four) (?:hours?|hrs?)(?: [a-z]+ [a-z]+)?(?: (?:in|around|near|at|downtown) [a-z ]+?)?(?: (?:tomorrow|today|tonight|right now|this (?:morning|afternoon|evening)|on [a-z]+|at (?:noon|\d{1,2}(?::\d\d)? ?(?:am|pm)?)))*\W*$/i.test(String(text).trim()) && !/\b(?:flights?|layover|airport)\b/i.test(text)) {
+    text = String(text).trim() + ' a cafe and an easy walk';
+  }
+  // "Thursday to Sunday", "arriving Friday, leaving Monday": a trip of that many days starting on the first weekday.
+  {
+    const WD = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const wdRe = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday)';
+    const days = (a, b) => ((WD.indexOf(b) - WD.indexOf(a) + 7) % 7) + 1;
+    const t0 = String(text);
+    if (!/\b\d{1,2}[ -]?(?:days?|nights?)\b/i.test(t0)) {
+      text = t0
+        .replace(new RegExp('\\b(?:arriv(?:e|es|ing)|land(?:s|ing)?|get(?:ting)? in|check(?:ing)? in|fly(?:ing)? in|coming|visit(?:ing)?)(?: on)? ' + wdRe + '\\b(?:[^.!?]{0,40}?)\\b(?:leav(?:e|es|ing)|depart(?:s|ing)?|fly(?:ing)? out|check(?:ing)? out|head(?:ing)? home|going home|returning|back)(?: on)? ' + wdRe + '\\b', 'gi'),
+          (m, a, b) => ` ${days(a.toLowerCase(), b.toLowerCase())} days starting ${a.toLowerCase()} `)
+        .replace(new RegExp('(?<!\\bopen )\\b(?:from )?' + wdRe + '(?: night| evening| morning| afternoon)? (?:to|through|thru|until|till) (?:the )?' + wdRe + '\\b', 'gi'),
+          (m, a, b) => (a.toLowerCase() === b.toLowerCase() ? m : ` ${days(a.toLowerCase(), b.toLowerCase())} days starting ${a.toLowerCase()} `));
+    }
+  }
+  // "Friday in Penticton, Saturday in Naramata, Sunday brunch in Summerland": one trip through the towns, one day each.
+  {
+    const WD = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const seg = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?: night| evening| morning| afternoon)?(?: (?:brunch|lunch|dinner|breakfast))? (?:in|at|around|near) ((?:[a-z]+)(?: (?:[a-z]+))?)';
+    const re = new RegExp('\\b' + seg + '(?:,? (?:and |then )?' + seg + ')+', 'gi');
+    text = String(text).replace(re, (m) => {
+      const parts = [...m.matchAll(new RegExp(seg, 'gi'))].map((x) => ({ d: x[1].toLowerCase(), place: x[2].toLowerCase().trim() }));
+      const places = [...new Set(parts.map((x) => x.place))];
+      if (parts.length < 2 || places.length < 2) return m;
+      const n = ((WD.indexOf(parts[parts.length - 1].d) - WD.indexOf(parts[0].d) + 7) % 7) + 1;
+      if (n < parts.length || n > 7) return m;
+      return ` ${n} days in ${places.slice(0, -1).join(', ')} and ${places[places.length - 1]} starting ${parts[0].d} `;
+    });
+  }
+  // "one nice dinner and the rest casual": the rest of the trip has no kind of place to look for.
+  text = String(text).replace(/\b(?:and |but )?(?:the )?rest (?:is |are |will be |being )?(?:casual|relaxed|easy|simple|low[ -]key|flexible)\b/gi, ' ');
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, twelve: 12, fourteen: 14 };
+  const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  return String(text).replace(/\b(?:in|within) (?:about |around )?(\d{1,2}|one|two|three|four|five|six|seven|ten|twelve|fourteen) (days?|weeks?)(?! (?:ago|away|long|time))\b(?!\s+(?:in|at|around) [a-z]+ (?:for|to))/gi, (m, n, unit) => {
+    const count = /^\d/.test(n) ? Number(n) : words[n.toLowerCase()];
+    const days = /^week/i.test(unit) ? count * 7 : count;
+    if (!(days >= 2 && days <= 31)) return m;
+    const d = new Date(now.getTime() - 7 * 3600000 + days * 86400000); // the Okanagan's calendar day
+    return ` on ${M[d.getUTCMonth()]} ${d.getUTCDate()} `;
+  });
+}
+
+// Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
+function holidayWeekendDates(name, now = new Date()) {
+  const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const nthMonday = (y, m, n) => { const d = new Date(Date.UTC(y, m, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7) + (n - 1) * 7); return d; };
+  const easter = (y) => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451); const mo = Math.floor((h + l - 7 * m + 114) / 31) - 1, da = ((h + l - 7 * m + 114) % 31) + 1; return new Date(Date.UTC(y, mo, da)); };
+  const monday = (y) => {
+    switch (name) {
+      case 'thanksgiving': return nthMonday(y, 9, 2);
+      case 'labour day': case 'labor day': return nthMonday(y, 8, 1);
+      case 'family day': return nthMonday(y, 1, 3);
+      case 'victoria day': { const d = new Date(Date.UTC(y, 4, 24)); d.setUTCDate(24 - ((d.getUTCDay() + 6) % 7)); return d; }
+      case 'easter': { const d = easter(y); d.setUTCDate(d.getUTCDate() + 1); return d; }
+      case 'remembrance day': return new Date(Date.UTC(y, 10, 11));
+      case 'canada day': return new Date(Date.UTC(y, 6, 1));
+      default: return null;
+    }
+  };
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  for (const y of [now.getUTCFullYear(), now.getUTCFullYear() + 1]) {
+    const mon = monday(y);
+    if (!mon) return null;
+    if (mon.getTime() < today) continue;
+    // Monday holidays run Saturday to Monday. Canada Day is July 1 and the days that make a break of it (at most four).
+    const start = new Date(mon), end = new Date(mon);
+    if (name === 'canada day') {
+      const w = mon.getUTCDay();
+      if (w === 6) end.setUTCDate(end.getUTCDate() + 2);
+      else if (w === 0) end.setUTCDate(end.getUTCDate() + 1);
+      else if (w === 1) start.setUTCDate(start.getUTCDate() - 2);
+      else end.setUTCDate(end.getUTCDate() + Math.min(3, 7 - w));
+    } else start.setUTCDate(start.getUTCDate() - 2);
+    const f = (d) => `${M[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    return ` ${f(start)} to ${f(end)} ${start.getUTCFullYear()} `;
+  }
+  return null;
+}
 function stripTravelNoise(normalized) {
-  let s = ` ${normalized} `;
+  let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
+  // "4 hours between flights, stuck at the airport" is a layover.
+  s = s.replace(/\bbetween (?:a |the |my |our )?(?:meetings?|conference|appointments?|work|calls?|sessions?)( (?:in|at) [a-z]+(?: [a-z]+)?)? and (?:my |our |the |a )?(?:flights?|plane|departure)\b/g, ' layover $1 ').replace(/\bbetween (?:my |our |the |two )?(?:flights?|connections?|connecting flights?|planes?)\b/g, ' layover ').replace(/\bstuck\b/g, ' ');
+  s = s.replace(/\bsit ?down\b/g, ' ').replace(/\s+/g, ' ');
   const arriving = /\b(?:land|lands|landing|landed|arrive|arrives|arriving|arrived|fly|flying|flight|layover|lay over|stopover|connecting)\b/.test(s);
   if (arriving) {
     // "land at Kelowna airport" is Kelowna; the airport itself is not a thing to search for.
@@ -131,6 +270,50 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?|hopping|trail)\b/g, ' brewery crawl ').replace(/\b(?:cider|cidery) (?:tours?|trail)\b/g, ' cidery crawl ').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) (?:tours?|trail)\b/g, ' distillery crawl ');
   // "for my sister's wedding" is why they are here; "we have the Friday free" is a day, not a search word.
   s = s.replace(/\bfor (?:my |our |a |the )?(?:\w+s )?wedding\b/g, ' ').replace(/\b(?:have|got) (?:the |a )?(\w+day|weekend|afternoon|morning|evening|day) free\b/g, ' on $1 ');
+  // Notes about the person, not places: "remote worker", "solo", "riding", "cold and rainy", "first week of", "bachelor party".
+  s = s.replace(/\b(?:remote|digital nomad|freelance) (?:workers?|work|working)\b/g, ' ').replace(/\bsolo\b/g, ' ').replace(/\b(?:bachelor|bachelorette|stag|stagette|hen) (?:party|parties|weekend|trip|do)\b/g, ' celebration ');
+  s = s.replace(/\b(?:we )?(?:need|want) (?:to )?(?:go )?riding\b|\briding the\b/g, ' ').replace(/\bcold and (?=rainy|wet)/g, ' ').replace(/\b(?:the )?(?:first|second|third|last) week of\b/g, 'in');
+  // Plain talk around the plan: "before our flight", "spending 2 nights", "stopping for lunch", "beginners", fall "colours"; transit means no car; spring break is March.
+  s = s.replace(/\b(?:before|until|till) (?:our|my|the|his|her) (?:flight|train|bus|ferry|shuttle|pickup|check in|checkin)\b/g, ' ').replace(/\b(?:spending|staying|stopping|stop)(?: for)?(?= (?:\d|one|two|three|four|five|a |an |the |lunch|dinner|breakfast|coffee))/g, ' ');
+  s = s.replace(/\b(?:relying on|rely on|using|taking|by) (?:public )?(?:transit|buses|the bus|bus)\b|\b(?:we )?(?:don t|do not|dont) (?:have a car|drive)\b/g, ' no car ');
+  s = s.replace(/\b(?:first time|first timers?|beginners?|newbies?|novices?)\b/g, ' ').replace(/\b(?:fall|autumn) colou?rs?\b|\bcolou?rs\b/g, ' ');
+  s = s.replace(/\bspring break(?: week)?\b/g, ' in march ');
+  // More plain talk: "Instagrammable" is a view, "locals only / no tourist traps" is hidden gems, a car and a rack, 3 generations, "do together", a snowy day is an indoor day.
+  s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
+  s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
+  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
+  // "six year olds", "a group of 6 guys", "bus tour group": ages and head counts, not places.
+  s = s.replace(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen) (?:years? old|year olds?|yo)\b/g, ' kids ');
+  s = s.replace(/\b(?:coach|bus|motorcoach) (?:tour )?(?:group|trip)\b/g, ' ');
+  s = s.replace(/\b(?:a )?(?:group|party|crew|gang|bunch) of (\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:guys|girls|ladies|gals|boys|men|women|people|folks|adults|friends|colleagues|coworkers|seniors|retirees|students|kids|teens|teenagers|members|guests)\b/g, ' $1 friends ');
+  s = plainClockTimes(s);
+  // Plain phrases: "cheap as possible", "avoid crowds", "exactly 3".
+  s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
+  // "a family week", "week long", "weeklong", "a fortnight": a week (or two) of the trip.
+  s = s.replace(/\b(?:(?:a|our|the|one|1) )?((?:(?:family|beach|wine|summer|winter|ski|relaxing|relaxed|little|whole|full|nice|lovely|great|long|quiet|romantic|fun|adventure|foodie|dream|perfect|first|last) )+)week\b/g, ' a week $1 ').replace(/\bweek ?-?long\b/g, ' a week ').replace(/\b(?:a )?fortnight\b/g, ' two weeks ');
+  // "dinner at a Thai restaurant" is one Thai dinner, not a dinner plus a separate Thai restaurant.
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from|with) (?:a|an|the|some) (italian|thai|sushi|japanese|chinese|indian|mexican|greek|french|korean|vietnamese|pizza|steak|seafood|vegan|vegetarian|mediterranean|middle eastern|bbq|burger|ramen|tapas)(?: food)? (?:restaurants?|places?|spots?|joints?|eateries|eatery)\b/g, ' $2 $1 ');
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|the|some) (nice|good|great|fancy|romantic|cozy|casual|local|lovely|decent|quiet|upscale|special|favourite|favorite) (?:restaurants?|places?|spots?)\b/g, ' $2 $1 ');
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|some) (?:restaurants?|places?|spots?|eateries|eatery)\b/g, ' $1 ');
+  // "10 girls", "8 guys", "a crew of 12 ladies": head counts of friends, not places.
+  s = s.replace(/\b(\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:girls|guys|ladies|gals|boys|women|men)\b/g, ' $1 friends ');
+  // "4 players", "a foursome", "one round of golf": party size and golf wording, not places.
+  s = s.replace(/\b(\d{1,2}|two|three|four|five|six|eight|ten|twelve) (?:players|golfers)\b/g, ' $1 friends ');
+  s = s.replace(/\b(?:a|one|another|the next) rounds? of (drinks?|beers?|cocktails?|wine)\b/g, ' $1 ');
+  if (/\bgolf/.test(s)) {
+    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?(?: of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, ' ');
+  }
+  // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
+  s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
+  s = joinOutsidePlaces(s);
+  s = plainRelativeDates(s);
+  // "two weeks": 14 days (the planner covers seven and says so).
+  s = s.replace(/\b(2|3|4|5|two|three|four|five)[ -]weeks?(?: long)?\b(?! (?:from now|ago|away))/g, (m, n, off) => (/\b(?:in|within|after|for the next) $/.test(s.slice(Math.max(0, off - 16), off)) && !/^ (?:in|around|at|for) /.test(s.slice(off + m.length, off + m.length + 5)) ? m : ` ${({ two: 2, three: 3, four: 4, five: 5 }[n] || Number(n)) * 7} days `));
+  // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
+  s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
+  // Holiday weekends become the dates of that long weekend (the next one coming).
+  s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
+  s = fixedHolidayDates(s, true);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
@@ -154,6 +337,17 @@ const VALLEY_WIDE_PHRASES = vocabulary.localList('wideScope');
 
 // Places visitors name that this site does not cover.
 const OUTSIDE_PLACES = Object.fromEntries(vocabulary.localList('outsidePlaces').map((p) => [String(p).toLowerCase(), p]));
+// A two-word place ("Salmon Arm", "Las Vegas") is matched as one word: its spaces are closed up in the text first.
+const OUTSIDE_MULTIWORD = vocabulary.localList('outsidePlaces').filter((p) => /\s/.test(String(p)));
+for (const p of OUTSIDE_MULTIWORD) OUTSIDE_PLACES[String(p).toLowerCase().replace(/\s+/g, '')] = p;
+function joinOutsidePlaces(text) {
+  let out = String(text);
+  for (const p of OUTSIDE_MULTIWORD) {
+    const re = new RegExp('\\b' + String(p).toLowerCase().split(/\s+/).join('\\s+') + '\\b', 'g');
+    out = out.replace(re, String(p).toLowerCase().replace(/\s+/g, ''));
+  }
+  return out;
+}
 
 const TYPE_ALIASES = {
   sport: ['sports and recreation', 'sports venues', 'recreation activities', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'disc golf', 'tennis', 'pickleball', 'bmx'],
@@ -903,6 +1097,8 @@ const NEVER_CORRECT = new Set([
   'flashing', 'flushing', 'koran', 'lunge', 'longe', 'lounger', 'outsider', 'padding', 'streak', 'tumbling', 'whisk',
   'toddle', 'germane', 'germanic', 'polis', 'celia', 'blinking', 'circling', 'skidding', 'skinning', 'boasting',
   'bloating', 'exacting', 'easting', 'divining', 'bridging', 'westland',
+  // 2026-11-05: "shopping" was read as the typo "sipping" (a winery) while the shops list is empty.
+  'shopping',
   // real words used in the site's own venue / event text
   'badly', 'drinking', 'eater', 'finishing', 'olive', 'outsized', 'polished', 'skipping', 'skirting', 'trial',
   // implementation review of the site's own text: a correction would change
@@ -2067,6 +2263,20 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
       parts = parts.slice(0, wi + 1).concat(extra, parts.slice(wi + 1));
     }
   }
+  // "lunch then a walk", "a winery then lunch": the visitor gave an order, so the planner keeps it (not the usual
+  // walk-in-the-morning, tasting-in-the-afternoon order).
+  if (parts.length >= 2 && /\b(?:and then|then|afterwards|after that|followed by|before heading to)\b/.test(normalized)) parts = parts.map((c, i) => {
+      if (c.kind !== 'venue') return c;
+      const prev = parts[i - 1], next = parts[i + 1];
+      let daypart = c.daypart;
+      // Around a meal the neighbours fall on the right side of it: before lunch is the morning, after it the afternoon.
+      if (!daypart && !c.meal) {
+        if (next && next.kind === 'venue' && next.meal === 'lunch') daypart = 'morning';
+        else if (prev && prev.kind === 'venue' && prev.meal === 'lunch') daypart = 'afternoon';
+        else if (next && next.kind === 'venue' && ['dinner', 'supper'].includes(next.meal)) daypart = 'afternoon';
+      }
+      return { ...c, sequenced: true, ...(daypart ? { daypart } : {}) };
+    });
   out.components = parts;
   out.regions = uniq(out.regions);
   if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };
@@ -2077,6 +2287,11 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  plainRelativeDates,
+  fixedHolidayDates,
+  plainClockTimes,
+  mergeSegmentStays,
+  holidayWeekendDates,
   OUTSIDE_PLACE_NAMES: Object.values(OUTSIDE_PLACES),
   DISCOVERY_INTENT_VERSION,
   DISCOVERY_NEVER_CORRECT: Object.freeze(Array.from(NEVER_CORRECT)),
