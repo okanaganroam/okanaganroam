@@ -77,6 +77,37 @@ body.pm-app-page .pm-item-main {
     height: auto;
   }
 }
+body.pm-app-page .rn-route-origin-heading { display: none; }
+body.pm-app-page .is-route-origin .rn-route-origin-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+body.pm-app-page .rn-route-origin-heading h2 {
+  font: 700 19px/1.2 Georgia, serif;
+  margin: 0;
+}
+body.pm-app-page .is-route-origin .rn-intro,
+body.pm-app-page .is-route-origin .pm-tabs,
+body.pm-app-page .is-route-origin .pm-searchbar,
+body.pm-app-page .is-route-origin .pm-quick,
+body.pm-app-page .is-route-origin .rn-views,
+body.pm-app-page .is-route-origin .rn-search-area,
+body.pm-app-page .is-route-origin .pm-sheet,
+body.pm-app-page .is-route-origin .pm-pinbtn,
+body.pm-app-page .is-route-origin .pm-locate { display: none; }
+body.pm-app-page .is-route-origin #okMap { left: 16px; right: 16px; }
+body.pm-app-page .rn-route-pin-hint { display: none; }
+body.pm-app-page .is-route-origin.is-pinning .rn-route-pin-hint {
+  display: block;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+body.pm-app-page .is-route-origin .leaflet-marker-pane .leaflet-interactive {
+  pointer-events: none;
+}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 
