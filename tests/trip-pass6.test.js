@@ -324,7 +324,7 @@ test('French: reason lines, the map credit, the category word and the length pro
   const steps = v3.t3PlanNextSteps({ requirementResults: [{ kind: 'event', value: 'any', eventKind: 'comedy', status: 'unmet' }, { kind: 'event', value: 'nightlife', status: 'unmet', id: 'x' }, { kind: 'type', value: 'winery', status: 'unmet' }] });
   assert.deepEqual(steps.map((s) => [s.label, s.labelFr]), [['comedy show', 'spectacle d’humour'], ['event', 'événement'], ['winery', 'vignoble']]);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(src.includes("geo: 'Fourni par Geoapify'"));
+  assert.equal(require('../trip-site.js').page.mapCredit.fr, 'Fourni par Geoapify');
   assert.ok(src.includes("if (editBtn) { editBtn.textContent = editText('edit');"), 'the edit bar is in the page language from the start');
   assert.ok(src.includes("u.lengthAsked === false"), 'a request with no length asks for one');
   assert.ok(src.includes("'✓ Your request matched a listing'"), 'one request is not "All 1"');
@@ -334,7 +334,7 @@ test('Accessibility: Favorite buttons are named and pressed, the Pace select is 
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(src.includes(`'<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>'`));
   assert.match(src, /\.t3-chip select \{[^}]*min-height: 32px;/);
-  assert.ok(src.includes(`'<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \\u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'`));
+  assert.ok(src.includes(`'<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \\u00b7 ' + (d.regionLabel || tx('\${SITE_PAGE.i18nAreaKey}'))) + '">'`));
   assert.match(src, /\.t3-examples \{ min-height: 120px; align-content: flex-start; \}/);
   assert.match(src, /html\[lang="fr"\] \.t3-examples \{ min-height: 260px; \}/);
   assert.ok(src.includes("html += (stop.noSwap ? '' : '<button type=\"button\" class=\"t3-act\" data-t3-swap="), 'the resort has no Swap');
@@ -387,7 +387,7 @@ test('My Trip: the same place on another day is its own stop; an old saved trip 
   old.click({ closest: () => null, dataset: {} });
   const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(page.includes("(opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot=\"' + esc(key.split('-')[0]) + '\"' : '')"));
-  assert.ok(page.includes("localStorage.setItem('okanaganTripDrives', JSON.stringify(driveMap));"), 'drive legs go to My Trip');
+  assert.ok(page.includes("localStorage.setItem('${SITE_PAGE.storagePrefix}TripDrives', JSON.stringify(driveMap));"), 'drive legs go to My Trip');
   const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.ok(server.includes("function keyOf(t){ return (t && t.key) || (t && t.ref) || null; }") && server.includes('<li class="mt-drive">'), '/my-trip reads repeat keys and shows drive rows');
 });

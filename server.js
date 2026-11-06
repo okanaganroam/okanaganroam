@@ -60,6 +60,7 @@ async function clickableOnPage(kind, id) {
 async function sheetWithPage(kind, d) { return d ? venueActivity.applyInventory(d, kind, await clickableOnPage(kind, d.venue.id)) : d; }
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
+const TRIP_SITE = require('./trip-site.js');
 const tripDemandLog = tripDemand.createLogger(db);
 const r2 = require('./r2');
 // Beach photo fallbacks; optional like french-text, so an isolated copy of server.js + db.js (the fail-closed tests)
@@ -6598,12 +6599,14 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const seasonStatesNow = getSeasonStates();
   // An owner's yearly season with no dated closure set by hand, judged by the planner on the trip's date (round 7).
   const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons').all().map((r) => r.venue_id));
+  // A closure with no reopening date (2026-10-25) still has the place's usual months, so a trip in season can use it.
+  const undatedClosure = new Set(db.prepare("SELECT venue_id FROM venue_seasons WHERE status = 'closed' AND reopens_date IS NULL").all().map((r) => r.venue_id));
   const openMonthsById = new Map();
-  try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
+  try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id) || undatedClosure.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
-  const golfWindows = getGolfRateWindows();
-  // Audit fix (2026-10-27): each venue's shown weekly nights (trivia, karaoke, bingo, open mic...; not stale), so "trivia
-  // night in Kelowna on Tuesday" is planned from the nights a place hosts, not the word "trivia" in its description.
+  // Recognised places (2026-10-25, data/acclaimed-restaurants.json): award and readers' poll results with their sources,
+  // so Build My Trip can put memorable places first on special trips (the listings have no ratings).
+  const acclaimed = tripAcclaimedById();
   let nightsByVenue = new Map();
   try { nightsByVenue = allVenueWeeklyNights(); } catch (e) { nightsByVenue = new Map(); }
   const nightsFact = (v) => {
@@ -6620,27 +6623,40 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
     const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
     return list.length ? list : undefined;
   };
+  const golfWindows = getGolfRateWindows();
   const facts = [];
   const indoorIds = new Set(getCollectionVenueIds('indoor_also'));
   const requirementModule = require('./trip-requirements');
   for (const v of rows) {
-    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type] || TRIP_PLANNER_DROPPED_TYPES.has(v.type)) continue;
+    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
+    // Whistler Roam (2026-10-25): sports places a visitor would go to (the bike park, climbing gyms, the Adventure Zone,
+    // the aerial course, paintball, disc golf, skating, curling, bike skills parks) are planned as outdoor or indoor
+    // stops; courts and other local facilities are not. The stop still links its own Sports listing.
+    // Shops (2026-10-25) are planned only when shopping is asked for (trip-planner.js shopPlace), as an indoor stop.
+    const plannerType = v.type === 'sport' ? tripSportPlannerType(v) : v.type === 'shop' ? 'indoor' : v.type;
+    if (!plannerType || TRIP_PLANNER_DROPPED_TYPES.has(plannerType)) continue;
     const features = {};
     for (const f of BOOL_FIELDS) if (Number(v[f]) === 1) features[f] = true;
     const m = memberships.get(v.id) || { collections: [], activities: [], fdTypes: [] };
     facts.push({
-      id: v.id, name: v.name, region: v.region, type: v.type, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      id: v.id, name: v.name, region: v.region, type: plannerType, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
       rating: v.rating == null ? null : Number(v.rating), reviews: v.reviews == null ? 0 : Number(v.reviews),
       price: v.price == null ? null : Number(v.price), address: v.address || null,
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
-      textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(v.description || ''),
-      features, collections: m.collections, activities: preparePlannerKinds ? [...new Set([...m.activities, ...requirementModule.inferPlannerActivities(v)])] : m.activities, fdTypes: m.fdTypes,
+      textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(`${v.description || ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}`),
+      ...(v.type === 'shop' ? { isShop: true } : {}),
+      features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
+      ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
+      // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
+      ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds({ ...v, activities: m.activities }) : [],
+      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
+      nights: nightsFact(v),
+      specials: specialsFact(v),
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
-      // planner kinds prepared, Naramata Creek's 2.5 km walk had no text and got the 3-hour hiking allowance).
+      // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
       trailText: v.type === 'outdoor' ? v.description || '' : undefined,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       // The stored JSON, parsed (never modified) by the planner -- or, in an owner's seasonal hours (2026-10-18), that
@@ -6668,8 +6684,6 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       seasonReopens: seasons.has(v.id) ? (seasons.get(v.id).reopens_date || null) : undefined, // the listed reopening date; null = not announced (2026-10-18)
       dogNote: dogNotes.get(v.id) || null,
       golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
-      nights: nightsFact(v),
-      specials: specialsFact(v),
     });
   }
   return facts;
@@ -6820,7 +6834,7 @@ function tripStartWeekday(when, now = new Date()) {
   if (when.weekday) return when.weekday.slice(0, 3);
   if (when.preset === 'this-weekend') {
     const wd = localWeekday(today);
-    return wd === 0 ? 'sun' : 'sat';
+    return wd === 0 && !weekendOverTonight(now) ? 'sun' : 'sat';
   }
   return null;
 }
@@ -6836,7 +6850,7 @@ function tripPlanDate(when, now = new Date()) {
   const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   const wd = localWeekday(today);
   if (when.weekday && names.includes(when.weekday.slice(0, 3))) return addLocalDays(today, (names.indexOf(when.weekday.slice(0, 3)) - wd + 7) % 7);
-  if (when.preset === 'this-weekend') return wd === 0 || wd === 6 ? today : addLocalDays(today, 6 - wd);
+  if (when.preset === 'this-weekend') return wd === 0 && weekendOverTonight(now) ? addLocalDays(today, 6) : wd === 0 || wd === 6 ? today : addLocalDays(today, 6 - wd);
   return today;
 }
 
@@ -7027,7 +7041,7 @@ function buildTripPlannerTaxonomy() {
 // 2026-10-25: "a day in Baldy" in late October came back with every slot empty ("No suitable morning stop..."), and
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
-const TRIP_SKI_HILL_BASE = { apex: { town: 'penticton', minutes: 40 }, baldy: { town: 'oliver', minutes: 40 }, 'big-white': { town: 'kelowna', minutes: 50 }, silverstar: { town: 'vernon', minutes: 30 } };
+const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
 function runTripPlan(args, now = new Date()) {
   const first = runTripPlanCore(args, now);
   let plan = first;
@@ -7061,6 +7075,108 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripHappyHourCrawlPlan(plan, args, now); } catch (e) { /* keep the plan */ }
   return plan;
 }
+const TRIP_SPORT_INDOOR_RE = /\b(?:climbing gym|bouldering gym|curling)\b/i;
+const TRIP_SPORT_OUTDOOR_RE = /\b(?:lift access bike park|lift-access bike park|bike skills park|pump track|dirt jumps|disc golf|aerial park|adventure park|mini golf|paintball|outdoor skating rink|climbing boulder|bmx track|skate park)\b/i;
+function tripSportPlannerType(v) {
+  const c = v.cuisine ? String(v.cuisine) : '';
+  if (TRIP_SPORT_INDOOR_RE.test(c)) return 'indoor';
+  if (TRIP_SPORT_OUTDOOR_RE.test(c)) return 'outdoor';
+  return null;
+}
+let tripShortNamesCache = null;
+function tripFullVenueNames(text, taxonomy) {
+  const venues = (taxonomy && taxonomy.venues) || [];
+  if (!tripShortNamesCache || tripShortNamesCache.n !== venues.length) {
+    const norm = (x) => String(x).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const shortOf = (n) => norm(String(n).replace(/\([^)]*\)/g, ' ')).replace(/\s+(?:provincial park|regional park|park|recreation site|trail|trails|viewing area)$/, '').trim();
+    const counts = new Map();
+    for (const v of venues) if (v && v.name) { const k = shortOf(v.name); counts.set(k, (counts.get(k) || 0) + 1); }
+    // A town's own name is never a place's short name ("Mount Currie (Ts'zil) Trail" is not "Mount Currie").
+    const towns = new Set(Object.entries((taxonomy && taxonomy.regionLabels) || {}).flatMap(([slug, label]) => [norm(label), norm(slug.replace(/-/g, ' '))]));
+    const list = [];
+    for (const v of venues) {
+      if (!v || !v.name) continue;
+      const k = shortOf(v.name);
+      if (k === norm(v.name) || k.split(' ').length < 2 || k.length < 8 || towns.has(k)) continue;
+      // Branches of one business ("La Cantina Tacos (Nesters Plaza)" and "(Village Marketplace)", 2026-10-25): the short
+      // name is the first-listed branch, and the plan says which; another short name stays ambiguous.
+      if (counts.get(k) !== 1) {
+        const same = venues.filter((o) => o && o.name && shortOf(o.name) === k);
+        if (!same.every((o) => /\(/.test(o.name)) || list.some((e) => e.short === k)) continue;
+      }
+      list.push({ short: k, full: v.name, fullNorm: norm(v.name) });
+    }
+    list.sort((a, b) => b.short.length - a.short.length);
+    // One-word names (2026-10-25: "lunch at Araxi"): a first word of 5+ letters found in no other listing's name and not
+    // an everyday word. It counts when written with a capital or after "at"/"to" (so "wildflower meadows" stays words).
+    const COMMON = new Set([...TRIP_SITE.commonNameWords, 'mount', 'mountain', 'alpine', 'little', 'green', 'black', 'white', 'golden', 'royal', 'grand', 'north', 'south', 'upper', 'lower', 'great', 'happy', 'local', 'urban', 'smoke', 'river', 'creek', 'falls', 'beach', 'house', 'kitchen', 'coffee', 'pizza', 'sushi', 'grill', 'garden', 'gardens', 'forest', 'trail', 'trails', 'canyon', 'island', 'valley', 'village', 'station', 'market', 'bakery', 'brewing', 'cider', 'provisions', 'wildflower', 'outbound', 'functional', 'forged', 'escape', 'create', 'plunge', 'spruce', 'cedar', 'cedars', 'pacific', 'coastal', 'summit', 'peak', 'glacier', 'eagle', 'eagles', 'raven', 'ravens', 'thunderbird', 'wonderland', 'discovery', 'adventure', 'adventures', 'nature', 'heritage', 'legacy', 'western', 'central', 'social', 'public', 'rocky', 'stone', 'cloud', 'cloudburst', 'sunny', 'match', 'backyard', 'timberwolf', 'lift', 'rockit', 'hunter', 'naked', 'portobello', 'railway', 'extremely', 'blazing', 'phantom', 'pony', 'centennial', 'lynx', 'lumpy', 'mosquito', 'shadow', 'keyhole', 'strawberry', 'driftwood', 'friendship', 'shady', 'crooked', 'salted', 'dragon', 'essence', 'fortune', 'watershed', 'unique', 'ledge', 'bluebird', 'dusty', 'beacon', 'cinnamon', 'buffalo', 'living', 'umbrella', 'wayside', 'ancient', 'bunker', 'crepe', 'avalanche', 'chalet', 'rendezvous', 'purple', 'edge', 'flute', 'rhythm', 'bread', 'musical', 'burnt', 'conflict', 'locomotive', 'torrent', 'vantage', 'blowdown', 'place', 'spirit', 'demon', 'barrier', 'crater', 'screaming', 'emerald', 'chubby', 'oxygen', 'foyer', 'electric', 'rogue', 'arrow', 'blueberry', 'comfortably', 'barking', 'canine', 'pasta', 'swings', 'steeps', 'skyline', 'harbour', 'gargoyles', 'dialed', 'ninja', 'misty', 'palmer', 'florence', 'alexander', 'boston', 'amsterdam', 'cleveland', 'westside', 'southside', 'canada', 'canadian', 'easter', 'thanksgiving', 'christmas', 'xmas', 'halloween', 'valentine', 'valentines', 'mother', 'mothers', 'father', 'fathers', 'victoria', 'labour', 'labor', 'remembrance', 'cross', 'country', 'nordic', 'winter', 'summer', 'spring', 'autumn', 'snow', 'snowy', 'sunny', 'rainy', 'quiet', 'scenic', 'family', 'kids', 'brunch', 'lunch', 'dinner', 'night', 'nights', 'weekend', 'romantic', 'cheap', 'budget', 'luxury', 'fancy', 'easy', 'short', 'long', 'best', 'top', 'cozy', 'cosy', 'fresh', 'wild', 'happy', 'lucky', 'perfect', 'amazing', 'beautiful', 'looking', 'planning', 'staying', 'visiting', 'coming', 'heading', 'traveling', 'travelling', 'celebrating', 'hoping', 'wanting', 'thinking', 'going', 'family', 'three', 'first', 'retired', 'vegetarian', 'couple', 'friends', 'weekend', 'morning', 'evening', 'something', 'anything', 'somewhere', 'maybe', 'would', 'could', 'should', 'there', 'their', 'where', 'which', 'about', 'after', 'before', 'during', 'every', 'other', 'since', 'still', 'today', 'tonight', 'tomorrow']);
+    const firstCount = new Map(), tokenCount = new Map();
+    for (const v of venues) if (v && v.name) { const w = norm(v.name).split(' '); firstCount.set(w[0], (firstCount.get(w[0]) || 0) + 1); for (const x of new Set(w)) tokenCount.set(x, (tokenCount.get(x) || 0) + 1); }
+    const oneWord = [];
+    for (const v of venues) {
+      if (!v || !v.name) continue;
+      // "The Crabapple Cafe" is found by "Crabapple" (2026-10-25).
+      const w = norm(v.name).replace(/^the /, '').split(' ')[0];
+      // Four-letter names count when the name is that word alone or with a generic word ("Tuba", "Arfa Park").
+      const shortName = norm(String(v.name).replace(/\([^)]*\)/g, ' ')).replace(/^the /, '').split(' ').filter(Boolean);
+      if ((w.length < 5 && !(w.length === 4 && (shortName.length === 1 || (shortName.length === 2 && /^(?:park|cafe|bar|pub|grill|trail|lake|beach)$/.test(shortName[1]))))) || /\d/.test(w) || COMMON.has(w) || (firstCount.get(w) || 0) + (firstCount.get(`the ${w}`) || 0) > 1 || tokenCount.get(w) !== 1) continue;
+      oneWord.push({ word: w, full: v.name, fullNorm: norm(v.name) });
+    }
+    tripShortNamesCache = { n: venues.length, list, norm, oneWord };
+  }
+  const { list, norm, oneWord } = tripShortNamesCache;
+  let out = String(text || '');
+  // A full name already in the text is left whole (2026-10-25: "Alice Lake Campground" became "Alice Lake Provincial Park
+  // Campground" through the park's short name).
+  const keep = [];
+  for (const v of [...venues].filter((x) => x && x.name && x.name.length >= 8).sort((a, b) => b.name.length - a.name.length)) {
+    const i = out.toLowerCase().indexOf(v.name.toLowerCase());
+    if (i < 0) continue;
+    out = `${out.slice(0, i)}\u0002${keep.length}\u0002${out.slice(i + v.name.length)}`;
+    keep.push(v.name);
+  }
+  const unmask = (x) => x.replace(/\u0002(\d+)\u0002/g, (_, k) => keep[Number(k)]);
+  // Names visitors use for the best-known places.
+  const NICKNAMES = TRIP_SITE.venueNicknames;
+  for (const [re, full] of NICKNAMES) if (re.test(out) && !norm(out).includes(norm(full)) && venues.some((v) => v && v.name === full)) out = out.replace(re, full);
+  // Short names first, then one-word names, each against the text as it now reads (2026-10-25: "near Joffre Lakes" was
+  // expanded twice, by "Joffre" and by "Joffre Lakes").
+  for (const e of list) {
+    const lower = norm(out);
+    if (/^happy hours?$/.test(e.short) || !(` ${lower} `).includes(` ${e.short} `) || lower.includes(e.fullNorm)) continue;
+    const words = e.short.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp(`\\b${words.join('[^a-z0-9]+')}\\b`, 'i');
+    if (re.test(out)) out = out.replace(re, e.full);
+  }
+  for (const e of oneWord) {
+    const lower = norm(out);
+    if (!(` ${lower} `).includes(` ${e.word} `) || lower.includes(e.fullNorm)) continue;
+    const re = new RegExp(`(\\b(?:at|to)\\s+)(?:the\\s+)?${e.word}\\b|\\b(?:the\\s+)?${e.word[0].toUpperCase()}${e.word.slice(1)}\\b`, 'i');
+    const m = re.exec(out);
+    if (m && (m[1] || /^[A-Z]/.test(m[0]))) out = out.slice(0, m.index) + (m[1] || '') + e.full + out.slice(m.index + m[0].length);
+  }
+  return unmask(out);
+}
+let tripAcclaimedCache = null;
+function tripAcclaimedById() {
+  if (tripAcclaimedCache) return tripAcclaimedCache;
+  const map = new Map();
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'acclaimed-restaurants.json'), 'utf8'));
+    for (const v of data.venues || []) {
+      const r = (v.recognitions || [])[0];
+      if (Number.isInteger(v.id) && r) map.set(v.id, { tier: v.tier === 'top' ? 'top' : 'noted', occasion: v.occasion || null, label: `${r.award}${r.year ? ` ${r.year}` : ''}` });
+    }
+  } catch (e) { /* no list yet */ }
+  tripAcclaimedCache = map;
+  return map;
+}
+// Audit 2026-10-26: "this weekend" asked late on a Sunday (from 8 pm) is the coming weekend; it planned the rest of Sunday
+// night and then Monday.
+function weekendOverTonight(now = new Date()) {
+  return localWeekday(todayLocal(now)) === 0 && okanaganClock(now).minutes >= 20 * 60;
+}
+const TRIP_HH_APRES_RE = /\bapr[eè]s(?:[- ]ski)?\b/i;
 // Planner (2026-10-27): "happy hour crawl in Kelowna tonight", "happy hour and dinner in Vernon Friday", "bar crawl" /
 // "pub crawl" (« tournée des bars », « 5 à 7 ») were a plain list of places with the Happy Hour badge (or a pub crawl
 // timed from 6 PM, after every happy hour). They are now a timed outing: two or three places whose happy hours that day
@@ -7076,9 +7192,10 @@ const TRIP_HH_TYPES = new Set(['pub', 'cocktail', 'brewery', 'restaurant', 'wine
 const TRIP_HH_WEEKDAY_NAMES = { sun: ['Sunday', 'dimanche'], mon: ['Monday', 'lundi'], tue: ['Tuesday', 'mardi'], wed: ['Wednesday', 'mercredi'], thu: ['Thursday', 'jeudi'], fri: ['Friday', 'vendredi'], sat: ['Saturday', 'samedi'] };
 function tripHappyHourAsk(text, planText) {
   const t = `${text || ''} ${planText || ''}`;
-  const hh = /\bhappy hours?\b/i.test(t) || TRIP_HH_CINQ_RE.test(String(text || ''));
+  const apres = TRIP_HH_APRES_RE.test(String(text || ''));
+  const hh = /\bhappy hours?\b/i.test(t) || TRIP_HH_CINQ_RE.test(String(text || '')) || apres;
   if (!TRIP_HH_CRAWL_RE.test(t) && !TRIP_HH_CINQ_RE.test(String(text || '')) && !/\btourn[ée]e des (?:bars|pubs)\b/i.test(String(text || ''))) return null;
-  return { happyHour: hh, dinner: /\b(?:dinner|supper|souper|d[îi]ner)\b/i.test(t) };
+  return { happyHour: hh, apres, dinner: /\b(?:dinner|supper|souper|d[îi]ner)\b/i.test(t) };
 }
 // The best chain of happy hour stops (and a dinner when asked for) on a date in one town, or null.
 function tripHappyHourApresMiss(f) {
@@ -7268,7 +7385,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
     if (c.hop) reasons.push({ code: 'distance', text: c.hop.mode === 'walk' ? `About a ${Math.max(1, c.hop.minutes)}-minute walk from the stop before` : `About a ${Math.max(1, c.hop.minutes)}-minute drive from the stop before` });
     if (f.rating) reasons.push({ code: 'rating', text: `Rated ${f.rating}${f.reviews ? ` from ${f.reviews} reviews` : ''}` });
     const part = c.start < 1020 ? (c.start < 930 ? 'afternoon' : 'late') : c.start < 1260 ? 'evening' : 'night';
-    stops.push({ kind: 'venue', label: c.dinner ? 'Dinner' : 'Happy hour', daypart: part, component: null, venue: planner.publicVenue(f, ctx), reasons, why: reasons.slice(0, 3).map((r) => r.text), caveats: [], alternates: [],
+    stops.push({ kind: 'venue', label: c.dinner ? 'Dinner' : ask.apres ? 'Après' : 'Happy hour', daypart: part, component: null, venue: planner.publicVenue(f, ctx), reasons, why: reasons.slice(0, 3).map((r) => r.text), caveats: [], alternates: [],
       ...(whenEn ? { happyHourWhen: whenEn, happyHourWhenFr: whenFr } : {}), happyHourCrawlStop: true,
       // Planner (2026-10-27): the stop carries its own clock times too (the page also reads them from plan.schedule).
       startMinutes: c.start, endMinutes: c.end, timeText: `${clock12(c.start)}–${clock12(c.end)}`, timeTextFr: `${clockFr(c.start)}–${clockFr(c.end)}` });
@@ -7287,7 +7404,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   const geoEn = `${timedEn}, and ${chain.length === 2 ? 'both' : 'all three'} are in ${town}. Plan a safe ride home.`;
   const geoFr = `${timedFr}, et ${chain.length === 2 ? 'les deux sont' : 'les trois sont'} à ${town}. Prévoyez un retour sécuritaire.`;
   const whenText = date === today ? (tonight ? 'tonight' : 'today') : date === addLocalDays(today, 1) ? 'tomorrow' : `on ${dayEn}`;
-  const summary = dinnerStop ? `Happy hour and dinner in ${town} ${whenText}.` : `A happy hour crawl in ${town} ${whenText}.`;
+  const summary = ask.apres ? (dinnerStop ? `Après and dinner in ${town} ${whenText}.` : `An après crawl in ${town} ${whenText}.`) : dinnerStop ? `Happy hour and dinner in ${town} ${whenText}.` : `A happy hour crawl in ${town} ${whenText}.`;
   const out = {
     ...plan,
     kind: 'itinerary',
@@ -7302,7 +7419,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
     schedule,
     suggestedTimes: true,
     happyHourCrawl: { date, region, stops: chain.length, dayFr },
-    notes: [`Each stop is timed inside its happy hour on ${dayEn}, from the times on its Okanagan Roam page. Happy hours and deals change, so check before you go.`, 'Stops are timed against each venue’s listed hours on Okanagan Roam; hours can change, so check before you go.'],
+    notes: [`Each stop is timed inside its happy hour on ${dayEn}, from the times on its ${TRIP_SITE.brand} page. Happy hours and deals change, so check before you go.`, 'Stops are timed against each venue’s listed hours on Okanagan Roam; hours can change, so check before you go.'],
     contextNotes: (plan.contextNotes || []).filter((n) => !/happy hour|^Checked against|^Hours were checked/i.test(n)),
     warnings: (plan.warnings || []).filter((w) => !/\bpubs?\b.*\bmatched\b|happy hour/i.test(w)),
     seeAll: null,
@@ -7318,7 +7435,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
 // place's town. A place is named by its full listed name, or -- only among words the planner could not read -- by the
 // distinctive part of it ("Sperling" for Sperling Vineyards). An open place named for a meal heads an Ideas list.
 const TRIP_NAME_GENERIC_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'at', 'estate', 'estates', 'winery', 'wineries', 'wines', 'wine', 'vineyard', 'vineyards', 'cellars', 'family', 'co', 'company',
-  'restaurant', 'grill', 'kitchen', 'bistro', 'cafe', 'pub', 'bar', 'lounge', 'brewing', 'brewery', 'distillery', 'distilling', 'ltd', 'inc', 'okanagan', 'kelowna', 'penticton', 'vernon', 'osoyoos', 'oliver']);
+  'restaurant', 'grill', 'kitchen', 'bistro', 'cafe', 'pub', 'bar', 'lounge', 'brewing', 'brewery', 'distillery', 'distilling', 'ltd', 'inc', ...TRIP_SITE.nameGenericWords]);
 // Words too common to stand for a place on their own ("The View" is not every lake view).
 const TRIP_NAME_COMMON_WORDS = new Set(['view', 'lake', 'hill', 'hills', 'creek', 'beach', 'park', 'garden', 'gardens', 'farm', 'house', 'valley', 'mountain', 'ridge', 'vista', 'sun', 'summit', 'river', 'falls',
   'bay', 'point', 'trail', 'trails', 'golf', 'club', 'market', 'patio', 'terrace', 'village', 'town', 'local', 'street', 'road', 'main', 'old', 'new', 'little', 'big', 'good', 'great', 'best', 'fresh', 'tasting', 'dinner', 'lunch', 'brunch', 'coffee', 'tea', 'pizza', 'sushi', 'tacos', 'wings']);
@@ -7390,7 +7507,9 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   }
   if (!hits.length) return plan;
   // Two listings with the same distinctive words (two "Sperling" places): only the closed one in a named town, or none.
-  const closedHits = hits.filter((h) => closed(h.f));
+  // In the order the visitor named them: a short name ("Ailm") can be read as a named place or from the leftover words.
+  const askedAt = (h) => { const words = norm(text.replace(/['’]/g, '')).split(' '); const at = (tripNameCore(h.f.name) || []).map((w) => words.indexOf(w)).filter((i) => i >= 0); return at.length ? Math.min(...at) : words.length; };
+  const closedHits = hits.filter((h) => closed(h.f)).sort((a, b) => askedAt(a) - askedAt(b));
   const open = hits.filter((h) => !closed(h.f) && h.item);
   if (!closedHits.length) {
     // An open place named with a meal ("lunch at Frankie We Salute You in Kelowna") heads an Ideas list.
@@ -7417,7 +7536,8 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   rewritten = rewritten.replace(/§(?:\s*(?:,|&|\band\b)\s*§)+/gi, '§').replace(/\b(?:at|to|visit(?:ing)?|try(?:ing)?)\s+(?:the\s+)?§/gi, ' ').replace(/§/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/\s+/g, ' ').trim();
   const regions = (plan.intent && plan.intent.regions) || [];
   const home = closedHits[0].f.region;
-  if (!regions.length && REGION_LABELS[home]) rewritten = `${rewritten} in ${REGION_LABELS[home]}`.trim();
+  const townInText = Object.values(REGION_LABELS).some((l) => ` ${norm(rewritten)} `.includes(` ${norm(l)} `));
+  if ((!regions.length || !townInText) && REGION_LABELS[home]) rewritten = `${rewritten} in ${REGION_LABELS[home]}`.trim();
   if (!norm(rewritten).replace(/\b(?:in|at|on|the|and)\b/g, '').replace(new RegExp(`\\b${norm(REGION_LABELS[home] || home)}\\b`, 'g'), '').trim()) {
     rewritten = `${(CATEGORY_LABELS[closedHits[0].f.type] || { plural: 'places' }).plural.toLowerCase()} ${rewritten}`;
   }
@@ -7435,11 +7555,11 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   const listWords = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
   out.warnings = (out.warnings || []).filter((w) => !closedHits.some((h) => h.item && String(w) === `No selected stop meets ${h.item.sourceText}.`))
     .map((w) => {
-      const m = /^Not part of this plan: (.+?) — Okanagan Roam couldn’t match (?:that word|those words) to a kind of place it lists\.$/.exec(String(w));
+      const m = new RegExp(`^Not part of this plan: (.+?) — ${TRIP_SITE.brand} couldn’t match (?:that word|those words) to a kind of place it lists\\.$`).exec(String(w));
       if (!m) return w;
       const left = [...m[1].matchAll(/“([^”]+)”/g)].map((q) => q[1]).filter((q) => !nameOnly(q));
       if (!left.length) return null;
-      return `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — Okanagan Roam couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
+      return `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — ${TRIP_SITE.brand} couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
     }).filter(Boolean);
   out.warnings = notes.concat(out.warnings.filter((w) => !notes.includes(w)));
   out.unsupported = dropWords(out.unsupported);
@@ -7449,14 +7569,7 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
 }
 // 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
 // A request "near" a town that comes back empty looks in the towns right around it, and says so.
-const TRIP_NEAR_TOWNS = {
-  vernon: ['coldstream', 'silverstar', 'armstrong'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
-  'lake-country': ['kelowna', 'vernon'], peachland: ['summerland', 'west-kelowna'], summerland: ['penticton', 'peachland'],
-  penticton: ['naramata', 'summerland', 'kaleden'], naramata: ['penticton'], kaleden: ['penticton', 'okanagan-falls'],
-  'okanagan-falls': ['kaleden', 'oliver'], oliver: ['osoyoos', 'okanagan-falls'], osoyoos: ['oliver'], coldstream: ['vernon', 'lumby'],
-  lumby: ['coldstream', 'vernon'], armstrong: ['enderby', 'vernon'], enderby: ['armstrong'], 'big-white': ['kelowna'], silverstar: ['vernon'],
-  apex: ['penticton'], baldy: ['oliver'],
-};
+const TRIP_NEAR_TOWNS = TRIP_SITE.nearTowns;
 function tripPlanEmpty(plan) {
   if (!plan) return true;
   if (plan.kind === 'discover' || plan.kind === 'recommendations') return !(plan.recommendations || []).length;
@@ -7487,17 +7600,74 @@ function runTripPlanSkiFallback(plan, args, now) {
 }
 function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
-  // 2026-11-05: a beer, cider or distillery "tour" is a run of breweries, cideries or distilleries ("craft beer tour in Kelowna"
-  // was one farm tour); the requirements see the same words.
-  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy)
+  // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
+  // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
+  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
+  const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
+    .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
+    .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');
+  // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
+  // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and
+  // lounges, unless wineries are listed or the wine is ruled out.
+  const noWineries = !(taxonomy.venues || []).some((v) => v && v.type === 'winery');
+  const wineText = (x) => (noWineries && !/\b(?:no|not|without|don.?t drink|alcohol.free|sober)\b[^.]*\bwine/i.test(x) ? x.replace(/\b(?:wine tasting|wine tastings|winery|wineries|wine)\b(?! bars?| lounges?)/gi, 'wine bars') : x);
+  const askedWineries = noWineries && /\b(?:winery|wineries|wine tasting|wine tastings|vineyards?)\b/i.test(planTextPlain);
+  // "Opening weekend at Whistler Blackcomb" (2026-10-25): the lifts' listed opening date.
+  let openingText = planTextPlain;
+  if (/\bopening (?:day|weekend)\b/i.test(planTextPlain) && (/\b(?:ski|skiing|lifts?|mountain|snowboard\w*)\b/i.test(planTextPlain) || TRIP_SITE.skiHillNameRe.test(planTextPlain.toLowerCase()))) {
+    try {
+      const row = db.prepare("SELECT s.reopens_date AS d FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE lower(v.cuisine) = 'ski resort' AND s.reopens_date IS NOT NULL ORDER BY s.reopens_date LIMIT 1").get();
+      if (row && row.d) { const M = ['January','February','March','April','May','June','July','August','September','October','November','December']; openingText = planTextPlain.replace(/\bopening (day|weekend)\b/i, (m, w) => `skiing ${w === 'weekend' ? 'weekend' : ''} from ${M[Number(row.d.slice(5, 7)) - 1]} ${Number(row.d.slice(8, 10))}`); }
+    } catch (e) { /* no season rows */ }
+  }
+  // Full place names are kept out of the shorthand rewrites (2026-10-25: "Grimm's Gourmet & Deli" lost "gourmet" to the
+  // foodie synonym).
+  const maskedNames = [];
+  let maskedPlan = String(openingText || '');
+  for (const v of [...(taxonomy.venues || [])].filter((x) => x && x.name && x.name.length >= 10).sort((a, b) => b.name.length - a.name.length)) {
+    const i = maskedPlan.toLowerCase().indexOf(v.name.toLowerCase());
+    if (i < 0) continue;
+    maskedPlan = `${maskedPlan.slice(0, i)}\u0001${maskedNames.length}\u0001${maskedPlan.slice(i + v.name.length)}`;
+    maskedNames.push(v.name);
+  }
+  const synonymText = require('./trip-requirements').tripRequestSynonyms(maskedPlan).replace(/\u0001(\d+)\u0001/g, (_, k) => maskedNames[Number(k)]);
+  let datedPlanText = wineText(tripFullVenueNames(require('./trip-requirements').holidayDateText(synonymText, todayLocal(now)), taxonomy));
+  // "A day in Squamish but not the Chief" (2026-10-25): a place named after no/not/skip/avoid is left out of the plan, and
+  // its name is not something to look for.
+  {
+    const plainNeg = (x) => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (const v of [...(taxonomy.venues || [])].filter((x) => x && x.name && x.name.length >= 6).sort((a, b) => b.name.length - a.name.length)) {
+      const esc = plainNeg(v.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`,?\\s*\\b(?:but )?(?:not|no|skip|avoid|without|except|apart from|other than)\\s+(?:the\\s+)?${esc}(?![\\w])`, 'i');
+      if (!re.test(plainNeg(datedPlanText))) continue;
+      excludeVenueIds = [...(excludeVenueIds || []), v.id];
+      datedPlanText = plainNeg(datedPlanText).replace(re, '');
+    }
+  }
+  // "Things to do near Brandywine Falls", "dinner near the Sea to Sky Gondola" (2026-10-25): the named place is where to
+  // look around, not a stop; the plan keeps to places within a short drive of it, in its town.
+  let nearAnchor = null;
+  {
+    const plain = (x) => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const lowerText = plain(datedPlanText).toLowerCase();
+    const named = (taxonomy.venues || []).filter((v) => v && v.name && v.name.length >= 6)
+      .filter((v) => new RegExp(`\\b(?:near|nearby|close to|around|by|next to)\\s+(?:the\\s+)?${plain(v.name).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`).test(lowerText))
+      .sort((a, b) => b.name.length - a.name.length);
+    if (named.length && !Object.values(taxonomy.regionLabels || {}).some((l) => String(l).toLowerCase() === named[0].name.toLowerCase())) {
+      const v = named[0];
+      nearAnchor = { id: v.id, name: v.name, region: v.region };
+      const re = new RegExp(`\\b(near|nearby|close to|around|by|next to)\\s+(?:the\\s+)?${plain(v.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+      datedPlanText = plain(datedPlanText).replace(re, `in ${(taxonomy.regionLabels || {})[v.region] || v.region}`);
+    }
+  }
   // Calendar dates are handled by requirements, not mistaken for a day count.
   const requirementModule = require('./trip-requirements');
-  const calendar = requirementModule.tripCalendar(planText, todayLocal(now));
+  const calendar = requirementModule.tripCalendar(datedPlanText, todayLocal(now));
   // Round 9 (2026-10-19): « soirée spectacle » / "a show on Saturday night" is dinner and a show, like "dinner and a show".
   const showEvening = tripPlannerModule().showEveningText;
   let interpretationText = requirementModule.sportsVenueInterpretationText(showEvening(calendar.cleanText), taxonomy);
-  let requirementsText = showEvening(planText);
+  let requirementsText = showEvening(datedPlanText);
   let namedEventAmbiguity = null;
   const eventChoiceDate = overrides?.startDate || calendar.startDate;
   let namedEventCandidates = [];
@@ -7509,7 +7679,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     interpretationText = detected.text;
     namedEventAmbiguity = detected.ambiguity;
     namedEventCandidates = detected.ambiguity ? listed.filter(e => detected.ambiguity.candidateIds.includes(e.id)) : [];
-    requirementsText = requirementModule.namedEventInterpretationText(showEvening(planText), listed);
+    requirementsText = requirementModule.namedEventInterpretationText(showEvening(datedPlanText), listed);
   }
   let selectedNamedEvent = null;
   if (overrides?.eventId !== undefined) {
@@ -7521,16 +7691,65 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     }
     namedEventAmbiguity = null;
   }
+  // "A weekend with a nice dinner" / "birthday weekend": every day already ends with dinner, so the phrase only asks for
+  // the first evening's to be special (it counted the meals as one dinner and left out lunch and a dinner).
+  const NICE_DINNER_RE = /\s*\bwith (?:a |one )?(?:nice|special|fancy|great|good|fine|upscale|memorable|celebratory) (?:dinner|supper|meal)\b/i;
+  const multiDayText = /\b(?:weekend|getaway|[2-7] days?|two days|three days|four days|[2-7] nights|two nights|three nights|long weekend)\b/i;
+  let niceDinnerOnce = false;
+  if (NICE_DINNER_RE.test(interpretationText) && multiDayText.test(interpretationText)) {
+    niceDinnerOnce = true;
+    interpretationText = interpretationText.replace(NICE_DINNER_RE, '');
+    requirementsText = requirementsText.replace(NICE_DINNER_RE, '');
+  }
+  // Shops (2026-10-25) are planned as indoor stops, so "shopping and lunch" reads as an indoor part and a meal; the
+  // requirement text keeps the shopping words, which let shops in and rank them first.
+  interpretationText = interpretationText.replace(/(?<!\b(?:coffee|tea|donut|doughnut|sandwich|pizza|cream|sweet|candy|chocolate|tattoo|bake|pastry|juice|smoothie|barber|boat)\s)\b(?:(?:bike|bicycle|e-?bike|ski|snowboard|board|gear|canoe|kayak|sup|paddleboard|surf|outdoor gear) (?:rentals?|shops?|stores?)|rentals?|rental shops?|farms|farm visits?|u-?pick|shopping|shops|boutiques|souvenir shopping|souvenirs|gift shops|bookstores|bookshops|farm stands?|farm gates?)\b/gi, 'indoor activities');
+  // A rest day on a ski trip (2026-10-25) is a day plan, not a word to match; the requirement text keeps it.
+  interpretationText = interpretationText.replace(/\b(?:with |and )?(?:a |one )?(?:rest|recovery|off|non ski|lazy|no ski) day\b|\b(?:with |and )?(?:a |one )?day off(?: (?:from )?(?:skiing|the slopes|the hill))?\b|\bskiing on (\d+) of the days\b/gi, (m) => /skiing/.test(m) && !/day off/.test(m) ? 'skiing' : ' ');
+  // "Christmas in Whistler with kids" (2026-10-25) is a trip over the holiday (dated by holidayDateText), not only the
+  // events list; the requirement text keeps the word for the holiday's events.
+  if (/\b(?:christmas|xmas)\b/i.test(interpretationText) && /\bfrom december 23\b/i.test(datedPlanText) && !/\b(?:events?|concerts?|shows?|markets?|what.?s on|happening|lights)\b/i.test(planTextPlain)) interpretationText = interpretationText.replace(/\b(?:a |an |our |my )?(?:family |kids |white )?(?:christmas|xmas)(?: (?:week|break|holidays?|vacation|trip|getaway))?\b/gi, 'a trip');
+  // Disc golf, skate parks and pump tracks (2026-10-25) are outdoor stops here (site search sends them to Sports); the
+  // requirement text keeps the words, which rank those places first.
+  interpretationText = interpretationText.replace(/\s*\boff the slopes\b/gi, '');
+  interpretationText = interpretationText.replace(/,?\s*\bnospa\b/gi, '');
+  // A start time ("starting at 10:30am") is applied from the requirement text; its words are not places to find (2026-10-25).
+  interpretationText = interpretationText.replace(/,?\s*\b(?:with |and )?(?:starting|start|starts|leaving|beginning|begin|heading out)(?: each day| every day| the day)? (?:at|around|from|by) \d{1,2}(?:[:.]\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?(?: each day| every day)?\b/gi, '');
+  interpretationText = interpretationText.replace(/\bsnowboard(?:ing|ers?)?\b/gi, 'skiing');
+  interpretationText = interpretationText.replace(/\b(?:disc golf|frisbee golf)(?: courses?)?\b|\bskate ?parks?\b|\bpump tracks?\b|\bdirt jumps\b|\bbike skills parks?\b/gi, 'outdoor activities');
+  // Other holidays named as the trip ("Easter in Whistler", 2026-10-25): dated by holidayDateText, so the holiday's name
+  // is the trip itself, not a word to search for or an events-only answer.
+  if (/\bfrom (?:january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}\b/i.test(datedPlanText) && !/\b(?:events?|concerts?|shows?|markets?|what.?s on|happening|parade|fireworks|egg hunt)\b/i.test(planTextPlain)) interpretationText = interpretationText.replace(/\b(?:easter|thanksgiving|canada day|bc day|b\.c\. day|labou?r day|victoria day|may long(?: weekend)?|family day|remembrance day|truth and reconciliation day)\b(?!\s+(?:weekend|long weekend))/gi, 'a trip').replace(/\b(?:easter|thanksgiving|canada day|bc day|labou?r day|victoria day|family day|remembrance day)\s+(?=weekend|long weekend)/gi, '');
+  // New Year's (2026-10-25: "New Year's in Whistler with friends" searched for "new" and "years"): dated by
+  // holidayDateText, so the words themselves are not something to look for.
+  if (/\bnew\s+year/i.test(interpretationText) && !/\bnew\s+year[’']?s?\s+eve\b/i.test(interpretationText) && /\bfrom december 3[01]\b/i.test(datedPlanText)) interpretationText = interpretationText.replace(/\b(?:the )?new\s+year[’']?s?\b(?!\s+(?:weekend|break|trip|getaway|holiday))/gi, 'a trip').replace(/\b(?:the )?new\s+year[’']?s?\s+(?=weekend|break|trip|getaway|holiday)/gi, '');
+  // "A weekend in Squamish, we like markets, cafes and easy hikes": markets among other interests on a trip of days are
+  // its events to look for (the requirement text keeps the word), not an events-only answer.
+  if (/\b(?:weekend|[2-7] days|[2-7] nights)\b/i.test(interpretationText) && /\bmarkets?\b/i.test(interpretationText) && /\b(?:cafes?|hikes?|hiking|walks?|restaurants?|beaches?|food|breweries)\b/i.test(interpretationText)) interpretationText = interpretationText.replace(/,?\s*\b(?:farmers'? )?markets?\b,?/gi, ' ');
   const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy, { tripPlanner: true });
-  // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
+  // "A weekend in Whistler with a nice dinner" (2026-10-25) is a weekend whose dinner is special, not a restaurants-only
+  // weekend (it left every afternoon empty); every day already ends with dinner.
+  if ((intent.days >= 2 || /\bweekend\b/i.test(interpretationText)) && (intent.types || []).length === 1 && intent.types[0] === 'restaurant' && /\b(?:dinner|supper)\b/i.test(interpretationText) && !/\b(?:restaurants?|food|foodie|eat|eating|lunch|lunches|brunch)\b/i.test(interpretationText) && !(intent.foodTerms || []).length) intent.types = [];
+  // Multi-part requests ("cafes and beaches from Whistler to Squamish",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
   let trip = discoveryIntentModule().interpretTripComponents(interpretationText, taxonomy, intent);
-  // Round 9: dinner and a show with no town is planned in Kelowna, where most shows are (it was West Kelowna, or a
-  // haunted corn maze in Vernon); the Where chip can change it.
+  // "Ski in the morning and spa in the afternoon" (2026-10-25) is a ski day -- the ski planner puts the hill first and
+  // a spa or après after the lifts close -- not two generic parts (it planned the spa first and a valley trail).
+  if (trip.multi && /\b(?:ski|skis|skiing|snowboard\w*)\b/i.test(interpretationText) && !/\b(?:cross country|nordic|water ?ski|jet ?ski)\b/i.test(interpretationText) && !/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(interpretationText) && !trip.components.some((c) => c.kind === 'event')) trip = { ...trip, multi: false };
+  // A weekend that lists markets among other interests is a trip, not an events list (2026-10-25).
+  if (false && intent.mode === 'events' && (intent.days > 1 || /\bweekend\b/i.test(interpretationText)) && ((intent.types || []).length || (intent.activities || []).length || /\b(?:cafes?|hikes?|hiking|walks?|restaurants?|beaches?)\b/i.test(interpretationText))) { intent.mode = 'plan'; if (!intent.days) intent.days = 2; }
+  // "Weekend in Squamish in May, we like markets, cafes and easy hikes" (2026-10-25): a trip of several days with interests
+  // listed is planned day by day around them, not as one day's stops (it became one November day around an event).
+  if (trip.multi && intent.days > 1 && !trip.route && !trip.components.some((c) => c.meal || c.daypart || c.venueId || (c.kind === 'event' && c.event && c.event.kind !== 'market'))) trip = { ...trip, multi: false };
+  // "Camping and hiking in Whistler" (2026-10-25) is a day around a campground (the day planner sets up camp), not two
+  // parts that both picked a summit hike for the morning.
+  if (trip.multi && /\b(?:camping|campground|campsite|tenting)\b/i.test(interpretationText) && !trip.components.some((c) => c.kind === 'event' || c.meal) && !trip.route) trip = { ...trip, multi: false };
+  // Round 9: dinner and a show with no town is planned in Whistler, the biggest hub, where most shows are; the
+  // Where chip can change it.
   if (!(intent.regions || []).length && trip.multi && !trip.route && trip.components.some((c) => c.kind === 'event' && c.event && ['show', 'performance', 'comedy'].includes(c.event.kind)) && trip.components.some((c) => c.meal)) {
-    intent.regions = ['kelowna'];
-    trip.regions = ['kelowna'];
+    intent.regions = [TRIP_SITE.defaultRegion];
+    trip.regions = [TRIP_SITE.defaultRegion];
   }
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
   // Round 12 (2026-10-20): an undated afternoon/evening that is already over today is planned for tomorrow.
@@ -7551,7 +7770,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   }
   if(overrides?.startMinutes!==undefined)extracted.startMinutes=overrides.startMinutes;
   // Round 12 (2026-10-20): an evening/afternoon window keeps its own start when the page sends the default 9 AM start
-  // ("one evening in West Kelowna" with &start=540 began with a winery at 11 AM).
+  // ("one evening in Brackendale" with &start=540 began with a winery at 11 AM).
   { const ws = { morning: 540, afternoon: 780, evening: 1020 }[extracted.timeWindow]; if (ws && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < ws) extracted.startMinutes = ws; }
   // Round 13 (2026-10-21): the same for a window that has already started today ("tonight" at 8:20 PM starts at 8:30).
   { const late = extracted.windowClock && !extracted.windowClock.rolled ? extracted.windowClock.start : null; if (late && !overrides?.startDate && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < late) extracted.startMinutes = late; }
@@ -7562,11 +7781,79 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     trip = requirementModule.expandTripComponents(trip.multi ? trip : {...trip, regions:intent.regions || [], party:intent.party || trip.party, when:intent.when || trip.when}, requirements);
     if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;
   }
+  // A place named with no town (2026-10-25: "day trip to Joffre Lakes" was planned in Pemberton without Joffre): the
+  // trip is based where the named places are.
+  if (requirements && !(intent.regions || []).length) {
+    const named = requirements.items.filter((i) => i.kind === 'venue').map((i) => (taxonomy.venues || []).find((v) => v.id === i.value)).filter(Boolean);
+    const towns = [...new Set(named.map((v) => (TRIP_SITE.notDayBaseRegions.includes(v.region) ? TRIP_SITE.routeOffCorridor[v.region] : v.region)))];
+    if (towns.length) { intent.regions = towns; if (!trip.route) trip = { ...trip, regions: towns }; }
+  }
+  // "Vallea Lumina and dinner", "Scandinave and dinner" (2026-10-25): a named place whose name has no kind word, with one
+  // meal, is a two-part plan too (only the meal was a part, so it came back as a list).
+  // 2026-10-25 (later): any named place with one other part ("Essence of India and a walk") is a two-part plan.
+  const namedNonDining = requirements ? requirements.items.filter((i) => i.kind === 'venue' && i.venueType && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'].includes(i.venueType)) : [];
+  const namedAll = requirements ? requirements.items.filter((i) => i.kind === 'venue' && i.venueType) : [];
+  let mealFirst = false;
+  if (!trip.multi && namedAll.length === 1 && !(intent.days > 1) && trip.components.length === 1 && trip.components[0].kind === 'venue' && !trip.components[0].venueId
+    && (trip.components[0].meal || !(trip.components[0].types || []).includes(namedAll[0].venueType))) {
+    trip = { ...trip, multi: true };
+    const lower = interpretationText.toLowerCase(), at = lower.indexOf(String(namedAll[0].venueName || '').toLowerCase().split(' ')[0]);
+    const other = trip.components[0];
+    const otherAt = other.meal ? lower.search(/\b(?:breakfast|brunch|lunch|dinner|supper|coffee|drinks?)\b/) : lower.indexOf(String(other.phrase || '').toLowerCase());
+    mealFirst = otherAt >= 0 && at >= 0 && otherAt < at;
+  }
+  // A night walk or light show named with dinner goes after dinner, in the evening.
+  const nightNamed = new Set(namedNonDining.filter((i) => { try { return /\b(?:night walk|light show|after dark)\b/i.test((db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(i.value) || {}).cuisine || ''); } catch (e) { return false; } }).map((i) => i.value));
+  if (nightNamed.size) mealFirst = true;
+  // A named place in a multi-part request (2026-10-25: "Sea to Sky Gondola and lunch" left the gondola out): the place
+  // is that part of the plan -- the part of its kind, or a part of its own.
+  if (trip.multi && requirements && requirements.items.some((i) => i.kind === 'venue')) {
+    const comps = trip.components.map((c) => ({ ...c }));
+    for (const i of requirements.items.filter((x) => x.kind === 'venue' && x.venueType)) {
+      if (comps.some((c) => c.venueId === i.value)) continue;
+      const open = (c) => c.kind === 'venue' && !c.venueId && !c.meal;
+      // A named restaurant fills the meal part of its kind ("lunch at Araxi" is that lunch).
+      const mealPart = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'].includes(i.venueType) ? comps.find((c) => c.kind === 'venue' && !c.venueId && c.meal && (c.types || []).includes(i.venueType)) : null;
+      const ex = mealPart || comps.find((c) => open(c) && (c.types || []).includes(i.venueType)) || comps.find((c) => open(c) && !(c.types || []).some((t) => ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'].includes(t)) && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'].includes(i.venueType));
+      // The part is that place now: cuisine words read from its name ("bar & grill", "ramen") no longer filter it out.
+      // A named breakfast or brunch place is the morning's stop, not dinner (2026-10-25: The Crabapple Cafe at 6 PM).
+      const namedCuisine = (() => { try { return String((db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(i.value) || {}).cuisine || ''); } catch (e) { return ''; } })();
+      const morningPlace = ['restaurant', 'cafe'].includes(i.venueType) && /\b(?:breakfast|brunch|bakery|coffee|caf[eé])\b/i.test(namedCuisine) && !/\b(?:dinner|bistro|grill)\b/i.test(namedCuisine);
+      // A named place to eat with no meal said is lunch or dinner by its listed hours (2026-10-25: Meadow Cafe & Seoul
+      // Rice, mostly a lunch spot, was planned for dinner and dropped).
+      const servesMost = (() => {
+        if (!['restaurant', 'cafe', 'pub'].includes(i.venueType)) return null;
+        try {
+          const h = JSON.parse((db.prepare('SELECT hours FROM venues WHERE id = ?').get(i.value) || {}).hours || 'null');
+          if (!h || typeof h !== 'object') return null;
+          const mins = (t) => { const [a, b] = String(t).split(':').map(Number); return a * 60 + (b || 0); };
+          let lunch = 0, dinner = 0;
+          for (const ranges of Object.values(h)) for (const r of ranges || []) { if (mins(r[0]) <= 12 * 60 + 30 && mins(r[1]) >= 13 * 60 + 30) lunch++; if (mins(r[0]) <= 18 * 60 + 30 && (mins(r[1]) >= 20 * 60 || mins(r[1]) < mins(r[0]))) dinner++; }
+          return dinner >= lunch ? null : 'midday';
+        } catch (e) { return null; }
+      })();
+      if (ex) { ex.venueId = i.value; ex.phrase = i.venueName; ex.types = [i.venueType]; ex.cuisines = []; }
+      else comps[mealFirst && !morningPlace ? 'push' : 'unshift']({ kind: 'venue', types: [i.venueType], phrase: i.venueName, venueId: i.value, ...(nightNamed.has(i.value) ? { daypart: 'evening' } : morningPlace ? { daypart: 'morning' } : servesMost ? { daypart: servesMost } : {}), activities: [], features: [], collections: [], cuisines: [], dog: !!trip.party?.dog, kids: !!trip.party?.kids, meal: null, generic: false });
+    }
+    // The name itself can also read as a generic place to eat ("Bearfoot Bistro" as "a bistro"): once a named restaurant
+    // fills a part, a generic eating part without a meal of its own is dropped (it booked two dinners).
+    const DINING = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'];
+    const namedDining = comps.some((c) => c.venueId && (c.types || []).some((x) => DINING.includes(x)));
+    // A generic part made from a named place's own words ("gondola", "art museum") is that place, not another stop.
+    const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const namedWords = comps.filter((c) => c.venueId).map((c) => ` ${n(c.phrase)} `);
+    const fromName = (c) => !c.venueId && !c.meal && c.phrase && namedWords.some((w) => w.includes(` ${n(c.phrase).replace(/ restaurants?$/, '')} `));
+    trip = { ...trip, components: comps.filter((c) => !(c.kind === 'venue' && ((namedDining && !c.venueId && !c.meal && (c.types || []).length && (c.types || []).every((x) => DINING.includes(x))) || fromName(c)))) };
+  }
+  // "I have 6 hours in Squamish" (2026-10-25) is a short day to plan, not a list.
+  if (requirements && requirements.items.some((i) => i.kind === 'duration') && ['find', 'recommend'].includes(intent.mode) && !trip.multi) { intent.mode = 'plan'; intent.days = 1; }
+  // The ski rule again after the time-of-day parts are expanded ("ski in the morning, spa in the afternoon").
+  if (trip.multi && /\b(?:ski|skis|skiing|snowboard\w*)\b/i.test(interpretationText) && !/\b(?:cross country|nordic|water ?ski|jet ?ski)\b/i.test(interpretationText) && !/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(interpretationText) && !trip.components.some((c) => c.kind === 'event')) trip = { ...trip, multi: false };
   // Build My Trip V3 (Step 2): chips the visitor edited. Without overrides
   // (every existing caller) nothing below changes.
   if (overrides) {
     if (overrides.durationMinutes !== undefined && requirements?.items.some(i=>i.kind==='duration')) requirements.items=requirements.items.map(i=>i.kind==='duration'?{...i,value:overrides.durationMinutes,sourceText:'Updated time budget'}:i);
-    // A length chosen for a request that had none ("dog-friendly Vernon") makes it a day-by-day plan (2026-10-19).
+    // A length chosen for a request that had none ("dog-friendly Pemberton") makes it a day-by-day plan (2026-10-19).
     if (overrides.days !== undefined && ['find', 'recommend'].includes(intent.mode)) intent.mode = 'plan';
     if (overrides.days !== undefined) { if (intent.mode === 'plan') intent.days = overrides.days; if (requirements) requirements.items = requirements.items.filter(i => i.kind !== 'days').concat({ id: 'override-days', kind: 'days', value: overrides.days, strength: 'must', dayIndex: null, sourceText: 'Updated trip length' }); }
     if (overrides.pace !== undefined) intent.pace = overrides.pace;
@@ -7602,7 +7889,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     if (requirements?.startDate) {const endDate=(plan.days || []).at(-1)?.date || requirements.endDate || requirements.startDate;const nice=(iso)=>{const d=new Date(`${iso}T12:00:00Z`);return Number.isFinite(d.getTime())?`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]}, ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]} ${d.getUTCDate()}`:iso;};result.when = endDate!==requirements.startDate ? `${nice(requirements.startDate)} – ${nice(endDate)}` : nice(requirements.startDate);result.season=null;}
     // Round 10 (2026-10-19): a French request's unused words are the visitor's own French words (« novembre »,
     // « marchés »), never the English rewrite.
-    if (planText !== text && typeof text === 'string') {
+    if (datedPlanText !== text && typeof text === 'string') {
       const quoted = (list) => (list || []).flatMap((w) => [...String(w).matchAll(/“([^”]{1,40})”/g)].map((m) => m[1]));
       const own = tripPlannerFrModule().frenchWordsFor ? tripPlannerFrModule().frenchWordsFor(text, taxonomy, [...(result.notUsed || []), ...(plan.unsupported || []), ...quoted(plan.warnings), ...quoted(plan.notes)]) : new Map();
       if (own.size) {
@@ -7642,7 +7929,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     if (overrides?.pace !== undefined) intent.pace = overrides.pace;
     intent.days = overrides && overrides.days !== undefined ? overrides.days : requirements.items.find(i => i.kind === 'days').value;
     trip.multi = false;
-    // Round 10 (2026-10-19): "3 days in Vernon in November with shows" reads November's shows, and the plan is dated.
+    // Round 10 (2026-10-19): "3 days in Pemberton in November with shows" reads November's shows, and the plan is dated.
     const monthFrom = !requirements.startDate && !intent.when ? tripMonthStart(intent, intent.days, now) : null;
     if (monthFrom) { requirements.startDate = monthFrom; requirements.endDate = intent.days > 1 ? addLocalDays(monthFrom, Math.min(7, intent.days) - 1) : null; requirements.dateSource = requirements.dateSource || 'the month you named'; }
     const from = requirements.startDate || tripPlanDate(intent.when, now);
@@ -7651,11 +7938,11 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     // Round 10: "shows and live music" reads every category (a show is not only Live Music).
     const categories = requirements.items.some(i => i.kind === 'event' && i.value === 'any') ? [] : requirements.items.filter(i => i.kind === 'event' && i.value !== 'any').map(i => i.value);
     // 2026-10-18: every town's events, one per dated occurrence; the planner keeps those in each day's town or one
-    // about 30 minutes away. (Only the named towns were read: a Vernon-to-Osoyoos road trip never saw Kelowna's or
-    // Penticton's live music, and a weekend event was only ever on its first day.)
+    // about 30 minutes away. (Only the named towns were read: a Squamish-to-Pemberton road trip never saw the live music
+    // in Whistler on the way, and a weekend event was only ever on its first day.)
     itineraryEvents = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to), now);
   }
-  // Family trips (2026-10-18): the family events on What's On in the trip's dates (O'Keefe Ranch's fall weekends, a
+  // Family trips (2026-10-18): the family events on What's On in the trip's dates (a heritage ranch's fall weekends, a
   // corn maze, a kids' haunted house), offered as one stop a day. An undated "family weekend" is the coming weekend.
   let familyEvents = null, familyEventsFrom = null;
   if (!itineraryEvents && !trip.multi && intent.mode === 'plan' && (intent.party?.kids || intent.occasion === 'family') && !requirements?.items.some(i => i.kind === 'event') && !/\b(?:ski|skiing|snowboard\w*)\b/i.test(interpretationText)) {
@@ -7687,10 +7974,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       }
     }
   }
-  // Holiday trips (round 8, 2026-10-19): "Halloween weekend in Kelowna" uses What's On's Halloween events on those
+  // Holiday trips (round 8, 2026-10-19): "Halloween weekend in Whistler" uses What's On's Halloween events on those
   // dates (one a day where there is one). An undated request is the Halloween weekend itself.
   let holidayEvents = null;
-  // Round 11 (2026-10-20): Christmas too ("Christmas in Penticton Dec 12-13" skipped the holiday markets on those dates);
+  // Round 11 (2026-10-20): Christmas too ("Christmas in Squamish Dec 12-13" skipped the holiday markets on those dates);
   // a dated request with a length is a plan even when it reads as an events search.
   const holiday = !itineraryEvents && !familyEvents && !trip.multi && (intent.mode === 'plan' || (intent.mode === 'events' && !!requirements?.items.some(i => i.kind === 'days'))) && !requirements?.items.some(i => i.kind === 'event') ? tripPlannerModule().holidayTheme(interpretationText) : null;
   if (holiday && ['halloween', 'christmas'].includes(holiday.key)) {
@@ -7712,8 +7999,34 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   }
   if (requirements) {
     const consumed = requirementModule.consumedTerms(requirements);
+    // Words of a named place ("A Chef's Life" left “chefs”) are that place, not something else to look for (2026-10-25).
+    for (const i of requirements.items.filter((x) => x.kind === 'venue' && x.venueName)) for (const w of discoveryIntentModule().normalizeDiscoveryText(i.venueName).split(' ')) { if (w) { consumed.add(w); consumed.add(w.replace(/s$/, '')); consumed.add(`${w}s`); } }
+    if (trip.leftoverTerms && trip.leftoverTerms.length) trip = { ...trip, leftoverTerms: trip.leftoverTerms.filter((w) => !consumed.has(w)) };
+    // A kind read only from a named place's own name ("The Crabapple Cafe" as "a café") is that place, not another stop.
+    const named = requirements.items.filter((x) => x.kind === 'venue' && x.venueName);
+    if (named.length) {
+      let rest = requirementsText.toLowerCase();
+      for (const i of named) rest = rest.split(String(i.venueName).toLowerCase()).join(' ');
+      const KIND_WORDS = { cafe: /\b(?:caf[eé]s?|coffee)\b/, restaurant: /\b(?:restaurants?|eat|food)\b/, pub: /\bpubs?\b/, brewery: /\bbrew\w*\b/, cocktail: /\b(?:bars?|lounges?|cocktails?)\b/, beach: /\bbeach(?:es)?\b/, indoor: /\b(?:museums?|galler(?:y|ies)|indoor)\b/ };
+      requirements.items = requirements.items.filter((x) => !(x.kind === 'type' && KIND_WORDS[x.value] && named.some((i) => KIND_WORDS[x.value].test(String(i.venueName).toLowerCase())) && !KIND_WORDS[x.value].test(rest)));
+    }
     intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
     intent.textTerms = (intent.textTerms || []).filter(t => !consumed.has(t));
+  }
+  // A place named with no date that is closed for the season now (2026-10-25: "Nordic skiing at Whistler Olympic Park" in
+  // October) is planned for its listed opening day, and the plan says so.
+  let openingNote = null;
+  if (requirements && !requirements.startDate && !overrides?.startDate && !Number.isInteger(intent.month) && !intent.season) {
+    const named = requirements.items.filter((i) => i.kind === 'venue' && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery'].includes(i.venueType));
+    const rows = named.map((i) => { try { return db.prepare('SELECT v.name, s.status, s.reopens_date FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE v.id = ?').get(i.value); } catch (e) { return null; } });
+    const today = todayLocal(now);
+    const closed = rows.filter((r) => r && r.status === 'closed' && r.reopens_date && r.reopens_date > today);
+    if (named.length && closed.length) {
+      const when = closed.map((r) => r.reopens_date).sort().slice(-1)[0];
+      requirements.startDate = when; requirements.dateSource = requirements.dateSource || 'opening';
+      const M = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      openingNote = `${closed.length === 1 ? closed[0].name : 'These places'} ${closed.length === 1 ? 'opens' : 'open'} for the season on ${M[Number(when.slice(5, 7)) - 1]} ${Number(when.slice(8, 10))}, so this plan is for then.`;
+    }
   }
   const rolledWindow = !!(requirements?.windowClock?.rolled && requirements.startDate);
   if (trip.multi) {
@@ -7756,6 +8069,8 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   plan.understood = understood(plan);
     addEventRecovery(plan);
     tripWindowClockNote(plan, requirements);
+    if (openingNote && Array.isArray(plan.notes)) plan.notes.unshift(openingNote);
+    if (askedWineries && Array.isArray(plan.notes)) plan.notes.unshift(`There are no wineries in ${TRIP_SITE.area}, so these are wine bars and lounges instead.`);
     return plan;
   }
   if (intent.mode === 'events') { intent.eventFarmers = TRIP_FARMERS_MARKET_RE.test(String(interpretationText || '').replace(/[’']/g, '')); intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
@@ -7773,7 +8088,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
   const plan = tripPlannerModule().planTrip({
-    intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
+    intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
     labels: tripPlannerLabels(),
     seed,
@@ -7793,6 +8108,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     if (listed.open.length) plan.events = listed.open.concat(plan.events || []);
     for (const n of listed.ended) if (!(plan.notes || []).includes(n)) (plan.notes = plan.notes || []).push(n);
   }
+  if (openingNote && plan && Array.isArray(plan.notes)) plan.notes.unshift(openingNote);
+  // No wineries in the corridor (2026-10-25): said, rather than showing wine bars as if they were wineries.
+  if (askedWineries && plan && Array.isArray(plan.notes)) plan.notes.unshift(`There are no wineries in ${TRIP_SITE.area}, so these are wine bars and lounges instead.`);
   if (intent.mode === 'navigate' && intent.exactVenue) {
     plan.venue = { id: intent.exactVenue.id, url: discoveryVenueUrl(intent.exactVenue) };
   }
@@ -11103,6 +11421,8 @@ function findAllTripParserAliases(paddedText, aliasTable) {
 // longer, more specific phrase is kept -- so overlapping aliases for the
 // same concept don't produce redundant near-duplicate entries.
 function findUnsupportedTripParserPhrases(paddedText, phrases) {
+  // Whistler fork: "Britannia Beach" is a town, not a request for a beach.
+  if (TRIP_SITE.beachTownRe) paddedText = String(paddedText).replace(TRIP_SITE.beachTownRe, 'town');
   const matched = phrases.filter((phrase) => paddedText.indexOf(` ${phrase} `) !== -1);
   const sortedByLengthDesc = [...matched].sort((a, b) => b.length - a.length);
   const kept = [];

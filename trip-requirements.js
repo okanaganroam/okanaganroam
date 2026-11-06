@@ -1,4 +1,5 @@
 'use strict';
+const SITE=require('./trip-site.js');
 // Pure planner-only interpretation and verification. No writes, network or AI.
 const norm = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 const DINING = new Set(['restaurant','cafe','pub','cocktail','brewery']);
@@ -24,9 +25,22 @@ const KINDS = {
   horseback: /\b(?:horseback riding|horseback rides?|horseback|horse riding|horse rides?|trail rides?|horse riding tours?)\b/, // 2026-10-25: "a horseback ride"
   sunset: /\b(?:sunset|sunsets)\b/,
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
+  // Sea to Sky adventures (2026-10-25): matched in the request and in each tour's own name and description.
+  zipline: /\b(?:zip ?lines?|zip ?lining|ziplining|zip trek|ziptrek)\b/,
+  bungee: /\b(?:bungee|bungy)(?: jumps?| jumping)?\b/,
+  rafting: /\b(?:rafting|white ?water rafting|river rafts?|raft trips?|raft tours?)\b/,
+  scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic flights?|helicopter tours?|heli tours?|flightseeing|glacier landing)\b/,
+  atv: /\b(?:atvs?|rzr|off road tours?|side by sides?)\b/,
+  snowmobile_tour: /\b(?:snowmobil\w*)\b/,
+  via_ferrata: /\bvia ferrata\b/,
+  shopping: /\b(?:shopping|boutiques?|souvenirs?|gift shops?)\b/,
+  farm: /\b(?:farms|farm stands?|farm gate|u ?pick|pick your own|farm visits?|farm tours?)\b/,
+  // Audit 2026-10-27: "ice skating and hot chocolate" planned Brandywine Falls (a winter-tagged trail); skating is the
+  // rinks and arenas themselves, indoors or out. Skate parks are SPORT_KINDS.skatepark.
+  skating: /\b(?:ice skating|skating rinks?|ice rinks?|ice arenas?|public skating|skating)\b/,
 };
-const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
-const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
+const LABELS = {skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',rafting:'rafting',scenic_flight:'scenic flight',atv:'ATV tour',snowmobile_tour:'snowmobile tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
+const WALKING_TRANSPORT = /\b(?:no car|(?:we |i )?(?:do not|don t|dont) drive|(?:rely|relying) on (?:public )?(?:transit|buses|the bus)|public transit|no vehicle|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
 const EVENING_NO_DRIVE = /\b(?:no|not|don t|do not|won t|will not|avoid|without)\s+(?:want to\s+)?(?:driving|drive|car)\s+(?:after|past|once it s|at|in the)\s+(?:(2[0-3]|1\d|0?[1-9])(?:\s*h)?(?:\s*([0-5]\d))?\s*(am|pm|h)?|dark|night|nightfall|sunset|dinner|evening|the evening)\b/;
@@ -40,6 +54,31 @@ const venueNames = new Map();
 function venueName(name) {
   if (!venueNames.has(name)) { if (venueNames.size >= 4096) venueNames.clear(); venueNames.set(name, norm(name)); }
   return venueNames.get(name);
+}
+// Front-of-name aliases, only when exactly one listing has them (and no listing's full name equals one).
+const ALIAS_TRAILING = new Set(['restaurant','restaurants','winery','wines','wine','estate','estates','family','vineyard','vineyards','cellars','cellar','brewing','brewery','co','company','kitchen','bar','grill','bistro','cafe','pub','lounge','taphouse','distillery','distilling','and','the','at']);
+const aliasCache = new WeakMap();
+function venueAliases(venues) {
+  if (aliasCache.has(venues)) return aliasCache.get(venues);
+  const count = new Map(), owner = new Map(), full = new Set();
+  for (const v of venues) { if (v.redirect_to || !v.name) continue; full.add(venueName(v.name)); }
+  for (const v of venues) {
+    if (v.redirect_to || !v.name) continue;
+    const words = venueName(v.name).split(' ').filter(Boolean);
+    let alias = null;
+    const at = words.indexOf('at');
+    if (at >= 2) alias = words.slice(0, at).join(' ');
+    else {
+      let end = words.length;
+      while (end > 2 && ALIAS_TRAILING.has(words[end - 1])) end--;
+      if (end < words.length && end >= 2) alias = words.slice(0, end).join(' ');
+    }
+    if (!alias || alias.length < 8 || full.has(alias) || /^happy hours?$/.test(alias)) continue;
+    count.set(alias, (count.get(alias) || 0) + 1); owner.set(alias, v);
+  }
+  const out = new Map([...owner].filter(([a]) => count.get(a) === 1));
+  aliasCache.set(venues, out);
+  return out;
 }
 // Interpret a uniquely named sports destination as its sport, not words within its name.
 // Keep the original request for named-venue requirements and quoted customer text.
@@ -57,7 +96,12 @@ function sportsVenueInterpretationText(text,taxonomy){
   const phrase=kind?kind.replace(/_/g,' '):'sports venues';
   clean=clean.split(' '+name+' ').join(' '+phrase+' ');changed=true;
  }
- return changed?clean.trim():text;
+ // 2026-11-05: a place named by the front of its name ("Waterfront Wines") is that place, not the words "wines" and "waterfront".
+ for(const [alias]of venueAliases(taxonomy.venues||[])){
+  if(!clean.includes(' '+alias+' '))continue;
+  clean=clean.split(' '+alias+' ').join('  ');changed=true;
+ }
+ return changed?clean.replace(/\s+/g,' ').trim():text;
 }
 // "Pizza one night", "sushi once": a food asked for one time; onceEvening are the ones asked for at night.
 function onceFoods(normalizedText){
@@ -67,14 +111,14 @@ function onceFoods(normalizedText){
 }
 // A walk "by the lake" (2026-10-21): "a nice lake walk", "a walk along the lake", "lakeside stroll", "waterfront walk".
 const LAKE_WALK_WORDS=/\b(?:lake|lakes|lakeside|lakeshore|lakefront|waterfront|beach|beachfront|shoreline|seawall|promenade|by the water)\b/;
-const LAKESIDE_PLACE=/\b(?:lake|lakeside|lakeshore|lakefront|waterfront|beach|beachfront|shoreline|seawall|promenade|channel|marina|okanagan lake|skaha|kalamalka|wood lake|osoyoos lake)\b/;
+const LAKESIDE_PLACE=new RegExp(`\\b(?:lake|lakeside|lakeshore|lakefront|waterfront|beach|beachfront|shoreline|seawall|promenade|channel|marina|${SITE.lakesideWords.join('|')})\\b`);
 function lakesidePlace(v){
   if(v.type==='beach')return true;
   const text=norm([v.name,v.description||v.plannerDescription,v.textName,v.textDesc].filter(Boolean).join(' '));
   // "Views of the lake" from a mountain trail is not a walk by the lake.
   return LAKESIDE_PLACE.test(norm(v.name))||/\b(?:along|beside|by|on|follows?|hugs?|around)\s+(?:the\s+)?(?:\w+\s+){0,2}(?:lake|lakeshore|waterfront|beach|shoreline|channel)\b/.test(text)||/\b(?:lakeshore|lakefront|waterfront|lakeside|beachfront)\s+(?:walk|walkway|path|promenade|trail|park|stroll)/.test(text);
 }
-// A walk by the lake: a lakeside walking place, or a long beach with a path along it (Okanagan Beach on Lakeshore Drive).
+// A walk by the lake: a lakeside walking place, or a long beach with a path along it (a town beach with a promenade).
 // Never a rental counter, an RV park or a fenced dog beach.
 function lakeWalk(v){
   const name=norm(v.name);
@@ -101,13 +145,13 @@ function inferPlannerKinds(v) {
       return String(v.description||v.textDesc||'').split(/[.;!]/).map(norm).some(c=>re.test(c)&&! /\b(?:near|nearby|no|not|without)\b/.test(c));
     }
     if (['walk','easy_walk'].includes(kind)) {
-      if (!['outdoor','beach'].includes(v.type) || !/\b(?:walks?|walking|promenade|path|trail|hikes?|hiking|walkway|stroll|boardwalk|seawall)\b/.test(text)) return false;
+      if (!['outdoor','beach'].includes(v.type) || !/\b(?:walks?|walking|promenade|paths?|trails?|hikes?|hiking|walkway|stroll|boardwalk|seawall|loop|dykes?)\b/.test(text)) return false;
       if (/\b(?:no|not|without) (?:easy |flat |walking )?(?:walk|walks|path|trail)\b/.test(text)) return false;
       // Accommodation access and nearby trails are not walking experiences.
       if (/\b(?:rv|resort|campground|glamping)\b/.test(name)) return false;
       const clauses = String(v.description || v.textDesc || v.name || '').split(/[.;!]/).map(norm);
       return clauses.some(clause => {
-        const walk = /\b(?:walks?|walking|promenade|path|trail|boardwalk|hikes?|hiking|walkway|stroll|seawall)\b/.exec(clause);
+        const walk = /\b(?:walks?|walking|promenade|paths?|trails?|boardwalk|hikes?|hiking|walkway|stroll|seawall|loop|dykes?)\b/.exec(clause);
         if (!walk || /\b(?:near|nearby|beside|from|close to|minutes from)\b.{0,65}$/.test(clause.slice(0,walk.index))) return false;
         if (kind === 'walk') return true;
         return /\b(?:easy|flat|paved|level|gentle)\b/.test(clause) && !/\b(?:steep|challenging|strenuous|pump tracks?|bike|cycling|riders|dirt jump)\b/.test(clause);
@@ -210,6 +254,9 @@ function tripCalendar(text, referenceDate=null) {
   if(!startDate&&!conflict&&referenceDate&&/^\d{4}-\d{2}-\d{2}$/.test(referenceDate)){
     const next=/\bnext weekend\b/i.exec(text);
     if(next){const ref=new Date(referenceDate+'T12:00:00Z'),wd=ref.getUTCDay();startDate=new Date(ref.getTime()+(wd===0?6:(6-wd)+7)*86400000).toISOString().slice(0,10);source=next[0];}
+    // 2026-10-25 (tools audit): "next week" starts on the coming Monday (tomorrow, when asked on a Sunday).
+    const nextWeek=!next&&/\bnext week\b/i.exec(text);
+    if(nextWeek){const ref=new Date(referenceDate+'T12:00:00Z'),wd=ref.getUTCDay();startDate=new Date(ref.getTime()+(wd===0?1:8-wd)*86400000).toISOString().slice(0,10);source=nextWeek[0];}
   }
   if(startDate && source) {
     const before=String(text).slice(0,String(text).indexOf(source));
@@ -222,7 +269,7 @@ function tripCalendar(text, referenceDate=null) {
 }
 // 2026-10-14: "something indoors if it rains", "in case it rains", "a rainy-day backup" is a fallback, not the
 // trip's weather. Like "a rainy day option", it adds one indoor option and leaves the rest of the plan as asked
-// (a family who wants the beach "if it's nice" kept getting an all-indoor trip with "no beaches in Penticton").
+// (a family who wants the beach "if it's nice" kept getting an all-indoor trip with "no beaches in Squamish").
 // Only a fallback when the rest of the request is about something else; "what can we do if it rains?" is a rainy-day
 // request outright.
 const RAIN_BACKUP_CONTEXT=/\b(?:beach|beaches|hike|hikes|hiking|walk|walks|park|parks|lake|outdoors?|outside|golf|swim|swimming|sunny|nice weather|if it s nice|weekend|nights?|[2-7] days?|two days|three days|four days|five days)\b/;
@@ -292,7 +339,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       const before=c.slice(0,m.index), neg=/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(before);
       add(neg?'excluded_kind':'venue_kind',kind,scopeText,!neg&&['walk','easy_walk'].includes(kind)&&LAKE_WALK_WORDS.test(c)?{lakeside:true}:{});
     }
-    for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
+    for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:SITE.beachWordRe,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/,brewery:/\b(?:brewery|breweries|brewpubs?|taprooms?|craft beer)\b/,distillery:/\b(?:distillery|distilleries)\b/,cocktail:/\b(?:cocktails?|cocktail (?:bars?|lounges?))\b/})) {
       const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:value==='restaurant'&&WINERY_LUNCH.test(c)?{wineryLunch:true}:{});
     }
     // "3 wineries a day" / "two breweries per day" is a count for every day (2026-10-18), capped at
@@ -330,12 +377,12 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     const comedy=/\b(?:comedy|comedians?|improv|stand ?up)\b/.exec(c), show=/\b(?:a|the|some|any) (?:\w+ )?shows?\b|\bshows\b/.exec(c);
     // Round 10: "shows and live music" asks for both (the show was dropped once live music was read).
     if((comedy||show)&&!items.some(i=>i.kind==='event'&&i.sourceText===scopeText&&!['live-music','hockey','festival','market'].includes(i.eventKind))&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,(comedy||show).index))&&!/\b(?:show (?:me|us)|shows? (?:me|us))\b/.test(c))add('event','any',scopeText,comedy?{eventKind:'comedy',textTerms:['comedy']}:{eventKind:'show'});
-    // 2026-10-21: "no hiking" rules out trail networks and hikes (Three Blind Mice opened a "no hiking" Penticton plan); a
+    // 2026-10-21: "no hiking" rules out trail networks and hikes (a trail network opened a "no hiking" Squamish plan); a
     // flat lakeside walk, promenade, garden or beach is still fine.
     {const h=/\b(?:hike|hikes|hiking|trails?|mountain biking)\b/.exec(c);
       if(h&&/\b(?:no|not|without|avoid|skip|exclude|hate|don t like|dont like)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,h.index)))add('excluded_activity','hiking',scopeText);}
     for (const [activity,re] of Object.entries({skiing:/\b(?:ski|skiing)\b/,snowshoeing:/\b(?:snowshoeing|snowshoe)\b/,winter:/\b(?:ski|skiing|snowshoeing|snowshoe|winter activities?)\b/,hiking:/\b(?:hike|hiking|hikes)\b/,viewpoints:/\b(?:viewpoints?|lookouts?|sunset)\b/})) {
-      const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('activity',activity,scopeText);
+      const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude|don t|do not|dont|won t|never)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index))&&!(activity==='skiing'||activity==='winter')||m&&(activity==='skiing'||activity==='winter')&&!/\b(?:no|not|without|avoid|skip|exclude|don t|do not|dont|won t|never)\s+(?:\w+\s+){0,2}$/.test(c.slice(0,m.index))&&!/\bnon ?skiers?\b/.test(c))add('activity',activity,scopeText);
     }
     if(/\b(?:rainy|rains?|indoors|indoor|wet weather)\b/.test(c)&&!/\b(?:no|avoid|without)\s+(?:rain|rainy|indoor)/.test(c)) add('rainy',true,scopeText,{activityOnly:/\brainy day (?:option|activity|activities)\b/.test(c)||!!trip.multi&&/^(?:a |an )?rainy day$/.test(c)||CONDITIONAL_RAIN.test(c)&&RAIN_BACKUP_CONTEXT.test(normalizedText),conditional:CONDITIONAL_RAIN.test(c)&&RAIN_BACKUP_CONTEXT.test(normalizedText)});
     for(const [feature,re] of Object.entries({vegetarian:/\bvegetarian\b/,vegan:/\bvegan\b/,gluten_free:/\bgluten free\b/})) {
@@ -350,11 +397,11 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     if(/\$\s*\d+/.test(String(text))&&/\b(?:budget|under|spend|cost|dollars|trip)\b/.test(c))add('unsupported','exact budget',scopeText);
     if(/\b(?:wheelchair|accessible|accessibility)\b/.test(c))add('unsupported','accessibility',scopeText);
     if(/\b(?:ages?|aged)\s*\d+\b|\b\d+\s*year olds?\b/.test(c))add('unsupported','age suitability',scopeText);
-    // 2026-10-14: "one day trip to Penticton" inside a longer stay is a day trip, not a second trip length.
+    // 2026-10-14: "one day trip to Squamish" inside a longer stay is a day trip, not a second trip length.
     const longerStay=/\b(?:[2-7]|two|three|four|five|six|seven)\s+days?\b|\bweekend\b|\bnights?\b|\bweek\b/.test(normalizedText);
     for(const length of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+days?\b/g)) {
       if(longerStay&&/^(?:1|one)$/.test(length[1])&&/^\s*trips?\b/.test(c.slice(length.index+length[0].length)))continue;
-      // Round 8 (2026-10-19): "2 days: West Kelowna wineries one day, Naramata wineries the next" -- "one day" is which day, not a length.
+      // Round 8 (2026-10-19): "2 days: Squamish breweries one day, Whistler breweries the next" -- "one day" is which day, not a length.
       if(longerStay&&/^(?:1|one)$/.test(length[1])&&/\b(?:the next|the other|the second|next day|another day|day two|the day after|the following day)\b/.test(normalizedText))continue;
       add('days',Number(length[1])||WORD_DAYS[length[1]],scopeText,{dayIndex:null,weekday:null});
     }
@@ -373,9 +420,22 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   for(const v of taxonomy.venues||[]) {
     if(v.redirect_to||!v.name)continue;
     const name=venueName(v.name);if(name.length<4)continue;
+    // A listing named like a region ("Whistler Blackcomb") is the region when the request says it (2026-10-25).
+    if(Object.values(taxonomy.regionLabels||{}).some(l=>venueName(String(l))===name))continue;
     const mention=clauses.find(({c})=>` ${c} `.includes(` ${name} `)&&!/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,c.indexOf(name))));
     if(!mention)continue;
     if(!names.has(name))names.set(name,[]);names.get(name).push({...v,scopeText:mention.scopeText});
+  }
+  // A name inside a longer name found too ("Sea to Sky Gondola" in "Sea to Sky Gondola Tube Park") is that longer place (2026-10-25).
+  for(const name of [...names.keys()])if([...names.keys()].some(o=>o!==name&&o.length>name.length&&` ${o} `.includes(` ${name} `)))names.delete(name);
+  // 2026-11-05: a place named by the front of its name -- "Waterfront Wines" for Waterfront Wines Restaurant, "Home Block" for
+  // Home Block at CedarCreek Estate Winery -- is that place when no other listing shares those words (never a guess between two).
+  const matchedIds=new Set([...names.values()].flatMap(vs=>vs.map(v=>v.id)));
+  for(const [alias,v] of venueAliases(taxonomy.venues||[])) {
+    if(matchedIds.has(v.id)||names.has(alias))continue;
+    const mention=clauses.find(({c})=>` ${c} `.includes(` ${alias} `)&&!/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,c.indexOf(alias))));
+    if(!mention)continue;
+    names.set(alias,[{...v,scopeText:mention.scopeText}]);
   }
   for(const [name,vs] of names){if(vs.length===1)add('venue',vs[0].id,vs[0].scopeText,{venueType:vs[0].type,venueName:vs[0].name});else conflicts.push(`More than one listing is named “${vs[0].name}”; choose a specific venue.`);}
   // Budget bands guide suggestions; they never verify a total dollar cost.
@@ -396,8 +456,8 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   const {onceTerms,onceEvening}=onceFoods(normalizedText);
   return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
 }
-// Time windows (2026-10-20, round 11): a request that names only a town and a time -- "this weekend in Penticton",
-// "Saturday evening in Penticton", "an afternoon in Kelowna", "morning in Peachland" -- is a plan for that time, not
+// Time windows (2026-10-20, round 11): a request that names only a town and a time -- "this weekend in Squamish",
+// "Saturday evening in Squamish", "an afternoon in Whistler", "morning in Pemberton" -- is a plan for that time, not
 // an Ideas list. "This weekend" is the coming Saturday and Sunday (only Sunday on a Sunday); a morning, afternoon or
 // evening is a one-day plan for that window (timeWindow, read by explicitOutingComponents), on the named day.
 const WINDOW_START={morning:540,afternoon:780,evening:1020};
@@ -406,7 +466,7 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   const i=intent||{},when=i.when||null;
   const empty=k=>!(i[k]||[]).length;
   if(i.mode!=='find'||(i.regions||[]).length!==1||trip?.route||trip?.multi||out.items.length||out.conflicts.length||out.startDate||out.onlyRequested||out.outingScope)return out;
-  // Round 12 (2026-10-20): "this weekend in Kelowna with kids / with the family" keeps the window (kid-friendly picks).
+  // Round 12 (2026-10-20): "this weekend in Whistler with kids / with the family" keeps the window (kid-friendly picks).
   const familyOnly=(i.features||[]).every(f=>f==='kid_friendly')&&(!i.occasion||i.occasion==='family');
   if(!['types','collections','activities','cuisines','foodTerms','textTerms','eventCategories'].every(empty)||!familyOnly||i.budget||i.lake)return out;
   if((i.excluded?.types||[]).length||(i.excluded?.concepts||[]).length)return out;
@@ -414,9 +474,9 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   const wd=ref?new Date(`${ref}T12:00:00Z`).getUTCDay():null;
   const weekday=when?.weekday?DAYS.indexOf(String(when.weekday).slice(0,3)):-1;
   // Only the words morning, afternoon or evening ("tonight" at 7 PM keeps the Ideas list, timed by the clock).
-  // Round 12 (2026-10-20): "tonight in Kelowna" and "Friday night / Saturday night in Kelowna" (« ce soir », « vendredi
+  // Round 12 (2026-10-20): "tonight in Whistler" and "Friday night / Saturday night in Whistler" (« ce soir », « vendredi
   // soir ») are an evening too; "tonight at 7 pm" keeps the Ideas list, timed by the clock.
-  // "What can we do in Kelowna tonight" asks for ideas, and keeps the Ideas list.
+  // "What can we do in Whistler tonight" asks for ideas, and keeps the Ideas list.
   const night=out.startMinutes==null&&(!out.daypart||out.daypart==='evening')&&/\b(?:tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day night)\b/.test(out.text||'')&&!/\b(?:what|where|things?|ideas?|suggest\w*|recommend\w*|anything|something)\b/.test(out.text||'');
   if(night)out.daypart='evening';
   const window=out.daypart&&(night||new RegExp(`\\b${out.daypart}\\b`).test(out.text||''))&&WINDOW_START[out.daypart]!=null&&!out.items.some(x=>x.kind==='deadline')?out.daypart:null;
@@ -427,8 +487,8 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
     out.endDate=ref&&n>1?isoAdd(out.startDate,1):null;out.planDays=n;
     return out;
   }
-  // Round 13 (2026-10-21): "Saturday in Osoyoos" (a town and a weekday, nothing else) is a one-day plan on that day,
-  // not an Ideas list. "What can we do Saturday in Osoyoos" still asks for ideas.
+  // Round 13 (2026-10-21): "Saturday in Pemberton" (a town and a weekday, nothing else) is a one-day plan on that day,
+  // not an Ideas list. "What can we do Saturday in Pemberton" still asks for ideas.
   if(!window&&weekday>=0&&ref&&!out.daypart&&!when?.preset&&!/\b(?:what|where|things?|ideas?|suggest\w*|recommend\w*|anything|something)\b/.test(out.text||'')){
     out.startDate=isoAdd(ref,(weekday-wd+7)%7);out.dateSource=out.dateSource||'the day you named';
     out.items.push({id:'weekday-day',kind:'days',value:1,strength:'must',sourceText:String(when.weekday),dayIndex:null,weekday:null});
@@ -447,8 +507,8 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   }
   return out;
 }
-// Round 12 (2026-10-20): an undated window that has already passed today ("an afternoon in Kelowna" asked at 6:45 PM
-// Pacific) is planned for tomorrow, not for hours that are over. clock is okanaganClock(now): {date, minutes}.
+// Round 12 (2026-10-20): an undated window that has already passed today ("an afternoon in Whistler" asked at 6:45 PM
+// Pacific) is planned for tomorrow, not for hours that are over. clock is whistlerClock(now): {date, minutes}.
 // Round 13 (2026-10-21): the same for "tonight" / « ce soir » (dated today). A window that has started but still has
 // at least 90 minutes left starts at the next quarter hour, with fewer stops (the first ones are dropped: at 8:20 PM
 // "tonight" is dinner at 8:30 and a nightcap, not drinks at 5 PM). requirements.windowClock records what was done, so
@@ -523,6 +583,35 @@ function consumedTerms(requirements) {
 
 // A constrained single-day outing schedules requested components, rather than
 // filling unrelated breakfast/lunch/dinner slots. Multi-day plans stay intact.
+// Skating asked for (audit 2026-10-27): the plan's generic outdoor ("winter") part is the rink, indoors or out
+// ("ice skating and hot chocolate in Whistler" planned the Train Wreck trail).
+function skatingComponents(trip,requirements){
+  if(!(requirements.items||[]).some(i=>i.kind==='venue_kind'&&i.strength==='must'&&i.value==='skating')||!Array.isArray(trip?.components))return trip;
+  if(trip.components.some(c=>(c.plannerKinds||[]).includes('skating')))return trip;
+  const rink={kind:'venue',types:['indoor','sport','outdoor'],phrase:LABELS.skating,plannerKinds:['skating'],activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false};
+  const at=trip.components.findIndex(c=>c.kind==='venue'&&(c.types||[]).length===1&&c.types[0]==='outdoor'&&!(c.plannerKinds||[]).length);
+  return {...trip,components:at>=0?trip.components.map((c,n)=>n===at?{...rink,daypart:c.daypart||rink.daypart}:c):[...trip.components,rink]};
+}
+// 2026-11-05: places named in a short outing ("lunch at Frankie We Salute You, then Kasugai Garden") are those stops, in the
+// order they were named; they were looked for and then replaced by other places.
+function bindNamedVenues(trip,requirements) {
+  const named=(requirements.items||[]).filter(i=>i.kind==='venue'&&i.strength==='must'&&Number.isInteger(i.value)&&i.venueType&&i.venueName);
+  if(!named.length||!trip?.multi||!(trip.components||[]).length)return trip;
+  const text=' '+norm(requirements.text||'')+' ',comps=trip.components.map(c=>({...c}));
+  const where=(s)=>{const n=text.indexOf(' '+norm(s||'')+' ');return n<0?-1:n;};
+  let changed=false;
+  for(const item of named) {
+    if(comps.some(c=>c.venueId===item.value))continue;
+    const at=where(item.venueName);
+    const idx=comps.findIndex(c=>c.kind==='venue'&&!c.venueId&&(c.types||[]).includes(item.venueType));
+    if(idx>=0){comps[idx].venueId=item.value;comps[idx].phrase=item.venueName;changed=true;continue;}
+    const part={kind:'venue',types:[item.venueType],phrase:item.venueName,activities:[],features:[],collections:[],cuisines:[],dog:!!trip.party?.dog,kids:!!trip.party?.kids,meal:null,daypart:requirements.daypart||null,generic:false,venueId:item.value};
+    let insertAt=comps.length;
+    if(at>=0)for(let n=0;n<comps.length;n++){const w=where(comps[n].phrase);if(w>at){insertAt=n;break;}}
+    comps.splice(insertAt,0,part);changed=true;
+  }
+  return changed?{...trip,components:comps,explicitStops:true}:trip;
+}
 function explicitOutingComponents(trip,requirements) {
   const items=requirements.items||[],days=items.find(i=>i.kind==='days')?.value||requirements.planDays;
   if(days>1 || items.some(i=>i.dayIndex>1))return trip;
@@ -530,16 +619,19 @@ function explicitOutingComponents(trip,requirements) {
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
   const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
-  if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
+  if(!scoped)trip=skatingComponents(trip,requirements);
+  if(!scoped)return bindNamedVenues(requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip,requirements);
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';
   const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false,...extra});
-  for(const i of kinds)parts.push(make([typeFor(i.value)],LABELS[i.value],{plannerKinds:[i.value]}));
+  for(const i of kinds)parts.push(make(i.value==='skating'?['indoor','sport','outdoor']:[typeFor(i.value)],LABELS[i.value],{plannerKinds:[i.value]}));
   for(const i of items.filter(i=>i.kind==='activity'&&i.strength==='must')) {
-    if(i.value==='winter'&&items.some(j=>j.kind==='activity'&&['skiing','snowshoeing'].includes(j.value)))continue;
+    if(i.value==='winter'&&(items.some(j=>j.kind==='activity'&&['skiing','snowshoeing'].includes(j.value))||kinds.some(k=>k.value==='skating')))continue;
     const existing=parts.find(c=>i.value==='viewpoints'&&(c.plannerKinds||[]).includes('sunset')||i.value==='hiking'&&(c.plannerKinds||[]).some(k=>['guided_hike','challenging_hike','easy_walk'].includes(k)));
     if(existing)existing.activities.push(i.value);
-    else parts.push(make(['outdoor'],i.value,{activities:[i.value]}));
+    // Water and adventure (2026-10-25: "kayak and SUP in Squamish"): lakes are listed as beaches and the paddling and zipline
+    // outfitters as tours, so the part looks at those too.
+    else parts.push(make(i.value==='water'?['outdoor','beach','tour']:i.value==='adventure'||i.value==='nature'?['outdoor','tour']:['outdoor'],i.value,{activities:[i.value]}));
   }
   for(const i of items.filter(i=>i.kind==='event'&&i.strength==='must')) {
     const kind=i.eventKind||(/\bfestivals?\b/.test(i.sourceText)?'festival':/\bmarkets?\b/.test(i.sourceText)?'market':'event');
@@ -558,7 +650,7 @@ function explicitOutingComponents(trip,requirements) {
     else if(i.venueType)parts.push(make([i.venueType],i.venueName,{venueId:i.value}));
   }
   // Round 14 (2026-10-20): a part of the request with no requirement of its own ("drinks" in "drinks and dinner tonight
-  // in Penticton") is kept; the plan was dinner alone.
+  // in Squamish") is kept; the plan was dinner alone.
   if(trip?.multi&&parts.length)for(const c of trip.components||[]){
     if(c.kind!=='venue'||c.meal||c.venueId||!(c.types||[]).length||c.types.some(t=>represented.has(t)))continue;
     parts.push({...c,daypart:c.daypart||requirements.daypart});for(const t of c.types)represented.add(t);
@@ -569,11 +661,14 @@ function explicitOutingComponents(trip,requirements) {
   return {...trip,multi:true,components:parts,leftoverTerms:[],explicitStops:true,outingOccasion:trip?.outingOccasion,regions:trip?.regions||[],party:trip?.party||{dog:false,kids:false},when:trip?.when||null,route:trip?.route||null,unknownPlaces:trip?.unknownPlaces||[]};
 }
 
-function expandTripComponents(trip,requirements) {
-  // Round 15b (2026-10-20): a crawl keeps its three stops ("winery hopping in Oliver this afternoon" became one winery:
-  // the afternoon's explicit-outing rebuild merged the crawl's copies into its one "winery" item).
+// A place named in a short outing is its stop (bindNamedVenues), whichever way the components were built.
+function expandTripComponents(trip,requirements) { return bindNamedVenues(expandTripComponentsInner(trip,requirements),requirements); }
+function expandTripComponentsInner(trip,requirements) {
+  // Round 15b (2026-10-20): a crawl keeps its three stops ("brewery hopping in Squamish this afternoon" became one brewery:
+  // the afternoon's explicit-outing rebuild merged the crawl's copies into its one "brewery" item).
   if (!(trip?.multi && trip.crawl) && (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport'))) trip=explicitOutingComponents(trip,requirements);
   if (!trip?.multi) return trip;
+  trip=skatingComponents(trip,requirements);
   const singleDay=!(requirements.planDays>1||(requirements.items||[]).some(i=>i.kind==='days'&&i.value>1||i.dayIndex>1));
   const components=trip.components.map(c=>singleDay&&requirements.daypart&&!c.meal?{...c,daypart:requirements.daypart}:c);
   for(const item of requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&['easy_walk','challenging_hike'].includes(i.value))){
@@ -618,7 +713,7 @@ function matches(v,i){
   return false;
 }
 // Round 11 (2026-10-20): a place with no stored hours whose listing says it runs on one day of the week ("every Saturday
-// morning from mid-April to the end of October", the Penticton Farmers' Market) is only planned on that day and in those
+// morning from mid-April to the end of October", a weekly farmers' market) is only planned on that day and in those
 // months. null when the listing says nothing that clear.
 const WEEKDAY_WORDS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 const MONTH_WORDS=['january','february','march','april','may','june','july','august','september','october','november','december'];
@@ -650,10 +745,19 @@ function venueAllowed(v,requirements,day,date){
     if(i.strength==='prefer'||!applicable(i,day,date))continue;
     if(i.servesCoffee&&(v.type==='cafe'||(v.fdTypes||[]).includes('cafe'))&&!coffeeEvidence(v))return false;
     if((i.kind==='excluded_kind'||i.kind==='excluded_type'||i.kind==='excluded_activity')&&matches(v,i))return false;
-    if(i.kind==='feature'&&(i.value==='dog_friendly'||i.value==='kid_friendly'||DINING.has(v.type))&&!matches(v,i))return false;
+    // A dog trip's meals may be at a place that isn't dog-friendly (labelled on the stop); places to go must be (2026-10-25).
+    if(i.kind==='feature'&&((i.value==='dog_friendly'&&(SITE.dogMealsMustBeListed||!DINING.has(v.type)))||i.value==='kid_friendly'||(DINING.has(v.type)&&i.value!=='dog_friendly'))&&!matches(v,i))return false;
     if(i.kind==='price_limit'&&DINING.has(v.type)&&v.price!=null&&v.price>i.value)return false;
-    if(i.kind==='rainy'&&!i.activityOnly&&(v.type==='beach'||v.type==='outdoor'||v.type==='golf'&&!v.indoorGolf))return false;
+    // Audit 2026-10-27: "a rainy day ... a short walk" kept every outdoor place out, the walk too; a place that answers
+    // something the visitor asked for by name (a walk, a hike, a beach) stays allowed on a rainy day.
+    if(i.kind==='rainy'&&!i.activityOnly&&(v.type==='beach'||v.type==='outdoor'||v.type==='golf'&&!v.indoorGolf)&&!(rainWeather(i)&&requestedOutdoor(v,requirements)))return false;
   }return true;
+}
+// Rain is the weather, not an instruction: "only indoors" / "indoors only" still keeps every outdoor place out.
+function rainWeather(i){return /\b(?:rain|rains|rainy|raining|wet weather)\b/.test(i.sourceText||'')&&!/\b(?:only indoors?|indoors? only|stay (?:inside|indoors))\b/.test(i.sourceText||'');}
+// An outdoor place that meets a must-have outdoor part of the request (venue kind, outdoor/beach/golf type, activity).
+function requestedOutdoor(v,requirements){
+  return (requirements?.items||[]).some(j=>j.strength==='must'&&(j.kind==='venue_kind'||j.kind==='activity'||j.kind==='type'&&['outdoor','beach','golf'].includes(j.value))&&matches(v,j));
 }
 function requirementScore(v,requirements,day,date,covered=new Set()){
   let score=0;
@@ -664,7 +768,7 @@ function requirementScore(v,requirements,day,date,covered=new Set()){
 }
 // Resolve distinctive phrases against supplied, date/region-filtered listings only.
 // Two meaningful words and one unique title are required; never infer from one word.
-const NAMED_EVENT_GENERIC = new Set(['tour', 'tours', 'one', 'two', 'day', 'days', 'weekend', 'weekends', 'night', 'nights', 'trip', 'food', 'okanagan', 'bc']);
+const NAMED_EVENT_GENERIC = new Set(['tour', 'tours', 'one', 'two', 'day', 'days', 'weekend', 'weekends', 'night', 'nights', 'trip', 'food', 'bc', ...SITE.areaWords]);
 function namedEventInterpretationText(text, events = [], details = false) {
   const normalized = norm(text), tokens = normalized.split(' ');
   if (/\b(?:concerts?|events?|live music|festivals?|hockey|markets?)\b/.test(normalized) || tokens.length > 100) return details ? {text, ambiguity:null} : text;
@@ -680,8 +784,8 @@ function namedEventInterpretationText(text, events = [], details = false) {
         const words = tokens.slice(start, end).filter(w => !['the','a','an','and','of'].includes(w));
         const eventRegion = norm(event.region || '').replace(/-/g, ' ');
         if (words.length < 2 || words.join(' ') === eventRegion || !(` ${title.join(' ')} `).includes(` ${words.join(' ')} `)) continue;
-        // Round 7 (2026-10-19): a town and a generic word are not an event's name ("food tour Kelowna" is not "Hungry for
-        // Laughs Comedy Tour (Kelowna)").
+        // Round 7 (2026-10-19): a town and a generic word are not an event's name ("food tour Whistler" is not "Whistler
+        // Comedy Food Tour (Whistler)").
         const regionWords = new Set(eventRegion.split(' '));
         if (words.filter(w => !regionWords.has(w) && !NAMED_EVENT_GENERIC.has(w)).length < 2) continue;
         if (/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include)\b).)*$/.test(tokens.slice(0,start).join(' '))) continue;
@@ -730,7 +834,7 @@ function selectedStops(plan){
 function km(a,b){const rad=x=>x*Math.PI/180;const dlat=rad(b.lat-a.lat),dlon=rad(b.lng-a.lng);return 6371*2*Math.asin(Math.min(1,Math.sqrt(Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2)));}
 // Road travel (2026-10-18): straight-line km x 1.3 for the road, at 50 km/h for a short hop rising to 70 km/h on a
 // longer highway leg, never under 5 minutes. (It used to be x1.6 at 30 km/h plus 15 minutes: "43 min" for 8.5 km
-// inside Naramata.) Walking stays 3-4 km/h.
+// inside one town.) Walking stays 3-4 km/h.
 const ROAD_FACTOR=1.3,MIN_DRIVE_MINUTES=5;
 function driveMinutes(distance){
   const road=distance*ROAD_FACTOR;
@@ -742,34 +846,32 @@ function transferRange(distance,walking=false){
   const max=driveMinutes(distance);
   return {minMinutes:Math.max(MIN_DRIVE_MINUTES,Math.floor(max*0.85)),maxMinutes:max};
 }
-// Okanagan Lake (2026-10-19, round 7): the only ways across are the bridge at Kelowna and around the south end at
-// Penticton, and there is no road along the east shore between Naramata and Kelowna (Okanagan Mountain Park). A pair
-// of places on opposite shores is measured around the lake, not across it: Naramata to Summerland went from "7 min" to
-// about 40. The shore line is a rough centre line of the lake, north to south; places more than ~9 km from the lake
-// (Big White, Rutland) are not on a shore and keep the straight line.
-const LAKE_CENTRE=[[49.49,-119.6],[49.55,-119.625],[49.6,-119.615],[49.65,-119.64],[49.7,-119.66],[49.75,-119.665],[49.8,-119.6],[49.85,-119.53],[49.88,-119.505],[49.95,-119.505],[50.05,-119.47],[50.1,-119.43]];
-// Round 9 (2026-10-19): the east shore splits at Okanagan Mountain Park (about 49.72), not at 49.8 -- Kelowna's Lower
-// Mission (CedarCreek, Waldhof, Summerhill) is on Lakeshore Road north of the park, so "WOK STAR to Waldhof" (4 km)
-// was "114 min" around the south end of the lake.
-const LAKE_SOUTH_END={lat:49.497,lng:-119.593},LAKE_BRIDGE={lat:49.876,lng:-119.505},LAKE_EAST_SPLIT=49.72;
+// Water detours: lakeDetour(a,b) -> { km, side, highway, via } when the road between two places has to go around a
+// body of water (shore roads in side, the rest in highway), else null. The parent site's lake-crossing geometry was
+// removed for the Sea to Sky fork: the corridor follows one highway along Howe Sound and the valleys, so the straight
+// line (x1.3) stands for every pair. Kept as a hook so estimateTransfer's around-the-water branch still works if a crossing is
+// added later.
+// A lake with no crossing between its two ends (SITE.lakeCrossing, null where there is none): a straight line across it is not the drive.
+const LAKE_CROSSING=SITE.lakeCrossing;
 function lakeShore(p){
+  if(!LAKE_CROSSING)return null;
+  const LAKE_CENTRE=LAKE_CROSSING.centre;
   if(!p||!(p.lat>LAKE_CENTRE[0][0]&&p.lat<LAKE_CENTRE[LAKE_CENTRE.length-1][0]))return null;
   const i=LAKE_CENTRE.findIndex(([lat])=>lat>=p.lat),[la,lo]=LAKE_CENTRE[i-1],[lb,lob]=LAKE_CENTRE[i];
   const centre=lo+(lob-lo)*(p.lat-la)/(lb-la),off=p.lng-centre;
   if(Math.abs(off)>0.12)return null;
-  return off<0?'west':p.lat<LAKE_EAST_SPLIT?'east-south':'east-north';
+  return off<0?'west':p.lat<LAKE_CROSSING.eastSplit?'east-south':'east-north';
 }
-// -> { km, via } for a pair on opposite shores (km along the way round, before the road factor), else null.
-// side: the km on winding shore roads (Naramata Road, Lakeshore Road); the rest is highway. Only a real detour counts
-// (the way round at least 1.3 times the straight line): Penticton to Kelowna already drives round the south end.
 function lakeDetour(a,b){
+  if(!LAKE_CROSSING)return null;
+  const {southEnd,bridge,viaSouth,viaBridge}=LAKE_CROSSING;
   const sa=lakeShore(a),sb=lakeShore(b);
   if(!sa||!sb||sa===sb)return null;
   const pair=[sa,sb].sort().join('/');
   let d;
-  if(pair==='east-south/west')d={side:km(a,LAKE_SOUTH_END)+km(LAKE_SOUTH_END,b),highway:0,via:'Penticton'};
-  else if(pair==='east-north/west')d={side:km(a,LAKE_BRIDGE)+km(LAKE_BRIDGE,b),highway:0,via:'the bridge'};
-  else{const [s,n]=sa==='east-south'?[a,b]:[b,a];d={side:km(s,LAKE_SOUTH_END)+km(LAKE_BRIDGE,n),highway:km(LAKE_SOUTH_END,LAKE_BRIDGE)*1.1,via:'Penticton'};}
+  if(pair==='east-south/west')d={side:km(a,southEnd)+km(southEnd,b),highway:0,via:viaSouth};
+  else if(pair==='east-north/west')d={side:km(a,bridge)+km(bridge,b),highway:0,via:viaBridge};
+  else{const [s,n]=sa==='east-south'?[a,b]:[b,a];d={side:km(s,southEnd)+km(bridge,n),highway:km(southEnd,bridge)*1.1,via:viaSouth};}
   d.km=d.side+d.highway;
   return d.km>=km(a,b)*1.3?d:null;
 }
@@ -779,7 +881,7 @@ function estimateTransfer(a,b,walking=false){
   if(!a||!b||![a.lat,a.lng,b.lat,b.lng].every(Number.isFinite)||Math.abs(a.lat)>90||Math.abs(b.lat)>90||Math.abs(a.lng)>180||Math.abs(b.lng)>180)return null;
   const detour=lakeDetour(a,b);
   if(!detour)return {...transferRange(km(a,b),walking),mode:walking?'walking':'driving assumed'};
-  // Around the lake: winding shore roads (x1.5 rather than x1.3) and through Penticton or over the bridge (+8 min).
+  // Around the water: winding shore roads (x1.5 rather than x1.3) plus 8 minutes for the crossing.
   if(walking)return {...transferRange(detour.km,true),mode:'walking',aroundLake:detour.via};
   const max=driveMinutes((detour.side*1.5+detour.highway*ROAD_FACTOR)/ROAD_FACTOR)+8;
   return {minMinutes:Math.max(MIN_DRIVE_MINUTES,Math.floor(max*0.85)),maxMinutes:max,mode:'driving assumed',aroundLake:detour.via};
@@ -914,7 +1016,7 @@ function evaluateTripRequirements({requirements,plan,facts,tripDate}){
       else if(estimates.some(t=>t.maxMinutes>i.value))reason+=' Allow extra time; the upper estimate exceeds your time limit.';
     }
     else if(i.kind==='price_limit'){status='unverified';reason='Higher known dining price bands are excluded; total cost and unknown prices still need confirmation.';}
-    else if(i.kind==='unsupported'){status='unverified';reason=`Okanagan Roam cannot verify ${i.value} from its listing data.`;}
+    else if(i.kind==='unsupported'){status='unverified';reason=`${SITE.brand} cannot verify ${i.value} from its listing data.`;}
     else if(i.weekday&&!tripDate){status='unverified';reason='A trip start date is needed to apply the weekday instruction.';}
     else if(i.kind==='days'){status=(plan.days?.length===i.value || i.value===1&&plan.kind==='itinerary')?'satisfied':'unmet';reason=status==='satisfied'?`${i.value} days planned.`:'The requested trip length was not met.';}
     else if(i.kind==='base'){status='unverified';reason='The named base guides geography; accommodation and return journeys are not scheduled.';}
@@ -924,10 +1026,10 @@ function evaluateTripRequirements({requirements,plan,facts,tripDate}){
       status=bad?'unmet':unknown?'unverified':'satisfied';reason=`Checked consecutive stops against ${i.value} km straight-line distance. Road distance and driving time are not verified.`;
     } else if(i.kind.startsWith('excluded_')){status=pool.some(s=>matches(s.v,i))?'unmet':'satisfied';reason=status==='satisfied'?'No selected stop matches this exclusion.':'A selected stop conflicts with this exclusion.';}
     else if(i.kind==='feature'){
-      const relevant=i.value==='dog_friendly'||i.value==='kid_friendly'?pool:pool.filter(s=>DINING.has(s.v.type));
+      const relevant=i.value==='dog_friendly'?(SITE.dogMealsMustBeListed?pool:pool.filter(s=>!DINING.has(s.v.type))):i.value==='kid_friendly'?pool:pool.filter(s=>DINING.has(s.v.type));
       status=relevant.length&&relevant.every(s=>matches(s.v,i))?'satisfied':'unmet';reason=status==='satisfied'?'Confirmed from stored badges or curated memberships.':'No complete set of verified matching stops was found.';
     } else if(i.kind==='rainy'){
-      const activities=pool.filter(s=>!DINING.has(s.v.type));const target=activities.length?activities:pool;
+      const keep=s=>!(rainWeather(i)&&requestedOutdoor(s.v,requirements));const activities=pool.filter(s=>!DINING.has(s.v.type)&&keep(s));const target=activities.length?activities:pool.filter(keep);
       status=(i.activityOnly?pool.some(s=>matches(s.v,i)):target.length&&target.every(s=>matches(s.v,i)))?'satisfied':'unverified';reason=status==='satisfied'?'Activity stops are listed as indoor experiences.':'Indoor suitability is not verified for every stop; check before visiting.';
     } else {status=pool.some(s=>matches(s.v,i))?'satisfied':'unmet';reason=status==='satisfied'?'Matched an actual listing.':`No selected stop meets ${LABELS[i.value]||i.sourceText}.`;}
     return {...i,status,reason};
@@ -987,4 +1089,73 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+
+// Holidays as dates (Whistler Roam, 2026-10-25): "3 days at Christmas" was planned from December 4 (the month's first
+// weekend) and "New Year's Eve" was a search for the words. A holiday named with no date of its own gets one, the next
+// time it comes round: Christmas Eve/Day, "at/over Christmas" (Dec 23), Boxing Day, New Year's Eve/Day, Valentine's,
+// Easter (Good Friday), Victoria Day, Canada Day, BC Day, Labour Day, Thanksgiving and Family Day (a long weekend starts
+// on the Saturday). The visitor's words stay; " from <Month D>" is added for the date reader.
+const MONTHS_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function nthWeekday(y,m,wd,n){const d=new Date(Date.UTC(y,m-1,1));let c=0;while(true){if(d.getUTCDay()===wd&&++c===n)return d;d.setUTCDate(d.getUTCDate()+1);}}
+function mondayBefore(y,m,day){const d=new Date(Date.UTC(y,m-1,day));d.setUTCDate(d.getUTCDate()-1);while(d.getUTCDay()!==1)d.setUTCDate(d.getUTCDate()-1);return d;}
+function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(Date.UTC(y,mo-1,da));}
+const HOLIDAYS=[
+ [/\bchristmas eve\b/,(y)=>new Date(Date.UTC(y,11,24))],
+ [/\bchristmas day\b/,(y)=>new Date(Date.UTC(y,11,25))],
+ [/\bboxing day\b/,(y)=>new Date(Date.UTC(y,11,26))],
+ [/\b(?:at|over|for|during|on|around) (?:the )?(?:christmas|xmas)\b|\b(?:christmas|xmas) (?:week|break|holidays?|vacation|trip|getaway)\b|^(?:a |an |our |my )?(?:family |kids |white )?(?:christmas|xmas) (?:in|with|at|for)\b/,(y)=>new Date(Date.UTC(y,11,23))],
+ [/\bnew year s eve\b|\bnew years eve\b|\bnye\b/,(y)=>new Date(Date.UTC(y,11,31))],
+ [/\bnew year s day\b|\bnew years day\b/,(y)=>new Date(Date.UTC(y,0,1))],
+ [/\b(?:at|over|for|around) new year s?\b|\bnew year s? (?:weekend|break|trip|getaway|holiday|in|with)\b|^new years?\b/,(y)=>new Date(Date.UTC(y,11,30))],
+ [/\bvalentine s(?: day)?\b|\bvalentines(?: day)?\b/,(y)=>new Date(Date.UTC(y,1,14))],
+ [/\beaster\b/,(y)=>{const e=easterSunday(y);e.setUTCDate(e.getUTCDate()-2);return e;}],
+ [/\bvictoria day\b|\bmay long(?: weekend)?\b/,(y)=>mondayBefore(y,5,25)],
+ [/\bcanada day\b/,(y)=>new Date(Date.UTC(y,6,1))],
+ [/\bremembrance day\b/,(y)=>new Date(Date.UTC(y,10,11))],
+ [/\b(?:national day for )?truth and reconciliation day\b/,(y)=>new Date(Date.UTC(y,8,30))],
+ [/\bbc day\b|\bb c day\b/,(y)=>nthWeekday(y,8,1,1)],
+ [/\blabou?r day\b/,(y)=>nthWeekday(y,9,1,1)],
+ [/\bthanksgiving\b/,(y)=>nthWeekday(y,10,1,2)],
+ [/\bmother s day\b|\bmothers day\b/,(y)=>nthWeekday(y,5,0,2)],
+ [/\bfather s day\b|\bfathers day\b/,(y)=>nthWeekday(y,6,0,3)],
+ [/\bfamily day (?:long )?weekend\b|\bbc family day\b|\bfamily day (?:holiday|monday)\b/,(y)=>nthWeekday(y,2,1,3)],
+];
+function holidayDateText(text,today){
+ const t=norm(text);
+ if(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.? \d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th)? (?:of )?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)|\b\d{4} \d{1,2} \d{1,2}\b|\b\d{1,2}\/\d{1,2}\b/.test(t))return text;
+ if(/\b(?:christmas|xmas|holiday) (?:craft )?(?:markets?|fairs?|lights?|events?|concerts?)\b/.test(t)&&!/\b(?:christmas|xmas) (?:eve|day|week|break|holidays?)\b|\b(?:at|over|for|during) christmas\b/.test(t))return text;
+ const hit=HOLIDAYS.find(([re])=>re.test(t));
+ if(!hit||!/^\d{4}-\d{2}-\d{2}$/.test(today||''))return text;
+ const y0=Number(today.slice(0,4));
+ let d=hit[1](y0);
+ // A month named that is not the holiday's ("a family day in July") wins.
+ const named=MONTHS_LONG.findIndex((m)=>new RegExp(`\\b${m.toLowerCase()}\\b`).test(t));
+ if(named>=0&&named!==d.getUTCMonth())return text;
+ const iso=(x)=>x.toISOString().slice(0,10);
+ if(iso(d)<today)d=hit[1](y0+1);
+ // A Monday holiday's long weekend starts on the Saturday before it.
+ if(d.getUTCDay()===1&&/\b(?:weekend|long weekend)\b/.test(t)){d=new Date(d.getTime()-2*86400000);}
+ // What the evening holidays mean: New Year's Eve is dinner and a night out; Valentine's is a romantic evening.
+ let out=text;
+ if(/\bnew year s eve\b|\bnew years eve\b|\bnye\b/.test(t)&&!/\b(?:dinner|drinks?|bars?|party|parties|night out|club|clubs|fireworks?|events?|show)\b/.test(t))out=`${out} with dinner and a night out`;
+ out=out.replace(/\b(?:mother|father)[’']?s day\b|\bremembrance day\b|\b(?:national day for )?truth and reconciliation day\b/ig,'');
+ if(/\bvalentine/.test(t))out=out.replace(/valentine[’']?s?(?: day)?/ig,/\bromantic\b/.test(t)?'':'romantic');
+ return `${out} from ${MONTHS_LONG[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+
+// Visitor shorthand (2026-10-25): words people use for an activity, said the way the planner reads it.
+// Texting shorthand and common misspellings (2026-10-25: "whistler wknd w kids", "whislter in febuary").
+const SHORTHAND=[[/\b(?:wknd|wkend|wkd|weeknd)\b/gi,'weekend'],[/\bw\/\s*|\bw (?=(?:kids|my|the|our|a|friends|family|dog|dogs|toddler|baby|teens)\b)/gi,'with '],[/(?<=\w) n (?=\w)/gi,' and '],[/\bnite\b/gi,'night'],[/\bnites\b/gi,'nights'],[/\b(?:things|stuff) 2 do\b/gi,'things to do'],[/\b(?:brekkie|brekky|brekfast|breakfeast)\b/gi,'breakfast'],[/\b(?:bday|b-day|bdays)\b/gi,'birthday'],[/\bfebuary\b/gi,'February'],[/\b(?:januray|janurary)\b/gi,'January'],[/\b(?:decmber|decemeber)\b/gi,'December'],[/\b(?:octobre)\b/gi,'October'],[/\b(?:me and my|my) (?:gf|bf|girlfriend|boyfriend|wife|husband|partner|hubby|fiance|fiancee|fiancé|fiancée)\b|\b(?:gf|bf) and (?:i|me)\b/gi,'my partner and I'],[/\b(?:somewhere|places?|spots?) (?:warm|cozy|cosy)(?: (?:to go|to be))?\b|\bwarm up\b|\bget out of the cold\b/gi,'indoor activities'],[/\b(?:a )?birthday (weekend|trip|getaway|night)\b/gi,'$1 with a special dinner'],[/\bbirthday dinner\b/gi,'special dinner']];
+const REQUEST_SYNONYMS=[...SHORTHAND,[/\bclimbers?\b/gi,'rock climbing'],[/\bmtb\b/gi,'mountain biking'],[/\b(?:mountain )?bike parks?\b/gi,'mountain biking'],[/\bx\s?c (?:ski|skiing)\b/gi,'cross-country skiing'],[/\bnordic (?:ski|skiing)\b/gi,'cross-country skiing'],[/\b(?:a )?(?:sunny|sunshine|nice weather|good weather|warm|beautiful) day\b/gi,'a day outdoors'],[/\b(?:grandparents|grandma and grandpa|elderly parents|older parents|seniors|retirees)\b/gi,'relaxed easy walks'],[/\bfondue\b/gi,'fondue restaurant'],[/\bsup\b/gi,'paddleboarding'],[/\bpaddle ?boarding\b/gi,'paddleboarding'],[/\bsnowboarders?\b/gi,'snowboarding'],[/\b(?:sunset spots?|sunset views?|watch the sunset|see the sunset|sunset photos?)\b/gi,'viewpoints'],[/\b(?:in |at )?(?:late|early|mid|middle of|end of|beginning of|start of|the end of|the start of)[\s-]+(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,'in $1'],[/\b(?:in )?(?:our|their|my) (?:50s|60s|70s|80s|fifties|sixties|seventies|eighties)\b/gi,''],[/\b(?:before|after) (?:the )?(?:lifts|ski season|ski hill) (?:open|opens|close|closes)\b/gi,''],[/\b(?:non[- ]?skiers?|people who don.?t ski)\b/gi,'winter activities off the slopes'],[/\bsnow(?:y)?(?: fun| stuff| activities)?,? (?:but )?(?:no|without|not) (?:skiing|ski|snowboarding)\b/gi,'winter activities off the slopes'],[/\b(?:solo (?:traveller|traveler|trip|travel)|travelling solo|traveling solo|on my own|by myself)\b/gi,''],[/\bgroup of \d+ (?:friends|people|guys|girls|of us)\b/gi,'group of friends'],[/\b(?:can.?t|cannot|can not) walk (?:far|much|long distances|very far)|limited mobility|mobility issues|not much walking|minimal walking|bad knees\b/gi,'relaxed easy walks'],[/\bpartying\b/gi,'nightlife'],[/\b(?:foodies?|food lovers?|gourmet|culinary)\b/gi,'great restaurants'],[/\b(?:last minute|spur of the moment|spontaneous)\b/gi,''],[/\b(?:active|outdoorsy|sporty|energetic)\b(?! (?:pass|passes|wear|kids))/gi,'outdoor activities'],[/\b(?:hot chocolate|hot cocoa)\b/gi,'cafe'],[/\b(?:things to do|what to do|stuff to do) at night\b|\bnight activities\b/gi,'night out'],[/\b(?:and|love|like|likes|enjoy|for) art\b(?! galler| museum)/gi,(m)=>m.replace(/art$/i,'art galleries')],[/\bbetween (whistler|squamish|pemberton) and vancouver\b/gi,'from vancouver to $1 with stops'],[/\bbetween vancouver and (whistler|squamish|pemberton)\b/gi,'from vancouver to $1 with stops'],[/\bdog ?sledding\b/gi,'dog sled'],[/\b(?:sledding|sledging|tobogganing|sled hill|sledding hill)\b/gi,'toboggan'],[/\bbakeries\b/gi,'bakery'],[/\bplaygrounds\b/gi,'playground'],[/\bcanyons\b/gi,'canyon'],[/\bsleigh rides?\b/gi,'sleigh'],[/\bindigenous (?:culture|history|art|experiences?|tours?)\b/gi,'indigenous'],[/\bfirst nations? (?:culture|history|art)\b/gi,'indigenous'],[/\b(?:horseback riding|horse riding|trail rides?|horseback rides?)\b/gi,'horseback riding'],[/\bbrowse (?:the |some |around )?(?=shops|boutiques|stores|galleries)/gi,''],[/\bwindow shopping\b/gi,'shopping'],[/\b(?:arts? (?:and|&) culture|culture and (?:the )?arts?|cultural (?:things|spots|places|sights|day|trip))\b/gi,'museums and art galleries'],[/\b(?:we |i )?(?:have|has|with) (?:a )?(?:bad|sore|injured|dodgy|weak) (?:knees?|back|hips?|ankles?)\b|\b(?:bad|sore) (?:knees?|back|hips?)\b/gi,'relaxed'],[/\b(?:nothing|not too|not) touristy\b|\bnon[- ]?touristy\b|\boff the beaten (?:path|track)\b|\b(?:like a local|where (?:the )?locals go|local spots)\b/gi,'hidden gems away from crowds'],[/\b(?:we |i )?(?:hate|dislike|don.?t like|can.?t stand) (?:the )?crowds\b/gi,'away from crowds'],[/\b(?:avoid|skip|away from|outside|not in) the village\b/gi,'away from crowds'],[/\b(?:no|without) early (?:mornings?|starts?)\b|\b(?:we )?(?:like to |want to )?sleep in\b|\blazy mornings?\b|\blate starts?\b/gi,'starting at 10:30am'],[/\b(?:vegan only|only vegan|100% vegan|fully vegan|all vegan)\b/gi,'vegan'],[/\b(?:skip|no|not|without|avoid)(?: the| a| any)? (?:spas?|saunas?|massages?)\b/gi,'nospa'],[/\b(?:where|somewhere|places?) to cool off\b|\bcool(?:ing)? off\b|\bbeat the heat\b|\b(?:a )?(?:hot|scorching|heat ?wave) day,?\b|\bheat ?wave\b/gi,'swimming and lakes'],[/\b(?:day trip|day) to (whistler|squamish|pemberton|brackendale|britannia beach|mount currie) from (?:whistler|squamish|pemberton|brackendale|britannia beach|mount currie)\b/gi,'day trip to $1'],[/^(?:day|one day|full day) in\b/i,'a day in'],[/\bquick lunch\b/gi,'lunch'],[/\b(?:apres|après)(?:[- ]ski)? with live music\b|\blive music (?:apres|après)(?:[- ]ski)?\b/gi,'après ski and nightlife'],[/\b(?:ski|snowboard) (?:lessons?|school|camp)s?\b|\blearn(?:ing)? to (?:ski|snowboard)\b/gi,'skiing'],[/\b(?:a )?powder day\b/gi,'skiing'],[/\b(?:good|great|nice|tasty) lunch(?:es)?\b|\blunches\b/gi,'lunch'],[/\b(?:a )?(?:rainy[- ]day|rain|wet[- ]weather|bad[- ]weather) (?:backup|back[- ]up|plan b|option|alternative)s?\b|\b(?:a )?backup plan for rain\b/gi,'something indoors if it rains'],[/\bretired(?: couple| parents| folks)?\b/gi,'relaxed easy walks'],[/\bscenic drives?\b|\b(?:a )?drive with views\b/gi,'viewpoints'],[/\b(?:quiet|peaceful|calm|tranquil) (?:places|spots|corners)\b/gi,'away from crowds'],[/\bfrom (vancouver|yvr) to (whistler|squamish|pemberton) and back\b/gi,'from vancouver to $2 with stops along the way'],[/\b(?:first time|first trip|first visit)(?: visiting| in| to)? (?:bc|british columbia|canada|the sea to sky)\b,?/gi,''],[/\b(?:a )?(?:vegetarian|vegan) couple\b/gi,(m)=>/vegan/i.test(m)?'vegan':'vegetarian'],[/\b(lunch|dinner|coffee|drinks|a drink|a beer|breakfast)(?: up)? (?:at|on) the (?:top|summit)\b/gi,'then $1'],[/\bcar camping\b|\bcamping trip\b|\btent camping\b/gi,'camping'],[/\bfamily reunion\b/gi,'family trip'],[/\b(?:for|at|during) (?:a |the |my |our )?(?:conference|convention|work trip|business trip|work conference|company retreat|offsite)\b,?/gi,''],[/\b(?:free )?evenings only\b|\bonly (?:in )?the evenings?\b|\bfree evenings?\b/gi,'in the evening'],[/\bwellness (?:retreat )?(?:weekend|getaway|trip|day)\b|\bretreat weekend\b/gi,(m)=>/day/i.test(m)?'spa day':'spa weekend'],[/\b(?:a )?wellness retreat\b/gi,'spa weekend'],[/\b(?:a )?hot tubs?\b|\b(?:a )?soak\b(?! in)/gi,'spa'],[/\b(?:with )?(?:no|nothing) (?:restaurants? |places? |meals? |food |dinners? )?(?:over|above|more than|pricier than) \$\$\$?(?!\$)|\b(?:under|below) \$\$\$(?!\$)/gi,'reasonably priced'],[/\b(?:(?:good )?for (?:a |an )?)?(?:beginners?|novices?|first[- ]timers?|newbies)\b/gi,'easy'],[/\bsunrise (hikes?|walks?|spots?|views?)\b/gi,'viewpoint $1'],[/\b(?:places|spots) to (?:take|get) (?:photos|pictures|pics)\b|\bphoto (?:spots?|ops?|opportunities)\b|\b(?:instagram|instagrammable|insta)(?: spots?| worthy| places)?\b|\bphotography spots?\b/gi,'viewpoints'],[/\bskate ?parks?\b/gi,'skatepark'],[/\boff[- ]?leash(?: (?:dog )?(?:parks?|areas?|beach(?:es)?|trails?))?\b/gi,'dog parks'],[/\b(?:(?:the )?(?:drive|way|trip|road) )?from (whistler|pemberton|squamish|brackendale|mount currie) (?:back |home )?to (?:vancouver|yvr|the city)\b/gi,'road trip from $1 to britannia beach'],[/\b(?:back |home )?to (?:vancouver|yvr) from (whistler|pemberton|squamish)\b/gi,'road trip from $1 to britannia beach'],[/\b(?:somewhere |a place |where )?to (?:watch|catch|see) (?:the |a )?(?:hockey|canucks|oilers|leafs|nhl|nfl|football|soccer|game|games|match|fight|ufc|super bowl|playoffs?)(?: game| games| match)?\b/gi,'sports bars'],[/\bwhat(?: is|'s|’s| s)? open\b/gi,'things to do'],[/\b(?:with |and )?(?:a |an |my |our |two |2 |three |3 )?(\d{1,2})[- ]?(?:year|yr)[- ]?olds?\b/gi,(m,a)=>(m.match(/^(?:with |and )/i)||[''])[0]+(Number(a)<13?'kids':'teenagers')],[/\b(\d+) days ending in (whistler|pemberton|squamish)\b/gi,'$1 days from vancouver to $2 with stops along the way'],[/\b(?:we |i )?(?:land|arrive|fly in|get in|get to)(?: in| at| into)? (?:vancouver|yvr)(?: on)? (monday|tuesday|wednesday|thursday|friday|saturday|sunday) (?:night|evening)(?: and)?(?: (?:want|would like|have|need))?/gi,(m,d)=>{const W=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];return `on ${W[(W.indexOf(d.toLowerCase())+1)%7]}, from vancouver,`;}],[/\b(a |our |my )?wedding anniversary\b/gi,(m,a)=>a&&/^a /i.test(a)?'an anniversary':`${a||''}anniversary`],[/\b(?:a )?(?:quiet|peaceful|intimate) (?=(?:romantic )?(?:dinner|lunch|evening|night|weekend|getaway|meal))/gi,''],[/\b(?:with |and )?(?:one|1|a single|just one) (?:ski|snowboard) day\b(?=.*\b(?:\d+|two|three|four|five|six|seven) days\b|.*\bweekend\b)|(?<=\b(?:\d+|two|three|four|five|six|seven) days\b.*)\b(?:with |and )?(?:one|1|a single|just one) (?:ski|snowboard) day\b|(?<=\bweekend\b.*)\b(?:with |and )?(?:one|1|a single|just one) (?:ski|snowboard) day\b/gi,'and skiing on 1 of the days'],[/\b(\d+|two|three|four|five|six|seven) (?:ski|snowboard|skiing) days\b|\b(\d+|two|three|four|five|six|seven) days (?:of )?(?:skiing|snowboarding|on the slopes|on the hill)\b/gi,(m,a,b)=>`skiing on ${({two:2,three:3,four:4,five:5,six:6,seven:7})[(a||b).toLowerCase()]||a||b} of the days`],[/\b(?:a |one |1 )?(?:ski|snowboard|powder|bluebird ski) days?\b(?! (?:passes?|tickets?))/gi,'skiing'],[/\b(?:ski|snowboard)s? (?:and (?:snowboard|ski|bike) )?(?:rentals?|rental shops?|shops?|stores?|tuning)\b/gi,'gear rental shops'],[/\ba few hours\b/gi,'3 hours'],[/\ba couple (?:of )?hours\b/gi,'2 hours'],[/\b(?:half a day|a half day|half day)\b/gi,'4 hours']];
+// 2026-10-25 (tools audit): "retired couple, no hiking" became "relaxed easy walks, no hiking", a walks part that "no
+// hiking" emptied (three mornings left free). With hiking or walking ruled out, those words mean "relaxed" only.
+const WALKS_NEGATED_RE=/\b(?:no|without|skip|avoid|not into|no more|don.?t (?:want|like|do|need)(?: to)?|do not (?:want|like|do|need)(?: to)?)\s+(?:\w+\s+)?(?:hik\w*|walks?|walking|trails?)\b/i;
+function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=WALKS_NEGATED_RE.test(out);for(const [re,w] of REQUEST_SYNONYMS)out=out.replace(re,walksNegated&&w==='relaxed easy walks'?'relaxed':w);
+ // "Best brunch then a walk" (2026-10-25): "best" ranks a list; in a request with several parts it emptied the plan.
+ if(/\b(?:then|followed by|after that|afterwards)\b/i.test(out))out=out.replace(/\b(?:the )?(?:best|top|top rated|highest rated)\s+(?=\w)/gi,'');
+ // A ski day already runs hill first, then après, a spa and dinner: "ski in the morning and spa in the afternoon" is that day.
+ if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
+ return out;}
+
+module.exports={tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
