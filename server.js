@@ -7491,7 +7491,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   // was one farm tour); the requirements see the same words.
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
   // 2026-11-05: the same words with trip-length, holiday-weekend and tour wording made plain (the French layer's own text is kept above).
-  const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText))))
+  const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(/\bsunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/gi, ' dinner with a lake view ')))
     .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');

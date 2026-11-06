@@ -329,3 +329,12 @@ test('"in 2 weeks" is a date, and week phrases are read as days', () => {
   assert.match(di.plainRelativeDates('a trip in 2 weeks to Kelowna', now), /on november 20/);
   assert.equal(di.plainRelativeDates('in 3 months', now), 'in 3 months');
 });
+
+test('"wine and a sunset dinner" keeps the wine and does not add a separate lookout', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'romantic Saturday in Kelowna with wine and a sunset dinner' });
+  const stops = (p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || [];
+  assert.ok(stops.some(s => s.venue && s.venue.type === 'winery'), 'a winery stop');
+  assert.ok(!(p.warnings || []).some(w => /viewpoint/i.test(w)), 'no lookout warning');
+});
