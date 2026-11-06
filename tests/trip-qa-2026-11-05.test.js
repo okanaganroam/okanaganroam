@@ -300,3 +300,16 @@ test('Server: a place named by the front of its name is that place ("Home Block"
   const names = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue).map((s) => s.venue.name);
   assert.ok(names.includes('Home Block at CedarCreek Estate Winery'), JSON.stringify(names));
 });
+
+test('a named holiday with a fixed date is that date (Canada Day, Remembrance Day, Valentine\'s Day, New Year\'s Eve)', () => {
+  assert.equal(d.fixedHolidayDates('fireworks in Kelowna on Canada Day').trim(), 'fireworks in Kelowna on july 1');
+  assert.match(d.fixedHolidayDates("Valentine's Day dinner in Penticton"), /on february 14/);
+  assert.match(d.fixedHolidayDates('Remembrance Day lunch'), /on november 11/);
+  assert.match(d.fixedHolidayDates("New Year's Eve in Kelowna"), /on december 31/);
+  assert.equal(d.fixedHolidayDates('Canada Day weekend in Penticton'), 'Canada Day weekend in Penticton');
+  assert.equal(d.fixedHolidayDates('a Christmas market in Vernon'), 'a Christmas market in Vernon');
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: "Valentine's Day dinner in Penticton" });
+  assert.equal(p.listDate, '2027-02-14');
+});

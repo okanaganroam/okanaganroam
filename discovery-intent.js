@@ -117,6 +117,23 @@ function plainClockTimes(text) {
     .replace(/\b(?:free|available) (?=(?:after|before|from|until|till|at|between) \d)/gi, ' ');
 }
 
+// A named holiday with a fixed date ("fireworks on Canada Day", "dinner on Valentine's Day") is that date.
+function fixedHolidayDates(text) {
+  const dateOf = (h) => {
+    const k = h.toLowerCase().replace(/[’']/g, '').replace(/\s+/g, ' ');
+    if (k === 'remembrance day') return 'november 11';
+    if (k === 'canada day') return 'july 1';
+    if (k === 'christmas eve') return 'december 24';
+    if (k === 'christmas day') return 'december 25';
+    if (k === 'boxing day') return 'december 26';
+    if (/^new ?years? ?s? eve$/.test(k)) return 'december 31';
+    if (/^new ?years? ?s? day$/.test(k)) return 'january 1';
+    if (/^valentines? ?s? day$/.test(k)) return 'february 14';
+    return null;
+  };
+  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? ` on ${dateOf(h)} ` : m)).replace(/\s+/g, ' ');
+}
+
 // Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
 function holidayWeekendDates(name, now = new Date()) {
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -224,6 +241,7 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
+  s = fixedHolidayDates(s);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
@@ -2172,6 +2190,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  fixedHolidayDates,
   plainClockTimes,
   mergeSegmentStays,
   holidayWeekendDates,
