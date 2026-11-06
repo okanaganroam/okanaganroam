@@ -20470,7 +20470,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (typeof route !== 'undefined' && route && view === 'list') return;
     stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
     $('rnList').setAttribute('aria-pressed',view === 'list');$('rnMap').setAttribute('aria-pressed',view === 'map');
-    floatGap();map.invalidateSize();if(!WIDE.matches)window.scrollTo(0,0);
+    floatGap();map.invalidateSize();sheetH();if(!WIDE.matches)window.scrollTo(0,0);
   }
   function setCompactResults(compact){
     stage.classList.toggle('rn-results-compact', compact);
