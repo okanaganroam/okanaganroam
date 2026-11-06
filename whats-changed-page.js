@@ -64,17 +64,18 @@ const QUOTES = [
 ];
 const dayNumber = (now) => Math.floor(now.getTime() / 86400000);
 const quoteFor = (now) => QUOTES[dayNumber(now) % QUOTES.length];
-const greeting = (now) => { const h = Number(new Intl.DateTimeFormat('en-CA', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Vancouver' }).format(now)); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortDay = (s) => `${MONTHS[Number(String(s).slice(5, 7)) - 1]} ${Number(String(s).slice(8, 10))}`;
 const shortRange = (r) => `${shortDay(r.start)} to ${shortDay(r.end)}`;
 const metric = (d, key) => (d.metrics || []).find((m) => m.key === key) || null;
-const metricSum = (d, keys) => { const list = keys.map((k) => metric(d, k)).filter(Boolean); return list.length ? { cur: list.reduce((a, m) => a + m.cur, 0), prev: list.reduce((a, m) => a + m.prev, 0) } : null; };
+const metricSum = (d, keys) => { const list = keys.map((k) => metric(d, k)).filter(Boolean); return list.length ? { cur: list.reduce((a, m) => a + m.cur, 0), prev: list.reduce((a, m) => a + m.prev, 0), recent: list.reduce((a, m) => a + (m.recent || 0), 0) } : null; };
+// With no earlier week to compare, the fairest number is the last 7 days so far, so a new counter never shows a false zero.
+const shownValue = (m) => (m.prev ? m.cur : Math.max(m.cur, m.recent || 0));
 
 // The change against last week as a small label. With nothing last week there is nothing fair to compare.
 function chip(m) {
-  if (!m.prev) return '<span class="chip">First week of data</span>';
+  if (!m.prev) return '<span class="chip">Last 7 days, just started counting</span>';
   if (m.cur === m.prev) return '<span class="chip">Same as last week</span>';
   const up = m.cur > m.prev; const pct = Math.round((Math.abs(m.cur - m.prev) / m.prev) * 100);
   return `<span class="chip ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${pct}% vs last week</span>`;
@@ -85,7 +86,7 @@ const TILES = [
   { t: 'Trips planned', keys: ['trip_plan_complete'], why: 'Finished plans in Build My Trip.', href: '/admin/dashboard/funnels' },
   { t: 'From Google and AI', keys: ['visits_search', 'visits_ai'], why: 'Visits from search engines and AI assistants.', href: '/admin/dashboard/search' },
 ];
-const tileHtml = (d) => `<div class="tiles">${TILES.map((x) => { const m = metricSum(d, x.keys) || { cur: 0, prev: 0 }; return `<a class="tile" href="${x.href}"><p class="t">${esc(x.t)}</p><p class="big">${num(m.cur)}</p>${chip(m)}<p class="why">${esc(x.why)}</p></a>`; }).join('')}</div>`;
+const tileHtml = (d) => `<div class="tiles">${TILES.map((x) => { const m = metricSum(d, x.keys) || { cur: 0, prev: 0, recent: 0 }; return `<a class="tile" href="${x.href}"><p class="t">${esc(x.t)}</p><p class="big">${num(shownValue(m))}</p>${chip(m)}<p class="why">${esc(x.why)}</p></a>`; }).join('')}</div>`;
 
 // Moves worth a mention, sorted into good news and things to look at. For these two a rise is bad news.
 const RISE_IS_BAD = new Set(['broken', 'searches_none']);
@@ -151,8 +152,8 @@ function goHtml() {
 
 // Home: { top, body }. weekly = this week's summary per site; inboxes = { siteKey: inbox counts }.
 function homeHtml(weekly, { notice = '', goals = null, inboxes = {}, now = new Date() } = {}) {
-  const clicks = weekly.reduce((a, s) => { const m = s.data && metric(s.data, 'outbound'); return a + (m ? m.cur : 0); }, 0);
-  const top = `<section class="hero"><p class="hi">${esc(greeting(now))}, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">Last week, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
+  const clicks = weekly.reduce((a, s) => { const m = s.data && metric(s.data, 'outbound'); return a + (m ? shownValue(m) : 0); }, 0);
+  const top = `<section class="hero"><p class="hi" id="hi">Welcome back, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">In the last 7 days, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
   const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${goalsCard(goals)}${goHtml()}
     <form method="post" action="/admin/dashboard/digest-send" class="foot"><button type="submit">Email me this summary now</button> It also arrives by itself every Monday morning.</form>`;
   return { top, body };

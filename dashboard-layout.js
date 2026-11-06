@@ -96,6 +96,7 @@ const SCRIPT = `<script>(function(){
   var cols=[].slice.call(document.querySelectorAll('main>section.col'));
   var btn=document.querySelector('.menu-btn'),nav=document.querySelector('.navs');
   if(btn&&nav)btn.addEventListener('click',function(){var o=nav.classList.toggle('open');btn.setAttribute('aria-expanded',o?'true':'false');});
+  var hi=document.getElementById('hi'),hr=new Date().getHours();if(hi)hi.textContent=(hr<12?'Good morning':hr<18?'Good afternoon':'Good evening')+', Dayton';
   var host=document.getElementById('siteSwitch');
   if(!host||cols.length<2)return;
   function name(c){var h=c.querySelector('h2');return h?h.firstChild.textContent.trim():'Site';}

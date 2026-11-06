@@ -82,3 +82,9 @@ test('renderers: the card and the email escape text and show both sites', () => 
   assert.match(html, /digest-send/); assert.match(text, /OKANAGAN ROAM/); assert.match(text, /Alpha <b>Brewing<\/b>/);
   assert.match(text, /Google/);
 });
+
+test('each number also carries the last 7 days including today, for counters that just started', () => {
+  const db = memDb(); db.prepare('INSERT INTO venue_event_counts VALUES (?, ?, ?, ?)').run(require('../trip-demand').dayOf(NOW), 1, 'venue_view', 9);
+  const m = wc.summarize(db, NOW).metrics.find((x) => x.key === 'views');
+  assert.deepEqual([m.cur, m.prev, m.recent], [0, 0, 9]);
+});
