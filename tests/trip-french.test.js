@@ -315,7 +315,7 @@ test('V3 interface: in English the static text is the page’s original text', (
   const html = v3.renderTripPlannerV3Page(PAGE_DEPS);
   const decode = (s) => s.replace(/&rsquo;/g, '’').replace(/&mdash;/g, '—').replace(/&ldquo;/g, '“').replace(/&rdquo;/g, '”');
   const tagged = [...html.matchAll(/data-i18n="([^"]+)"[^>]*>([^<]*)</g)];
-  assert.ok(tagged.length >= 20, `${tagged.length} tagged elements`);
+  assert.ok(tagged.length >= 10, `${tagged.length} tagged elements`); // the itinerary-first page (#727) writes its hero text in both languages
   for (const m of tagged) assert.equal(T.en[m[1]], decode(m[2]), m[1]);
   const ph = /placeholder="([^"]+)" data-i18n-placeholder="([^"]+)"/.exec(html);
   assert.equal(T.en[ph[2]], ph[1]);
