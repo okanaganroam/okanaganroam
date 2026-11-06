@@ -108,6 +108,11 @@ body.pm-app-page .is-route-origin.is-pinning .rn-route-pin-hint {
 body.pm-app-page .is-route-origin .leaflet-marker-pane .leaflet-interactive {
   pointer-events: none;
 }
+body.pm-app-page .rn-event-copy,
+body.pm-app-page .rn-events-mode .rn-place-copy { display: none; }
+body.pm-app-page .rn-events-mode .rn-event-copy { display: block; }
+body.pm-app-page .rn-place-options { display: contents; }
+body.pm-app-page .rn-events-mode .rn-place-options { display: none; }
 body.pm-app-page .rn-map-picker-heading { display: none; }
 body.pm-app-page .is-map-picker .rn-map-picker-heading { display: block; }
 body.pm-app-page .rn-map-picker-heading p { margin: 8px 0 0; }
