@@ -3844,6 +3844,35 @@ function leadUpToDinner(result, input, requirements) {
   }
   return false;
 }
+// 2026-11-05: a café and a lunch under 75 minutes apart (10:45 coffee, 11:30 lunch) is two meals in a row. Days whose start was
+// slid later are slid back, a quarter hour at a time, until the two are apart; if nothing works the slide is dropped.
+function separateBackToBackMeals(result, input, requirements) {
+  if (!result || !(result.days || []).length || !(result.schedule || []).length || !requirements || !requirements.dayStartMinutes) return false;
+  let changed = false;
+  for (const day of result.days) {
+    const set = requirements.dayStartMinutes[day.day];
+    if (set == null) continue;
+    const typeOf = new Map(day.stops.filter((st) => st.venue).map((st) => [st.venue.id, st.venue.type]));
+    const eats = (r) => ['cafe', 'restaurant'].includes(typeOf.get(r.venueId));
+    const tooClose = (rows) => rows.some((r, i) => i > 0 && eats(r) && eats(rows[i - 1]) && Number.isFinite(r.startMinutes) && Number.isFinite(rows[i - 1].startMinutes) && r.startMinutes - rows[i - 1].startMinutes < 75);
+    const rows = result.schedule.filter((r) => r.day === day.day);
+    if (!tooClose(rows)) continue;
+    const ids = rows.map((r) => r.venueId).join(',');
+    let fixed = null;
+    for (let m = set - 15; m >= Math.max(0, set - 180); m -= 15) {
+      const probe = JSON.parse(JSON.stringify(result));
+      scheduleTripByHours(probe, input, { ...requirements, dayStartMinutes: { ...requirements.dayStartMinutes, [day.day]: m } }, { probe: true });
+      const cand = probe.schedule.filter((r) => r.day === day.day);
+      if (cand.map((r) => r.venueId).join(',') !== ids || cand.some((r) => !Number.isFinite(r.startMinutes) || (r.daylight && r.daylight.status === 'conflict')) || tooClose(cand)) continue;
+      fixed = m; break;
+    }
+    if (fixed != null) requirements.dayStartMinutes = { ...requirements.dayStartMinutes, [day.day]: fixed };
+    else { requirements.dayStartMinutes = { ...requirements.dayStartMinutes }; delete requirements.dayStartMinutes[day.day]; }
+    changed = true;
+  }
+  if (changed) scheduleTripByHours(result, input, requirements);
+  return changed;
+}
 function startLaterOnMorningGaps(result, input, requirements) {
   if (!result || !(result.days || []).length || !(result.schedule || []).length || input.swap || !requirements) return false;
   if (requirements.startMinutes != null || requirements.windowClock || requirements.windowToday) return false;
@@ -5336,6 +5365,7 @@ function planTripUnchecked(input) {
   leadUpToDinner(result, { ...input, intent }, requirements);
   // Planner (2026-10-27): no wait of more than 90 minutes between stops is left unexplained (see closeIdleGaps).
   closeIdleGaps(result, { ...input, intent }, requirements, { userTimed: namedTimes });
+  separateBackToBackMeals(result, { ...input, intent }, requirements);
   if (eveningWalk && result.days.length) {
     // 2026-10-19: the rule is applied, not only stated. A dinner reached by car after the cut-off is said, day by day.
     const late = eveningWalkLateDrives(result, eveningWalk);
