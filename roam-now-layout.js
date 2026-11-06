@@ -140,6 +140,27 @@ body.pm-app-page #rnApplyFilters,
 body.pm-app-page #rnShowResults,
 body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
 @media (max-width: 899px) {
+  body.pm-app-page .pm-filters-btn:has(.rn-open-badge:not([hidden])) {
+    flex-direction: column-reverse;
+    gap: 0;
+  }
+  body.pm-app-page .rn-open-badge {
+    background: transparent;
+    height: auto;
+    padding: 0;
+    line-height: 1.2;
+  }
+  body.pm-app-page .pm-item:not(.pm-event) .pm-item-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  body.pm-app-page .pm-item:not(.pm-event) .pm-name {
+    order: -1;
+    margin: 12px 0 8px;
+  }
+  body.pm-app-page .pm-item:not(.pm-event) .rn-photo,
+  body.pm-app-page .pm-item:not(.pm-event) .rn-no-photo { align-self: stretch; }
   body.pm-app-page .pm-searchbar { padding-left: 12px; gap: 2px; }
   body.pm-app-page .pm-searchbar .pm-search-icon,
   body.pm-app-page .pm-searchbar .pm-filters-btn svg { display: none; }
