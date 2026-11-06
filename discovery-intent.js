@@ -252,6 +252,10 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
   // "a family week", "week long", "weeklong", "a fortnight": a week (or two) of the trip.
   s = s.replace(/\b(?:(?:a|our|the|one|1) )?((?:(?:family|beach|wine|summer|winter|ski|relaxing|relaxed|little|whole|full|nice|lovely|great|long|quiet|romantic|fun|adventure|foodie|dream|perfect|first|last) )+)week\b/g, ' a week $1 ').replace(/\bweek ?-?long\b/g, ' a week ').replace(/\b(?:a )?fortnight\b/g, ' two weeks ');
+  // "dinner at a Thai restaurant" is one Thai dinner, not a dinner plus a separate Thai restaurant.
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from|with) (?:a|an|the|some) (italian|thai|sushi|japanese|chinese|indian|mexican|greek|french|korean|vietnamese|pizza|steak|seafood|vegan|vegetarian|mediterranean|middle eastern|bbq|burger|ramen|tapas)(?: food)? (?:restaurants?|places?|spots?|joints?|eateries|eatery)\b/g, ' $2 $1 ');
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|the|some) (nice|good|great|fancy|romantic|cozy|casual|local|lovely|decent|quiet|upscale|special|favourite|favorite) (?:restaurants?|places?|spots?)\b/g, ' $2 $1 ');
+  s = s.replace(/\b(dinner|lunch|breakfast|brunch|supper) (?:at|in|from) (?:a|an|some) (?:restaurants?|places?|spots?|eateries|eatery)\b/g, ' $1 ');
   s = plainRelativeDates(s);
   // "two weeks": 14 days (the planner covers seven and says so).
   s = s.replace(/\b(2|3|4|5|two|three|four|five)[ -]weeks?(?: long)?\b(?! (?:from now|ago|away))/g, (m, n, off) => (/\b(?:in|within|after|for the next) $/.test(s.slice(Math.max(0, off - 16), off)) && !/^ (?:in|around|at|for) /.test(s.slice(off + m.length, off + m.length + 5)) ? m : ` ${({ two: 2, three: 3, four: 4, five: 5 }[n] || Number(n)) * 7} days `));

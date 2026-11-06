@@ -338,3 +338,13 @@ test('"wine and a sunset dinner" keeps the wine and does not add a separate look
   assert.ok(stops.some(s => s.venue && s.venue.type === 'winery'), 'a winery stop');
   assert.ok(!(p.warnings || []).some(w => /viewpoint/i.test(w)), 'no lookout warning');
 });
+
+test('"dinner at a Thai restaurant" is one dinner stop, not a dinner plus a restaurant', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['lunch at a sushi place then a winery in Kelowna tomorrow', 'dinner at a restaurant then a winery in Kelowna on Saturday']) {
+    const p = app.runTripPlan({ text });
+    const stops = ((p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []).filter(s => s && s.venue);
+    assert.equal(stops.filter(s => s.venue.type === 'restaurant').length, 1, text);
+  }
+});
