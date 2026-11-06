@@ -77,6 +77,7 @@ function collect(db, { site = 'site', days = 30, now = new Date() } = {}) {
       venue_submissions_pending: count('venue_submissions', "status='pending'"),
       event_submissions_pending: count('event_submissions', "status='pending'"),
       claims_pending: count('venue_claims', "status='pending'"),
+      arrival_pending: count('venue_arrival_points', "status='pending'"),
       claims_approved: count('venue_claims', "status='approved'"),
       visitor_contributions_pending: count('visitor_contributions', "status='pending'"),
       new_submissions_in_window: (count('venue_submissions', 'submitted_at >= ?', [sinceTs]) || 0) + (count('event_submissions', 'submitted_at >= ?', [sinceTs]) || 0),

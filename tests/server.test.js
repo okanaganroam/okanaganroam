@@ -32831,3 +32831,45 @@ test('a combination guide with too few places sends people to the closest real p
   assert.match(to, /utm_campaign=y/);
   assert.equal((await fetch(`${base}/guide/peachland/not-a-combo`, { redirect: 'manual' })).status, 404);
 }));
+
+test('Storefront spot: the portal offers it, a link upload waits for review, a signed-in owner near the pin goes live, the photo link works', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Storefront Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'storefront-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'storefront-fixture');
+  db.prepare('UPDATE venues SET latitude = 49.8863, longitude = -119.4966 WHERE id = ?').run(v.id);
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const spot = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, lat: 49.8864, lng: -119.4966, device_lat: 49.8864, device_lng: -119.4966, accuracy: 9, rights: true };
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.9.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const files = [];
+  try {
+    const page = await (await fetch(`${base}/owner/${token}`)).text();
+    assert.match(page, /id="arrival" data-task="arrival"/);
+    assert.match(page, /data-pick="arrival"|Help people find your door/);
+    const viaLink = await post(`/owner/${token}/arrival`, spot);
+    assert.equal(viaLink.status, 201, JSON.stringify(viaLink.body));
+    assert.equal(viaLink.body.live, false);
+    const row = db.prepare('SELECT * FROM venue_arrival_points WHERE id = ?').get(viaLink.body.id);
+    files.push(row.file);
+    assert.equal(row.status, 'pending');
+    const img = await fetch(`${base}/owner-photos/arrival/${row.preview_key}.jpg`);
+    assert.equal(img.status, 200); assert.match(img.headers.get('content-type'), /image\/jpeg/); assert.match(img.headers.get('x-robots-tag'), /noindex/);
+    assert.equal((await fetch(`${base}/owner-photos/arrival/${'x'.repeat(24)}.jpg`)).status, 404);
+    const made = await post(`/owner/${token}/account`, { email: 'storefront@example.com', password: 'a long enough password' });
+    const live = await post(`/owner/account/venue/${v.id}/arrival`, spot, made.cookie);
+    assert.equal(live.status, 201, JSON.stringify(live.body));
+    assert.equal(live.body.live, true);
+    files.push(db.prepare('SELECT file FROM venue_arrival_points WHERE id = ?').get(live.body.id).file);
+    assert.equal((await post(`/owner/account/venue/${v.id}/arrival`, spot)).status, 401);
+    const after = db.prepare('SELECT latitude, longitude FROM venues WHERE id = ?').get(v.id);
+    assert.deepEqual([after.latitude, after.longitude], [49.8863, -119.4966]);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+    for (const f of files) { try { require('node:fs').unlinkSync(require('node:path').join(process.env.OWNER_PHOTO_DIR || require('node:path').join(__dirname, '..', '.owner-photos-local'), f)); } catch (e) { /* already gone */ } }
+  }
+});

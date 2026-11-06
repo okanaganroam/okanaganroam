@@ -1370,6 +1370,29 @@ CREATE TABLE IF NOT EXISTS health_alert_log (
 
 // Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
 db.exec(`
+CREATE TABLE IF NOT EXISTS venue_arrival_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  file TEXT NOT NULL,
+  preview_key TEXT NOT NULL UNIQUE,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  device_lat REAL,
+  device_lng REAL,
+  accuracy_m REAL,
+  distance_m INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'replaced')),
+  review_reasons TEXT,
+  submitted_by TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_arrival_venue ON venue_arrival_points (venue_id, status);
+`);
+
+db.exec(`
 CREATE TABLE IF NOT EXISTS page_counts (
   day TEXT NOT NULL,
   page TEXT NOT NULL,
