@@ -171,6 +171,11 @@ function stripTravelNoise(normalized) {
   // Notes about the person, not places: "remote worker", "solo", "riding", "cold and rainy", "first week of", "bachelor party".
   s = s.replace(/\b(?:remote|digital nomad|freelance) (?:workers?|work|working)\b/g, ' ').replace(/\bsolo\b/g, ' ').replace(/\b(?:bachelor|bachelorette|stag|stagette|hen) (?:party|parties|weekend|trip|do)\b/g, ' celebration ');
   s = s.replace(/\b(?:we )?(?:need|want) (?:to )?(?:go )?riding\b|\briding the\b/g, ' ').replace(/\bcold and (?=rainy|wet)/g, ' ').replace(/\b(?:the )?(?:first|second|third|last) week of\b/g, 'in');
+  // Plain talk around the plan: "before our flight", "spending 2 nights", "stopping for lunch", "beginners", fall "colours"; transit means no car; spring break is March.
+  s = s.replace(/\b(?:before|until|till) (?:our|my|the|his|her) (?:flight|train|bus|ferry|shuttle|pickup|check in|checkin)\b/g, ' ').replace(/\b(?:spending|staying|stopping|stop)(?: for)?(?= (?:\d|one|two|three|four|five|a |an |the |lunch|dinner|breakfast|coffee))/g, ' ');
+  s = s.replace(/\b(?:relying on|rely on|using|taking|by) (?:public )?(?:transit|buses|the bus|bus)\b|\b(?:we )?(?:don t|do not|dont) (?:have a car|drive)\b/g, ' no car ');
+  s = s.replace(/\b(?:first time|first timers?|beginners?|newbies?|novices?)\b/g, ' ').replace(/\b(?:fall|autumn) colou?rs?\b|\bcolou?rs\b/g, ' ');
+  s = s.replace(/\bspring break(?: week)?\b/g, ' in march ');
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   // "I hate the cold" is a feeling about the weather, not a place.

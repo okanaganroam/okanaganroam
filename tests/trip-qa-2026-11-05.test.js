@@ -199,3 +199,18 @@ test('"remote worker", "solo", "bachelor party" and "cold and rainy" are not sea
     assert.deepEqual(leftovers(i), [], text + ' -> ' + JSON.stringify(leftovers(i)));
   }
 });
+
+test('"we don\'t drive" and "relying on transit" are a car-free trip, not search words', () => {
+  const cal = (text) => { const i = parse(text); return tr.extractTripRequirements({ text, intent: i, trip: {}, taxonomy: TAXONOMY, referenceDate: '2026-11-05' }); };
+  for (const text of ["we don't drive, 3 days in Kelowna", '4 days in Kelowna, relying on transit']) {
+    const r = cal(text);
+    assert.ok(r.items.some((i) => i.kind === 'transport'), text + ' ' + JSON.stringify(r.items.map((i) => i.kind)));
+  }
+});
+
+test('"before our flight", "spending 2 nights", "beginners", "colours" and "spring break" are not search words', () => {
+  for (const text of ['3 afternoon hours in Penticton before our flight', 'road trip stopping for lunch in Vernon and spending 2 nights in Kelowna', 'first time wine tasting in Naramata for beginners', 'fall colours weekend in Kelowna, wine']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /flight|spending|stopping|beginner|first|colou?r/i.test(w)), [], text);
+  }
+});
