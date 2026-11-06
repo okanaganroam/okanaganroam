@@ -20410,14 +20410,38 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     $('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();
   }
   function cancelPendingLocation(){if(!me){watching=false;stopWatch();nearBtn.classList.remove('is-finding');nearBtn.setAttribute('aria-pressed','false');nearLabel.textContent=T.nearMe;}}
+  var mapPickerReturn = null;
+  function finishMapPicker(){
+    var previous = mapPickerReturn;
+    mapPickerReturn = null;
+    setPinMode(false);
+    setStatus('');
+    stage.classList.remove('is-map-picker');
+    roamView(previous.view);
+    render(false);
+    openPanel();
+    panel.querySelector('.rn-panel-body').scrollTop = previous.scroll;
+    $('rnPanelPin').focus({preventScroll:true});
+  }
   function chooseMapPoint(){
+    if (!pendingRoute) {
+      mapPickerReturn = {
+        view: stage.classList.contains('pm-map-view') ? 'map' : 'list',
+        scroll: panel.hidden ? 0 : panel.querySelector('.rn-panel-body').scrollTop
+      };
+      stage.classList.add('is-map-picker');
+      $('rnMapPickerHint').textContent = FR ? 'Touchez la carte pour choisir où chercher.' : 'Tap the map to choose where to search.';
+    }
     cancelPendingLocation();
     closePanel();
     $('rnLocationHelp').hidden = true;
     roamView('map');
     setPinMode(true);
     if (pendingRoute) setStatus('');
+    if (mapPickerReturn) $('rnMapPickerBack').focus({preventScroll:true});
   }
+  $('rnMapPickerBack').addEventListener('click', finishMapPicker);
+  document.addEventListener('keydown', function(e){ if (mapPickerReturn && e.key === 'Escape') { e.stopImmediatePropagation(); finishMapPicker(); } });
   function roamView(view){
     if (typeof route !== 'undefined' && route && view === 'list') return;
     stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
@@ -20501,12 +20525,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
   else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
-  function openPanel(){ $('rnBackdrop').hidden=false;panel.hidden = false; panel.querySelector('.rn-panel-body').scrollTop = 0; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus({preventScroll:true}); }
+  function openPanel(){
+    $('rnPanelPin').textContent = me && me.pin ? (FR ? 'Repère choisi · Modifier' : 'Map pin selected · Change') : (FR ? 'Choisir sur la carte' : 'Choose on map');
+    $('rnBackdrop').hidden=false;panel.hidden = false; panel.querySelector('.rn-panel-body').scrollTop = 0; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus({preventScroll:true}); }
   function closePanel(){ choosingTown = false; if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
   $('rnApplyFilters').addEventListener('click', function(){
     closePanel();
+    roamView('list');
     setCompactResults(true);
     if (!WIDE.matches) $('rnEditSearch').focus();
   });
@@ -21189,7 +21216,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var PIN_ICON = L.divIcon({ className: 'pm-droppin', html: '<svg viewBox="0 0 24 34" width="30" height="42" aria-hidden="true"><path d="M12 1C6 1 1 5.8 1 11.9 1 20.3 12 33 12 33s11-12.7 11-21.1C23 5.8 18 1 12 1z" fill="#DC2626" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg>', iconSize: [30, 42], iconAnchor: [15, 41] });
   function setPinMode(on){ pinMode = on; stage.classList.toggle('is-pinning', on); pinBtn.setAttribute('aria-pressed', on || pinMarker ? 'true' : 'false'); if (on) setStatus(pendingRoute?(FR?'Touchez votre point de départ sur la carte pour voir l’itinéraire.':'Tap your starting point on the map to preview the route.'):T.tapToPin, 15000); }
   function dropPin(ll, fit){
-    if (!OK_BOUNDS.contains(ll)) { setStatus(T.pinOutside); return; }
+    if (!OK_BOUNDS.contains(ll)) { setStatus(T.pinOutside); if(mapPickerReturn) $('rnMapPickerHint').textContent=T.pinOutside; return; }
     // A new browsing location replaces the town; a route start keeps the original search.
     if(!pendingRoute)town='';
     if (watching || (me && !me.pin)) stopLocation(true);
@@ -21206,7 +21233,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     setStatus(pendingRoute?(FR?'Point de départ choisi. Calcul de l’itinéraire…':'Starting point selected. Calculating your route…'):T.pinned); limit = 25;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
     track('map_pin', { radius_km: radiusKm });
-    syncChips();render(pendingRoute?false:fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
+    syncChips();
+    if (mapPickerReturn) { finishMapPicker(); return; }
+    render(pendingRoute?false:fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
   }
   pinBtn.addEventListener('click', function(){
     if (pinMarker) { stopLocation(); setStatus(T.pinRemoved); return; }
@@ -22305,6 +22334,10 @@ ${renderGolfHeaderHtml()}
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
       <div class="rn-intro"><div><h1>${R('Find a place near you','Trouvez un lieu près de vous')}</h1><p>${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Kelowna map area','Zone de Kelowna')}</b></span></button></div>
+      <div class="rn-map-picker-heading">
+        <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
+        <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
+      </div>
       <div class="rn-route-origin-heading">
         <h2 id="rnRouteOriginTitle"></h2>
         <button type="button" id="rnRouteCancel" class="pm-chip">${R('Back to results','Retour aux résultats')}</button>
