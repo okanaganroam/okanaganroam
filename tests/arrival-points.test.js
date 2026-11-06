@@ -98,7 +98,7 @@ test('the portal section explains itself and shows what is live or waiting', asy
   const db = memDb(); const { ap } = kit(db); const L = (en) => en; const esc = (s) => String(s).replace(/"/g, '&quot;');
   const v = db.prepare('SELECT * FROM venues').get();
   const empty = ap.sectionHtml(v, L, esc, 'Okanagan Roam');
-  assert.match(empty, /Help people find your door/); assert.match(empty, /referrerPolicy:'origin'/); assert.match(empty, /capture="environment"/); assert.match(empty, /directions right to the spot where you’re standing/); assert.match(empty, /never track you/); assert.match(empty, /Okanagan Roam may show it/);
+  assert.match(empty, /Help people find your door/); assert.match(empty, /<strong>Here’s why:<\/strong>/); assert.match(empty, /<strong>Example:<\/strong>/); assert.ok(empty.indexOf('Example:') < empty.indexOf('id="arTake"')); assert.match(empty, /referrerPolicy:'origin'/); assert.match(empty, /capture="environment"/); assert.match(empty, /directions right to the spot where you’re standing/); assert.match(empty, /never track you/); assert.match(empty, /Okanagan Roam may show it/);
   assert.doesNotMatch(empty, /owner-photos\/arrival/);
   await ap.submit({ body: body() }, {}, 'good');
   assert.match(ap.sectionHtml(v, L, esc, 'Okanagan Roam'), /Waiting for us to check it/);
