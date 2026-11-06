@@ -146,6 +146,9 @@ function holidayWeekendDates(name, now = new Date()) {
 function stripTravelNoise(normalized) {
   let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
+  // "4 hours between flights, stuck at the airport" is a layover.
+  s = s.replace(/\bbetween (?:my |our |the |two )?(?:flights?|connections?|connecting flights?|planes?)\b/g, ' layover ').replace(/\bstuck\b/g, ' ');
+  s = s.replace(/\bsit ?down\b/g, ' ').replace(/\s+/g, ' ');
   const arriving = /\b(?:land|lands|landing|landed|arrive|arrives|arriving|arrived|fly|flying|flight|layover|lay over|stopover|connecting)\b/.test(s);
   if (arriving) {
     // "land at Kelowna airport" is Kelowna; the airport itself is not a thing to search for.

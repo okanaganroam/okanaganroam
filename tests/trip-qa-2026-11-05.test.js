@@ -258,3 +258,12 @@ test('"six year olds", "a group of 6 guys", "bus tour group" and "shopping" are 
   assert.deepEqual(i.types, []);
   assert.deepEqual(i.corrections, []);
 });
+
+test('Server: "3 hours between flights, stuck at Kelowna airport" is a 3-hour window in Kelowna', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: '3 hours between flights, stuck at Kelowna airport, what is close by' });
+  const text = JSON.stringify([p.summary, p.warnings, p.unsupported, p.understood]);
+  assert.ok(/180 minutes|3 hours/.test(text) && !/stuck|flights|airport/i.test(JSON.stringify(p.unsupported || [])), text.slice(0, 400));
+  assert.ok(/Kelowna/.test(JSON.stringify(p.understood || p.summary)), text.slice(0, 300));
+});
