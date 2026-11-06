@@ -236,3 +236,14 @@ test('a sunrise hike is a morning hike', () => {
   assert.ok(!leftovers(i).includes('sunrise'), JSON.stringify(leftovers(i)));
   assert.equal(i.when && i.when.daypart, 'morning');
 });
+
+test('French: "quelle journée parfaite", "de la France", "glaces", "personnes" are read', () => {
+  const fr = require('../trip-planner-fr.js');
+  const t = (q) => fr.tripPlannerText(q, TAXONOMY);
+  assert.equal(t('Quelle journée parfaite à Kelowna avec deux enfants, demain'), 'a day in kelowna with two kids, tomorrow');
+  assert.match(t('je visite de la France, une semaine en juillet'), /from france/);
+  assert.match(t('plage et glaces'), /ice cream/);
+  assert.match(t('deux personnes'), /two people/);
+  const i = parse(t('je visite de la France, une semaine en juillet, vins et plages'));
+  assert.ok(!leftovers(i).includes('france'), JSON.stringify(leftovers(i)));
+});
