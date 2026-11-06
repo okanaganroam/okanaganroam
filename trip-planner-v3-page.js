@@ -658,6 +658,7 @@ function renderStyles() {
   .t3-caveats li + li { margin-top: 4px; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
+  .t3-estimate { padding: 14px 16px; border-radius: 12px; background: #e9f1ec; font-weight: 800; }
   .t3-stop-price { margin: 6px 0; font-size: .88rem; font-weight: 800; color: #28594d; }
   .t3-how .t3-sample { color: inherit; }
   .t3-fit summary, .t3-how summary { cursor: pointer; font-weight: 700; }
@@ -1395,6 +1396,37 @@ function renderScript(d) {
     }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
+  function cad(cents){
+    return new Intl.NumberFormat(lang() === 'fr' ? 'fr-CA' : 'en-CA', {
+      style: 'currency', currency: 'CAD', minimumFractionDigits: cents % 100 ? 2 : 0
+    }).format(cents / 100);
+  }
+  function stopPriceHtml(v){
+    var french = lang() === 'fr', cost = v.cost;
+    if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
+      return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
+        + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
+    }
+    return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
+      + esc(v.freeEntry ? (french ? 'Entrée gratuite' : 'Free entry') : (french ? 'Prix par personne à vérifier' : 'Check price per person')) + '</p>';
+  }
+  function updateTripEstimate(){
+    var el = resultEl.querySelector('[data-t3-estimate]');
+    if (!el) return;
+    var cards = Array.from(resultEl.querySelectorAll('.t3-stops .t3-card'));
+    var known = 0, cents = 0, french = lang() === 'fr';
+    cards.forEach(function(card){
+      var price = card.querySelector('[data-cost-cents]');
+      if (price) { known++; cents += Number(price.dataset.costCents); }
+    });
+    if (!cards.length) return;
+    var missing = cards.length - known;
+    el.hidden = false;
+    el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
+      + (known ? cad(cents) + ' CAD' : (french ? 'à vérifier' : 'check prices'))
+      + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
+      + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
+  }
   function cardHtml(stop, key, opts){
     opts = opts || {};
     var v = stop.venue, url = placeUrl(v), counts = opts.counts || {};
@@ -1419,9 +1451,7 @@ function renderScript(d) {
       + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
-      + '<p class="t3-stop-price">' + esc(v.freeEntry
-        ? (lang() === 'fr' ? 'Entrée gratuite' : 'Free entry')
-        : (lang() === 'fr' ? 'Prix par personne à vérifier' : 'Check price per person')) + '</p>'
+      + stopPriceHtml(v)
       + factsLine(v)
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
@@ -1905,11 +1935,13 @@ function renderScript(d) {
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
+    if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
+    updateTripEstimate();
     // Round 11: French plans link to French pages (see t3FrenchHref).
     if (lang() === 'fr') Array.prototype.forEach.call(resultEl.querySelectorAll('a[href^="/"]'), function(a){ var u = a.getAttribute('href'), fr = t3FrenchHref(u, a.getAttribute('data-url-fr')); if (fr !== u) a.setAttribute('href', fr); });
     resultEl.hidden = false;
