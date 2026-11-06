@@ -144,8 +144,8 @@ body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
   body.pm-app-page .rn-results-compact.pm-list-view #rnShowResults,
   body.pm-app-page .rn-results-compact.pm-list-view .rn-intro,
   body.pm-app-page .rn-results-compact.pm-list-view .pm-searchbar,
-  body.pm-app-page .rn-results-compact.pm-list-view .pm-quick,
-  body.pm-app-page .rn-results-compact.pm-list-view .rn-location-help { display: none; }
+  body.pm-app-page .rn-results-compact.pm-list-view .pm-quick { display: none; }
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-location-help { flex-basis: 100%; margin-top: 0; }
 }
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
