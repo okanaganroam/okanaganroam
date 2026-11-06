@@ -161,3 +161,18 @@ test('Server: a date range with two kinds of stop is a day-by-day trip of that l
   assert.equal(q.days.length, 7);
   assert.ok(q.warnings.some((w) => /cover 8 days/.test(w)), JSON.stringify(q.warnings));
 });
+
+test('Server: a craft beer tour is a run of breweries, not a tour company (it was a farm tour)', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'craft beer tour in Kelowna for 6 people Saturday afternoon' });
+  const stops = (p.itinerary && p.itinerary.stops || []).filter((s) => s.venue);
+  assert.ok(stops.length >= 2, JSON.stringify(stops.map((s) => s.venue.name)));
+  assert.ok(stops.every((s) => s.venue.type === 'brewery'), JSON.stringify(stops.map((s) => [s.venue.name, s.venue.type])));
+});
+
+test('"for my sister\'s wedding" and "we have the Friday free" are not search words', () => {
+  const i = parse("I'm visiting for my sister's wedding in Penticton in June, we have the Friday free, 6 of us");
+  assert.deepEqual(leftovers(i), []);
+  assert.deepEqual(i.when, { weekday: 'friday' });
+});

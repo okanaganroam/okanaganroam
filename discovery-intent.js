@@ -127,6 +127,10 @@ function stripTravelNoise(normalized) {
   });
   // "What's open right now in Vernon" asks for things to do that are open (the hours check does the rest).
   s = s.replace(/\b(?:whats|what is|is anything|anything|what s) open\b/g, ' things to do ');
+  // A beer, cider or distillery "tour" is a run of breweries, cideries or distilleries (it picked a farm tour).
+  s = s.replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?|hopping|trail)\b/g, ' brewery crawl ').replace(/\b(?:cider|cidery) (?:tours?|trail)\b/g, ' cidery crawl ').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) (?:tours?|trail)\b/g, ' distillery crawl ');
+  // "for my sister's wedding" is why they are here; "we have the Friday free" is a day, not a search word.
+  s = s.replace(/\bfor (?:my |our |a |the )?(?:\w+s )?wedding\b/g, ' ').replace(/\b(?:have|got) (?:the |a )?(\w+day|weekend|afternoon|morning|evening|day) free\b/g, ' on $1 ');
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
@@ -1837,7 +1841,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   // Step 1 (2026-09-29): a comma or semicolon separates parts like "and"
   // does ("coffee, a beach afternoon, a winery and dinner"). Normalization
   // drops punctuation, so the separator is made a word first.
-  const normalized = normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text);
+  const normalized = stripTravelNoise(normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text));
   // A planning verb does not turn dinner plus an event into a full-day trip.
   // Explicit day counts continue through the day planner.
   const shortEventOuting = base.mode === 'plan' && !base.days
@@ -1845,7 +1849,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     && /\b(?:hockey|concerts?|live music|festivals?|events?|markets?)\b/.test(normalized);
   if (!normalized || base.exactVenue || (!['find', 'events'].includes(base.mode) && !shortEventOuting)) return out;
   // Stage 3.2: the same corrections as the base request, word for word.
-  const tokens = correctDiscoveryTokens(stripTravelNoise(normalized).split(' '), discoveryIndex(taxonomy, t)).tokens;
+  const tokens = correctDiscoveryTokens(normalized.split(' '), discoveryIndex(taxonomy, t)).tokens;
   const table = tripPhraseTable(taxonomy);
   const regionPhrase = new Map();
   for (const e of table) for (const a of e.assign) if (a.field === 'region' && !regionPhrase.has(e.phrase)) regionPhrase.set(e.phrase, a.value);
