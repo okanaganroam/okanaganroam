@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: what people search for on our own site and in Build My Trip.
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 function siteCard(g, days) {
   if (g.error || !g.data) return `<section class="col"><h2>${esc(g.name)}</h2><p class="warn">${esc(g.error || 'No data.')}</p></section>`;
@@ -20,14 +21,7 @@ function siteCard(g, days) {
 
 function renderSearchTermsPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/searches?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>What people search for – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>What people search for</h1><p class="sub">The words typed into the site search and Build My Trip, how often, and which searches found nothing.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'searches', title: 'What people search for', ask: askFor('searches'), tells: 'The words typed into the site search and Build My Trip, and the searches that found nothing.', use: 'Searches that found nothing are your free to-do list: places or topics people want and we don’t show yet.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderSearchTermsPage };

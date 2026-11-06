@@ -1,6 +1,7 @@
 'use strict';
-// "What changed" card for the top of the owner dashboard, and the Monday email (HTML + plain text).
+// The dashboard's Home page, and the Monday email (HTML + plain text).
 const { esc, num } = require('./dashboard-page');
+const { NAV } = require('./dashboard-layout');
 
 const arrow = (m) => (m.cur === m.prev ? '–' : m.cur > m.prev ? '▲' : '▼');
 const label = (r) => `${r.start} to ${r.end}`;
@@ -39,30 +40,122 @@ function healthLines(d) {
 }
 const healthBad = (d) => !!(d.health && d.health.problems.length) || !!(d.connections && d.connections.google_search && !['ok', 'not connected'].includes(d.connections.google_search));
 
-function goalsHtml(g) {
-  if (!g) return '';
-  const bar = (x) => `<div style="background:#e5e7eb;border-radius:4px;height:10px;position:relative;margin:4px 0"><div style="background:${x.status === 'behind' || x.status === 'below the starting point' ? '#b42318' : '#1a7f37'};width:${x.progress || 0}%;height:10px;border-radius:4px"></div>${x.expected ? `<div title="where we should be by now" style="position:absolute;left:${x.expected}%;top:-2px;height:14px;border-left:2px solid #667"></div>` : ''}</div>`;
-  return `<h2 style="margin:18px 16px 0">Goals for ${esc(g.deadline)} <small class="empty">${num(g.days_left)} days left. Marker: where we should be by now.</small></h2>
-    <main><section class="col"><div class="card"><table>${g.goals.map((x) => `<tr><td style="vertical-align:top"><b>${esc(x.label)}</b><br><small class="empty">${x.measured ? `Measured: ${esc(x.measured)}. ` : ''}${esc(x.extra || '')} ${esc(x.note || '')}</small></td>
-      <td style="min-width:200px">${x.current === null ? '<span class="empty">not measured</span>' : `<b>${num(x.current)}</b> of ${num(x.target)} ${esc(x.unit)} <small class="empty">(started at ${num(x.baseline)})</small>${bar(x)}<small>${esc(x.status)}</small>`}</td></tr>`).join('')}</table></div></section></main>`;
-}
 function goalsLines(g) {
   if (!g) return [];
   return [`Goals for ${g.deadline} (${g.days_left} days left)`, ...g.goals.map((x) => `  ${x.label}: ${x.current === null ? 'not measured' : `${x.current} of ${x.target} ${x.unit} (started at ${x.baseline}), ${x.status}`}`), ''];
 }
 
-function cardHtml(sites, { notice = '', goals = null } = {}) {
-  const col = (s) => {
-    if (s.error || !s.data) return `<section class="col"><h2>${esc(s.name)}</h2><p class="warn">${esc(s.error || 'No data.')}</p></section>`;
-    const d = s.data;
-    return `<section class="col"><h2>${esc(s.name)} <small>${esc(label(d.range.cur))}, against ${esc(label(d.range.prev))}</small></h2><div class="card">
-      <p class="${healthBad(d) ? 'warn' : 'empty'}">${healthLines(d).map(esc).join('<br>')}</p>
-      ${d.headlines.length ? `<ul>${d.headlines.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : '<p class="empty">A quiet week: nothing moved much.</p>'}
-      <details><summary>Everything that changed</summary>${sections(d).map((x) => `<h4>${esc(x.h)}</h4><table>${x.rows.map((r) => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>`).join('')}</details></div></section>`;
+// Lines for the top of Home. Written by hand so the message is ours; one shows per day.
+const QUOTES = [
+  'Every listing you add is someone’s best day out. Keep building.',
+  'The best directory in the world gets built one true, useful page at a time.',
+  'Great places deserve to be found. You’re the one making sure they are.',
+  'Small businesses can’t buy what you’re giving them: being found. Keep going.',
+  'Nobody hands you the best directory ever. You build it, one good day after another.',
+  'Slow is fine. Stopping is the only thing that loses.',
+  'Today’s small fix is tomorrow’s reason someone trusts you.',
+  'Behind every number on this page is a real person who found somewhere great.',
+  'The big guides stopped caring about the little places. You didn’t. That’s your edge.',
+  'Keep showing up. Most people quit right before it starts to work.',
+  'Be the guide you wish you’d had the first time you came here.',
+  'Do the work nobody will see. It’s what they’ll feel when they use it.',
+  'One more listing. One more fix. One more reason to trust you.',
+  'You’re building something this valley and these mountains have never had.',
+];
+const dayNumber = (now) => Math.floor(now.getTime() / 86400000);
+const quoteFor = (now) => QUOTES[dayNumber(now) % QUOTES.length];
+const greeting = (now) => { const h = Number(new Intl.DateTimeFormat('en-CA', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Vancouver' }).format(now)); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDay = (s) => `${MONTHS[Number(String(s).slice(5, 7)) - 1]} ${Number(String(s).slice(8, 10))}`;
+const shortRange = (r) => `${shortDay(r.start)} to ${shortDay(r.end)}`;
+const metric = (d, key) => (d.metrics || []).find((m) => m.key === key) || null;
+const metricSum = (d, keys) => { const list = keys.map((k) => metric(d, k)).filter(Boolean); return list.length ? { cur: list.reduce((a, m) => a + m.cur, 0), prev: list.reduce((a, m) => a + m.prev, 0) } : null; };
+
+// The change against last week as a small label. With nothing last week there is nothing fair to compare.
+function chip(m) {
+  if (!m.prev) return '<span class="chip">First week of data</span>';
+  if (m.cur === m.prev) return '<span class="chip">Same as last week</span>';
+  const up = m.cur > m.prev; const pct = Math.round((Math.abs(m.cur - m.prev) / m.prev) * 100);
+  return `<span class="chip ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${pct}% vs last week</span>`;
+}
+const TILES = [
+  { t: 'Business pages viewed', keys: ['views'], why: 'Times people opened a listing.', href: '/admin/dashboard/business' },
+  { t: 'Clicks to businesses', keys: ['outbound'], why: 'People calling, booking or heading to a business. Your real value.', href: '/admin/dashboard/outbound' },
+  { t: 'Trips planned', keys: ['trip_plan_complete'], why: 'Finished plans in Build My Trip.', href: '/admin/dashboard/funnels' },
+  { t: 'From Google and AI', keys: ['visits_search', 'visits_ai'], why: 'Visits from search engines and AI assistants.', href: '/admin/dashboard/search' },
+];
+const tileHtml = (d) => `<div class="tiles">${TILES.map((x) => { const m = metricSum(d, x.keys) || { cur: 0, prev: 0 }; return `<a class="tile" href="${x.href}"><p class="t">${esc(x.t)}</p><p class="big">${num(m.cur)}</p>${chip(m)}<p class="why">${esc(x.why)}</p></a>`; }).join('')}</div>`;
+
+// Moves worth a mention, sorted into good news and things to look at. For these two a rise is bad news.
+const RISE_IS_BAD = new Set(['broken', 'searches_none']);
+function moves(d) {
+  const good = []; const watch = [];
+  for (const m of d.metrics || []) {
+    if (!m.prev || Math.max(m.cur, m.prev) < 5 || Math.abs(m.cur - m.prev) / m.prev < 0.25) continue;
+    const up = m.cur > m.prev; const line = `${m.label}: ${up ? 'up' : 'down'} from ${num(m.prev)} to ${num(m.cur)}`;
+    (up !== RISE_IS_BAD.has(m.key) ? good : watch).push(line);
+  }
+  const L = d.lists || {};
+  if (L.no_results && L.no_results[0]) watch.push(`People searched “${L.no_results[0].term}” and found nothing (${num(L.no_results[0].n)} times)`);
+  if (L.broken_pages && L.broken_pages[0]) watch.push(`Visitors hit a missing page: ${L.broken_pages[0].path} (${num(L.broken_pages[0].n)} times)`);
+  if (L.rising_businesses && L.rising_businesses[0]) good.push(`${L.rising_businesses[0].name} is getting more attention: +${num(L.rising_businesses[0].views - L.rising_businesses[0].prev)} views`);
+  return { good: good.slice(0, 5), watch: watch.slice(0, 5) };
+}
+const listHtml = (rows, none) => (rows.length ? `<ul class="list">${rows.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : `<p class="empty">${esc(none)}</p>`);
+
+function todoHtml(inbox) {
+  if (!inbox) return '';
+  const rows = [['New businesses to review', inbox.venue_submissions_pending], ['Events to review', inbox.event_submissions_pending], ['Listing claims to approve', inbox.claims_pending], ['Visitor photos and tips', inbox.visitor_contributions_pending]].filter((r) => r[1]);
+  return `<div class="card"><h3>Waiting on you</h3>${rows.length ? `<ul class="list">${rows.map((r) => `<li><a class="todo" href="/admin/review"><span>${esc(r[0])}</span><b>${num(r[1])}</b></a></li>`).join('')}</ul>` : '<p class="empty">All clear. Nothing needs you right now.</p>'}</div>`;
+}
+
+function siteHome(s, inbox) {
+  if (s.error || !s.data) return `<section class="col"><h2>${esc(s.name)}</h2><div class="card"><p class="warn">${esc(s.error || 'No data yet.')}</p></div></section>`;
+  const d = s.data; const bad = healthBad(d); const m = moves(d);
+  return `<section class="col"><h2>${esc(s.name)} <small>${esc(shortRange(d.range.cur))}</small></h2>
+    <p class="status${bad ? ' bad' : ''}"><span class="dot"></span>${esc(bad ? healthLines(d)[0] : 'Tracking is working normally')}</p>
+    ${tileHtml(d)}
+    <div class="two"><div class="card"><h3>Good news</h3>${listHtml(m.good, 'Nothing big moved up yet. That’s normal while we collect the first few weeks.')}</div>
+    <div class="card"><h3>Worth a look</h3>${listHtml(m.watch, 'Nothing needs your attention.')}</div></div>
+    ${todoHtml(inbox)}
+    <details class="fold card"><summary>See everything that changed this week</summary>${sections(d).map((x) => `<h4>${esc(x.h)}</h4><div class="tw"><table>${x.rows.map((r) => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table></div>`).join('')}</details>
+  </section>`;
+}
+
+// Goal names in everyday words. Anything not listed keeps its own label.
+const GOAL_WORDS = {
+  nonbrand_impressions: ['Found on Google without searching our name', 'Times a day we show up for people who didn’t search “Okanagan Roam”.'],
+  chatgpt_sessions: ['Visits from ChatGPT', 'People who clicked through to us from ChatGPT.'],
+  linking_sites: ['Other websites linking to us', 'Each one tells Google we can be trusted.'],
+  venues_linking: ['Local businesses linking to us', 'Listings that link back from their own website.'],
+  ai_citations: ['Mentioned in AI answers', 'Out of 30 test questions asked to AI assistants.'],
+};
+const GOAL_CHIP = { 'on track': 'up', reached: 'up', behind: 'down', 'below the starting point': 'down' };
+function goalsCard(g) {
+  if (!g) return '';
+  const row = (x) => {
+    const w = GOAL_WORDS[x.key] || [x.label, ''];
+    const low = x.status === 'behind' || x.status === 'below the starting point';
+    return `<div class="goal"><div class="goal-top"><span class="goal-t">${esc(w[0])}</span><span class="goal-n">${x.current === null ? 'Not measured yet' : `<b>${num(x.current)}</b> of ${num(x.target)}`}</span></div>
+      ${x.current === null ? '' : `<div class="track"><div class="fill${low ? ' behind' : ''}" style="width:${Math.max(0, Math.min(100, x.progress || 0))}%"></div><div class="mark" style="left:${Math.max(0, Math.min(100, x.expected || 0))}%" title="Where we should be by now"></div></div>`}
+      <span class="chip ${GOAL_CHIP[x.status] || ''}">${esc(x.status)}</span> <span class="empty">${esc(w[1])}</span></div>`;
   };
-  return `<h2 style="margin:18px 16px 0">What changed this week</h2>${notice ? `<p class="empty" style="margin:4px 16px">${esc(notice)}</p>` : ''}<main>${sites.map(col).join('')}</main>
-    ${goalsHtml(goals)}
-    <form method="post" action="/admin/dashboard/digest-send" style="margin:0 16px 12px"><button type="submit">Email me this now</button> <small class="empty">It also arrives by itself every Monday morning.</small></form>`;
+  return `<h2 class="sec">Your goals <small>${num(g.days_left)} days left, to ${esc(shortDay(g.deadline))}. The black line shows where we should be by now.</small></h2><div class="card">${g.goals.map(row).join('')}</div>`;
+}
+
+function goHtml() {
+  const items = NAV.flatMap((n) => n.items).filter((i) => i.key !== 'home');
+  return `<h2 class="sec">Where do you want to go?</h2><div class="go">${items.map((i) => `<a href="${i.href}"><b>${esc(i.ask)}</b><span>${esc(i.label)}</span></a>`).join('')}</div>`;
+}
+
+// Home: { top, body }. weekly = this week's summary per site; inboxes = { siteKey: inbox counts }.
+function homeHtml(weekly, { notice = '', goals = null, inboxes = {}, now = new Date() } = {}) {
+  const clicks = weekly.reduce((a, s) => { const m = s.data && metric(s.data, 'outbound'); return a + (m ? m.cur : 0); }, 0);
+  const top = `<section class="hero"><p class="hi">${esc(greeting(now))}, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">Last week, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
+  const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${goalsCard(goals)}${goHtml()}
+    <form method="post" action="/admin/dashboard/digest-send" class="foot"><button type="submit">Email me this summary now</button> It also arrives by itself every Monday morning.</form>`;
+  return { top, body };
 }
 
 function emailText(sites, { goals = null } = {}) {
@@ -94,4 +187,4 @@ function emailHtml(sites, { goals = null } = {}) {
   return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1c1c1c;font-size:14px;line-height:1.45"><h1 style="font-size:20px">What changed this week</h1>${body}${goals ? `<h2 style="margin:24px 0 4px">Goals for ${esc(goals.deadline)}</h2><table style="border-collapse:collapse;width:100%">${goals.goals.map((x) => `<tr><td style="padding:3px 8px 3px 0;border-bottom:1px solid #eee">${esc(x.label)}</td><td style="padding:3px 0;border-bottom:1px solid #eee;text-align:right">${x.current === null ? 'not measured' : `${esc(String(x.current))} of ${esc(String(x.target))} (${esc(x.status)})`}</td></tr>`).join('')}</table>` : ''}<p style="margin-top:24px"><a href="${ABS}/admin/dashboard">Open the full dashboard</a></p></div>`;
 }
 
-module.exports = { sections, healthLines, goalsHtml, cardHtml, emailText, emailHtml };
+module.exports = { sections, healthLines, homeHtml, quoteFor, QUOTES, moves, emailText, emailHtml };

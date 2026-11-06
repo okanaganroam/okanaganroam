@@ -69,8 +69,8 @@ test('renderers: the health lines, the goals card and the email show them, and e
   const data = { ...wc.summarize(db, NOW), health: health.check(db, NOW), connections: { google_search: 'bad <i>news' } };
   const g = goals.evaluate(goals.load(), { gsc_nonbrand: { per_day: 56, last7_per_day: 11, start: 'a', end: 'b' }, ga_chatgpt: { sessions: 83 } }, new Date('2026-11-06T12:00:00Z'));
   const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data }];
-  const html = wcp.cardHtml(sites, { goals: g }); const text = wcp.emailText(sites, { goals: g }); const mail = wcp.emailHtml(sites, { goals: g });
-  assert.match(html, /recorded nothing yesterday/); assert.match(html, /Goals for 2027-01-31/); assert.match(html, /below the starting point/);
+  const home = wcp.homeHtml(sites, { goals: g }); const html = home.top + home.body; const text = wcp.emailText(sites, { goals: g }); const mail = wcp.emailHtml(sites, { goals: g });
+  assert.match(html, /recorded nothing yesterday/); assert.match(html, /Your goals/); assert.match(html, /Jan 31/); assert.match(html, /below the starting point/);
   assert.match(text, /!! Business page views recorded nothing/); assert.match(text, /Goals for 2027-01-31/); assert.match(mail, /Goals for 2027-01-31/);
   for (const out of [html, mail]) assert.doesNotMatch(out, /<i>news/);
 });

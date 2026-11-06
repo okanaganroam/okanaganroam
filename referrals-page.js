@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: how people find us (AI assistants, search engines, social, other sites, and Google's own search words).
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 const NAMES = {
   chatgpt: 'ChatGPT', perplexity: 'Perplexity', gemini: 'Gemini', copilot: 'Copilot', claude: 'Claude', you_com: 'You.com', poe: 'Poe', meta_ai: 'Meta AI',
@@ -64,14 +65,7 @@ function siteCard(g, days) {
 
 function renderReferralsPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/search?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>How people find us – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>How people find us</h1><p class="sub">Visits from AI assistants (ChatGPT, Perplexity, Gemini, Copilot, Claude…) and search engines, the pages they landed on, which pages AI tools read for people, and the words typed into Google.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'search', title: 'How people find us', ask: askFor('search'), tells: 'Which search engines, AI assistants, social sites and emails bring visitors, and the words people typed into Google.', use: 'Put your effort into what already brings people. Pages going down are worth a look.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderReferralsPage, searchConsoleHtml };

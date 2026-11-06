@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: guide and page performance, and Roam Now detail, both sites side by side.
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 const TYPES = { home: 'Home', tool: 'Tool', list: 'List', guide: 'Guide', category: 'Category', town: 'Town or topic' };
 const FILTERS = {
@@ -10,14 +11,6 @@ const FILTERS = {
 };
 const pct = (n) => (n === null || n === undefined ? '–' : `${n}%`);
 const link = (p) => `<a href="${esc(p)}" target="_blank" rel="noopener">${esc(p)}</a>`;
-const shell = (title, sub, nav, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>${esc(title)} – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p>
-<div class="bar"><div class="tabs">${nav}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${body}</main>
-</body></html>`;
 const range = (path, days) => [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="${path}?days=${n}">${n}d</a>`).join('');
 const errorCol = (g) => `<section class="col"><h2>${esc(g.name)}</h2><div class="card"><p class="empty">${esc(g.error || 'No data yet.')}</p></div></section>`;
 
@@ -39,7 +32,7 @@ function pagesCol(g, days) {
 }
 
 function renderPagesPage({ days = 30, sites = [] }) {
-  return shell('Guides and pages', 'Which guides, categories, towns and lists get opened, where those visits came from, and which pages send people on to businesses.', range('/admin/dashboard/pages', days), sites.map((g) => pagesCol(g, days)).join(''));
+  return layout({ active: 'pages', title: 'Guides and pages', ask: askFor('pages'), tells: 'Which guides, categories and town pages get opened, and which ones send people on to a business.', use: 'Pages opened a lot that send nobody on need better links or a clearer next step. Copy what the best pages do.', range: range('/admin/dashboard/pages', days), body: sites.map((g) => pagesCol(g, days)).join('') });
 }
 
 function roamCol(g, days) {
@@ -65,7 +58,7 @@ function roamCol(g, days) {
 }
 
 function renderRoamNowPage({ days = 30, sites = [] }) {
-  return shell('Roam Now detail', 'What people do on the map: filters, words, towns and the businesses they open or get directions to.', range('/admin/dashboard/roam-now', days), sites.map((g) => roamCol(g, days)).join(''));
+  return layout({ active: 'roam-now', title: 'Roam Now', ask: askFor('roam-now'), tells: 'What people do on the map: which filters they use, what they type, and which businesses they open or get directions to.', use: 'Searches that found nothing show what to add. Popular filters show what people care about most.', range: range('/admin/dashboard/roam-now', days), body: sites.map((g) => roamCol(g, days)).join('') });
 }
 
 function eventsCol(g, days) {
@@ -86,7 +79,7 @@ function eventsCol(g, days) {
 }
 
 function renderEventsPage({ days = 30, sites = [] }) {
-  return shell('Event performance', 'Which What’s On events get opened, what people do on them, and which coming events nobody has found.', range('/admin/dashboard/events', days), sites.map((g) => eventsCol(g, days)).join(''));
+  return layout({ active: 'events', title: 'Events', ask: askFor('events'), tells: 'Which What’s On events get opened, what people do on them, and which coming events nobody has found.', use: 'Events coming up that nobody has opened are good ones to share on social this week.', range: range('/admin/dashboard/events', days), body: sites.map((g) => eventsCol(g, days)).join('') });
 }
 
 function emailCol(g, days) {
@@ -115,7 +108,32 @@ function emailCol(g, days) {
 }
 
 function renderEmailPage({ days = 30, sites = [] }) {
-  return shell('Email results', 'What happened to the email we sent: delivered, bounced, complaints, and visits from tagged links.', range('/admin/dashboard/email', days), sites.map((g) => emailCol(g, days)).join(''));
+  return layout({ active: 'email', title: 'Email results', ask: askFor('email'), tells: 'Whether the email we sent was accepted, bounced or complained about, and the visits our email links brought.', use: 'Watch the warnings at the top. Clicks and replies matter more than opens, which are only a rough guide.', range: range('/admin/dashboard/email', days), body: sites.map((g) => emailCol(g, days)).join('') });
 }
 
-module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage };
+const WORDS = [
+  ['Visit', 'One person coming to the site once. The same person coming back tomorrow is a second visit.'],
+  ['Page view', 'A page being opened. One visit can have many page views.'],
+  ['Click to a business', 'Someone tapping call, website, book, directions or menu on a listing. This is the value we give businesses.'],
+  ['Shown in Google (impression)', 'Our site appeared in someone’s Google results. They may not have clicked.'],
+  ['Clicks from Google', 'Someone saw us in Google and came to the site.'],
+  ['Position', 'Where we sit in Google’s results. 1 is the top; lower numbers are better.'],
+  ['Not searching our name (non-brand)', 'People who found us by searching things like “best patios Kelowna”, not “Okanagan Roam”. These are brand new people.'],
+  ['Funnel', 'A set of steps, like start a plan then finish a plan. It shows where people give up.'],
+  ['Sent on', 'People who went from a guide or page to a business or event page.'],
+  ['Campaign', 'A name for one batch of emails or posts, so we can tell which one brought people.'],
+  ['Crawler', 'A computer program reading the site, such as Google’s. Not a person.'],
+  ['Missing page (404)', 'Someone tried to open an address that doesn’t exist.'],
+  ['Delivered', 'The other side accepted our email. It could still land in spam; nobody can see that.'],
+  ['Bounce', 'An email came back. A hard bounce is a dead address. A soft bounce is temporary, like a full mailbox.'],
+  ['Spam complaint', 'Someone pressed “this is spam”. Keep this very low.'],
+  ['Opened', 'A rough guess that an email was read. Mail apps can get this wrong both ways.'],
+  ['Claim', 'A business owner asking to take over their listing.'],
+];
+function renderHelpPage() {
+  return layout({ active: 'help', title: 'What the words mean', ask: 'Short answers, and how to use this dashboard.', tells: 'What each word on the dashboard means in everyday language.', use: 'Come back here whenever a word doesn’t make sense.',
+    body: `<div class="card"><h3>How to use this in five minutes a week</h3><ul class="list"><li><b>1. Open Home.</b> Are the four big numbers going up?</li><li><b>2. Read “Worth a look”.</b> Fix one thing from it.</li><li><b>3. Clear “Waiting on you”.</b> Approve what’s in the review inbox.</li><li><b>4. Check your goals.</b> Green means on track.</li></ul></div>
+    <div class="card"><h3>The words</h3><dl class="glossary">${WORDS.map((w) => `<dt>${esc(w[0])}</dt><dd>${esc(w[1])}</dd>`).join('')}</dl></div>` });
+}
+
+module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage, renderHelpPage };

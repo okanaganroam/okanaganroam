@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: broken pages (404s) and the links that lead to them.
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 const refLabel = (r) => (r.startsWith('own:') ? `our page <a href="${esc(r.slice(4))}" target="_blank" rel="noopener">${esc(r.slice(4))}</a>` : esc(r));
 
@@ -19,14 +20,7 @@ function siteCard(g, days) {
 
 function renderErrorsPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/errors?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Broken pages – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>Broken pages</h1><p class="sub">Addresses that visitors and crawlers asked for that do not exist, and which of our pages link to them.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'errors', title: 'Broken pages', ask: askFor('errors'), tells: 'Addresses people tried to open that don’t exist on the site, and which page sent them there.', use: 'Fix anything under Visitors first, especially if one of our own pages links to it. Crawlers and scanners can mostly be ignored.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderErrorsPage };

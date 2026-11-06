@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: outbound clicks per business (website, book, call, directions, menu, social), busiest first.
-const { esc, num, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, stat, table } = require('./dashboard-page');
 
 function siteCard(g, days) {
   if (g.error || !g.data) return `<section class="col"><h2>${esc(g.name)}</h2><p class="warn">${esc(g.error || 'No data.')}</p></section>`;
@@ -20,14 +21,7 @@ function siteCard(g, days) {
 
 function renderOutboundPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/outbound?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Outbound clicks – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>Outbound clicks</h1><p class="sub">What each business gets from visitors: website, booking, call, directions, menu and social clicks. Use the 30-day view as the monthly summary to share with a business.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'outbound', title: 'Clicks to businesses', ask: askFor('outbound'), tells: 'How many times visitors left us to call, book, visit the website or get directions. This is the value we give businesses.', use: 'Use the 30-day numbers when talking to a business: it is real proof we send them customers.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderOutboundPage };

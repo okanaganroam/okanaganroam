@@ -115,7 +115,7 @@ test('the two dashboard pages draw, with a site that is not connected', () => {
   const a = renderPagesPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: c.pages(30, 100, NOW) }, off] });
   const b = renderRoamNowPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: c.roamNow(30, NOW) }, off] });
   assert.match(a, /Guides and pages/); assert.match(a, /Not connected yet/);
-  assert.match(b, /Roam Now detail/); assert.match(b, /Filters turned on/);
+  assert.match(b, /How are people using the map/); assert.match(b, /Filters turned on/);
 });
 
 test('every Roam Now filter on the page is on the counted list, so a new chip cannot go uncounted', () => {

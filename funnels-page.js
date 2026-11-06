@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: the Build My Trip funnel and the business claim / portal funnel, both sites side by side.
-const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
+const { layout, askFor } = require('./dashboard-layout');
+const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 const pct = (n) => (n === null || n === undefined ? '' : `${n}%`);
 const stepRows = (steps) => steps.map((s) => [esc(s.text), `<b>${num(s.n)}</b>`, pct(s.of_previous)]);
@@ -44,14 +45,7 @@ function siteCard(g, days) {
 
 function renderFunnelsPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/funnels?days=${n}">${n}d</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Funnels – Okanagan Roam and Whistler Roam</title>
-${STYLE}
-</head><body>
-<header><h1>Funnels</h1><p class="sub">Where people drop off in Build My Trip, and how business owners move from our emails to claiming and editing their listing.</p>
-<div class="bar"><div class="tabs">${range}</div><a class="tab" href="/admin/dashboard">Back to dashboard</a></div></header>
-<main>${sites.map((g) => siteCard(g, days)).join('')}</main>
-</body></html>`;
+  return layout({ active: 'funnels', title: 'Build My Trip and claims', ask: askFor('funnels'), tells: 'Where people stop when planning a trip, and how many business owners go from our emails to claiming a listing.', use: 'Look for the step with the biggest drop. That is the one step worth improving first.', range, body: sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderFunnelsPage };
