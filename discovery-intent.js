@@ -125,13 +125,14 @@ function fixedHolidayDates(text, keepName = false) {
     if (k === 'canada day') return 'july 1';
     if (k === 'christmas eve') return 'december 24';
     if (k === 'christmas day') return 'december 25';
+    if (k === 'christmas week') return 'december 27'; // Dec 25 itself is mostly closed
     if (k === 'boxing day') return 'december 26';
     if (/^new ?years? ?s? eve$/.test(k)) return 'december 31';
     if (/^new ?years? ?s? day$/.test(k)) return 'january 1';
     if (/^valentines? ?s? day$/.test(k)) return 'february 14';
     return null;
   };
-  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? (keepName ? ` ${h} on ${dateOf(h)} ` : ` on ${dateOf(h)} `) : m)).replace(/\s+/g, ' ');
+  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|christmas week|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?: week)?(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? (keepName ? ` ${h} on ${dateOf(h)} ` : ` on ${dateOf(h)} `) : m)).replace(/\s+/g, ' ');
 }
 
 // "in 2 weeks", "in ten days", "a week from Friday" is not read by the date reader; "in N days/weeks" becomes that date.
@@ -272,6 +273,8 @@ function stripTravelNoise(normalized) {
   }
   // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
   s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
+  // Mood words that no listing carries: they colour a request but there is nothing to search for.
+  s = s.replace(/\b(?:cozy|cosy|charming|lovely|delicious|yummy|tasty|amazing|awesome|fabulous|gorgeous)\b/g, ' ');
   s = joinOutsidePlaces(s);
   s = plainRelativeDates(s);
   // "two weeks": 14 days (the planner covers seven and says so).
