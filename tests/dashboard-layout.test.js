@@ -37,7 +37,7 @@ test('Home: big numbers with a fair comparison, good news kept apart from proble
   const inboxes = { okanagan: { claims_pending: 3 } };
   const { top, body } = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: d }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet' }], { inboxes, now: NOW });
   assert.match(top, /Dayton/); assert.match(top, /40 times because of what you built/);
-  assert.match(body, /▲ 100% vs last week/); assert.match(body, /Last 7 days, just started counting/);
+  assert.match(body, /▲ 100% vs last week/); assert.match(body, /Last 7 days so far/);
   assert.match(body, /Listing claims to approve/); assert.match(body, /Oct 30 to Nov 5/); assert.match(body, /Not connected yet/);
   assert.match(body, /Where do you want to go/);
   assert.ok(home.QUOTES.includes(home.quoteFor(NOW)));
@@ -57,4 +57,26 @@ test('with no clicks yet the top line stays quiet, and the help page explains th
   assert.doesNotMatch(home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: data([]) }], { now: NOW }).top, /because of what you built/);
   const help = renderHelpPage();
   assert.match(help, /five minutes a week/); assert.match(help, /Hard bounce|hard bounce/); assert.match(help, /Funnel/);
+});
+
+test('lessons are complete, each quiz has one valid right answer, and the day picks one to show', () => {
+  const { LESSONS, todayLesson, allLessons } = require('../dashboard-learn');
+  assert.equal(new Set(LESSONS.map((l) => l.id)).size, LESSONS.length);
+  for (const l of LESSONS) { assert.ok(l.title && l.text && l.why && l.q && l.because, l.id); assert.equal(l.a.length, 3, l.id); assert.ok(l.a[l.r], l.id); }
+  const html = todayLesson(NOW, { clicks: 7 });
+  assert.equal((html.match(/data-lesson=/g) || []).length, LESSONS.length);
+  assert.equal((html.match(/data-lesson="[^"]+" hidden/g) || []).length, LESSONS.length - 1);
+  assert.equal((html.match(/data-right="1"/g) || []).length, LESSONS.length);
+  assert.doesNotMatch(allLessons(), /data-lesson="[^"]+" hidden/);
+});
+
+test('milestones unlock only from real numbers, and the mission comes from the site’s own problems', () => {
+  const { milestonesHtml, MILESTONES } = require('../dashboard-learn');
+  assert.match(milestonesHtml({}), new RegExp(`0 of ${MILESTONES.length} reached`));
+  const some = milestonesHtml({ clicks: 1, views: 99 });
+  assert.match(some, /1 of \d+ reached/); assert.match(some, /99 of 100/);
+  const withBroken = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: data([], { broken_pages: [{ path: '/gone', n: 3 }] }) }], { now: NOW }).body;
+  assert.match(withBroken, /Fix a dead end: \/gone/);
+  const waiting = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: data([]) }], { inboxes: { okanagan: { claims_pending: 2 } }, now: NOW }).body;
+  assert.match(waiting, /2 items need your approval/);
 });

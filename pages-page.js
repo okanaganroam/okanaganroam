@@ -1,6 +1,7 @@
 'use strict';
 // Owner dashboard: guide and page performance, and Roam Now detail, both sites side by side.
 const { layout, askFor } = require('./dashboard-layout');
+const { allLessons } = require('./dashboard-learn');
 const { esc, num, bars, stat, table } = require('./dashboard-page');
 
 const TYPES = { home: 'Home', tool: 'Tool', list: 'List', guide: 'Guide', category: 'Category', town: 'Town or topic' };
@@ -131,9 +132,9 @@ const WORDS = [
   ['Claim', 'A business owner asking to take over their listing.'],
 ];
 function renderHelpPage() {
-  return layout({ active: 'help', title: 'What the words mean', ask: 'Short answers, and how to use this dashboard.', tells: 'What each word on the dashboard means in everyday language.', use: 'Come back here whenever a word doesn’t make sense.',
+  return layout({ active: 'help', title: 'Learn analytics', ask: 'Quick lessons, and what the words mean.', tells: 'How analytics works, one small idea at a time, with a question to test yourself.', use: 'Do a lesson or two when you have a minute, and come back whenever a word doesn’t make sense.',
     body: `<div class="card"><h3>How to use this in five minutes a week</h3><ul class="list"><li><b>1. Open Home.</b> Are the four big numbers going up?</li><li><b>2. Read “Worth a look”.</b> Fix one thing from it.</li><li><b>3. Clear “Waiting on you”.</b> Approve what’s in the review inbox.</li><li><b>4. Check your goals.</b> Green means on track.</li></ul></div>
-    <div class="card"><h3>The words</h3><dl class="glossary">${WORDS.map((w) => `<dt>${esc(w[0])}</dt><dd>${esc(w[1])}</dd>`).join('')}</dl></div>` });
+    ${allLessons()}<div class="card" style="margin-top:14px"><h3>The words</h3><dl class="glossary">${WORDS.map((w) => `<dt>${esc(w[0])}</dt><dd>${esc(w[1])}</dd>`).join('')}</dl></div>` });
 }
 
 module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage, renderHelpPage };
