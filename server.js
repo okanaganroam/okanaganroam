@@ -22077,7 +22077,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 18; // 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 19; // 19: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -22193,8 +22193,24 @@ const MAP_TAGS = [
     // Fintry, Kalamalka Lake ...).
     (v, name, text) => (v.hikeList || (v.type === 'outdoor' && MAP_HIKE_TEXT_RE.test(text))
       || (v.type === 'beach' && /\b(?:regional|provincial) park\b/.test(name) && /\b(?:trails?|trailhead|hik(?:e|es|ing))\b/.test(text))) && !MAP_NOT_HIKE_NAME_RE.test(name)],
-  ['parks', 'Parks', 'Parcs', 'tree', /\bparks?\b/, 'parks|parcs', [], (v, name) => ['outdoor','beach','sport'].includes(v.type) && /\bpark\b/.test(name)],
   ['skatepark', 'Skateparks', 'Parcs de planche à roulettes', 'target', /\bskate[ -]?(?:board(?:ing)?[ -]?)?parks?\b/, 'skatepark|skateparks|skate park|skate parks|skateboard park|skateboard parks|skateboarding park|skateboarding parks', [], (v, name) => /\bskate[ -]?(?:board(?:ing)?[ -]?)?parks?\b/.test(name)],
+  ['swimbeach', 'Beaches & swimming', 'Plages et baignade', 'beach', /\b(?:beach|swimming)\b/, 'beaches swimming|beaches and swimming|plages et baignade', ['beach'],
+    (v, name, text) => v.type === 'beach' && (/\bbeach\b/.test(name) || /\b(?:swimming|swim area|sandy beach|pebble beach)\b/.test(text))],
+  ['playground', 'Playgrounds', 'Aires de jeux', 'target', /\bplaygrounds?\b/, 'playground|playgrounds|aires de jeux', ['outdoor', 'beach', 'sport'],
+    (v, name, text) => ['outdoor', 'beach', 'sport'].includes(v.type) && /\b(?:playgrounds?|play structures?|play equipment)\b/.test(text)],
+  ['viewpoint', 'Scenic viewpoints', 'Belvédères', 'mountain', /\b(?:viewpoints?|lookouts?|overlooks?)\b/, 'scenic viewpoints|viewpoints|belvédères', ['outdoor', 'beach'],
+    (v, name, text) => v.viewpointList || (['outdoor', 'beach'].includes(v.type) && /\b(?:viewpoints?|lookouts?|scenic overlooks?)\b/.test(text))],
+  ['museums', 'Museums & galleries', 'Musées et galeries', 'target', /\b(?:museums?|art galler(?:y|ies))\b/, 'museums galleries|museums and galleries|musées et galeries', ['indoor'],
+    (v, name, text) => v.type === 'indoor' && /\b(?:museums?|art galler(?:y|ies)|public gallery)\b/.test(text)],
+  ['indoorplay', 'Indoor play', 'Jeux intérieurs', 'target', /\b(?:indoor play|trampoline park)\b/, 'indoor play|jeux intérieurs', ['indoor', 'sport'],
+    (v, name, text) => ['indoor', 'sport'].includes(v.type) && /\b(?:indoor play(?:ground| space| cent(?:re|er))?|trampoline park|soft play|play cafe|play café)\b/.test(text)],
+  ['bikeparks', 'Bike parks & pump tracks', 'Parcs à vélo et pistes à bosses', 'target', /\b(?:bike parks?|pump tracks?|bmx tracks?)\b/, 'bike parks pump tracks|bike parks and pump tracks|parcs à vélo et pistes à bosses', ['outdoor', 'sport'],
+    (v, name, text) => ['outdoor', 'sport'].includes(v.type) && /\b(?:bike parks?|pump tracks?|bmx tracks?)\b/.test(text)],
+  ['discgolf', 'Disc golf', 'Disque-golf', 'golf', /\bdisc golf\b/, 'disc golf|disque golf', ['outdoor', 'sport', 'golf'],
+    (v, name, text) => ['outdoor', 'sport', 'golf'].includes(v.type) && /\bdisc golf\b/.test(text)],
+  ['skisnow', 'Ski & snow', 'Ski et neige', 'mountain', /\b(?:ski resorts?|nordic ski|snow tubing)\b/, 'ski snow|ski and snow|ski et neige', ['outdoor', 'sport'],
+    (v, name, text) => ['outdoor', 'sport'].includes(v.type) && /\b(?:ski resorts?|ski areas?|ski hills?|ski clubs?|ski trails?|ski lifts?|skiing|snow tubing|tube parks?|snowshoeing)\b/.test(text)],
+  ['parks', 'Parks', 'Parcs', 'tree', /\bparks?\b/, 'parks|parcs', [], (v, name) => ['outdoor','beach','sport'].includes(v.type) && /\bpark\b/.test(name)],
 ].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: uiIcon('leaf') }, { key: 'vegan', label: 'Vegan', icon: uiIcon('sprout') }, { key: 'gf', label: 'Gluten-free', icon: uiIcon('wheat') },
@@ -22220,6 +22236,7 @@ function mapPlacesData(now = new Date()) {
   const seasons = getSeasonStates(now);
   const dogNotes = getDogPolicyNotes();
   const hikeIds = getCollectionVenueIds('activity_hiking'), favIds = getCollectionVenueIds('local_favorite');
+  const viewpointIds = getCollectionVenueIds('activity_viewpoints');
   const specials = specialsTodayFor(venues, now);
   const claimed = claimedVenueIds();
   const nightsToday = weeklyNightsTodayFor(venues, now);
@@ -22230,6 +22247,7 @@ function mapPlacesData(now = new Date()) {
     const ss = seasons.get(v.id);
     const blocked = !!((st && st.reason === 'advisory') || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current))));
     v.hikeList = hikeIds.has(v.id);
+    v.viewpointList = viewpointIds.has(v.id);
     const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
     const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
@@ -22509,11 +22527,27 @@ ${renderGolfHeaderHtml()}
           const first = ['happy', 'specials', 'nights', 'patio', 'dogs'];
           return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_DIETARY.map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
         })()}
-        <div class="rn-outdoor-shortcuts" id="rnOutdoorShortcuts" role="group" aria-label="${R('Outdoor activities','Activités de plein air')}">
-          <button type="button" class="pm-chip" data-outdoor-search="parks"><span aria-hidden="true">🌳</span> ${R('Parks','Parcs')}</button>
-          <button type="button" class="pm-chip" data-outdoor-search="dog beaches"><span aria-hidden="true">🐾</span> ${R('Dog beaches','Plages pour chiens')}</button>
-          <button type="button" class="pm-chip" data-outdoor-search="hiking trails"><span aria-hidden="true">🥾</span> ${R('Hiking trails','Sentiers de randonnée')}</button>
-          <button type="button" class="pm-chip" data-outdoor-search="skateparks"><span aria-hidden="true">🛹</span> ${R('Skateparks','Parcs de planche à roulettes')}</button>
+        <div class="rn-outdoor-shortcuts" id="rnOutdoorShortcuts" role="group" aria-label="${R('Activity shortcuts','Raccourcis d’activités')}">
+          ${(() => {
+            const shortcut = (en, fr, emoji, query = R(en, fr)) => `<button type="button" class="pm-chip" data-outdoor-search="${escapeHtml(query)}"><span aria-hidden="true">${emoji}</span> ${escapeHtml(R(en, fr))}</button>`;
+            return shortcut('Parks', 'Parcs', '🌳', 'parks') +
+              shortcut('Dog beaches', 'Plages pour chiens', '🐾', 'dog beaches') +
+              shortcut('Hiking trails', 'Sentiers de randonnée', '🥾', 'hiking trails') +
+              shortcut('Skateparks', 'Parcs de planche à roulettes', '🛹', 'skateparks') +
+              shortcut('Beaches & swimming', 'Plages et baignade', '🏖️') +
+              shortcut('Playgrounds', 'Aires de jeux', '🛝') +
+              shortcut('Scenic viewpoints', 'Belvédères', '📸') +
+              `<details class="rn-more-activities">
+                <summary>${R('More things to do','Plus d’activités')}</summary>
+                <div class="rn-more-activity-options">
+                  ${shortcut('Museums & galleries', 'Musées et galeries', '🖼️')}
+                  ${shortcut('Indoor play', 'Jeux intérieurs', '🧸')}
+                  ${shortcut('Bike parks & pump tracks', 'Parcs à vélo et pistes à bosses', '🚲')}
+                  ${shortcut('Disc golf', 'Disque golf', '🥏')}
+                  ${shortcut('Ski & snow', 'Ski et neige', '🎿')}
+                </div>
+              </details>`;
+          })()}
         </div>
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>

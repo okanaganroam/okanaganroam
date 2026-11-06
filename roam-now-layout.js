@@ -194,6 +194,19 @@ body.pm-app-page .rn-outdoor-shortcuts .pm-chip {
   display: inline-flex;
   background: #e6eee3;
 }
+body.pm-app-page .rn-more-activities { flex-basis: 100%; }
+body.pm-app-page .rn-more-activities summary {
+  cursor: pointer;
+  min-height: 44px;
+  line-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+}
+body.pm-app-page .rn-more-activity-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 body.pm-app-page .rn-event-copy,
 body.pm-app-page .rn-events-mode .rn-place-copy { display: none; }
 body.pm-app-page .rn-events-mode .rn-event-copy { display: block; }
