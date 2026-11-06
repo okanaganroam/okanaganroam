@@ -38,7 +38,9 @@ function summarize(db, now = new Date()) {
   const has = (t) => tableExists(db, t);
 
   const metrics = [];
-  const add = (key, label, fn) => { const v = both(fn); metrics.push({ key, label, cur: v.cur, prev: v.prev }); };
+  // recent: the last 7 days including today, for counters too new to have a complete week behind them.
+  const recentFrom = dayOf(new Date(now.getTime() - 6 * 86400000)); const today = dayOf(now);
+  const add = (key, label, fn) => { const v = both(fn); metrics.push({ key, label, cur: v.cur, prev: v.prev, recent: fn(recentFrom, today) }); };
 
   if (has('venue_event_counts')) {
     add('views', 'Business page views', (a, b) => one("SELECT SUM(n) FROM venue_event_counts WHERE name = 'venue_view' AND day BETWEEN ? AND ?", a, b));

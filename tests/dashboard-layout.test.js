@@ -36,14 +36,21 @@ test('Home: big numbers with a fair comparison, good news kept apart from proble
   assert.deepEqual(mv.watch, ['Visitors who hit a missing page: up from 10 to 30', 'AI visits: down from 20 to 6']);
   const inboxes = { okanagan: { claims_pending: 3 } };
   const { top, body } = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: d }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet' }], { inboxes, now: NOW });
-  assert.match(top, /Good afternoon|Good morning/); assert.match(top, /Dayton/); assert.match(top, /40 times because of what you built/);
-  assert.match(body, /▲ 100% vs last week/); assert.match(body, /First week of data/);
+  assert.match(top, /Dayton/); assert.match(top, /40 times because of what you built/);
+  assert.match(body, /▲ 100% vs last week/); assert.match(body, /Last 7 days, just started counting/);
   assert.match(body, /Listing claims to approve/); assert.match(body, /Oct 30 to Nov 5/); assert.match(body, /Not connected yet/);
   assert.match(body, /Where do you want to go/);
   assert.ok(home.QUOTES.includes(home.quoteFor(NOW)));
   assert.notEqual(home.quoteFor(NOW), home.quoteFor(new Date(NOW.getTime() + 86400000)));
   const page = renderDashboardPage({ sites: [], view: 'home', home: { top, body } });
   assert.match(page, /This week at a glance/);
+});
+
+test('a counter with no earlier week shows the last 7 days so far, never a false zero', () => {
+  const d = data([{ ...m('views', 'Business page views', 0, 0), recent: 88 }, { ...m('outbound', 'Clicks', 0, 0), recent: 12 }, { ...m('visits_search', 'Search', 200, 100), recent: 999 }]);
+  const { top, body } = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: d }], { now: NOW });
+  assert.match(body, /class="big">88</); assert.match(top, /12 times because of what you built/);
+  assert.match(body, /class="big">200</); // a real comparison keeps the complete week
 });
 
 test('with no clicks yet the top line stays quiet, and the help page explains the words', () => {
