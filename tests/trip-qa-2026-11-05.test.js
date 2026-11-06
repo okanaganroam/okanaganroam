@@ -355,3 +355,13 @@ test('"10 girls" is a head count, not an unknown place word', () => {
   const p = app.runTripPlan({ text: 'bachelorette weekend in Kelowna, 10 girls, wineries' });
   assert.ok(!(p.unsupported || []).includes('girls'));
 });
+
+test('golf wording ("4 players", "one round", "foursome") and "a round of drinks" leave no stray words', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['guys golf trip to Vernon, 4 players, one round and beers after', 'a round of drinks in Kelowna']) {
+    const p = app.runTripPlan({ text });
+    const said = JSON.stringify([p.summary, p.warnings, p.unsupported]);
+    assert.ok(!/\bround\b|\bplayers\b/i.test(said), text + ' -> ' + said);
+  }
+});
