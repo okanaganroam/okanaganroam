@@ -176,3 +176,26 @@ test('"for my sister\'s wedding" and "we have the Friday free" are not search wo
   assert.deepEqual(leftovers(i), []);
   assert.deepEqual(i.when, { weekday: 'friday' });
 });
+
+test('holiday weekends are the dates of that long weekend', () => {
+  const now = new Date('2026-11-05T12:00:00Z');
+  assert.match(d.holidayWeekendDates('thanksgiving', now), /october 9 to october 11 2027/);
+  assert.match(d.holidayWeekendDates('canada day', now), /july 1 to july 4 2027/);
+  assert.match(d.holidayWeekendDates('easter', now), /march 27 to march 29 2027/);
+  assert.equal(d.holidayWeekendDates('nonsense', now), null);
+});
+
+test('Server: "Canada Day weekend in Penticton" plans the four days of that break', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'Canada Day weekend in Penticton' });
+  assert.equal(p.kind, 'multi_day');
+  assert.equal(p.days.length, 4);
+});
+
+test('"remote worker", "solo", "bachelor party" and "cold and rainy" are not search words', () => {
+  for (const text of ['remote worker, 5 days in Vernon, a good cafe to work from', 'solo trip to Kelowna, 2 days, good coffee', 'bachelor party in Penticton, 3 days', 'cold and rainy weekend in Kelowna']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i), [], text + ' -> ' + JSON.stringify(leftovers(i)));
+  }
+});

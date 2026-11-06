@@ -86,6 +86,43 @@ function normalizeDiscoveryText(text) {
 // Only on the visitor's own words, after an exact venue-name match, so "Kelowna Airport" the venue still resolves.
 const ORIGIN_PLACES = require('./vocabulary.js').sharedList('originPlaces').map((p) => normalizeDiscoveryText(String(p))).filter(Boolean).sort((a, b) => b.length - a.length);
 const ORIGIN_RE = ORIGIN_PLACES.length ? new RegExp(`\\bfrom (?:the )?(?:${ORIGIN_PLACES.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g') : null;
+
+// Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
+function holidayWeekendDates(name, now = new Date()) {
+  const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const nthMonday = (y, m, n) => { const d = new Date(Date.UTC(y, m, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7) + (n - 1) * 7); return d; };
+  const easter = (y) => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451); const mo = Math.floor((h + l - 7 * m + 114) / 31) - 1, da = ((h + l - 7 * m + 114) % 31) + 1; return new Date(Date.UTC(y, mo, da)); };
+  const monday = (y) => {
+    switch (name) {
+      case 'thanksgiving': return nthMonday(y, 9, 2);
+      case 'labour day': case 'labor day': return nthMonday(y, 8, 1);
+      case 'family day': return nthMonday(y, 1, 3);
+      case 'victoria day': { const d = new Date(Date.UTC(y, 4, 24)); d.setUTCDate(24 - ((d.getUTCDay() + 6) % 7)); return d; }
+      case 'easter': { const d = easter(y); d.setUTCDate(d.getUTCDate() + 1); return d; }
+      case 'remembrance day': return new Date(Date.UTC(y, 10, 11));
+      case 'canada day': return new Date(Date.UTC(y, 6, 1));
+      default: return null;
+    }
+  };
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  for (const y of [now.getUTCFullYear(), now.getUTCFullYear() + 1]) {
+    const mon = monday(y);
+    if (!mon) return null;
+    if (mon.getTime() < today) continue;
+    // Monday holidays run Saturday to Monday. Canada Day is July 1 and the days that make a break of it (at most four).
+    const start = new Date(mon), end = new Date(mon);
+    if (name === 'canada day') {
+      const w = mon.getUTCDay();
+      if (w === 6) end.setUTCDate(end.getUTCDate() + 2);
+      else if (w === 0) end.setUTCDate(end.getUTCDate() + 1);
+      else if (w === 1) start.setUTCDate(start.getUTCDate() - 2);
+      else end.setUTCDate(end.getUTCDate() + Math.min(3, 7 - w));
+    } else start.setUTCDate(start.getUTCDate() - 2);
+    const f = (d) => `${M[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    return ` ${f(start)} to ${f(end)} ${start.getUTCFullYear()} `;
+  }
+  return null;
+}
 function stripTravelNoise(normalized) {
   let s = ` ${normalized} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
@@ -131,6 +168,11 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?|hopping|trail)\b/g, ' brewery crawl ').replace(/\b(?:cider|cidery) (?:tours?|trail)\b/g, ' cidery crawl ').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) (?:tours?|trail)\b/g, ' distillery crawl ');
   // "for my sister's wedding" is why they are here; "we have the Friday free" is a day, not a search word.
   s = s.replace(/\bfor (?:my |our |a |the )?(?:\w+s )?wedding\b/g, ' ').replace(/\b(?:have|got) (?:the |a )?(\w+day|weekend|afternoon|morning|evening|day) free\b/g, ' on $1 ');
+  // Notes about the person, not places: "remote worker", "solo", "riding", "cold and rainy", "first week of", "bachelor party".
+  s = s.replace(/\b(?:remote|digital nomad|freelance) (?:workers?|work|working)\b/g, ' ').replace(/\bsolo\b/g, ' ').replace(/\b(?:bachelor|bachelorette|stag|stagette|hen) (?:party|parties|weekend|trip|do)\b/g, ' celebration ');
+  s = s.replace(/\b(?:we )?(?:need|want) (?:to )?(?:go )?riding\b|\briding the\b/g, ' ').replace(/\bcold and (?=rainy|wet)/g, ' ').replace(/\b(?:the )?(?:first|second|third|last) week of\b/g, 'in');
+  // Holiday weekends become the dates of that long weekend (the next one coming).
+  s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
@@ -2077,6 +2119,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  holidayWeekendDates,
   OUTSIDE_PLACE_NAMES: Object.values(OUTSIDE_PLACES),
   DISCOVERY_INTENT_VERSION,
   DISCOVERY_NEVER_CORRECT: Object.freeze(Array.from(NEVER_CORRECT)),
