@@ -346,6 +346,63 @@ body.pm-app-page #rnShowResults:hover { background: #284858; }
   body.pm-app-page .rn-results-compact.pm-list-view .pm-quick { display: none; }
   body.pm-app-page .rn-results-compact.pm-list-view .rn-location-help { flex-basis: 100%; margin-top: 0; }
 }
+@media (min-width: 900px) {
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) {
+    padding-block: 16px;
+  }
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-float {
+    width: 51%;
+    max-height: 44%;
+    margin-bottom: 12px;
+    padding: 1px 4px 6px 0;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+  }
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) #okMap {
+    top: 16px;
+    bottom: 16px;
+    box-shadow: 0 6px 18px #253b4315;
+  }
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-locate { top: 30px; }
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-pinbtn { top: 95px; }
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-search-area { top: 30px; }
+  body.pm-app-page .rn-intro { gap: 10px; margin-bottom: 8px; }
+  body.pm-app-page .rn-intro h1 { font-size: clamp(21px, 2vw, 29px); }
+  body.pm-app-page .rn-location { padding: 7px 10px; text-align: left; }
+  body.pm-app-page .rn-location small { font-size: 11px; }
+  body.pm-app-page .pm-searchbar { margin-top: 6px; }
+  body.pm-app-page .pm-search { min-width: 0; }
+  body.pm-app-page .pm-quick { gap: 5px; margin-top: 8px; }
+  body.pm-app-page .pm-quick .pm-chip { min-height: 36px; padding-inline: 9px; }
+  body.pm-app-page .pm-quick [data-pm-kind]:not([aria-pressed="true"]):not([data-pm-kind="drinks"], [data-pm-kind="food"], [data-pm-kind="coffee"], [data-pm-kind="indoor"], [data-pm-kind="do"]),
+  body.pm-app-page .rn-needs-title { display: none; }
+  body.pm-app-page .pm-quick [data-pm-kind="indoor"]:not([aria-pressed="true"]) { background: #e5edf7; }
+  body.pm-app-page .pm-sheet-head { padding: 0 0 8px; }
+  body.pm-app-page .pm-sheet-body { scrollbar-width: thin; }
+  body.pm-app-page .pm-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  body.pm-app-page .pm-item {
+    box-shadow: 0 2px 6px #253b4310;
+    border-radius: 16px;
+  }
+  body.pm-app-page .pm-item-main {
+    display: flow-root;
+    box-sizing: border-box;
+    padding: 11px 12px 8px;
+  }
+  body.pm-app-page .pm-item .rn-photo,
+  body.pm-app-page .pm-item .rn-no-photo {
+    float: right;
+    width: 30%;
+    height: 90px;
+    margin: 0 0 5px 10px;
+    border-radius: 10px;
+  }
+  body.pm-app-page .pm-item .pm-name { display: block; }
+  body.pm-app-page .pm-item .pm-acts { padding-bottom: 10px; }
+}
+@media (min-width: 900px) and (max-height: 680px) {
+  body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-float { max-height: 40%; }
+}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 
