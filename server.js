@@ -19981,7 +19981,7 @@ const MAP_GROUPS = [
   { key: 'outdoor', label: 'Outdoors', types: ['outdoor'] },
   { key: 'golf', label: 'Golf', types: ['golf'] },
   // Shops & Outfitters (2026-10-23) pin with the things to do (same group, so the map's chips and legend are unchanged).
-  { key: 'do', label: 'Tours, sports & indoor', types: ['tour', 'sport', 'indoor', 'shop', 'outdoor', 'beach'] },
+  { key: 'do', label: 'Tours, sports & indoor', types: ['tour', 'sport', 'indoor', 'shop'] },
 ];
 const MAP_GROUP_BY_TYPE = Object.fromEntries(MAP_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 function mapPlaces() {
@@ -22107,7 +22107,7 @@ const MAP_KINDS = [
   { key: 'outdoor', label: 'Outdoors', icon: uiIcon('tree'), types: ['outdoor'] },
   { key: 'golf', label: 'Golf', icon: uiIcon('golf'), types: ['golf'] },
   { key: 'indoor', label: 'Indoor things to do', icon: '<span aria-hidden="true">🌧️</span>', types: ['indoor'] },
-  { key: 'do', label: 'Things to do', icon: uiIcon('target'), types: ['tour', 'sport', 'indoor', 'shop'] },
+  { key: 'do', label: 'Things to do', icon: uiIcon('target'), types: ['tour', 'sport', 'indoor', 'shop', 'outdoor', 'beach'] },
 ];
 const MAP_MUST_HAVES = [
   { key: 'patio', label: 'Patio', icon: uiIcon('sun') }, { key: 'dogs', label: 'Dogs OK', icon: uiIcon('paw') },
