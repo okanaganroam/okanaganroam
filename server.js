@@ -20394,7 +20394,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     $('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();
   }
   function cancelPendingLocation(){if(!me){watching=false;stopWatch();nearBtn.classList.remove('is-finding');nearBtn.setAttribute('aria-pressed','false');nearLabel.textContent=T.nearMe;}}
-  function chooseMapPoint(){cancelPendingLocation();closePanel();$('rnLocationHelp').hidden=true;roamView('map');setPinMode(true);}
+  function chooseMapPoint(){
+    cancelPendingLocation();
+    closePanel();
+    $('rnLocationHelp').hidden = true;
+    roamView('map');
+    setPinMode(true);
+    if (pendingRoute) setStatus('');
+  }
   function roamView(view){
     if (typeof route !== 'undefined' && route && view === 'list') return;
     stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
@@ -20403,11 +20410,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   $('rnList').addEventListener('click',function(){roamView('list')});
   $('rnMap').addEventListener('click',function(){roamView('map')});
-  $('rnLocation').addEventListener('click',function(){openPanel();$('pmTown').focus()});
+  var choosingTown = false;
+  function openTownPicker(){
+    openPanel();
+    choosingTown = true;
+    $('pmTown').focus();
+  }
+  $('rnLocation').addEventListener('click',openTownPicker);
   $('rnClear').addEventListener('click',clearAll);
   $('rnUseLocation').addEventListener('click',function(){town='';syncChips();closePanel();nearBtn.click()});
   $('rnRetryLocation').addEventListener('click',function(){nearBtn.click()});
-  $('rnChooseTown').addEventListener('click',function(){openPanel();$('pmTown').focus()});
+  $('rnChooseTown').addEventListener('click',openTownPicker);
   $('rnChoosePin').addEventListener('click',chooseMapPoint);
   $('rnPanelPin').addEventListener('click',chooseMapPoint);
   // The map fills the screen below the header.
@@ -20453,7 +20466,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
   function openPanel(){ $('rnBackdrop').hidden=false;panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
-  function closePanel(){ if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
+  function closePanel(){ choosingTown = false; if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
   $('rnApplyFilters').addEventListener('click',closePanel);
@@ -20697,7 +20710,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if(town)countEl.textContent+=(FR?' · À ':' · In ')+CONF.r[town];
     }
     // During directions, only the destination stays on the map.
-    if (typeof route !== 'undefined' && route) onMap = [route.x];
+    if (pendingRoute) onMap = [pendingRoute];
+    else if (route) onMap = [route.x];
     var layers = onMap.map(function(x){ return x.m; }).filter(Boolean);
     // Keyboard (2026-10-19, review pass 5): the pins are rebuilt only when the set on the map changes. Rebuilding them
     // after every pan (a popup's own pan included) closed the popup that had just opened and threw away the focused pin.
@@ -20800,15 +20814,34 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   });
   moreBtn.addEventListener('click', function(){ limit += 25; drawList(); });
   // ---- Directions on our map (Mapbox), when a token is set ----
-  var MB = CONF.mb || '', route = null, pendingRoute = null, routeEl = $('pmRoute');
+  var MB = CONF.mb || '', route = null, pendingRoute = null, routeReturn = null, routeEl = $('pmRoute');
   var MODES = [['walking', T.walk], ['driving', T.drive], ['cycling', T.bike]];
   function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function startRoute(x){
     if (!MB) return false;
-    roamView('map');$('pmSheetBody').scrollTop=0;
+    if (!routeReturn) {
+      routeReturn = {
+        view: stage.classList.contains('pm-map-view') ? 'map' : 'list',
+        scroll: $('pmSheetBody').scrollTop,
+        limit: limit,
+        hadLocation: !!me,
+        radius: radiusKm
+      };
+    }
+    stage.classList.toggle('is-route-origin', !me);
+    $('rnRouteOriginTitle').textContent = T.to + ' ' + x.name;
+    roamView('map');
+    $('pmSheetBody').scrollTop = 0;
     // Asked for during the tap itself (iPhone only allows the compass prompt then).
     if (!me || !me.pin) { startCompass(); unlockVoice(); }
-    if (!me) { pendingRoute = x; showLocationHelp(T.routeNeedsLocation);if (!watching) nearBtn.click();return true; }
+    if (!me) {
+      pendingRoute = x;
+      render(false);
+      map.setView([x.lat, x.lng], 13, { animate: false });
+      showLocationHelp(T.routeNeedsLocation);
+      if (!watching) nearBtn.click();
+      return true;
+    }
     if (route && route.line) map.removeLayer(route.line);
     route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
     map.closePopup();
@@ -20862,12 +20895,28 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     drawNav();
   }
   routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
+  $('rnRouteCancel').addEventListener('click', endRoute);
   function endRoute(){
-    pendingRoute=null;
+    var previous = routeReturn;
+    routeReturn = null;
+    pendingRoute = null;
+    stage.classList.remove('is-route-origin');
+    cancelPendingLocation();
+    setPinMode(false);
+    $('rnLocationHelp').hidden = true;
+    setStatus('');
     if (route && route.line) map.removeLayer(route.line);
     route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass(); hush();
-    // Back from street level to the results around the visitor, with the list half open.
-    drawRoute();roamView('list'); if (me) setSheet('half'); render(true);
+    if (previous && !previous.hadLocation && me && me.pin) {
+      stopLocation();
+      radiusKm = previous.radius;
+      radiusSel.value = String(radiusKm);
+    }
+    if (previous) limit = previous.limit;
+    drawRoute();
+    roamView(previous ? previous.view : 'list');
+    render(true);
+    if (previous) $('pmSheetBody').scrollTop = previous.scroll;
   }
   // ---- Following the visitor along the route ----
   var navbar = $('pmNavbar'), follow = false, wakeLock = null, followZoom = 18, waitingZoom = false;
@@ -21674,7 +21723,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) closePanel(); });
   function setTab(t){
     tab = t; limit = 25;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
@@ -22198,6 +22247,11 @@ ${renderGolfHeaderHtml()}
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
       <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Find places to go and events happening nearby.','Trouvez des lieux à visiter et des événements à proximité.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
+      <div class="rn-route-origin-heading">
+        <h2 id="rnRouteOriginTitle"></h2>
+        <button type="button" id="rnRouteCancel" class="pm-chip">${R('Back to results','Retour aux résultats')}</button>
+      </div>
+      <p class="rn-route-pin-hint">${R('Tap the map to set your starting point.','Touchez la carte pour choisir votre point de départ.')}</p>
       <div class="pm-tabs" role="tablist" aria-label="${R('Explore places or events','Explorer les lieux ou les événements')}">
           <button type="button" role="tab" class="pm-tab" id="pmTabPlaces" aria-selected="true" aria-controls="pmList">Places</button>
           <button type="button" role="tab" class="pm-tab" id="pmTabEvents" aria-selected="false" aria-controls="pmList">Events</button>
@@ -22246,14 +22300,6 @@ ${renderGolfHeaderHtml()}
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
       <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">${R('Close filters','Fermer les filtres')}</button></div>
       <div class="rn-panel-body">
-      <p class="rn-panel-note">${R('Open a section to choose what matters to you. Place filters apply to Places; Events use your town and search.','Ouvrez une section pour choisir vos critères. Les filtres de lieux concernent les lieux; les événements utilisent la ville et la recherche.')}</p>
-      <p class="pm-active" id="pmActive" hidden></p>
-      <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
-      <div class="pm-chips" role="group" aria-label="What are you after?">
-        ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
-      </div>
-      </details>
-      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
       <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
       <div class="pm-panel-row">
         <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
@@ -22264,6 +22310,14 @@ ${renderGolfHeaderHtml()}
           <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select></label>
       </div>
       <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
+      <p class="rn-panel-note">${R('Open a section to choose what matters to you. Place filters apply to Places; Events use your town and search.','Ouvrez une section pour choisir vos critères. Les filtres de lieux concernent les lieux; les événements utilisent la ville et la recherche.')}</p>
+      <p class="pm-active" id="pmActive" hidden></p>
+      <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
+      <div class="pm-chips" role="group" aria-label="What are you after?">
+        ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
+      </div>
+      </details>
+      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
       <h3>What the pins mean</h3>
       <ul class="pm-key" aria-label="What the pins mean">
         ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
