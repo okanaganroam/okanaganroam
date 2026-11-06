@@ -32873,3 +32873,35 @@ test('Storefront spot: the portal offers it, a link upload waits for review, a s
     for (const f of files) { try { require('node:fs').unlinkSync(require('node:path').join(process.env.OWNER_PHOTO_DIR || require('node:path').join(__dirname, '..', '.owner-photos-local'), f)); } catch (e) { /* already gone */ } }
   }
 });
+
+test('Roam Now: a live storefront spot ships with its place and its photo becomes public; a waiting one does neither', async () => {
+  const http = require('node:http'); const fsx = require('node:fs'); const pathx = require('node:path');
+  seasonInsert.run({ name: 'Look For This Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'look-for-this-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'look-for-this-fixture');
+  db.prepare('UPDATE venues SET latitude = 49.8863, longitude = -119.4966 WHERE id = ?').run(v.id);
+  const dir = process.env.OWNER_PHOTO_DIR || pathx.join(__dirname, '..', '.owner-photos-local');
+  fsx.mkdirSync(dir, { recursive: true });
+  const live = 'a1'.repeat(12) + '.jpg'; const wait = 'b2'.repeat(12) + '.jpg';
+  for (const f of [live, wait]) fsx.writeFileSync(pathx.join(dir, f), Buffer.from([0xFF, 0xD8, 0xFF, 0xD9]));
+  const add = db.prepare('INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, ?, ?, ?, ?, ?)');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    add.run(v.id, wait, 'w'.repeat(24), 49.8864, -119.4966, 'pending');
+    assert.equal((await fetch(`${base}/images/arrival/${wait}`)).status, 404);
+    const row = (d) => d.p.find((a) => a[2] === 'Look For This Fixture');
+    add.run(v.id, live, 'l'.repeat(24), 49.8865, -119.4966, 'approved');
+    assert.equal((await fetch(`${base}/images/arrival/${live}`)).status, 200);
+    const page = await (await fetch(`${base}/map`)).text();
+    const src = /\/map\/data\.json\?v=[a-z0-9]+/.exec(page)[0];
+    const place = row(await (await fetch(base + src)).json());
+    assert.deepEqual(place[20], [49.8865, -119.4966, `/images/arrival/${live}`]);
+    assert.match(page, /Look for this/); assert.match(page, /function showLook/);
+    assert.equal(place[0], 49.8863, 'the map pin itself stays where it was');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+    db.prepare('DELETE FROM venue_arrival_points WHERE venue_id = ?').run(v.id);
+    for (const f of [live, wait]) { try { fsx.unlinkSync(pathx.join(dir, f)); } catch (e) { /* gone */ } }
+  }
+});

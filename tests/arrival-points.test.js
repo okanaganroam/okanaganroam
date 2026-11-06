@@ -103,3 +103,17 @@ test('the portal section explains itself and shows what is live or waiting', asy
   await ap.submit({ body: body() }, {}, 'good');
   assert.match(ap.sectionHtml(v, L, esc, 'Okanagan Roam'), /Waiting for us to check it/);
 });
+
+test('Roam Now gets only live spots, with a photo address, and a new spot changes the version', async () => {
+  const db = memDb(); const { ap } = kit(db);
+  assert.equal(ap.forMap().size, 0);
+  await ap.submit({ body: body() }, {}, 'good');
+  assert.equal(ap.forMap().size, 0, 'waiting spots stay off the map');
+  const before = ap.version();
+  await ap.submit({ body: body() }, {}, signedIn(db));
+  const spot = ap.forMap().get(1);
+  assert.equal(spot.length, 3); assert.match(spot[2], /^\/images\/arrival\/file\d+\.jpg$/);
+  assert.notEqual(ap.version(), before);
+  assert.equal(ap.isLive(spot[2].split('/').pop()), true);
+  assert.equal(ap.isLive('nope.jpg'), false);
+});
