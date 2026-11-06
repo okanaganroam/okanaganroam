@@ -39,7 +39,12 @@ const AI_SOURCES = new Set(AI_HOSTS.map((h) => h[1]));
 const hostMatches = (host, suffix) => (suffix.endsWith('.') ? (`.${host}.`).includes(`.${suffix}`) : host === suffix || host.endsWith(`.${suffix}`));
 
 // { group: 'ai'|'search'|'social'|'other', source } for a visit that arrived from elsewhere, or null (direct, or from us).
-function classifyVisit(referer, utmSource) {
+function classifyVisit(referer, utmSource, utmMedium, utmCampaign) {
+  // A link in one of our own emails (utm_medium=email): counted by campaign name, whatever the referrer says (mail apps send none).
+  if (String(utmMedium || '').toLowerCase() === 'email') {
+    const camp = String(utmCampaign || utmSource || 'email').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40) || 'email';
+    return { group: 'email', source: camp };
+  }
   const utm = String(utmSource || '').toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 40);
   if (utm) {
     for (const [h, name] of AI_HOSTS) if (utm === h || utm === h.split('.')[0]) return { group: 'ai', source: name };
@@ -62,6 +67,8 @@ const pageOf = (url) => {
   const p = String(url || '').split(/[?#]/)[0];
   return /^\/[A-Za-z0-9._~\/%-]{0,118}$/.test(p) ? p.replace(/(.)\/$/, '$1') : null;
 };
+// Private pages an email can point to; the address holds a secret, so only the kind of page is kept.
+const privatePage = (p) => (/^\/(?:fr\/)?owner\/[A-Za-z0-9_-]{12,}/.test(p) ? '/owner/(emailed edit link)' : /^\/(?:fr\/)?claim\//.test(p) ? '/claim/(claim page)' : null);
 const SKIP = /^\/(?:api|admin|owner|claim|images|styles|scripts|healthz|share|fonts|assets)(?:\/|$)|\.(?:js|css|png|jpe?g|webp|gif|svg|ico|json|xml|txt|webmanifest|woff2?|mp4|pdf)$/i;
 
 function createReferralCounter(db) {
@@ -73,8 +80,11 @@ function createReferralCounter(db) {
   function watch(req, res, ip, now = () => new Date()) {
     if (req.method !== 'GET') return;
     const u = String(req.url || '');
-    const page = pageOf(u);
-    if (!page || SKIP.test(page)) return;
+    let utmMedium = null; let utmCampaign = null; let utmSource0 = null;
+    try { const q = new URL(u, 'http://x').searchParams; utmMedium = q.get('utm_medium'); utmCampaign = q.get('utm_campaign'); utmSource0 = q.get('utm_source'); } catch (e) { /* ignore */ }
+    const isEmail = String(utmMedium || '').toLowerCase() === 'email';
+    const page = (isEmail && privatePage(String(u).split(/[?#]/)[0])) || pageOf(u);
+    if (!page || (SKIP.test(page) && !(isEmail && privatePage(String(u).split(/[?#]/)[0])))) return;
     res.on('finish', () => {
       try {
         if (res.statusCode !== 200 || !/content-type:\s*text\/html/i.test(`content-type: ${res.getHeader('Content-Type') || ''}\n${res._header || ''}`) || !demandEnabled()) return;
@@ -82,8 +92,7 @@ function createReferralCounter(db) {
         const agent = classifyAgent(req.headers['user-agent']);
         if (agent) { if (!rateLimited(ip)) bump(day, agent.kind, agent.source, agent.kind === 'ai_fetch' ? page : ''); return; }
         if (isBot(req) || isInternal(req) || rateLimited(ip)) return;
-        let utm = null; try { utm = new URL(u, 'http://x').searchParams.get('utm_source'); } catch (e) { /* ignore */ }
-        const v = classifyVisit(req.headers.referer || req.headers.referrer, utm);
+        const v = classifyVisit(req.headers.referer || req.headers.referrer, utmSource0, utmMedium, utmCampaign);
         if (!v) return;
         let source = v.source;
         if (v.group === 'other') {
@@ -100,9 +109,9 @@ function createReferralCounter(db) {
     days = [7, 30, 90].includes(Number(days)) ? Number(days) : 30;
     const list = []; for (let i = days - 1; i >= 0; i -= 1) list.push(dayOf(new Date(now.getTime() - i * 86400000)));
     const rows = db.prepare('SELECT day, kind, source, page, n FROM referral_counts WHERE day >= ?').all(list[0]);
-    const sources = new Map(); const landing = { ai: new Map(), search: new Map(), social: new Map(), other: new Map() };
-    const fetched = new Map(); const crawls = new Map(); const perDay = { ai: new Map(), search: new Map() };
-    const totals = { ai: 0, search: 0, social: 0, other: 0 };
+    const sources = new Map(); const landing = { ai: new Map(), search: new Map(), social: new Map(), other: new Map(), email: new Map() };
+    const fetched = new Map(); const crawls = new Map(); const perDay = { ai: new Map(), search: new Map(), email: new Map() };
+    const totals = { ai: 0, search: 0, social: 0, other: 0, email: 0 };
     for (const r of rows) {
       if (r.kind === 'visit') {
         const [group, source] = r.source.split(':');
@@ -120,7 +129,8 @@ function createReferralCounter(db) {
       days, since: list[0], counting_since: first || null, totals,
       sources: top(sources, 60).map(([k, n]) => { const [group, source] = k.split(':'); return { group, source, n }; }),
       landing_ai: top(landing.ai, 40).map(split), landing_search: top(landing.search, 40).map(split),
-      landing_social: top(landing.social, 20).map(split), landing_other: top(landing.other, 20).map(split),
+      landing_social: top(landing.social, 20).map(split), landing_other: top(landing.other, 20).map(split), landing_email: top(landing.email, 40).map(split),
+      email_per_day: list.map((day) => ({ day, n: perDay.email.get(day) || 0 })),
       ai_fetched: top(fetched, 40).map(split),
       crawlers: top(crawls, 30).map(([source, n]) => ({ source, n, ai: AI_SOURCES.has(source) })),
       ai_per_day: list.map((day) => ({ day, n: perDay.ai.get(day) || 0 })),

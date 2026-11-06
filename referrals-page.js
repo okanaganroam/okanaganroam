@@ -9,7 +9,7 @@ const NAMES = {
   facebook: 'Facebook', instagram: 'Instagram', x_twitter: 'X / Twitter', pinterest: 'Pinterest', reddit: 'Reddit', tiktok: 'TikTok', youtube: 'YouTube', linkedin: 'LinkedIn',
   bytedance: 'ByteDance', common_crawl: 'Common Crawl', amazon: 'Amazon', apple: 'Apple', googlebot: 'Googlebot', bingbot: 'Bingbot', duckduckbot: 'DuckDuckBot', yandexbot: 'YandexBot', cohere: 'Cohere', other_sites: 'Other sites (many)',
 };
-const GROUPS = { ai: 'AI assistants', search: 'Search engines', social: 'Social', other: 'Other sites' };
+const GROUPS = { ai: 'AI assistants', search: 'Search engines', social: 'Social', email: 'Our emails (campaign)', other: 'Other sites' };
 const name = (s) => NAMES[s] || s;
 const pageLink = (p) => `<a href="${esc(p)}" target="_blank" rel="noopener">${esc(p)}</a>`;
 
@@ -30,7 +30,7 @@ function siteCard(g, days) {
   const bySource = (grp) => d.sources.filter((s) => s.group === grp);
   const landing = (list) => table(['Source', 'Page they landed on', 'Visits'], list.map((r) => [esc(name(r.source)), pageLink(r.page), `<b>${num(r.n)}</b>`]));
   return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card">
-    <div class="stats">${stat(tot.ai, 'from AI assistants')}${stat(tot.search, 'from search engines')}${stat(tot.social, 'from social')}${stat(tot.other, 'from other sites')}</div>
+    <div class="stats">${stat(tot.ai, 'from AI assistants')}${stat(tot.search, 'from search engines')}${stat(tot.social, 'from social')}${stat(tot.email, 'from our emails')}${stat(tot.other, 'from other sites')}</div>
     ${bars(d.ai_per_day, 'Visits from AI assistants per day')}${bars(d.search_per_day, 'Visits from search engines per day')}
     <h4>Where visitors came from</h4>
     ${table(['Type', 'Source', 'Visits'], Object.keys(GROUPS).flatMap((grp) => bySource(grp).map((s) => [esc(GROUPS[grp]), esc(name(s.source)), `<b>${num(s.n)}</b>`])))}
