@@ -53105,12 +53105,13 @@ ${renderGolfHeaderHtml()}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${tile('more', '&#11088;', L('Features, prices and deals', 'Caractéristiques, prix et spéciaux'), L('Dog friendly, patio, happy hour…', 'Chiens admis, terrasse, happy hour…'))}
+          ${showHappyHour ? tile('happy', '&#127867;', L('Happy hour', 'Happy hour'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${tile('more', '&#11088;', L('Features, prices and deals', 'Caractéristiques, prix et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
       </section>
-      <div class="op-taskbar" id="opTaskBar" data-task="hours photos arrival video events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
-      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos arrival video events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
+      <div class="op-taskbar" id="opTaskBar" data-task="hours photos arrival video events contact happy more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
+      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos arrival video events contact happy more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
       })()}
       <div data-task="all">
       ${instantOn
@@ -53222,7 +53223,7 @@ ${renderGolfHeaderHtml()}
       </div></div>
       </details>`}
       ${showHappyHour ? `
-      <details class="op-fold op-sec" id="happy" data-task="more">
+      <details class="op-fold op-sec" id="happy" data-task="happy more">
       <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? L(`Set for ${n} day${n === 1 ? '' : 's'}`, `Indiqué pour ${n} jour${n === 1 ? '' : 's'}`) : L('Not set', 'Non indiqué'); })()}</span></summary>
       <p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
@@ -53252,18 +53253,18 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
 
-      <p class="lyv-section-label" data-task="hours contact more all">${L('Anything else?', 'Autre chose?')}</p>
-      <div class="form-row" data-task="hours contact more all">
+      <p class="lyv-section-label" data-task="hours contact happy more all">${L('Anything else?', 'Autre chose?')}</p>
+      <div class="form-row" data-task="hours contact happy more all">
         <div class="form-field"><label for="opName">${L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
-      <div class="form-row full" data-task="hours contact more all"><div class="form-field">
+      <div class="form-row full" data-task="hours contact happy more all"><div class="form-field">
         <label for="opNote">${L('Note for us (optional)', 'Note pour nous (facultatif)')}</label>
         <textarea id="opNote" rows="3" maxlength="1000" placeholder="${L('Seasonal closures, new menu, anything we should know.', 'Fermetures saisonnières, nouveau menu, tout ce que nous devrions savoir.')}"></textarea>
       </div></div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="opSubmit" data-task="hours contact more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
+      <button type="submit" class="venue-form-submit" id="opSubmit" data-task="hours contact happy more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
     </form>
     <div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
       <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>
@@ -53450,7 +53451,7 @@ ${ownerFooterHtml(fr)}
   }
   // Simple view (2026-11-04): start from a short list of tasks; picking one shows only that part of the page.
   // Old links (#photos, #hours, an email that points at a section) and "Show me the full page" open the whole page.
-  var TASK_OF = { hours: 'hours', photos: 'photos', video: 'video', events: 'events', badges: 'more', price: 'more', happy: 'more', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
+  var TASK_OF = { hours: 'hours', photos: 'photos', arrival: 'arrival', video: 'video', events: 'events', badges: 'more', price: 'more', happy: 'happy', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
   function setTask(t){
     document.body.setAttribute('data-op-task', t);
     var fm = document.getElementById('opForm'), dn = document.getElementById('opDone');

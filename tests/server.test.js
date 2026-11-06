@@ -32905,3 +32905,23 @@ test('Roam Now: a live storefront spot ships with its place and its photo become
     for (const f of [live, wait]) { try { fsx.unlinkSync(pathx.join(dir, f)); } catch (e) { /* gone */ } }
   }
 });
+
+test('Portal: places that serve alcohol get a clear Happy hour choice with a Save button; others do not', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Happy Tile Pub', type: 'pub', hours: SEASON_WEEK, slug: 'happy-tile-pub' });
+  seasonInsert.run({ name: 'Happy Tile Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'happy-tile-cafe' });
+  const link = (type, slug) => app.createOwnerLink(app.findVenueBySlug('kelowna', type, slug).id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const pub = await (await fetch(`${base}/owner/${link('pub', 'happy-tile-pub')}`)).text();
+    assert.match(pub, /data-pick="happy"/); assert.match(pub, /Your times and what’s on special/);
+    assert.match(pub, /id="happy" data-task="happy more"/);
+    assert.match(pub, /id="opSubmit" data-task="hours contact happy more all"/);
+    const cafe = await (await fetch(`${base}/owner/${link('cafe', 'happy-tile-cafe')}`)).text();
+    assert.doesNotMatch(cafe, /data-pick="happy"/);
+    assert.doesNotMatch(cafe, /id="happy"/);
+    assert.doesNotMatch(cafe, /Dog friendly, patio, happy hour/);
+  } finally { await new Promise((resolve) => srv.close(resolve)); }
+});
