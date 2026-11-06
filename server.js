@@ -21,6 +21,7 @@ const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
 const pageStats = require('./page-stats').createPageStats(db);
+const emailStats = require('./email-stats').createEmailStats(db);
 const searchTerms = require('./search-terms');
 const searchTermCounter = searchTerms.createSearchTermCounter(db);
 const funnelsReport = require('./funnels').createFunnels(db);
@@ -31,7 +32,7 @@ const seoGoals = require('./seo-goals');
 const whatsChangedPage = require('./whats-changed-page');
 const { renderErrorsPage } = require('./errors-page');
 const { renderFunnelsPage } = require('./funnels-page');
-const { renderPagesPage, renderRoamNowPage, renderEventsPage } = require('./pages-page');
+const { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage } = require('./pages-page');
 const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const gscReport = require('./gsc-report');
@@ -57697,6 +57698,12 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Cache-Control', 'no-store');
       return sendJSON(res, 200, searchTermCounter.report(query.days, query.limit));
     }
+    // Email results (2026-11-06). GET /api/admin/email-stats?days=30. Admin token.
+    if (pathname === '/api/admin/email-stats' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, await emailStats.report(query.days));
+    }
     // Event performance (2026-11-06). GET /api/admin/event-stats?days=30. Admin token.
     if (pathname === '/api/admin/event-stats' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
@@ -57756,9 +57763,9 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, pathname === '/api/admin/roam-now' ? pageStats.roamNow(query.days) : pageStats.pages(query.days));
     }
     // The pages: /admin/dashboard/pages and /admin/dashboard/roam-now (both sites side by side).
-    const pageStatsView = /^\/admin\/dashboard\/(pages|roam-now|events)\/?$/.exec(pathname);
+    const pageStatsView = /^\/admin\/dashboard\/(pages|roam-now|events|email)\/?$/.exec(pathname);
     if (pageStatsView && (method === 'GET' || method === 'HEAD')) {
-      const view = { pages: { label: 'Guides and pages', api: 'page-stats', own: (d) => pageStats.pages(d), render: renderPagesPage }, 'roam-now': { label: 'Roam Now detail', api: 'roam-now', own: (d) => pageStats.roamNow(d), render: renderRoamNowPage }, events: { label: 'Event performance', api: 'event-stats', own: (d) => venueActivityCounter.eventStats(d), render: renderEventsPage } }[pageStatsView[1]];
+      const view = { pages: { label: 'Guides and pages', api: 'page-stats', own: (d) => pageStats.pages(d), render: renderPagesPage }, 'roam-now': { label: 'Roam Now detail', api: 'roam-now', own: (d) => pageStats.roamNow(d), render: renderRoamNowPage }, events: { label: 'Event performance', api: 'event-stats', own: (d) => venueActivityCounter.eventStats(d), render: renderEventsPage }, email: { label: 'Email results', api: 'email-stats', own: (d) => emailStats.report(d), render: renderEmailPage } }[pageStatsView[1]];
       const { label } = view;
       const signedIn = adminSessionValid(req);
       res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
@@ -57776,7 +57783,7 @@ const server = http.createServer(async (req, res) => {
             : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have this report yet.' : `Whistler Roam answered ${r.status}.` };
         } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
       }
-      const own = { key: 'okanagan', name: 'Okanagan Roam', data: view.own(days) };
+      const own = { key: 'okanagan', name: 'Okanagan Roam', data: await view.own(days) };
       return res.end(view.render({ days, sites: [own, whistler] }));
     }
     // Funnels (2026-11-06). GET /api/admin/funnels?days=30 -> Build My Trip steps and the claim / portal funnel. Admin token.

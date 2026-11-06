@@ -1,6 +1,6 @@
 'use strict';
 // Owner dashboard: guide and page performance, and Roam Now detail, both sites side by side.
-const { esc, num, stat, table, STYLE } = require('./dashboard-page');
+const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
 
 const TYPES = { home: 'Home', tool: 'Tool', list: 'List', guide: 'Guide', category: 'Category', town: 'Town or topic' };
 const FILTERS = {
@@ -89,4 +89,33 @@ function renderEventsPage({ days = 30, sites = [] }) {
   return shell('Event performance', 'Which What’s On events get opened, what people do on them, and which coming events nobody has found.', range('/admin/dashboard/events', days), sites.map((g) => eventsCol(g, days)).join(''));
 }
 
-module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage };
+function emailCol(g, days) {
+  if (!g.data) return errorCol(g);
+  const d = g.data; const t = d.totals;
+  const clicks = `<h4>Visits from our tagged email links <small>counted on our own site, by campaign</small></h4>
+    ${table(['Campaign', 'Visits'], (d.campaigns || []).map((c) => [esc(c.campaign), `<b>${num(c.visits)}</b>`]))}`;
+  if (!d.connected) return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card"><p class="empty">${esc(d.error || 'Not connected.')}</p>${clicks}</div></section>`;
+  return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card">
+    ${(d.warnings || []).map((w) => `<p><b>${esc(w)}</b></p>`).join('')}
+    <div class="stats">${stat(t.sent, 'sent')}${stat(t.delivered, `delivered (${pct(t.delivered_rate)})`)}${stat(t.hard_bounces + t.soft_bounces, `bounced (${pct(t.bounce_rate)})`)}${stat(t.complaints, `spam complaints (${pct(t.complaint_rate)})`)}</div>
+    ${bars(d.per_day, 'Emails sent per day')}
+    <h4>The detail</h4>
+    ${table(['What', 'Emails', 'Share'], [
+    ['Opened, at least once <small>rough guide only</small>', num(t.openers), pct(t.open_rate)],
+    ['Clicked a link', num(t.clickers), pct(t.click_rate)],
+    ['Hard bounce <small>address does not work</small>', num(t.hard_bounces), ''],
+    ['Soft bounce <small>temporary, such as a full mailbox</small>', num(t.soft_bounces), ''],
+    ['Blocked by Brevo', num(t.blocked), ''],
+    ['Invalid address', num(t.invalid), ''],
+    ['Unsubscribed through Brevo', num(t.unsubscribed), ''],
+  ])}
+    ${clicks}
+    <p class="empty">Covers everything sent through this Brevo account: site emails and mail sent from Gmail as info@. "Delivered" means the receiving server accepted it, which can still mean the spam folder. Open counts are unreliable: Apple Mail can load the image without anyone reading, and some apps block it. Nobody can see inbox or spam placement, deleted mail or ignored mail. Replies stay in Gmail and are not counted here.</p>
+  </div></section>`;
+}
+
+function renderEmailPage({ days = 30, sites = [] }) {
+  return shell('Email results', 'What happened to the email we sent: delivered, bounced, complaints, and visits from tagged links.', range('/admin/dashboard/email', days), sites.map((g) => emailCol(g, days)).join(''));
+}
+
+module.exports = { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage };
