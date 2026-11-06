@@ -21,6 +21,7 @@
 const hoursModule = require('./hours.js');
 const tripRequirements = require('./trip-requirements');
 const tripStory = require('./trip-story');
+const { tripStopPrice } = require('./trip-stop-prices');
 
 const PLAN_DAYPARTS = {
   relaxed: ['morning', 'afternoon', 'evening'],
@@ -953,8 +954,10 @@ function why(reasons) {
 // Collections a stop card may name, and how (Build My Trip V3).
 const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
 function publicVenue(v, ctx) {
+  const cost = tripStopPrice(v.url);
   return {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
+    ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
