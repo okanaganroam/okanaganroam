@@ -162,8 +162,12 @@ function createArrivalPoints(deps) {
     return { status: 400, body: { error: 'Unknown action.' } };
   }
 
+  // Live spots for Roam Now: venue id -> [lat, lng, photo address].
+  const forMap = () => new Map(db.prepare("SELECT venue_id, lat, lng, file FROM venue_arrival_points WHERE status = 'approved'").all().map((r) => [r.venue_id, [Math.round(r.lat * 1e6) / 1e6, Math.round(r.lng * 1e6) / 1e6, `/images/arrival/${r.file}`]]));
+  const version = () => { const r = db.prepare("SELECT COUNT(*) AS n, MAX(id) AS i FROM venue_arrival_points WHERE status = 'approved'").get(); return `${r.n}.${r.i}`; };
+  const isLive = (file) => !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE file = ? AND status = 'approved'").get(file);
   const previewFile = (key) => { const r = db.prepare("SELECT file FROM venue_arrival_points WHERE preview_key = ? AND status IN ('pending', 'approved')").get(key); return r ? r.file : null; };
-  return { submit, sectionHtml, pending, cardHtml, action, previewFile, latest };
+  return { submit, sectionHtml, pending, cardHtml, action, previewFile, latest, forMap, version, isLive };
 }
 
 module.exports = { LIMITS, distanceMeters, decide, createArrivalPoints };

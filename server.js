@@ -20145,6 +20145,10 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-steps li small { display: block; opacity: 0.65; font-size: 0.8rem; }
   body.map-page .pm-steps li.is-now { background: rgba(29,78,216,0.1); font-weight: 800; }
   body.map-page .pm-steps li.is-done { opacity: 0.45; }
+  body.map-page .rn-look-pre { margin: 10px 0 4px; } body.map-page .rn-look-pre img { display: block; width: 100%; max-height: 170px; object-fit: cover; border-radius: 12px; } body.map-page .rn-look-pre figcaption { font-size: 0.82rem; margin-top: 4px; opacity: 0.85; }
+  body.map-page .rn-look { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 1200; max-width: 420px; margin: 0 auto; background: #fff; color: #1B2B3A; border-radius: 16px; padding: 12px; box-shadow: 0 10px 30px rgba(27,43,58,0.35); }
+  body.map-page .rn-look[hidden] { display: none; } body.map-page .rn-look h2 { margin: 0 44px 8px 2px; font-size: 1.1rem; } body.map-page .rn-look img { display: block; width: 100%; max-height: 42vh; object-fit: cover; border-radius: 12px; } body.map-page .rn-look small { display: block; margin-top: 6px; }
+  body.map-page .rn-look-x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border: 0; background: transparent; font-size: 1.5rem; line-height: 1; color: inherit; cursor: pointer; }
   body.map-page .pm-route-alt { margin: 10px 0 0; font-size: 0.82rem; opacity: 0.85; }
   body.map-page .pm-key { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; font-size: 0.88rem; }
   body.map-page .pm-key li { display: inline-flex; align-items: center; gap: 5px; }
@@ -20977,6 +20981,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       return true;
     }
     if (route && route.line) map.removeLayer(route.line);
+    if (x.ar) x = Object.assign({}, x, { lat: x.ar.lat, lng: x.ar.lng });
     route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
     map.closePopup();
     render(false);
@@ -21011,11 +21016,20 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function fitRoutePreview(r){
     map.stop();map.invalidateSize({pan:false});fitTo(r.line.getBounds(),17);
   }
+  function showLook(){
+    // Storefront photos (arrival-points.js): "Look for this" appears close to the place, over whatever else is on screen.
+    var r = route, el = $('rnLook'), on = !!(r && r.x.ar && (r.near || r.arrived) && !r.lookClosed);
+    if (!el) { if (!on) return; el = document.createElement('aside'); el.id = 'rnLook'; el.className = 'rn-look'; el.setAttribute('aria-live', 'polite'); stage.appendChild(el); }
+    el.hidden = !on; if (!on || el.getAttribute('data-for') === r.x.ar.img) return;
+    el.setAttribute('data-for', r.x.ar.img);
+    el.innerHTML = '<button type="button" class="rn-look-x" aria-label="' + esc(FR ? 'Fermer' : 'Close') + '">&times;</button><h2>' + esc(FR ? 'Cherchez ceci' : 'Look for this') + '</h2><img src="' + esc(r.x.ar.img) + '" alt="' + esc((FR ? 'Devanture de ' : 'Storefront of ') + r.x.name) + '"><small>' + esc(r.x.name) + (r.mode === 'driving' ? ' · ' + esc(FR ? 'Conducteur : gardez les yeux sur la route.' : 'Driver: keep your eyes on the road.') : '') + '</small>';
+    el.querySelector('button').addEventListener('click', function(){ if (route) route.lookClosed = true; showLook(); });
+  }
   function drawRoute(){
     var r = route;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
     stage.classList.toggle('is-route',!!r);
-    if (!r) { routeEl.innerHTML = ''; drawNav(); return; }
+    if (!r) { routeEl.innerHTML = ''; drawNav(); showLook(); return; }
     var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(r.started ? T.endRoute : (FR ? 'Retour aux résultats' : 'Back to results')) + '</button></div>';
     html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
     if (r.arrived) html += '<p class="pm-route-sum is-arrived">' + esc(T.arrived) + '</p>';
@@ -21030,9 +21044,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
 
     }
+    if (x.ar && !r.started && !r.arrived) html += '<figure class="rn-look-pre"><img src="' + esc(x.ar.img) + '" alt="" loading="lazy"><figcaption>' + esc(FR ? 'Ce que vous cherchez à l’arrivée' : 'What to look for when you get there') + '</figcaption></figure>';
     html += '<p class="pm-route-alt"><a ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
     drawNav();
+    showLook();
   }
   routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
   routeEl.addEventListener('click', function(e){
@@ -21192,6 +21208,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // As the visitor moves: the next step lights up, arriving is announced, and leaving the route plans it again.
   function followRoute(){
     var r = route; if (!r || !r.data || !me || r.arrived) return;
+    if (r.x.ar && !r.near && distKm(me.lat, me.lng, r.x.ar.lat, r.x.ar.lng) < 0.3) { r.near = true; showLook(); }
     if (distKm(me.lat, me.lng, r.x.lat, r.x.lng) < 0.03) { r.arrived = true; drawRoute(); track('map_arrived', { mode: r.mode }); return; }
     var next = r.steps[r.step + 1];
     if (next && next.maneuver && distKm(me.lat, me.lng, next.maneuver.location[1], next.maneuver.location[0]) < 0.03) { sayTurn(r); r.step++; drawRoute(); }
@@ -21999,6 +22016,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       // Today's specials (2026-10-27): [weekday, English, French?]; their words join the deal search ("wings", "taco tuesday").
       if (a[17] && a[17][1]) { p.spDay = a[17][0]; p.sp = FR && a[17][2] ? a[17][2] : a[17][1]; p.spEn = !!(FR && !a[17][2]); p.dk = (p.dk || ' ') + mapNameKey(a[17].slice(1).join(' ')).slice(1); }
       // Tonight's weekly nights (2026-10-27): [weekday, [[kind, time, every other week, title]]]; their kind words join the deal search.
+      if (a[20]) p.ar = { lat: a[20][0], lng: a[20][1], img: a[20][2] };
       if (a[19] && a[19][1]) { p.wnDay = a[19][0]; p.wn = a[19][1]; p.dk = (p.dk || ' ') + mapNameKey(p.wn.map(function(n){ return (WN_WORDS[n[0]] || '') + ' ' + (n[3] || ''); }).join(' ')).slice(1); }
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
@@ -22075,7 +22093,7 @@ function mapDataVersion(now = new Date()) {
   const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',');
   const visit = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_visit_info').get();
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
@@ -22195,6 +22213,7 @@ function mapFrenchNote(note) {
   return fr && fr !== en ? String(fr).slice(0, 160) : 0;
 }
 function mapPlacesData(now = new Date()) {
+  const arrivalSpots = arrivalPoints.forMap();
   const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
@@ -22260,6 +22279,9 @@ function mapPlacesData(now = new Date()) {
         return x;
       })]);
     }
+    // [20] Storefront spot (arrival-points.js): [lat, lng, photo], only on a place that has one.
+    const spot = arrivalSpots.get(v.id);
+    if (spot) { while (row.length < 20) row.push(0); row.push(spot); }
     return row;
   });
 }
@@ -55174,7 +55196,12 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'image/jpeg', ...cache });
         return res.end(buf);
       }
-      // Storefront photos: private to anyone holding the unguessable link until Roam Now shows them.
+      // Storefront photos: public once live on Roam Now; before that, only through the unguessable link.
+      const al = /^\/images\/arrival\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
+      if (al && method === 'GET') {
+        if (!arrivalPoints.isLive(al[1])) { res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, al[1], { 'Cache-Control': 'public, max-age=86400' });
+      }
       const ap = /^\/owner-photos\/arrival\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
       if (ap && method === 'GET') {
         const file = arrivalPoints.previewFile(ap[1]);
