@@ -2,6 +2,7 @@
 // The dashboard's Home page, and the Monday email (HTML + plain text).
 const { esc, num } = require('./dashboard-page');
 const { NAV } = require('./dashboard-layout');
+const { todayLesson, milestonesHtml } = require('./dashboard-learn');
 
 const arrow = (m) => (m.cur === m.prev ? '–' : m.cur > m.prev ? '▲' : '▼');
 const label = (r) => `${r.start} to ${r.end}`;
@@ -75,7 +76,7 @@ const shownValue = (m) => (m.prev ? m.cur : Math.max(m.cur, m.recent || 0));
 
 // The change against last week as a small label. With nothing last week there is nothing fair to compare.
 function chip(m) {
-  if (!m.prev) return '<span class="chip">Last 7 days, just started counting</span>';
+  if (!m.prev) return '<span class="chip">Last 7 days so far</span>';
   if (m.cur === m.prev) return '<span class="chip">Same as last week</span>';
   const up = m.cur > m.prev; const pct = Math.round((Math.abs(m.cur - m.prev) / m.prev) * 100);
   return `<span class="chip ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${pct}% vs last week</span>`;
@@ -111,12 +112,23 @@ function todoHtml(inbox) {
   return `<div class="card"><h3>Waiting on you</h3>${rows.length ? `<ul class="list">${rows.map((r) => `<li><a class="todo" href="/admin/review"><span>${esc(r[0])}</span><b>${num(r[1])}</b></a></li>`).join('')}</ul>` : '<p class="empty">All clear. Nothing needs you right now.</p>'}</div>`;
 }
 
+// One clear job for the week, taken from this site's real numbers.
+function mission(d, inbox) {
+  const L = d.lists || {}; const waiting = inbox ? (inbox.venue_submissions_pending || 0) + (inbox.event_submissions_pending || 0) + (inbox.claims_pending || 0) + (inbox.visitor_contributions_pending || 0) : 0;
+  if (L.broken_pages && L.broken_pages[0]) return { d: `Fix a dead end: ${L.broken_pages[0].path}`, href: '/admin/dashboard/errors', go: 'See broken pages' };
+  if (L.no_results && L.no_results[0]) return { d: `People want “${L.no_results[0].term}”. Can you add it?`, href: '/admin/dashboard/searches', go: 'See searches' };
+  if (waiting) return { d: `${num(waiting)} ${waiting === 1 ? 'item needs' : 'items need'} your approval`, href: '/admin/review', go: 'Open review inbox' };
+  return { d: 'Find a guide that gets opened but sends nobody on, and add a link to a business', href: '/admin/dashboard/pages', go: 'See guides' };
+}
+const missionHtml = (x) => `<div class="mission"><div><p class="m-t">Your mission this week</p><p class="m-d">${esc(x.d)}</p></div><a href="${x.href}">${esc(x.go)} →</a></div>`;
+
 function siteHome(s, inbox) {
   if (s.error || !s.data) return `<section class="col"><h2>${esc(s.name)}</h2><div class="card"><p class="warn">${esc(s.error || 'No data yet.')}</p></div></section>`;
   const d = s.data; const bad = healthBad(d); const m = moves(d);
   return `<section class="col"><h2>${esc(s.name)} <small>${esc(shortRange(d.range.cur))}</small></h2>
     <p class="status${bad ? ' bad' : ''}"><span class="dot"></span>${esc(bad ? healthLines(d)[0] : 'Tracking is working normally')}</p>
     ${tileHtml(d)}
+    ${missionHtml(mission(d, inbox))}
     <div class="two"><div class="card"><h3>Good news</h3>${listHtml(m.good, 'Nothing big moved up yet. That’s normal while we collect the first few weeks.')}</div>
     <div class="card"><h3>Worth a look</h3>${listHtml(m.watch, 'Nothing needs your attention.')}</div></div>
     ${todoHtml(inbox)}
@@ -153,8 +165,10 @@ function goHtml() {
 // Home: { top, body }. weekly = this week's summary per site; inboxes = { siteKey: inbox counts }.
 function homeHtml(weekly, { notice = '', goals = null, inboxes = {}, now = new Date() } = {}) {
   const clicks = weekly.reduce((a, s) => { const m = s.data && metric(s.data, 'outbound'); return a + (m ? shownValue(m) : 0); }, 0);
-  const top = `<section class="hero"><p class="hi" id="hi">Welcome back, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">In the last 7 days, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
-  const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${goalsCard(goals)}${goHtml()}
+  const sum = (keys) => weekly.reduce((a, s) => { const m = s.data && metricSum(s.data, keys); return a + (m ? shownValue(m) : 0); }, 0);
+  const numbers = { clicks, views: sum(['views']), ai: sum(['visits_ai']), trips: sum(['trip_plan_complete']) };
+  const top = `<section class="hero"><svg class="peaks" viewBox="0 0 1200 96" preserveAspectRatio="none" aria-hidden="true"><path fill="rgba(255,255,255,.08)" d="M0 96V62l130-38 120 34 150-52 170 56 130-36 150 40 140-46 210 54v22z"/><path fill="rgba(8,24,32,.32)" d="M0 96V78l170-30 140 30 190-34 150 36 170-26 170 28 210-24v38z"/></svg><p class="hi" id="hi">Welcome back, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">In the last 7 days, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
+  const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${todayLesson(now, numbers)}${milestonesHtml(numbers)}${goalsCard(goals)}${goHtml()}
     <form method="post" action="/admin/dashboard/digest-send" class="foot"><button type="submit">Email me this summary now</button> It also arrives by itself every Monday morning.</form>`;
   return { top, body };
 }
