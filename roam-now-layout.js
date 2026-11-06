@@ -108,6 +108,23 @@ body.pm-app-page .is-route-origin.is-pinning .rn-route-pin-hint {
 body.pm-app-page .is-route-origin .leaflet-marker-pane .leaflet-interactive {
   pointer-events: none;
 }
+body.pm-app-page .rn-map-picker-heading { display: none; }
+body.pm-app-page .is-map-picker .rn-map-picker-heading { display: block; }
+body.pm-app-page .rn-map-picker-heading p { margin: 8px 0 0; }
+body.pm-app-page .is-map-picker .pm-float > :not(.rn-map-picker-heading),
+body.pm-app-page .is-map-picker .pm-sheet,
+body.pm-app-page .is-map-picker .rn-search-area,
+body.pm-app-page .is-map-picker .pm-pinbtn,
+body.pm-app-page .is-map-picker .pm-locate { display: none; }
+body.pm-app-page .is-map-picker #okMap {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+}
+body.pm-app-page .is-map-picker .leaflet-marker-pane .leaflet-interactive {
+  pointer-events: none;
+}
 body.pm-app-page .rn-results-toolbar,
 body.pm-app-page #rnEditSearch { display: none; }
 body.pm-app-page .is-route .rn-search-area,
