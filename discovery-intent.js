@@ -137,6 +137,8 @@ function fixedHolidayDates(text, keepName = false) {
 
 // "in 2 weeks", "in ten days", "a week from Friday" is not read by the date reader; "in N days/weeks" becomes that date.
 function plainRelativeDates(text, now = new Date()) {
+  // "can't walk much", "bad knees", "limited mobility": step-free access is not listed (it is said so), and trails are out.
+  text = String(text).replace(/\b(?:(?:can['’ ]?t|cannot|can not|doesn['’ ]?t|does not|don['’ ]?t|do not|won['’ ]?t) (?:walk|hike) (?:much|far|well|long)|(?:trouble|difficulty|problems?) (?:with )?walking|bad (?:knees|hips|back|legs)|(?:limited|reduced) mobility|mobility (?:issues?|limitations?|problems?|challenges?)|(?:uses|using|with) a (?:walker|cane|rollator)|walks? slowly|slow walkers?)\b/g, ' accessible no hiking ');
   // "an hour to kill", "time to kill", "kill some time": a stretch of free time, not words to search for.
   text = String(text).replace(/\b(an|one|1) hour (?:to|2) kill\b/g, ' 1 hours ').replace(/\b(\d{1,2}|two|three|four|five) hours? (?:to )?kill\b/g, ' $1 hours ').replace(/\b(?:some |a little |a bit of |extra )?time to kill\b|\bkill(?:ing)? (?:some |a little |an? )?(?:time|hour|afternoon|morning|evening)\b/g, ' ');
   // A bare time box ("we have 2 hours in Vernon") with nothing to do in it: a coffee and an easy walk fill it.

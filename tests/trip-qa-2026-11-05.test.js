@@ -412,3 +412,11 @@ test('"a winery then lunch" and "lunch then a winery" keep the order asked', () 
   assert.deepEqual(order('a winery then lunch in Kelowna tomorrow'), ['winery', 'restaurant']);
   assert.deepEqual(order('lunch then a winery in Kelowna tomorrow'), ['restaurant', 'winery']);
 });
+
+test('"can\'t walk much" / "bad knees" does not plan a walk and says access is not listed', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: "something for a 70 year old who can't walk much, Vernon, Saturday" });
+  assert.ok(!/outdoor/i.test(p.summary || ''), p.summary);
+  assert.ok((p.warnings || []).some(w => /access isn.t listed/i.test(w)));
+});
