@@ -108,6 +108,41 @@ body.pm-app-page .is-route-origin.is-pinning .rn-route-pin-hint {
 body.pm-app-page .is-route-origin .leaflet-marker-pane .leaflet-interactive {
   pointer-events: none;
 }
+body.pm-app-page .rn-results-toolbar,
+body.pm-app-page #rnEditSearch { display: none; }
+body.pm-app-page .is-route .rn-search-area,
+body.pm-app-page .is-route .pm-pinbtn { display: none; }
+body.pm-app-page .rn-route-start { margin: 0 0 8px; }
+@media (max-width: 899px) {
+  body.pm-app-page .pm-list-view:not(.is-route):not(.is-route-origin) .rn-results-toolbar {
+    display: flex;
+    margin-top: 6px;
+  }
+  body.pm-app-page .rn-results-compact.pm-list-view .pm-float {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-results-toolbar {
+    flex: 1;
+    order: -1;
+    margin: 0;
+  }
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-views {
+    width: auto;
+    margin: 0;
+  }
+  body.pm-app-page .rn-results-compact.pm-list-view #rnMap { padding: 0 14px; }
+  body.pm-app-page .rn-results-compact.pm-list-view #rnEditSearch { display: inline-flex; }
+  body.pm-app-page .rn-results-compact.pm-list-view .pm-tabs,
+  body.pm-app-page .rn-results-compact.pm-list-view #rnList,
+  body.pm-app-page .rn-results-compact.pm-list-view #rnShowResults,
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-intro,
+  body.pm-app-page .rn-results-compact.pm-list-view .pm-searchbar,
+  body.pm-app-page .rn-results-compact.pm-list-view .pm-quick,
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-location-help { display: none; }
+}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 

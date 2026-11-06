@@ -52,3 +52,27 @@ test('a delayed location error cannot reopen help once browsing has a town',()=>
  const from=source.indexOf('  function showLocationHelp(text){');const to=source.indexOf('\n  function ',from+3);
  const c={dismissTownLocationHelp:()=>true,$(){throw new Error('Should not reopen town help')}};vm.createContext(c);vm.runInContext(source.slice(from,to)+';showLocationHelp("blocked")',c);
 });
+
+test('a calculated GPS route stays in preview until Start is pressed', () => {
+  const begin = source.indexOf('  function drawNav(){');
+  const end = source.indexOf("  navbar.addEventListener('click'", begin);
+  const startHandler = source.match(/  routeEl.addEventListener\('click', function\(e\)\{\n    if \(!e.target.closest\('#rnStartRoute'\)[\s\S]+?\n  \}\);/)[0];
+  const route = { data: {} };
+  let click, starts = 0;
+  const context = {
+    route, me: { pin: false }, navbar: {}, stage: { classList: { toggle() {} } },
+    routeEl: { addEventListener(type, handler) { click = handler; } },
+    startCompass() {}, unlockVoice() {}, drawRoute() {}, startNav() { starts++; },
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(begin, end).replaceAll(/\$\{uiIcon\([^}]*\)\}/g, "<svg/>") + startHandler + '\n drawNav();', context);
+  assert.equal(context.navbar.hidden, true);
+  assert.equal(starts, 0);
+  context.me.pin = true;
+  click({ target: { closest: () => true } });
+  assert.equal(starts, 0);
+  context.me.pin = false;
+  click({ target: { closest: () => true } });
+  assert.equal(route.started, true);
+  assert.equal(starts, 1);
+});

@@ -20392,7 +20392,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function roamLocationLabel(){return town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location')}
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
-  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
+  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,compact:stage.classList.contains('rn-results-compact'),y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
   function dismissTownLocationHelp(){
     if(!town||pendingRoute)return false;
     cancelPendingLocation();
@@ -20422,6 +20422,26 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     $('rnList').setAttribute('aria-pressed',view === 'list');$('rnMap').setAttribute('aria-pressed',view === 'map');
     floatGap();map.invalidateSize();if(!WIDE.matches)window.scrollTo(0,0);
   }
+  function setCompactResults(compact){
+    stage.classList.toggle('rn-results-compact', compact);
+    $('rnEditSearch').setAttribute('aria-expanded', String(!compact));
+    floatGap();
+    map.invalidateSize();
+  }
+  $('rnEditSearch').addEventListener('click', function(){
+    setCompactResults(false);
+    searchEl.focus();
+  });
+  $('rnShowResults').addEventListener('click', function(){
+    setCompactResults(true);
+    $('rnEditSearch').focus();
+  });
+  $('pmSheetBody').addEventListener('scroll', function(){
+    if (!WIDE.matches && !route && !pendingRoute && this.scrollTop > 48 &&
+        stage.classList.contains('pm-list-view') && !stage.classList.contains('rn-results-compact')) {
+      setCompactResults(true);
+    }
+  }, { passive: true });
   $('rnList').addEventListener('click',function(){roamView('list')});
   $('rnMap').addEventListener('click',function(){roamView('map')});
   var choosingTown = false;
@@ -20483,7 +20503,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function closePanel(){ choosingTown = false; if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
-  $('rnApplyFilters').addEventListener('click',closePanel);
+  $('rnApplyFilters').addEventListener('click', function(){
+    closePanel();
+    setCompactResults(true);
+    if (!WIDE.matches) $('rnEditSearch').focus();
+  });
   $('rnBackdrop').addEventListener('click',closePanel);
   document.addEventListener('keydown',function(e){if(panel.hidden)return;if(e.key==='Escape')closePanel();if(e.key==='Tab'){var els=Array.prototype.slice.call(panel.querySelectorAll('button,select,a[href],summary')).filter(function(x){return !x.disabled&&x.offsetParent!==null}),first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
   function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
@@ -20846,8 +20870,6 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     $('rnRouteOriginTitle').textContent = T.to + ' ' + x.name;
     roamView('map');
     $('pmSheetBody').scrollTop = 0;
-    // Asked for during the tap itself (iPhone only allows the compass prompt then).
-    if (!me || !me.pin) { startCompass(); unlockVoice(); }
     if (!me) {
       pendingRoute = x;
       render(false);
@@ -20866,11 +20888,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function fetchRoute(){
     var r = route; if (!r || !me) return;
+    const request = (r.request || 0) + 1;
+    r.request = request;
     r.at = Date.now(); r.loading = true; drawRoute();
     var url = 'https://api.mapbox.com/directions/v5/mapbox/' + r.mode + '/' + me.lng.toFixed(5) + ',' + me.lat.toFixed(5) + ';' + r.x.lng + ',' + r.x.lat
       + '?geometries=geojson&steps=true&overview=full&language=' + (FR ? 'fr' : 'en') + '&voice_instructions=true&voice_units=metric&access_token=' + encodeURIComponent(MB);
     fetch(url).then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); }).then(function(d){
-      if (route !== r) return;
+      if (route !== r || r.request !== request) return;
       var rt = d && d.routes && d.routes[0];
       r.loading = false;
       if (!rt) { r.error = true; drawRoute(); return; }
@@ -20881,10 +20905,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var first = !r.fitted; r.fitted = true;
       drawRoute();
       if(me.pin)setStatus(FR?'Aperçu de l’itinéraire depuis votre point de départ.':'Route preview from your chosen starting point.');
-      // With the visitor's real location: zoom in on them and follow as they go. From a pin: show the whole route.
-      if (first) { if (!me.pin) {map.stop();startNav();} else fitRoutePreview(r); }
+      // Show the full route until the visitor starts live navigation.
+      if (first && !r.started) fitRoutePreview(r);
       track('map_directions', { kind: 'route', mode: r.mode, on_site: true });
-    }).catch(function(){ if (route !== r) return; r.loading = false; r.error = true; drawRoute(); });
+    }).catch(function(){ if (route !== r || r.request !== request) return; r.loading = false; r.error = true; drawRoute(); });
   }
   function fitRoutePreview(r){
     map.stop();map.invalidateSize({pan:false});fitTo(r.line.getBounds(),17);
@@ -20901,14 +20925,26 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (r.error && !r.data) html += '<p class="pm-route-sum">' + esc(T.routeFailed) + '</p>';
     else if (r.data) {
       html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
+      if (me && !me.pin && !r.started && !r.loading) {
+        html += '<button type="button" class="pm-panel-done rn-route-start" id="rnStartRoute">' + esc(FR ? 'Démarrer' : 'Start') + '</button>';
+      }
+      if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Le guidage en direct utilise votre position.':'Live guidance uses your location.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
-      if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Aperçu depuis le point choisi. Utilisez votre position pour le guidage en direct et les annonces vocales.':'Route preview from your chosen point. Use your location for live progress and voice guidance.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
+
     }
     html += '<p class="pm-route-alt"><a ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
     drawNav();
   }
   routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
+  routeEl.addEventListener('click', function(e){
+    if (!e.target.closest('#rnStartRoute') || !route || !route.data || route.loading || !me || me.pin) return;
+    route.started = true;
+    startCompass();
+    unlockVoice();
+    drawRoute();
+    startNav();
+  });
   $('rnRouteCancel').addEventListener('click', endRoute);
   function endRoute(){
     var previous = routeReturn;
@@ -20959,12 +20995,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       else if (!on && wakeLock) { wakeLock.release(); wakeLock = null; }
     } catch (e) {}
   }
-  document.addEventListener('visibilitychange', function(){ if (!document.hidden && route && route.data && me && !me.pin) keepAwake(true); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden && route && route.started && route.data && me && !me.pin) keepAwake(true); });
   var ARROWS = { left: '↰', right: '↱', 'slight left': '↖', 'slight right': '↗', 'sharp left': '↰', 'sharp right': '↱', uturn: '↶', straight: '↑' };
   function arrowFor(st){ var m = st && st.maneuver || {}; if (m.type === 'arrive') return '⚑'; if (m.type === 'roundabout' || m.type === 'rotary') return '⟳'; return ARROWS[m.modifier] || '↑'; }
   // The next turn, how far to it, and the time and distance left.
   function drawNav(){
-    var r = route, on = !!(r && r.data && me && !me.pin);
+    var r = route, on = !!(r && r.started && r.data && me && !me.pin);
     stage.classList.toggle('is-nav', on); navbar.hidden = !on;
     if (!on) { navbar.innerHTML = ''; return; }
     var end = (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '${uiIcon('volume', 20, true)}' : '${uiIcon('mute', 20, true)}') + '</button>' : '')
@@ -21092,7 +21128,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     drawMe();
     if (pendingRoute) { var pr = pendingRoute; pendingRoute = null; if (first) { radiusKm = pickRadius(8); located(); render(false); } startRoute(pr); return; }
     if (!compassSeen && pos.coords.heading != null && pos.coords.speed > 0.7) setHeading(pos.coords.heading);
-    if (route) { followRoute(); if (follow) centerOn([me.lat, me.lng], followZoom); drawNav(); return; }
+    if (route) { if (route.started) followRoute(); if (follow) centerOn([me.lat, me.lng], followZoom); drawNav(); return; }
     if (first) {
       if (!radiusFixed) radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); located();
       if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -21127,7 +21163,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     places.forEach(function(p){ p.d = null; }); render(false);
   }
   nearBtn.addEventListener('click', function(){
-    if (me && !me.pin) { if (route && route.data) startFollow(); else render(true); return; }
+    if (me && !me.pin) { if (route && route.started && route.data) startFollow(); else render(true); return; }
     setPinMode(false);
     if (watching) return;
     nearLabel.textContent = T.finding; nearBtn.classList.add('is-finding'); startWatch();
@@ -21702,7 +21738,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       setTab('events');
       eventNotice(); }
     else { evTerm = ''; evKinds = []; aheadOn = false; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
-    var hadWords = !!term; searchFit = true; changed(); reportSearch(v, how || 'typed', hadWords);
+    var hadWords = !!term; searchFit = true; changed();
+    if (typedWords) setCompactResults(true);
+    reportSearch(v, how || 'typed', hadWords);
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
@@ -21737,7 +21775,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) closePanel(); });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) { closePanel(); setCompactResults(true); if (!WIDE.matches) $('rnEditSearch').focus(); } });
   function setTab(t){
     tab = t; limit = 25;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
@@ -21848,7 +21886,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if(CONF.directionRequested){showLocationHelp(FR?'Ce lieu n’a pas de point de navigation. Choisissez un autre lieu.':'This place has no navigation point. Choose another place.');}
     else if (initialHash === '#near-me') nearBtn.click();
     else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching) nearBtn.click(); }).catch(function(){});
-    if(returnContext&&!CONF.dest){roamView(returnContext.view==='map'?'map':'list');requestAnimationFrame(function(){requestAnimationFrame(function(){$('pmSheetBody').scrollTop=Math.max(0,Number(returnContext.listY)||0);window.scrollTo(0,Math.max(0,Number(returnContext.y)||0));})});}
+    if(returnContext&&!CONF.dest){setCompactResults(!!returnContext.compact);roamView(returnContext.view==='map'?'map':'list');requestAnimationFrame(function(){requestAnimationFrame(function(){$('pmSheetBody').scrollTop=Math.max(0,Number(returnContext.listY)||0);window.scrollTo(0,Math.max(0,Number(returnContext.y)||0));})});}
   }).catch(function(){ countEl.textContent = T.loadFailed; });
   // Opening times move on: refresh every minute.
   setInterval(function(){ refreshStatus(); if (!document.hidden) { var y = window.scrollY; render(false); window.scrollTo(0, y); } }, 60000);
@@ -22292,6 +22330,10 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="rn-location-help" id="rnLocationHelp" hidden><p id="rnLocationMessage" role="status"></p><div><button type="button" id="rnRetryLocation">${R('Try my location','Réessayer ma position')}</button><button type="button" id="rnChooseTown">${R('Choose a town','Choisir une ville')}</button><button type="button" id="rnChoosePin">${R('Choose on map','Choisir sur la carte')}</button></div></div>
       <div class="rn-views" role="group" aria-label="Results view"><button type="button" id="rnList" aria-pressed="true">${R('List','Liste')}</button><button type="button" id="rnMap" aria-pressed="false">${R('Map','Carte')}</button></div>
+      <div class="rn-results-toolbar">
+        <button type="button" class="pm-chip" id="rnEditSearch" aria-expanded="true">${R('Edit search & filters','Modifier la recherche et les filtres')}</button>
+        <button type="button" class="pm-chip" id="rnShowResults">${R('Show results','Afficher les résultats')}</button>
+      </div>
       <div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"></div>
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>
     </div>
