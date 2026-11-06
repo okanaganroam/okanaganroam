@@ -444,3 +444,12 @@ test('"an hour to kill" plans one stop; two hours still gets a coffee and a walk
   const two = app.runTripPlan({ text: '2 hours in Vernon' });
   assert.ok(/walk/i.test(JSON.stringify(two.warnings || []) + (two.summary || '')));
 });
+
+test('"at noon" / "starting at midday" starts the plan at 12:00; "lunch at noon" is not a start time', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const start = (t) => (app.runTripPlan({ text: t }).schedule || [])[0]?.startMinutes;
+  assert.equal(start('an hour to kill in Kelowna tomorrow at noon'), 720);
+  assert.equal(start('coffee and a walk in Kelowna tomorrow starting at midday'), 720);
+  assert.notEqual(start('coffee and a walk in Kelowna tomorrow'), 720);
+});
