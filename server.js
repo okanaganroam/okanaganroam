@@ -20401,7 +20401,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function roamLocationLabel(){return town?(CONF.r[town]):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna':'Kelowna map area')}
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
-  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,compact:stage.classList.contains('rn-results-compact'),y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
+  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,compact:stage.classList.contains('rn-results-compact'),y:window.scrollY,listY:$('pmSheetBody').scrollTop,cardOffset:a.closest('.pm-item')?.getBoundingClientRect().top-$('pmSheetBody').getBoundingClientRect().top}));}catch(err){}});
   function dismissTownLocationHelp(){
     if(!town||pendingRoute)return false;
     cancelPendingLocation();
@@ -20827,7 +20827,22 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     lastRender = me ? { lat: me.lat, lng: me.lng } : null;
   }
+  function restoreResultsScroll(){
+    if (!returnContext || CONF.dest || (watching && !me && !town)) return;
+    var saved = returnContext;
+    returnContext = null;
+    var scroller = $('pmSheetBody');
+    var links = listEl.querySelectorAll('.pm-item-main');
+    var target = Array.prototype.find.call(links, function(link){ return new URL(link.href).pathname === saved.target; });
+    if (target && typeof saved.cardOffset === 'number') {
+      scroller.scrollTop += target.closest('.pm-item').getBoundingClientRect().top - scroller.getBoundingClientRect().top - saved.cardOffset;
+    } else {
+      scroller.scrollTop = Math.max(0, Number(saved.listY) || 0);
+    }
+    window.scrollTo(0, Math.max(0, Number(saved.y) || 0));
+  }
   function drawList(){
+    var scroller = $('pmSheetBody'), scrollTop = scroller.scrollTop;
     var html = '', lastGroup = null, openSeen = false, dividerDone = false;
     listItems.slice(0, limit).forEach(function(x){
       if (tab === 'places') {
@@ -20851,6 +20866,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var wider = tab === 'places' && listItems.length && listItems.length < 8 ? widerRadius(listItems.length) : null;
     if (wider) html += '<li class="pm-group pm-wider"><button type="button" class="pm-more pm-wider-btn" data-wider="' + wider.r + '">' + esc(T.moreNear(wider.n, wider.r)) + '</button></li>';
     listEl.innerHTML = html;
+    scroller.scrollTop = scrollTop;
     if (typeof route !== 'undefined' && route) drawRoute();
     moreBtn.hidden = listItems.length <= limit;
     moreBtn.textContent = T.more;
@@ -21165,7 +21181,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (!OK_BOUNDS.pad(0.1).contains([pos.coords.latitude, pos.coords.longitude])) {
         watching = false; stopWatch(); nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe;
         showLocationHelp(T.outside);
-        if (!pendingRoute) render(false);
+        if (!pendingRoute) { render(false); restoreResultsScroll(); }
         setStatus(''); track('map_outside', {}); return;
       }
       if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); me = null; }
@@ -21181,6 +21197,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
       track('map_near_me', { radius_km: radiusKm });
       render(true);
+      restoreResultsScroll();
     } else if (!lastRender || distKm(lastRender.lat, lastRender.lng, me.lat, me.lng) > 0.15) render(false);
   }
   function located(){
@@ -21193,7 +21210,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     watching = false; stopWatch(); nearBtn.classList.remove('is-finding');
     if (!me) { nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; }
     setStatus('');showLocationHelp(err && err.code === 1 ? T.denied : T.failed);
-    if (!pendingRoute && !me) render(false);
+    if (!pendingRoute && !me) { render(false); restoreResultsScroll(); }
   }
   function startWatch(){
     if (!navigator.geolocation) { showLocationHelp(T.unsupported); return; }
@@ -21929,8 +21946,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if(CONF.dest){var dest=places.concat(events).filter(function(x){return x.url===CONF.dest.url})[0];if(!dest){dest=CONF.dest;dest.m=L.marker([dest.lat,dest.lng],{icon:iconFor('event'),title:dest.name});}if(!startRoute(dest))setStatusHtml(esc(T.routeFailed)+' <a '+hrefAttr(dirUrl(dest.lat,dest.lng,dest.venue||dest.name))+' target="_blank" rel="noopener">'+esc(IOS?T.openApple:T.openGoogle)+'</a>',15000);}
     else if(CONF.directionRequested){showLocationHelp(FR?'Ce lieu n’a pas de point de navigation. Choisissez un autre lieu.':'This place has no navigation point. Choose another place.');}
     else if (initialHash === '#near-me') nearBtn.click();
-    else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching && !town) nearBtn.click(); }).catch(function(){});
-    if(returnContext&&!CONF.dest){setCompactResults(!!returnContext.compact);roamView(returnContext.view==='map'?'map':'list');requestAnimationFrame(function(){requestAnimationFrame(function(){$('pmSheetBody').scrollTop=Math.max(0,Number(returnContext.listY)||0);window.scrollTo(0,Math.max(0,Number(returnContext.y)||0));})});}
+    else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching && !town) nearBtn.click(); }).catch(function(){}).then(restoreResultsScroll);
+    if (returnContext && !CONF.dest) {
+      setCompactResults(!!returnContext.compact);
+      roamView(returnContext.view === 'map' ? 'map' : 'list');
+      if (initialHash === '#near-me' || !navigator.permissions || !navigator.permissions.query) restoreResultsScroll();
+    }
   }).catch(function(){ countEl.textContent = T.loadFailed; });
   // Opening times move on: refresh every minute.
   setInterval(function(){ refreshStatus(); if (!document.hidden) { var y = window.scrollY; render(false); window.scrollTo(0, y); } }, 60000);

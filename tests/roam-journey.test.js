@@ -19,7 +19,7 @@ test('detail directions link to the built-in map and retain French routing',()=>
  assert.equal(roamDirectionsHref('https://evil.example/test'),null);
 });
 test('initial Events and Near me links survive URL synchronization',()=>{
- const block=source.slice(source.indexOf('    var initialHash = location.hash;'),source.indexOf('    if(returnContext&&!CONF.dest)',source.indexOf('    var initialHash = location.hash;')));
+ const block=source.slice(source.indexOf('    var initialHash = location.hash;'),source.indexOf('    if (returnContext && !CONF.dest)',source.indexOf('    var initialHash = location.hash;')));
  for(const hash of ['#events','#near-me']){
   const c={location:{hash},tab:'places',syncChips(){c.location.hash=''},returnContext:null,render(){},setTab(t){c.tab=t},CONF:{},nearBtn:{click(){c.near=true}},navigator:{}};
   vm.createContext(c);vm.runInContext(block,c);if(hash==='#events')assert.equal(c.tab,'events');else assert.equal(c.near,true);
