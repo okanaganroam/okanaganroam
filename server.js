@@ -22077,7 +22077,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 19; // 19: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 20; // 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -22180,7 +22180,6 @@ const MAP_TAGS = [
   ['winebar', 'Wine bar', 'Bar à vin', 'wine', /\b(wine bar|wine list|by the glass)/, 'wine bar|wine list|bar a vin|bar à vin', []],
   ['datenight', 'Date night', 'Soirée en amoureux', 'heart', /\b(romantic|date night|intimate|candlelit|anniversar)/, 'date night|date|romantic|anniversary|romantique', []],
   ['sunset', 'Sunset views', 'Coucher de soleil', 'sunrise', /\bsunset/, 'sunset|sunsets|coucher de soleil', []],
-  ['games', 'Games & pool', 'Jeux et billard', 'target', /\b(arcade|pool table|billiard|board game|darts|bowling|shuffleboard|trivia|karaoke)/, 'games|arcade|pool|billiards|darts|bowling|shuffleboard|jeux|billard', []],
   ['salad', 'Salads & bowls', 'Salades et bols', 'leaf', /\b(salad|poke|bowls?)\b/, 'salad|salads|poke|bowl|bowls|salade|salades', []],
   ['crepes', 'Crêpes & waffles', 'Crêpes et gaufres', 'cake', /\b(cr[eê]pe|waffle)/, 'crepe|crepes|crêpe|crêpes|waffle|waffles|gaufre|gaufres', []],
   ['specialty', 'Specialty coffee', 'Café de spécialité', 'coffee', /\b(roaster|pour[ -]over|specialty coffee|espresso)/, 'specialty coffee|pour over|roaster|espresso', []],
@@ -22211,6 +22210,7 @@ const MAP_TAGS = [
   ['skisnow', 'Ski & snow', 'Ski et neige', 'mountain', /\b(?:ski resorts?|nordic ski|snow tubing)\b/, 'ski snow|ski and snow|ski et neige', ['outdoor', 'sport'],
     (v, name, text) => ['outdoor', 'sport'].includes(v.type) && /\b(?:ski resorts?|ski areas?|ski hills?|ski clubs?|ski trails?|ski lifts?|skiing|snow tubing|tube parks?|snowshoeing)\b/.test(text)],
   ['parks', 'Parks', 'Parcs', 'tree', /\bparks?\b/, 'parks|parcs', [], (v, name) => ['outdoor','beach','sport'].includes(v.type) && /\bpark\b/.test(name)],
+  ['games', 'Games & pool', 'Jeux et billard', 'target', /\b(arcade|pool table|billiard|board game|darts|bowling|shuffleboard|trivia|karaoke)/, 'games|arcade|pool|billiards|darts|bowling|shuffleboard|jeux|billard', []],
 ].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: uiIcon('leaf') }, { key: 'vegan', label: 'Vegan', icon: uiIcon('sprout') }, { key: 'gf', label: 'Gluten-free', icon: uiIcon('wheat') },
