@@ -7575,6 +7575,11 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     }
   }
   if (trip.explicitStops && requirements?.items.some(i=>i.kind==='days'&&i.value>1)) trip.multi=false;
+  // 2026-11-05: dates that span several days ("June 12 to June 16", "arriving Dec 20, leaving Dec 27") are a trip of that
+  // length even with no "N days" in the request; "June 12 to June 16, wineries and beaches" was a two-stop outing, and
+  // "from July 3 until the 9th, Penticton and Naramata" an Ideas list.
+  { const span = requirements?.items.find((i) => i.kind === 'days' && i.value > 1 && i.dayIndex == null);
+    if (span && !intent.days && ['find', 'recommend'].includes(intent.mode) && !trip.crawl) { intent.mode = 'plan'; intent.days = span.value; trip.multi = false; } }
   const understood = (plan) => {
     const recovery=requirementModule.sparseDayRecovery(plan,requirements);
     if(recovery)plan.sparseRecovery=recovery;

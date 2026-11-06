@@ -124,3 +124,40 @@ test('"what\'s open right now in Vernon" asks for things to do now, not places t
   assert.equal(i.when.now, true);
   assert.deepEqual(i.regions, ['vernon']);
 });
+
+test('date ranges: "June 12 to June 16", "from July 3rd until the 9th", "arriving Dec 20, leaving Dec 27", "Dec 20 to Jan 2"', () => {
+  const cal = (text) => tr.tripCalendar(text, '2026-11-05');
+  let r = cal('June 12 to June 16, Kelowna, wineries and beaches');
+  assert.deepEqual([r.startDate, r.endDate, r.days], ['2027-06-12', '2027-06-16', 5]);
+  r = cal('we are there from July 3rd until the 9th, couple');
+  assert.deepEqual([r.startDate, r.endDate, r.days], ['2027-07-03', '2027-07-09', 7]);
+  r = cal('from the 3rd to the 9th of July');
+  assert.deepEqual([r.startDate, r.endDate], ['2027-07-03', '2027-07-09']);
+  r = cal('arrive Oct 5 and leave Oct 9, wine');
+  assert.deepEqual([r.startDate, r.endDate, r.days], ['2027-10-05', '2027-10-09', 5]);
+  r = cal('arriving December 20, leaving December 27');
+  assert.equal(r.startDate, '2026-12-20');
+  assert.equal(r.endDate, '2026-12-26', 'a week at a time: the first seven days');
+  assert.equal(r.trimmed, 8);
+  assert.equal(r.conflict, null);
+  r = cal('Dec 20 to Jan 2');
+  assert.equal(r.startDate, '2026-12-20');
+  assert.equal(r.trimmed, 14);
+  // Existing forms are unchanged.
+  r = cal('Aug 1-4 Kelowna');
+  assert.deepEqual([r.startDate, r.endDate, r.days], ['2027-08-01', '2027-08-04', 4]);
+  assert.equal(cal('May 5th, we have a wedding').endDate, null);
+  assert.ok(cal('Jan 1 to Dec 31').conflict, 'a whole year is still not planned');
+});
+
+test('Server: a date range with two kinds of stop is a day-by-day trip of that length (it was a two-stop outing)', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'June 12 to June 16, Kelowna, wineries and dinner' });
+  assert.equal(p.kind, 'multi_day');
+  assert.equal(p.days.length, 5);
+  const q = app.runTripPlan({ text: 'arriving December 20, leaving December 27, Kelowna, wineries and dinner' });
+  assert.equal(q.kind, 'multi_day');
+  assert.equal(q.days.length, 7);
+  assert.ok(q.warnings.some((w) => /cover 8 days/.test(w)), JSON.stringify(q.warnings));
+});
