@@ -313,3 +313,12 @@ test('a named holiday with a fixed date is that date (Canada Day, Remembrance Da
   const p = app.runTripPlan({ text: "Valentine's Day dinner in Penticton" });
   assert.equal(p.listDate, '2027-02-14');
 });
+
+test('Server: a trip to Hawaii or Paris says the Okanagan Valley is the only area covered', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const [text, place] of [['trip to Hawaii', 'Hawaii'], ['3 days in Paris', 'Paris']]) {
+    const p = app.runTripPlan({ text });
+    assert.ok((p.notes || []).some((n) => n.includes(`${place} isn’t included`)), text + ' ' + JSON.stringify(p.notes));
+  }
+});
