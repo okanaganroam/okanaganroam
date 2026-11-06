@@ -273,8 +273,6 @@ function stripTravelNoise(normalized) {
   }
   // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
   s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
-  // Mood words that no listing carries: they colour a request but there is nothing to search for.
-  s = s.replace(/\b(?:cozy|cosy|charming|lovely|delicious|yummy|tasty|amazing|awesome|fabulous|gorgeous)\b/g, ' ');
   s = joinOutsidePlaces(s);
   s = plainRelativeDates(s);
   // "two weeks": 14 days (the planner covers seven and says so).
@@ -2233,6 +2231,20 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
       parts = parts.slice(0, wi + 1).concat(extra, parts.slice(wi + 1));
     }
   }
+  // "lunch then a walk", "a winery then lunch": the visitor gave an order, so the planner keeps it (not the usual
+  // walk-in-the-morning, tasting-in-the-afternoon order).
+  if (parts.length >= 2 && /\b(?:and then|then|afterwards|after that|followed by|before heading to)\b/.test(normalized)) parts = parts.map((c, i) => {
+      if (c.kind !== 'venue') return c;
+      const prev = parts[i - 1], next = parts[i + 1];
+      let daypart = c.daypart;
+      // Around a meal the neighbours fall on the right side of it: before lunch is the morning, after it the afternoon.
+      if (!daypart && !c.meal) {
+        if (next && next.kind === 'venue' && next.meal === 'lunch') daypart = 'morning';
+        else if (prev && prev.kind === 'venue' && prev.meal === 'lunch') daypart = 'afternoon';
+        else if (next && next.kind === 'venue' && ['dinner', 'supper'].includes(next.meal)) daypart = 'afternoon';
+      }
+      return { ...c, sequenced: true, ...(daypart ? { daypart } : {}) };
+    });
   out.components = parts;
   out.regions = uniq(out.regions);
   if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };

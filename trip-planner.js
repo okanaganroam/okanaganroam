@@ -6897,7 +6897,9 @@ function planItinerary(input) {
     if (s.timed || !firstEvent) return windowStart(s.daypart);
     return firstEvent.start >= 17 * 60 ? firstEvent.start - 1 : firstEvent.start + 1;
   };
+  const asAsked = !route && stops.length > 1 && stops.every((s) => s.kind === 'venue' && s.component && s.component.sequenced);
   stops.sort((a, b) => {
+    if (asAsked) return a.index - b.index;
     if (route && a.kind === 'venue' && b.kind === 'venue') {
       const ra = routeIndex.get(a.venue.region) ?? 99, rb = routeIndex.get(b.venue.region) ?? 99;
       if (ra !== rb) return ra - rb;

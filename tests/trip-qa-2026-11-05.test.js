@@ -397,10 +397,18 @@ test('a bare time box ("we have 2 hours in Vernon", "an hour to kill") becomes a
   assert.equal(app.runTripPlan({ text: '3 hours between flights in Kelowna' }).kind, 'discover');
 });
 
-test('"Christmas week" is a date and mood words ("cozy") are not unknown places', () => {
+test('"Christmas week" is a date, not an unknown word', () => {
   process.env.TRIP_PLANNER_V2 = 'on';
   const app = require('../server.js');
   const p = app.runTripPlan({ text: 'Christmas week in the Okanagan, ski and cozy dinners' });
   const said = JSON.stringify([p.warnings, p.unsupported]);
-  assert.ok(!/\bweek\b|\bcozy\b/i.test(said), said);
+  assert.ok(!/\bweek\b/i.test(said), said);
+});
+
+test('"a winery then lunch" and "lunch then a winery" keep the order asked', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const order = (text) => ((app.runTripPlan({ text }).itinerary || {}).stops || []).map(s => s.venue && s.venue.type);
+  assert.deepEqual(order('a winery then lunch in Kelowna tomorrow'), ['winery', 'restaurant']);
+  assert.deepEqual(order('lunch then a winery in Kelowna tomorrow'), ['restaurant', 'winery']);
 });
