@@ -43374,6 +43374,7 @@ function rememberOwnerContact(venueId, email) {
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights'];
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
+const OWNER_NOTHING_NEW_WAITING = 'Your earlier changes are already waiting for review. There is nothing new to send.';
 // Price range (2026-10-18): the owner picks one, per person.
 const OWNER_PRICE_SCALE = { 1: 'under $15', 2: '$15–30', 3: '$30–60', 4: 'over $60' };
 const OWNER_PRICE_SCALE_FR = { 1: 'moins de 15 $', 2: '15 à 30 $', 3: '30 à 60 $', 4: 'plus de 60 $' };
@@ -44400,6 +44401,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
     }
   }
   if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length || Object.keys(carried).length)) delete errors.form;
+  // Pressing Save again with nothing new while earlier changes are still waiting (2026-11-07): say they are safe.
+  if (errors.form === OWNER_NOTHING_CHANGED && waiting && Object.keys(waitingChanges).length) errors.form = OWNER_NOTHING_NEW_WAITING;
   if (Object.keys(errors).length) {
     // Which boxes were refused, never what was typed, so a save that keeps failing can be traced.
     console.warn(`[owner-portal] refused changes for venue #${venue.id}: ${Object.keys(errors).join(', ')}`);
@@ -50298,6 +50301,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'Nothing was sent. Please try again.': 'Rien n’a été envoyé. Veuillez réessayer.',
   'Some of the information could not be read. Please reload the page and try again.': 'Une partie de l’information est illisible. Rechargez la page et réessayez.',
   [OWNER_NOTHING_CHANGED]: 'Rien n’a encore changé. Modifiez un champ, puis envoyez-le.',
+  [OWNER_NOTHING_NEW_WAITING]: 'Vos modifications précédentes sont déjà en attente de révision. Il n’y a rien de nouveau à envoyer.',
   'Please enter a phone number, like 250-555-0123.': 'Entrez un numéro de téléphone, comme 250-555-0123.',
   'Please check the web address, for example yourbusiness.com': 'Vérifiez l’adresse Web, par exemple votreentreprise.com',
   [`Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`]: `Votre description doit compter de ${OWNER_DESCRIPTION_MIN} à ${frNumber(OWNER_DESCRIPTION_MAX.toLocaleString('en-CA'))} caractères.`,

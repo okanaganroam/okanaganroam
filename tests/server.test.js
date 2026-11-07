@@ -20794,6 +20794,10 @@ test('Owner portal: edit link, owner page, change request, review and approval',
     assert.equal(reqRow.venue_name, 'Owner Portal Fixture');
     assert.equal(reqRow.previous.badges.patio, false);
     assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /waiting for review/);
+    // Saving again with nothing new while earlier changes wait says they are safe (2026-11-07).
+    const nothingNew = await send(token, { changes: { badges: {} }, started_at: started });
+    assert.equal(nothingNew.status, 400);
+    assert.match(nothingNew.body.errors.form, /already waiting for review/);
 
     // A newer request is added to the older pending one (2026-10-15): the earlier
     // fields stay, the field sent again takes the new value, and it is reviewed once.
