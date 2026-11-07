@@ -74,3 +74,38 @@ body.copper-page .cp-nearby .related-grid {grid-template-columns:1fr}
 body.copper-page .cp-aside {display:grid;gap:0}
 body.copper-page .cp-extra-actions {grid-template-columns:1fr 1fr}
 }
+/* Keep mobile section navigation in the same containing block as Hours and contact details. */
+@media(max-width:899px) {
+  body.copper-page .cp-content { display:contents; }
+}
+body.copper-page .cp-extra-actions {
+  align-items:stretch;
+  grid-auto-rows:46px;
+}
+body.copper-page .cp-extra-actions > * {
+  margin:0!important;
+  width:100%!important;
+  height:46px!important;
+  min-height:46px!important;
+  box-sizing:border-box;
+  align-self:stretch;
+  white-space:nowrap;
+}
+body.copper-page .cp-trivia-booking {
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid #eee6d8;
+}
+body.copper-page .cp-trivia-booking .cta {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:46px;
+  margin:0 0 8px;
+}
+body.copper-page .cp-trivia-booking p {
+  margin:0 0 8px;
+  font-size:13px;
+  color:#6b655b;
+}
+body.copper-page .cp-trivia-booking > a:last-child { font-size:13px; }

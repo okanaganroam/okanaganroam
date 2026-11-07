@@ -34508,6 +34508,17 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const priceHint = prices.length ? 'Menu examples ' + menuPriceLabel(String(Math.min(...prices))) + (Math.max(...prices) !== Math.min(...prices) ? '–' + menuPriceLabel(String(Math.max(...prices))).replace('$', '') : '') : '';
     const atAGlance = priceHint ? atAGlanceParts.replace(/ &middot; \$+$/, '') + ' &middot; ' + escapeHtml(priceHint) : atAGlanceParts;
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
+    const triviaBooking = require('./data/copper-trivia-booking.json');
+    const copperNights = weeklyNights ? {
+      ...weeklyNights,
+      rows: weeklyNights.rows.map((row) => row.s.kind === 'trivia'
+        ? { ...row, s: { ...row.s, detail: 'Reserve directly with Copper Brewing.', host: null } }
+        : row),
+    } : null;
+    const hasTrivia = copperNights && copperNights.rows.some((row) => row.s.kind === 'trivia');
+    const triviaBookingHtml = hasTrivia
+      ? '<div class="cp-trivia-booking"><a class="cta" href="tel:' + escapeHtml(triviaBooking.phone) + '"' + trackAttr('booking') + '>Call to book trivia</a><p>Reservations with Copper · ' + escapeHtml(triviaBooking.displayPhone) + '</p><a href="' + escapeHtml(triviaBooking.sourceUrl) + '" target="_blank" rel="nofollow noopener">Copper’s reservation details ↗</a></div>'
+      : '';
     return require('./copper-venue-layout').renderCopperVenueLayout({
       venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml,
       directionsHtml, extraActionsHtml: ctaEntries.filter((action) => action !== directionsHtml).join('\n'),
@@ -34516,7 +34527,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       menuLink: menuPagePath(venue, 'en'), menuCount: venueMenu ? venueMenu.items : 0,
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNights, false),
+      weeklyNightsHtml: venueWeeklyNightsHtml(copperNights, false), triviaBookingHtml,
       visitHtml, descriptionHtml: '<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
       badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
       detailRows: detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, ''),
