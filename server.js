@@ -33836,6 +33836,8 @@ const SHOW_VENUE_RE = /\b(theatre|theater|playhouse|opera house|cabaret)\b/i;
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
   const fr = opts.lang === 'fr';
+  const copperLayout = !fr && !venue.redirect_to && venue.region === 'kelowna'
+    && venue.type === 'brewery' && venue.slug === 'copper-brewing-co';
   // Round 12 (2026-10-20): « du Okanagan Golf Club » in a French description reads « de l’Okanagan Golf Club ».
   if (fr && venue.description_fr) venue = { ...venue, description_fr: frElideOkanagan(venue.description_fr) };
   const L = (en, frText) => (fr ? frText : en);
@@ -34225,7 +34227,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
 
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
-  const ctaButtons = [
+  const ctaEntries = [
     // Phone visitors (2026-10-20): Directions is the main button (what someone on the move wants, and it keeps them
     // with us afterwards), and Website is a plain button marked as opening elsewhere. With no address, Website stays
     // the main button as before.
@@ -34238,7 +34240,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
     venuePageUsesEngagement(venue.type) ? (fr ? frFavTripButtons(golfFavTripButtonsHtml(venue, { appLabels: themedShell }), venue) : golfFavTripButtonsHtml(venue, { appLabels: themedShell })) : null,
-  ].filter(Boolean).join('\n  ');
+  ].filter(Boolean);
+  const ctaButtons = ctaEntries.join('\n  ');
   const ctaRowAttrs = venuePageUsesEngagement(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
     : '';
@@ -34301,6 +34304,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // stay at the bottom.
   const nearbyStripPhotos = new Set();
   const nearbyStripIds = new Set();
+  let copperNearbyCards = [];
   const nearbyStripHtml = (() => {
     if (venue.redirect_to) return '';
     const seen = new Set([venue.id]);
@@ -34314,7 +34318,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const away = (km) => (km <= 1.2
       ? L(`${Math.max(1, Math.round(km * 12))} min walk`, `${Math.max(1, Math.round(km * 12))} min à pied`)
       : L(`${Math.round(km * 1.6 + 2)} min drive`, `${Math.round(km * 1.6 + 2)} min en voiture`));
-    const cards = pool.map(({ v, km }) => {
+    const cardItems = pool.map(({ v, km }) => {
       const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
       const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
       const photo = venueThumbPhoto(v, nearbyStripPhotos);
@@ -34325,7 +34329,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
         <a class="nearby-link" href="${href}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="nearby-type">${escapeHtml(typeLabel)} · ${escapeHtml(away(km))}</span><span class="nearby-name">${escapeHtml(v.name)}</span></a>
         <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(L(`Add ${v.name} to trip`, `Ajouter ${v.name} au voyage`))}">${fr ? appTripLabelHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage') : APP_TRIP_LABEL_HTML}</button>
       </li>`;
-    }).join('');
+    });
+    if (copperLayout) copperNearbyCards = cardItems;
+    const cards = cardItems.join('');
     return `<section class="nearby-strip" aria-labelledby="nearbyStripHead">
     <h2 id="nearbyStripHead">${L('Close by', 'À proximité')}</h2>
     <ul class="nearby-list">${cards}</ul>
@@ -34465,14 +34471,68 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ? `<p class="venue-hh-status" data-hh="${happyHour.live.state}" id="venueHappyHour">${happyHour.live.state === 'now' ? `<span aria-hidden="true">${uiIcon('cocktail')}</span> ` : ''}${escapeHtml(happyHour.live.text)}</p>`
     : '';
 
+  const verifiedHtml = (() => {
+      // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
+      // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
+      // the "Updated by the business" line.
+      if (!venueIsClaimed(venue.id)) return '';
+      const last = ownerLastUpdatedAt(venue.id);
+      const date = last ? ownerUpdatedDate(last, fr) : '';
+      return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the venue', 'V\u00e9rifi\u00e9 par l\u2019\u00e9tablissement')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
+    })();
+  const ownerCtaHtml = venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:6px 0 18px;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
+    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
+    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="${fr ? '/fr' : ''}/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+  </div>
+  <script>
+  // Owners (2026-10-18): on a device where this listing's owner is signed in (My listings remembers its
+  // listings), "Claim this listing" becomes "You manage this listing" with a link to edit it.
+  (function(){
+    var box = document.getElementById('venueOwnerCta'), mine = [];
+    try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
+    if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
+    box.hidden = false;
+    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
+    // Round 8: the address is set as a property, so the page's HTML holds no glued href text for crawlers.
+    // Audit fix (2026-10-27): the French page's "Modifier" opens the French account page.
+    var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '${fr ? '/fr' : ''}/owner/account/venue/' + box.getAttribute('data-venue-id');
+  })();
+  </script>`;
+  const copperBody = copperLayout ? (() => {
+    const items = venueMenu ? venueMenu.data.sections.flatMap((section) => section.items) : [];
+    const names = ['Smash Burger Tacos', 'Hummus & Veggies', 'Crispy Brussels Sprouts'];
+    const selected = names.map((name) => items.find((item) => item.name.toLowerCase() === name.toLowerCase())).filter(Boolean);
+    const picks = selected.length ? selected : items.slice(0, 3);
+    const prices = picks.map((item) => /^\$?\d+(?:\.\d{1,2})?$/.test(String(item.price)) ? Number(String(item.price).replace('$', '')) : NaN).filter(Number.isFinite);
+    const priceHint = prices.length ? 'Menu examples ' + menuPriceLabel(String(Math.min(...prices))) + (Math.max(...prices) !== Math.min(...prices) ? '–' + menuPriceLabel(String(Math.max(...prices))).replace('$', '') : '') : '';
+    const atAGlance = priceHint ? atAGlanceParts.replace(/ &middot; \$+$/, '') + ' &middot; ' + escapeHtml(priceHint) : atAGlanceParts;
+    const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
+    return require('./copper-venue-layout').renderCopperVenueLayout({
+      venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml,
+      directionsHtml, extraActionsHtml: ctaEntries.filter((action) => action !== directionsHtml).join('\n'),
+      ctaRowAttrs, menuPicks: picks, formatPrice: menuPriceLabel,
+      menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
+      menuLink: menuPagePath(venue, 'en'), menuCount: venueMenu ? venueMenu.items : 0,
+      happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
+      weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNights, false),
+      visitHtml, descriptionHtml: '<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
+      badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
+      detailRows: detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, ''),
+      locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, 'en'), guideLinks, ownerCtaHtml,
+      eventsHtml: venueEventsHtml, nearbyCards: copperNearbyCards, relatedHtml, nearbyHtml,
+    });
+  })() : '';
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: (fr && !FRENCH_INDEXABLE) || venuePageIsThin(venue), alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', shopTheme: venue.type === 'shop', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
+${copperLayout ? '<link rel="stylesheet" href="/copper-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'copper-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
 </head>
-<body${themedBodyClassAttr(venue.type, themedShell)}>
+<body${copperLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ' copper-page"') : themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   <div class="venue-topbar">${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
@@ -34497,19 +34557,11 @@ ${VENUE_MENU_CSS}` : ''}
   }</style>
   ${themedHeroTitle ? '' : `<h1 class="venue-mobile-title">${escapeHtml(venue.name)}</h1>`}
   ${imageHtml}
-  <div class="venue-layout">
+  ${copperLayout ? copperBody : `  <div class="venue-layout">
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1 class="venue-desktop-title">${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${(() => {
-      // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
-      // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
-      // the "Updated by the business" line.
-      if (!venueIsClaimed(venue.id)) return '';
-      const last = ownerLastUpdatedAt(venue.id);
-      const date = last ? ownerUpdatedDate(last, fr) : '';
-      return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the venue', 'V\u00e9rifi\u00e9 par l\u2019\u00e9tablissement')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
-    })()}
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${verifiedHtml}
   </div>
   <!-- Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip come straight after the name,
        hours and badges (and any check-before-you-go notice), before the description, so they are on the first screen of
@@ -34533,35 +34585,19 @@ ${VENUE_MENU_CSS}` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
-  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:6px 0 18px;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
-    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
-    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
-    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="${fr ? '/fr' : ''}/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
-  </div>
-  <script>
-  // Owners (2026-10-18): on a device where this listing's owner is signed in (My listings remembers its
-  // listings), "Claim this listing" becomes "You manage this listing" with a link to edit it.
-  (function(){
-    var box = document.getElementById('venueOwnerCta'), mine = [];
-    try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
-    if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
-    box.hidden = false;
-    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
-    // Round 8: the address is set as a property, so the page's HTML holds no glued href text for crawlers.
-    // Audit fix (2026-10-27): the French page's "Modifier" opens the French account page.
-    var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '${fr ? '/fr' : ''}/owner/account/venue/' + box.getAttribute('data-venue-id');
-  })();
-  </script>`}
+  ${ownerCtaHtml}
   </div>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${nearbyStripHtml ? `${nearbyStripHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
+`}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   <a class="cta secondary" href="/${venue.region}">${fr ? `Tout d\u00e9couvrir \u00e0 ${escapeHtml(regionLabel)}` : `Explore all of ${escapeHtml(regionLabel)}`}</a>
   ${themedShell ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
   ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
+${copperLayout ? '<script src="/copper-venue.js?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'copper-venue.js'))).digest('hex').slice(0, 12) + '"></script>' : ''}
 ${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
@@ -55597,6 +55633,8 @@ const server = http.createServer(async (req, res) => {
     // no bundler. Cached for an hour rather than a day (unlike og-image.png)
     // since these are actively being iterated on during Phase 5.
     const STATIC_ASSETS = {
+      '/copper-venue.css': { file: 'public/copper-venue.css', type: 'text/css; charset=utf-8' },
+      '/copper-venue.js': { file: 'public/copper-venue.js', type: 'application/javascript; charset=utf-8' },
       '/food-drink-layout.css': { file: 'public/food-drink-layout.css', type: 'text/css; charset=utf-8' },
       '/styles/tokens.css': { file: 'public/styles/tokens.css', type: 'text/css; charset=utf-8' },
       '/styles/app.css': { file: 'public/styles/app.css', type: 'text/css; charset=utf-8' },
