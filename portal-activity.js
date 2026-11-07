@@ -86,6 +86,26 @@ function classify(method, rawPath) {
   return null;
 }
 
+// Link scanners (2026-11-07): mail-security tools and crawlers fetch the claim and edit-link addresses in emails, which
+// inflated "Opened a claim page" and "Opened an emailed edit link". Two signs, neither of which stores anything about
+// a person: real browsers always send Accept-Language, and one browser fetching more than two different claim or edit
+// links in six hours is a scanner, not one owner. Only those two views are checked; the memory is a short-lived
+// in-process map of a hash and a few path hashes, never written to the database.
+const SCAN_STEPS = new Set(['claim_page_view', 'edit_link_view']);
+const SCAN_WINDOW_MS = 6 * 3600000, SCAN_MAX_DISTINCT = 2;
+const scanSeen = new Map();
+function scannerLike(req, ip, pathname, now = Date.now()) {
+  if (!String(req.headers['accept-language'] || '').trim()) return true;
+  const hash = (t) => require('node:crypto').createHash('sha256').update(String(t)).digest('hex').slice(0, 16);
+  const key = hash(`${ip}|${req.headers['user-agent'] || ''}`);
+  const entry = scanSeen.get(key);
+  const fresh = entry && now - entry.t < SCAN_WINDOW_MS ? entry : { t: now, paths: new Set() };
+  fresh.paths.add(hash(String(pathname).replace(/^\/fr(?=\/)/, '')));
+  scanSeen.set(key, fresh);
+  if (scanSeen.size > 5000) for (const [k, v] of scanSeen) if (now - v.t >= SCAN_WINDOW_MS) scanSeen.delete(k);
+  return fresh.paths.size > SCAN_MAX_DISTINCT;
+}
+
 function createPortalCounter(db) {
   const up = db.prepare('INSERT INTO site_event_counts (day, name, n) VALUES (?, ?, 1) ON CONFLICT(day, name) DO UPDATE SET n = n + 1');
   function bump(req, name, ip, now = new Date()) {
@@ -101,7 +121,7 @@ function createPortalCounter(db) {
       try {
         const code = res.statusCode;
         if (key === 'login') return bump(req, storedName(code === 200 ? 'login_success' : code === 429 ? 'login_locked' : 'login_failed'), ip);
-        if (method === 'GET') return code === 200 ? bump(req, storedName(key), ip) : false;
+        if (method === 'GET') return code === 200 && !(SCAN_STEPS.has(key) && scannerLike(req, ip, pathname)) ? bump(req, storedName(key), ip) : false;
         return bump(req, storedName(code < 400 ? key : `${key}_failed`), ip);
       } catch (e) { return false; } // counting must never break the portal
     });
@@ -125,4 +145,5 @@ function createPortalCounter(db) {
   return { watch, report, bump };
 }
 
-module.exports = { STEPS, CLIENT_KEYS, STEP_KEYS, classify, createPortalCounter };
+module.exports = {
+  scannerLike, _resetScanMemory: () => scanSeen.clear(), STEPS, CLIENT_KEYS, STEP_KEYS, classify, createPortalCounter };

@@ -8,7 +8,7 @@ const siteEvents = require('../site-events');
 const { renderPortalPage } = require('../portal-activity-page');
 
 const NOW = new Date('2026-11-05T20:00:00Z');
-const req = (ua = 'Mozilla/5.0 (iPhone) Safari', cookie = '') => ({ headers: { 'user-agent': ua, cookie } });
+const req = (ua = 'Mozilla/5.0 (iPhone) Safari', cookie = '', lang = 'en-CA') => ({ headers: { 'user-agent': ua, cookie, ...(lang ? { 'accept-language': lang } : {}) } });
 const memDb = () => { const d = new DatabaseSync(':memory:'); d.exec('CREATE TABLE site_event_counts (day TEXT NOT NULL, name TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, name))'); return d; };
 function answer(c, r, method, path, code, ip = '5.5.5.5') {
   const res = new EventEmitter(); res.statusCode = code;
@@ -49,7 +49,7 @@ test('server steps are counted when answered: success, failure, sign-in outcomes
   answer(c, req(), 'GET', '/owner/account', 302);
   answer(c, req('Googlebot/2.1'), 'GET', '/owner/login', 200);
   answer(c, req(undefined, 'roam_internal=1'), 'GET', '/owner/login', 200);
-  const r = c.report(30, NOW); const by = Object.fromEntries(r.steps.map((s) => [s.key, s]));
+  const r = c.report(30, new Date()); const by = Object.fromEntries(r.steps.map((s) => [s.key, s])); // the server counts on today's date
   assert.equal(by.login_page_view.n, 1); assert.equal(by.login_success.n, 1); assert.equal(by.login_failed.n, 2); assert.equal(by.login_locked.n, 1);
   assert.equal(by.edit_save.n, 1); assert.equal(by.edit_save.failed, 1); assert.equal(by.account_view.n, 0);
   assert.equal(r.logins_per_day.at(-1).n, 1);
@@ -72,4 +72,25 @@ test('page: renders both sites, groups, failures, and a site that is not connect
   answer(c, req(), 'POST', '/owner/login', 401);
   const html = renderPortalPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: c.report(30, NOW) }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet' }] });
   for (const s of ['Business portal', 'Signing in', 'Inside the portal', 'Sign-in failed', 'Not connected yet', 'Okanagan Roam']) assert.ok(html.includes(s), s);
+});
+
+test('link scanners are not counted as owners opening claim pages or edit links', () => {
+  pa._resetScanMemory();
+  const db = memDb(); const c = pa.createPortalCounter(db);
+  const count = () => (db.prepare("SELECT n FROM site_event_counts WHERE name = 'portal:claim_page_view'").get() || { n: 0 }).n;
+  // No Accept-Language: not a person's browser.
+  answer(c, req('Mozilla/5.0 (Windows NT 10.0) Chrome/140', '', ''), 'GET', '/claim/kelowna/cafes/a', 200, '9.9.9.1');
+  assert.equal(count(), 0);
+  // One browser, one claim page: counted, even if reloaded.
+  answer(c, req(), 'GET', '/claim/kelowna/cafes/b', 200, '9.9.9.2');
+  answer(c, req(), 'GET', '/claim/kelowna/cafes/b', 200, '9.9.9.2');
+  assert.equal(count(), 2);
+  // The same browser walking through a third different venue is a scanner: not counted.
+  answer(c, req(), 'GET', '/claim/kelowna/cafes/c', 200, '9.9.9.2');
+  assert.equal(count(), 3, 'a second different page is still fine');
+  answer(c, req(), 'GET', '/claim/vernon/cafes/d', 200, '9.9.9.2');
+  assert.equal(count(), 3, 'the third different page is not counted');
+  // Other steps (login page) are never filtered this way.
+  answer(c, req('Mozilla/5.0 (Windows NT 10.0) Chrome/140', '', ''), 'GET', '/owner/login', 200, '9.9.9.3');
+  assert.equal((db.prepare("SELECT n FROM site_event_counts WHERE name = 'portal:login_page_view'").get() || { n: 0 }).n, 1);
 });
