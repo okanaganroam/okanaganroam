@@ -27042,7 +27042,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       if (!more) return chunk;
       // Labels in the original title are already HTML-escaped by capChips.
       const features = more[1].split(', ').map((label) => `<span class="fd-extra-feature">${label}</span>`).join('');
-      const disclosure = `<details class="fd-extra-features"><summary><span class="fd-more-label">${more[2]} more features</span><span class="fd-less-label">Fewer features</span></summary><div class="fd-extra-list">${features}</div></details>`;
+      const disclosure = `<details class="fd-extra-features"><summary><span class="fd-more-label">${more[2]} more feature${Number(more[2]) === 1 ? '' : 's'}</span><span class="fd-less-label">Fewer features</span></summary><div class="fd-extra-list">${features}</div></details>`;
       return chunk.replace(more[0], '').replace(/(<p class="chips">[\s\S]*?<\/p>)/, '$1' + disclosure);
     });
   }
