@@ -22000,6 +22000,14 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(frForm, /<h1>Réclamer cette fiche<\/h1>/);
     assert.match(frForm, /Envoyer ma demande/);
     assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
+    // An old claim link (emailed before the listing was renamed) follows the rename (2026-11-07).
+    db.prepare('INSERT OR REPLACE INTO venue_slug_redirects (region, type, old_slug, venue_id, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)').run('kelowna', 'cafe', 'claim-fixture-cafe-old', v.id);
+    const oldLink = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe-old?utm_medium=email`, { redirect: 'manual' });
+    assert.equal(oldLink.status, 301);
+    assert.match(oldLink.headers.get('location'), /^\/claim\/kelowna\/cafes\/claim-fixture-cafe(\?|$)/);
+    const oldFr = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe-old`, { redirect: 'manual' });
+    assert.equal(oldFr.status, 301);
+    assert.match(oldFr.headers.get('location'), /^\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe/);
 
     // Guards and validation; nothing stored.
     const before = db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n;
