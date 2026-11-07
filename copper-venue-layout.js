@@ -39,14 +39,14 @@ function renderCopperVenueLayout(parts) {
     parts.venue.kid_friendly ? '<span>🧸 Kids welcome</span>' : '',
     parts.venue.gluten_free ? '<span>🌾 Gluten-free options</span>' : '',
     '</div>', happyLink, parts.verifiedHtml.replace(/<span class="venue-verified-date">[\s\S]*?<\/span>/, ''), '</section>',
-    '<nav class="cp-section-nav" aria-label="Copper Brewing sections"><a href="#copperOverview">Overview</a><a href="#copperMenu">Menu</a><a href="#copperDeals">Deals</a><a href="#venueHours">Hours</a></nav>',
+    '<nav class="cp-section-nav" aria-label="Copper Brewing sections"><a href="#copperOverview" aria-current="location">Overview</a><a href="#copperMenu">Menu</a><a href="#copperDeals">Deals</a><a href="#venueHours">Hours</a></nav>',
     menu, deals,
     fold('More about Copper &amp; all venue features', parts.descriptionHtml + parts.badgesHtml + parts.visitHtml + parts.verifiedHtml + parts.guideLinks + parts.ownerCtaHtml, 'cp-card'),
     fold('Upcoming events at Copper', parts.eventsHtml, 'cp-card'), parts.visitorHtml,
     '</div><aside class="cp-aside">',
     parts.detailRows ? '<div class="venue-section venue-key-info"><h2>Your visit, made easy</h2>' + parts.detailRows + '</div>' : '',
     parts.locationHtml, '<div class="venue-section venue-hours" id="venueHours">' + (parts.hoursHtml || '<h2>Hours</h2><p>Check with Copper for current hours.</p>') + '</div>',
-    '<section class="cp-card"><h2>Keep this one handy 💛</h2><p>Visit their website, give them a call, or save Copper for your next outing.</p><div class="cp-extra-actions"' + parts.ctaRowAttrs + '>' + parts.extraActionsHtml + '</div></section>',
+    '<section class="cp-card"><h2>Keep this one handy 💛</h2><p>Visit their website, give them a call, or save Copper for your next outing.</p><div class="cp-extra-actions"' + parts.ctaRowAttrs + '>' + parts.extraActionsHtml + '</div><p class="cp-save-help"><span id="copperFavoriteHelp"><strong>Favorite</strong> saves Copper for later.</span><span id="copperTripHelp"><strong>Add to trip</strong> puts Copper on your trip list.</span></p></section>',
     '</aside></div>', nearby
   ].join('\n');
 }

@@ -109,3 +109,7 @@ body.copper-page .cp-trivia-booking p {
   color:#6b655b;
 }
 body.copper-page .cp-trivia-booking > a:last-child { font-size:13px; }
+
+body.copper-page .cp-section-nav a[aria-current="location"] {background:#286962;color:#fff;box-shadow:0 2px 5px #163e3620}
+body.copper-page .cp-save-help {font-size:13px;line-height:1.6;color:#625b50;margin:14px 0 0}
+body.copper-page .cp-save-help span {display:block}
