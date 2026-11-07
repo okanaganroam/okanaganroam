@@ -1,0 +1,46 @@
+body.fd-page.fd-refresh .fd-intro {margin-bottom:10px!important}
+body.fd-page.fd-refresh .fd-type-page-link {display:none}
+body.fd-page.fd-refresh .fd-type-row {display:flex!important;flex-wrap:wrap!important;overflow:visible!important;gap:8px!important;border:0!important;margin-bottom:18px!important}
+body.fd-page.fd-refresh .fd-type-row .outdoor-filter-chip {border:1px solid #ddd6c9!important;border-radius:24px!important;background:#fffdf8!important;padding:8px 14px!important}
+body.fd-page.fd-refresh .fd-type-row .outdoor-filter-chip[aria-pressed=true] {background:#1b2b3a!important;color:white!important;border-color:#1b2b3a!important}
+body.fd-page.fd-refresh .fd-toolbar {background:#fffaf0;padding:16px;border:1px solid #e5dcc9;border-radius:22px;box-shadow:0 4px 12px #392b1b06}
+body.fd-page.fd-refresh .fd-open-note:not(.fd-open-note-end) {display:none!important}
+body.fd-page.fd-refresh .fd-pop-long {display:inline!important}
+body.fd-page.fd-refresh .fd-pop-short {display:none!important}
+body.fd-page.fd-refresh .fd-pop-panel {width:min(520px,90vw)!important;max-height:70vh;overflow:auto}
+body.fd-page.fd-refresh .fd-feature-grid {display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
+body.fd-page.fd-refresh .fd-feature-chip {justify-content:flex-start;min-height:48px}
+body.fd-page.fd-refresh .fd-pop-actions {position:sticky;bottom:0;background:#fffcf6;padding:14px}
+body.fd-page.fd-refresh .fd-pop-apply {width:100%;min-height:48px}
+.fd-panel-heading {font-size:13px;color:#2a6b67;font-weight:800;margin:0 0 9px}
+@media(max-width:640px){
+body.fd-page.fd-refresh .category-banner {height:94px!important;min-height:0!important;aspect-ratio:auto!important;margin-bottom:12px!important}
+body.fd-page.fd-refresh .category-banner img {height:94px!important;width:100%;object-fit:cover}
+body.fd-page.fd-refresh h1 {font-size:26px!important;line-height:1.15!important;margin:8px 0!important}
+body.fd-page.fd-refresh .fd-intro {font-size:14px!important;display:block!important;line-height:1.4!important}
+body.fd-page.fd-refresh .fd-toolbar {padding:10px;gap:8px;margin-bottom:12px}
+body.fd-page.fd-refresh .fd-toolbar .fd-controls {display:flex;flex-wrap:wrap;width:100%;gap:6px}
+body.fd-page.fd-refresh .fd-toolbar .fd-pop-btn {font-size:13px!important;padding:9px 12px!important}
+body.fd-page.fd-refresh .fd-toolbar .fd-open-toggle {order:0}
+body.fd-page.fd-refresh .fd-type-row {gap:6px!important;margin-bottom:10px!important}
+body.fd-page.fd-refresh .fd-type-row .outdoor-filter-chip {font-size:12px!important;min-height:36px!important;padding:6px 10px!important}
+body.fd-page.fd-refresh .fd-type-row .outdoor-activity-count {display:none}
+body.fd-page.fd-refresh .fd-pop-panel {position:fixed!important;left:10px!important;right:10px!important;top:80px!important;bottom:12px!important;width:auto!important;max-height:none!important;z-index:9999!important;padding-top:12px}
+body.fd-page.fd-refresh .fd-feature-grid {padding:8px 14px}
+body.fd-page.fd-refresh .fd-feature-chip {font-size:13px!important;padding:9px!important}
+body.fd-page.fd-refresh .venue-card {display:flex;flex-direction:column}
+body.fd-page.fd-refresh .venue-card .venue-name {font-size:21px}
+}
+body.fd-page.fd-refresh .fd-toolbar .fd-open-toggle {order:0}
+body.fd-page.fd-refresh #fdFeaturesBtn .fd-pop-icon {display:none}
+@media(max-width:640px){
+body.fd-page.fd-refresh .fd-toolbar .fd-pop-btn {font-size:12px!important;padding:8px 10px!important}
+body.fd-page.fd-refresh .fd-toolbar .fd-controls {flex-wrap:nowrap;gap:5px}
+body.fd-page.fd-refresh .fd-toolbar .fd-controls>.fd-pop {flex:0 0 auto}
+body.fd-page.fd-refresh .golf-main>.breadcrumb {margin-bottom:8px}
+}
+
+body.fd-page.fd-refresh #fdOpenNowCount { display:none }
+@media (max-width:360px) {
+  body.fd-page.fd-refresh .fd-toolbar .fd-controls { flex-wrap:wrap; }
+}
