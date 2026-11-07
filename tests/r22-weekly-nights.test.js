@@ -240,8 +240,8 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   assert.equal((en.match(/venue-wn-today/g) || []).length, 2, 'only tonight');
   assert.doesNotMatch(en, /[\u{1F300}-\u{1FAFF}]/u, 'no emoji');
   assert.match(en, /<span class="venue-hours-checked venue-wn-checked">Checked [A-Z][a-z]{2} \d+, \d{4}<\/span><\/section>$/);
-  // Placement: inside .venue-extra, before the hours.
-  const extra = html.indexOf('<div class="venue-extra">'), at1 = html.indexOf('id="venueNights"'), hours = html.indexOf('id="venueHours"');
+  // Placement: inside .venue-extra (the Food & Drink layout's main column, 2026-11-07), before the hours.
+  const extra = Math.max(html.indexOf('<div class="venue-extra">'), html.indexOf('<div class="fd-content">')), at1 = html.indexOf('id="venueNights"'), hours = html.indexOf('id="venueHours"');
   assert.ok(extra > 0 && at1 > extra && (hours === -1 || at1 < hours));
   // French: kinds in French, English title marked lang="en", the French title where given, « Ce soir ».
   const fr = card(page(v, at(TUE, '12:00'), 'fr'));

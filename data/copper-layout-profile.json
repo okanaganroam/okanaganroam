@@ -1,0 +1,24 @@
+{
+  "shortName": "Copper",
+  "intro": "Locally brewed beer, comfort food and a dog-friendly patio in Kelowna’s Landmark District. Bring the kids, try a flight and settle in for a game.",
+  "menuEyebrow": "A bite with your beer",
+  "dealsEyebrow": "Make a little time for happy hour",
+  "menuPickNames": [
+    "Smash Burger Tacos",
+    "Hummus & Veggies",
+    "Crispy Brussels Sprouts"
+  ],
+  "highlightKeys": [
+    "dog",
+    "kid",
+    "gluten"
+  ],
+  "highlightLabels": {
+    "dog": "Dogs on the patio",
+    "kid": "Kids welcome"
+  },
+  "highlightMax": 3,
+  "stripVerifiedDate": true,
+  "happyHourLink": true,
+  "visitorFirst": true
+}
