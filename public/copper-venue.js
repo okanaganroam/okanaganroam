@@ -11,6 +11,14 @@
   document.addEventListener('click', function (event) {
     var link = event.target.closest('a[href^="#"]');
     if (link) openTarget(link.getAttribute('href'));
+    var nearby = event.target.closest('.cp-nearby .nearby-link');
+    if (nearby && window.trackEvent) {
+      window.trackEvent('nearby_click', {
+        from_venue_id: Number(nearby.closest('.cp-nearby').dataset.fromVenue),
+        venue_id: Number(nearby.closest('.nearby-card').dataset.venueId),
+        surface: 'venue_page'
+      });
+    }
   });
   window.addEventListener('hashchange', function () { openTarget(location.hash); });
   openTarget(location.hash);
