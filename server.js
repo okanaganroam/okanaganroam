@@ -8875,8 +8875,9 @@ function seasonTagShortText(st) {
   }
   return st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
 }
-function seasonTagHtml(st) {
-  const short = seasonTagShortText(st);
+function seasonTagHtml(st, seasonEndLabel = false) {
+  const text = seasonTagShortText(st);
+  const short = seasonEndLabel && st.kind === 'open_until' ? text.replace(/^Closes /, 'Season ends ') : text;
   return `<p class="season-tag season-tag-${st.kind}"><span aria-hidden="true">${SEASON_TAG_ICON[st.kind] || ''}</span> ${escapeHtml(short)}</p>`;
 }
 
@@ -19150,7 +19151,7 @@ function venueCardHtml(venue, opts = {}) {
     ? { ...seasonTag, text: String(seasonTag.text).replace(/^Closed for the season\. Reopens ([A-Za-z]+ \d+)(?:, \d{4})?\.$/, 'Closed \u00b7 reopens $1') }
     : seasonTag;
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
-    ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag) : advisoryNoticeHtml(advisoryNote)}`
+    ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag, opts.seasonEndLabel) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
@@ -27619,7 +27620,7 @@ function renderWineriesHubPage(venues, filter = null, now = new Date()) {
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { welcoming: true });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { welcoming: true, cardOpts: { seasonEndLabel: true } });
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -27667,6 +27668,8 @@ ${golfEngagementHeadHtml('winery', true, 'hub')}
     body.wine-hub-page.fd-refresh #fdResults .fd-price-context {padding:8px 10px;margin:4px 0 8px;}
     body.wine-hub-page.fd-refresh #fdResults .fd-extra-features {margin:4px 0 8px;}
     body.wine-hub-page.fd-refresh #fdResults .venue-meta {margin-bottom:5px;}
+    /* Follow the photo in flex order; wrapped titles move both photo and badge together. */
+    body.wine-hub-page.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
   }
   body.wine-hub-page .wine-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.wine-hub-page .wine-guide-link a { color: var(--teal); }
