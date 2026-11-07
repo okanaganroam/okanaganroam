@@ -19908,7 +19908,7 @@ test('Wineries hub: search, regions, winery features, Open now and Sort; best fi
   const html = app.renderWineriesHubPage(venues, { types: [], features: [], regions: [] });
   assert.match(html, /<title>Wineries in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/wineries">/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page winery-page wine-hub-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh winery-page wine-hub-page">/);
   assert.match(html, /placeholder="Search by name, town or wine\.\.\."/);
   assert.match(html, /id="fdRegionsBtn"/);
   assert.match(html, /id="fdFeaturesBtn"/);
