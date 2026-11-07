@@ -21,7 +21,7 @@ function renderCopperVenueLayout(parts) {
     : '<section class="cp-card" id="copperMenu"><h2>Menu &amp; prices 🍽️</h2><p>Check Copper’s website for the latest menu.</p></section>';
   const deals = parts.happyDealsHtml || parts.weeklySpecialsHtml || parts.weeklyNightsHtml
     ? '<section class="cp-card" id="copperDeals"><div class="cp-eyebrow">Make a little time for happy hour</div><h2>Deals &amp; good times 🍻</h2><div id="venueDeals">'
-      + parts.happyDealsHtml + '</div>' + fold('Weekly food &amp; drink specials', parts.weeklySpecialsHtml) + parts.weeklyNightsHtml + '</section>' : '';
+      + parts.happyDealsHtml + '</div>' + fold('Weekly food &amp; drink specials', parts.weeklySpecialsHtml) + parts.weeklyNightsHtml + (parts.triviaBookingHtml || '') + '</section>' : '';
   const nearbyList = (cards) => cards.length ? '<ul class="nearby-list">' + cards.join('') + '</ul>' : '';
   const nearby = parts.nearbyCards.length || parts.relatedHtml || parts.nearbyHtml
     ? '<section class="cp-nearby" data-from-venue="' + Number(parts.venue.id) + '"><div class="cp-section-title"><div><div class="cp-eyebrow">While you’re in the neighbourhood</div><h2>A little more to explore 🌿</h2></div><a href="/kelowna">Explore Kelowna →</a></div>'
