@@ -393,8 +393,8 @@ test('a bare time box ("we have 2 hours in Vernon", "an hour to kill") becomes a
     assert.ok(['itinerary', 'discover'].includes(p.kind), text);
     assert.ok(!/\b(?:hour|hours|kill)\b/i.test(p.summary || ''), text + ' -> ' + p.summary);
   }
-  // A layover keeps its own handling.
-  assert.equal(app.runTripPlan({ text: '3 hours between flights in Kelowna' }).kind, 'discover');
+  // A short layover is a time box too (parity with Whistler Roam, 2026-11-06: a plan, not a list, and not a whole day).
+  assert.equal(app.runTripPlan({ text: '3 hours between flights in Kelowna' }).kind, 'itinerary');
 });
 
 test('"Christmas week" is a date, not an unknown word', () => {

@@ -1,5 +1,6 @@
 'use strict';
-const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE}=require('./trip-french-copy');
+const SITE_PAGE=require('./trip-site.js').page;
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -90,7 +91,7 @@ function t3FrenchHref(u, urlFr) {
   if (typeof urlFr === 'string' && /^\/fr(?:\/|$)/.test(urlFr)) return urlFr;
   if (typeof u !== 'string' || !/^\/(?!\/)/.test(u) || /^\/fr(?:[\/?#]|$)/.test(u)) return u;
   var path = u.split(/[?#]/)[0], first = path.split('/')[1] || '';
-  var towns = ['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+  var towns = SITE_PAGE.regionSlugs;
   var pages = ['whats-on','browse','guides','guide','food-drink','restaurants','cafes','breweries','pubs','cocktail-lounges','distilleries','wineries','golf','beaches','outdoors','tours','ski-snow','indoor','sports','dog-friendly','local-favorites','secret-spots','hidden-gems','destinations','categories','map','my-trip','trip','search','favorites'];
   return towns.indexOf(first) !== -1 || pages.indexOf(first) !== -1 ? '/fr' + u : u;
 }
@@ -98,7 +99,7 @@ function t3PlanNextSteps(p) {
   var steps=[],seen={};
   function browseUrl(item){
     var types={restaurant:'restaurants',cafe:'cafes',winery:'wineries',brewery:'breweries',pub:'pubs-bars',cocktail:'cocktail-lounges',distillery:'distilleries',beach:'beaches',golf:'golf',indoor:'indoor',outdoor:'outdoors',sport:'sports-recreation',tour:'tours'};
-    var validRegions=['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+    var validRegions=SITE_PAGE.regionSlugs;
     var regions=p.intent&&Array.isArray(p.intent.regions)?p.intent.regions:[];
     if(item.kind==='event'){
       var categories={festival:'events-festivals',market:'markets-fairs','live-music':'live-music',hockey:'sports-recreation'};
@@ -179,14 +180,14 @@ function t3EditLosesMatch(previous,next) {
 
 // What the visitor asked for that the plan could not use (2026-10-19): the "not used" words and anything the planner
 // reported as unsupported, once each.
-// "Drive from Kelowna to Penticton: about 42–50 min (estimate)" (2026-10-19).
+// "Drive from Squamish to Whistler: about 47–55 min (estimate)" (2026-10-19).
 function t3DriveText(leg, lang) {
   if (!leg || !leg.fromLabel || !leg.toLabel) return '';
   var fr = lang === 'fr', a = leg.minMinutes, b = leg.maxMinutes;
   var mins = a && b && a !== b ? (fr ? a + ' à ' + b : a + '–' + b) : String(b || a);
-  // Round 7: a drive to the other shore of Okanagan Lake goes around it, and says so.
+  // Round 7: a drive that has to go around a lake (leg.aroundLake, set by the planner) says so.
   var lake = leg.aroundLake ? (fr ? ' en contournant le lac' : ' around the lake') : '';
-  // Round 11 (2026-10-20): « Trajet d’Osoyoos », not « de Osoyoos ».
+  // Round 11 (2026-10-20): « d’ » before a vowel (« Trajet d’Alta Lake »), « de » otherwise.
   return fr ? 'Trajet ' + (/^[AEIOUYÉÈÊaeiouyéèê]/.test(leg.fromLabel) ? 'd’' : 'de ') + leg.fromLabel + ' à ' + leg.toLabel + lake + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + lake + ': about ' + mins + ' min (estimate)';
 }
 function t3DroppedRequests(p) {
@@ -323,7 +324,7 @@ function t3MapsUrl(queries) {
 }
 // The whole-trip map's points (Stage 5G, 2026-10-02): per day, in plan order,
 // each shown stop numbered by its place among that day's shown stops. Only a
-// stored location inside a generous Okanagan box counts (lat 48.5-51.5, lng
+// stored location inside a generous Sea to Sky box counts (lat 48.5-51.5, lng
 // -121.5 to -117.5); a stop without one (an event with no known place) is
 // counted as "not on the map". Removed stops and empty slots have no card, so
 // they are neither numbered nor counted.
@@ -339,10 +340,10 @@ function t3MapPoints(days, removed) {
       const key = d.day + '-' + s.daypart;
       if (removed && Object.prototype.hasOwnProperty.call(removed, key)) return;
       n += 1;
-      // Round 14 (2026-10-20): an event with a known place (its listing's pin, or a curated host such as the Penticton
-      // Trade & Convention Centre) is on the map too; Christkindl and the Penticton holiday markets were "not on the map".
+      // Round 14 (2026-10-20): an event with a known place (its listing's pin, or a curated host with no listing of
+      // its own) is on the map too; holiday markets at such hosts were "not on the map".
       const v = s.venue || (s.event && s.event.location ? { name: s.event.name, latitude: s.event.location.lat, longitude: s.event.location.lng } : null);
-      if (!v || !inRange(v.latitude, 48.5, 51.5) || !inRange(v.longitude, -121.5, -117.5)) { out.skipped += 1; return; }
+      if (!v || !inRange(v.latitude, SITE_PAGE.mapBounds.lat[0], SITE_PAGE.mapBounds.lat[1]) || !inRange(v.longitude, SITE_PAGE.mapBounds.lng[0], SITE_PAGE.mapBounds.lng[1])) { out.skipped += 1; return; }
       points.push({ n, key, label: String(s.label || ''), name: String(v.name || ''), lat: v.latitude, lng: v.longitude });
     });
     if (points.length) { out.days.push({ day: d.day, points }); out.count += points.length; }
@@ -377,10 +378,7 @@ function t3WhyLines(stop) {
 const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
-  '3 days in Kelowna: wineries, easy walks and great food',
-  '2 days in Penticton with the kids',
-  'A romantic weekend in Naramata',
-  'What can we do around Penticton if it rains?',
+  ...SITE_PAGE.examples,
 ];
 
 function renderStyles() {
@@ -485,7 +483,7 @@ function renderStyles() {
   .t3-length-ask { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-length-ask select { font: inherit; font-size: 16px; min-height: 44px; margin-left: 6px; }
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
-  /* Phone (2026-10-19, round 8): at 320px the "Where" chip's select ("Anywhere in the Okanagan") pushed the page 12px
+  /* Phone (2026-10-19, round 8): at 320px the "Where" chip's select ("Anywhere in the Sea to Sky") pushed the page 12px
      sideways. A chip now never grows past its row: long text wraps, and on narrow screens a chip's select shrinks to
      the space left beside its label. The plan's date and time inputs get 16px text and a 44px height, so tapping
      them doesn't make iPhone Safari zoom the page. */
@@ -510,7 +508,7 @@ function renderStyles() {
   .t3-plan-head .t3-btn-ghost:hover { background: rgba(255,255,255,0.12); }
   .t3-plan-status { margin: 10px 0 0; font-size: 0.88rem; color: rgba(255,255,255,0.9); min-height: 1.2em; }
   .t3-edit-error { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #FFF6E6; border: 1px solid rgba(181,69,43,0.45); color: #7A2E1B; font-size: 0.88rem; font-weight: 700; }
-  .t3-rain a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
+  .t3-rain a, .t3-ski-suggest a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
   .t3-details { margin-top: 12px; font-size: 0.84rem; color: rgba(255,255,255,0.8); }
   .t3-details summary { cursor: pointer; font-weight: 700; padding: 11px 0; } /* round 11 (2026-10-20): 44px tap target */
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
@@ -805,16 +803,16 @@ function renderStyles() {
 function t3SampleCardHtml(d) {
   const esc = d.esc;
   const x = d.sample;
-  const line = `<p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.</span></p>`;
+  const line = `<p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">${SITE_PAGE.sampleText}</span></p>`;
   if (!x || !x.stops || x.stops.length < 2) return line;
   const DAYS = [['Sunday', 'dimanche'], ['Monday', 'lundi'], ['Tuesday', 'mardi'], ['Wednesday', 'mercredi'], ['Thursday', 'jeudi'], ['Friday', 'vendredi'], ['Saturday', 'samedi']];
   const day = x.date && x.date !== d.today ? DAYS[new Date(`${x.date}T12:00:00Z`).getUTCDay()] : null;
   const two = (en, fr) => (en === fr ? esc(en) : `<span class="t3-en">${esc(en)}</span><span class="t3-fr" lang="fr">${esc(fr)}</span>`);
   const when = day ? two(day[0], day[1]) : two('Today', 'Aujourd\u2019hui');
   const rows = x.stops.map((st) => `
-          <li><span class="t3-try-time">${two(st.time, st.timeFr)}</span><span class="t3-try-stop"><a href="${esc(st.url)}">${esc(st.name)}</a>${st.hh ? `<span class="t3-try-hh">${two(`Happy hour ${st.hh}`, `Happy hour ${st.hhFr}`)}</span>` : ''}${st.deal ? `<span class="t3-try-deal">${two(st.deal, st.dealFr || st.deal)}</span>` : ''}</span></li>`).join('');
+          <li><span class="t3-try-time">${two(st.time, st.timeFr)}</span><span class="t3-try-stop"><a href="${esc(st.url)}">${esc(st.name)}</a>${st.hh ? `<span class="t3-try-hh">${two(`${SITE_PAGE.sampleStopLabel.en} ${st.hh}`, `${SITE_PAGE.sampleStopLabel.fr} ${st.hhFr}`)}</span>` : ''}${st.deal ? `<span class="t3-try-deal">${two(st.deal, st.dealFr || st.deal)}</span>` : ''}</span></li>`).join('');
   return `<div class="t3-try" aria-labelledby="t3TryTitle">
-        <p class="t3-try-title" id="t3TryTitle"><span class="t3-try-when">${when}</span> <span data-i18n="tripv3.cardTitle">A happy hour crawl in Penticton</span></p>
+        <p class="t3-try-title" id="t3TryTitle"><span class="t3-try-when">${when}</span> <span data-i18n="tripv3.cardTitle">${SITE_PAGE.sampleTitle}</span></p>
         <ol class="t3-try-stops">${rows}
         </ol>
         <button type="button" class="t3-try-btn" data-t3-request="${esc(x.request)}"><span data-i18n="tripv3.cardButton">Plan this trip</span> <span aria-hidden="true">&rarr;</span></button>
@@ -835,11 +833,11 @@ function renderBody(d) {
     <div class="t3-wrap t3-hero-inner">
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
       <p class="t3-eyebrow" data-i18n="tripv3.name">Build My Trip</p>
-      <h1 class="t3-title" id="t3Title"><span class="t3-en">Build your Okanagan trip</span><span class="t3-fr" lang="fr">Planifiez votre voyage dans l’Okanagan</span></h1>
+      <h1 class="t3-title" id="t3Title"><span class="t3-en">${SITE_PAGE.title}</span><span class="t3-fr" lang="fr">${SITE_PAGE.titleFr}</span></h1>
       <p class="t3-lead"><span class="t3-en">Tell us where you’re going, for how long, and what you’d like to do.</span><span class="t3-fr" lang="fr">Indiquez votre destination, la durée du voyage et ce que vous aimeriez faire.</span></p>
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
-        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food." data-i18n-placeholder="tripv3.placeholder"></textarea>
+        <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
           <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
@@ -882,6 +880,7 @@ function renderScript(d) {
   // Day headers that show a pre-rendered map instead of a photograph: { slug: { group: { key, label }, assets: { desktop, narrow } } } (see tripV3MapHeaders in server.js).
   var MAP_HEADERS = ${JSON.stringify(d.mapHeaders || {})};
   var TRIP_MAX_STOPS = 30; // My Trip's own limit (MAX_STOPS in /scripts/app.js; 30 since 2026-10-18)
+  var SITE_PAGE = ${JSON.stringify(SITE_PAGE)};
   ${CLIENT_HELPERS_SRC}
   ${t3EditLosesMatch.toString()}
   ${t3FrenchHref.toString()}
@@ -900,6 +899,10 @@ function renderScript(d) {
   ${frHeadingWhen.toString()}
   ${frHeadingWhere.toString()}
   ${t3FrenchHeading.toString()}
+  var FR_SITE = ${JSON.stringify(FR_SITE)};
+  ${frSiteIn.toString()}
+  ${frSiteOut.toString()}
+  ${t3FrenchTextCore.toString()}
   ${t3FrenchText.toString()}
   ${t3FrenchEvent.toString()}
   // Round 8: the written French summary and its lookup ship with t3FrenchPlan, which calls them.
@@ -942,7 +945,7 @@ function renderScript(d) {
   function frLabel(key, english){ if (lang() !== 'fr') return english; var s = tx(key); return s === key ? english : s; }
   function num(n){ return lang() === 'fr' ? String(n).replace('.', ',') : String(n); }
   // Strings for the map day header (new; kept here so the shared dictionary in app.js stays untouched).
-  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: 'Powered by Geoapify' }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: 'Fourni par Geoapify' } };
+  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: ${JSON.stringify(SITE_PAGE.mapCredit.en)} }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: ${JSON.stringify(SITE_PAGE.mapCredit.fr)} } };
   function dh(key, vars){
     var s = (DH_TEXT[lang()] || DH_TEXT.en)[key] || DH_TEXT.en[key] || key;
     if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
@@ -1137,7 +1140,7 @@ function renderScript(d) {
       return;
     }
     if (!ns || !ns.venue || ns.venue.name === oldName) return;
-    // Round 11: one full stop after a name that already ends with one ("Kelowna Brewing Co." read "Co..").
+    // Round 11: one full stop after a name that already ends with one ("Whistler Brewing Co." read "Co..").
     var stopped = function(t){ return /[.!?…]$/.test(t) ? t : t + '.'; };
     announce(oldName ? (fr ? stopped(oldName + ' a été remplacé par ' + ns.venue.name) : stopped('Swapped ' + oldName + ' for ' + ns.venue.name)) : (fr ? stopped('Nouvelle suggestion : ' + ns.venue.name) : stopped('New suggestion: ' + ns.venue.name)));
     var nb = findBtn();
@@ -1161,7 +1164,7 @@ function renderScript(d) {
     (p.recommendations || []).forEach(function(s){ if (s.venue) ids.push(s.venue.id); });
     return ids.slice(0, 200);
   }
-  function tripQuery(v){ return v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', Okanagan Valley, BC'); }
+  function tripQuery(v){ return v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', ${SITE_PAGE.addressSuffix}'); }
   function nameCounts(){
     var c = {}, p = state.last || {};
     var all = [];
@@ -1179,7 +1182,7 @@ function renderScript(d) {
   // detaches it before rewriting the result and puts it back into the new
   // plan's map slot, so an open map, its chosen day and its Leaflet instance
   // survive every edit -- only the markers and day lines are redrawn. A view
-  // only: no analytics, no URL state, no request to Okanagan Roam.
+  // only: no analytics, no URL state, no request to Whistler Roam.
   var LEAFLET_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
   var LEAFLET_JS_SRI = 'sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==';
   var LEAFLET_CSS_SRI = 'sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==';
@@ -1248,7 +1251,7 @@ function renderScript(d) {
       if (!tripMap.open || tripMap.leaflet || !tripMap.box.parentNode) return;
       if (!ok) { mapStatus(tx('tripv3.map.failed')); return; }
       try {
-        tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView([49.75, -119.55], 9);
+        tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView(${JSON.stringify(SITE_PAGE.mapCentre)}, ${SITE_PAGE.mapZoom});
         L.tileLayer(MAP_TILES, { maxZoom: 15, attribution: MAP_ATTRIBUTION }).addTo(tripMap.leaflet);
         tripMap.layer = L.layerGroup().addTo(tripMap.leaflet);
       } catch (e) { tripMap.leaflet = null; mapStatus(tx('tripv3.map.failed')); return; }
@@ -1378,7 +1381,7 @@ function renderScript(d) {
     return '/images/trip-v3/stops/stop-' + pick + '-480.jpg';
   }
   function badgesHtml(v){
-    // The badges that answer the request come first: the party's (dog, kids), then Okanagan Roam's own lists.
+    // The badges that answer the request come first: the party's (dog, kids), then Whistler Roam's own lists.
     var party = ((state.last && state.last.understood && state.last.understood.party) || []).join(' ');
     var wanted = function(b){ return (/dog/.test(party) && b.key === 'dog_friendly') || (/kid/.test(party) && b.key === 'kid_friendly') ? 0 : 1; };
     var badges = (v.badges || []).slice().sort(function(a, b){ return wanted(a) - wanted(b); });
@@ -1563,7 +1566,7 @@ function renderScript(d) {
             + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + e.name + ' au voyage' : 'Add ' + e.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || ${JSON.stringify(SITE_PAGE.fallbackRegionLabel)}) + ', ${SITE_PAGE.addressSuffix}') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + e.name + ' au voyage' : 'Add ' + e.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
@@ -1617,7 +1620,7 @@ function renderScript(d) {
       + '<source media="(max-width: ' + (nw.below - 1) + 'px)" srcset="' + esc(nw.src) + '">'
       + '<img src="' + esc(dk.src) + '" alt="" width="' + dk.w + '" height="' + dk.h + '" decoding="async" loading="' + (first ? 'eager' : 'lazy') + '"></picture>'
       + (layout.fits ? pinsHtml : '<span class="t3-dh-ring"></span>') + '</div>'
-      + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="https://www.geoapify.com/" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
+      + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="${SITE_PAGE.mapCredit.url}" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
   }
   // "N stops · About N km" for a day (2026-10-18: every day shows it, not only the first day in a town).
   function dayMeta(d){
@@ -1633,10 +1636,10 @@ function renderScript(d) {
   function mapHeadHtml(d, mh, maps){
     var meta = dayMeta(d);
     var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
-    // Round 11 (2026-10-20): a day in towns of two parts of the valley (Penticton and Vernon) is not tagged with one of them.
+    // Round 11 (2026-10-20): a day in towns of two parts of the corridor (Squamish and Pemberton) is not tagged with one of them.
     if (d.regions && d.regions.length > 1 && d.regions.some(function(r){ var h = MAP_HEADERS[r]; return !h || !h.group || !mh.group || h.group.key !== mh.group.key; })) group = '';
     return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
-      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}')) + '</h3>'
       + (group ? '<p class="t3-dh-sub">' + esc(group) + '</p>' : '')
       + '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
@@ -1705,14 +1708,14 @@ function renderScript(d) {
     // town used to show the town photo with neither. A region without a map keeps the photo header, with the same line.
     var meta = dayMeta(d);
     var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
-      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}')) + '</h3>'
       + (meta.length ? '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>' : '')
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
       + (maps ? '<a class="t3-btn" ' + hrefAttr(maps) + ' target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
-    // A label of its own for each day (2026-10-19): "Day 1 · Kelowna", not "Kelowna" twice.
-    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'
+    // A label of its own for each day (2026-10-19): "Day 1 · Whistler", not "Whistler" twice.
+    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}'))) + '">'
       + head
       + (d.driveIn ? '<p class="t3-leg t3-leg-drive t3-drive-in">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
@@ -1801,6 +1804,8 @@ function renderScript(d) {
       + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
       + rainHtml
+      // Winter: skiing is suggested, not forced (2026-10-25).
+      + (p.skiSuggestion && state.text ? '<p class="t3-expect t3-ski-suggest">' + esc(lang() === 'fr' ? p.skiSuggestion.textFr : p.skiSuggestion.text) + ' <a ' + hrefAttr(((location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip') + '?q=' + encodeURIComponent(state.text + ' ' + (lang() === 'fr' ? p.skiSuggestion.addFr : p.skiSuggestion.add))) + '>' + esc(lang() === 'fr' ? p.skiSuggestion.labelFr : p.skiSuggestion.label) + ' \u2192</a></p>' : '')
       + '</details>'
       + (notes.length ? '<details class="t3-details"><summary>' + esc(tx('tripv3.howMade')) + '</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
       + '</header>';
@@ -1858,7 +1863,7 @@ function renderScript(d) {
       var timeValue=selectedMinutes!==undefined?String(Math.floor(selectedMinutes/60)).padStart(2,'0')+':'+String(selectedMinutes%60).padStart(2,'0'):'';
       // Closed until a date or time is set, so the plan's stops come first on a phone (2026-10-14).
       var schedOpen=!!(state.overrides.startDate||selectedMinutes!==undefined);
-      schedHtml='<details class="t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Dates et heure de départ':'Dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></details>';
+      schedHtml='<details class="t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Dates et heure de départ':'Dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale ${SITE_PAGE.timeLabelFr}. Les événements conservent leurs heures indiquées.':'${SITE_PAGE.timeLabel} local time. Events keep their listed times.')+'</p></details>';
     }
     if(p.shortWalkRepairs && !Object.keys(state.removed).length){
       var swFr=lang()==='fr';
@@ -1911,7 +1916,7 @@ function renderScript(d) {
     // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
-      // Round 12 (2026-10-20): French day tabs say « Penticton et Osoyoos » (the plan's own days are not translated).
+      // Round 12 (2026-10-20): French day tabs say « Squamish et Whistler » (the plan's own days are not translated).
       if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a ' + hrefAttr('#t3-day-' + d.day) + '>' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(lang() === 'fr' ? String(d.regionLabel).replace(/ and /g, ' et ') : d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
@@ -1974,7 +1979,7 @@ function renderScript(d) {
     var c = document.getElementById('tripTrayCount');
     var n = c ? parseInt(c.textContent, 10) : NaN;
     if (!isNaN(n)) return n;
-    try { var t = JSON.parse(window.localStorage.getItem('okanaganTrip') || '[]'); return Array.isArray(t) ? t.length : 0; } catch (e) { return 0; }
+    try { var t = JSON.parse(window.localStorage.getItem('${SITE_PAGE.storagePrefix}Trip') || '[]'); return Array.isArray(t) ? t.length : 0; } catch (e) { return 0; }
   }
   function planStopButtons(day){
     var seen = {}, out = [];
@@ -2013,10 +2018,10 @@ function renderScript(d) {
     s.textContent = '';
     setTimeout(function(){ s.textContent = text; }, 40);
   }
-  // My Trip keeps the plan's days (2026-10-18): each stop's day goes in okanaganTripDays (ref -> day), the same store
+  // My Trip keeps the plan's days (2026-10-18): each stop's day goes in ${SITE_PAGE.storagePrefix}TripDays (ref -> day), the same store
   // the older planner used, so /my-trip groups the stops by day with a directions link per day. Saved trips without
   // days still show as one list.
-  // A dated one-day outing (an itinerary: "brewery crawl Penticton afternoon" on Sat, Oct 24) has no day list, so its
+  // A dated one-day outing (an itinerary: "brewery crawl Squamish afternoon" on Sat, Oct 24) has no day list, so its
   // stops are Day 1 of My Trip and keep that date (round 7: they were saved with no date at all).
   // Round 8 (2026-10-19): the date test needs a doubled backslash inside this template; a single one became "d" and
   // never matched, so a dated one-day outing still lost its date and times in My Trip.
@@ -2036,7 +2041,7 @@ function renderScript(d) {
     return y + '-' + (n < 9 ? '0' : '') + (n + 1);
   }
   function readDays(){
-    try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
+    try { var m = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
   }
   // offset: "Add to it" puts this plan's days after the days already in My Trip (Day 1 of a second trip is Day 3).
   function rememberDays(buttons, offset){
@@ -2046,11 +2051,11 @@ function renderScript(d) {
         var ref = tripKey(b), d = parseInt(b.getAttribute('data-plan-day'), 10);
         if (ref && d > 0 && b.classList.contains('in-trip') && !(offset && dayMap[ref] > 0)) dayMap[ref] = d + (offset || 0);
       });
-      localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripDays', JSON.stringify(dayMap));
       // The plan's dates and times go with them (2026-10-19): ref -> { d: date, s: start, e: end } (minutes), so
       // /my-trip shows "Day 1 · Sat, Oct 24" and each stop's planned time.
       var timeMap = {};
-      try { timeMap = JSON.parse(localStorage.getItem('okanaganTripTimes') || '{}') || {}; } catch (e2) { timeMap = {}; }
+      try { timeMap = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripTimes') || '{}') || {}; } catch (e2) { timeMap = {}; }
       if (typeof timeMap !== 'object' || Array.isArray(timeMap)) timeMap = {};
       var rows = (state.last && state.last.schedule) || [];
       buttons.forEach(function(b){
@@ -2067,11 +2072,11 @@ function renderScript(d) {
         if (row && Number.isFinite(row.startMinutes) && row.status !== 'unmet') { t.s = row.startMinutes; if (Number.isFinite(row.endMinutes)) t.e = row.endMinutes; }
         if (t.d || t.m || t.s != null) timeMap[ref] = t;
       });
-      localStorage.setItem('okanaganTripTimes', JSON.stringify(timeMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripTimes', JSON.stringify(timeMap));
       // Drive legs between towns (2026-10-19) go with their day: day -> { f, t, a, b } (from, to, min and max minutes),
       // shown on /my-trip as a row of their own, never as a stop or a map pin.
       var driveMap = {};
-      try { driveMap = JSON.parse(localStorage.getItem('okanaganTripDrives') || '{}') || {}; } catch (e3) { driveMap = {}; }
+      try { driveMap = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripDrives') || '{}') || {}; } catch (e3) { driveMap = {}; }
       if (typeof driveMap !== 'object' || Array.isArray(driveMap)) driveMap = {};
       var planDays = {};
       buttons.forEach(function(b){ var d = parseInt(b.getAttribute('data-plan-day'), 10); if (d > 0 && b.classList.contains('in-trip')) planDays[d] = true; });
@@ -2079,7 +2084,7 @@ function renderScript(d) {
         var leg = x.driveIn, at = x.day + (offset || 0);
         if (planDays[x.day] && leg && leg.fromLabel && leg.toLabel && !(offset && driveMap[at])) driveMap[at] = { f: String(leg.fromLabel), t: String(leg.toLabel), a: leg.minMinutes || null, b: leg.maxMinutes || null };
       });
-      localStorage.setItem('okanaganTripDrives', JSON.stringify(driveMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripDrives', JSON.stringify(driveMap));
     } catch (e) {}
     if (window.__roamTripRender) window.__roamTripRender();
   }
@@ -2088,11 +2093,11 @@ function renderScript(d) {
     var days = readDays(), plan = {}, max = 0;
     planStopButtons().forEach(function(b){ var r = tripKey(b); if (r) plan[r] = true; });
     try {
-      (JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []).forEach(function(x){ var k = x && (x.key || x.ref); if (k && !plan[k] && days[k] > max) max = Number(days[k]); });
+      (JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}Trip') || '[]') || []).forEach(function(x){ var k = x && (x.key || x.ref); if (k && !plan[k] && days[k] > max) max = Number(days[k]); });
     } catch (e) {}
     return max;
   }
-  // "Add whole trip" when My Trip already holds other stops (2026-10-18: an old Vernon stop and a new 12-stop plan were
+  // "Add whole trip" when My Trip already holds other stops (2026-10-18: an old stop from another town and a new 12-stop plan were
   // mixed into one list): ask first whether to replace the current trip or add to it.
   function askReplaceOrAdd(){
     var st = addState();
@@ -2158,7 +2163,7 @@ function renderScript(d) {
     var one = e.target.closest && e.target.closest('.trip-btn[data-plan-day]');
     if (one && resultEl.contains(one)) setTimeout(function(){ rememberDays([one]); }, 0);
   });
-  window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
+  window.addEventListener('storage', function(ev){ if (ev.key === '${SITE_PAGE.storagePrefix}Trip') refreshAddAll(); });
 
   // ---- interactions ----
   // An open "More" menu closes when you click elsewhere or press Escape.
@@ -2395,29 +2400,27 @@ function renderScript(d) {
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
   // /trip?region=<town> (the town pages' "Build my <town> trip" buttons): the placeholder and the four example requests
-  // name that town instead of Kelowna / Penticton / Naramata. Nothing is submitted; an unknown town changes nothing.
+  // name that town instead of the usual ones. Nothing is submitted; an unknown town changes nothing.
   (function(){
     try {
       var slug = new URLSearchParams(location.search).get('region');
       var town = slug && REGIONS.filter(function(r){ return r.slug === slug; })[0];
       if (!town || !town.label) return;
-      // The example card and its one-liner are a Penticton happy hour crawl; coming from another town's page they would
-      // show the wrong town (West Kelowna visitors saw Penticton stops), so they are hidden there.
-      if (town.slug !== 'penticton') {
+      // The example card and its one-liner are about one town (SITE_PAGE.sampleTown); from another town's page they would show
+      // the wrong town, so they are hidden there.
+      if (town.slug !== '${SITE_PAGE.sampleTown}') {
         Array.prototype.forEach.call(document.querySelectorAll('.t3-try, .t3-sample'), function(el){ el.hidden = true; if (el.style) el.style.display = 'none'; });
       }
       var n = town.label, fr = lang() === 'fr';
-      var texts = fr
-        ? ['3 jours \u00e0 ' + n + '\u00a0: vignobles, promenades faciles et bonne bouffe', '2 jours \u00e0 ' + n + ' avec les enfants', 'Une fin de semaine romantique \u00e0 ' + n, 'Que peut-on faire autour de ' + n + ' s\u2019il pleut?']
-        : ['3 days in ' + n + ': wineries, easy walks and great food', '2 days in ' + n + ' with the kids', 'A romantic weekend in ' + n, 'What can we do around ' + n + ' if it rains?'];
+      var ex = ${JSON.stringify(SITE_PAGE.townExamples)};
+      var fill = function(s){ return s.split('{n}').join(n); };
+      var texts = (fr ? ex.fr : ex.en).map(fill);
       Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip, i){
         if (!texts[i]) return;
         chip.removeAttribute('data-i18n'); chip.textContent = texts[i];
       });
       input.removeAttribute('data-i18n-placeholder');
-      input.setAttribute('placeholder', fr
-        ? 'Planifiez 3 jours \u00e0 ' + n + ' cet automne avec des vignobles, des promenades faciles et de la bonne bouffe.'
-        : 'Plan 3 days in ' + n + ' this autumn with some vineyards, some easy walks and some great food.');
+      input.setAttribute('placeholder', fill(fr ? ex.placeholderFr : ex.placeholderEn));
     } catch (e) { /* cosmetic only */ }
   })();
   // A shared link (/trip?q=...) restores the same plan: it replays the
@@ -2500,12 +2503,12 @@ function renderTripPlannerV3Page(d) {
 <meta name="description" content="${d.esc(d.description)}">
 <link rel="canonical" href="${d.canonical}">
 ${d.preview ? '<meta name="robots" content="noindex">\n' : ''}${d.faviconLink || ''}
-<meta property="og:site_name" content="Okanagan Roam">
+<meta property="og:site_name" content="${FR_SITE.brand}">
 <meta property="og:title" content="${d.esc(d.title)}">
 <meta property="og:description" content="${d.esc(d.description)}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="${d.canonical}">
-<meta property="og:image" content="https://okanaganroam.com/og-image.png">
+<meta property="og:image" content="${SITE_PAGE.siteUrl}/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 ${d.breadcrumbJson}

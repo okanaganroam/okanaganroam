@@ -726,8 +726,8 @@ test('Stage 3.2: real words near the vocabulary are never corrected (reviewed li
   assert.deepEqual(d.DISCOVERY_NEVER_CORRECT.slice().sort(), [
     'america', 'americana', 'americas', 'badly', 'bleach', 'blinking', 'bloating', 'boasting', 'boosting', 'breach', 'breeches', 'brewer', 'bridging',
     'campaign', 'celeriac', 'celia', 'circling', 'composite', 'defining', 'divining', 'drinking', 'easting', 'eater', 'exacting', 'finishing', 'flashing', 'flushing',
-    'germane', 'germanic', 'indiana', 'javanese', 'koran', 'longe', 'lounger', 'lunge', 'olive', 'olivier', 'outsider', 'outsized', 'padding', 'piazza', 'polis', 'polished', 'shopping',
-    'skidding', 'skinning', 'skipping', 'skirting', 'streak', 'toddle', 'trailers', 'trial', 'tumbling', 'westland', 'whisk',
+    'germane', 'germanic', 'indiana', 'javanese', 'koran', 'longe', 'lounger', 'lunge', 'olive', 'olivier', 'outsider', 'outsized', 'padding', 'piazza', 'polis', 'polished',
+    'shopping', 'skidding', 'skinning', 'skipping', 'skirting', 'streak', 'toddle', 'trailers', 'trial', 'tumbling', 'westland', 'whisk',
   ]);
   for (const w of d.DISCOVERY_NEVER_CORRECT) assert.deepEqual(I(w).corrections, [], w);
   // Final safety review: each is a real food, cuisine or name one edit from a target.

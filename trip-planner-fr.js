@@ -3,9 +3,9 @@
 // ---------- Build My Trip: French requests (2026-10-04) ----------
 //
 // The planner's interpreter (discovery-intent.js) reads English. A French
-// request ("3 jours à Kelowna avec des vignobles") is rewritten here, word for
+// request ("3 jours à Whistler avec des microbrasseries") is rewritten here, word for
 // word and phrase for phrase, into the English the interpreter already
-// understands ("3 days in kelowna with some vineyards"); everything after that
+// understands ("3 days in whistler with some breweries"); everything after that
 // is the same deterministic planner, so a French request can only reach the
 // places, rules and facts an English one can.
 //
@@ -13,14 +13,17 @@
 // and /browse are unchanged. A request that is not recognised as French is
 // returned exactly as given -- the same string -- so every English request
 // plans byte-for-byte as before. A venue's own name inside a French request
-// ("souper au Le Vieux Pin") is never translated.
+// ("souper au Le Petit Bistro") is never translated.
 
+const SITE_FRENCH = require('./trip-site.js').frenchRequests;
+const SITE_FRENCH_PLACES = SITE_FRENCH.places;
+const SITE_FRENCH_LAKES = SITE_FRENCH.lakes;
 const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
-  + 'randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
+const STRONG = new Set(('pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+  + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
   + 'automne biere bieres microbrasserie microbrasseries degustation terrasse terrasses lac velo raquette raquettes baignade '
@@ -31,7 +34,7 @@ const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ate
   + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite '
   // 2026-10-18: "un week-end vinicole", "où les chiens sont acceptés" (ouu is the tokenizer's où).
   + 'vinicole vinicoles viticole viticoles oenologique acceptes admis bienvenus ouu '
-  // Search gaps (2026-10-18): "végétalien kelowna" and "abordable penticton" were read as unknown words.
+  // Search gaps (2026-10-18): "végétalien whistler" and "abordable squamish" were read as unknown words.
   + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
@@ -82,7 +85,7 @@ const PHRASES = [
   ['jour', 'day'], ['jours', 'days'], ['journee', 'day'], ['journees', 'days'], ['nuit', 'night'], ['nuits', 'nights'],
   ['un', 'a'], ['une', 'a'], ['deux', 'two'], ['trois', 'three'], ['quatre', 'four'], ['cinq', 'five'], ['sept', 'seven'],
   ['huit', 'eight'], ['neuf', 'nine'], ['dix', 'ten'],
-  // Round 14 (2026-10-20): « une journée vins à Oliver » is a wine day (it read "a day wines in Oliver" and planned one
+  // Round 14 (2026-10-20): « une journée vins à Pemberton » is a wine day (it read "a day wines in Pemberton" and planned one
   // winery between a bakery and a Thai lunch).
   ['journee vins', 'wine day'], ['journee vin', 'wine day'], ['journee de vins', 'wine day'], ['journee des vins', 'wine day'], ['journee du vin', 'wine day'],
   ['journee vignobles', 'wineries day'], ['journee des vignobles', 'wineries day'], ['journee dans les vignobles', 'wineries day'],
@@ -120,7 +123,9 @@ const PHRASES = [
   ['juin', 'june'], ['juillet', 'july'], ['aout', 'august'], ['septembre', 'september'], ['octobre', 'october'],
   ['novembre', 'november'], ['decembre', 'december'],
   // Round 12 (2026-10-20): « le 1er novembre » is the 1st (« 1er » was read as an interest), and « à travers
-  // l'Okanagan » is "through" (« travers » was an interest: a road trip of meals only).
+  // la région Sea to Sky » is "through" (« travers » was an interest: a road trip of meals only).
+  // Whistler fork: « la région Sea to Sky » / « le corridor Sea to Sky » mean the whole corridor (no region filter).
+  ...SITE_FRENCH_PLACES,
   ['1er', '1'], ['1re', '1'], ['a travers', 'through'], ['au travers de', 'through'], ['au travers du', 'through the'], ['travers', 'through'],
   ['cet hiver', 'this winter'], ['en hiver', 'in winter'], ['hiver', 'winter'], ['ce printemps', 'this spring'],
   ['au printemps', 'in spring'], ['printemps', 'spring'], ['cet ete', 'this summer'], ['en ete', 'in summer'], ['l ete', 'summer'],
@@ -173,6 +178,9 @@ const PHRASES = [
   ['route de la biere', 'brewery crawl'], ['circuit des brasseries', 'brewery crawl'], ['circuit des microbrasseries', 'brewery crawl'],
   // Planner (2026-10-27): « tournée des bars / des pubs » is a bar or pub crawl (a timed happy hour outing, server.js).
   ['tournee des bars', 'bar crawl'], ['tournee des pubs', 'pub crawl'], ['tournee de bars', 'bar crawl'], ['tournee de pubs', 'pub crawl'],
+  ['equitation', 'horseback riding'], ['balade a cheval', 'horseback riding'], ['randonnee a cheval', 'horseback riding'], ['planche a roulettes', 'skate park'], ['skateparc', 'skate park'], ['planchodrome', 'skate park'], ['promenade', 'walk'], ['promenades', 'walks'], ['journee spa', 'spa day'], ['journee de repos', 'rest day'], ['journee sans ski', 'rest day'], ['jours de ski', 'ski days'], ['journees de ski', 'ski days'], ['location de velos', 'bike rentals'], ['location de skis', 'ski rentals'],
+  ['avec une journee de ski', 'with one ski day'], ['une journee de ski', 'one ski day'], ['journee de ski', 'ski day'], ['avec du ski', 'with skiing'],
+  ['magasinage', 'shopping'], ['magasiner', 'shopping'], ['faire du magasinage', 'shopping'], ['faire les boutiques', 'shopping'], ['lèche-vitrine', 'shopping'], ['leche vitrine', 'shopping'], ['boutiques', 'shops'], ['souvenirs', 'souvenirs'], ['librairie', 'bookshop'], ['librairies', 'bookshops'],
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
   ['cidrerie', 'cidery'], ['cidreries', 'cideries'],
@@ -198,6 +206,15 @@ const PHRASES = [
   ['ski de fond', 'cross country skiing'], ['skier', 'skiing'], ['raquette a neige', 'snowshoeing'], ['raquettes', 'snowshoeing'],
   ['raquette', 'snowshoeing'], ['patinage', 'skating'], ['patiner', 'skating'], ['patin', 'skating'], ['glissade sur tube', 'tubing'],
   ['activites d hiver', 'winter activities'], ['terrain de camping', 'campground'], ['terrains de camping', 'campgrounds'],
+  // Whistler Roam (2026-10-25): the words the English planner learned this round.
+  ['de vancouver a', 'from vancouver to'], ['depuis vancouver jusqu a', 'from vancouver to'], ['depuis vancouver', 'from vancouver'], ['de vancouver', 'from vancouver'], ['en partant de vancouver', 'from vancouver'],
+  ['vie nocturne', 'nightlife'], ['sortie nocturne', 'night out'], ['boite de nuit', 'nightclub'], ['boites de nuit', 'nightclubs'],
+  ['observer les ours', 'bear viewing'], ['ours', 'bears'], ['aigles', 'eagles'], ['aigle', 'eagle'], ['saumons', 'salmon'], ['saumon', 'salmon'],
+  ['cascades', 'waterfalls'], ['cascade', 'waterfall'], ['chutes', 'falls'],
+  ['grimpeurs', 'rock climbing'], ['grimpeur', 'rock climbing'], ['grimpeuses', 'rock climbing'], ['escalade', 'rock climbing'],
+  ['coucher de soleil', 'sunset spots'], ['couchers de soleil', 'sunset spots'], ['belles vues', 'views'], ['vue sur les montagnes', 'mountain views'],
+  ['avec des arrets', 'with stops along the way'], ['arrets en route', 'stops along the way'], ['arrets', 'stops'],
+  ['tyrolienne', 'zipline'], ['tyroliennes', 'ziplines'], ['saut a l elastique', 'bungee'], ['rafting', 'rafting'], ['velo de montagne', 'mountain biking'],
   ['camper', 'camping'], ['observation des oiseaux', 'birdwatching'], ['ornithologie', 'birdwatching'], ['faune', 'wildlife'],
   ['milieux humides', 'wetlands'], ['planche a pagaie', 'paddleboarding'], ['surf a pagaie', 'paddleboarding'],
   ['pagaie', 'paddling'], ['canot', 'canoe'], ['location de bateau', 'boat rental'], ['bateau', 'boating'],
@@ -209,7 +226,7 @@ const PHRASES = [
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],
   ['vue sur le lac', 'lake view'], ['vue sur lac', 'lake view'], ['vue sur la lac', 'lake view'],
   ['au bord du lac', 'by the lake'], ['bord du lac', 'by the lake'], ['pres du lac', 'by the lake'], ['sur le lac', 'on the lake'],
-  ['au bord de l eau', 'waterfront'], ['bord de l eau', 'waterfront'], ['lac okanagan', 'okanagan lake'], ['lac', 'lake'], ['lacs', 'lakes'],
+  ['au bord de l eau', 'waterfront'], ['bord de l eau', 'waterfront'], ...SITE_FRENCH_LAKES, ['lac', 'lake'], ['lacs', 'lakes'],
   ['terrasse', 'patio'], ['terrasses', 'patios'],
   // events
   ['musique live', 'live music'], ['musique en direct', 'live music'], ['musique sur scene', 'live music'],
@@ -218,6 +235,7 @@ const PHRASES = [
   ['spectacle', 'a show'], ['spectacles', 'shows'], ['evenement', 'event'], ['evenements', 'events'],
   // Round 10: Christmas markets, and « de la musique » with shows is live music.
   ['marches de noel', 'christmas markets'], ['marche de noel', 'christmas market'], ['marches du temps des fetes', 'christmas markets'], ['marche des fetes', 'christmas market'],
+  ['reveillon du nouvel an', "new year's eve"], ['veille du jour de l an', "new year's eve"], ['jour de l an', "new year's day"], ['nouvel an', "new year's"], ['saint valentin', "valentine's"], ['st valentin', "valentine's"], ['action de grace', 'thanksgiving'], ['jour du souvenir', 'remembrance day'], ['paques', 'easter'], ['fete des meres', "mother's day"], ['fete des peres', "father's day"],
   ['noel', 'christmas'], ['temps des fetes', 'holidays'],
   ['de la musique', 'live music'], ['musique', 'live music'],
   ['marches', 'markets'],
@@ -250,7 +268,7 @@ const PHRASES = [
   ['grand groupe', 'large group'], ['grands groupes', 'large groups'], ['en groupe', 'groups'], ['groupe', 'groups'], ['groupes', 'groups'],
   // Transport phrases map to the existing English walking constraints.
   ['nous n avons pas de voiture', 'we do not have a car'], ['je n ai pas de voiture', 'i do not have a car'],
-  // Round 11 (2026-10-20): « de Kelowna à Osoyoos (en voiture) » is a road trip; « en voiture » is how, not a word to match.
+  // Round 11 (2026-10-20): « de Squamish à Pemberton (en voiture) » is a road trip; « en voiture » is how, not a word to match.
   ['en voiture', 'by car'], ['en auto', 'by car'],
   ['pas de voiture', 'no car'], ['sans voiture', 'without a car'], ['sans auto', 'without a car'],
   ['a pied', 'on foot'], ['pas de conduite', 'no driving'], ['sans conduire', 'no driving'],
@@ -316,7 +334,8 @@ const PHRASES = [
 const PHRASE_MAP = new Map();
 for (const [fr, en] of PHRASES) if (!PHRASE_MAP.has(fr)) PHRASE_MAP.set(fr, en);
 const MAX_PHRASE_WORDS = Math.max(...PHRASES.map(([fr]) => fr.split(' ').length));
-const REGION_FRENCH = { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' };
+// French spellings of Sea to Sky place names -> the English the interpreter knows.
+const REGION_FRENCH = SITE_FRENCH.regions;
 
 // Lowercase, accents removed, French elisions split ("l'eau" -> "l eau",
 // "s'il" -> "si il"), clause boundaries and ISO dates kept for day instructions.
@@ -378,7 +397,7 @@ function regionAt(tokens, at, regions) {
   return 0;
 }
 
-// A standalone "à" ("3 jours à Kelowna") is French; English borrows it only
+// A standalone "à" ("3 jours à Whistler") is French; English borrows it only
 // in "à la carte" and "à la mode".
 const A_GRAVE = /(?:^|[\s,;:(\[«"'])\u00e0(?=$|[\s,;:.!?)\]»"'])(?!\s+la\s+(?:carte|mode)\b)/i;
 function isFrenchTokens(tokens, keep, text, frenchPage = false) {
@@ -482,13 +501,13 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
     // Calendar ranges must preserve both days before ordinary du/au grammar.
     if (w === 'du' && /^\d{1,2}$/.test(tokens[i+1] || '')) {out.push('from');i++;continue;}
     if (w === 'au' && /^\d{1,2}$/.test(tokens[i-1] || '') && /^\d{1,2}$/.test(tokens[i+1] || '')) {out.push('to');i++;continue;}
-    // Routes and places: "de Kelowna à Penticton" -> "from kelowna to
-    // penticton"; "à / en / au Kelowna" -> "in kelowna".
+    // Routes and places: "de Squamish à Pemberton" -> "from squamish to
+    // pemberton"; "à / en / au Whistler" -> "in whistler".
     const fr = Object.keys(REGION_FRENCH).find((p) => tokens.slice(i, i + p.split(' ').length).join(' ') === p);
     if (fr) { out.push(REGION_FRENCH[fr]); i += fr.split(' ').length; continue; }
     const nextRegion = regionAt(tokens, i + 1, places.regions);
-    // Round 10 (2026-10-19): « d'Osoyoos à Vernon » (the elided d') is a route too, and so is « Osoyoos à Vernon » with no
-    // « de » at all: both were read "of osoyoos in vernon", a trip that ran north to south.
+    // Round 10 (2026-10-19): « de Pemberton à Squamish » is a route, and so is « Pemberton à Squamish » with no
+    // « de » at all (the elided « d' » form is handled too): both were read "of pemberton in squamish", a trip that ran the wrong way.
     if ((w === 'de' || w === 'd' || w === 'depuis') && nextRegion && tokens.slice(i + 1 + nextRegion, i + 4 + nextRegion).some((x) => x === 'a' || x === 'vers' || x === 'jusqu')) {
       out.push('from'); fromOpen = true; i += 1; continue;
     }

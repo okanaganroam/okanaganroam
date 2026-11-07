@@ -211,10 +211,9 @@ test('Fix 6: a named closed place is said plainly and the plan is in its town; a
   assert.ok(!w.warnings.some((x) => /couldn’t match/.test(x)), JSON.stringify(w.warnings));
   assert.ok(stopsOf(w).some((s) => s.venue && s.venue.type === 'winery' && s.venue.region === 'kelowna'));
   assert.equal(t3FrenchText(w.warnings[0]), 'Ailm Estate Winery, Sperling Vineyards et The Vibrant Vine sont fermés pour la saison et n’ont pas encore annoncé leur réouverture; ils ne font donc pas partie de ce plan.');
-  // Open: the place named comes first.
+  // Open: the place named is the stop (parity with Whistler Roam, 2026-11-06: it was the head of an Ideas list).
   const f = full('lunch at Frankie We Salute You in Kelowna', MON_NOON);
-  assert.equal(recNames(f)[0], 'Frankie We Salute You');
-  assert.equal(f.recommendations[0].reasons[0].text, 'The place you named');
+  assert.equal(stopsOf(f)[0].venue.name, 'Frankie We Salute You');
   assert.equal(t3FrenchText('The place you named'), 'Le lieu que vous avez nommé');
   // "Masa's" read as one word is the name (consumedTerms).
   assert.ok(r.consumedTerms({ items: [{ kind: 'venue', venueName: "Masa's Grill", sourceText: '' }] }).has('masas'));

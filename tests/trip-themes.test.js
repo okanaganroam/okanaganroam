@@ -284,7 +284,7 @@ test('Day maps: stops close together go on the header picture as numbered pins; 
 
 test('The /trip page: phones get an Edit request bar, plan days are saved for My Trip, My Trip holds 30', () => {
   const src = require('node:fs').readFileSync(require.resolve('../trip-planner-v3-page.js'), 'utf8');
-  for (const marker of ['id="t3EditBar"', 'id="t3EditBtn"', 'is-compact', 'Modifier la demande', "okanaganTripDays", 'function rememberDays', 'data-t3-fit-day', 'var TRIP_MAX_STOPS = 30;']) assert.ok(src.includes(marker), `missing ${marker}`);
+  for (const marker of ['id="t3EditBar"', 'id="t3EditBtn"', 'is-compact', 'Modifier la demande', '${SITE_PAGE.storagePrefix}TripDays', 'function rememberDays', 'data-t3-fit-day', 'var TRIP_MAX_STOPS = 30;']) assert.ok(src.includes(marker), `missing ${marker}`);
   const appJs = require('node:fs').readFileSync(require.resolve('../public/scripts/app.js'), 'utf8');
   assert.match(appJs, /var MAX_STOPS = 30;/);
 });
