@@ -55511,9 +55511,10 @@ const server = http.createServer(async (req, res) => {
         return res.end(method === 'HEAD' ? undefined : fs.readFileSync(file));
       }
     }
-    // Audit fix (2026-10-27): iOS, link previewers and crawlers ask for the root apple-touch-icon paths whatever the page
-    // declares; they get the declared 180px icon (they were 404s).
-    if ((pathname === '/apple-touch-icon.png' || pathname === '/apple-touch-icon-precomposed.png') && (method === 'GET' || method === 'HEAD')) {
+    // Apple touch icons (2026-10-27, widened 2026-11-07): iOS, link previewers and crawlers ask for root icon paths
+    // whatever the page declares, including sized ones like /apple-touch-icon-120x120-precomposed.png. All get the
+    // declared 180px icon instead of a 404.
+    if (/^\/apple-touch-icon(?:-\d{2,3}x\d{2,3})?(?:-precomposed)?\.png$/.test(pathname) && (method === 'GET' || method === 'HEAD')) {
       const file = path.join(__dirname, 'public', 'images', 'icons', 'okanagan-roam-apple-touch-180.png');
       if (fs.existsSync(file)) {
         res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' });
