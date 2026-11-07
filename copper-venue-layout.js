@@ -39,7 +39,7 @@ function renderCopperVenueLayout(parts) {
     parts.venue.kid_friendly ? '<span>🧸 Kids welcome</span>' : '',
     parts.venue.gluten_free ? '<span>🌾 Gluten-free options</span>' : '',
     '</div>', happyLink, parts.verifiedHtml.replace(/<span class="venue-verified-date">[\s\S]*?<\/span>/, ''), '</section>',
-    '<nav class="cp-section-nav" aria-label="Copper Brewing sections"><a href="#copperOverview" aria-current="location">Overview</a><a href="#copperMenu">Menu</a><a href="#copperDeals">Deals</a><a href="#venueHours">Hours</a></nav>',
+    '<nav class="cp-section-nav" aria-label="Copper Brewing sections"><a href="#copperOverview" aria-current="location">Overview</a><a href="#copperMenu">Menu</a><a href="#copperDeals">Deals &amp; trivia</a><a href="#venueHours">Hours</a></nav>',
     menu, deals,
     fold('More about Copper &amp; all venue features', parts.descriptionHtml + parts.badgesHtml + parts.visitHtml + parts.verifiedHtml + parts.guideLinks + parts.ownerCtaHtml, 'cp-card'),
     fold('Upcoming events at Copper', parts.eventsHtml, 'cp-card'), parts.visitorHtml,

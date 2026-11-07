@@ -13,7 +13,7 @@ body.copper-page .cp-highlights span {background:#edf3e9;border:1px solid #d0dfc
 body.copper-page .cp-deal-link {display:inline-block;color:#286962;font-weight:800;margin-bottom:12px}
 body.copper-page .venue-verified-wrap {margin:0 0 18px!important}
 body.copper-page .cp-section-nav {display:flex;gap:8px;background:#f7f3e9;padding:8px;border:1px solid #e5dcc9;border-radius:18px;margin-bottom:18px;position:sticky;top:80px;z-index:5;box-shadow:0 3px 10px #332a1408}
-body.copper-page .cp-section-nav a {flex:1;text-align:center;text-decoration:none;padding:10px 8px;border-radius:12px;font-weight:800;font-size:14px;color:#1b2b3a}
+body.copper-page .cp-section-nav a {display:flex;align-items:center;justify-content:center;flex:1;text-align:center;text-decoration:none;padding:10px 8px;border-radius:12px;font-weight:800;font-size:14px;color:#1b2b3a}
 body.copper-page .cp-section-nav a:hover,body.copper-page .cp-section-nav a:focus-visible {background:#e8eee4}
 body.copper-page .cp-card {padding:24px;background:#fffdf8;border:1px solid #ebe3d7;border-radius:22px;margin:0 0 20px;box-shadow:0 5px 14px #44351a07}
 body.copper-page .cp-card h2 {margin:0 0 14px;font-size:24px}
