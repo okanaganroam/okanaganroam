@@ -26127,7 +26127,8 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null, welcom
       </div>
     </div>`;
   const features = pop('fdFeatures', welcoming ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', welcoming ? '' : uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state));
-  const regions = pop('fdRegions', welcoming ? 'Choose a town' : 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }));
+  const townLabel = nR ? (REGION_LABELS[state.regions[0]] || state.regions[0]) + (nR > 1 ? ` +${nR - 1}` : '') : 'Choose a town';
+  const regions = pop('fdRegions', welcoming ? `<span class="fd-town-label">${escapeHtml(townLabel)}</span>` : 'Regions', uiIcon('pin'), welcoming ? '' : nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }));
   return `<div class="fd-controls">${welcoming ? regions + features : features + regions}\n  </div>`;
 }
 // Removable active-filter tags, one row per group, plus Clear all.
@@ -26723,6 +26724,15 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
     if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    if (welcoming) {
+      var townButton = document.getElementById('fdRegionsBtn');
+      var townLabel = townButton && townButton.querySelector('.fd-town-label');
+      var townNames = labelsOf('regions', regions);
+      if (townLabel) townLabel.textContent = townNames.length ? townNames[0] + (townNames.length > 1 ? ' +' + (townNames.length - 1) : '') : 'Choose a town';
+      if (townButton) townButton.setAttribute('aria-label', townNames.length ? 'Choose a town. Selected ' + townNames.join(', ') : 'Choose a town');
+      if (townButton) townButton.title = townNames.length ? townNames.join(', ') : 'Choose a town';
+      if (regionsCount) regionsCount.hidden = true;
+    }
     if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = fdSummaryText(shown, total, filtered);
     applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
@@ -27016,6 +27026,18 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   }
   if (extra.welcoming) {
     cardChunks = cardChunks.map((chunk) => {
+      const venueId = (chunk.match(/data-venue-id="(\d+)"/) || [])[1];
+      const price = cardPriceFor(venueId);
+      const priceInfo = CARD_PRICES[venueId];
+      if (price && priceInfo && priceInfo.basis) {
+        const priceHtml = `<div class="fd-price-context"><strong>${escapeHtml(price)}</strong><span>${escapeHtml(priceInfo.basis)}</span></div>`;
+        const priceLabel = escapeHtml(price.replace(/ \/ person$/, ''));
+        chunk = chunk.replace(/<span class="chip chip-feat chip-price"[^>]*>[\s\S]*?<\/span>/g, (chip) => {
+          const label = chip.replace(/<[^>]+>/g, '').trim();
+          return label === priceLabel ? '' : chip;
+        });
+        chunk = chunk.replace('<div class="card-slot card-slot-fee">', () => '<div class="card-slot card-slot-fee">' + priceHtml);
+      }
       const more = chunk.match(/<span class="chip chip-more" title="([^"]*)"[^>]*>\+?(\d+)(?: more features)?<\/span>/);
       if (!more) return chunk;
       // Labels in the original title are already HTML-escaped by capChips.
