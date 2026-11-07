@@ -69,3 +69,31 @@ body.fd-page.fd-refresh .chip-more { white-space:nowrap; }
     position:static!important; display:inline-flex!important; margin:0 6px 6px 0!important;
   }
 }
+body.fd-page.fd-refresh #fdResults .fd-extra-features {
+  position:relative; z-index:2; order:2; margin:8px 0 12px;
+  color:#2a6b67; font:700 13px Nunito,sans-serif;
+}
+body.fd-page.fd-refresh .fd-extra-features summary {
+  cursor:pointer; min-height:44px; padding:10px 12px;
+  border:1px solid #d5e2df; border-radius:14px; background:#f0f6f2;
+}
+body.fd-page.fd-refresh .fd-extra-features summary:focus-visible {
+  outline:2px solid #8a6a0f; outline-offset:3px;
+}
+body.fd-page.fd-refresh .fd-less-label { display:none; }
+body.fd-page.fd-refresh details[open] .fd-more-label { display:none; }
+body.fd-page.fd-refresh details[open] .fd-less-label { display:inline; }
+body.fd-page.fd-refresh .fd-extra-list { display:flex; flex-wrap:wrap; gap:8px; padding:12px 0; }
+body.fd-page.fd-refresh .fd-extra-feature {
+  padding:6px 10px; background:#f1eee6; border-radius:14px; color:#4f5a62;
+}
+@media(max-width:640px) {
+  body.fd-page.fd-refresh #fdResults > .venue-card > .chips:not(:empty) {
+    flex-wrap:wrap!important; gap:8px 12px!important; overflow:visible!important;
+  }
+  body.fd-page.fd-refresh #fdResults > .venue-card > .chips > .chip {
+    flex:0 0 auto!important; max-width:100%; white-space:normal!important;
+    overflow:visible!important; text-overflow:clip!important;
+  }
+  body.fd-page.fd-refresh #fdResults > .venue-card > .chips > .chip::before { content:none!important; }
+}
