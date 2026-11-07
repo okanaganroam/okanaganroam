@@ -27650,12 +27650,23 @@ ${renderFoodDrinkOpenNowStyles()}
 <link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
 ${golfEngagementHeadHtml('winery', true, 'hub')}
 <style id="wine-hub">
+  body.wine-hub-page .wine-sort-help {margin:0 0 12px;color:var(--teal);font:700 13px/1.5 Nunito,sans-serif;}
+  body.wine-hub-page .wine-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;width:fit-content;}
+  body.wine-hub-page .wine-sort-help summary::before {content:'▸';}
+  body.wine-hub-page .wine-sort-help[open] summary::before {content:'▾';}
+  body.wine-hub-page .wine-sort-help p {max-width:70ch;margin:0 0 12px;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
   body.wine-hub-page .category-banner {height:170px;min-height:0;}
   body.wine-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;max-width:65ch;}
   body.wine-hub-page .wine-guide-link {font-size:14px;}
   @media(max-width:640px){
     body.wine-hub-page.fd-refresh .category-banner, body.wine-hub-page.fd-refresh .category-banner img {height:110px!important;}
     body.wine-hub-page .wine-guide-link {font-size:13px;margin-bottom:12px;}
+    body.wine-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.wine-hub-page.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.wine-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.wine-hub-page.fd-refresh #fdResults .fd-price-context {padding:8px 10px;margin:4px 0 8px;}
+    body.wine-hub-page.fd-refresh #fdResults .fd-extra-features {margin:4px 0 8px;}
+    body.wine-hub-page.fd-refresh #fdResults .venue-meta {margin-bottom:5px;}
   }
   body.wine-hub-page .wine-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.wine-hub-page .wine-guide-link a { color: var(--teal); }
@@ -27685,6 +27696,7 @@ ${renderGolfHeaderHtml()}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered).replace(/places?$/, (m) => (m === 'place' ? 'winery' : 'wineries')), state, sort)}
+  <details class="wine-sort-help" id="wineSortHelp"><summary>How Recommended works</summary><p>Wineries open now appear first. Within that order, we balance ratings, the number of reviews and useful listing details such as hours. Seasonal closures and notices that a winery is not operating also affect the order.</p></details>
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No wineries match that combination yet.</span> <a href="/wineries" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   <p class="fd-no-results-try">Try one word, like ${wineTry}<a href="/wineries?regions=oliver">Oliver</a> or <a href="/wineries?regions=naramata">Naramata</a>.</p></div>
@@ -27703,6 +27715,17 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('winery', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
+  <script>
+  (function(){
+    var sort = document.getElementById('fdSort'), help = document.getElementById('wineSortHelp');
+    if (!sort || !help) return;
+    function sync(){ help.hidden = sort.value !== 'recommended'; }
+    sort.addEventListener('change', sync);
+    window.addEventListener('popstate', function(){ setTimeout(sync,0); });
+    window.addEventListener('pageshow', sync);
+    sync();
+  })();
+  </script>
 </body>
 </html>`;
 }
