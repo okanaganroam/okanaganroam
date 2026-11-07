@@ -44,3 +44,28 @@ body.fd-page.fd-refresh #fdOpenNowCount { display:none }
 @media (max-width:360px) {
   body.fd-page.fd-refresh .fd-toolbar .fd-controls { flex-wrap:wrap; }
 }
+body.fd-page.fd-refresh .fd-panel-heading { padding-right:76px; }
+body.fd-page.fd-refresh .fd-panel-close {
+  position:absolute; right:14px; top:10px; padding:10px 12px;
+  min-height:44px; border:1px solid #ddd6c9; border-radius:24px;
+  background:#fffdf8; color:#1b2b3a; cursor:pointer; font:700 14px Nunito,sans-serif;
+}
+body.fd-page.fd-refresh .chip-more { white-space:nowrap; }
+@media(max-width:640px) {
+  body.fd-page.fd-refresh #fdResults > .venue-card {
+    padding:14px 18px!important; content-visibility:visible; contain-intrinsic-size:none;
+  }
+  body.fd-page.fd-refresh #fdResults > .venue-card > h2 {
+    order:-3; padding-right:32px; margin:0 0 10px; font-size:21px;
+  }
+  body.fd-page.fd-refresh #fdResults > .venue-card::before {
+    position:relative; order:-2; flex:none; inset:auto; width:calc(100% + 36px);
+    margin:0 -18px 12px; padding-bottom:56.25%; border-radius:0!important;
+  }
+  body.fd-page.fd-refresh #fdResults > .venue-card > .venue-meta { order:-1; }
+  body.fd-page.fd-refresh #fdResults .chips { flex-wrap:wrap; white-space:normal; overflow:visible; }
+  body.fd-page.fd-refresh #fdResults .local-favourite-badge,
+  body.fd-page.fd-refresh #fdResults .hidden-gem-badge {
+    position:static!important; display:inline-flex!important; margin:0 6px 6px 0!important;
+  }
+}
