@@ -55494,6 +55494,7 @@ const server = http.createServer(async (req, res) => {
     // no bundler. Cached for an hour rather than a day (unlike og-image.png)
     // since these are actively being iterated on during Phase 5.
     const STATIC_ASSETS = {
+      '/food-drink-layout.css': { file: 'public/food-drink-layout.css', type: 'text/css; charset=utf-8' },
       '/styles/tokens.css': { file: 'public/styles/tokens.css', type: 'text/css; charset=utf-8' },
       '/styles/app.css': { file: 'public/styles/app.css', type: 'text/css; charset=utf-8' },
       '/scripts/app.js': { file: 'public/scripts/app.js', type: 'application/javascript; charset=utf-8' },
