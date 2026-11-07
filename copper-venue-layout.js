@@ -24,7 +24,7 @@ function renderCopperVenueLayout(parts) {
       + parts.happyDealsHtml + '</div>' + fold('Weekly food &amp; drink specials', parts.weeklySpecialsHtml) + parts.weeklyNightsHtml + '</section>' : '';
   const nearbyList = (cards) => cards.length ? '<ul class="nearby-list">' + cards.join('') + '</ul>' : '';
   const nearby = parts.nearbyCards.length || parts.relatedHtml || parts.nearbyHtml
-    ? '<section class="cp-nearby"><div class="cp-section-title"><div><div class="cp-eyebrow">While you’re in the neighbourhood</div><h2>A little more to explore 🌿</h2></div><a href="/kelowna">Explore Kelowna →</a></div>'
+    ? '<section class="cp-nearby" data-from-venue="' + Number(parts.venue.id) + '"><div class="cp-section-title"><div><div class="cp-eyebrow">While you’re in the neighbourhood</div><h2>A little more to explore 🌿</h2></div><a href="/kelowna">Explore Kelowna →</a></div>'
       + nearbyList(parts.nearbyCards.slice(0, 3))
       + fold('More nearby places &amp; breweries', nearbyList(parts.nearbyCards.slice(3)) + parts.relatedHtml + parts.nearbyHtml) + '</section>' : '';
   return [
