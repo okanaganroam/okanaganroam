@@ -26426,6 +26426,10 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   var returnView = welcoming && history.state && history.state.fdReturn;
   if (returnView && returnView.url !== location.pathname + location.search) returnView = null;
   if (returnView) page = Math.max(1, Number(returnView.page) || 1);
+  if (returnView && Array.isArray(returnView.expanded)) cards.forEach(function(card){
+    var extra = card.querySelector('.fd-extra-features');
+    if (extra) extra.open = returnView.expanded.indexOf(card.getAttribute('data-venue-id')) !== -1;
+  });
   var searchTerm = '';
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-fd-apply]'));
   // Sort (hub only): reorder the full pool, then apply() pages through it.
@@ -26610,6 +26614,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   function fdSearchHit(card){
     if (!searchPlan.groups.length) return true;
     var text = card.__fd || '';
+    var coffeeRequest = welcoming && searchPlan.groups.some(function(alts){ return /^(coffee|cafes?)$/.test(alts[0].trim()); });
+    if (coffeeRequest) {
+      var venue = DATA[card.getAttribute('data-venue-id')] || { c: [] };
+      var specificName = searchPlan.groups.length > 1 && searchPlan.groups.every(function(alts){ return fdHit(card.__fdName, alts); });
+      if (venue.c.indexOf('cafe') === -1 && !fdHit(card.__fdName, ['coffee', 'espresso', 'roast']) && !specificName) return false;
+    }
     for (var i = 0; i < searchPlan.groups.length; i++) { if (!fdHit(text, searchPlan.groups[i])) return false; }
     return true;
   }
@@ -26875,7 +26885,8 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var link = e.target.closest && e.target.closest('#fdResults a[href]');
       if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || link.target === '_blank') return;
       var card = link.closest('.venue-card');
-      var view = { url: location.pathname + location.search, id: card.getAttribute('data-venue-id'), offset: card.getBoundingClientRect().top, page: page };
+      var view = { url: location.pathname + location.search, id: card.getAttribute('data-venue-id'), offset: card.getBoundingClientRect().top, page: page,
+        expanded: Array.prototype.map.call(results.querySelectorAll('.fd-extra-features[open]'), function(extra){ return extra.closest('.venue-card').getAttribute('data-venue-id'); }) };
       history.replaceState(Object.assign({}, history.state, { fdReturn: view }), '', location.href);
     }, true);
     window.addEventListener('pageshow', function(e){
@@ -27004,10 +27015,14 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     });
   }
   if (extra.welcoming) {
-    cardChunks = cardChunks.map((chunk) => chunk.replace(
-      /(<span class="chip chip-more"[^>]*>)\+(\d+)(<\/span>)/g,
-      '$1$2 more features$3'
-    ));
+    cardChunks = cardChunks.map((chunk) => {
+      const more = chunk.match(/<span class="chip chip-more" title="([^"]*)"[^>]*>\+?(\d+)(?: more features)?<\/span>/);
+      if (!more) return chunk;
+      // Labels in the original title are already HTML-escaped by capChips.
+      const features = more[1].split(', ').map((label) => `<span class="fd-extra-feature">${label}</span>`).join('');
+      const disclosure = `<details class="fd-extra-features"><summary><span class="fd-more-label">${more[2]} more features</span><span class="fd-less-label">Fewer features</span></summary><div class="fd-extra-list">${features}</div></details>`;
+      return chunk.replace(more[0], '').replace(/(<p class="chips">[\s\S]*?<\/p>)/, '$1' + disclosure);
+    });
   }
   // extra.cardExtraHtml (2026-10-26): Map of venue id -> ready-made HTML at the top of the card's fee slot, right under
   // the meta / open-status lines (the town Happy Hour pages' times and deals). Inside a slot, so the two-up cards'
