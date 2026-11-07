@@ -17041,6 +17041,7 @@ test('Seasons everywhere: the card tag reads "Closes Oct 31" (fr "Ferme le 31 oc
   const st = app.seasonStateOn({ status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
   assert.equal(st.text, 'Open for the season until October 31.', 'the venue page keeps the sentence');
   assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Closes Oct 31</p>`));
+  assert.match(app.seasonTagHtml(st, true), /Season ends Oct 31<\/p>$/, 'winery cards distinguish season end from daily closing time');
   assert.equal(app.frText('Closes Oct 31'), 'Ferme le 31 oct.');
   assert.equal(app.frText('Open until Oct 31'), 'Ouvert jusqu’au 31 oct.');
   assert.equal(app.frText('Open until Nov 1'), 'Ouvert jusqu’au 1er nov.');
