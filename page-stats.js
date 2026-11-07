@@ -1,5 +1,5 @@
 'use strict';
-// Pages and Roam Now detail (2026-11-06). Counted on our own server when a page is opened: how often each guide, category,
+// Pages and Roam Now detail (2026-11-06). Each page tells our server once it has loaded in a browser: how often each guide, category,
 // town and list page is opened, how many people went from it to a business or event page (read from the link they
 // followed on our own site), and which business pages were opened or got directions from Roam Now.
 // Daily totals only: a day, a page address, a fixed name, a number. No IP, no visitor id, no location, nothing typed.
@@ -56,26 +56,23 @@ function createPageStats(db) {
     up.run(day, page, name);
   }
 
-  // Called for each page request; counts once the answer is known to be a normal page (200, HTML).
-  function watch(req, res, ip, now = () => new Date()) {
-    if (req.method !== 'GET') return;
-    const path = pageOf(req.url);
-    const type = pageType(path);
-    if (!type) return;
-    res.on('finish', () => {
-      try {
-        if (res.statusCode !== 200 || !/content-type:\s*text\/html/i.test(`content-type: ${res.getHeader('Content-Type') || ''}\n${res._header || ''}`) || !demandEnabled() || isBot(req) || isInternal(req) || rateLimited(ip)) return;
-        const day = dayOf(now());
-        const page = fold(path);
-        if (isContent(type)) bump(day, page, 'view');
-        const from = ownReferer(req.headers.referer || req.headers.referrer);
-        const fromType = pageType(from);
-        if (!isContent(fromType) || !(type === 'business' || type === 'event')) return;
-        const source = fold(from);
-        bump(day, source, type === 'business' ? 'to_business' : 'to_event');
-        if (source === '/map' && type === 'business') bump(day, page, 'map_open');
-      } catch (e) { /* counting must never break the site */ }
-    });
+  // Sent by the page itself once it has loaded in a browser, so robots that only download pages are not counted.
+  function recordView(req, path, from, ip, now = new Date()) {
+    try {
+      const p = pageOf(path);
+      const type = pageType(p);
+      if (!type || !demandEnabled() || isBot(req) || isInternal(req) || rateLimited(ip)) return false;
+      const day = dayOf(now);
+      const page = fold(p);
+      if (isContent(type)) bump(day, page, 'seen');
+      const origin = ownReferer(from);
+      const fromType = pageType(origin);
+      if (!isContent(fromType) || !(type === 'business' || type === 'event')) return true;
+      const source = fold(origin);
+      bump(day, source, type === 'business' ? 'sent_business' : 'sent_event');
+      if (source === '/map' && type === 'business') bump(day, page, 'map_opened');
+      return true;
+    } catch (e) { return false; } // counting must never break the site
   }
 
   // Directions asked for on Roam Now, sent by the map page with the business's address.
@@ -97,10 +94,12 @@ function createPageStats(db) {
     const start = since(days, now);
     const map = new Map();
     const get = (page) => { if (!map.has(page)) map.set(page, { page, type: pageType(page), views: 0, to_business: 0, to_event: 0, from: { search: 0, ai: 0, social: 0, email: 0, other: 0 } }); return map.get(page); };
-    for (const r of db.prepare("SELECT page, name, SUM(n) AS n FROM page_counts WHERE day >= ? AND name IN ('view', 'to_business', 'to_event') GROUP BY page, name").all(start)) {
+    for (const r of db.prepare("SELECT page, name, SUM(n) AS n FROM page_counts WHERE day >= ? AND name IN ('seen', 'sent_business', 'sent_event') GROUP BY page, name").all(start)) {
       const e = get(r.page);
-      if (r.name === 'view') e.views = r.n; else e[r.name] = r.n;
+      if (r.name === 'seen') e.views = r.n; else if (r.name === 'sent_business') e.to_business = r.n; else e.to_event = r.n;
     }
+    // The homepage reports itself through its own page_view event.
+    if (tableExists(db, 'site_event_counts')) { const h = db.prepare("SELECT SUM(n) AS n FROM site_event_counts WHERE name = 'page_view:home' AND day >= ?").get(start).n; if (h) get('/').views = h; }
     if (tableExists(db, 'referral_counts')) {
       for (const r of db.prepare("SELECT page, source, SUM(n) AS n FROM referral_counts WHERE kind = 'visit' AND day >= ? GROUP BY page, source").all(start)) {
         const page = fold(r.page);
@@ -118,7 +117,7 @@ function createPageStats(db) {
     const types = {};
     for (const e of all) { const t = types[e.type] || (types[e.type] = { type: e.type, pages: 0, views: 0, sent: 0 }); t.pages += 1; t.views += e.views; t.sent += e.sent; }
     const enough = all.filter((e) => e.views >= 10 && e.type !== 'tool' && e.type !== 'home');
-    const first = db.prepare('SELECT MIN(day) AS d FROM page_counts').get().d;
+    const first = db.prepare("SELECT MIN(day) AS d FROM page_counts WHERE name = 'seen'").get().d;
     return {
       days, since: start, counting_since: first || null,
       totals: { pages: all.length, views: all.reduce((s, e) => s + e.views, 0), sent: all.reduce((s, e) => s + e.sent, 0) },
@@ -138,9 +137,9 @@ function createPageStats(db) {
     const filters = [...ev.entries()].filter(([k]) => k.startsWith('map_filter:')).map(([k, n]) => ({ key: k.slice(11), n })).sort((a, b) => b.n - a.n || a.key.localeCompare(b.key));
     const lookup = db.prepare('SELECT name, region FROM venues WHERE slug = ? AND redirect_to IS NULL');
     const biz = new Map();
-    for (const r of db.prepare("SELECT page, name, SUM(n) AS n FROM page_counts WHERE day >= ? AND name IN ('map_open', 'map_directions') GROUP BY page, name").all(start)) {
+    for (const r of db.prepare("SELECT page, name, SUM(n) AS n FROM page_counts WHERE day >= ? AND name IN ('map_opened', 'map_directions') GROUP BY page, name").all(start)) {
       const e = biz.get(r.page) || { page: r.page, opens: 0, directions: 0 };
-      if (r.name === 'map_open') e.opens = r.n; else e.directions = r.n;
+      if (r.name === 'map_opened') e.opens = r.n; else e.directions = r.n;
       biz.set(r.page, e);
     }
     const businesses = []; const towns = new Map();
@@ -166,7 +165,7 @@ function createPageStats(db) {
     const pv = g('page_view:map');
     const share = (n) => (pv ? Math.round((n / pv) * 100) : null);
     const step = (text, n) => ({ text, n, of_opens: share(n) });
-    const first = db.prepare("SELECT MIN(day) AS d FROM page_counts WHERE name IN ('map_open', 'map_directions')").get().d;
+    const first = db.prepare("SELECT MIN(day) AS d FROM page_counts WHERE name IN ('map_opened', 'map_directions')").get().d;
     return {
       days, since: start, counting_since: first || null,
       steps: [step('Opened Roam Now', pv), step('Used Near me', g('map_near_me')), step('Searched', g('map_search')), step('Turned on a filter', filters.reduce((s, f) => s + f.n, 0)), step('Opened a business page from the map', opens), step('Asked for directions to a business', directions), step('Arrived (on-site directions)', g('map_arrived'))],
@@ -176,7 +175,7 @@ function createPageStats(db) {
       businesses: businesses.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name)).slice(0, 40),
     };
   }
-  return { watch, recordMapDirections, pages, roamNow };
+  return { recordView, recordMapDirections, pages, roamNow };
 }
 
 module.exports = { pageType, fold, ownReferer, createPageStats };

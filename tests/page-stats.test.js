@@ -18,12 +18,8 @@ const memDb = () => {
   return d;
 };
 let ipN = 0;
-function hit(c, url, { referer, ua = 'Mozilla/5.0 (iPhone) Safari', cookie = '', status = 200, type = 'text/html; charset=utf-8', method = 'GET' } = {}) {
-  const req = { method, url, headers: { 'user-agent': ua, cookie, ...(referer ? { referer } : {}) } };
-  const res = new EventEmitter();
-  res.statusCode = status; res.getHeader = () => type;
-  c.watch(req, res, `ip-${ipN += 1}`, () => NOW);
-  res.emit('finish');
+function hit(c, url, { referer, ua = 'Mozilla/5.0 (iPhone) Safari', cookie = '' } = {}) {
+  return c.recordView({ headers: { 'user-agent': ua, cookie } }, url.split('?')[0], referer, `ip-${ipN += 1}`, NOW);
 }
 const counts = (db) => Object.fromEntries(db.prepare('SELECT page, name, n FROM page_counts').all().map((r) => [`${r.page}|${r.name}`, r.n]));
 
@@ -48,10 +44,7 @@ test('counts pages opened and where people went next; bots, staff, errors and ot
   hit(c, '/kelowna/restaurants/joes', { referer: 'https://okanaganroam.com/kelowna/restaurants/other' }); // business to business
   hit(c, '/kelowna', { ua: 'Googlebot/2.1' });
   hit(c, '/kelowna', { cookie: 'roam_internal=1' });
-  hit(c, '/kelowna', { status: 404 });
-  hit(c, '/kelowna', { type: 'application/json' });
-  hit(c, '/kelowna', { method: 'POST' });
-  assert.deepEqual(counts(db), { '/guide/kelowna/best_patios|view': 2, '/guide/kelowna/best_patios|to_business': 1, '/guide/kelowna/best_patios|to_event': 1 });
+  assert.deepEqual(counts(db), { '/guide/kelowna/best_patios|seen': 2, '/guide/kelowna/best_patios|sent_business': 1, '/guide/kelowna/best_patios|sent_event': 1 });
 });
 
 test('opening a business from Roam Now and directions are counted by business; junk addresses are refused', () => {
@@ -79,9 +72,9 @@ test('the page report joins opens, outside visits and people sent on', () => {
   const db = memDb(); const c = ps.createPageStats(db);
   const day = '2026-11-06';
   const put = db.prepare('INSERT INTO page_counts VALUES (?, ?, ?, ?)');
-  put.run(day, '/guide/kelowna/a', 'view', 20); put.run(day, '/guide/kelowna/a', 'to_business', 5);
-  put.run(day, '/guide/kelowna/b', 'view', 30); put.run(day, '/kelowna', 'view', 4);
-  put.run(day, '/kelowna/restaurants/joes', 'map_open', 2); // not a content page
+  put.run(day, '/guide/kelowna/a', 'seen', 20); put.run(day, '/guide/kelowna/a', 'sent_business', 5);
+  put.run(day, '/guide/kelowna/b', 'seen', 30); put.run(day, '/kelowna', 'seen', 4);
+  put.run(day, '/kelowna/restaurants/joes', 'map_opened', 2); // not a content page
   db.prepare('INSERT INTO referral_counts VALUES (?, ?, ?, ?, ?)').run(day, 'visit', 'search:google', '/fr/guide/kelowna/a', 6);
   db.prepare('INSERT INTO referral_counts VALUES (?, ?, ?, ?, ?)').run(day, 'visit', 'ai:chatgpt', '/guide/kelowna/a', 2);
   const r = c.pages(30, 100, NOW);
@@ -124,4 +117,24 @@ test('every Roam Now filter on the page is on the counted list, so a new chip ca
   const keys = [...block('MAP_KINDS').matchAll(/key: '([a-z_]+)'/g), ...block('MAP_MUST_HAVES').matchAll(/key: '([a-z_]+)'/g)].map((m) => m[1]);
   assert.ok(keys.length > 15);
   assert.deepEqual(keys.filter((k) => !EVENTS.has(`map_filter:${k}`)), []);
+});
+
+test('robots and our own testing are not counted as visitors', () => {
+  const { isBot, isInternal } = require('../trip-demand');
+  for (const ua of ['node', 'Mozilla/5.0', 'okr-audit/1.0', 'curl/8.7.1', 'HeadlessChrome/156', 'Mozilla/5.0 (compatible; fresh-domain-watch/1.0)']) assert.equal(isBot({ headers: { 'user-agent': ua } }), true, ua);
+  assert.equal(isBot({ headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1' } }), false);
+  const env = { INTERNAL_IPS: ' 1.2.3.4, 5.6.7.8 ' };
+  assert.equal(isInternal({ headers: { 'x-real-ip': '5.6.7.8' } }, env), true);
+  assert.equal(isInternal({ headers: { 'x-real-ip': '9.9.9.9' } }, env), false);
+  assert.equal(isInternal({ headers: {} }, env), false);
+  assert.equal(isInternal({ headers: { cookie: 'a=1; roam_internal=1' } }, {}), true);
+});
+
+test('the homepage reports through its own event, and sent-on counts can never come from a download alone', () => {
+  const db = memDb(); const c = ps.createPageStats(db);
+  db.prepare('INSERT INTO site_event_counts VALUES (?, ?, ?)').run('2026-11-06', 'page_view:home', 12);
+  hit(c, '/kelowna/restaurants/joes', { referer: 'https://okanaganroam.com/' });
+  const home = c.pages(30, 100, NOW).top.find((p) => p.page === '/');
+  assert.deepEqual([home.views, home.to_business, home.rate], [12, 1, 8]);
+  assert.equal(typeof c.watch, 'undefined');
 });
