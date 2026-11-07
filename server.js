@@ -57920,6 +57920,18 @@ const server = http.createServer(async (req, res) => {
         const type = SLUG_TO_TYPE[cm[3]];
         const venue = REGION_LABELS[cm[2]] && type ? findVenueBySlug(cm[2], type, cm[4]) : null;
         if (!venue || venue.redirect_to) {
+          // A claim link emailed before the listing was renamed, moved town or merged (2026-11-07): follow the same
+          // moves the listing page follows, so an old claim email still lands on the right claim page.
+          let moved = null;
+          if (venue && venue.redirect_to) { const t = getVenue(venue.redirect_to); moved = t && !t.redirect_to ? t : null; }
+          else if (type) {
+            const there = findActiveVenueBySlugAcrossRegions(type, cm[4]);
+            moved = there && there.region !== cm[2] ? there : findSlugRedirectVenue(cm[2], type, cm[4]);
+          }
+          if (moved && moved.slug && CATEGORY_SLUGS[moved.type]) {
+            res.writeHead(301, { Location: `${cm[1] || ''}/claim${venuePagePath(moved)}${parsed.search || ''}` });
+            return res.end();
+          }
           res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(render404Page(pathname));
         }
