@@ -39564,7 +39564,8 @@ async function handleVenueSubmission(req, res) {
     data.hours_text || null, data.happy_hour_text || null, data.social_url || null, data.submitter_role || null
   );
   const id = Number(info.lastInsertRowid);
-  await notifyVenueSubmission(id);
+  // The notice can take ~20 s (FormSubmit times out before Brevo takes over); the submitter never waits for it (2026-11-07).
+  notifyInBackground(`venue submission #${id}`, () => notifyVenueSubmission(id));
   return sendSubmissionResponse(res, 201, {
     ok: true,
     id,
@@ -43003,7 +43004,7 @@ async function handleEventSubmission(req, res) {
   }
 
   const id = insertEventSubmission(data, ip, req.headers['user-agent'], null);
-  await notifyEventSubmission(id);
+  notifyInBackground(`event submission #${id}`, () => notifyEventSubmission(id));
   return sendSubmissionResponse(res, 201, {
     ok: true,
     id,
@@ -44588,7 +44589,7 @@ async function handleOwnerEventChange(req, res, venue, subId, data) {
       data.image_link || null, data.contact_name, data.contact_email,
       data.partner_venue_ids && data.partner_venue_ids.length ? JSON.stringify(data.partner_venue_ids) : null, sub.id);
     ownerMarkFrench(res, 'event_submissions', sub.id);
-    await notifyEventSubmission(sub.id);
+    notifyInBackground(`owner event #${sub.id}`, () => notifyEventSubmission(sub.id));
     return sendSubmissionResponse(res, 200, { ok: true, id: sub.id, updated: true });
   }
   const event = sub.event_id && db.prepare('SELECT id, status FROM events WHERE id = ?').get(sub.event_id);
@@ -44797,7 +44798,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   if (duplicate) return sendSubmissionResponse(res, 409, { ok: false, error: 'You already sent this event. It is waiting for review.' });
   const id = insertEventSubmission(data, ip, req.headers['user-agent'], venue.id);
   ownerMarkFrench(res, 'event_submissions', id);
-  await notifyEventSubmission(id);
+  notifyInBackground(`owner event #${id}`, () => notifyEventSubmission(id));
   return sendSubmissionResponse(res, 201, { ok: true, id });
 }
 
@@ -51252,7 +51253,7 @@ async function handleClaimSubmission(req, res) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, data.name, data.role, data.email, data.phone, data.verify_method, data.verify_detail, data.message, lang,
     crypto.createHash('sha256').update(`okanagan-roam-claim:${ip}`).digest('hex'));
   const id = Number(info.lastInsertRowid);
-  await notifyClaim(id);
+  notifyInBackground(`claim #${id}`, () => notifyClaim(id));
   return sendSubmissionResponse(res, 201, { ok: true, id, message });
 }
 
