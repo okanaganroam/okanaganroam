@@ -26122,7 +26122,7 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null, welcom
   }
   const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${welcoming ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to eat?' : '✨ Make it your kind of outing'}</p>` : ''}${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${welcoming ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to eat?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>` : ''}${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
@@ -26422,6 +26422,10 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   var results = document.getElementById('fdResults');
   var featuresCount = document.getElementById('fdFeaturesCount');
   var regionsCount = document.getElementById('fdRegionsCount');
+  var welcoming = document.body.classList.contains('fd-refresh');
+  var returnView = welcoming && history.state && history.state.fdReturn;
+  if (returnView && returnView.url !== location.pathname + location.search) returnView = null;
+  if (returnView) page = Math.max(1, Number(returnView.page) || 1);
   var searchTerm = '';
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-fd-apply]'));
   // Sort (hub only): reorder the full pool, then apply() pages through it.
@@ -26528,6 +26532,9 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
                  meta ? meta.textContent : '', desc ? desc.textContent : '', d.k || ''];
     card.__fd = fdFold(parts.join(' '));
+    card.__fdName = fdFold(parts[0]);
+    card.__fdCategory = fdFold(parts[2]);
+    card.__fdMeta = fdFold(parts[1] + ' ' + parts[4]);
   });
   // Search (2026-10-14): every word has to match, in any order ("kelowna
   // patio", "penticton coffee"), accents and apostrophes do not matter, a few
@@ -26606,6 +26613,19 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     for (var i = 0; i < searchPlan.groups.length; i++) { if (!fdHit(text, searchPlan.groups[i])) return false; }
     return true;
   }
+  function fdSearchScore(card){
+    var score = 0;
+    if (card.__fdName.trim() === fdFold(searchTerm).trim()) score += 1000;
+    searchPlan.groups.forEach(function(alts){
+      var categoryRequest = /^(coffee|cafes?|restaurants?|breweries|brewery|pubs?|bars?|cocktails?)$/.test(alts[0].trim());
+      if (categoryRequest && fdHit(card.__fdCategory, alts)) score += 200;
+      if (fdHit(card.__fdName, alts)) score += 100;
+      else if (fdHit(card.__fdCategory, alts)) score += 60;
+      else if (fdHit(card.__fdMeta, alts)) score += 20;
+      else score += 1;
+    });
+    return score;
+  }
   var searchNote = document.getElementById('fdSearchNote');
   var noResultsText = document.getElementById('fdNoResultsText');
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
@@ -26672,6 +26692,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
       return fdMatches(types, features, regions, d.c, d.f, d.r)${O(" && (!openOn || !!OPEN_IDS[card.getAttribute('data-venue-id')])")} && (!searchTerm || fdSearchHit(card));
     });
+    if (welcoming && searchTerm && sortKey === 'recommended') matches.sort(function(a, b){ return fdSearchScore(b) - fdSearchScore(a); });
     var shown = matches.length;
     if (searchNote) { searchNote.hidden = !(searchTerm && searchPlan.corrected && shown); searchNote.textContent = searchPlan.corrected ? 'Showing results for \u201c' + searchPlan.corrected + '\u201d' : ''; }
     if (noResultsText) noResultsText.textContent = searchTerm ? 'No places match \u201c' + (searchInput ? searchInput.value.trim() : searchTerm) + '\u201d' + (activeFilterCount() ? ' with these filters.' : '.') : 'No places match that combination yet.';
@@ -26778,6 +26799,8 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       pnl.hidden = open;
     });
     pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+    var close = pnl.querySelector('[data-fd-close]');
+    if (close) close.addEventListener('click', function(){ closePops(null); b.focus(); });
   });
   // "Show results": filtering is already live, so this closes the panel and
   // hands the visitor back to the list. Every other selection is preserved.
@@ -26812,7 +26835,13 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
     });
   }
-  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); page = 1; apply('none'); });
+  window.addEventListener('popstate', function(){
+    readUrlIntoChips(); openGroupsForSelection();
+    var view = welcoming && history.state && history.state.fdReturn;
+    page = view ? Math.max(1, Number(view.page) || 1) : 1;
+    apply('none');
+    restoreVenuePosition(view);
+  });
   readUrlIntoChips();
   openGroupsForSelection();${O(`
   if (openToggle) openToggle.addEventListener('click', function(){ openOn = !openOn; page = 1; apply('push'); trackFilterChange('open_now', 'now', openOn ? 'add' : 'remove'); });
@@ -26823,7 +26852,38 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     if (openOn) { apply('none'); return; }
     paintOpenCount(pressed(typeChips, 'data-fd-type'), pressed(featureChips, 'data-fd-feature'), pressed(regionChips, 'data-region'));
   }, 60000);`)}
+  function restoreVenuePosition(view){
+    if (!welcoming || !view) return;
+    var anchor = cards.find(function(card){ return card.getAttribute('data-venue-id') === view.id; });
+    if (!anchor || anchor.parentNode !== results) return;
+    var stopped = false;
+    function stop(){ stopped = true; }
+    ['touchstart', 'wheel', 'pointerdown', 'keydown'].forEach(function(type){ window.addEventListener(type, stop, { once: true, passive: true }); });
+    function restore(){
+      if (stopped) return;
+      window.scrollTo(0, window.scrollY + anchor.getBoundingClientRect().top - view.offset);
+    }
+    requestAnimationFrame(function(){ requestAnimationFrame(restore); });
+    [100, 250, 500, 1000].forEach(function(delay){ setTimeout(restore, delay); });
+    setTimeout(function(){
+      ['touchstart', 'wheel', 'pointerdown', 'keydown'].forEach(function(type){ window.removeEventListener(type, stop); });
+    }, 1200);
+  }
+  if (welcoming) {
+    history.scrollRestoration = 'manual';
+    document.addEventListener('click', function(e){
+      var link = e.target.closest && e.target.closest('#fdResults a[href]');
+      if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || link.target === '_blank') return;
+      var card = link.closest('.venue-card');
+      var view = { url: location.pathname + location.search, id: card.getAttribute('data-venue-id'), offset: card.getBoundingClientRect().top, page: page };
+      history.replaceState(Object.assign({}, history.state, { fdReturn: view }), '', location.href);
+    }, true);
+    window.addEventListener('pageshow', function(e){
+      if (e.persisted) restoreVenuePosition(history.state && history.state.fdReturn);
+    });
+  }
   apply('replace');
+  restoreVenuePosition(returnView);
 }
   // Lighter pages (2026-10-18): the cards after the first page arrive right
   // after the page appears (see withRestCardsDeferred); the filters start
@@ -26942,6 +27002,12 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
+  }
+  if (extra.welcoming) {
+    cardChunks = cardChunks.map((chunk) => chunk.replace(
+      /(<span class="chip chip-more"[^>]*>)\+(\d+)(<\/span>)/g,
+      '$1$2 more features$3'
+    ));
   }
   // extra.cardExtraHtml (2026-10-26): Map of venue id -> ready-made HTML at the top of the card's fee slot, right under
   // the meta / open-status lines (the town Happy Hour pages' times and deals). Inside a slot, so the two-up cards'
@@ -27406,7 +27472,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   // them, so every venue stays searchable and filterable and the count is
   // always "N of 850". data-fd-i keeps the canonical order stable no matter
   // which subset happens to be live.
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId);
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { welcoming: true });
 
   return `<!DOCTYPE html>
 <html lang="en">
