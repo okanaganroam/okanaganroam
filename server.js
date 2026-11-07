@@ -24349,9 +24349,9 @@ function renderOutdoorRegionFilterChips(venues, state = {}) {
   const count = (r) => (state.counts && state.counts.regions ? (state.counts.regions[r] || 0) : (counts.get(r) || 0));
   const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])} <span class="outdoor-activity-count">${count(r)}</span></button>`;
   const placed = new Set();
-  const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r]) }));
+  const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r] && (!state.hideEmpty || counts.get(r) || selected.has(r))) })).filter((g) => g.regions.length);
   groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
-  const leftover = canonicalOutdoorRegionOrder().filter((r) => !placed.has(r));
+  const leftover = canonicalOutdoorRegionOrder().filter((r) => !placed.has(r) && (!state.hideEmpty || counts.get(r) || selected.has(r)));
   if (leftover.length) groups.push({ label: 'Other', slug: 'other', regions: leftover });
   const blocks = groups.map((g) => {
     // A group holding a URL-selected region renders open with its
@@ -27619,17 +27619,17 @@ function renderWineriesHubPage(venues, filter = null, now = new Date()) {
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId);
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { welcoming: true });
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to sip?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys))}
+    ${pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts, hideEmpty: true }))}
+    ${pop('fdFeatures', '✨ Filters', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys))}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   // The town pages, busiest first, for visitors and crawlers alike.
@@ -27647,8 +27647,16 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
 ${golfEngagementHeadHtml('winery', true, 'hub')}
 <style id="wine-hub">
+  body.wine-hub-page .category-banner {height:170px;min-height:0;}
+  body.wine-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;max-width:65ch;}
+  body.wine-hub-page .wine-guide-link {font-size:14px;}
+  @media(max-width:640px){
+    body.wine-hub-page.fd-refresh .category-banner, body.wine-hub-page.fd-refresh .category-banner img {height:110px!important;}
+    body.wine-hub-page .wine-guide-link {font-size:13px;margin-bottom:12px;}
+  }
   body.wine-hub-page .wine-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.wine-hub-page .wine-guide-link a { color: var(--teal); }
   body.wine-hub-page .wine-towns { margin: 26px 0 8px; }
@@ -27659,7 +27667,7 @@ ${golfEngagementHeadHtml('winery', true, 'hub')}
   body.wine-hub-page .wine-towns a span { font-size: 0.74rem; color: var(--ref-navy-muted, #56636E); }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page winery-page wine-hub-page">
+<body class="golf-page outdoor-page fd-page fd-refresh winery-page wine-hub-page">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -27667,10 +27675,12 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Wineries' }])}
   ${categoryHeroHtml(categoryBannerHtml('winery'), `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.winery)}</p>
+  <p class="outdoor-intro fd-intro">Find your next favourite tasting, vineyard patio or little wine-country escape. 🍇</p>
   <p class="wine-guide-link"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>`)}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search wineries').replace('Search by name, place or dish...', 'Search by name, town or wine...')}
   ${controlsHtml}
+  </div>
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
