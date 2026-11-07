@@ -21961,6 +21961,28 @@ test('Edit link re-sends (2026-10-18): repeated requests never push out the work
   assert.ok(app.venueForOwnerToken(t3));
 });
 
+test('Claim submission answers at once even when the email notice is slow (2026-11-07)', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Slow Notice Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'slow-notice-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'slow-notice-cafe');
+  db.prepare("UPDATE venues SET phone = '250-555-0188' WHERE id = ?").run(v.id);
+  let sent = 0;
+  app.setVenueSubmissionTransport(async () => { await new Promise((r) => setTimeout(r, 1500)); sent += 1; });
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const t0 = Date.now();
+    const r = await fetch(`${base}/api/claims`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.77.0.1' },
+      body: JSON.stringify({ venue_id: v.id, lang: 'en', started_at: Date.now() - 10000, company_website: '', name: 'Sam Slow', role: 'owner', email: 'sam@slownotice.example', phone: '250 555 0188', verify_method: 'call', verify_detail: '', message: '' }) });
+    assert.equal(r.status, 201);
+    assert.ok(Date.now() - t0 < 1200, `answered in ${Date.now() - t0} ms, not after the 1.5 s notice`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    assert.equal(sent, 1, 'the notice still goes out');
+    assert.equal(db.prepare('SELECT notify_status FROM venue_claims WHERE venue_id = ?').get(v.id).notify_status, 'sent');
+  } finally { srv.close(); app.setVenueSubmissionTransport(null); db.prepare('DELETE FROM venue_claims WHERE venue_id = ?').run(v.id); }
+});
+
 test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, storage, email to info@, admin approve makes a working link', async () => {
   const http = require('node:http');
   seasonInsert.run({ name: 'Claim Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'claim-fixture-cafe' });
