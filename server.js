@@ -33833,11 +33833,20 @@ function renderVenuePageLayoutStyles() {
 // GET /:region/:category/:slug — individual venue page
 // A venue whose weekly hours are show times (2026-10-29): its page leads with the next show (see showRun).
 const SHOW_VENUE_RE = /\b(theatre|theater|playhouse|opera house|cabaret)\b/i;
+// A Food & Drink page: a Food & Drink type, or any venue also listed in one of the Food & Drink categories (a winery with a
+// restaurant listing, say). Redirect stubs never are.
+function foodDrinkPageApplies(venue) {
+  if (!venue || venue.redirect_to) return false;
+  return FOOD_DRINK_TYPES.includes(venue.type) || getFoodDrinkCategoriesForVenueIds([venue.id]).has(venue.id);
+}
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
   const fr = opts.lang === 'fr';
-  const copperLayout = !fr && !venue.redirect_to && venue.region === 'kelowna'
-    && venue.type === 'brewery' && venue.slug === 'copper-brewing-co';
+  // Food & Drink venue layout (2026-11-07): every English Food & Drink page uses Copper's approved layout, built from the
+  // venue's own record (food-drink-venue-layout.js). Copper's own wording is its profile, which no other venue gets.
+  const fdLayout = !fr && !venue.redirect_to && foodDrinkPageApplies(venue);
+  const copperProfile = fdLayout && venue.region === 'kelowna' && venue.type === 'brewery' && venue.slug === 'copper-brewing-co'
+    ? require('./data/copper-layout-profile.json') : null;
   // Round 12 (2026-10-20): « du Okanagan Golf Club » in a French description reads « de l’Okanagan Golf Club ».
   if (fr && venue.description_fr) venue = { ...venue, description_fr: frElideOkanagan(venue.description_fr) };
   const L = (en, frText) => (fr ? frText : en);
@@ -34139,7 +34148,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // an image_url today; if one ever does, the photo hero renders and the
   // <h1> falls back into the header.
   const themedShell = usesThemedVenueShell(venue.type);
-  const themedHeroTitle = themedShell && !venue.image_url;
+  // The Food & Drink layout has no photo-less hero block: the name is its own <h1> (mobile title above the photos).
+  const themedHeroTitle = themedShell && !venue.image_url && !fdLayout;
   const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
   const photoCredit = venue.image_url ? (ownerPhotoCreditFor(venue.image_url) || visitorPhotoCreditFor(venue.image_url, L) || require('./data/venue-photo-credits.json')[venue.image_url.split('?')[0]]) : null;
   // Gallery (2026-10-16): with two or more photos the hero gets a "See all"
@@ -34188,7 +34198,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}"${heroPosY === null ? '' : ` style="object-position: 50% ${heroPosY}%"`} fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}${creditOverlay}</div>` : '';
   const creditHtml = creditText && galleryHtml ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo: ', 'Photo : ')}${escapeHtml(creditText)}</p>` : '';
-  const imageHtml = venue.image_url
+  const imageHtml = fdLayout && !venue.image_url ? '' : venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : heroPhotoHtml)
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
@@ -34304,7 +34314,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // stay at the bottom.
   const nearbyStripPhotos = new Set();
   const nearbyStripIds = new Set();
-  let copperNearbyCards = [];
+  let fdNearbyCards = [];
   const nearbyStripHtml = (() => {
     if (venue.redirect_to) return '';
     const seen = new Set([venue.id]);
@@ -34330,7 +34340,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
         <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(L(`Add ${v.name} to trip`, `Ajouter ${v.name} au voyage`))}">${fr ? appTripLabelHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage') : APP_TRIP_LABEL_HTML}</button>
       </li>`;
     });
-    if (copperLayout) copperNearbyCards = cardItems;
+    if (fdLayout) fdNearbyCards = cardItems;
     const cards = cardItems.join('');
     return `<section class="nearby-strip" aria-labelledby="nearbyStripHead">
     <h2 id="nearbyStripHead">${L('Close by', 'À proximité')}</h2>
@@ -34499,40 +34509,60 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '${fr ? '/fr' : ''}/owner/account/venue/' + box.getAttribute('data-venue-id');
   })();
   </script>`;
-  const copperBody = copperLayout ? (() => {
-    const items = venueMenu ? venueMenu.data.sections.flatMap((section) => section.items) : [];
-    const names = ['Smash Burger Tacos', 'Hummus & Veggies', 'Crispy Brussels Sprouts'];
-    const selected = names.map((name) => items.find((item) => item.name.toLowerCase() === name.toLowerCase())).filter(Boolean);
-    const picks = selected.length ? selected : items.slice(0, 3);
-    const prices = picks.map((item) => /^\$?\d+(?:\.\d{1,2})?$/.test(String(item.price)) ? Number(String(item.price).replace('$', '')) : NaN).filter(Number.isFinite);
-    const priceHint = prices.length ? 'Menu examples ' + menuPriceLabel(String(Math.min(...prices))) + (Math.max(...prices) !== Math.min(...prices) ? '–' + menuPriceLabel(String(Math.max(...prices))).replace('$', '') : '') : '';
-    const atAGlance = priceHint ? atAGlanceParts.replace(/ &middot; \$+$/, '') + ' &middot; ' + escapeHtml(priceHint) : atAGlanceParts;
+  const fdBody = fdLayout ? (() => {
+    const fdLib = require('./food-drink-venue-layout');
+    const profile = copperProfile || {};
+    const picks = venueMenu ? fdLib.pickMenuExamples(venueMenu.data.sections, profile.menuPickNames) : [];
+    const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
+    const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
+    const atAGlance = [
+      label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
+    ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
-    const triviaBooking = require('./data/copper-trivia-booking.json');
-    const copperNights = weeklyNights ? {
-      ...weeklyNights,
-      rows: weeklyNights.rows.map((row) => row.s.kind === 'trivia'
-        ? { ...row, s: { ...row.s, detail: 'Reserve directly with Copper Brewing.', host: null } }
-        : row),
-    } : null;
-    const hasTrivia = copperNights && copperNights.rows.some((row) => row.s.kind === 'trivia');
-    const triviaBookingHtml = hasTrivia
-      ? '<div class="cp-trivia-booking"><a class="cta" href="tel:' + escapeHtml(triviaBooking.phone) + '"' + trackAttr('booking') + '>Call to book trivia</a><p>Reservations with Copper · ' + escapeHtml(triviaBooking.displayPhone) + '</p><a href="' + escapeHtml(triviaBooking.sourceUrl) + '" target="_blank" rel="nofollow noopener">Copper’s reservation details ↗</a></div>'
-      : '';
-    return require('./copper-venue-layout').renderCopperVenueLayout({
-      venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml,
-      directionsHtml, extraActionsHtml: ctaEntries.filter((action) => action !== directionsHtml).join('\n'),
-      ctaRowAttrs, menuPicks: picks, formatPrice: menuPriceLabel,
+    const saveActions = ctaEntries.find((action) => action.includes('fav-btn')) || '';
+    const contactActions = ctaEntries.filter((action) => action !== directionsHtml && action !== saveActions);
+    const descText = editorial ? editorial.intro : trimVenueTagline(venue.description);
+    const desc = fdLib.introFrom(descText);
+    // Copper's reservation line for its trivia night (its own booking page; a phone call, so it says "Call to book").
+    let weeklyNightsForPage = weeklyNights, extraDealsHtml = '';
+    if (copperProfile) {
+      const triviaBooking = require('./data/copper-trivia-booking.json');
+      weeklyNightsForPage = weeklyNights ? {
+        ...weeklyNights,
+        rows: weeklyNights.rows.map((row) => row.s.kind === 'trivia'
+          ? { ...row, s: { ...row.s, detail: 'Reserve directly with Copper Brewing.', host: null } }
+          : row),
+      } : null;
+      if (weeklyNightsForPage && weeklyNightsForPage.rows.some((row) => row.s.kind === 'trivia')) {
+        extraDealsHtml = '<div class="fd-trivia-booking"><a class="cta" href="tel:' + escapeHtml(triviaBooking.phone) + '"' + trackAttr('booking') + '>Call to book trivia</a><p>Reservations with Copper · ' + escapeHtml(triviaBooking.displayPhone) + '</p><a href="' + escapeHtml(triviaBooking.sourceUrl) + '" target="_blank" rel="nofollow noopener">Copper’s reservation details ↗</a></div>';
+      }
+    }
+    const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
+    return fdLib.renderFoodDrinkVenueLayout({
+      venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml, profile: copperProfile,
+      regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
+      menuPicks: picks, formatPrice: menuPriceLabel,
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
-      menuLink: menuPagePath(venue, 'en'), menuCount: venueMenu ? venueMenu.items : 0,
+      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(venueMenu.items, 'en', menuKind(venue)) : '',
+      menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(copperNights, false), triviaBookingHtml,
-      visitHtml, descriptionHtml: '<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
+      nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
+      highlights: fdLib.highlightsFor(venue, dogFriendlyNote, profile),
+      intro: desc.intro,
+      dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
+      editorialHtml, whyHtml: venueWhyHtml,
+      recognitionHtml: (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
+      visitHtml, descriptionHtml: (copperProfile || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
       badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
-      detailRows: detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, ''),
+      dogNoteHtml: !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
+      // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;
+      // every other venue keeps its rows (the price row, the happy hour row with its jump to the deals).
+      detailRows: copperProfile ? detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, '') : detailRows,
       locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, 'en'), guideLinks, ownerCtaHtml,
-      eventsHtml: venueEventsHtml, nearbyCards: copperNearbyCards, relatedHtml, nearbyHtml,
+      eventsHtml: venueEventsHtml, nearbyCards: fdNearbyCards, relatedHtml, nearbyHtml,
     });
   })() : '';
   const page = `<!DOCTYPE html>
@@ -34541,9 +34571,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: (fr && !FRENCH_INDEXABLE) || venuePageIsThin(venue), alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', shopTheme: venue.type === 'shop', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
-${copperLayout ? '<link rel="stylesheet" href="/copper-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'copper-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
+${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
 </head>
-<body${copperLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ' copper-page"') : themedBodyClassAttr(venue.type, themedShell)}>
+<body${fdLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ` fd-venue-page${venue.image_url ? '' : ' fd-no-photo'}"`) || ' class="fd-venue-page fd-no-photo"' : themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   <div class="venue-topbar">${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
@@ -34566,9 +34596,9 @@ ${copperLayout ? '<link rel="stylesheet" href="/copper-venue.css?v=' + crypto.cr
     .venue-topbar .venue-top-links .category-back-link { display: none; }
     .venue-topbar .venue-lang-switch { margin: 0 !important; white-space: nowrap; }
   }</style>
-  ${themedHeroTitle ? '' : `<h1 class="venue-mobile-title">${escapeHtml(venue.name)}</h1>`}
+  ${themedHeroTitle || (fdLayout && !venue.image_url) ? '' : `<h1 class="venue-mobile-title">${escapeHtml(venue.name)}</h1>`}
   ${imageHtml}
-  ${copperLayout ? copperBody : `  <div class="venue-layout">
+  ${fdLayout ? fdBody : `  <div class="venue-layout">
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1 class="venue-desktop-title">${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
@@ -34608,7 +34638,7 @@ ${copperLayout ? '<link rel="stylesheet" href="/copper-venue.css?v=' + crypto.cr
   ${renderHomeFooterHTML(true)}
   ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
-${copperLayout ? '<script src="/copper-venue.js?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'copper-venue.js'))).digest('hex').slice(0, 12) + '"></script>' : ''}
+${fdLayout ? '<script src="/food-drink-venue.js?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-venue.js'))).digest('hex').slice(0, 12) + '"></script>' : ''}
 ${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
@@ -55649,8 +55679,8 @@ const server = http.createServer(async (req, res) => {
     // no bundler. Cached for an hour rather than a day (unlike og-image.png)
     // since these are actively being iterated on during Phase 5.
     const STATIC_ASSETS = {
-      '/copper-venue.css': { file: 'public/copper-venue.css', type: 'text/css; charset=utf-8' },
-      '/copper-venue.js': { file: 'public/copper-venue.js', type: 'application/javascript; charset=utf-8' },
+      '/food-drink-venue.css': { file: 'public/food-drink-venue.css', type: 'text/css; charset=utf-8' },
+      '/food-drink-venue.js': { file: 'public/food-drink-venue.js', type: 'application/javascript; charset=utf-8' },
       '/food-drink-layout.css': { file: 'public/food-drink-layout.css', type: 'text/css; charset=utf-8' },
       '/styles/tokens.css': { file: 'public/styles/tokens.css', type: 'text/css; charset=utf-8' },
       '/styles/app.css': { file: 'public/styles/app.css', type: 'text/css; charset=utf-8' },

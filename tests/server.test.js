@@ -1936,7 +1936,7 @@ test('Kin & Folk page: Penticton dining information reaches search, visible copy
   assert.match(html, /<title>Kin &amp; Folk Penticton: Menu &amp; Reservations \| Okanagan Roam<\/title>/);
   assert.match(html, /<meta name="description" content="Visit Kin &amp; Folk in Penticton at 557 Main Street/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/penticton\/restaurants\/kin-folk"/);
-  assert.match(html, /<h1>Kin &amp; Folk<\/h1>/);
+  assert.match(html, /<h1[^>]*>Kin &amp; Folk<\/h1>/);
   assert.match(html, /Asian-inspired food/);
   const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
   const restaurant = schemas.find((s) => s['@type'] === 'Restaurant');
@@ -1978,7 +1978,7 @@ test('Elora page: search and visible copy answer dining intent without altering 
   assert.match(html, /<title>Elora Restaurant &amp; Bar Vernon: Menu &amp; Dining Info \| Okanagan Roam<\/title>/);
   assert.match(html, /<meta name="description" content="Find Elora Restaurant &amp; Bar in Vernon at 5350 Anderson Way\./);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/vernon\/restaurants\/elora-restaurant-bar"/);
-  assert.match(html, /<h1>Elora Restaurant &amp; Bar<\/h1>/);
+  assert.match(html, /<h1[^>]*>Elora Restaurant &amp; Bar<\/h1>/);
   assert.match(html, /inside the Best Western Premier Route 97/);
   assert.doesNotMatch(html, /Expect the chef to visit every table/);
   const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
@@ -2009,7 +2009,7 @@ test('Elora page: editorial copy is limited to the active Vernon restaurant', ()
 test('renderVenuePage produces a page with the venue name as H1 and a canonical link', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.match(html, /<h1>Test Trattoria<\/h1>/);
+  assert.match(html, /<h1[^>]*>Test Trattoria<\/h1>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/restaurant/);
   assert.match(html, /BreadcrumbList/); // JSON-LD present
 });
@@ -5219,7 +5219,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   const venuePage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
   assert.equal(venuePage.status, 200);
-  assert.match(await venuePage.text(), /<h1>Test Trattoria<\/h1>/);
+  assert.match(await venuePage.text(), /<h1[^>]*>Test Trattoria<\/h1>/);
 
   const notFound = await fetch(`${base}/this-region-does-not-exist`);
   assert.equal(notFound.status, 404);
@@ -7076,7 +7076,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), `${type}: app.css before the inline SEO CSS`);
     assert.match(html, /body\.golf-page \{/, type);
     assert.match(html, /<style>\s*\/\* Hero: same per-type gradient/, `${type}: venue hero polish`);
-    assert.match(html, new RegExp(`<body class="golf-page ${type}-page">`), type);
+    assert.match(html, new RegExp(`<body class="golf-page ${type}-page fd-venue-page fd-no-photo">`), type);
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, type);
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${type}: tray precedes the header`);
     assert.match(html, /<header id="top">/, type);
@@ -7085,8 +7085,9 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
     assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, type);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
-    assert.match(html, new RegExp(`<div class="venue-hero venue-hero-fallback venue-hero-${type}">\\s*<span class="venue-hero-type">${label}</span>\\s*<h1>Test Trattoria</h1>\\s*</div>`), `${type}: hero carries the title`);
-    assert.match(html, /<div class="venue-header">\s*<p class="venue-at-a-glance">/, `${type}: header does not repeat the name`);
+    // Food & Drink layout (2026-11-07): a venue with no photo has no hero block; its name is the one <h1>, in the header.
+    assert.doesNotMatch(html, /<div class="venue-hero venue-hero-fallback/, `${type}: no empty photo block`);
+    assert.match(html, /<div class="venue-header"><h1 class="venue-desktop-title">Test Trattoria<\/h1>/, `${type}: the header carries the title`);
     assert.doesNotMatch(html.replace(/<style>[\s\S]*?<\/style>/g, ''), /venue-hero-name/, `${type}: duplicate hero name removed`);
   }
 });
@@ -7115,10 +7116,13 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip<\\/button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
+    // Food & Drink layout (2026-11-07): Directions leads the main buttons (Call and the save buttons sit in the "Keep this one handy" card).
+    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page"><a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps</a>(?:<a class="cta secondary" href="#venueHours">[^<]*</a>)?</div>`), `${type}: main buttons`);
+    assert.match(html, new RegExp(`<div class="fd-actions fd-contact-actions" data-venue-id="\\d+"[^>]*><a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a></div>`), `${type}: Call`);
+    assert.match(html, new RegExp(`<div class="fd-actions fd-save-actions" data-venue-id="\\d+"[^>]*>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip</button>\\s*</div>`), `${type}: Favorite / Add to trip`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
-    assert.match(html, /<h2>Good to Know<\/h2>/);
-    // Favorite / Add to Trip (2026-10-14): one of each, in the CTA row.
+    assert.match(html, /<h2>Your visit, made easy<\/h2>/);
+    // Favorite / Add to Trip (2026-10-14): one of each (Food & Drink layout, 2026-11-07: in the "Keep this one handy" card).
     const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '');
     assert.equal((markup.match(/class="card-action fav-btn"/g) || []).length, 1, `${type}: one Favorite`);
     assert.equal((markup.match(/class="card-action trip-btn"/g) || []).length, 1, `${type}: one Add to trip`);
@@ -7569,7 +7573,7 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
   // theme, app.css, tray, app.js) but still no beach theme, advisory,
   // Favorite / Add to Trip or tracking markup.
   const page = app.renderVenuePage(trattoria, [], [], []);
-  assert.match(page, /<body class="golf-page restaurant-page">/);
+  assert.match(page, /<body class="golf-page restaurant-page fd-venue-page fd-no-photo">/);
   assert.doesNotMatch(page, /Beach page theme|\.venue-advisory \{/);
   assert.doesNotMatch(markupOnly(page), /beach-page|venue-advisory|data-venue-category="(?!restaurant")/);
   assert.match(markupOnly(page), /data-venue-category="restaurant"/, 'its own Favorite / Add to Trip row since 2026-10-14');
@@ -19843,9 +19847,10 @@ test('Venue page open-now line: hours.js on the Okanagan clock, French wording, 
 test('Venue page layout: details in a sidebar without repeating type, town or rating; the address carries the map link', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  const aside = html.slice(html.indexOf('<aside class="venue-aside">'), html.indexOf('</aside>'));
-  assert.ok(html.indexOf('<div class="venue-layout">') < html.indexOf('<div class="venue-main">'));
-  assert.match(aside, /<h2>Good to Know<\/h2>/);
+  // Food & Drink layout (2026-11-07): the facts sit in the "Your visit, made easy" sidebar beside the main column.
+  const aside = html.slice(html.indexOf('<aside class="fd-aside">'), html.indexOf('</aside>'));
+  assert.ok(html.indexOf('<div class="fd-layout">') < html.indexOf('<div class="fd-content">'));
+  assert.match(aside, /<h2>Your visit, made easy<\/h2>/);
   assert.doesNotMatch(aside, /<span class="label">(?:Type|Region|Rating)<\/span>/);
   assert.match(aside, /<span class="label">Address<\/span><span>[^<]+<\/span>/);
   assert.doesNotMatch(aside, /class="map-link"/, 'the address no longer repeats the map link (2026-11-01)');
@@ -22512,7 +22517,8 @@ test('Venue photo gallery (2026-10-16): main photo plus approved owner photos op
   db.prepare("UPDATE owner_photos SET credit = 'Gallery Cafe' WHERE venue_id = ?").run(v.id);
   // The thumbnails skip the main photo (it is already the big one) and open the viewer at photo 2.
   // Round 11 (2026-10-20): the strip is in the page twice, by the photo and after the buttons for phones (.vg-phone).
-  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 4);
+  // Food & Drink layout (2026-11-07): the thumbnails sit beside the photo on phones too, so the strip is in the page once.
+  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 2);
   assert.match(page, /<div class="vg-mosaic"><div class="venue-hero venue-hero-photo">[\s\S]*?<\/div><div class="vg-strip vg-count-2"><button type="button" class="vg-thumb" data-vg-open="1" aria-label="Open photo 2 of 3">/);
   assert.match(page, /<\/div><\/div><p class="venue-photo-credit"[^>]*>Photo: Gallery Cafe<\/p>/, 'credit sits under the whole gallery');
   assert.match(page, /aria-label="Next photo"/);
@@ -26747,9 +26753,9 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
     assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
     assert.doesNotMatch(en, />example-cafe\.ca ↗<\/a>/, 'the website is the button above, not repeated as a sidebar row (2026-11-01)');
     assert.match(en, /href="https:\/\/www\.example-cafe\.ca\/"[^>]*>(?:Website ↗|Visit Website)<\/a>/, 'the Website button');
-    assert.match(en, /<div class="venue-extra">/);
-    // Round 9 (2026-10-19): the extras follow the sidebar in the page itself, so no CSS order is needed.
-    assert.ok(en.indexOf('</aside>') < en.indexOf('<div class="venue-extra">'));
+    // Food & Drink layout (2026-11-07): the main column comes first, the facts sidebar after it, visitor extras last.
+    assert.match(en, /<div class="fd-content">/);
+    assert.ok(en.indexOf('<div class="fd-content">') < en.indexOf('<aside class="fd-aside">'));
     assert.doesNotMatch(en, /\.venue-aside \{ order: 1;/);
     const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
     assert.match(fr, /<span>Tous les jours<\/span>/);
@@ -31317,13 +31323,15 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
     db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
     for (const lang of ['en', 'fr']) {
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
-      const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
-      assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
+      // English Food & Drink pages (2026-11-07): the sidebar closes the facts, and the visitor photos and tips come after it.
+      const fdPage = lang === 'en';
+      const aside = html.indexOf(fdPage ? '<aside class="fd-aside">' : '<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = fdPage ? asideEnd : html.indexOf('<div class="venue-extra">');
+      assert.ok(aside > 0 && extra >= asideEnd, 'the extras follow the sidebar');
       // (#572: one map link, the Directions button; a place with no coordinates for the built-in directions gets the Google Maps button.)
       assert.match(html, /<a class="cta" href="[^"]+"[^>]*data-track="directions">(?:Get Directions|Itinéraire|Open in Google Maps|Ouvrir dans Google Maps)<\/a>/, 'the map link is the Directions button');
       assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
       if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
-      assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
+      assert.ok(html.indexOf(fdPage ? '<div class="fd-content">' : '<div class="venue-main">') < aside, 'the story still comes first');
       // Desktop keeps two columns: the extras under the story, the sidebar beside both. Phones need no CSS order.
       assert.match(html, /body\.golf-page \.venue-layout \{ display: grid; grid-template-columns: minmax\(0, 1fr\) 340px; grid-template-rows: auto 1fr;/);
       assert.match(html, /body\.golf-page \.venue-aside \{ grid-column: 2; grid-row: 1 \/ span 2; \}/);
@@ -31782,6 +31790,17 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   for (const opts of [{}, { lang: 'fr' }]) {
     const html = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria fictive pour les tests.' }, [], [], [], opts);
+    if (!opts.lang) {
+      // English Food & Drink pages (2026-11-07) follow Copper's approved order: a short introduction, then the main buttons
+      // (Directions, Menu, Hours); Call and the save buttons sit in the "Keep this one handy" card with the facts.
+      const top = html.slice(html.indexOf('<div class="fd-content">'), html.indexOf('<aside class="fd-aside">'));
+      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description">') > top.indexOf('<div class="venue-header">'));
+      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description">'), 'the introduction, then the main buttons');
+      assert.match(html, /<div class="fd-actions fd-contact-actions"[^>]*><a class="cta secondary" href="tel:/, 'the Call button is in the contact card');
+      assert.match(html, /<div class="fd-actions fd-save-actions"[^>]*>\s*<button type="button" class="card-action fav-btn"/);
+      assert.ok(html.indexOf('<aside class="fd-aside">') < html.indexOf('id="vcOpen"') || !html.includes('id="vcOpen"'), 'the facts come before the visitor photos and tips');
+      continue;
+    }
     const main = html.slice(html.indexOf('<div class="venue-main">'), html.indexOf('<aside class="venue-aside">'));
     const at = (s) => main.indexOf(s);
     assert.ok(at('<div class="venue-header">') >= 0 && at('<div class="venue-cta-row"') > 0 && at('<p class="venue-description"') > 0);
@@ -31796,7 +31815,7 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   }
   // Editorial story sections (Elora) follow the description in the page and are marked for the wide-screen order.
   const elora = app.renderVenuePage(eloraPageFixture(), [], [], []);
-  assert.ok(elora.indexOf('<div class="venue-cta-row"') < elora.indexOf('<p class="venue-description"'));
+  assert.ok(elora.indexOf('<p class="venue-description"') < elora.indexOf('<div class="venue-cta-row"'), 'Food & Drink layout (2026-11-07): the introduction, then the buttons');
   assert.ok(elora.indexOf('<p class="venue-description"') < elora.indexOf('<section class="venue-section venue-editorial"'));
 });
 
