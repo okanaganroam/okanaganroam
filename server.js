@@ -26068,23 +26068,24 @@ function renderFoodDrinkOpenNowStyles() {
 </style>`;
 }
 
-function foodDrinkSearchHtml() {
+function foodDrinkSearchHtml(welcoming = false) {
   return `<div class="fd-search">
     <label class="visually-hidden" for="fdSearch">Search food and drink</label>
-    <input type="search" id="fdSearch" class="fd-search-input" placeholder="Search by name, place or dish..." autocomplete="off" spellcheck="false">
+    <input type="search" id="fdSearch" class="fd-search-input" placeholder="${welcoming ? 'Search food, drinks or a place…' : 'Search by name, place or dish...'}" autocomplete="off" spellcheck="false">
     <button type="button" class="fd-search-clear" id="fdSearchClear" aria-label="Clear search" hidden>&#215;</button>
   </div>`;
 }
 // Venue-type chips: "All" plus the five categories. "All" is a reset control
 // (data-fd-type-all), not a sixth type -- it is pressed exactly when no type
 // is chosen, which is already what "no constraint" means to the predicate.
-function foodDrinkTypeChipsHtml(state = {}) {
+function foodDrinkTypeChipsHtml(state = {}, welcoming = false) {
   const selected = new Set(state.types || []);
   const counts = state.counts && state.counts.types ? state.counts.types : null;
-  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
+  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">${welcoming ? 'All places' : 'All'}</button>`;
+  const icons = { restaurant: '🍽️', cafe: '☕', pub: '🍻', cocktail: '🍸', brewery: '🍺', distillery: '🥃' };
   const chips = FD_HUB_TYPES.map((t) => {
     const n = counts ? (counts[t.type] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${welcoming ? `<span aria-hidden="true">${icons[t.type] || ''}</span> ` : ''}${escapeHtml(t.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="fd-type">${all}${chips}</div>`;
 }
@@ -26103,7 +26104,7 @@ function foodDrinkFeatureChipsHtml(state = {}, onlyKeys = null) {
 // so the canonical 20-region list and its FOOTER_REGION_GROUPS grouping are
 // literally the same code the other directories use -- no second region
 // system, and it cannot drift.
-function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
+function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null, welcoming = false) {
   const nF = (state.features || []).length, nR = (state.regions || []).length;
   // A destination category page (scopeFeatures set) offers only "What are you
   // looking for?", with just the features that page's venues actually have --
@@ -26121,14 +26122,13 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
   }
   const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${welcoming ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to eat?' : '✨ Make it your kind of outing'}</p>` : ''}${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
-  return `<div class="fd-controls">
-    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state))}
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
-  </div>`;
+  const features = pop('fdFeatures', welcoming ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', welcoming ? '' : uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state));
+  const regions = pop('fdRegions', welcoming ? 'Choose a town' : 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }));
+  return `<div class="fd-controls">${welcoming ? regions + features : features + regions}\n  </div>`;
 }
 // Removable active-filter tags, one row per group, plus Clear all.
 function foodDrinkSelectedTagsHtml(state = {}) {
@@ -27112,7 +27112,7 @@ function categoryHeroHtml(bannerHtml, textHtml) {
 // gets its own ("Cocktail Lounges in the Okanagan"), anything else the
 // general Food & Drink text.
 const FD_HUB_HEADINGS = Object.freeze({
-  all: { heading: 'Food & Drink in the Okanagan', intro: 'Every restaurant, caf\u00e9, pub, cocktail lounge and brewery in the Okanagan that Okanagan Roam has verified.' },
+  all: { heading: 'Food & Drink in the Okanagan', intro: 'Find your next favourite bite, cosy café or sunny patio.' },
   restaurant: { heading: 'Restaurants in the Okanagan', intro: 'Lakeside patios, farm-to-table dining rooms and easygoing local favourites \u2014 every restaurant across the Okanagan that Okanagan Roam has verified.' },
   cafe: { heading: 'Caf\u00e9s in the Okanagan', intro: 'Third-wave coffee, fresh baking and cozy corners for a slow morning \u2014 every caf\u00e9 across the Okanagan that Okanagan Roam has verified.' },
   pub: { heading: 'Pubs & Bars in the Okanagan', intro: 'Neighbourhood pubs, sports bars and patios for a pint and a bite \u2014 every pub and bar across the Okanagan that Okanagan Roam has verified.' },
@@ -27415,9 +27415,10 @@ ${pageHead(title, description, pageCanonical, [breadcrumb, itemList], { shareIma
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="${versionedImageUrl('/food-drink-layout.css')}">
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
-<body class="golf-page outdoor-page fd-page">
+<body class="golf-page outdoor-page fd-page fd-refresh">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -27429,10 +27430,10 @@ ${renderGolfHeaderHtml()}
   <p class="fd-type-page-link"><a href="${PATIO_GUIDE_PATH}">Guide: the best patios in Kelowna &rarr;</a></p>
   <p class="fd-type-page-link" id="fdTypePageLink"${f.types.length === 1 ? '' : ' hidden'}><a href="${f.types.length === 1 ? `/${CATEGORY_SLUGS[f.types[0]]}` : '#'}">See the ${escapeHtml(f.types.length === 1 ? CATEGORY_LABELS[f.types[0]].plural.toLowerCase() : '')} page &rarr;</a></p>`)}
   <div class="fd-toolbar">
-  ${foodDrinkSearchHtml()}
-  ${foodDrinkFilterBarHtml(venues, state).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
+  ${foodDrinkSearchHtml(true)}
+  ${foodDrinkFilterBarHtml(venues, state, null, true).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
   </div>
-  ${foodDrinkTypeChipsHtml(state)}
+  ${foodDrinkTypeChipsHtml(state, true)}
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>

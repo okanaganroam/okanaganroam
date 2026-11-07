@@ -9023,7 +9023,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
   assert.match(html, /"@type":"ItemList"/);
-  assert.match(markup, /<body class="golf-page outdoor-page fd-page">/);
+  assert.match(markup, /<body class="golf-page outdoor-page fd-page fd-refresh">/);
   assert.match(markup, /Home<\/a>[\s\S]{0,80}Food &amp; Drink/, 'breadcrumb');
 
   // The compact surface, in order, with the results directly after it.
@@ -9034,7 +9034,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(markup, /<div class="fd-pop-panel" id="fdFeaturesPanel" hidden>/, 'features popover starts closed');
   assert.match(markup, /<div class="fd-pop-panel" id="fdRegionsPanel" hidden>/, 'regions popover starts closed');
   assert.match(markup, /<p class="fd-count" id="fdResultsSummary" aria-live="polite">/, 'compact result bar');
-  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-controls"', 'id="fdFeaturesBtn"', 'id="fdRegionsBtn"', 'class="fd-type-row"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
+  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-controls"', 'id="fdRegionsBtn"', 'id="fdFeaturesBtn"', 'class="fd-type-row"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
 
   // None of the old oversized directory treatment.
@@ -9048,7 +9048,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
 
   // Venue types: All + the five, with counts, and NO wineries.
   assert.deepEqual([...markup.matchAll(/data-fd-type="([a-z]+)"/g)].map((m) => m[1]), app.FD_HUB_TYPES.map((t) => t.type));
-  assert.match(markup, /<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="true">All<\/button>/);
+  assert.match(markup, /<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="true">All places<\/button>/);
   assert.doesNotMatch(markup, /data-fd-type="winery"/, 'Wineries are not a Food & Drink type here');
   assert.doesNotMatch(markup, /data-venue-category="winery"/, 'no winery cards on the Food & Drink hub');
   assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
