@@ -27481,7 +27481,7 @@ ${pageHead(title, description, pageCanonical, [breadcrumb, itemList], { shareIma
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
-<link rel="stylesheet" href="${versionedImageUrl('/food-drink-layout.css')}">
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page fd-page fd-refresh">
