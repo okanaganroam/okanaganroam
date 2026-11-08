@@ -6896,7 +6896,7 @@ test('Golf venue page: hero is the title treatment, header does not repeat it, i
 
   const sim = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-simulator'), [], [], []);
   assert.match(sim, /<span class="venue-hero-type">Indoor Golf<\/span>\s*<h1>Test Golf Simulator<\/h1>/);
-  assert.match(sim, /<p class="venue-at-a-glance">Indoor Golf &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
+  assert.match(sim, /<p class="gb-eyebrow">⛳ Indoor golf · <a href="\/kelowna">Kelowna<\/a><\/p>/); // the shared Indoor & Rainy Day layout (2026-11-08)
   // Good to Know drops the Type row (2026-10-14): the hero and the line under it already say it.
   assert.doesNotMatch(sim, /<span class="label">Type<\/span>/, 'no repeated Type row');
   assert.match(sim, /"@type":"GolfCourse"/, 'JSON-LD type unchanged');
