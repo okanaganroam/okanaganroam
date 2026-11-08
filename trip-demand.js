@@ -23,9 +23,20 @@ function visitorKey(ip, ua, day, secret = process.env.TRIP_DEMAND_SALT || 'okana
   return crypto.createHash('sha256').update(`${secret}|${day}|${ip}|${ua}`).digest('hex').slice(0, 20);
 }
 
+// Crawlers that run a full browser (so they look like Chrome and fire our page beacons) from cloud-hosting networks.
+// Seen on 2026-11-07: hundreds of one-page "visits" with no engagement, from Tencent Cloud address blocks. Real visitors
+// browse from home, mobile and office networks. Extra prefixes can be added with BOT_IP_PREFIXES (comma separated, e.g. "47.88.,8.209.").
+const CLOUD_CRAWLER_PREFIXES = ['49.51.', '43.153.', '43.173.', '43.172.', '43.135.', '170.106.'];
+function fromCloudCrawlerNetwork(req, env = process.env) {
+  const ip = String(req.headers['x-real-ip'] || '').trim();
+  if (!ip) return false;
+  const extra = String(env.BOT_IP_PREFIXES || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return CLOUD_CRAWLER_PREFIXES.concat(extra).some((p) => ip.startsWith(p));
+}
+
 function isBot(req) {
   const ua = String(req.headers['user-agent'] || '');
-  return !ua || BOT_RE.test(ua);
+  return !ua || BOT_RE.test(ua) || fromCloudCrawlerNetwork(req);
 }
 
 // Our own visits: the roam_internal cookie, or an address in INTERNAL_IPS (comma separated), so testing never counts as visitors.
@@ -83,4 +94,4 @@ function createLogger(db) {
   return { record, report };
 }
 
-module.exports = { enabled, dayOf, visitorKey, isBot, isInternal, collectVenueIds, createLogger, DAILY_CAP, KINDS };
+module.exports = { enabled, dayOf, visitorKey, isBot, fromCloudCrawlerNetwork, isInternal, collectVenueIds, createLogger, DAILY_CAP, KINDS };
