@@ -13334,11 +13334,17 @@ function renderHomeFooterHTML(fromBrowse) {
           <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
           </a>
-          <a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">
+          <a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
           </a>
           <a class="home-footer-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok" data-i18n-aria="homeFooter.tiktokAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
+          </a>
+          <a class="home-footer-social-icon icon-youtube" href="https://www.youtube.com/@OkanaganRoam" target="_blank" rel="noopener" aria-label="Okanagan Roam on YouTube">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/></svg>
+          </a>
+          <a class="home-footer-social-icon icon-pinterest" href="https://www.pinterest.com/okanaganroam/" target="_blank" rel="noopener" aria-label="Okanagan Roam on Pinterest">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 20.5 12 9.5"/><path d="M8 13.5C6.7 11.2 7.6 7 11.5 6.2c3.6-.7 6 1.8 5.4 4.8-.5 2.4-2.3 3.6-3.9 3.1-.9-.3-1.3-1.2-1-2.3"/></svg>
           </a>
         </div>
       </div>
@@ -13859,6 +13865,8 @@ function renderCanonicalFooterStyles() {
   .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; }
   .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
   .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
+  .home-footer-social-icon.icon-youtube { background: #FF0000; color: #fff; }
+  .home-footer-social-icon.icon-pinterest { background: #E60023; color: #fff; }
   .home-footer-social-row .home-footer-social-icon { background-clip: padding-box; }
   .home-footer-social-icon::after {
     content: attr(data-tooltip);
@@ -23085,7 +23093,9 @@ function renderSocialLinksPage(now = new Date()) {
   const socials = [
     { title: 'Instagram', url: 'https://www.instagram.com/okanaganroam', note: '@okanaganroam' },
     { title: 'TikTok', url: 'https://www.tiktok.com/@okanaganroam', note: '@okanaganroam' },
-    { title: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61595021770981', note: 'Okanagan Roam' },
+    { title: 'Facebook', url: 'https://www.facebook.com/okanaganroam', note: 'Okanagan Roam' },
+    { title: 'YouTube', url: 'https://www.youtube.com/@OkanaganRoam', note: '@OkanaganRoam' },
+    { title: 'Pinterest', url: 'https://www.pinterest.com/okanaganroam/', note: '@okanaganroam' },
   ];
   return `<!DOCTYPE html>
 <html lang="en">
@@ -41391,7 +41401,7 @@ function renderContactPage() {
       <li><strong>Press or partnerships?</strong> <button type="button" class="info-link-btn" data-contact-open data-contact-topic="press" aria-haspopup="dialog" aria-controls="contactDialog">Send us a note</button> or email <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</li>
     </ul>
     <h2>Follow along</h2>
-    <p><a href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener">Instagram</a> &middot; <a href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener">Facebook</a> &middot; <a href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener">TikTok</a></p>
+    <p><a href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener">Instagram</a> &middot; <a href="https://www.facebook.com/okanaganroam" target="_blank" rel="noopener">Facebook</a> &middot; <a href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener">TikTok</a> &middot; <a href="https://www.youtube.com/@OkanaganRoam" target="_blank" rel="noopener">YouTube</a> &middot; <a href="https://www.pinterest.com/okanaganroam/" target="_blank" rel="noopener">Pinterest</a></p>
     <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="/about">About us</a> &middot; <a href="/privacy">Privacy</a></p>`,
   });
 }

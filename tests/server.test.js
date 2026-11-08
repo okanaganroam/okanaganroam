@@ -2837,6 +2837,8 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
   assert.match(html, /data-i18n="gems\.heading">Hidden Gems</);
   assert.match(html, /data-i18n-aria="homeFooter\.instagramAria"/);
   assert.match(html, /data-i18n-aria="homeFooter\.tiktokAria"/);
+  assert.match(html, /icon-youtube" href="https:\/\/www\.youtube\.com\/@OkanaganRoam"/);
+  assert.match(html, /icon-pinterest" href="https:\/\/www\.pinterest\.com\/okanaganroam\/"/);
   assert.match(html, /data-i18n-aria="homeFooter\.facebookAria"/);
   assert.match(html, /class="home-footer-copyright" data-i18n="homeFooter\.copyright"/);
   assert.match(html, /class="home-footer-logo" href="\/" aria-label="Okanagan Roam home" data-i18n-aria="nav\.homeAriaLabel"/);
@@ -2940,7 +2942,7 @@ test('Home footer: About and Social Media (renamed from Follow) column links/ico
   assert.match(html, /<a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
-  assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
+  assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
   assert.doesNotMatch(html, /Facebook, coming soon|icon-facebook[^>]*data-tooltip/);
 });
 

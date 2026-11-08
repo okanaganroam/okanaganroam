@@ -59,7 +59,7 @@ test('links (2026-10-19): /links lists Instagram, TikTok and Facebook so visitor
   const body = src.slice(start, src.indexOf('\nfunction ', start + 10));
   assert.ok(body.includes("url: 'https://www.tiktok.com/@okanaganroam'"));
   assert.ok(body.includes("url: 'https://www.instagram.com/okanaganroam'"));
-  assert.ok(body.includes("url: 'https://www.facebook.com/profile.php?id=61595021770981'"));
+  assert.ok(body.includes("url: 'https://www.facebook.com/okanaganroam'"));
   assert.ok(body.includes('<h2>Follow along</h2>'));
   assert.ok(body.includes('target="_blank" rel="noopener" data-post-date="social"'));
   assert.ok(body.includes('Instagram, TikTok and Facebook posts'));
