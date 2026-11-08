@@ -17666,9 +17666,9 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.match(empty.text, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="indoor-coming-soon">More indoor spots are coming soon/);
       // One list since 2026-10-14: the simulators sit in it, under the Indoor Golf chip.
-      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">[1-9]\d*<\/span>/);
+      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">⛳ Indoor Golf <span class="outdoor-activity-count">[1-9]\d*<\/span>/);
       assert.match(empty.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator links to its existing golf page');
-      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page fd-refresh indoor-page indoor-hub-page">/);
       assert.doesNotMatch(empty.text, /noindex/);
       assert.equal((await WINTER_GET(base, '/vernon/indoor')).status, 404, 'an empty region/indoor pair 404s like any other');
 
@@ -19780,7 +19780,7 @@ test('Food & Drink search: every word in any order, plurals, accents, synonyms, 
   const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
   const vm = require('node:vm');
   const texts = ['Kelowna Restaurants Patio The best tacos in town', 'Penticton Cafes Coffee and croissants', 'Kelowna Cafes Sushi bar', 'Vernon Breweries Craft beer and a taco truck', 'Kelowna Restaurants Open early breakfast', "Earls Kitchen + Bar Kelowna Restaurants", 'Kelowna Cafés crème brûlée'];
-  const ctx = {};
+  const ctx = { welcoming: false };
   vm.runInNewContext(`${src}; var cards = ${JSON.stringify(texts)}.map(function(t){ return { __fd: fdFold(t) }; }); function hitsRaw(q){ searchPlan = fdPlan(q); return cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; }); } this.hits = function(q){ return JSON.stringify(hitsRaw(q)); }; this.plan = function(q){ return fdPlan(q); };`, ctx);
   const H = (q) => JSON.parse(ctx.hits(q));
   assert.deepEqual(H('kelowna patio'), [0]);
@@ -20051,13 +20051,17 @@ test('Indoor hub: one list, experience chips incl. Indoor Golf, a real Family Fu
   const notes = new Map([[9106, 'Bowling lanes and arcade']]);
   const html = app.renderIndoorHubPage(indoor, golf, also, notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">6 places</);
-  assert.match(html, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /data-fd-type="golf" aria-pressed="false">⛳ Indoor Golf <span class="outdoor-activity-count">1<\/span>/);
   // Family Fun is the hands-on places, not every kid-friendly listing; never the brewery.
   assert.deepEqual(app.indoorExperiencesOf(indoor[2], null), ['family']);
   assert.ok(!app.indoorExperiencesOf(indoor[1], null).includes('family'), 'a kid-friendly gallery is not Family Fun');
   assert.ok(!app.indoorExperiencesOf(also[0], notes.get(9106)).includes('family'), 'a brewery is never Family Fun');
   assert.ok(app.indoorExperiencesOf(also[0], notes.get(9106)).includes('games'));
   assert.match(html, /id="fdOpenNow"/);
+  assert.match(html, /fd-page fd-refresh indoor-page/);
+  assert.match(html, /Choose a town/);
+  assert.match(html, /id="indoorSortHelp"/);
+  assert.match(html, /data-fd-close>Close ×/);
   assert.match(html, /<span class="card-note-label">Rainy day:<\/span> Bowling lanes and arcade/);
   assert.match(html, /data-venue-id="9105"[^>]*data-ph="none"/);
   assert.match(html, /data-venue-id="9103"[^>]*data-ph="none"/);
@@ -20074,7 +20078,7 @@ test('Shared directory search: short words match whole words, swapped letters co
   const script = html.match(/<script>\s*\(function\(\)\{\s*var LABELS[\s\S]*?<\/script>/)[0];
   const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
   const vm = require('node:vm');
-  const ctx = {};
+  const ctx = { welcoming: false };
   vm.runInNewContext(`${src}; var cards = ${JSON.stringify(['Kelowna Thermal spa and steam', 'A spacious play space', 'Exit Escape Games'])}.map(function(t){ return { __fd: fdFold(t) }; }); this.hits = function(q){ searchPlan = fdPlan(q); return JSON.stringify(cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; })); }; this.plan = function(q){ return JSON.stringify(fdPlan(q)); };`, ctx);
   assert.deepEqual(JSON.parse(ctx.hits('spa')), [0], '"spa" is not "space"');
   assert.equal(JSON.parse(ctx.plan('escpae')).corrected, 'escape');

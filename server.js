@@ -27898,20 +27898,21 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { cardNotes, cardNoteLabel: 'Rainy day:', photoKeyFor });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { welcoming:true, cardNotes, cardNoteLabel:'Rainy day:', photoKeyFor, cardOpts:{allBadges:true} });
+  const indoorIcons = {arts:'🖼️',family:'🧸',games:'🎯',spas:'🧖',theatre:'🎭',golf:'⛳'};
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an indoor experience" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${INDOOR_HUB_EXPERIENCES.map((e) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${e.slug}" aria-pressed="${selected.has(e.slug) ? 'true' : 'false'}">${escapeHtml(e.label)} <span class="outdoor-activity-count">${counts.types[e.slug] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an indoor experience" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All activities</button>${INDOOR_HUB_EXPERIENCES.map((e) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${e.slug}" aria-pressed="${selected.has(e.slug) ? 'true' : 'false'}">${indoorIcons[e.slug] || '✨'} ${escapeHtml(e.label)} <span class="outdoor-activity-count">${counts.types[e.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to play?' : '✨ Make it your kind of day'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="indoor-panel-help">Numbers show how many places match each choice.</p>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
-    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
+    ${pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts, hideEmpty:true }))}
+    ${featureKeys.length ? pop('fdFeatures', '✨ Filters', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${foodDrinkOpenNowToggleHtml(openNow, openCount).replace('data-fd-open-now', 'data-fd-open-now aria-label="Show only places open now" title="Show only places open now"')}
   </div>`;
   const expLinks = INDOOR_EXPERIENCES.map((e) => `<a href="/indoor/${e.slug}">${escapeHtml(e.label)} <span>${counts.types[e.slug] || 0}</span></a>`).join('\n      ');
   const townCounts = {};
@@ -27927,8 +27928,30 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0,12)}">
 ${golfEngagementHeadHtml('indoor', true, 'hub')}
 <style id="indoor-hub">
+  body.indoor-hub-page .category-banner {height:170px;min-height:0;}
+  body.indoor-hub-page .category-banner img {object-position:50% 22%!important;}
+  body.indoor-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  body.indoor-hub-page .indoor-panel-help {font:400 13px/1.4 Nunito,sans-serif;color:#615b53;margin:22px 0 12px;}
+  body.indoor-hub-page .indoor-filter-help {font-size:12px;color:#615b53;margin:0 0 12px;}
+  body.indoor-hub-page .indoor-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.indoor-hub-page .indoor-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.indoor-hub-page .indoor-sort-help summary::before {content:'▸';}
+  body.indoor-hub-page .indoor-sort-help[open] summary::before {content:'▾';}
+  body.indoor-hub-page .indoor-sort-help p {max-width:70ch;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;margin:0;}
+  html body.indoor-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-fee {display:block!important;}
+  @media(max-width:640px){
+    body.indoor-hub-page.fd-refresh .category-banner,body.indoor-hub-page.fd-refresh .category-banner img {height:110px!important;}
+    body.indoor-hub-page.fd-refresh .fd-toolbar .fd-controls {flex-wrap:wrap;}
+    body.indoor-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
+    body.indoor-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.indoor-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.indoor-hub-page.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.indoor-hub-page.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
+
   body.indoor-hub-page .rainy-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.indoor-hub-page .rainy-guide-link a { color: var(--teal); }
   body.indoor-hub-page .hub-links { margin: 26px 0 8px; }
@@ -27940,7 +27963,7 @@ ${golfEngagementHeadHtml('indoor', true, 'hub')}
   body.indoor-hub-page .card-note-label { font-weight: 800; }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">
+<body class="golf-page outdoor-page fd-page fd-refresh indoor-page indoor-hub-page">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -27948,16 +27971,20 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Indoor & Rainy Day Spots' }])}
   ${categoryHeroHtml(categoryBannerHtml('indoor'), `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.indoor)}</p>
+  <p class="outdoor-intro fd-intro">Find a little fun for a rainy day. Museums, games, family adventures &amp; more. 🌈</p>
   <p class="rainy-guide-link"><a href="${RAINY_GUIDE_PATH}">Guide: a rainy day in the Okanagan &rarr;</a></p>`)}
   ${indoorVenues.length ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>'}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search indoor things to do').replace('Search by name, place or dish...', 'Search escape room, climbing, a town...')}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}
+  <p class="indoor-filter-help">Numbers show matching places. Open now limits the list to places currently open.</p>
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, sort, INDOOR_SORTS)}
+  <details class="indoor-sort-help" id="indoorSortHelp"><summary>How Recommended works</summary><p>We mix different activities, prioritising indoor attractions and listings with useful details such as hours. Family and group features also contribute. Seasonal closures move places lower down; this is not a star-rating order.</p></details>
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No places match that combination yet.</span> <a href="/indoor" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   <p class="fd-no-results-try">Try one word, like <a href="/indoor?types=games">escape rooms</a>, <a href="/indoor?types=family">family fun</a> or <a href="/indoor?types=arts">museums</a>.</p></div>
@@ -27982,6 +28009,7 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${hubCardFitScriptHtml()}
   ${golfCardEngagementScriptHtml('indoor', true)}
+  <script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('indoorSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);window.addEventListener('popstate',function(){setTimeout(sync,0);});sync();})();</script>
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'indoor', typeLabels: expLabel, searchLabels: { arts: 'museum gallery', family: 'family kids', games: 'games', spas: 'spa', theatre: 'theatre cinema', golf: 'indoor golf simulator' } })}
 </body>
 </html>`;
