@@ -26,9 +26,19 @@ test('dollar amounts are read from page text, not scripts, with a little context
 
 test('a price still on its page is confirmed; a missing one is changed; no prices or no page is flagged', () => {
   assert.equal(judge(15, { ok: true, body: '<p>Flight $15</p>' }).status, 'confirmed');
-  assert.equal(judge(15, { ok: true, body: '<p>Flight $18</p>' }).status, 'changed');
+  assert.equal(judge(15, { ok: true, body: '<p>Tasting flight $18</p>' }, 'Tasting flight of four').status, 'changed');
   assert.equal(judge(15, { ok: true, body: '<p>Call us</p>' }).status, 'missing');
   assert.equal(judge(15, { ok: false, detail: 'HTTP 500' }).status, 'unreachable');
+});
+
+test('other prices on the page are not a change: bottles, fees, add-ons and far-off amounts stay quiet', () => {
+  // Real cases from the first run (2026-11-08).
+  assert.equal(judge(6, { ok: true, body: 'Custom Wine Boxes - Starting at $60' }, 'Flight of four wines tasting').status, 'unclear');
+  assert.equal(judge(45, { ok: true, body: 'You will be charged a $10 late penalty fee for your session' }, 'Single drop-in community session').status, 'unclear');
+  assert.equal(judge(35, { ok: true, body: 'Boat rental $3000' }, 'Paddleboard rental, 1 hour').status, 'unclear');
+  assert.equal(judge(27.5, { ok: true, body: 'Private Lessons from just $28.60 p/p' }, 'All Ages drop-in session').status, 'unclear');
+  const ds = judge(650, { ok: true, body: 'Half day from $675. Full Day $1,050' }, 'Half-day (5 hr) private fishing charter');
+  assert.equal(ds.status, 'changed'); assert.equal(ds.found[0].amount, 675);
 });
 
 test('robots.txt is followed', () => {
@@ -54,14 +64,15 @@ test('weekly run: confirmed prices stay quiet, changed ones wait for a decision,
   const out = await pc.runAll({ pauseMs: 0 });
   assert.equal(out.checked, 3);
   const flagged = pc.listFlagged();
-  assert.deepEqual(flagged.map((r) => [r.venue_id, r.status]), [[2, 'changed'], [3, 'unreachable']]);
+  assert.deepEqual(flagged.map((r) => [r.venue_id, r.status]), [[2, 'changed']], 'a page that did not load is counted, not listed');
+  assert.equal(pc.quietCount(), 1);
   assert.equal(flagged[0].found[0].amount, 35);
   assert.equal(flagged[0].name, 'Place 2');
 
   // Use the new price: live at once and off the list.
   assert.equal(pc.decide(2, 'approve', { edits: { from: '$35' } }).status, 200);
   assert.equal(prices[2].from, 35); assert.equal(prices[2].per, 'person');
-  // Take the price off.
+  // Take the price off (still possible for a quiet one).
   assert.equal(pc.decide(3, 'dismiss').status, 200);
   assert.equal(prices[3], undefined);
   assert.deepEqual(pc.listFlagged(), []);
@@ -74,8 +85,8 @@ test('weekly run: confirmed prices stay quiet, changed ones wait for a decision,
 });
 
 test('"keep" stays quiet until the prices on the page change', async () => {
-  const prices = { 7: { from: 20, source: 'https://k.test/p' } };
-  const pages = { 'https://k.test/p': page('<p>Now $22</p>') };
+  const prices = { 7: { from: 20, basis: 'Kayak rental', source: 'https://k.test/p' } };
+  const pages = { 'https://k.test/p': page('<p>Kayak rental now $22</p>') };
   const { pc } = setup(pages, prices);
   await pc.checkOne(7);
   assert.equal(pc.listFlagged().length, 1);
@@ -83,7 +94,7 @@ test('"keep" stays quiet until the prices on the page change', async () => {
   assert.equal(pc.listFlagged().length, 0);
   await pc.checkOne(7);
   assert.equal(pc.listFlagged().length, 0, 'same prices: still quiet');
-  pages['https://k.test/p'] = page('<p>Now $25</p>');
+  pages['https://k.test/p'] = page('<p>Kayak rental now $25</p>');
   await pc.checkOne(7);
   assert.equal(pc.listFlagged().length, 1, 'prices changed: back on the list');
   assert.equal(prices[7].from, 20, 'nothing changed on the card by itself');
