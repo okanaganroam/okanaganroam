@@ -25,11 +25,12 @@ function renderGolfboxLayout(p) {
         <div class="gb-price-heading"><strong>Bay hire · $35–$60</strong><span>per bay, per hour · up to 4 golfers</span></div>
         <dl class="gb-rates"><div><dt>Night <small>11 PM–6 AM</small></dt><dd>$35</dd></div><div><dt>Weekday daytime <small>6 AM–3 PM</small></dt><dd>$50</dd></div><div><dt>Evenings <small>3 PM–11 PM</small></dt><dd>$60</dd></div><div><dt>Weekend daytime &amp; evening <small>6 AM–11 PM</small></dt><dd>$60</dd></div></dl>
         <p class="gb-help">Winter rates through Apr 30, 2027. Final price and availability are confirmed when booking.</p>
+        <div class="gb-after-rates">${book}<p class="gb-help">Opens GOLFBOX’s booking site in a new tab.</p></div>
         <p class="gb-source">${external('https://www.golfbox.ca/simulator-bays/rates-info','Official rates')} · checked Nov 8, 2026</p>
       </aside>
       <section class="gb-card gb-visit" id="gbVisit"><p class="gb-eyebrow">First time? You’ve got this</p><h2>From booking to first swing ✨</h2>
         <ol class="gb-steps"><li><strong>Pick your bay &amp; time</strong><p>Book and pay online for up to four golfers.</p></li><li><strong>Check your email</strong><p>Your confirmation has your door access code and bay session code.</p></li><li><strong>Let yourself in &amp; play</strong><p>Enter the door code and press Enter, then use your session code on the bay touchscreen. Connect the TrackMan app or play as a guest.</p></li></ol>
-        <div class="gb-rules"><strong>A few things before you go</strong><ul><li>Everyone needs a waiver before playing; under-14s need an adult.</li><li>Outside food and non-alcoholic drinks are welcome, away from the hitting area. No alcohol.</li><li>One golfer swings at a time; everyone else stays behind the hitting area.</li></ul>${external('https://www.golfbox.ca/our-space/policies-guidelines','Read the full venue policies')}</div>
+        <div class="gb-rules"><strong>A few things before you go</strong><ul><li>Every player must submit a waiver before playing. <span class="gb-waiver-help">Need the form? Request the waiver link before your visit: <a href="mailto:info@golfbox.ca?subject=Waiver%20link%20for%20my%20GOLFBOX%20visit">Email GOLFBOX</a> (info@golfbox.ca) or <a href="tel:2508635864">call 250-863-5864</a>. Under-14s need an adult. A parent or guardian must complete the waiver for anyone under 19.</span></li><li>Outside food and non-alcoholic drinks are welcome, away from the hitting area. No alcohol.</li><li>One golfer swings at a time; everyone else stays behind the hitting area.</li></ul>${external('https://www.golfbox.ca/our-space/policies-guidelines','Read the full venue policies')}</div>
         <details class="gb-fold"><summary>Cancellations &amp; access</summary><p>Cancel at least 12 hours ahead for a credit. Later cancellations are non-refundable. Your session ends at the booked time, even if you arrive late.</p><p>Open 24/7 for booked sessions. Access is by emailed code; staff may not be on site.</p></details>
       </section>
       <section class="gb-card gb-contact" id="gbContact"><p class="gb-eyebrow">Meet you at the bay</p><h2>Getting here 📍</h2><p>3310 Carrington Road, Unit 102<br>Westbank / West Kelowna, BC</p><p class="gb-access">🌙 24/7 access with a booking</p><div class="gb-contact-actions">${directions}${p.actions.filter(a=>/data-track="phone"|data-track="website"/.test(a)).join('')}</div>
@@ -42,6 +43,25 @@ function renderGolfboxLayout(p) {
     ${p.eventsHtml}${p.visitorHtml}
     ${p.nearbyCards.length ? `<section class="gb-nearby"><p class="gb-eyebrow">Keep the good day going</p><h2>Around the neighbourhood 🌿</h2><ul class="nearby-list">${p.nearbyCards.slice(0,3).join('')}</ul><details class="gb-fold"><summary>More nearby ideas</summary><ul class="nearby-list">${p.nearbyCards.slice(3).join('')}</ul>${p.relatedHtml}${p.nearbyHtml}</details></section>` : ''}
     <p class="gb-source">Know something we should update? <a href="/contact" data-contact-open>Let us know →</a></p>
-  </div>`;
+  </div><script>
+  (function(){
+    var layout=document.getElementById('gbLayout');
+    if(!layout)return;
+    // Jump directly below both sticky bars, avoiding the shared smooth-scroll
+    // animation carrying a section heading behind the tabs mid-transition.
+    layout.addEventListener('click',function(event){
+      var link=event.target.closest('a[href^="#gb"]');
+      if(!link || event.defaultPrevented || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)return;
+      var target=document.getElementById(link.hash.slice(1));
+      if(!target || !layout.contains(target))return;
+      event.preventDefault();event.stopPropagation();
+      var nav=layout.querySelector('.gb-nav'),header=document.querySelector('header');
+      var offset=(header?header.getBoundingClientRect().height:52)+(nav?nav.offsetHeight:64)+18;
+      var top=target.getBoundingClientRect().top+window.scrollY-offset;
+      window.scrollTo({top:Math.max(0,top),behavior:'instant'});
+      history.pushState(null,'',link.hash);
+    },true);
+  })();
+  </script>`;
 }
 module.exports={renderGolfboxLayout};
