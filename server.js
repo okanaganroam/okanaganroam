@@ -15204,6 +15204,8 @@ function renderGa4ConfigIifeJs(cfgInit) {
       }
       if (document.referrer.indexOf('${GA4_INTERNAL_COOKIE}=') !== -1) cfg.page_referrer = strip(document.referrer);
       if (/(?:^|;\\s*)${GA4_INTERNAL_COOKIE}=1(?:;|$)/.test(document.cookie)) cfg.traffic_type = 'internal';
+      // Our own scripted testing (headless or automated browsers) is never a visitor: flag it and send no page views.
+      if (navigator.webdriver || /HeadlessChrome/.test(navigator.userAgent)) { cfg.traffic_type = 'internal'; cfg.send_page_view = false; }
     } catch (e) { /* analytics must never break the site */ }
     if (location.hostname === '${GA4_LIVE_HOSTNAME}') {
       var load = function(){
