@@ -20016,7 +20016,10 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   const notes = new Map([[9002, 'MTB network: 60 trails, 70 km singletrack']]);
   const html = app.renderSportsHubPage([own], [big], notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">2 places to play</);
-  assert.match(html, /Mountain biking network: 60 trails, 70 km narrow trails/);
+  assert.match(html, /Mountain biking network: 60 trails, 70 km of narrow trails/);
+  assert.match(html, /Tennis, Pickleball &amp; More/);
+  assert.match(html, /Numbers show how many places match each filter/);
+  assert.match(html, /Numbers show how many places match each activity/);
   assert.match(html, /bottom:auto!important;max-height:calc\(100dvh - 92px\)!important/);
   assert.ok(html.indexOf('data-venue-name="Fixture Trail Network"') < html.indexOf('data-venue-name="Fixture Skate Park"'), 'biggest first');
   assert.doesNotMatch(html, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
