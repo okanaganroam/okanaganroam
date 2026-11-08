@@ -27993,7 +27993,7 @@ ${renderGolfHeaderHtml()}
 // never by an editorial flag. The activity pages (/sports/skate ...) and the
 // town pages stay linked under the list.
 const SPORTS_SORTS = [
-  { key: 'recommended', label: 'Biggest first' },
+  { key: 'recommended', label: 'Largest places first' },
   { key: 'town', label: 'By town' },
   { key: 'az', label: 'A\u2013Z' },
 ];
@@ -28149,15 +28149,20 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id)) + '</p></div>']));
-  const statusOverrides = new Map(all.filter(v => !['sport', 'outdoor', 'beach'].includes(v.type)).map(v => [v.id, { state:'unknown', text:'Activity hours: check venue details' }]));
+  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id).replace(/\bMTB\b/gi, 'Mountain biking').replace(/\bsingletrack\b/gi, 'narrow trails')) + '</p></div>']));
+  const sportsOpenStatus = foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId;
+  const statusOverrides = new Map(all.flatMap(v => {
+    if (!['sport', 'outdoor', 'beach'].includes(v.type)) return [[v.id, { state:'unknown', text:'Activity hours: check venue details' }]];
+    const status = cardStatusFor(sportsOpenStatus.get(v.id), v);
+    return status && status.text === 'Open year-round' ? [[v.id, { ...status, text:'Year-round access' }]] : [];
+  }));
   const priceAllowed = (v, price) => {
     if (!price || !price.basis) return false;
     const basis = String(price.basis);
     if (/pool|swim|fitness|ski|snowboard/i.test(basis)) return false;
     return /bike|cycling|bmx|disc golf|court|pickleball|tennis|volleyball|skat(?:e|ing)|rink|arena|trail/i.test(basis);
   };
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { welcoming:true, photoKeyFor, cardExtraHtml:sportDetails, statusOverrides, priceAllowed, cardOpts: { allBadges: true } });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, sportsOpenStatus, { welcoming:true, photoKeyFor, cardExtraHtml:sportDetails, statusOverrides, priceAllowed, cardOpts: { allBadges: true } });
   const sportIcons = { skate:'🛹', bike:'🚵', disc:'🥏', courts:'🎾' };
   const selected = new Set(f.types);
   const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All activities</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${sportIcons[a.slug] || '✨'} ${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
@@ -28202,6 +28207,7 @@ ${golfEngagementHeadHtml('sport', true, 'hub')}
   body.sports-hub-page .sports-sort-help[open] summary::before {content:'▾';}
   body.sports-hub-page .sports-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
   @media(max-width:640px){
+    body.sports-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
     body.sports-hub-page.fd-refresh .category-banner,body.sports-hub-page.fd-refresh .category-banner img {height:110px!important;}
     body.sports-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
     body.sports-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
@@ -28239,7 +28245,7 @@ ${renderGolfHeaderHtml()}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered).replace(/places?$/, (m) => (m === 'place' ? 'place to play' : 'places to play')), state, sort, SPORTS_SORTS)}
-  <details class="sports-sort-help" id="sportsSortHelp"><summary>How “Biggest first” works</summary><p>We use the listed trail distances and numbers of trails, courts or course holes to bring larger facilities and networks higher up. Seasonal closures also affect the order.</p></details>
+  <details class="sports-sort-help" id="sportsSortHelp"><summary>How “Largest places first” works</summary><p>We use the listed trail distances and numbers of trails, courts or course holes to bring larger facilities and networks higher up. Seasonal closures also affect the order.</p></details>
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No places match that combination yet.</span> <a href="/sports" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   <p class="fd-no-results-try">Try one word, like <a href="/sports?types=courts">pickleball</a>, <a href="/sports?types=skate">skate park</a> or <a href="/sports?types=bike">bike park</a>.</p></div>
