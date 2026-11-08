@@ -13,7 +13,12 @@ const crypto = require('node:crypto');
 
 const USER_AGENT = 'OkanaganRoamPriceCheck/1.0 (+https://okanaganroam.com/about)';
 const WEEK_MS = 7 * 86400000;
-const FLAGGED = ['changed', 'missing', 'unreachable'];
+// Only a likely real change goes on the review list (2026-11-08: the first run listed 141 places, 140 of them noise).
+// Pages that could not be read, or whose other prices are for something else, are counted but not listed.
+const FLAGGED = ['changed'];
+const QUIET = ['missing', 'unreachable', 'unclear'];
+const STOP_WORDS = new Set(['with', 'from', 'that', 'this', 'your', 'per', 'person', 'each', 'about', 'only', 'plus', 'gst', 'pst', 'tax', 'and', 'the', 'for', 'min', 'mins', 'hour', 'hours', 'hrs']);
+const words = (t) => new Set(String(t || '').toLowerCase().replace(/[^a-z\s-]/g, ' ').split(/[\s-]+/).filter((w) => w.length >= 4 && !STOP_WORDS.has(w)).map((w) => w.replace(/s$/, '')));
 const STATUS_TEXT = {
   changed: 'The page no longer shows this price',
   missing: 'The page shows no prices (it may load them with JavaScript, or moved)',
@@ -56,11 +61,22 @@ function extractPrices(html) {
 const sameAmount = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
 
 // What a check found -> { status, found }. found is the page's prices (for the review card).
-function judge(expected, page) {
+// 'changed' only when a price on the page sits next to a word from what the card price is for ("tasting", "half day",
+// "rental") and is within half to double the old price. Anything else the page shows (bottles, gift boxes, fees, a
+// $3,000 boat next to a $35 board) is 'unclear' and stays off the list.
+function judge(expected, page, basis = '') {
   if (!page.ok) return { status: 'unreachable', found: [], detail: page.detail || 'did not load' };
   const found = extractPrices(page.body);
   if (!found.length) return { status: 'missing', found };
-  return { status: found.some((f) => sameAmount(f.amount, expected)) ? 'confirmed' : 'changed', found };
+  if (found.some((f) => sameAmount(f.amount, expected))) return { status: 'confirmed', found };
+  const want = words(basis);
+  const likely = found.filter((f) => {
+    const ratio = f.amount / Number(expected);
+    if (!(ratio >= 0.5 && ratio <= 2)) return false;
+    for (const w of words(f.context)) if (want.has(w)) return true;
+    return false;
+  });
+  return likely.length ? { status: 'changed', found: likely } : { status: 'unclear', found };
 }
 
 // A fingerprint of the prices on a page, so "keep" stays quiet until they change.
@@ -175,7 +191,7 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
     if (!(await allowed(e.source))) page = { ok: false, detail: 'robots.txt asks us not to read it' };
     else page = await get(e.source);
     if (page.pdf) return null;
-    const { status, found, detail } = judge(e.from, page);
+    const { status, found, detail } = judge(e.from, page, e.basis);
     const hash = pricesHash(found);
     const prev = db.prepare('SELECT kept_hash FROM price_checks WHERE venue_id = ?').get(Number(id));
     db.prepare(`INSERT INTO price_checks (venue_id, source, expected, status, found, found_hash, detail, checked_at, kept_hash, decided_at)
@@ -207,6 +223,11 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
       return { checked, flagged };
     })().finally(() => { running = null; });
     return running;
+  }
+
+  // How many priced places the last check could not judge (unreadable page, blocked, or only other prices on it).
+  function quietCount() {
+    return db.prepare(`SELECT COUNT(*) AS n FROM price_checks WHERE status IN (${QUIET.map(() => '?').join(',')})`).get(...QUIET).n;
   }
 
   function lastRun() { return db.prepare('SELECT * FROM price_check_runs ORDER BY id DESC LIMIT 1').get() || null; }
@@ -281,7 +302,7 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
       <p class="rv-result" hidden></p></article>`;
   }
 
-  return { runAll, tick, checkOne, listFlagged, decide, cardHtml, lastRun, isRunning: () => !!running, applyOverrides };
+  return { runAll, tick, checkOne, listFlagged, decide, cardHtml, lastRun, quietCount, isRunning: () => !!running, applyOverrides };
 }
 
 module.exports = { createPriceCheck, extractPrices, judge, robotsAllows, pageText, USER_AGENT };
