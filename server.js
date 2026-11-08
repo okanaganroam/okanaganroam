@@ -25066,7 +25066,7 @@ const SPORT_ACTIVITIES = [
   { slug: 'skate', label: 'Skate Parks & BMX', pattern: /skate|pump track|bmx/i, banner: { src: '/images/sports/activity-skate.jpg', alt: 'A skateboarder riding a ramp at a tree-lined skate park', pos: 10 }, heading: 'Skate Parks & BMX in the Okanagan', intro: 'Skate parks, pump tracks and BMX tracks across the valley — free to ride, from beginner bowls to big street plazas.' },
   { slug: 'bike', label: 'Mountain Biking', pattern: /bike park|mountain[- ]bike|mtb|singletrack|freeride|bike skills|dirt jump/i, banner: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 }, heading: 'Mountain Biking in the Okanagan', intro: 'Bike parks, skills areas, dirt jumps and singletrack networks — where to ride, from first jumps to lift-served downhill.' },
   { slug: 'disc', label: 'Disc Golf', pattern: /disc golf/i, banner: { src: '/images/sports/activity-disc.jpg', alt: 'A disc golf basket on a grassy fairway among tall trees', pos: 55 }, heading: 'Disc Golf in the Okanagan', intro: 'Disc golf courses through parks, pines and hillsides — most are free to play, so bring a disc and go.' },
-  { slug: 'courts', label: 'Courts', pattern: /pickleball|tennis|volleyball|basketball|courts?\b/i, banner: { src: '/images/sports/activity-courts.jpg', alt: 'Outdoor tennis and pickleball courts under a pink evening sky', pos: 55 }, heading: 'Pickleball, Tennis & Courts in the Okanagan', intro: 'Pickleball, tennis, basketball and beach volleyball courts — public places to play a game across the valley.' },
+  { slug: 'courts', label: 'Tennis, Pickleball & More', pattern: /pickleball|tennis|volleyball|basketball|courts?\b/i, banner: { src: '/images/sports/activity-courts.jpg', alt: 'Outdoor tennis and pickleball courts under a pink evening sky', pos: 55 }, heading: 'Pickleball, Tennis & Courts in the Okanagan', intro: 'Pickleball, tennis, basketball and beach volleyball courts — public places to play a game across the valley.' },
 ];
 function sportActivitiesOf(venue, notes) {
   const note = notes && notes.get(venue.id);
@@ -28149,7 +28149,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id).replace(/\bMTB\b/gi, 'Mountain biking').replace(/\bsingletrack\b/gi, 'narrow trails')) + '</p></div>']));
+  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id).replace(/\bMTB\s+singletrack\b/gi, 'Mountain biking trails').replace(/\bMTB\b/gi, 'Mountain biking').replace(/\b(km)\s+singletrack\b/gi, '$1 of narrow trails').replace(/\bsingletrack\b/gi, 'narrow trails')) + '</p></div>']));
   const sportsOpenStatus = foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId;
   const statusOverrides = new Map(all.flatMap(v => {
     if (!['sport', 'outdoor', 'beach'].includes(v.type)) return [[v.id, { state:'unknown', text:'Activity hours: check venue details' }]];
@@ -28165,11 +28165,11 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, sportsOpenStatus, { welcoming:true, photoKeyFor, cardExtraHtml:sportDetails, statusOverrides, priceAllowed, cardOpts: { allBadges: true } });
   const sportIcons = { skate:'🛹', bike:'🚵', disc:'🥏', courts:'🎾' };
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All activities</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${sportIcons[a.slug] || '✨'} ${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All activities</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${sportIcons[a.slug] || '✨'} ${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div><p class="sports-filter-help">Numbers show how many places match each activity.</p>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to play?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to play?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="sports-filter-help">Numbers show how many places match each filter.</p>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
@@ -28201,12 +28201,15 @@ ${golfEngagementHeadHtml('sport', true, 'hub')}
   body.sports-hub-page .sports-play-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
   body.sports-hub-page .sports-play-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
   body.sports-hub-page .sports-play-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.sports-hub-page .sports-filter-help {font:400 13px/1.45 Nunito,sans-serif;color:#615b53;margin:8px 0 12px;}
+  body.sports-hub-page .fd-pop-panel .sports-filter-help {margin-top:22px;}
   body.sports-hub-page .sports-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
   body.sports-hub-page .sports-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
   body.sports-hub-page .sports-sort-help summary::before {content:'▸';}
   body.sports-hub-page .sports-sort-help[open] summary::before {content:'▾';}
   body.sports-hub-page .sports-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
   @media(max-width:640px){
+    body.sports-hub-page .fd-type-row + .sports-filter-help {display:none;}
     body.sports-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
     body.sports-hub-page.fd-refresh .category-banner,body.sports-hub-page.fd-refresh .category-banner img {height:110px!important;}
     body.sports-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
