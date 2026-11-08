@@ -2552,7 +2552,7 @@ test('Wine engagement: winery region and venue pages carry Favorite / Add to Tri
   const venuePage = app.renderVenuePage(first, [], [], []);
   assert.match(venuePage, /class="card-action fav-btn"/, 'winery venue pages must render Favorite');
   assert.match(venuePage, /class="card-action trip-btn"/, 'winery venue pages must render Add to Trip');
-  assert.match(venuePage, /<div class="venue-cta-row" data-venue-id=/, 'the CTA row needs its engagement attributes');
+  assert.match(venuePage, /<div class="fd-actions fd-save-actions" data-venue-id=/, 'the Favorite / Add to trip row needs its engagement attributes (winery layout, 2026-11-08)');
 
   // 3. the controls are wired: the standalone script needs no app.js
   assert.match(regionPage, /var HOLDER = '\[data-venue-category="winery"\]'/, 'region page must bind the engagement script to winery cards');
@@ -5103,7 +5103,7 @@ test('W14: the V2 and V3 "Add whole trip" buttons recalculate after a tray Undo,
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
   // Stage 4.1: winery venue pages use the themed venue shell, never the guide theme.
   const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(venue, /<body class="golf-page winery-page">/);
+  assert.match(venue, /<body class="golf-page winery-page fd-venue-page winery-venue-page fd-no-photo">/); // the winery layout (2026-11-08)
   assert.doesNotMatch(venue, /guide-page/);
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   assert.doesNotMatch(region, /<body class="[^"]*(?:guide|golf)-page|<script src="\/scripts\/app\.js[?"]/); // (shared inline CSS names the page classes)
@@ -7142,20 +7142,20 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
 // engagement script takes its hand-off branch; winery REGION pages are unchanged.
 test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> and their Favorite / Add to Trip controls', () => {
   const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(html, /<body class="golf-page winery-page">/);
+  assert.match(html, /<body class="golf-page winery-page fd-venue-page winery-venue-page fd-no-photo">/); // the winery layout (2026-11-08)
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
   assert.match(html, /id="tripTray"/, 'the site-wide Trip tray is on the page');
   assert.match(html, /<header id="top">/, 'the shared site header and navigation');
   assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'the old minimal header is gone');
   assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1>');
-  assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*(?:<img class="venue-hero-img"[^>]*>\s*)?<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
+  assert.match(html, /<div class="venue-header"><h1 class="venue-desktop-title">Test Winery<\/h1>/, 'a winery with no photo: its name is the one heading, in the header (winery layout, 2026-11-08)');
   // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
   assert.match(html, /<button type="button" class="card-action fav-btn" data-fav-name="Test Winery" aria-pressed="false" aria-label="Favorite Test Winery"><svg [^>]*>[\s\S]*?<\/svg> Favorite<\/button>/, 'app.js heart label, as on Golf venue pages');
   assert.ok(/class="card-action trip-btn" data-trip-name="Test Winery"[^>]*>(<svg[\s\S]*?<\/svg> Add to trip)<\/button>/.exec(html)[1] === app.APP_TRIP_LABEL_HTML);
   assert.doesNotMatch(html, /\.venue-card\[data-venue-category="winery"\] \.card-actions/, 'the engagement-only stylesheet is for unthemed pages');
   assert.match(html, /body\.golf-page \.venue-cta-row \.card-action \{/, 'the themed CTA-row button rules apply instead');
-  assert.match(html, /<div class="venue-cta-row" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
+  assert.match(html, /<div class="fd-actions fd-save-actions" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
   // app.js loads first, so the engagement script takes its hand-off branch (as on Golf venue pages).
   const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
   assert.ok(appAt > 0 && appAt < html.indexOf('var pageCtx'), 'app.js loads before the venue engagement script');
@@ -32460,7 +32460,8 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   assert.match(box, /<a href="https:\/\/visit\.example\/bistro" rel="nofollow noopener" target="_blank">More ↗<\/a>/);
   assert.match(box, /From visit\.example, checked Oct 29, 2026/);
   assert.ok(page.indexOf('id="venueVisit"') < page.indexOf('id="venueHours"'), 'the box comes before the hours');
-  assert.match(page, /<a class="cta secondary" href="https:\/\/visit\.example\/book" rel="nofollow noopener" target="_blank"[^>]*>Book a tasting<\/a>/);
+  // The winery layout (2026-11-08): the winery's own booking link leads the main buttons, with an arrow for "opens elsewhere".
+  assert.match(page, /<a aria-label="Book a tasting on [^"]*website \(opens in a new tab\)" class="cta fd-menu-button" href="https:\/\/visit\.example\/book" rel="nofollow noopener" target="_blank"[^>]*>Book a tasting <span class="fd-external-arrow" aria-hidden="true">↗<\/span><\/a>/);
   // Box polish (2026-10-31): times are tidied ("on site, 11 AM – 9:30 PM").
   assert.match(box, /on site, 11 AM – 9:30 PM\./);
   // French pages leave it out.
@@ -32477,7 +32478,8 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   assert.match(open, /visit-label">Tastings<.*visit-label">Restaurant<.*visit-label">Winter</s, 'the three key rows stay open, in their stored order');
   assert.match(box2, /<details class="visit-more"><summary>More: wine &amp; cheese, groups<\/summary>/);
   assert.match(box2, /11 AM – 1 PM/);
-  assert.doesNotMatch(page2, /See the menu/, 'the Menu row goes when the box already links that page');
+  // (Winery layout, 2026-11-08: the Menu card in the main column links the menu; the sidebar's own Menu row still goes.)
+  assert.doesNotMatch(page2.slice(page2.indexOf('<aside class="fd-aside">'), page2.indexOf('</aside>')), /See the menu/, 'the Menu row goes when the box already links that page');
   // Known for (2026-10-31): always first and open, wherever it is stored; up to 7 rows.
   const known = { ...fuller, rows: [...fuller.rows, { label: 'Known for', text: 'Pinot Noir and Chardonnay; also the Old Vines Foch.' }] };
   const set3 = app.guardedVisitInfoUpdate(w.id, set2.info, known, meta);

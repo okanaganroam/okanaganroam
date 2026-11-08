@@ -33880,8 +33880,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const fr = opts.lang === 'fr';
   // Food & Drink venue layout (2026-11-07): every English Food & Drink page uses Copper's approved layout, built from the
   // venue's own record (food-drink-venue-layout.js). Copper's own wording is its profile, which no other venue gets.
-  const nichePage = venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company';
-  const fdLayout = !fr && !venue.redirect_to && (foodDrinkPageApplies(venue) || nichePage);
+  // Winery pages (2026-11-08): every English winery page uses the tasting-focused layout first built for Niche Wine Company
+  // (a Book button first, the tastings from its Plan your visit box, a one-sentence introduction).
+  const wineryPage = !fr && !venue.redirect_to && venue.type === 'winery';
+  const fdLayout = !fr && !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
+  const nichePrices = wineryPage && venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company' ? require('./data/niche-tasting-prices.json') : null;
   const copperProfile = fdLayout && venue.region === 'kelowna' && venue.type === 'brewery' && venue.slug === 'copper-brewing-co'
     ? require('./data/copper-layout-profile.json') : null;
   // Round 12 (2026-10-20): « du Okanagan Golf Club » in a French description reads « de l’Okanagan Golf Club ».
@@ -34548,8 +34551,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   </script>`;
   const fdBody = fdLayout ? (() => {
     const fdLib = require('./food-drink-venue-layout');
-    const niche = nichePage;
-    const profile = copperProfile || (niche ? { shortName: 'Niche' } : {});
+    const winery = wineryPage;
+    const profile = copperProfile || (nichePrices ? { shortName: 'Niche' } : {});
     const picks = venueMenu ? fdLib.pickMenuExamples(venueMenu.data.sections, profile.menuPickNames) : [];
     const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
@@ -34559,9 +34562,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
     const saveActions = ctaEntries.find((action) => action.includes('fav-btn')) || '';
-    const bookingAction = niche ? ctaEntries.find((action) => action.includes('data-track="booking"')) || '' : '';
+    const bookingAction = winery ? ctaEntries.find((action) => action.includes('data-track="booking"')) || '' : '';
+    // The booking button leads a winery page. Its link is the winery's own booking address; the words it says come from the
+    // same record (the Book button, or the Plan your visit box's own label such as "Book a tasting").
+    const bookingText = (/>([^<]+)<\/a>$/.exec(bookingAction) || [])[1] || '';
     const primaryActionHtml = bookingAction
-      .replace('<a ', '<a aria-label="Book a tasting on Niche’s website (opens in a new tab)" ')
+      .replace('<a ', `<a aria-label="${escapeHtml(bookingText)} on ${escapeHtml(venue.name)}’s website (opens in a new tab)" `)
       .replace('</a>', ' <span class="fd-external-arrow" aria-hidden="true">↗</span></a>');
     const contactActions = ctaEntries.filter((action) => action !== directionsHtml && action !== saveActions && action !== bookingAction);
     const descText = editorial ? editorial.intro : trimVenueTagline(venue.description);
@@ -34583,7 +34589,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
     return fdLib.renderFoodDrinkVenueLayout({
       venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml, profile,
-      primaryActionHtml, experienceHtml: niche ? require('./niche-tastings').nicheTastingsHtml(visitInfoRaw, escapeHtml, require('./data/niche-tasting-prices.json')) : '',
+      primaryActionHtml, experienceHtml: winery ? require('./niche-tastings').wineryTastingsHtml(visitInfoRaw, escapeHtml, nichePrices) : '',
       regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
       menuPicks: picks, formatPrice: menuPriceLabel,
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
@@ -34594,11 +34600,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       highlights: fdLib.highlightsFor(venue, dogFriendlyNote, profile),
-      intro: niche ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
+      intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
       recognitionHtml: (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
-      visitHtml: niche ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, require('./data/niche-tasting-prices.json')), false) : visitHtml, descriptionHtml: (copperProfile || niche || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
+      visitHtml: nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false) : visitHtml, descriptionHtml: (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
       badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
       dogNoteHtml: !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
       // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;
@@ -34616,7 +34622,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
 ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
 </head>
-<body${fdLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ` fd-venue-page${nichePage ? ' niche-venue-page' : ''}${venue.image_url ? '' : ' fd-no-photo'}"`) || ' class="fd-venue-page fd-no-photo"' : themedBodyClassAttr(venue.type, themedShell)}>
+<body${fdLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ` fd-venue-page${wineryPage ? ' winery-venue-page' : ''}${venue.image_url ? '' : ' fd-no-photo'}"`) || ' class="fd-venue-page fd-no-photo"' : themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   <div class="venue-topbar">${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },

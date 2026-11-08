@@ -47,4 +47,28 @@ function nicheTastingsHtml(info, esc, prices = null) {
   const checked = /^\d{4}-\d{2}-\d{2}$/.test(checkedAt || '') ? new Date(checkedAt + 'T12:00:00Z').toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric', timeZone:'UTC' }) : '';
   return '<section class="fd-card fd-tastings" id="fdTastings"><div class="fd-eyebrow">A little wine-country time</div><h2>Tastings &amp; vineyard visits 🍇</h2>' + (cards || '<p>' + esc(tasting.text) + '</p>') + '<p class="fd-note">Listed tasting prices' + (checked ? ' · checked ' + esc(checked) : '') + '. Confirm current options when booking.</p></section>';
 }
-module.exports = { nicheTastingsHtml, nicheVisitInfoWithPrices };
+// Every winery page (2026-11-08): the same Tastings card, from the winery's own Plan your visit box. Niche's priced
+// options keep their cards; any other winery shows the rows it has recorded (Tastings, and Flights / Vineyard walk /
+// Tours when present) exactly as written, with where they came from. Nothing is parsed into prices it does not state,
+// and a winery with no Tastings row gets no card.
+const TASTING_ROW_LABELS = ['Tastings', 'Flights', 'Vineyard walk', 'Tours'];
+function wineryTastingsHtml(info, esc, prices = null) {
+  const rows = info && Array.isArray(info.rows) ? info.rows : [];
+  if (!rows.some((r) => r.label === 'Tastings')) return '';
+  // Priced option cards only where verified prices were supplied (Niche); every other winery shows its recorded rows as written.
+  const priced = prices ? nicheTastingsHtml(info, esc, prices) : '';
+  if (priced.includes('fd-tasting-option')) return priced;
+  const shown = TASTING_ROW_LABELS.map((label) => rows.find((r) => r.label === label)).filter(Boolean);
+  const url = (u) => (typeof u === 'string' && /^https?:\/\/[^\s<>"]+$/i.test(u.trim()) ? u.trim() : '');
+  // A lone Tastings row is not labelled again under a heading that already says "Tastings".
+  const items = shown.map((r) => '<li>' + (shown.length === 1 && r.label === 'Tastings' ? '' : '<strong>' + esc(r.label) + '</strong>') + '<span>' + esc(r.text)
+    + (url(r.url) ? ' <a href="' + esc(url(r.url)) + '" rel="nofollow noopener" target="_blank">More \u2197</a>' : '') + '</span></li>').join('');
+  let host = '';
+  try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
+  const checked = /^\d{4}-\d{2}-\d{2}$/.test(info.checked_at || '') ? new Date(info.checked_at + 'T12:00:00Z').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  const heading = shown.length > 1 ? 'Tastings &amp; visits' : 'Tastings';
+  return '<section class="fd-card fd-tastings" id="fdTastings"><div class="fd-eyebrow">A little wine-country time</div><h2>' + heading + ' \ud83c\udf47</h2>'
+    + '<ul class="fd-tasting-list">' + items + '</ul>'
+    + '<p class="fd-note">' + (host ? 'From ' + esc(host) : 'From the winery') + (checked ? ' \u00b7 checked ' + esc(checked) : '') + '. Confirm current options when booking.</p></section>';
+}
+module.exports = { nicheTastingsHtml, nicheVisitInfoWithPrices, wineryTastingsHtml };

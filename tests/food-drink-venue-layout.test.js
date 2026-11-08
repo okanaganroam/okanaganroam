@@ -156,9 +156,10 @@ test('Copper wording and booking reach Copper only', () => {
   assert.doesNotMatch(like, /A bite with your beer/i);
 });
 
-test('wineries: only those also listed in Food & Drink get the layout', () => {
-  assert.match(page(crossListed), /fd-venue-page/);
-  assert.doesNotMatch(page(plainWinery), /<body[^>]*fd-venue-page|<div class="fd-layout">/);
+test('every winery uses the layout (the tasting-focused version); French pages keep theirs', () => {
+  assert.match(page(crossListed), /<body[^>]*fd-venue-page winery-venue-page/);
+  assert.match(page(plainWinery), /<body[^>]*fd-venue-page winery-venue-page/);
+  assert.match(page(plainWinery), /<div class="fd-layout">/);
 });
 
 test('French pages and redirects keep their existing layout', () => {
