@@ -10,3 +10,5 @@ body.golfbox-page .venue-hero-photo>img{width:100%;height:100%!important;object-
 #gbLayout .gb-mobile-book{display:none}
 @media(max-width:899px){#gbLayout .gb-mobile-book{display:block;margin:16px 0}#gbLayout .gb-desktop-book{display:none}}
 #gbLayout .gb-contact-actions{align-items:center}#gbLayout .gb-contact-actions a{display:inline-flex;align-items:center;justify-content:center;margin:0!important}
+
+#gbLayout .gb-after-rates{margin:16px 0 0}#gbLayout .gb-waiver-help{display:block;margin-top:7px}#gbLayout .gb-waiver-help a{text-decoration:underline;font-weight:800}
