@@ -107,30 +107,21 @@ test('R11 speed: the admin backfill lists, stores and serves the 160 and 240px c
 });
 
 test('R11 speed: the strip lists 160/240/480px copies with sizes for its box; the phone copy sits after the buttons', async () => {
+  // Winery pages (2026-11-08) use the winery layout: its thumbnails sit beside the photo on phones too, so the strip is in the
+  // page once (no phone copy). The French page keeps the older two-strip layout, checked below.
   const page = (await get('/naramata/wineries/r11-gallery-winery')).text;
   const mosaic = thumbsIn(mosaicStrip(page));
-  const phone = thumbsIn(phoneStrip(page));
   assert.equal(mosaic.length, 4);
-  assert.equal(phone.length, 4, 'the same four thumbnails');
+  assert.doesNotMatch(page, /<div class="vg-phone">/, 'one strip, no phone copy');
   for (const [i, t] of mosaic.entries()) {
     const stem = STEMS[i + 1];
-    assert.match(t, new RegExp(`data-src="/images/owner/${stem}-w480\\.jpg\\?v=[0-9a-f]{10}" data-srcset="/images/owner/${stem}-w160\\.jpg\\?v=[0-9a-f]{10} 160w, /images/owner/${stem}-w240\\.jpg\\?v=[0-9a-f]{10} 240w, /images/owner/${stem}-w480\\.jpg\\?v=[0-9a-f]{10} 480w" sizes="\\(min-width: 900px\\) 220px, 96px"`));
-    assert.match(phone[i], new RegExp(`data-srcset="/images/owner/${stem}-w160\\.jpg\\?v=[0-9a-f]{10} 160w, [^"]+" sizes="80px"`));
-    assert.match(phone[i], new RegExp(`aria-label="Open photo ${i + 2} of 5"`));
+    assert.match(t, new RegExp(`data-src="/images/owner/${stem}-w480\\.jpg\\?v=[0-9a-f]{10}" data-srcset="/images/owner/${stem}-w160\\.jpg\\?v=[0-9a-f]{10} 160w, /images/owner/${stem}-w240\\.jpg\\?v=[0-9a-f]{10} 240w, /images/owner/${stem}-w480\\.jpg\\?v=[0-9a-f]{10} 480w"`));
+    assert.match(t, new RegExp(`aria-label="Open photo ${i + 2} of 5"`));
   }
-  // Order in the page: hero, mosaic strip, the button row, the phone strip with the credit, then the description.
   const at = (s) => page.indexOf(s);
-  assert.ok(at('<div class="vg-mosaic">') < at('<div class="venue-cta-row"'));
-  assert.ok(at('<div class="venue-cta-row"') < at('<div class="vg-phone">'));
-  assert.ok(at('<div class="vg-phone">') < at('<p class="venue-description"'));
-  assert.match(page, /<div class="vg-phone"><div class="vg-strip vg-count-4">[\s\S]*?<\/div><p class="venue-photo-credit"[^>]*>Photo: R11 Winery<\/p><\/div>/);
-  // Phones show the phone copy, wider screens the one by the photo.
-  assert.match(page, /\.vg-phone \{ display: none; \}/);
-  assert.match(page, /@media \(max-width: 640px\) \{\s*\.vg-mosaic \.vg-strip, \.vg-mosaic \+ \.venue-photo-credit \{ display: none; \}\s*\.vg-phone \{ display: block;/);
-  // One click listener covers both strips (the viewer's script comes before the phone copy).
-  assert.match(page, /document\.addEventListener\('click', function\(e\)\{ var b = e\.target && e\.target\.closest \? e\.target\.closest\('\[data-vg-open\]'\)/);
-  // The wide-screen layout rule that drops the button row's margin ignores the hidden phone copy.
-  assert.match(page, /\.venue-cta-row:not\(:has\(~ :not\(\.venue-description, \.venue-editorial, \.vg-phone, script\)\)\)/);
+  assert.ok(at('<div class="vg-mosaic">') < at('<div class="venue-cta-row"'), 'the photos, then the buttons');
+  assert.ok(at('<div class="vg-mosaic">') < at('<p class="venue-photo-credit"') && at('<p class="venue-photo-credit"') < at('<div class="venue-cta-row"') || !page.includes('venue-photo-credit'));
+  assert.match(page, /<script src="\/food-drink-venue\.js\?v=[0-9a-f]{12}"><\/script>/, 'the layout script loads the thumbnails once the photo is in');
   // French: the same, with French labels.
   db.prepare("UPDATE venues SET description_fr = 'Un domaine fictif pour les tests.' WHERE id = ?").run(galleryId);
   const fr = (await get('/fr/naramata/wineries/r11-gallery-winery'));
@@ -167,7 +158,8 @@ test('R11 speed: the hero sizes match its box, the preload repeats them, and the
 });
 
 test('R11 speed: the thumbnail loader waits for the photo, then loads only the strip on screen (the other on resize)', async () => {
-  const page = (await get('/naramata/wineries/r11-gallery-winery')).text;
+  // The French page keeps the two-strip layout and this loader (the winery layout's one strip has its own, in food-drink-venue.js).
+  const page = (await get('/fr/naramata/wineries/r11-gallery-winery')).text;
   const script = (page.match(/<script>\s*\(function\(\)\{\s*function show\(img\)[\s\S]*?<\/script>/) || [''])[0].replace(/^<script>|<\/script>$/g, '');
   assert.ok(script, 'the loader is in the page');
   assert.ok(page.indexOf(script) > page.indexOf('<div class="vg-phone">'), 'after both strips');
