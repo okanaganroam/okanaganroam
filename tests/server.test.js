@@ -4635,7 +4635,7 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   assert.match(noMatch, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
   assert.match(noMatch, /<ul class="card-grid" id="whatsOnResults" hidden>/);
   // (Oct 2026, rest links) cards that are not shown are not rendered as hidden cards: they ride in the "rest" template and
-  // the crawlable "More upcoming events" list, and the client builds the card when a chip reveals it.
+  // the crawlable "View a simple list" list, and the client builds the card when a chip reveals it.
   const restLinks = (html) => (html.match(/<li hidden><a data-href="[^"]+">/g) || []).length;
   const shownCards = (html) => (html.match(/<li class="venue-card whatson-event-card"(?![^>]*hidden)/g) || []).length;
   assert.equal(shownCards(noMatch), 0, 'no card is shown');
@@ -24951,7 +24951,7 @@ test('Lighter pages: crawlable links: every place and event waiting for "Show mo
       const links = crawlLinks(html);
       const missing = events.filter((e) => !links.has(`/${e.region}/events/${e.slug}`) && !links.has(`/fr/${e.region}/events/${e.slug}`)).map((e) => e.slug);
       assert.deepEqual(missing, [], `${p}: every upcoming fixture event is linked`);
-      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>More upcoming events \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
+      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>View a simple list \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
     }
     // A page whose cards all ship gets no list.
     assert.doesNotMatch(await (await fetch(base + '/kelowna')).text(), /class="rest-links"/);
@@ -27546,7 +27546,7 @@ test('Search ranking: A-Z lists add the town to a repeated name, show ALL-CAPS n
   assert.ok(fr.includes('>Earls (Penticton)<') && fr.includes('>Earls (Kelowna)<'));
   // A name that appears once keeps no town; events keep their order and label.
   assert.ok(en.includes('>Solo Winery<'));
-  assert.match(app.restLinksHtml('whatsOnRest', card('/kelowna/events/b', 'B Show') + card('/kelowna/events/a', 'A Show'), 'en'), /More upcoming events \(2\)[\s\S]*B Show[\s\S]*A Show/);
+  assert.match(app.restLinksHtml('whatsOnRest', card('/kelowna/events/b', 'B Show') + card('/kelowna/events/a', 'A Show'), 'en'), /View a simple list \(2\)[\s\S]*B Show[\s\S]*A Show/);
 });
 
 test('Search ranking: the desktop /map lists the places in view, open first then by rating; Open now over the clusters lists them', () => {
@@ -29061,12 +29061,12 @@ test("What's On pass 6: Today + one category: the More upcoming list follows it,
   // Every live-music event left today is on the first page, so all the waiting ones are other kinds or finished.
   // Round 9 (2026-10-19): a hidden link keeps its address in data-href, so crawlers don't follow it.
   assert.match(links, /<li hidden><a data-href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
-  assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>More upcoming events \(0\)</);
+  assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>View a simple list \(0\)</);
   assert.doesNotMatch(links, /<li><a /);
   const unit = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-2" data-group="earlier"><h2><a class="venue-card-link" href="/kelowna/events/b"><span class="venue-card-name">B Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-3" data-group="today"><h2><a class="venue-card-link" href="/kelowna/events/c"><span class="venue-card-name">C Show</span></a></h2></li>', 'en');
-  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
+  assert.match(unit, /View a simple list \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
   assert.match(app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>', 'en'), /<details class="rest-links" id="whatsOnRestLinks" hidden>/, 'an empty list is hidden');
   // Markets today: all over, so the block says so and lists the next three markets.
   const mk = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: WO6_NIGHT });
@@ -31874,7 +31874,7 @@ test('Round 10 phone: map, What\'s On, list, homepage, gallery, footer and town-
   assert.match(map, /body\.map-page \.pm-filters-btn \{[^}]*width: 44px; height: 44px;/);
   assert.match(map, /body\.map-page \.pm-mic \{[^}]*width: 44px; height: 44px;/);
   assert.doesNotMatch(map, /body\.map-page \.pm-(?:chip|tab|more|mode|route-end) \{[^}]*min-height: (?:3\d|4[0-3])px/);
-  // "More upcoming events (N)" (What's On) and "All places on this page, A-Z" (list pages) share one summary rule.
+  // "View a simple list (N)" (What's On) and "All places on this page, A-Z" (list pages) share one summary rule.
   const rest = app.restLinksHtml('fdRest', '<li class="venue-card"><a class="venue-card-link" href="/kelowna/restaurants/a-place"><span class="venue-card-name">A Place</span></a></li>', 'en');
   assert.match(rest, /\.rest-links summary\{[^}]*min-height:44px/);
   assert.match(app.renderWhatsOnStyles(), /\.whatson-browse-list a, body\.whatson-page \.whatson-browse-list span \{[^}]*min-height: 44px;/);
