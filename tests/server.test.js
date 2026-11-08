@@ -18061,7 +18061,7 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(empty.text, /<h1>Sports &amp; Recreation in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="sport-coming-soon">More sports and recreation spots are coming soon/);
       // One list on the directory engine since 2026-10-14.
-      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Skate parks, pump tracks, BMX tracks, bike parks and mountain bike trail networks, disc golf courses, and pickleball, tennis and beach volleyball courts/);
+      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Find your next place to ride, skate or play\./);
       assert.match(empty.text, /<body class="golf-page outdoor-page fd-page sport-page sports-hub-page">/);
       assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
       assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/sports\/sports\.jpg"/);
@@ -19978,12 +19978,22 @@ test('Cards: Free is the first badge, ahead of the Dog Friendly collection badge
 test('Sports hub: a free park keeps its own badges on the card (top two + N), other pages still leave the expected ones off', () => {
   const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
   const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
-  assert.match(hub, /Dogs OK<\/span> <span class="chip chip-feat">[^]*?Kids OK<\/span> <span class="chip chip chip-more|Dogs OK[^]*Kids OK[^]*\+1/, 'dogs, kids and +1 (Free)');
+  assert.match(hub, /Free[^]*Dogs OK[^]*fd-extra-features[^]*Kids OK/, 'free and dogs remain visible; extra amenities expand');
   assert.match(hub, /body\.sports-hub-page\.golf-page \.card-grid > li\.venue-card[^{]*> \.chips:not\(:empty\) \{ display: flex !important; \}/, 'badge row shown on trail and park cards too');
   // Free-or-price is the first badge on every card (2026-11-02); the default card still leaves the third badge off.
   assert.match(app.cardBadgeChipsHtml(park), /Free[^]*Dogs OK/);
   assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids OK/);
   assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs OK[^]*Kids OK/, 'Free is the first badge');
+});
+
+test('Sports hub: cross-listed courts show their sport note without unrelated centre admission or hours', () => {
+  const centre = {id:1553, name:'Fixture Recreation Centre', type:'indoor', region:'kelowna', slug:'fixture-recreation-centre', description:'A pool and fitness centre.'};
+  const notes = new Map([[1553,'12 outdoor pickleball and 6 tennis courts outside']]);
+  const html = app.renderSportsHubPage([], [centre], notes, {types:['courts'], features:[], regions:[]});
+  assert.match(html, /sports-play-info[^]*12 outdoor pickleball and 6 tennis courts outside/);
+  assert.match(html, /Activity hours: check venue details/);
+  assert.doesNotMatch(html, /From \$9/);
+  assert.match(html, /card-slot-fee \{display:block!important;/, 'sport details remain visible in the compact card');
 });
 
 test('Sports hub: Covered / Indoor is read from the place and shows as a filter and a card badge', () => {
@@ -20010,7 +20020,7 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   assert.match(html, /data-venue-id="9002"[^>]*data-ph="none"/);
   assert.match(html, /data-venue-id="9001"[^>]*data-ph="none"/);
   for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
-  assert.match(html, /data-fd-type="skate" aria-pressed="false">Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /data-fd-type="skate" aria-pressed="false">🛹 Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
   assert.match(html, /<option value="recommended" selected>Biggest first<\/option><option value="town">By town<\/option>/);
   assert.match(html, /if \(key === 'town'\)/, 'the page can sort by town');
   assert.match(html, /<a href="\/sports\/bike">Mountain Biking <span>1<\/span><\/a>/, 'activity pages stay linked');
