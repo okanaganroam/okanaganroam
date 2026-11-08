@@ -19,12 +19,6 @@
    "heading": "Worth the trip",
    "items": [
     {
-     "ref": "penticton/bench-market",
-     "name": "Bench Market",
-     "text": "a popular cafeteria-style breakfast, brunch and market spot, and a handy pitstop on a Naramata Bench wine tour. The gluten-free options are excellent, and dogs are welcome on the outdoor terrace.",
-     "where": "Penticton"
-    },
-    {
      "ref": "penticton/mack-s-social-house",
      "name": "Mack's Social House",
      "text": "a dog-friendly restaurant with a swing indoors. The $3 Sunday mimosas are poured with visible generosity, and the Pavé potatoes are good enough to order on their own.",
@@ -212,8 +206,7 @@
    [
     "Vegan or gluten-free",
     [
-     "penticton/stillfood-bistro-cappuccino-bar|Stillfood Bistro & Cappuccino Bar",
-     "penticton/bench-market|Bench Market"
+     "penticton/stillfood-bistro-cappuccino-bar|Stillfood Bistro & Cappuccino Bar"
     ]
    ],
    [
