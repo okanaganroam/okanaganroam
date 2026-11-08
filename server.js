@@ -27935,7 +27935,7 @@ ${golfEngagementHeadHtml('indoor', true, 'hub')}
   body.indoor-hub-page .category-banner img {object-position:50% 22%!important;}
   body.indoor-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
   body.indoor-hub-page .indoor-panel-help {font:400 13px/1.4 Nunito,sans-serif;color:#615b53;margin:22px 0 12px;}
-  body.indoor-hub-page .indoor-filter-help {font-size:12px;color:#615b53;margin:0 0 12px;}
+  body.indoor-hub-page .indoor-intro-mobile {display:none;}
   body.indoor-hub-page .indoor-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
   body.indoor-hub-page .indoor-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
   body.indoor-hub-page .indoor-sort-help summary::before {content:'▸';}
@@ -27943,6 +27943,8 @@ ${golfEngagementHeadHtml('indoor', true, 'hub')}
   body.indoor-hub-page .indoor-sort-help p {max-width:70ch;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;margin:0;}
   html body.indoor-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-fee {display:block!important;}
   @media(max-width:640px){
+    body.indoor-hub-page .indoor-intro-mobile {display:inline;}
+    body.indoor-hub-page .indoor-intro-desktop {display:none;}
     body.indoor-hub-page.fd-refresh .category-banner,body.indoor-hub-page.fd-refresh .category-banner img {height:110px!important;}
     body.indoor-hub-page.fd-refresh .fd-toolbar .fd-controls {flex-wrap:wrap;}
     body.indoor-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
@@ -27971,15 +27973,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Indoor & Rainy Day Spots' }])}
   ${categoryHeroHtml(categoryBannerHtml('indoor'), `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">Find a little fun for a rainy day. Museums, games, family adventures &amp; more. 🌈</p>
-  <p class="rainy-guide-link"><a href="${RAINY_GUIDE_PATH}">Guide: a rainy day in the Okanagan &rarr;</a></p>`)}
+  <p class="outdoor-intro fd-intro"><span class="indoor-intro-desktop">Find a little fun for a rainy day. Museums, games, family adventures &amp; more. 🌈</span><span class="indoor-intro-mobile">Find your rainy-day adventure. 🌈</span></p>`)}
   ${indoorVenues.length ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>'}
   <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search indoor things to do').replace('Search by name, place or dish...', 'Search escape room, climbing, a town...')}
   ${controlsHtml}
   </div>
   ${chips}
-  <p class="indoor-filter-help">Numbers show matching places. Open now limits the list to places currently open.</p>
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
@@ -27990,6 +27990,7 @@ ${renderGolfHeaderHtml()}
   <p class="fd-no-results-try">Try one word, like <a href="/indoor?types=games">escape rooms</a>, <a href="/indoor?types=family">family fun</a> or <a href="/indoor?types=arts">museums</a>.</p></div>
   ${cardsHtml}
   <p class="fd-open-note fd-open-note-end">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <p class="rainy-guide-link"><a href="${RAINY_GUIDE_PATH}">Need inspiration? A rainy day in the Okanagan &rarr;</a></p>
   <section class="hub-links" aria-labelledby="indoorExperiencesHeading">
     <h2 id="indoorExperiencesHeading">By experience</h2>
     <nav aria-label="Indoor things to do by experience">
