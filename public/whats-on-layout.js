@@ -5,8 +5,29 @@
  const shortIntro=()=>{if(intro&&intro.textContent!=='Live music, markets and little adventures. Find your next good day out.')intro.textContent='Live music, markets and little adventures. Find your next good day out.'};
  shortIntro();
  const townLabel=document.querySelector('.wo-town-label');
+ const weekly=document.getElementById('whatsOnNights');
+ function syncWeekly(selected){
+  if(!weekly)return;
+  const regions=selected.map(c=>c.dataset.region);
+  const names=selected.map(c=>c.textContent.trim().replace(/\s+\d+\s*$/,''));
+  const where=names.length?names.join(', '):'the Okanagan';
+  let total=0;
+  weekly.querySelectorAll('[data-wo-weekly-region]').forEach(li=>{li.hidden=regions.length>0&&!regions.includes(li.dataset.woWeeklyRegion);if(!li.hidden)total++});
+  weekly.querySelectorAll('[data-wo-weekly-label]').forEach(group=>{
+   const count=group.querySelectorAll('[data-wo-weekly-region]:not([hidden])').length;
+   group.hidden=count===0;
+   const summary=group.querySelector('[data-wo-weekly-summary]');
+   if(summary)summary.textContent=group.dataset.woWeeklyLabel+' at '+count+' place'+(count===1?'':'s');
+  });
+  weekly.querySelectorAll('.whatson-nights-day').forEach(day=>{day.hidden=!day.querySelector('[data-wo-weekly-label]:not([hidden])')});
+  const context=document.getElementById('woWeeklyTown');if(context)context.textContent=names.length?'Regular nights in '+where+'.':'Regular nights across the Okanagan.';
+  const empty=document.getElementById('woWeeklyEmpty');if(empty){empty.hidden=total>0;empty.textContent=total?'':'No weekly favourites are listed for '+where+' yet. Try another town.'}
+  const fold=weekly.querySelector('.wo-fold');if(fold)fold.hidden=total===0;
+ }
+
  const sync=()=>{
   const selected=[...document.querySelectorAll('#whatsOnRegionsPanel [data-region][aria-pressed="true"]')];
+  syncWeekly(selected);
   if(townLabel)townLabel.textContent=selected.length===1?selected[0].textContent.trim().replace(/\s+\d+\s*$/,''):selected.length>1?selected.length+' towns':'Choose a town';
   const active=new URL(location.href).searchParams.get('when')||'';
   document.querySelectorAll('.wo-when [data-when]').forEach(a=>a.setAttribute('aria-pressed',String(a.dataset.when===active)));
