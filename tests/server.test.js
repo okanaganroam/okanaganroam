@@ -20016,6 +20016,8 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   const notes = new Map([[9002, 'MTB network: 60 trails, 70 km singletrack']]);
   const html = app.renderSportsHubPage([own], [big], notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">2 places to play</);
+  assert.match(html, /Mountain biking network: 60 trails, 70 km narrow trails/);
+  assert.match(html, /bottom:auto!important;max-height:calc\(100dvh - 92px\)!important/);
   assert.ok(html.indexOf('data-venue-name="Fixture Trail Network"') < html.indexOf('data-venue-name="Fixture Skate Park"'), 'biggest first');
   assert.doesNotMatch(html, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
   assert.match(html, /Skate Parks &amp; BMX/);
@@ -20023,7 +20025,7 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   assert.match(html, /data-venue-id="9001"[^>]*data-ph="none"/);
   for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
   assert.match(html, /data-fd-type="skate" aria-pressed="false">🛹 Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
-  assert.match(html, /<option value="recommended" selected>Biggest first<\/option><option value="town">By town<\/option>/);
+  assert.match(html, /<option value="recommended" selected>Largest places first<\/option><option value="town">By town<\/option>/);
   assert.match(html, /if \(key === 'town'\)/, 'the page can sort by town');
   assert.match(html, /<a href="\/sports\/bike">Mountain Biking <span>1<\/span><\/a>/, 'activity pages stay linked');
   assert.match(html, /"bike":"Mountain Biking"/, 'search knows the activity names');
