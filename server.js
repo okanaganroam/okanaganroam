@@ -305,7 +305,43 @@ const RESEARCHED_BOOL_FIELDS = [
   'great_groups', 'happy_hour', 'free_entry', 'arts_culture',
 ];
 const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture', 'beginner', 'lit', 'covered', 'rentals']);
-const ACTIVITY_BADGE_TYPES = new Set(['outdoor', 'indoor', 'beach', 'tour', 'sport']);
+
+// Business portal field map (2026-11-08): the one place that says which parts of a listing a venue type has.
+// Before this the answer was spread over seven type sets (happy hour, specials, weekly nights, menu, booking-first,
+// no-price, activity badges), each defined where it was first needed. They are now all read from this table, so a
+// category's whole portal is one row. Flags:
+//   happyHour    the owner form shows the happy hour box (places that serve alcohol, and golf courses)
+//   specials     weekly specials / nightly deals box
+//   nights       weekly nights (trivia, live music)
+//   menu         menu or price list upload and links
+//   bookingFirst the booking link is the first thing asked
+//   price        a price range / price badge makes sense
+//   activityBadges  activity badges (free entry, arts & culture, rentals...) instead of food badges
+//   foodBadgesHidden  food-only badges (vegan, gluten free, sports TV...) are kept but not offered
+// Types not listed here (a type added later) get PORTAL_FIELDS_DEFAULT: nothing optional, price shown.
+const PORTAL_FIELDS_DEFAULT = Object.freeze({ happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false });
+const portalRow = (flags) => Object.freeze({ ...PORTAL_FIELDS_DEFAULT, ...flags });
+const PORTAL_FIELDS_BY_TYPE = Object.freeze({
+  // Food & drink (key order is the old NIGHT_TYPES order)
+  restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  cafe: portalRow({ specials: true, nights: true, menu: true }),
+  pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  distillery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  winery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  // Things to do
+  golf: portalRow({ happyHour: true, specials: true, menu: true, bookingFirst: true, price: false }),
+  tour: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
+  indoor: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
+  sport: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
+  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
+  beach: portalRow({ activityBadges: true }),
+  shop: portalRow({ price: false }),
+});
+const portalFields = (type) => (Object.hasOwn(PORTAL_FIELDS_BY_TYPE, type) ? PORTAL_FIELDS_BY_TYPE[type] : PORTAL_FIELDS_DEFAULT);
+const portalTypesWith = (flag) => new Set(Object.keys(PORTAL_FIELDS_BY_TYPE).filter((t) => PORTAL_FIELDS_BY_TYPE[t][flag]));
+const ACTIVITY_BADGE_TYPES = portalTypesWith('activityBadges');
 
 // Derived badges (2026-10-11): computed ONLY from the venue's stored hours
 // by deriveHoursBadges() below -- never researched, never set by hand. They
@@ -546,7 +582,7 @@ const PRICE_ERROR = 'price must be null, an integer 1-4, a numeric string "1"-"4
 
 // Types whose listings never show a price (2026-10-23): golf already, and shops (the 1-4 scale is per-person
 // spend on a visit, which says nothing useful about a store). The stored value is kept.
-const NO_PRICE_TYPES = new Set(['golf', 'shop']);
+const NO_PRICE_TYPES = new Set(Object.keys(PORTAL_FIELDS_BY_TYPE).filter((t) => !PORTAL_FIELDS_BY_TYPE[t].price));
 const venueShowsPrice = (v) => !!(v && v.price && !NO_PRICE_TYPES.has(v.type));
 
 function normalizePrice(price) {
@@ -9605,7 +9641,7 @@ function visitInfoHtml(info, fr = false) {
 // brewery, winery, distillery or golf course (OWNER_HAPPY_HOUR_TYPES), or carries the happy_hour badge. Drink and
 // food-and-drink specials show only there; food specials anywhere (cafés, family restaurants).
 function venueServesAlcohol(v) {
-  return !!v && (OWNER_HAPPY_HOUR_TYPES.has(v.type) || Number(v.happy_hour) === 1);
+  return !!v && (portalFields(v.type).happyHour || Number(v.happy_hour) === 1);
 }
 function specialsStale(checkedAt, now = new Date()) {
   if (!parseLocalDate(checkedAt)) return true;
@@ -9893,7 +9929,7 @@ const NIGHT_COST_MAX = 20;
 const NIGHTS_STALE_DAYS = 120;
 const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'other'];
 const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th'];
-const NIGHT_TYPES = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery']);
+const NIGHT_TYPES = portalTypesWith('nights');
 // One night as stored and compared: every key, in this order, null when not given.
 const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'source', 'checked_at'];
 const NIGHT_KIND_LABELS = {
@@ -34104,7 +34140,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     if (closure) localBusiness.openingHoursSpecification = closureAwareOpeningHours(localBusiness.openingHoursSpecification, closure);
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
-  const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
+  const venueMenu = !venue.redirect_to && portalFields(venue.type).menu ? publishedMenu(venue.id) : null;
   if (venueMenu && menuKind(venue) === 'menu') localBusiness.hasMenu = menuMenuUrl(venue, fr ? 'fr' : 'en');
 
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
@@ -43821,9 +43857,9 @@ const OWNER_DESCRIPTION_MAX = 1200;
 const OWNER_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const OWNER_DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 // Happy hour only makes sense where alcohol is served.
-const OWNER_HAPPY_HOUR_TYPES = new Set(['restaurant', 'pub', 'cocktail', 'brewery', 'winery', 'distillery', 'golf']);
+const OWNER_HAPPY_HOUR_TYPES = portalTypesWith('happyHour');
 // Weekly specials (2026-10-27): places that serve food or drink (cafés too: food specials only there).
-const OWNER_SPECIALS_TYPES = new Set([...OWNER_HAPPY_HOUR_TYPES, 'cafe']);
+const OWNER_SPECIALS_TYPES = portalTypesWith('specials');
 
 function ownerTokenHash(token) {
   return crypto.createHash('sha256').update(`okanagan-roam-owner-link:${token}`).digest('hex');
@@ -44353,7 +44389,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     }
   }
   if ('happy_hour' in input) {
-    if (!OWNER_HAPPY_HOUR_TYPES.has(venue.type)) {
+    if (!portalFields(venue.type).happyHour) {
       errors.happy_hour = 'Happy hour is only listed for places that serve alcohol.';
     } else if (input.happy_hour === null) {
       if (current.happy_hour) changes.happy_hour = null;
@@ -44367,7 +44403,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // Happy hour deals (2026-10-26): { deals: [{ text, price }], deals_fr: [...] } (up to 6 each), or null to remove them.
   if ('happy_hour_deals' in input) {
     const x = input.happy_hour_deals;
-    if (!OWNER_HAPPY_HOUR_TYPES.has(venue.type)) {
+    if (!portalFields(venue.type).happyHour) {
       errors.happy_hour_deals = 'Happy hour is only listed for places that serve alcohol.';
     } else if (x === null) {
       if (current.happy_hour_deals) changes.happy_hour_deals = null;
@@ -44390,7 +44426,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // null / [] to remove them. Drink specials only where alcohol is served.
   if ('specials' in input) {
     const x = input.specials;
-    if (!OWNER_SPECIALS_TYPES.has(venue.type)) {
+    if (!portalFields(venue.type).specials) {
       errors.specials = 'Weekly specials are listed for places that serve food or drinks.';
     } else if (x === null || (Array.isArray(x) && !x.length)) {
       if (current.specials.length) changes.specials = null;
@@ -44410,7 +44446,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // (up to 7), or null / [] to remove them. Only for the places that host them (NIGHT_TYPES).
   if ('weekly_nights' in input) {
     const x = input.weekly_nights;
-    if (!NIGHT_TYPES.has(venue.type)) {
+    if (!portalFields(venue.type).nights) {
       errors.weekly_nights = OWNER_NIGHTS_ERRORS.type;
     } else if (x === null || (Array.isArray(x) && !x.length)) {
       if ((current.weekly_nights || []).length) changes.weekly_nights = null;
@@ -46519,7 +46555,7 @@ const MENU_DIR = process.env.MENU_DIR
 // Price lists (2026-10-17) use the same uploader: tour operators ("Tours & prices"), golf courses ("Green fees &
 // rates") and indoor attractions, simulators and sports & recreation ("Prices & rates"), each on a /prices page.
 // Beaches and outdoor spots are public places with no owner posting prices, so they have none.
-const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery', 'tour', 'golf', 'indoor', 'sport']);
+const MENU_VENUE_TYPES = portalTypesWith('menu');
 function menuKind(venue) {
   if (!venue) return 'menu';
   if (venue.type === 'tour') return 'tours';
@@ -49098,7 +49134,7 @@ function listIndexableMenusForSitemap() {
   for (const r of rows) {
     const menu = publishedMenu(r.venue_id);
     const v = menu && getVenue(r.venue_id);
-    if (v && !v.redirect_to && CATEGORY_SLUGS[v.type] && v.slug && MENU_VENUE_TYPES.has(v.type) && menuIndexable(menu, v)) out.push({ venue: v, publishedAt: menu.publishedAt });
+    if (v && !v.redirect_to && CATEGORY_SLUGS[v.type] && v.slug && portalFields(v.type).menu && menuIndexable(menu, v)) out.push({ venue: v, publishedAt: menu.publishedAt });
   }
   return out;
 }
@@ -52174,10 +52210,10 @@ function ownerDecisionRecipients(venueId, senderEmail) {
 function ownerExtrasFor(venue, lang = 'en') {
   const kind = menuKind(venue);
   if (lang === 'fr') {
-    if (!MENU_VENUE_TYPES.has(venue.type)) return 'vos liens de réservation et de réseaux sociaux';
+    if (!portalFields(venue.type).menu) return 'vos liens de réservation et de réseaux sociaux';
     return kind === 'menu' ? 'votre menu' : frDecode(PRICE_LIST_WORDS[kind].fr.listHtml);
   }
-  if (!MENU_VENUE_TYPES.has(venue.type)) return 'booking and social links';
+  if (!portalFields(venue.type).menu) return 'booking and social links';
   return kind === 'menu' ? 'your menu' : PRICE_LIST_WORDS[kind].en.list;
 }
 
@@ -53313,7 +53349,7 @@ function ownerA11y(html) {
 
 // The big "Add your menu" button at the top of the owner page (food, drink and wineries only).
 function ownerMenuCardHtml(venue, href, lang = 'en') {
-  if (!MENU_VENUE_TYPES.has(venue.type)) return '';
+  if (!portalFields(venue.type).menu) return '';
   const pub = publishedMenu(venue.id);
   const draft = activeMenuDraft(venue.id);
   const w = PRICE_LIST_WORDS[menuKind(venue)];
@@ -53340,7 +53376,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
 }
 
 // Businesses people book (tours, golf, activities): the booking link comes first on the owner page.
-const OWNER_BOOKING_FIRST_TYPES = new Set(['tour', 'golf', 'indoor', 'sport', 'outdoor']);
+const OWNER_BOOKING_FIRST_TYPES = portalTypesWith('bookingFirst');
 
 // What the folded Seasonal hours and Special closures headers say once something is set (2026-10-18), so an owner
 // sees it without opening them: "Winter hours Nov 1–Apr 30", "2 closures (next: Dec 25)".
@@ -53494,7 +53530,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const listing = fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
   const dayLabel = (d) => (fr ? OWNER_DAY_LABELS_FR[d].charAt(0).toUpperCase() + OWNER_DAY_LABELS_FR[d].slice(1) : OWNER_DAY_LABELS[d]);
   const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
-  const showHappyHour = OWNER_HAPPY_HOUR_TYPES.has(venue.type);
+  const showHappyHour = portalFields(venue.type).happyHour;
   const parseWeek = (json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
@@ -53515,7 +53551,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   };
   // Weekly specials editor (2026-10-27): up to SPECIALS_MAX boxes, each with its days, name, deal, price, kind (places
   // that serve alcohol), optional times and optional French. A box's season (from research) rides along unchanged.
-  const showSpecials = OWNER_SPECIALS_TYPES.has(venue.type);
+  const showSpecials = portalFields(venue.type).specials;
   const specialsAlcohol = venueServesAlcohol(venue);
   const specialsNow = Array.isArray(snap.specials) ? snap.specials : [];
   const specialRows = () => {
@@ -53543,7 +53579,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   };
   // Weekly nights editor (2026-10-27): up to NIGHTS_MAX boxes like the specials: the days, what kind of night, its
   // name, times, how often, and optional detail, host, cost and French.
-  const showNights = NIGHT_TYPES.has(venue.type);
+  const showNights = portalFields(venue.type).nights;
   const nightsNow = Array.isArray(snap.weekly_nights) ? snap.weekly_nights : [];
   const nightRows = () => {
     const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length + (nightsNow.length < NIGHTS_MAX ? 1 : 0)));
@@ -53590,8 +53626,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         </div>`;
   }).join('');
   // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
-  const foodOnly = OWNER_BOOKING_FIRST_TYPES.has(venue.type) && venue.type !== 'golf' ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
-  const activityOnly = ACTIVITY_BADGE_TYPES.has(venue.type) ? new Set() : ACTIVITY_ONLY_BADGES;
+  const foodOnly = portalFields(venue.type).foodBadgesHidden ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
+  const activityOnly = portalFields(venue.type).activityBadges ? new Set() : ACTIVITY_ONLY_BADGES;
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"${(foodOnly.has(f) || activityOnly.has(f)) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
   // Signed in (2026-10-18): "Anything else you send now is added to them" isn't true any more (most fields go live on
@@ -53843,7 +53879,7 @@ ${renderGolfHeaderHtml()}
       <h1>${escapeHtml(venue.name)}</h1>
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
-        const hasMenu = MENU_VENUE_TYPES.has(venue.type);
+        const hasMenu = portalFields(venue.type).menu;
         const tile = (task, icon, title, sub) => `<button type="button" class="op-task" data-pick="${task}"><span class="op-task-icon" aria-hidden="true">${icon}</span><span class="op-task-text"><strong>${title}</strong><span>${sub}</span></span></button>`;
         const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(`Please update ${venue.name}`)}`;
         return `<section class="op-tasks" id="opTasks" data-task="home" hidden aria-labelledby="opTasksHead">
@@ -53875,21 +53911,21 @@ ${renderGolfHeaderHtml()}
       <p class="op-reassure">Gratuit &middot; environ 5 minutes. Pour que vos modifications soient en ligne tout de suite, <a href="#opLogin" data-open-login>créez un compte</a> ci-dessous.</p>`)}</div>
       <div data-task="all">${ownerMenuCardHtml(venue, token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`), lang).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}</div>
     </div>
-    <nav class="op-secnav" id="opSecNav" data-task="all" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
+    <nav class="op-secnav" id="opSecNav" data-task="all" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${portalFields(venue.type).menu ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
     <div class="op-head">
       ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       <div data-task="home all">${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}</div>
       ${found.account ? `<p class="op-bar-in">${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="${P('/owner/account')}">${L('My listings', 'Mes fiches')}</a> &middot; <a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a></p>` : viewer && found.viewerManages ? `
-      <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
+      <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${portalFields(venue.type).menu ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${portalFields(venue.type).menu ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
       <div class="op-login" id="opAddLogin" data-task="home all">
         <p style="margin:0 0 10px">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>. Add ${escapeHtml(venue.name)} to your login to manage it from <a href="/owner/account">My listings</a>, with photos going live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>. Ajoutez ${escapeHtml(venue.name)} à votre compte pour la gérer à partir de <a href="/fr/owner/account">Mes fiches</a>; vos photos seront alors mises en ligne tout de suite.`)}</p>
         <button type="button" class="venue-form-submit" id="olsAdd">${L('Add to my login', 'Ajouter à mon compte')} (${escapeHtml(viewer.email)})</button>
         <p class="lyv-error" id="olsAddError" hidden></p>
       </div>` : `
       <details class="op-login" id="opLogin" data-task="home all">
-        <summary>${L(`<strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time`, `<strong>Créer un compte</strong> (30 secondes) : vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord}` : ''} seront mis en ligne tout de suite, et vous n’aurez plus besoin de ce lien`)}</summary>
+        <summary>${L(`<strong>Create a login</strong> (30 seconds): your photos${portalFields(venue.type).menu ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time`, `<strong>Créer un compte</strong> (30 secondes) : vos photos${portalFields(venue.type).menu ? ` et ${menuWord}` : ''} seront mis en ligne tout de suite, et vous n’aurez plus besoin de ce lien`)}</summary>
         <form id="olsForm" novalidate>
           <p class="op-hint">${L('Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a>', 'Choisissez un mot de passe. La prochaine fois, connectez-vous à <strong>okanaganroam.com/fr/owner/login</strong>. Vous avez déjà un compte? Utilisez le même courriel et le même mot de passe pour y ajouter cette entreprise. <a href="/fr/owner/forgot">Mot de passe oublié?</a>')}</p>
           <div class="form-row">
@@ -53931,8 +53967,8 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
-      <details class="op-fold" id="opLinksBox" data-task="contact"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
-      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
+      <details class="op-fold" id="opLinksBox" data-task="contact"${portalFields(venue.type).bookingFirst && !snap.booking_url ? ' open' : ''}>
+      <summary><span class="lyv-section-label">${portalFields(venue.type).bookingFirst ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${portalFields(venue.type).bookingFirst ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
       <div class="form-row">
         ${instantOn ? `<p class="op-hint" style="grid-column:1/-1;margin:0">${L('We check a new name, address or link before it goes live, usually within a day.', 'Nous vérifions un nouveau nom, une nouvelle adresse ou un nouveau lien avant sa mise en ligne, en général d’ici un jour.')}</p>` : ''}
         <div class="form-field"><label for="opBizName">${L('Business name', 'Nom de l’entreprise')}${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
@@ -53963,7 +53999,7 @@ ${renderGolfHeaderHtml()}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
-      ${NO_PRICE_TYPES.has(venue.type) ? '' : `
+      ${!portalFields(venue.type).price ? '' : `
       <details class="op-fold op-sec" id="price" data-task="more"${waitingFields.has('price_range') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement')}</span></summary>
       <div class="form-row full"><div class="form-field">
@@ -60019,6 +60055,7 @@ module.exports = {
   renderGuidePage, guideBadgeHeading, guideIntroFor, guideIntroFacts, guideIntroContext, MIN_INDEXABLE_GUIDE_VENUES, rowToVenue,
   render404Page,
   CATEGORY_SLUGS,
+  PORTAL_FIELDS_BY_TYPE, portalFields, MENU_VENUE_TYPES, OWNER_HAPPY_HOUR_TYPES, OWNER_SPECIALS_TYPES, OWNER_BOOKING_FIRST_TYPES, ACTIVITY_BADGE_TYPES, FOOD_DRINK_TYPES,
   REGION_LABELS,
   MIN_GUIDE_VENUES,
   MIN_CATEGORY_VENUES,
