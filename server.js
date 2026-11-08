@@ -30663,7 +30663,7 @@ function whatsOnCategoryChipsHtml(state = {}) {
     return { key:c.key, html:`<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${label}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>` };
   });
   // Free (2026-10-29): free and by-donation events, on top of whatever else is chosen (?free=1).
-  const free = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-free-chip" data-price="free" aria-pressed="${state.free ? 'true' : 'false'}">${layout ? '🎟️ ' : ''}Free${state.freeCount == null ? '' : ` <span class="outdoor-activity-count">${state.freeCount}</span>`}</button>`;
+  const free = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-free-chip"${layout ? ' aria-describedby="woFreeHelp"' : ''} data-price="free" aria-pressed="${state.free ? 'true' : 'false'}">${layout ? '🎟️ ' : ''}Free${state.freeCount == null ? '' : ` <span class="outdoor-activity-count">${state.freeCount}</span>`}</button>`;
   if (layout) return layout.renderDiscovery({ allChip, free, categories:chips, filters:state.filtersHtml || '', basePath:state.basePath || '/whats-on' });
   return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${free}${chips.map(c=>c.html).join('')}</div>`;
 }
@@ -30712,7 +30712,7 @@ function whatsOnFilterBarHtml(state = {}) {
     </div>` : '';
   return `<div class="whatson-controls">${state.welcoming ? '<span class="wo-step wo-where-label">2 · Where?</span>' : ''}
     ${state.town ? townPop : pop('whatsOnRegions', state.welcoming ? '<span class="wo-town-label">Choose a town</span>' : 'Regions', uiIcon('pin'), nRegions || '', whatsOnRegionChipsHtml(state))}
-    ${state.hasInventory ? pop('whatsOnDate', 'Date', uiIcon('calendar'), dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
+    ${state.hasInventory ? pop('whatsOnDate', state.welcoming ? 'More dates' : 'Date', uiIcon('calendar'), !state.welcoming && dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
   </div>`;
 }
 
@@ -31657,13 +31657,13 @@ function whatsOnWeeklyNightsHtml(now = new Date(), compact = false) {
       const en = `${dayEn} · ${NIGHT_KIND_LABELS.en[k]} at ${n} place${n === 1 ? '' : 's'}`;
       const fr = `${dayFr} · ${NIGHT_KIND_LABELS.fr[k]} à ${n} endroit${n === 1 ? '' : 's'}`;
       return `
-      <details class="whatson-nights-group" data-kind="${k}"${i === 0 && !compact ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span>${two(en, fr)}</span></summary>
+      <details class="whatson-nights-group" data-kind="${k}"${compact ? ` data-wo-weekly-label="${escapeHtml(`${dayEn} · ${NIGHT_KIND_LABELS.en[k]}`)}"` : ''}${i === 0 && !compact ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span${compact ? ' data-wo-weekly-summary' : ''}>${two(en, fr)}</span></summary>
         <ul>${list.map(({ v, s }) => {
           const showTitle = k === 'other' || !specialWords(s.title).join(' ').includes(specialWords(NIGHT_KIND_LABELS.en[k]).join(' ')) ? s.title : '';
           const metaEn = [nightTimeText(s, false), REGION_LABELS[v.region], showTitle, nightFrequencyText(s, false)].filter(Boolean).join(' · ');
           const metaFr = [nightTimeText(s, true), REGION_LABELS[v.region], showTitle ? (s.title_fr || s.title) : '', nightFrequencyText(s, true)].filter(Boolean).join(' · ');
           return `
-          <li><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a> <span class="whatson-nights-meta">${two(metaEn, metaFr)}</span></li>`;
+          <li${compact ? ` data-wo-weekly-region="${escapeHtml(v.region)}"` : ''}><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a> <span class="whatson-nights-meta">${two(metaEn, metaFr)}</span></li>`;
         }).join('')}
         </ul>
       </details>`;
@@ -31672,7 +31672,7 @@ function whatsOnWeeklyNightsHtml(now = new Date(), compact = false) {
   };
   return `<section class="whatson-nights${compact ? ' wo-weekly' : ''}" id="whatsOnNights" aria-labelledby="whatsOnNightsHeading">
     ${compact ? '<p class="wo-eyebrow">Same time next week?</p>' : ''}<h2 class="category-subsection-heading" id="whatsOnNightsHeading">${compact ? 'Weekly favourites 🎤' : two('Every week', 'Chaque semaine')}</h2>
-    <p class="whatson-nights-intro">${compact ? 'Trivia, karaoke, open mics and familiar local nights.' : two('Trivia, karaoke, open mics and more at local pubs, breweries and restaurants, tonight first.', 'Quiz, karaoké, scènes ouvertes et plus dans les pubs, brasseries et restaurants, ce soir d’abord.')}</p>${compact ? '<details class="wo-fold"><summary>Browse weekly favourites</summary>' : ''}${days.map(dayHtml).join('')}${compact ? '</details>' : ''}
+    <p class="whatson-nights-intro">${compact ? 'Trivia, karaoke, open mics and familiar local nights.' : two('Trivia, karaoke, open mics and more at local pubs, breweries and restaurants, tonight first.', 'Quiz, karaoké, scènes ouvertes et plus dans les pubs, brasseries et restaurants, ce soir d’abord.')}</p>${compact ? '<p id="woWeeklyTown" class="wo-filter-help">Regular nights across the Okanagan.</p><p id="woWeeklyEmpty" class="wo-filter-help" role="status" hidden></p><details class="wo-fold"><summary>Browse weekly favourites</summary>' : ''}${days.map(dayHtml).join('')}${compact ? '</details>' : ''}
   </section>`;
 }
 function renderWhatsOnPage(filter = null, opts = {}) {
