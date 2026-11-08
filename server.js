@@ -38431,7 +38431,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
-      const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
+      const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
