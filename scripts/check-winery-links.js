@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Checks that every clickable link on every winery page goes where its words say. Read-only: it only fetches pages.
+// Checks that every clickable link on every winery (or, with --category, Outdoors / Sports) page goes where its words say. Read-only: it only fetches pages.
 //
 //   node scripts/check-winery-links.js                       # https://okanaganroam.com, internal links only
 //   node scripts/check-winery-links.js --external            # also opens each outside link (needs network access to winery sites)
+//   node scripts/check-winery-links.js --category outdoors   # the Outdoors pages (or: sports); the default is wineries
 //   node scripts/check-winery-links.js http://localhost:3001 --limit 20
 //
 // Finds the winery pages from /sitemap.xml, then for each page's own content (not the site header or footer):
@@ -18,6 +19,8 @@ const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 
 const BASE = (args.find((a) => /^https?:\/\//.test(a)) || process.env.OKR_BASE_URL || 'https://okanaganroam.com').replace(/\/$/, '');
 const EXTERNAL = args.includes('--external');
 const LIMIT = Number(flag('--limit')) || Infinity;
+const CATEGORY = flag('--category') || 'wineries';
+if (!/^[a-z]+$/.test(CATEGORY)) { console.error('--category must be a word like wineries, outdoors or sports'); process.exit(2); }
 const UA = { 'User-Agent': 'okanaganroam-link-check/1.0' };
 const decode = (s) => String(s).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const text = (html) => decode(html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
@@ -36,9 +39,9 @@ async function pool(items, size, fn) {
 (async () => {
   const sitemap = await (await get(BASE + '/sitemap.xml')).text();
   const pages = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/^https?:\/\/[^/]+/, ''))
-    .filter((p) => /^\/[a-z-]+\/wineries\/[a-z0-9-]+$/.test(p)).slice(0, LIMIT);
-  if (!pages.length) { console.error('No winery pages found in ' + BASE + '/sitemap.xml'); process.exit(2); }
-  console.log(`Checking ${pages.length} winery pages on ${BASE}${EXTERNAL ? ' (outside links too)' : ''}`);
+    .filter((p) => new RegExp('^/[a-z-]+/' + CATEGORY + '/[a-z0-9-]+$').test(p)).slice(0, LIMIT);
+  if (!pages.length) { console.error('No ' + CATEGORY + ' pages found in ' + BASE + '/sitemap.xml'); process.exit(2); }
+  console.log(`Checking ${pages.length} ${CATEGORY} pages on ${BASE}${EXTERNAL ? ' (outside links too)' : ''}`);
 
   const problems = [], unchecked = [];
   const internalCache = new Map(), externalCache = new Map();
@@ -55,8 +58,8 @@ async function pool(items, size, fn) {
     const res = await internal(path);
     if (res.status !== 200) { problems.push(`${path}: the page itself answered ${res.status || res.error}`); return; }
     const html = res.html;
-    const start = html.indexOf('<div class="fd-layout">');
-    if (start < 0) { problems.push(`${path}: not on the new winery layout`); return; }
+    const start = Math.max(html.indexOf('<div class="fd-layout">'), html.indexOf('<div id="klLayout"'));
+    if (start < 0) { problems.push(`${path}: not on the new layout`); return; }
     const body = html.slice(start, html.indexOf('<footer', start) < 0 ? undefined : html.indexOf('<footer', start));
     const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
     const sameAs = (/"sameAs":"([^"]+)"/.exec(html) || [])[1] || '';
@@ -97,7 +100,7 @@ async function pool(items, size, fn) {
     }
   });
 
-  console.log(`\nChecked ${pages.length} pages, ${internalCache.size} on-site addresses${EXTERNAL ? `, ${externalCache.size} outside addresses` : ''}.`);
+  console.log(`\nChecked ${pages.length} ${CATEGORY} pages, ${internalCache.size} on-site addresses${EXTERNAL ? `, ${externalCache.size} outside addresses` : ''}.`);
   if (unchecked.length) console.log(`\nCould not be checked (${unchecked.length}; the site blocks robots or did not answer):\n  ` + unchecked.sort().join('\n  '));
   if (problems.length) { console.log(`\nPROBLEMS (${problems.length}):\n  ` + problems.sort().join('\n  ')); process.exit(1); }
   console.log('\nEvery link checked goes where its words say.');

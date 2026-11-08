@@ -1,6 +1,6 @@
-/* Scoped to the Kalamalka park preview; other venues keep their layout. */
-body.kalamalka-page .venue-hero-photo {height:260px!important;min-height:0!important;margin-bottom:22px!important;overflow:hidden;border-radius:22px!important}
-body.kalamalka-page .venue-hero-photo>img {width:100%;height:100%!important;object-fit:cover}
+/* Outdoors and Sports & Recreation pages (first built for the Kalamalka park page); other categories keep their layouts. */
+body.outdoor-venue-page .venue-hero-photo {height:260px!important;min-height:0!important;margin-bottom:22px!important;overflow:hidden;border-radius:22px!important}
+body.outdoor-venue-page .venue-hero-photo>img {width:100%;height:100%!important;object-fit:cover}
 #klLayout {color:#24383e;line-height:1.6}
 #klLayout h1,#klLayout h2 {font-family:Fraunces,Georgia,serif;color:#49382c;line-height:1.2}
 #klLayout h1 {font-size:36px;max-width:900px;margin:6px 0 8px}
@@ -49,8 +49,8 @@ body.kalamalka-page .venue-hero-photo>img {width:100%;height:100%!important;obje
 #klLayout .nearby-link img {height:170px;object-fit:cover}
 #klLayout .kl-update {font-size:13px;margin:24px 0}
 @media(max-width:899px){
- body.kalamalka-page .venue-hero-photo {height:180px!important;margin-bottom:16px!important}
- body.kalamalka-page h1.venue-mobile-title {font-size:27px;line-height:1.15}
+ body.outdoor-venue-page .venue-hero-photo {height:180px!important;margin-bottom:16px!important}
+ body.outdoor-venue-page h1.venue-mobile-title {font-size:27px;line-height:1.15}
  #klLayout .kl-desktop-title {display:none}
  #klLayout .kl-grid {grid-template-columns:1fr;gap:0}
  #klLayout .kl-main {display:contents}
@@ -78,3 +78,18 @@ body.kalamalka-page .venue-hero-photo>img {width:100%;height:100%!important;obje
 
 #klLayout .kl-parking-choice>small {display:block;color:#72685c;font-size:12px;margin-top:3px}
 #klLayout .kl-parking-directions {display:flex;align-items:center;justify-content:center;text-align:center;background:#1b2b3a;color:white;border-radius:25px;margin:14px 0 0;padding:12px;min-height:48px;font-size:13px;line-height:1.4}
+
+/* Every other Outdoors and Sports & Recreation page (outdoor-venue-layout.js) */
+#klLayout.kl-generic .kl-nav {overflow-x:auto;scrollbar-width:none}
+#klLayout.kl-generic .kl-nav a {white-space:nowrap;flex:0 0 auto}
+#klLayout.kl-generic .kl-quick {grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#klLayout.kl-generic .kl-quick strong {overflow-wrap:anywhere}
+#klLayout.kl-generic .kl-primary .cta,#klLayout.kl-generic .kl-primary a {flex:1 1 180px}
+#klLayout.kl-generic .chips {margin:8px 0}
+#klLayout.kl-generic .venue-open-status {margin:8px 0}
+#klLayout.kl-generic .venue-glance {margin:6px 0 10px;font-weight:700}
+#klLayout.kl-generic .kl-card h2:first-child {margin-top:0}
+@media(max-width:899px){
+ #klLayout.kl-generic .kl-primary:has(> :nth-child(3)) {grid-template-columns:1fr 1fr}
+ #klLayout.kl-generic .kl-primary:has(> :nth-child(3)) .cta:first-child {grid-column:1 / -1}
+}

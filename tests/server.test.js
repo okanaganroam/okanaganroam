@@ -7936,7 +7936,7 @@ test('Outdoor venue page: hero carries the H1 (exactly one), themed CTA row, can
   assert.match(html, /<title>Test Canyon Regional Park/);
   assert.match(html, /<meta property="og:title" content="Test Canyon Regional Park/);
   assert.match(html, /"@type":"TouristAttraction"/);
-  assert.match(html, /<body class="golf-page outdoor-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page outdoor-venue-page outdoor-no-photo">/); // the shared Outdoors layout (2026-11-08)
   assert.match(html, /Outdoor page theme \(2026-09-20\)/);
   assert.match(html, /body\.golf-page \.venue-hero-fallback\.venue-hero-outdoor \{ box-shadow/);
   assert.match(html, /<a class="category-back-link" href="\/kelowna\/outdoors">← Kelowna Outdoors<\/a>/);
