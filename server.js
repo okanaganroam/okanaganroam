@@ -33942,6 +33942,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // venue's own record (food-drink-venue-layout.js). Copper's own wording is its profile, which no other venue gets.
   // Winery pages (2026-11-08): every English winery page uses the tasting-focused layout first built for Niche Wine Company
   // (a Book button first, the tastings from its Plan your visit box, a one-sentence introduction).
+  const parkLayout = !fr && !venue.redirect_to && venue.region === 'coldstream' && venue.slug === 'kalamalka-lake-provincial-park-trails-rattlesnake-point';
   const wineryPage = !fr && !venue.redirect_to && venue.type === 'winery';
   const fdLayout = !fr && !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
   const nichePrices = wineryPage && venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company' ? require('./data/niche-tasting-prices.json') : null;
@@ -34440,7 +34441,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
         <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(L(`Add ${v.name} to trip`, `Ajouter ${v.name} au voyage`))}">${fr ? appTripLabelHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage') : APP_TRIP_LABEL_HTML}</button>
       </li>`;
     });
-    if (fdLayout) fdNearbyCards = cardItems;
+    if (fdLayout || parkLayout) fdNearbyCards = cardItems;
     const cards = cardItems.join('');
     return `<section class="nearby-strip" aria-labelledby="nearbyStripHead">
     <h2 id="nearbyStripHead">${L('Close by', 'À proximité')}</h2>
@@ -34674,15 +34675,21 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       eventsHtml: venueEventsHtml, nearbyCards: fdNearbyCards, relatedHtml, nearbyHtml,
     });
   })() : '';
+  const parkBody = parkLayout ? require('./kalamalka-venue-layout').renderKalamalkaLayout({
+    venue, escapeHtml, facts:OUTDOOR_FACTS[String(venue.id)], visitInfo:visitInfoRaw, advisoryHtml:venueAdvisoryHtml,
+    actions:ctaEntries, ctaRowAttrs, guideLinks, nearbyCards:fdNearbyCards,
+    visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
+  }) : '';
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: (fr && !FRENCH_INDEXABLE) || venuePageIsThin(venue), alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', shopTheme: venue.type === 'shop', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
+${parkLayout ? '<link rel="stylesheet" href="/kalamalka-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'kalamalka-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
 ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-venue.css'))).digest('hex').slice(0, 12) + '">' : ''}
 </head>
-<body${fdLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ` fd-venue-page${wineryPage ? ' winery-venue-page' : ''}${venue.image_url ? '' : ' fd-no-photo'}"`) || ' class="fd-venue-page fd-no-photo"' : themedBodyClassAttr(venue.type, themedShell)}>
+<body${parkLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ' kalamalka-page"') : fdLayout ? themedBodyClassAttr(venue.type, themedShell).replace(/"$/, ` fd-venue-page${wineryPage ? ' winery-venue-page' : ''}${venue.image_url ? '' : ' fd-no-photo'}"`) || ' class="fd-venue-page fd-no-photo"' : themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   <div class="venue-topbar">${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
@@ -34705,9 +34712,9 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
     .venue-topbar .venue-top-links .category-back-link { display: none; }
     .venue-topbar .venue-lang-switch { margin: 0 !important; white-space: nowrap; }
   }</style>
-  ${themedHeroTitle || (fdLayout && !venue.image_url) ? '' : `<h1 class="venue-mobile-title">${escapeHtml(venue.name)}</h1>`}
+  ${themedHeroTitle || (fdLayout && !venue.image_url) ? '' : `<h1 class="venue-mobile-title">${escapeHtml(parkLayout ? 'Kalamalka Lake Trails & Rattlesnake Point' : venue.name)}</h1>`}
   ${imageHtml}
-  ${fdLayout ? fdBody : `  <div class="venue-layout">
+  ${parkLayout ? parkBody : fdLayout ? fdBody : `  <div class="venue-layout">
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1 class="venue-desktop-title">${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
@@ -55827,6 +55834,7 @@ const server = http.createServer(async (req, res) => {
     // no bundler. Cached for an hour rather than a day (unlike og-image.png)
     // since these are actively being iterated on during Phase 5.
     const STATIC_ASSETS = {
+      '/kalamalka-venue.css': { file: 'public/kalamalka-venue.css', type: 'text/css; charset=utf-8' },
       '/food-drink-venue.css': { file: 'public/food-drink-venue.css', type: 'text/css; charset=utf-8' },
       '/food-drink-venue.js': { file: 'public/food-drink-venue.js', type: 'application/javascript; charset=utf-8' },
       '/food-drink-layout.css': { file: 'public/food-drink-layout.css', type: 'text/css; charset=utf-8' },
