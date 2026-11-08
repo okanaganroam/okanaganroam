@@ -74,7 +74,7 @@ test('POST /admin/set-venue-links: auth, strict keys, required meta, field allow
     assert.equal((await post({ ...base, reason: '' })).body.error, 'invalid_meta');
     const { batch_id: _b, ...noBatch } = base;
     assert.equal((await post(noBatch)).body.error, 'invalid_meta');
-    for (const field of ['instagram_url', 'facebook_url', 'open_months', 'website', undefined]) {
+    for (const field of ['open_months', 'website', undefined]) {
       const r = await post({ ...base, field });
       assert.equal(r.status, 400, String(field));
       assert.equal(r.body.error, 'invalid_field');
@@ -178,9 +178,60 @@ test('Venue page: a researched menu shows "See the menu" with no "Verified by th
   assert.equal(app.claimedVenueIds().has(v.id), false);
   const html = page(v);
   assert.ok(html.includes(`<a href="${MENU}" rel="nofollow noopener" target="_blank">See the menu ↗</a>`));
-  assert.ok(html.includes(`<a href="${BOOK}" rel="nofollow noopener" target="_blank">Book online ↗</a>`));
+  // The booking link is the venue's "Book" button now (not a detail row).
+  assert.ok(html.includes(`<a class="cta secondary" href="${BOOK}" rel="nofollow noopener" target="_blank" data-track="booking">Book</a>`));
   assert.doesNotMatch(html, /<p class="venue-verified-wrap">/);
   const fr = page(v, 'fr');
   assert.match(fr, /Voir le menu/);
   assert.doesNotMatch(fr, /<p class="venue-verified-wrap">/);
+});
+
+test('Researched Instagram / Facebook links: profile/page links only, stored in canonical form, shown on the page and the card', async () => {
+  const v = mk({ name: 'Links Social Bistro' });
+  const base = { id: v.id, expected_current: null, reason: 'linked from the venue website', batch_id: 'socials-test', source_url: 'https://example.com/' };
+  await withServer(async ({ post, read }) => {
+    for (const bad of ['https://example.com/socialbistro', 'https://www.instagram.com/p/AbC123/', 'https://www.instagram.com/explore/', 'https://instagram.com/', 'https://www.instagram.com/a/b']) {
+      const r = await post({ ...base, field: 'instagram_url', value: bad });
+      assert.equal(r.status, 400, bad);
+      assert.equal(r.body.error, 'invalid_value', bad);
+    }
+    for (const bad of ['https://example.com/socialbistro', 'https://www.facebook.com/', 'https://www.facebook.com/sharer/sharer.php?u=x', 'https://www.facebook.com/groups/123', 'https://www.facebook.com/events/1']) {
+      const r = await post({ ...base, field: 'facebook_url', value: bad });
+      assert.equal(r.status, 400, bad);
+      assert.equal(r.body.error, 'invalid_value', bad);
+    }
+    assert.equal(app.venueLinks(v.id).instagram_url, null);
+    const ig = await post({ ...base, field: 'instagram_url', value: 'https://instagram.com/social.bistro?hl=en' });
+    assert.equal(ig.status, 200, JSON.stringify(ig.body));
+    assert.equal(ig.body.value, 'https://www.instagram.com/social.bistro/');
+    const fb = await post({ ...base, field: 'facebook_url', value: 'http://facebook.com/SocialBistro' });
+    assert.equal(fb.status, 200, JSON.stringify(fb.body));
+    const links = (await read(v.id)).body.links;
+    assert.equal(links.instagram_url, 'https://www.instagram.com/social.bistro/');
+    assert.match(links.facebook_url, /^https:\/\/(www\.)?facebook\.com\/SocialBistro/);
+    // Compare-and-set against the stored canonical value; clearing works.
+    assert.equal((await post({ ...base, field: 'instagram_url', value: 'https://www.instagram.com/other.bistro/' })).body.error, 'mismatch');
+    assert.equal((await post({ ...base, field: 'instagram_url', expected_current: links.instagram_url, value: null })).status, 200);
+    assert.equal((await post({ ...base, field: 'instagram_url', expected_current: null, value: '@social.bistro' })).status, 400, 'a bare handle is not an http(s) URL');
+    assert.equal((await post({ ...base, field: 'instagram_url', expected_current: null, value: 'https://www.instagram.com/social.bistro/' })).status, 200);
+  });
+  const html = page(v);
+  assert.ok(html.includes('<a href="https://www.instagram.com/social.bistro/" rel="nofollow noopener" target="_blank">Instagram</a>'));
+  assert.match(html, />Facebook<\/a>/);
+  assert.equal(app.venueIsClaimed(v.id), false);
+  assert.doesNotMatch(html, /<p class="venue-verified-wrap">/);
+});
+
+test('Owner value wins for social links too', async () => {
+  const v = mk({ name: 'Links Owner Social Bistro' });
+  const IG = 'https://www.instagram.com/owner.bistro/';
+  db.prepare('INSERT INTO venue_links (venue_id, instagram_url) VALUES (?, ?)').run(v.id, IG);
+  db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, 'instagram_url', NULL, ?, 'venue_owner', 'owner update', 'high', 'owner-2', 0, 'admin')`).run(v.id, IG);
+  await withServer(async ({ post }) => {
+    const r = await post({ id: v.id, field: 'instagram_url', expected_current: IG, value: 'https://www.instagram.com/parent.company/', reason: 'research', batch_id: 'socials-owner' });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.error, 'owner_value');
+  });
+  assert.equal(app.venueLinks(v.id).instagram_url, IG);
 });
