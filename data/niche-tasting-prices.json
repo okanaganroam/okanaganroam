@@ -1,0 +1,10 @@
+{
+  "sourceUrl": "https://nichewinecompany.com/reservation/",
+  "checkedAt": "2026-11-07",
+  "evidence": "Niche's embedded Commerce7 availability results explicitly display each amount as per guest. Checked for two guests on November 13, 2026 without reserving a time.",
+  "experiences": {
+    "Splash & Dash": { "price": 15, "basis": "person", "recordedPrices": [15], "bookingSlug": "splash-dash-winter" },
+    "Tarot tasting": { "price": 18, "basis": "person", "recordedPrices": [17, 18], "bookingSlug": "tarot-tasting-" },
+    "Vineyard walk": { "price": 35, "basis": "person", "recordedPrices": [35], "bookingSlug": "vineyard-tasting" }
+  }
+}

@@ -34559,8 +34559,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
     const saveActions = ctaEntries.find((action) => action.includes('fav-btn')) || '';
-    const primaryActionHtml = niche ? ctaEntries.find((action) => action.includes('data-track="booking"')) || '' : '';
-    const contactActions = ctaEntries.filter((action) => action !== directionsHtml && action !== saveActions && action !== primaryActionHtml);
+    const bookingAction = niche ? ctaEntries.find((action) => action.includes('data-track="booking"')) || '' : '';
+    const primaryActionHtml = bookingAction
+      .replace('<a ', '<a aria-label="Book a tasting on Niche’s website (opens in a new tab)" ')
+      .replace('</a>', ' <span class="fd-external-arrow" aria-hidden="true">↗</span></a>');
+    const contactActions = ctaEntries.filter((action) => action !== directionsHtml && action !== saveActions && action !== bookingAction);
     const descText = editorial ? editorial.intro : trimVenueTagline(venue.description);
     const desc = fdLib.introFrom(descText);
     // Copper's reservation line for its trivia night (its own booking page; a phone call, so it says "Call to book").
@@ -34580,7 +34583,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
     return fdLib.renderFoodDrinkVenueLayout({
       venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml, profile,
-      primaryActionHtml, experienceHtml: niche ? require('./niche-tastings').nicheTastingsHtml(visitInfoRaw, escapeHtml) : '',
+      primaryActionHtml, experienceHtml: niche ? require('./niche-tastings').nicheTastingsHtml(visitInfoRaw, escapeHtml, require('./data/niche-tasting-prices.json')) : '',
       regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
       menuPicks: picks, formatPrice: menuPriceLabel,
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
@@ -34595,7 +34598,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
       recognitionHtml: (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
-      visitHtml, descriptionHtml: (copperProfile || niche || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
+      visitHtml: niche ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, require('./data/niche-tasting-prices.json')), false) : visitHtml, descriptionHtml: (copperProfile || niche || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
       badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
       dogNoteHtml: !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
       // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;
