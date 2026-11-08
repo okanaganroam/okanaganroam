@@ -318,8 +318,10 @@ const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture', 'beginner', 
 //   price        a price range / price badge makes sense
 //   activityBadges  activity badges (free entry, arts & culture, rentals...) instead of food badges
 //   foodBadgesHidden  food-only badges (vegan, gluten free, sports TV...) are kept but not offered
+//   hiddenBadges  more badges that make no sense for the type; kept if already set, otherwise not offered
+//   arrivalTile  "Help people find your door" (storefront photo): only for places with a door to find
 // Types not listed here (a type added later) get PORTAL_FIELDS_DEFAULT: nothing optional, price shown.
-const PORTAL_FIELDS_DEFAULT = Object.freeze({ happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false });
+const PORTAL_FIELDS_DEFAULT = Object.freeze({ happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: Object.freeze([]), arrivalTile: true });
 const portalRow = (flags) => Object.freeze({ ...PORTAL_FIELDS_DEFAULT, ...flags });
 const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   // Food & drink (key order is the old NIGHT_TYPES order)
@@ -335,9 +337,10 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   tour: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   indoor: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   sport: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
-  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
-  beach: portalRow({ activityBadges: true }),
-  shop: portalRow({ price: false }),
+  // Nothing to find a door for, and no kitchen: no storefront tile, no dietary / patio badges (2026-11-08).
+  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true, arrivalTile: false }),
+  beach: portalRow({ activityBadges: true, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
+  shop: portalRow({ price: false, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
 });
 const portalFields = (type) => (Object.hasOwn(PORTAL_FIELDS_BY_TYPE, type) ? PORTAL_FIELDS_BY_TYPE[type] : PORTAL_FIELDS_DEFAULT);
 const portalTypesWith = (flag) => new Set(Object.keys(PORTAL_FIELDS_BY_TYPE).filter((t) => PORTAL_FIELDS_BY_TYPE[t][flag]));
@@ -53626,7 +53629,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         </div>`;
   }).join('');
   // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
-  const foodOnly = portalFields(venue.type).foodBadgesHidden ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
+  const foodOnly = new Set([...(portalFields(venue.type).foodBadgesHidden ? ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv'] : []), ...portalFields(venue.type).hiddenBadges]);
   const activityOnly = portalFields(venue.type).activityBadges ? new Set() : ACTIVITY_ONLY_BADGES;
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"${(foodOnly.has(f) || activityOnly.has(f)) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
@@ -53889,7 +53892,7 @@ ${renderGolfHeaderHtml()}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
-          ${tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone'))}
+          ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
@@ -54085,7 +54088,7 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="ofSubmit">${L('Upload photos', 'Téléverser les photos')}</button>
     </form>
     </details>
-    ${arrivalPoints.sectionHtml(venue, L, escapeHtml, 'Okanagan Roam')}
+    ${portalFields(venue.type).arrivalTile ? arrivalPoints.sectionHtml(venue, L, escapeHtml, 'Okanagan Roam') : ''}
     ${ownerVideoEnabled() ? `<details class="op-fold op-sec" id="video" data-task="video" open>
     <summary><h2 class="lyv-section-label">${L('Share a video', 'Partager une vidéo')}</h2></summary>
     <p class="op-hint">${L('Film 10 to 60 seconds of your business: your space, a dish or drink being made, your team, or the view. Any phone video is fine, and it can be held up or sideways. We&rsquo;ll edit it into a short reel and share it on our Instagram and Facebook, naming and tagging your business.', 'Filmez de 10 à 60 secondes de votre entreprise : votre espace, un plat ou une boisson en préparation, votre équipe ou la vue. N’importe quelle vidéo de téléphone convient, à la verticale ou à l’horizontale. Nous la monterons en un court reel et le partagerons sur notre Instagram et notre Facebook, en nommant et en identifiant votre entreprise.')}</p>
