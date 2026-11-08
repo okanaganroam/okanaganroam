@@ -20,12 +20,6 @@
    "lead": "Fuel up at the foot of the Bench, then start tasting when the wineries open.",
    "items": [
     {
-     "ref": "penticton/bench-market",
-     "name": "Bench Market",
-     "text": "a popular cafeteria-style breakfast and market spot, and a handy pitstop before a Naramata Bench wine day. The gluten-free options are excellent, and dogs are welcome on the terrace.",
-     "where": "Penticton"
-    },
-    {
      "ref": "naramata/laughing-stock-vineyards",
      "name": "Laughing Stock Vineyards",
      "text": "an award-winning winery high on a hill, with a terrace overlooking the lake. Try the playful blind-tasting format, and don't miss the chardonnay and syrah.",
@@ -234,12 +228,6 @@
    "Go to"
   ],
   "rows": [
-   [
-    "Breakfast before the wineries",
-    [
-     "penticton/bench-market|Bench Market"
-    ]
-   ],
    [
     "A view with your tasting",
     [
