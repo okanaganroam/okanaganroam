@@ -27037,15 +27037,17 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
-      const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
+      const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
   if (extra.welcoming) {
     cardChunks = cardChunks.map((chunk) => {
       const venueId = (chunk.match(/data-venue-id="(\d+)"/) || [])[1];
-      const price = cardPriceFor(venueId);
       const priceInfo = CARD_PRICES[venueId];
+      const priceAllowed = !extra.priceAllowed || extra.priceAllowed(venueById.get(Number(venueId)), priceInfo);
+      const price = priceAllowed ? cardPriceFor(venueId) : null;
+      if (!priceAllowed) chunk = chunk.replace(/<span class="chip chip-feat chip-price"[^>]*>[\s\S]*?<\/span>/g, chip => /^Free(?: to visit)?$/i.test(chip.replace(/<[^>]+>/g, '').trim()) ? chip : '');
       if (price && priceInfo && priceInfo.basis) {
         const priceHtml = `<div class="fd-price-context"><strong>${escapeHtml(price)}</strong><span>${escapeHtml(priceInfo.basis)}</span></div>`;
         const priceLabel = escapeHtml(price.replace(/ \/ person$/, ''));
@@ -28147,19 +28149,28 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { photoKeyFor, cardOpts: { allBadges: true } });
+  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id)) + '</p></div>']));
+  const statusOverrides = new Map(all.filter(v => !['sport', 'outdoor', 'beach'].includes(v.type)).map(v => [v.id, { state:'unknown', text:'Activity hours: check venue details' }]));
+  const priceAllowed = (v, price) => {
+    if (!price || !price.basis) return false;
+    const basis = String(price.basis);
+    if (/pool|swim|fitness|ski|snowboard/i.test(basis)) return false;
+    return /bike|cycling|bmx|disc golf|court|pickleball|tennis|volleyball|skat(?:e|ing)|rink|arena|trail/i.test(basis);
+  };
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { welcoming:true, photoKeyFor, cardExtraHtml:sportDetails, statusOverrides, priceAllowed, cardOpts: { allBadges: true } });
+  const sportIcons = { skate:'🛹', bike:'🚵', disc:'🥏', courts:'🎾' };
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All activities</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${sportIcons[a.slug] || '✨'} ${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to play?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts, hideEmpty:true }))}
+    ${featureKeys.length ? pop('fdFeatures', '✨ Filters', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
   </div>`;
   const activityLinks = SPORT_ACTIVITIES.map((a) => `<a href="/sports/${a.slug}">${escapeHtml(a.label)} <span>${counts.types[a.slug] || 0}</span></a>`).join('\n      ');
   const townCounts = {};
@@ -28175,8 +28186,28 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: banner.src, golfTheme: true, beachTheme: all.some((v) => v.type === 'beach'), advisoryStyles: all.some((v) => advisoryNotes.has(v.id)), savedSidecar: true, noindex: all.length === 0 })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
 ${golfEngagementHeadHtml('sport', true, 'hub')}
 <style id="sports-hub">
+  body.sports-hub-page .category-banner {height:170px;min-height:0;}
+  body.sports-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  html body.sports-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-desc {display:none!important;}
+  html body.sports-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-fee {display:block!important;}
+  body.sports-hub-page .sports-play-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
+  body.sports-hub-page .sports-play-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
+  body.sports-hub-page .sports-play-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.sports-hub-page .sports-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.sports-hub-page .sports-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.sports-hub-page .sports-sort-help summary::before {content:'▸';}
+  body.sports-hub-page .sports-sort-help[open] summary::before {content:'▾';}
+  body.sports-hub-page .sports-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
+  @media(max-width:640px){
+    body.sports-hub-page.fd-refresh .category-banner,body.sports-hub-page.fd-refresh .category-banner img {height:110px!important;}
+    body.sports-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.sports-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.sports-hub-page.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.sports-hub-page.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
   body.sports-hub-page .hub-links { margin: 26px 0 8px; }
   body.sports-hub-page .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.sports-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -28190,7 +28221,7 @@ ${golfEngagementHeadHtml('sport', true, 'hub')}
   html body.sports-hub-page.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:not(:empty) { display: flex !important; }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page sport-page sports-hub-page">
+<body class="golf-page outdoor-page fd-page fd-refresh sport-page sports-hub-page">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -28198,14 +28229,17 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Sports & Recreation' }])}
   ${categoryHeroHtml(categoryBannerHtml('sport'), `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.sport)}</p>`)}
+  <p class="outdoor-intro fd-intro">Find your next place to ride, skate or play. 🚲</p>`)}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search places to play').replace('Search by name, place or dish...', 'Search pickleball, pump track, a town...')}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}
   ${all.length ? '' : '<p class="sport-coming-soon">More sports and recreation spots are coming soon &mdash; skate parks, pump tracks, bike parks, disc golf courses and courts across the valley.</p>'}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered).replace(/places?$/, (m) => (m === 'place' ? 'place to play' : 'places to play')), state, sort, SPORTS_SORTS)}
+  <details class="sports-sort-help" id="sportsSortHelp"><summary>How “Biggest first” works</summary><p>We use the listed trail distances and numbers of trails, courts or course holes to bring larger facilities and networks higher up. Seasonal closures also affect the order.</p></details>
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No places match that combination yet.</span> <a href="/sports" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   <p class="fd-no-results-try">Try one word, like <a href="/sports?types=courts">pickleball</a>, <a href="/sports?types=skate">skate park</a> or <a href="/sports?types=bike">bike park</a>.</p></div>
@@ -28230,6 +28264,7 @@ ${renderGolfHeaderHtml()}
   ${hubCardFitScriptHtml()}
   ${golfCardEngagementScriptHtml('sport', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: false, surface: 'sports', noun: ['place to play', 'places to play'], typeLabels: actLabel })}
+  <script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('sportsSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);window.addEventListener('popstate',function(){setTimeout(sync,0);});sync();})();</script>
 </body>
 </html>`;
 }
@@ -38345,7 +38380,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
-      const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
+      const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
