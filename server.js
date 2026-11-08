@@ -43551,7 +43551,27 @@ function clearVenueSocialCache() { venueSocialCache = null; }
 // POST /admin/set-venue-links -- never through an owner change request, so the venue is not "claimed" and gets no
 // "Verified by the venue" pill. One field at a time with compare-and-set on the live value; logged as source
 // 'research'. A link the owner set last (venue_owner in venue_enrichment_log) wins unless opts.force_owner.
-const RESEARCH_LINK_FIELDS = ['menu_url', 'booking_url'];
+// Instagram / Facebook (2026-11-07): researched social links too, stored in the same canonical form the owner portal
+// uses (normalizeInstagram / normalizeFacebook), so a card's "Instagram · Facebook" line reads the same either way.
+const RESEARCH_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+// Instagram paths that are not a profile (a post, reel, the explore page...).
+const INSTAGRAM_NON_PROFILE = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'tv', 'direct']);
+// Facebook paths that are not a page (share links, login, search...).
+const FACEBOOK_NON_PAGE = /^\/(?:sharer|share|login|dialog|search|watch|events|groups|hashtag|plugins|l\.php|home\.php)(?:[/?.]|$)/i;
+// A researched social link in canonical form, or null when it is not a profile/page link.
+function researchSocialLink(field, value) {
+  if (field === 'instagram_url') {
+    const ig = normalizeInstagram(value);
+    if (!ig) return null;
+    const handle = ig.split('/')[3];
+    return INSTAGRAM_NON_PROFILE.has(handle.toLowerCase()) ? null : ig;
+  }
+  const fb = normalizeFacebook(value);
+  if (!fb) return null;
+  const u = new URL(fb);
+  if (u.pathname === '/' || FACEBOOK_NON_PAGE.test(u.pathname)) return null;
+  return fb;
+}
 const RESEARCH_LINK_MAX = 500;
 function researchLinkValid(value) {
   if (value === null) return true;
@@ -43569,6 +43589,11 @@ function guardedVenueLinkUpdate(id, field, expectedCurrent, value, meta, opts = 
   if (!RESEARCH_LINK_FIELDS.includes(field)) return { ok: false, reason: 'invalid_field', detail: `field must be one of ${RESEARCH_LINK_FIELDS.join(', ')}` };
   if (expectedCurrent !== null && typeof expectedCurrent !== 'string') return { ok: false, reason: 'invalid_expected', detail: 'expected_current must be the current value or null' };
   if (!researchLinkValid(value)) return { ok: false, reason: 'invalid_value', detail: `value must be an http(s) URL of at most ${RESEARCH_LINK_MAX} characters, or null to clear` };
+  if (value !== null && (field === 'instagram_url' || field === 'facebook_url')) {
+    const social = researchSocialLink(field, value);
+    if (!social) return { ok: false, reason: 'invalid_value', detail: field === 'instagram_url' ? 'value must be an instagram.com profile link' : 'value must be a facebook.com page link' };
+    value = social;
+  }
   if (m.source_url != null && !researchLinkValid(m.source_url)) return { ok: false, reason: 'invalid_source_url', detail: 'source_url must be an http(s) URL' };
   const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
   if (!existing) return { ok: false, reason: 'venue_not_found' };
@@ -56921,7 +56946,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /admin/set-venue-links (2026-10-27) -- researched venue links, the HTTP route for guardedVenueLinkUpdate():
-    // { id, field: 'menu_url' | 'booking_url', expected_current, value: <http(s) URL> | null, reason, batch_id,
+    // { id, field: 'menu_url' | 'booking_url' | 'instagram_url' | 'facebook_url', expected_current, value: <http(s) URL> | null, reason, batch_id,
     // source_url?, force_owner? }. One field per call; expected_current is the live value from GET /admin/venue-links/:id
     // (null when unset). Logged as 'research', not 'venue_owner', so the venue does not become "Verified by the venue".
     if (pathname === '/admin/set-venue-links' && method === 'POST') {
