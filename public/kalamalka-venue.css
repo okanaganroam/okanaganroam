@@ -1,0 +1,77 @@
+/* Scoped to the Kalamalka park preview; other venues keep their layout. */
+body.kalamalka-page .venue-hero-photo {height:260px!important;min-height:0!important;margin-bottom:22px!important;overflow:hidden;border-radius:22px!important}
+body.kalamalka-page .venue-hero-photo>img {width:100%;height:100%!important;object-fit:cover}
+#klLayout {color:#24383e;line-height:1.6}
+#klLayout h1,#klLayout h2 {font-family:Fraunces,Georgia,serif;color:#49382c;line-height:1.2}
+#klLayout h1 {font-size:36px;max-width:900px;margin:6px 0 8px}
+#klLayout h2 {font-size:24px;margin:0 0 14px}
+#klLayout p {margin:0 0 14px}
+#klLayout .kl-eyebrow {color:#2b7067;font-size:12px;font-weight:800;margin:0 0 8px;letter-spacing:.03em}
+#klLayout .kl-park-name {font-size:14px;color:#70675c}
+#klLayout .kl-overview {max-width:1000px}
+#klLayout .kl-quick {display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}
+#klLayout .kl-quick>div {display:grid;grid-template-columns:28px 1fr;align-content:center;background:#edf4e8;border:1px solid #dce7d6;padding:13px;border-radius:18px;gap:0 5px}
+#klLayout .kl-quick strong {font-size:15px}
+#klLayout .kl-quick small {grid-column:2;font-size:12px;color:#5d675a}
+#klLayout .kl-notice {padding:15px 18px;background:#fff0da;border:1px solid #ead3ab;border-radius:18px;margin-bottom:18px;font-size:14px}
+#klLayout .kl-notice strong {display:block;margin-bottom:5px;color:#6b502d}
+#klLayout .kl-notice p {margin:0 0 5px}
+#klLayout .kl-notice small {font-size:12px}
+#klLayout .kl-primary,#klLayout .kl-save {display:flex;flex-wrap:wrap;gap:10px}
+#klLayout .kl-primary .cta {background:#1b2b3a;color:#fff;margin:0;min-height:48px;padding:10px 20px;display:inline-flex;align-items:center;justify-content:center;text-align:center;border-radius:28px}
+#klLayout .kl-primary .cta.secondary {background:#fffcf6;color:#285e55;border:1px solid #a9c6b9}
+#klLayout .kl-save {margin:14px 0 5px}
+#klLayout .kl-save button {min-height:44px;border:1px solid #b6c9c2;border-radius:24px;padding:8px 16px;background:#fffcf6;font:700 14px Nunito,sans-serif;color:#275951;cursor:pointer}
+#klLayout .kl-save-help {font-size:12px;color:#6d665d}
+#klLayout .kl-nav {position:sticky;top:72px;z-index:20;display:flex;gap:8px;padding:10px 0;margin:14px 0 18px;background:#f7f4ec;flex-wrap:wrap}
+#klLayout .kl-nav a {padding:9px 16px;min-height:44px;box-sizing:border-box;background:#fffcf6;border:1px solid #d4d9cb;border-radius:24px;text-decoration:none;font-size:14px;font-weight:800;color:#29665e}
+#klLayout .kl-grid {display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:24px;align-items:start}
+#klLayout .kl-card {background:#fffcf6;border:1px solid #e7e0d4;padding:24px;border-radius:22px;box-shadow:0 5px 16px #29342406;margin-bottom:20px;min-width:0}
+#klLayout [id] {scroll-margin-top:150px}
+#klLayout .kl-fact-row {padding:14px 0;border-top:1px solid #e9e5d9}
+#klLayout .kl-fact-row p {margin:5px 0 0}
+#klLayout .kl-fact-row small {display:block;margin-top:8px;font-size:12px;color:#71675c}
+#klLayout .kl-fold {border-top:1px solid #e2e3d7;padding:0}
+#klLayout .kl-fold summary {padding:14px 0;min-height:48px;box-sizing:border-box;cursor:pointer;color:#28685f;font-weight:800}
+#klLayout .kl-fold>p {padding-bottom:10px}
+#klLayout .kl-parking-choice {padding:14px 0;border-top:1px solid #e9e5d9}
+#klLayout .kl-parking-choice p {margin:6px 0 0;font-size:14px}
+#klLayout .kl-map-link {display:inline-block;padding:10px 0;font-weight:800;min-height:44px;box-sizing:border-box;color:#28685f}
+#klLayout .kl-map-note {background:#edf4e8;padding:16px;border-radius:16px;margin:8px 0 16px;font-size:13px}
+#klLayout .kl-map-note .cta {background:#1b2b3a;color:#fff;display:flex;justify-content:center;text-align:center;margin:0;min-height:44px;padding:10px;border-radius:24px;font-size:13px}
+#klLayout .kl-map-note p {margin:6px 0 12px}
+#klLayout .kl-address,#klLayout .kl-source {font-size:12px;color:#72685c}
+#klLayout .kl-source {margin-top:14px}
+#klLayout .kl-nearby {margin:26px 0}
+#klLayout .kl-nearby-head {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+#klLayout .nearby-list {display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;overflow:visible!important}
+#klLayout .nearby-card {width:auto!important;min-width:0!important;border-radius:20px}
+#klLayout .nearby-link img {height:170px;object-fit:cover}
+#klLayout .kl-update {font-size:13px;margin:24px 0}
+@media(max-width:899px){
+ body.kalamalka-page .venue-hero-photo {height:180px!important;margin-bottom:16px!important}
+ body.kalamalka-page h1.venue-mobile-title {font-size:27px;line-height:1.15}
+ #klLayout .kl-desktop-title {display:none}
+ #klLayout .kl-grid {grid-template-columns:1fr;gap:0}
+ #klLayout .kl-main {display:contents}
+ #klLayout .kl-main>.kl-card:first-child {grid-row:1}
+ #klLayout .kl-parking {grid-row:2}
+ #klLayout #klBefore {grid-row:3}
+ #klLayout .kl-quick {grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+ #klLayout .kl-quick>div {padding:10px;grid-template-columns:22px 1fr}
+ #klLayout .kl-quick strong {font-size:13px}
+ #klLayout .kl-quick small {font-size:11px}
+ #klLayout .kl-card {padding:18px;margin-bottom:16px}
+ #klLayout .kl-nav {top:52px;flex-wrap:nowrap;gap:6px;margin:10px 0 16px}
+ #klLayout .kl-nav a {padding:9px 12px;font-size:12px}
+ #klLayout .kl-primary {display:grid;grid-template-columns:1fr}
+ #klLayout .kl-primary .cta {width:100%;box-sizing:border-box}
+ #klLayout .kl-notice {padding:13px;font-size:13px}
+ #klLayout h2 {font-size:23px}
+ #klLayout .nearby-list {grid-template-columns:1fr}
+ #klLayout .nearby-link {display:grid;grid-template-columns:112px minmax(0,1fr);column-gap:12px;align-content:start}
+ #klLayout .nearby-link img {grid-column:1;grid-row:1 / 3;height:112px;width:112px;object-fit:cover}
+ #klLayout .nearby-type,#klLayout .nearby-name {grid-column:2;margin:0;padding:8px 10px 0 0}
+ #klLayout .nearby-name {font-size:15px;padding-top:4px}
+ #klLayout .nearby-card .card-action {margin:8px 12px 12px!important;min-height:44px}
+}
