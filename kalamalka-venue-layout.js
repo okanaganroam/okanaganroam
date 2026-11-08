@@ -1,5 +1,7 @@
-// A page-specific preview, composed from the park's existing listing and facts.
+// A page-specific layout, composed from the park's existing listing and facts.
 function renderKalamalkaLayout(p) {
+  const access = require('./data/kalamalka-trail-access.json');
+  const parkingHref = key => '/map?directions=' + encodeURIComponent(access.venuePath) + '&entrance=' + encodeURIComponent(key) + '#near-me';
   const e = p.escapeHtml, facts = p.facts || {}, rows = (p.visitInfo || {}).rows || [];
   const row = label => rows.find(r => r.label === label);
   const map = row('Trail map');
@@ -11,8 +13,6 @@ function renderKalamalkaLayout(p) {
   const fact = (icon, value, label) => `<div><span aria-hidden="true">${icon}</span><strong>${value}</strong><small>${label}</small></div>`;
   const detail = (label, text) => text ? `<div class="kl-fact-row"><strong>${e(label)}</strong><p>${e(text)}</p></div>` : '';
   const saved = p.actions.filter(a => /fav-btn|trip-btn/.test(a)).join('');
-  const directions = p.actions.find(a => /data-track="directions"/.test(a));
-  const parkMap = directions ? directions.replace(/>Get Directions<\/a>/, '>Open park in Roam Now →</a>') : '';
   const photos = p.gallery || '';
   const source = `<p class="kl-source">Park information: ${external(facts.source_url || p.venue.website, 'BC Parks')}${facts.checked_at ? ' · listing checked ' + e(facts.checked_at) : ''}</p>`;
   return `<div id="klLayout">
@@ -20,7 +20,7 @@ function renderKalamalkaLayout(p) {
       <p class="kl-eyebrow">🌿 A little lake-view adventure · <a href="/coldstream">Coldstream</a></p>
       <h1 class="kl-desktop-title">Kalamalka Lake Trails &amp; Rattlesnake Point</h1>
       <p class="kl-park-name">Kalamalka Lake Provincial Park</p>
-      <div class="kl-quick" aria-label="Hiking essentials">${fact('🥾', '1.5 km', 'Juniper Trail¹')}${fact('🌿', 'Easy–moderate', 'Juniper Trail')}${fact('🎟️', 'Free', 'To visit')}${fact('🐾', 'Dogs on leash', 'Pet beach rules apply')}</div>
+      <div class="kl-quick" aria-label="Hiking essentials">${fact('🥾', 'About 2.5 km return', 'Rattlesnake Point route')}${fact('🕒', '50–75 min', 'Estimated walking time')}${fact('🎟️', 'Free', 'To visit')}${fact('🐾', 'Dogs on leash', 'Pet beach rules apply')}</div>
       ${before ? `<aside class="kl-notice"><strong>🌲 Check trail access before you go</strong><p>${e(before.text.replace(/ Rattlesnakes and bears live here\.?/, ''))}</p><small>Listed notice${p.visitInfo.checked_at ? ' · checked ' + e(checked) : ''}. ${external(p.venue.website, 'Check current BC Parks advisories')}</small></aside>` : ''}
       <div class="kl-primary"><a class="cta" href="#klParking">📍 Parking &amp; directions</a>${mapUrl ? external(mapUrl, '🗺️ Official trail map', 'cta secondary') : ''}</div>
       <div class="kl-save"${p.ctaRowAttrs}>${saved}</div>
@@ -30,22 +30,21 @@ function renderKalamalkaLayout(p) {
     <div class="kl-grid">
       <div class="kl-main">
         <section class="kl-card"><p class="kl-eyebrow">Your next little escape</p><h2>Lake views, at your own pace 💚</h2><p>Follow grassland and forest trails above the lake to the viewpoint at Rattlesnake Point.</p>
-          <div class="kl-fact-row"><strong>🥾 Juniper Trail</strong><p>${e(row('The hike')?.text || '')}</p><small>¹ BC Parks lists 1.5 km but does not specify whether this is one way or return. Check the official map when planning your route.</small></div>
-          ${detail('Trail surface', facts.accessibility)}
+          <div class="kl-fact-row"><strong>🥾 Rattlesnake Point · easy route</strong><p>About 1.2 km one way from Twin Bays / Yellow Gate parking, or <strong>about 2.5 km return</strong> when you retrace the same route.</p><p>Allow <strong>50–75 minutes walking</strong>, plus time for views and breaks.</p><small>Walking time is our estimate at roughly 2–3 km/h; allow longer with children or in difficult conditions. ${external(access.sources.tourismMap, 'View the mapped route')}</small></div>
+          ${detail('Route choice', 'The mapped route follows the ridge towards Rattlesnake Point. The separate Juniper Trail descends to the bays on pavement, then continues on gravel.')}
+          <details class="kl-fold"><summary>Route distances &amp; sources</summary><p>The old 1.5 km figure is BC Parks’ Juniper Trail listing, not the return distance for the route above. Tourism Vernon’s mapped Rattlesnake Point route is 1.24 km from Yellow Gate to the viewpoint; doubling it gives about 2.5 km out and back. A Juniper/Crest loop is a different route.</p><p>${external(access.sources.tourismMap, 'Tourism Vernon route')} · ${external(access.sources.brochure, 'Official park brochure')}</p><small>Route and parking checked Nov 8, 2026.</small></details>
           <details class="kl-fold"><summary>More about the park &amp; best season</summary><p>${e(p.venue.description)}</p>${season ? detail('Best season', season.text) : ''}${p.guideLinks}</details>
         </section>
         <section class="kl-card" id="klBefore"><h2>Before you go 🌞</h2><p>A few handy details for a happy day outside.</p><p class="kl-family">🧸 Listed as kid-friendly. Choose a route that suits your group.</p>
-          <details class="kl-fold"><summary>🐾 Dogs &amp; pet beaches</summary><p>${e(facts.dogs || '')}</p></details>
+          <details class="kl-fold"><summary>🐾 Dogs &amp; pet beaches</summary><p>${e(facts.dogs || '')}</p><p>The park brochure directs dogs along Crest Trail to the pet beach. Follow the signed dog route and avoid the main beach areas.</p></details>
           <details class="kl-fold"><summary>🌿 Wildlife &amp; swimming safety</summary>${(facts.extras || []).map(r => detail(r.label === 'Rattlesnakes' ? 'Wildlife' : r.label, r.text)).join('')}</details>
           ${source}
         </section>${photos}
       </div>
       <aside class="kl-card kl-parking" id="klParking"><p class="kl-eyebrow">Start on the right foot</p><h2>Parking &amp; directions 📍</h2><p>Choose your trail first—this park has more than one entrance.</p>
-        <div class="kl-parking-choice"><strong>Jade &amp; Juniper Bay parking</strong><p>Crest Trail starts here and leads towards Rattlesnake Point. Juniper Trail descends to the twin bays and continues towards the viewpoint.</p></div>
-        <div class="kl-parking-choice"><strong>Cosens Bay Gate</strong><p>${e(facts.parking || '')}. Use the official map to plan a Cosens Bay outing.</p></div>
-        ${mapUrl ? external(mapUrl, 'Choose your trailhead on the official map', 'kl-map-link') : ''}
-        <div class="kl-map-note"><strong>About the Roam Now pin</strong><p>The existing pin marks the park’s listed location, not a verified parking entrance. Check your chosen trailhead before starting directions.</p>${parkMap}</div>
-        <p class="kl-address">${e(p.venue.address)}</p>
+        ${Object.entries(access.entrances).map(([key, point]) => `<div class="kl-parking-choice"><strong>${e(point.name)}</strong><small>${e(point.road)}</small><p>${e(point.description)}</p><a class="cta kl-parking-directions" data-track="directions" data-entrance="${e(key)}" href="${e(parkingHref(key))}">📍 ${e(point.button)}</a></div>`).join('')}
+        ${mapUrl ? external(mapUrl, 'Compare entrances on the official map', 'kl-map-link') : ''}
+        <p class="kl-source">Parking locations from ${external(access.sources.tourismMap, 'Tourism Vernon')}, checked Nov 8, 2026; entrances cross-checked against the BC Parks map. These buttons open the selected parking location in Roam Now.</p>
         ${external(p.venue.website, 'Visit the BC Parks website')}
       </aside>
     </div>

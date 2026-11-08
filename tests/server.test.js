@@ -32998,3 +32998,17 @@ test('Portal: places that serve alcohol get a clear Happy hour choice with a Sav
     assert.doesNotMatch(cafe, /Dog friendly, patio, happy hour/);
   } finally { await new Promise((resolve) => srv.close(resolve)); }
 });
+
+test('Kalamalka parking: named entrances resolve to distinct sourced parking points, never the generic park pin', () => {
+  const path = '/coldstream/outdoors/kalamalka-lake-provincial-park-trails-rattlesnake-point';
+  const a = app.mapDestination(path, new Date(), 'twin-bays');
+  const b = app.mapDestination(path, new Date(), 'cosens-bay');
+  assert.equal(a.name, 'Twin Bays / Yellow Gate parking');
+  assert.equal(a.lat, 50.20386581);
+  assert.equal(a.lng, -119.2805426);
+  assert.equal(b.lat, 50.20929417);
+  assert.equal(b.lng, -119.23262088);
+  assert.notEqual(a.url, path, 'do not replace the entrance with the matching generic park marker on load');
+  assert.equal(app.mapDestination(path, new Date(), 'invented'), null);
+  assert.equal(app.mapDestination('/kelowna/outdoors/another-place', new Date(), 'twin-bays'), null);
+});
