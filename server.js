@@ -30593,13 +30593,13 @@ function whatsOnRegionChipsHtml(state = {}) {
     const open = g.slug === OUTDOOR_REGION_GROUP_DEFAULT_OPEN || nSel > 0;
     const listId = `whatsOnRegionGroup-${g.slug}`;
     return `<div class="outdoor-region-group-block${nSel ? ' has-selection' : ''}" data-region-group="${g.slug}">
-      <button type="button" class="outdoor-region-group-toggle" id="${listId}-toggle" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${listId}"><span class="outdoor-region-group-name">${escapeHtml(g.label)}</span><span class="outdoor-region-group-meta">${g.regions.length} region${g.regions.length === 1 ? '' : 's'}</span><span class="outdoor-region-group-selected"${nSel ? '' : ' hidden'}>${nSel ? `· ${nSel} selected` : ''}</span><span class="outdoor-region-group-chevron" aria-hidden="true"></span></button>
-      <div class="outdoor-region-group-chips" id="${listId}" role="group" aria-label="${escapeHtml(g.label)} regions"${open ? '' : ' hidden'}>
+      <button type="button" class="outdoor-region-group-toggle" id="${listId}-toggle" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${listId}"><span class="outdoor-region-group-name">${escapeHtml(g.label)}</span><span class="outdoor-region-group-meta">${g.regions.length} town${g.regions.length === 1 ? '' : 's'}</span><span class="outdoor-region-group-selected"${nSel ? '' : ' hidden'}>${nSel ? `· ${nSel} selected` : ''}</span><span class="outdoor-region-group-chevron" aria-hidden="true"></span></button>
+      <div class="outdoor-region-group-chips" id="${listId}" role="group" aria-label="${escapeHtml(g.label)} towns"${open ? '' : ' hidden'}>
         ${g.regions.map(chip).join('\n        ')}
       </div>
     </div>`;
   }).join('\n      ');
-  return `<div class="category-region-selector outdoor-filter-group outdoor-region-groups" role="group" aria-label="Choose regions" data-filter="region">
+  return `<div class="category-region-selector outdoor-filter-group outdoor-region-groups" role="group" aria-label="Choose towns" data-filter="region">
       ${blocks}
     </div>`;
 }
@@ -30656,13 +30656,16 @@ function whatsOnCategoryChipsHtml(state = {}) {
   const selected = new Set(state.selectedCategories || []);
   const counts = state.counts || null;
   const allChip = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-cat-all" data-category-all="1" aria-pressed="${selected.size === 0 ? 'true' : 'false'}">All</button>`;
+  const layout = state.welcoming ? require('./whats-on-layout') : null;
   const chips = WHATSON_CATEGORIES.map((c) => {
     const n = counts ? (counts[c.key] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${escapeHtml(c.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
-  }).join('');
+    const label = layout ? `${layout.ICONS[c.key] ? '<span aria-hidden="true">' + layout.ICONS[c.key] + '</span> ' : ''}${escapeHtml(layout.SHORT_LABELS[c.key] || c.label)}` : escapeHtml(c.label);
+    return { key:c.key, html:`<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${label}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>` };
+  });
   // Free (2026-10-29): free and by-donation events, on top of whatever else is chosen (?free=1).
-  const free = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-free-chip" data-price="free" aria-pressed="${state.free ? 'true' : 'false'}">Free${state.freeCount == null ? '' : ` <span class="outdoor-activity-count">${state.freeCount}</span>`}</button>`;
-  return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${free}${chips}</div>`;
+  const free = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-free-chip" data-price="free" aria-pressed="${state.free ? 'true' : 'false'}">${layout ? '🎟️ ' : ''}Free${state.freeCount == null ? '' : ` <span class="outdoor-activity-count">${state.freeCount}</span>`}</button>`;
+  if (layout) return layout.renderDiscovery({ allChip, free, categories:chips, filters:state.filtersHtml || '', basePath:state.basePath || '/whats-on' });
+  return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${free}${chips.map(c=>c.html).join('')}</div>`;
 }
 
 // The Regions / Date control row. Each popover holds the EXISTING markup for
@@ -30697,7 +30700,7 @@ function whatsOnFilterBarHtml(state = {}) {
   const dateActive = state.window && state.window.preset !== 'upcoming';
   const pop = (id, label, icon, badge, panelHtml) => `<div class="whatson-pop">
       <button type="button" class="whatson-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="whatson-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="whatson-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="whatson-pop-panel" id="${id}Panel" hidden>${panelHtml}
+      <div class="whatson-pop-panel" id="${id}Panel" hidden>${state.welcoming ? '<button type="button" class="wo-panel-close" aria-label="Close filter panel">Close ×</button>' : ''}${panelHtml}
         <div class="whatson-pop-actions"><button type="button" class="whatson-pop-apply" data-whatson-apply>Show results</button></div>
       </div>
     </div>`;
@@ -30707,8 +30710,8 @@ function whatsOnFilterBarHtml(state = {}) {
       ${whatsOnTownLinksHtml(state.town, state.townCounts || {})}
       </div>
     </div>` : '';
-  return `<div class="whatson-controls">
-    ${state.town ? townPop : pop('whatsOnRegions', 'Regions', uiIcon('pin'), nRegions || '', whatsOnRegionChipsHtml(state))}
+  return `<div class="whatson-controls">${state.welcoming ? '<span class="wo-step wo-where-label">2 · Where?</span>' : ''}
+    ${state.town ? townPop : pop('whatsOnRegions', state.welcoming ? '<span class="wo-town-label">Choose a town</span>' : 'Regions', uiIcon('pin'), nRegions || '', whatsOnRegionChipsHtml(state))}
     ${state.hasInventory ? pop('whatsOnDate', 'Date', uiIcon('calendar'), dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
   </div>`;
 }
@@ -30915,7 +30918,7 @@ function whatsOnSelectedTagsHtml(selectedRegions, selectedCategories) {
   const regionTags = selectedRegions.map((r) => tag('region', r, REGION_LABELS[r] || r));
   const categoryTags = selectedCategories.map((c) => tag('category', c, (WHATSON_CATEGORY_BY_KEY[c] || { label: c }).label));
   const any = regionTags.length + categoryTags.length > 0;
-  return `<div class="outdoor-selected" id="whatsOnSelected"${any ? '' : ' hidden'}>${row('Regions', regionTags)}${row('Categories', categoryTags)}${any ? '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>' : ''}</div>`;
+  return `<div class="outdoor-selected" id="whatsOnSelected"${any ? '' : ' hidden'}>${row('Towns', regionTags)}${row('Categories', categoryTags)}${any ? '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>' : ''}</div>`;
 }
 function whatsOnSummaryText(shown, total, filtered) {
   const noun = total === 1 ? 'event' : 'events';
@@ -31173,7 +31176,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var any = regions.length || categories.length || freeOnly();
     function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
     function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
-    var html = row('Regions', regions.map(function(r){ return tag('region', r, LABELS.regions[r] || r); }))
+    var html = row('Towns', regions.map(function(r){ return tag('region', r, LABELS.regions[r] || r); }))
       + row('Categories', categories.map(function(k){ return tag('category', k, LABELS.categories[k] || k); }))
       + row('Price', freeOnly() ? [tag('price', 'free', 'Free')] : []);
     if (any) html += '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>';
@@ -31188,6 +31191,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (!isScope && regions.length) q.push('regions=' + regions.join(','));
     if (!isScope && categories.length) q.push('categories=' + categories.join(','));
     if (freeOnly()) q.push('free=1');
+    if (searchTerm) q.push('q=' + encodeURIComponent(searchTerm));
     return q.length ? '?' + q.join('&') : '';
   }
   function dateParamsOf(search){ var p = new URLSearchParams(search); return { when: p.get('when') || '', from: p.get('from') || '', to: p.get('to') || '' }; }
@@ -31244,10 +31248,10 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var searchTimer = null;
     searchInput.addEventListener('input', function(){
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120);
+      searchTimer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('replace'); }, 120);
     });
   }
-  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('replace'); });
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-whatson-apply]'));
   var pops = Array.prototype.slice.call(document.querySelectorAll('.whatson-pop'));
   function closePops(except){
@@ -31294,6 +31298,8 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   function readUrlIntoChips(){
     try {
       var params = new URLSearchParams(window.location.search);
+      searchTerm = (params.get('q') || '').trim().toLowerCase();
+      if (searchInput) searchInput.value = searchTerm;
       var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), category: (params.get('categories') || '').split(',').filter(Boolean) };
       if (!pre.region.length && !pre.category.length) pre = { region: SCOPE.region.slice(), category: SCOPE.category.slice() };
       pre.price = params.get('free') === '1' ? ['free'] : [];
@@ -31453,7 +31459,7 @@ const WHATSON_CATEGORY_BANNERS = Object.freeze({
 // only the first WHATSON_PAGE_SIZE visible events stay shown -- the rest wait
 // behind "Show more" -- and a heading shows only when one of its events is
 // visible. Runs on its own, so the filter script's contract is unchanged.
-const WHATSON_PAGE_SIZE = 48;
+const WHATSON_PAGE_SIZE = 12;
 const WHATSON_LIST_STYLE = `<style id="whatson-list">
   /* Group headings span the whole grid. */
   body.whatson-page #whatsOnResults > .whatson-group-head { grid-column: 1 / -1; list-style: none; margin: 18px 0 2px; padding: 0; border: 0; background: none; box-shadow: none; }
@@ -31609,7 +31615,7 @@ const WHATSON_NIGHTS_STYLE = `<style>
   body.whatson-page .whatson-nights-group li { break-inside: avoid; padding: 3px 0; }
   body.whatson-page .whatson-nights-meta { color: #5f6b73; font-size: 0.9rem; }
 </style>`;
-function whatsOnWeeklyNightsHtml(now = new Date()) {
+function whatsOnWeeklyNightsHtml(now = new Date(), compact = false) {
   const byVenue = allVenueWeeklyNights();
   if (!byVenue.size) return '';
   const ids = [...byVenue.keys()];
@@ -31651,7 +31657,7 @@ function whatsOnWeeklyNightsHtml(now = new Date()) {
       const en = `${dayEn} · ${NIGHT_KIND_LABELS.en[k]} at ${n} place${n === 1 ? '' : 's'}`;
       const fr = `${dayFr} · ${NIGHT_KIND_LABELS.fr[k]} à ${n} endroit${n === 1 ? '' : 's'}`;
       return `
-      <details class="whatson-nights-group" data-kind="${k}"${i === 0 ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span>${two(en, fr)}</span></summary>
+      <details class="whatson-nights-group" data-kind="${k}"${i === 0 && !compact ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span>${two(en, fr)}</span></summary>
         <ul>${list.map(({ v, s }) => {
           const showTitle = k === 'other' || !specialWords(s.title).join(' ').includes(specialWords(NIGHT_KIND_LABELS.en[k]).join(' ')) ? s.title : '';
           const metaEn = [nightTimeText(s, false), REGION_LABELS[v.region], showTitle, nightFrequencyText(s, false)].filter(Boolean).join(' · ');
@@ -31664,15 +31670,17 @@ function whatsOnWeeklyNightsHtml(now = new Date()) {
     }).join('')}
     </div>`;
   };
-  return `<section class="whatson-nights" id="whatsOnNights" aria-labelledby="whatsOnNightsHeading">
-    <h2 class="category-subsection-heading" id="whatsOnNightsHeading">${two('Every week', 'Chaque semaine')}</h2>
-    <p class="whatson-nights-intro">${two('Trivia, karaoke, open mics and more at local pubs, breweries and restaurants, tonight first.', 'Quiz, karaoké, scènes ouvertes et plus dans les pubs, brasseries et restaurants, ce soir d’abord.')}</p>${days.map(dayHtml).join('')}
+  return `<section class="whatson-nights${compact ? ' wo-weekly' : ''}" id="whatsOnNights" aria-labelledby="whatsOnNightsHeading">
+    ${compact ? '<p class="wo-eyebrow">Same time next week?</p>' : ''}<h2 class="category-subsection-heading" id="whatsOnNightsHeading">${compact ? 'Weekly favourites 🎤' : two('Every week', 'Chaque semaine')}</h2>
+    <p class="whatson-nights-intro">${compact ? 'Trivia, karaoke, open mics and familiar local nights.' : two('Trivia, karaoke, open mics and more at local pubs, breweries and restaurants, tonight first.', 'Quiz, karaoké, scènes ouvertes et plus dans les pubs, brasseries et restaurants, ce soir d’abord.')}</p>${compact ? '<details class="wo-fold"><summary>Browse weekly favourites</summary>' : ''}${days.map(dayHtml).join('')}${compact ? '</details>' : ''}
   </section>`;
 }
 function renderWhatsOnPage(filter = null, opts = {}) {
   // opts.scope ({ category } or { region }) renders a scoped page (see whatsOnScopeFromPath): it pre-selects that chip unless the
   // query picks its own, and defaults to the scope's 90-day window unless the query sets dates.
   const scope = opts.scope || null;
+  const welcoming = !scope;
+  const welcomeLayout = welcoming ? require('./whats-on-layout') : null;
   const queryPicks = !!(filter && (filter.regions.length || filter.categories.length));
   // A town page (/<town>/events, /<town>/events/this-weekend) carries only that town's events plus valley-wide ones
   // (2026-10-14): it used to ship every other town's events hidden (Kelowna: 1 MB). Its town is fixed, so it has no
@@ -31716,6 +31724,8 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // A town page's own heading/intro stand in for the "all" text, so the client sync shows them whenever no single type is chosen.
   const allText = scope && scope.region ? { heading: scopeText.heading, intro: scopeText.intro } : WHATSON_CATEGORY_TEXT.all;
   const woText = (selectedCategories.length === 1 && WHATSON_CATEGORY_TEXT[selectedCategories[0]]) || allText;
+  const bannerTexts = { ...WHATSON_CATEGORY_TEXT, all: allText };
+  if (welcomeLayout) for (const key of Object.keys(bannerTexts)) bannerTexts[key] = { ...bannerTexts[key], intro:welcomeLayout.INTRO };
   const title = scopeText ? scopeText.title : `${heading} | Okanagan Roam`;
   const description = scopeText ? scopeText.description : 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
   const canonical = `https://okanaganroam.com${basePath}`;
@@ -31871,6 +31881,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, pageItemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
+${welcomeLayout ? welcomeLayout.styles : ''}
 ${WHATSON_LIST_STYLE}
 ${WHATSON_NIGHTS_STYLE}
 ${CATEGORY_BANNER_STYLE}
@@ -31890,7 +31901,7 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${bannerSwapJson(WHATSON_CATEGORY_BANNERS)}, general = ${bannerSwapJson(WHATS_ON_BANNER)}, text = ${JSON.stringify({ ...WHATSON_CATEGORY_TEXT, all: allText }).replace(/</g, '\\u003c')};
+    var map = ${bannerSwapJson(WHATSON_CATEGORY_BANNERS)}, general = ${bannerSwapJson(WHATS_ON_BANNER)}, text = ${JSON.stringify(bannerTexts).replace(/</g, '\\u003c')};
     var box = document.getElementById('whatsOnBanner'); if (!box) return;
     ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
@@ -31906,10 +31917,10 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(woText.heading)}</h1>
-  <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
+  <p class="outdoor-intro whatson-intro">${escapeHtml(welcomeLayout ? welcomeLayout.INTRO : woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
-  ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null, freeCount: counts ? counts.free : null })}
-  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath, town: townScope, townCounts })}
+  ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null, freeCount: counts ? counts.free : null, welcoming, basePath, filtersHtml: welcoming ? whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath, town:townScope, townCounts, welcoming }) : '' })}
+  ${welcoming ? '' : whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath, town: townScope, townCounts })}
   ${townScope && hasInventory ? whatsOnTownQuickDatesHtml(townScope, scope.weekend ? 'this-weekend' : (queryDates ? window.preset : 'upcoming')) : ''}
   <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
   <section class="outdoor-step outdoor-step-results whatson-results-step" aria-labelledby="whatsOnResultsTop">
@@ -31923,23 +31934,24 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 && !(nextUp && nextUp.on) ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
-  ${scope ? '' : whatsOnWeeklyNightsHtml(renderNow)}
+  ${scope ? '' : whatsOnWeeklyNightsHtml(renderNow, welcoming)}
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
     <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
     <ul class="card-grid">${comingUp.map((e) => whatsOnEventCardHtml(e)).join('')}</ul>
   </section>` : ''}
-  ${furtherAhead.length ? `<section class="whatson-further" aria-labelledby="whatsOnFurtherHeading">
+  ${furtherAhead.length ? `${welcoming ? '<details class="wo-fold wo-future"><summary>Planning further ahead? 🗓️</summary>' : ''}<section class="whatson-further" aria-labelledby="whatsOnFurtherHeading">
     <h2 class="category-subsection-heading" id="whatsOnFurtherHeading">Further ahead</h2>
     <ul class="whatson-further-list" style="list-style:none;padding:0;margin:0 0 24px;columns:18rem auto;column-gap:2rem">${furtherAhead.map((e) => `
       <li style="break-inside:avoid"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a> <span class="event-related-meta" style="color:#5f6b73;font-size:0.9rem">${escapeHtml(`${formatLocalDateShort(e.startDate, { weekday: false })}, ${e.startDate.slice(0, 4)}`)}</span></li>`).join('')}
     </ul>
-  </section>` : ''}
+  </section>${welcoming ? '</details>' : ''}` : ''}
   ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList.length ? scopeList : comingUp)) : ''}
   ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState, scope })}
+  ${welcomeLayout ? welcomeLayout.script : ''}
 </body>
 </html>`;
 }
