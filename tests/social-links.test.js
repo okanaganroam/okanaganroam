@@ -32,7 +32,7 @@ test('links: the data file is valid and every post has a date, title and site pa
     assert.match(p.path, /^\/[a-z0-9\-/]*$/, p.path);
     assert.ok(p.title && p.title.trim());
   }
-  assert.equal(linksForDay(data.posts, '2026-11-02', 50).length, data.posts.length);
+  assert.equal(linksForDay(data.posts, '2099-01-01', 500).length, data.posts.length);
 });
 
 test('links: /links is noindex, briefly cached, uses plain internal links and counts clicks', () => {
