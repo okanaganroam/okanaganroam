@@ -22788,9 +22788,16 @@ function mapFrWords() {
   return { ...Object.fromEntries(FR_SEARCH_SYNONYM_MAP), marche: 'farmers market', marches: 'farmers market' };
 }
 function mapDirectionsAvailable(){return /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN||''));}
-function mapDestination(path,now=new Date()){
+function mapDestination(path,now=new Date(),entrance=null){
   if(typeof path!=='string'||!/^\/(?:fr\/)?[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+$/.test(path))return null;
-  const key=path.replace(/^\/fr\//,'/'),data=JSON.parse(mapLiveData(now).json);
+  const key=path.replace(/^\/fr\//,'/');
+  if(entrance!==null){
+    const access=require('./data/kalamalka-trail-access.json');
+    const point=key===access.venuePath&&Object.prototype.hasOwnProperty.call(access.entrances,entrance)?access.entrances[entrance]:null;
+    // A fragment avoids matching the park's generic venue marker and losing the parking coordinates on the client.
+    return point?{lat:point.lat,lng:point.lng,name:point.name,region:'coldstream',url:key+'#klParking'}:null;
+  }
+  const data=JSON.parse(mapLiveData(now).json);
   const p=data.p.find(p=>p[5]===key);if(p)return {lat:p[0],lng:p[1],name:p[2],region:p[4],url:p[5]};
   const e=data.e.concat(JSON.parse(mapAheadData(now).json).e).find(e=>e[1]===key);
   return e&&e[4]!=null&&e[5]!=null?{lat:e[4],lng:e[5],name:e[0],region:e[2],url:e[1],venue:e[3]}:null;
@@ -22804,7 +22811,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const ver = mapDataVersion(now);
-  const conf = JSON.stringify({ dest: mapDestination(opts.directions,now),directionRequested:!!opts.directions,src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
+  const conf = JSON.stringify({ dest: mapDestination(opts.directions,now,opts.entrance==null?null:opts.entrance),directionRequested:!!opts.directions,src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
     k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT, nights: MAP_NIGHTS_BIT },
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // The food types' line icons, once each (the tags carry only the icon's name).
@@ -55492,7 +55499,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
       // A real map of every place (2026-10-14), so it is indexable now.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderPlacesMapPage(null, new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en',directions:query.directions }));
+      return res.end(renderPlacesMapPage(null, new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en',directions:query.directions,entrance:query.entrance }));
     }
     // GET /map/data.json -- the places, their hours and this week's events for /map, versioned by ?v=.
     if (pathname === '/map/data.json' && method === 'GET') {

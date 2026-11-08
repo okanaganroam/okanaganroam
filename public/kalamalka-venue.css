@@ -75,3 +75,6 @@ body.kalamalka-page .venue-hero-photo>img {width:100%;height:100%!important;obje
  #klLayout .nearby-name {font-size:15px;padding-top:4px}
  #klLayout .nearby-card .card-action {margin:8px 12px 12px!important;min-height:44px}
 }
+
+#klLayout .kl-parking-choice>small {display:block;color:#72685c;font-size:12px;margin-top:3px}
+#klLayout .kl-parking-directions {display:flex;align-items:center;justify-content:center;text-align:center;background:#1b2b3a;color:white;border-radius:25px;margin:14px 0 0;padding:12px;min-height:48px;font-size:13px;line-height:1.4}
