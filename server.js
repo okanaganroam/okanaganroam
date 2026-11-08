@@ -19009,6 +19009,12 @@ function cardPriceFor(venueId) {
   if (!Number.isFinite(n) || n <= 0) return null;
   return `From $${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}${e.per ? ` / ${e.per}` : ''}`;
 }
+// Weekly price check (price-check.js, 2026-11-07): re-reads each price's source page once a week; anything that no
+// longer matches waits on /admin/review. Approved changes are saved in the database and laid over CARD_PRICES here.
+const priceCheck = require('./price-check').createPriceCheck({
+  db, prices: CARD_PRICES,
+  venueName: (id) => { try { const r = db.prepare('SELECT name FROM venues WHERE id = ?').get(Number(id)); return r ? r.name : null; } catch (e) { return null; } },
+});
 function tourCardFacts(info) {
   const out = { price: null, time: null };
   if (!info || !Array.isArray(info.rows)) return out;
@@ -52703,6 +52709,8 @@ function renderAdminReviewPage() {
   const staleSpecials = staleVenueSpecials();
   const staleNights = staleVenueWeeklyNights();
   const nightsMusic = weeklyNightsLiveMusicWithoutBadge();
+  const priceFlags = priceCheck.listFlagged();
+  const priceRun = priceCheck.lastRun();
   const total = changes.length + photos.length + arrivals.length + videos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
@@ -52714,7 +52722,7 @@ function renderAdminReviewPage() {
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
     ${renderAdminOwnerStats(ownerSignupStats())}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a>${arrivals.length ? `<a href="#arrivals">Storefront spots (${arrivals.length})</a>` : ''}${ownerVideoEnabled() ? `<a href="#videos">Videos (${videos.length})</a>` : ''}<a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a>${arrivals.length ? `<a href="#arrivals">Storefront spots (${arrivals.length})</a>` : ''}${ownerVideoEnabled() ? `<a href="#videos">Videos (${videos.length})</a>` : ''}<a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a><a href="#prices">Price checks (${priceFlags.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${arrivals.length ? section('arrivals', 'Storefront spots to check', arrivals, (a) => arrivalPoints.cardHtml(a, adminReviewEsc, adminReviewActions('arrival', a.id, { approveLabel: 'Looks right', reasonPlaceholder: 'Reason if rejecting (the photo is deleted)' })), '') : ''}
@@ -52731,12 +52739,22 @@ function renderAdminReviewPage() {
     ${visitorLive.length ? section('visitorlive', 'Visitor photos &amp; tips live (last 30 days)', visitorLive, (c) => renderAdminVisitorCard(c, 'live'), '') : ''}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
     ${section('liveupdates', 'Changes owners made live (last 14 days)', instant, renderAdminInstantCard, 'None in the last 14 days.')}
+    ${section('prices', 'Price checks', priceFlags, (r) => priceCheck.cardHtml(r, { esc: adminReviewEsc, editBox: adminEditBox }), 'Nothing waiting: every card price matched its page at the last check.')}
+    <p class="rv-meta" id="priceRunLine">${priceCheck.isRunning() ? 'A price check is running now.' : priceRun ? `Last price check started ${adminReviewEsc(String(priceRun.started_at).slice(0, 16).replace('T', ' '))} UTC${priceRun.finished_at ? `: ${priceRun.checked} prices checked, ${priceRun.flagged} waiting` : ' (still running or stopped by a restart)'}. It runs by itself once a week.` : 'No price check has run yet. It runs by itself once a week.'} <button type="button" class="rv-btn" id="priceRunNow">Check all prices now</button></p>
     ${section('staledeals', `Stale happy hour deals (over ${HH_DEALS_STALE_DAYS} days)`, staleDeals, renderAdminStaleDealsCard, 'None: every happy hour deal on file was checked in the last 120 days.')}
     ${section('stalespecials', `Stale weekly specials (over ${SPECIALS_STALE_DAYS} days)`, staleSpecials, renderAdminStaleSpecialsCard, 'None: every weekly special on file was checked in the last 120 days.')}
     ${section('stalenights', `Stale weekly nights (over ${NIGHTS_STALE_DAYS} days)`, staleNights, renderAdminStaleNightsCard, 'None: every weekly night on file was checked in the last 120 days.')}
     ${section('nightsmusic', 'Live music nights without the Live music badge', nightsMusic, renderAdminNightsMusicCard, 'None: every place with a live music night has the badge.')}
 <script>
 (function(){
+  var prn = document.getElementById('priceRunNow');
+  if (prn) prn.addEventListener('click', function(){
+    prn.disabled = true;
+    fetch('/admin/review/price-check/run', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ document.getElementById('priceRunLine').textContent = j.error || 'Started. It takes about 15 minutes; reload this page afterwards.'; })
+      .catch(function(){ prn.disabled = false; });
+  });
   document.getElementById('rvLogout').addEventListener('click', function(){
     fetch('/admin/review/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.reload(); });
   });
@@ -52791,6 +52809,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
+        if (x.ok && kind === 'price') { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = { approve: 'The new price is live.', keep: 'Kept as it is. It comes back only if the page\u2019s prices change.', dismiss: 'The price is off the card.' }[act]; card.classList.add('rv-done'); return; }
         if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : act === 'dismiss' ? 'Dismissed.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
@@ -58702,6 +58721,25 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Set-Cookie', adminCookieHeader(req, '', 0));
       return sendJSON(res, 200, { ok: true });
     }
+    if (pathname === '/admin/review/price-check/run' && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      if (priceCheck.isRunning()) return sendJSON(res, 200, { ok: true, already: true });
+      priceCheck.runAll().catch((e) => console.error('[price-check]', e.message));
+      return sendJSON(res, 202, { ok: true });
+    }
+    {
+      const m = /^\/admin\/review\/price\/(\d+)\/(approve|keep|dismiss)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+        if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = priceCheck.decide(Number(m[1]), m[2], body, ADMIN_REVIEWER);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
     {
       const m = /^\/admin\/review\/visitor\/(\d+)\/note$/.exec(pathname);
       if (m && method === 'POST') {
@@ -59416,6 +59454,10 @@ function startDigestTimer() {
   if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
   const t = setInterval(() => { digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message)); }, 15 * 60 * 1000);
   t.unref();
+  if (process.env.PRICE_CHECK_DISABLED !== '1') {
+    const pc = setInterval(() => { const r = priceCheck.tick(); if (r) r.catch((e) => console.error('[price-check]', e.message)); }, 15 * 60 * 1000);
+    pc.unref();
+  }
 }
 const digestManual = [];
 
@@ -59817,6 +59859,7 @@ module.exports = {
   breadcrumbNavHtml,
   venueCardHtml,
   CARD_PRICES,
+  priceCheck,
   cardPriceFor,
   tourCardFacts,
   listVenues,
