@@ -84,3 +84,20 @@ test('the event page draws, with a site that is not connected', () => {
   const html = renderEventsPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet.' }] });
   assert.match(html, /Which What’s On events get opened/); assert.match(html, />Big Show</); assert.match(html, /Not connected yet/);
 });
+
+test('event performance: a repeating event is dated by its next showing, not its first', () => {
+  const d = memDb();
+  d.exec(`CREATE TABLE event_occurrences (id INTEGER PRIMARY KEY, event_id INTEGER, start_date TEXT, end_date TEXT, status TEXT DEFAULT 'scheduled');`);
+  const ev = d.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const oc = d.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, status) VALUES (?, ?, ?, ?)');
+  ev.run(10, 'Fortnightly Brunch', 'brunch', 'kelowna', '2026-10-04T10:00', null, null); oc.run(10, '2026-10-04', '2026-10-04', 'scheduled'); oc.run(10, '2026-11-20', '2026-11-20', 'scheduled'); oc.run(10, '2026-12-04', '2026-12-04', 'scheduled');
+  ev.run(11, 'Monthly Tea', 'tea', 'kelowna', '2026-10-18T14:00', null, null); oc.run(11, '2026-10-18', '2026-10-18', 'scheduled'); oc.run(11, '2026-12-20', '2026-12-20', 'scheduled');
+  ev.run(12, 'Finished Series', 'series', 'kelowna', '2026-09-01T10:00', null, 'FREQ=WEEKLY'); oc.run(12, '2026-09-01', '2026-09-01', 'scheduled'); oc.run(12, '2026-10-01', '2026-10-01', 'scheduled');
+  ev.run(13, 'Cancelled Next', 'cancelled', 'kelowna', '2026-10-05T10:00', null, null); oc.run(13, '2026-10-05', '2026-10-05', 'scheduled'); oc.run(13, '2026-11-12', '2026-11-12', 'cancelled');
+  const r = va.createCounter(d).eventStats(30, 100, NOW);
+  const row = (name) => r.unseen_soon.find((e) => e.name === name);
+  assert.equal(row('Fortnightly Brunch').start, '2026-11-20'); // next showing, not Oct 4
+  assert.equal(row('Monthly Tea'), undefined); // next showing Dec 20 is beyond the next 30 days
+  assert.equal(row('Finished Series'), undefined); // every showing is over, even with a repeat rule
+  assert.equal(row('Cancelled Next'), undefined); // its only upcoming showing is cancelled
+});

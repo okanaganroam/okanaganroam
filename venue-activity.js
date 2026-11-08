@@ -196,11 +196,20 @@ function createCounter(db) {
       if (r.name === 'event_view') e.views += r.n; else if (keyTo[r.name]) e[keyTo[r.name]] += r.n;
       by.set(r.id, e);
     }
+    // A repeating event keeps the date of its first showing in the events table, so its start can be weeks old while the next
+    // showing is still ahead. The occurrences table has the real dates: use the next one that has not finished (2026-11-08).
+    const nextShowing = new Map(), hasShowings = new Set();
+    try {
+      for (const r of db.prepare('SELECT DISTINCT event_id FROM event_occurrences').all()) hasShowings.add(r.event_id);
+      for (const r of db.prepare("SELECT event_id, MIN(MAX(start_date, ?)) AS next FROM event_occurrences WHERE status = 'scheduled' AND end_date >= ? GROUP BY event_id").all(today, today)) nextShowing.set(r.event_id, r.next);
+    } catch (e) { /* no occurrences table (older databases): fall back to the event's own dates */ }
     const all = db.prepare('SELECT id, name, slug, region, start_datetime, end_datetime, recurrence_rule FROM events').all().map((v) => {
       const last = String(v.end_datetime || v.start_datetime).slice(0, 10);
-      const start = String(v.start_datetime).slice(0, 10);
+      let start = String(v.start_datetime).slice(0, 10);
+      let upcoming = last >= today || !!v.recurrence_rule;
+      if (hasShowings.has(v.id)) { upcoming = nextShowing.has(v.id); if (upcoming) start = nextShowing.get(v.id); }
       const c = by.get(v.id) || blank();
-      return { id: v.id, name: v.name, region: v.region, path: `/${v.region}/events/${v.slug}`, start, upcoming: last >= today || !!v.recurrence_rule, ...c, actions: c.tickets + c.calendar + c.directions + c.trip + c.favorite };
+      return { id: v.id, name: v.name, region: v.region, path: `/${v.region}/events/${v.slug}`, start, upcoming, ...c, actions: c.tickets + c.calendar + c.directions + c.trip + c.favorite };
     });
     const seen = all.filter((e) => e.views || e.actions);
     const totals = { views: 0, tickets: 0, calendar: 0, directions: 0, trip: 0, favorite: 0 };
