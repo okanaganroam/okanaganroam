@@ -142,6 +142,7 @@ function renderFoodDrinkVenueLayout(parts) {
 
   // The tabs: only for sections this page really has, and only when there are at least two to move between.
   const tabs = [];
+  if (parts.experienceHtml) tabs.push(['fdTastings', 'Tastings']);
   if (menu) tabs.push(['fdMenu', 'Menu']);
   if (deals) tabs.push(['fdDeals', dealsLabel]);
   if (hours) tabs.push(['venueHours', 'Hours']);
@@ -151,9 +152,10 @@ function renderFoodDrinkVenueLayout(parts) {
 
   // Main buttons
   const buttons = [];
+  if (parts.primaryActionHtml) buttons.push(parts.primaryActionHtml.replace('class="cta secondary"', 'class="cta fd-menu-button"'));
   if (menu) buttons.push('<a class="cta fd-menu-button" href="#fdMenu">🍽️ Menu &amp; prices</a>');
   // Directions is the main button unless there is a menu button, which leads.
-  if (parts.directionsHtml) buttons.push(menu ? parts.directionsHtml.replace('class="cta"', 'class="cta secondary"') : parts.directionsHtml);
+  if (parts.directionsHtml) buttons.push(menu || parts.primaryActionHtml ? parts.directionsHtml.replace('class="cta"', 'class="cta secondary"') : parts.directionsHtml);
   if (hours) buttons.push('<a class="cta secondary" href="#venueHours">🕒 Hours</a>');
   const ctaRow = buttons.length ? '<div class="venue-cta-row"' + parts.ctaRowAttrs + '>' + buttons.join('') + '</div>' : '';
 
@@ -199,7 +201,7 @@ function renderFoodDrinkVenueLayout(parts) {
     recognition, parts.venueAdvisoryHtml || '',
     intro ? '<p class="venue-description">' + esc(intro) + '</p>' : '', parts.whyHtml || '',
     ctaRow, highlights, profile.happyHourLink ? happyLink : '', verifiedInSummary, '</section>',
-    nav, menu, deals, editorial, more,
+    nav, parts.experienceHtml || '', menu, deals, editorial, more,
     fold('Upcoming events at ' + (short || name), parts.eventsHtml, 'fd-card'), profile.visitorFirst ? parts.visitorHtml : '',
     // The facts (map, phone, hours, save buttons) come before the visitor photos and tips in the page itself, for keyboard
     // and screen reader order (round 9 accessibility rule); Copper keeps its approved order.

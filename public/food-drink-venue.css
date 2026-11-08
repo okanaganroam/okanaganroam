@@ -149,3 +149,19 @@ body.fd-venue-page .fd-content {grid-column:1;grid-row:1}
 body.fd-venue-page .fd-aside {grid-column:2;grid-row:1 / span 2}
 body.fd-venue-page .fd-after {grid-column:1;grid-row:2;align-self:start;width:100%}
 }
+
+body.fd-venue-page .fd-tasting-option {display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:18px 0;border-bottom:1px solid #eee6d8;}
+body.fd-venue-page .fd-tasting-option h3 {margin:0 0 6px;font:800 18px Nunito,sans-serif;color:#1b2b3a;}
+body.fd-venue-page .fd-tasting-option p {margin:0;font-size:14px;line-height:1.5;max-width:48ch;}
+body.fd-venue-page .fd-tasting-facts {display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;white-space:nowrap;}
+body.fd-venue-page .fd-tasting-facts strong {font-size:22px;color:#286962;}
+body.fd-venue-page .fd-tasting-facts span {font-size:13px;}
+body.fd-venue-page .fd-tastings>.fd-note {margin:14px 0 0;font-size:12px;line-height:1.5;}
+body.fd-venue-page #fdTastings {scroll-margin-top:150px;}
+@media(max-width:640px){body.fd-venue-page .fd-tasting-option {gap:12px;padding:15px 0;}body.fd-venue-page .fd-tasting-option h3 {font-size:16px;}}
+
+@media(max-width:899px){
+body.fd-venue-page.niche-venue-page .vg-mosaic .vg-strip {height:64px!important;}
+body.fd-venue-page.niche-venue-page .vg-mosaic .vg-thumb {flex:0 0 96px!important;width:96px!important;height:64px!important;}
+body.fd-venue-page.niche-venue-page .vg-mosaic .vg-thumb img {height:64px!important;object-position:50% 40%;}
+}
