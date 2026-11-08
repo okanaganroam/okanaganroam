@@ -16827,7 +16827,7 @@ function restLinksHtml(kind, inner, lang, shown = '') {
   if (!events) links.sort((a, b) => a.name.localeCompare(b.name, fr ? 'fr' : 'en', { sensitivity: 'base' }));
   const n = links.filter((l) => !l.off).length;
   const summary = events
-    ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
+    ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `View a simple list (${n})`)
     : (fr ? `Toutes les adresses de cette page, de A \u00e0 Z (${n})` : `All places on this page, A\u2013Z (${n})`);
   // Round 9 (2026-10-19): a link the filters hide carries its address as data-href, not href, so a type page
   // (/whats-on/sports-recreation) no longer links every other type's events to crawlers (Bunnicula showed up on the
@@ -31647,8 +31647,8 @@ function whatsOnWeeklyNightsHtml(now = new Date(), compact = false) {
   if (!days.length) return '';
   const two = (en, fr) => bilingualDescHtml(en, fr === en ? null : fr);
   const dayHtml = ({ i, weekday, groups }) => {
-    const dayEn = i === 0 ? 'Tonight' : HH_DAYS_LONG.en[weekday];
-    const dayFr = i === 0 ? 'Ce soir' : HH_DAYS_LONG.fr[weekday].charAt(0).toUpperCase() + HH_DAYS_LONG.fr[weekday].slice(1);
+    const dayEn = i === 0 ? (compact ? 'Today' : 'Tonight') : HH_DAYS_LONG.en[weekday];
+    const dayFr = i === 0 ? (compact ? 'Aujourd’hui' : 'Ce soir') : HH_DAYS_LONG.fr[weekday].charAt(0).toUpperCase() + HH_DAYS_LONG.fr[weekday].slice(1);
     const kinds = [...groups.keys()].sort((a, b) => groups.get(b).length - groups.get(a).length || NIGHT_KINDS.indexOf(a) - NIGHT_KINDS.indexOf(b));
     return `
     <div class="whatson-nights-day" data-day="${weekday}">${kinds.map((k) => {
