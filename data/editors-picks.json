@@ -1,51 +1,61 @@
 {
   "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
-  "updated": "2026-11-02",
+  "updated": "2026-11-09",
   "picks": [
     {
-      "id": 464,
-      "why": "A friendly Penticton roastery with a local following",
-      "why_fr": "Une torréfaction chaleureuse de Penticton, aimée des gens du coin"
+      "id": 344,
+      "why": "Family-run Sicilian-inspired Italian in Lake Country",
+      "why_fr": "Cuisine italienne familiale d’inspiration sicilienne à Lake Country"
     },
     {
-      "id": 141,
-      "why": "Lively Penticton tapas bar with a loyal crowd",
-      "why_fr": "Un bar à tapas animé de Penticton, avec ses habitués"
+      "id": 515,
+      "why": "Penticton pizzeria from well-known Okanagan restaurateurs",
+      "why_fr": "Une pizzeria de Penticton signée par des restaurateurs réputés de l’Okanagan"
     },
     {
-      "id": 850,
-      "why": "Boutique Oliver winery with sweeping valley views",
-      "why_fr": "Un petit domaine d’Oliver avec vue sur toute la vallée"
+      "id": 839,
+      "why": "Organic West Kelowna winery best known for its ice wine",
+      "why_fr": "Un vignoble biologique de West Kelowna, réputé pour son vin de glace"
     },
     {
-      "id": 347,
-      "why": "Italian gelato and espresso in Vernon",
-      "why_fr": "Gelato et espresso à l’italienne à Vernon"
+      "id": 1494,
+      "why": "The Interior’s oldest commercial art gallery, since 1963",
+      "why_fr": "La plus ancienne galerie d’art commerciale de l’Intérieur, depuis 1963"
     },
     {
-      "id": 1512,
-      "why": "Live theatre in Penticton’s Cannery Stage",
-      "why_fr": "Du théâtre en direct à la Cannery Stage de Penticton"
+      "id": 948,
+      "why": "Generous, veggie-packed sandwiches in Vernon",
+      "why_fr": "De généreux sandwichs aux légumes à Vernon"
     },
     {
-      "id": 1649,
-      "why": "Fresh bread and baking in a Kelowna bakery-café",
-      "why_fr": "Pain frais et pâtisseries dans une boulangerie-café de Kelowna"
+      "id": 847,
+      "why": "A design-forward winery and bistro in Okanagan Falls",
+      "why_fr": "Un vignoble-bistro au design soigné à Okanagan Falls"
     },
     {
-      "id": 63,
-      "why": "Vernon’s early-opening café, daily from 7 AM",
-      "why_fr": "Le café de Vernon ouvert dès 7 h, tous les jours"
+      "id": 907,
+      "why": "A Kelowna coffee house that’s also a used bookstore",
+      "why_fr": "Un café de Kelowna qui est aussi une librairie d’occasion"
     },
     {
-      "id": 1467,
-      "why": "Contemporary art and openings in downtown Kelowna",
-      "why_fr": "Art contemporain et vernissages au centre-ville de Kelowna"
+      "id": 897,
+      "why": "Downtown Kelowna’s soup and sandwich stop since the 1970s",
+      "why_fr": "La halte soupes et sandwichs du centre-ville de Kelowna depuis les années 1970"
     },
     {
-      "id": 1477,
-      "why": "Indoor play for little ones, open every day",
-      "why_fr": "Jeux intérieurs pour les petits, ouvert tous les jours"
+      "id": 1551,
+      "why": "An indoor playground for ages 1 to 12 in West Kelowna",
+      "why_fr": "Une aire de jeux intérieure à West Kelowna pour les 1 à 12 ans"
+    },
+    {
+      "id": 246,
+      "why": "Fresh bread and local coffee on the Summerland wine trail",
+      "why_fr": "Pain frais et café local sur la route des vins de Summerland"
+    },
+    {
+      "id": 1032,
+      "why": "A local café with homemade bread in Okanagan Falls",
+      "why_fr": "Un café local d’Okanagan Falls, avec pain fait maison"
     }
   ]
 }
