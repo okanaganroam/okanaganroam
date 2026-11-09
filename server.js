@@ -34921,7 +34921,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
       recognitionHtml: (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
-      visitHtml: nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false) : visitHtml, descriptionHtml: (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
+      // Winery: the box leaves out the rows the Tastings card above already shows (no tasting listed twice, 2026-11-08).
+      visitHtml: winery ? visitInfoHtml(require('./niche-tastings').withoutTastingCardRows(nichePrices ? require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices) : visitInfoRaw, escapeHtml, nichePrices), false)
+        : nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false) : visitHtml, descriptionHtml: (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
       badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
       dogNoteHtml: !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
       // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;

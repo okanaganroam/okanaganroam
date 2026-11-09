@@ -73,12 +73,14 @@ test('every winery page uses the shared layout, with the tasting card first and 
   assert.ok(order.some((t) => /Directions|Google Maps/.test(t)), 'Directions is among the main buttons');
 });
 
-test('the introduction is one sentence; the whole description and the Plan your visit box are under More about', () => {
+test('the introduction is one sentence; the whole description is under More about; the Plan your visit box is open above it', () => {
   const body = layoutOf(page(rich));
   assert.match(body, /<p class="venue-description">A family estate on a south-facing slope\.<\/p>/);
   const more = body.slice(body.indexOf('<summary>More about'));
   assert.match(more, /Its wines are made from the vineyards around the tasting room\. Visitors can stay for lunch\./);
-  assert.match(more, /id="venueVisit"/);
+  // 2026-11-08: the box left the fold so visitors see it without a tap.
+  assert.doesNotMatch(more, /id="venueVisit"/);
+  assert.ok(body.indexOf('id="venueVisit"') > 0 && body.indexOf('id="venueVisit"') < body.indexOf('<summary>More about'));
 });
 
 test('the tastings card shows what is recorded, as written, with where it came from', () => {
@@ -179,4 +181,25 @@ test('no winery page repeats a link address under the wrong words', () => {
 test('French winery pages keep their current layout', () => {
   const fr = app.renderVenuePage(app.getVenue(rich.id), [], [], [], { now: NOW, lang: 'fr' });
   assert.doesNotMatch(fr, /<body[^>]*winery-venue-page|<div class="fd-layout">/);
+});
+
+test('a tasting is never listed twice: the Plan your visit box leaves out the rows the Tastings card shows', () => {
+  const count = (s, needle) => s.split(needle).length - 1;
+  const body = layoutOf(page(rich));
+  assert.equal(count(body, 'Seated tasting of 5 wines'), 1, 'the tasting once, in the card');
+  assert.equal(count(body, 'Guided walk through the vines'), 1, 'the vineyard walk once, in the card');
+  const box = body.slice(body.indexOf('id="venueVisit"'), body.indexOf('</section>', body.indexOf('id="venueVisit"')));
+  assert.match(box, /Pinot Noir and sparkling wine\./, 'other rows stay in the box');
+  assert.match(box, /Open Thursday to Sunday\./);
+  assert.doesNotMatch(box, /Seated tasting|Guided walk/);
+  // Niche: the priced card shows Tastings and Vineyard walk, so the box has nothing left to add and is not shown.
+  const n = layoutOf(page(niche));
+  assert.equal(count(n, 'Walk the vines with a glass'), 1);
+  assert.doesNotMatch(n, /id="venueVisit"/);
+  // A winery whose only row is the tasting: the card shows it; no empty box.
+  const v = layoutOf(page(visitOnly));
+  assert.equal(count(v, 'Tasting of 4 wines'), 1);
+  assert.doesNotMatch(v, /id="venueVisit"/);
+  // Not a winery: a restaurant's box is untouched.
+  assert.equal(tastings.withoutTastingCardRows({ rows: [{ label: 'Known for', text: 'x' }] }, (s) => s).rows.length, 1);
 });
