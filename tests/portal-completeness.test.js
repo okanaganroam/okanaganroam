@@ -318,3 +318,20 @@ test('minutes left: summed from the missing items, waiting items and fresh-hours
   const done = pc.renderCompleteness({ ...r, complete: true, pct: 100, missing: [], minutes: 0 }, {});
   assert.ok(!/minute/.test(done.slice(0, done.indexOf('op-cb-panel'))), 'no minutes once complete');
 });
+
+test('edit page intro: a restaurant on the edit link says which quick answers go live; other types keep the old wording', async () => {
+  const r = mk('restaurant');
+  const en = await get(`/owner/${tokenFor(r.id)}`);
+  assert.match(en, /We check most changes \(usually within a day\) before they go on your page\. Quick answers from the checklist above/);
+  assert.ok(!en.includes('Nothing changes until you press the Send button'), 'the old "nothing changes" line is gone for restaurants');
+  assert.ok(!en.includes('We review every change'), 'and so is "we review every change"');
+  assert.match(en, /Quick answers from the checklist at the top go live as soon as you save them\./);
+  const fr = await get(`/fr/owner/${tokenFor(r.id)}`);
+  assert.match(fr, /Les réponses rapides de la liste ci-dessus/);
+  for (const type of ['pub', 'cafe', 'winery']) {
+    const html = await get(`/owner/${tokenFor(mk(type).id)}`);
+    assert.ok(html.includes('Nothing changes until you press the Send button'), `${type} keeps its wording`);
+    assert.ok(!html.includes('Quick answers from the checklist above'), `${type} has no checklist line`);
+    assert.ok(html.includes('We review every change, usually within a day'), `${type} keeps the review line`);
+  }
+});

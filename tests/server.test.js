@@ -26143,7 +26143,7 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   const linkPage = await get(`/owner/${token}`);
   assert.match(linkPage, /id="opPhone" maxlength="40" value="250-555-0199"/, 'the pending phone, not the live (empty) one');
   assert.match(linkPage, /Phone <span class="op-status op-status-wait op-wait-chip">Waiting for review<\/span>/);
-  assert.match(linkPage, /We review every change, usually within a day/);
+  assert.match(linkPage, /We review most changes, usually within a day, and then they go live on <a [^>]+>your page<\/a>\. Quick answers from the checklist at the top go live as soon as you save them\./, 'a restaurant on the edit link: most changes wait, the checklist answers go live');
   // Inline scripts on the edit pages and the review page parse (regexes in template literals keep their backslashes).
   const vm = require('node:vm');
   for (const html of [page, again, linkPage, app.renderAdminReviewPage()]) {
