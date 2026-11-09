@@ -25,7 +25,7 @@ const ITEMS = [
   { key: 'cuisine', group: 'basics', w: 4, fix: true, target: { task: 'more', id: 'cuisine' }, fields: ['cuisine'],
     en: 'What you serve (cuisine)', fr: 'Ce que vous servez (cuisine)', whyEn: 'Italian, sushi, steakhouse and so on. Pick it from the list.', whyFr: 'Italienne, sushis, grilladerie, etc. Choisissez-la dans la liste.', btnEn: 'Pick cuisine', btnFr: 'Choisir', icon: '🍽️' },
   { key: 'hours', group: 'hours', w: 8, fix: true, target: { task: 'hours', id: 'hours' }, fields: ['hours'],
-    en: 'Weekly opening hours', fr: 'Heures d’ouverture', whyEn: 'The times you’re open each day.', whyFr: 'Vos heures d’ouverture chaque jour.', btnEn: 'Add hours', btnFr: 'Ajouter', icon: '🕑' },
+    en: 'Weekly opening hours', fr: 'Heures d’ouverture', whyEn: 'The times you’re open each day.', whyFr: 'Vos heures d’ouverture chaque jour.', btnEn: 'Add your hours', btnFr: 'Ajouter vos heures', icon: '🕑' },
   { key: 'hours_fresh', group: 'hours', w: 4, fix: true, target: { task: 'hours', id: 'opHoursOk' }, fields: ['hours', 'hours_checked'],
     en: 'Are your hours still right?', fr: 'Vos heures sont-elles toujours exactes?', whyEn: 'If nothing has changed, one tap is enough.', whyFr: 'Si rien n’a changé, un seul toucher suffit.', btnEn: 'Check them', btnFr: 'Vérifier', icon: '🔄' },
   { key: 'photo_main', group: 'photos', w: 8, fix: true, target: { task: 'photos', id: 'photos' }, fields: [],
@@ -35,9 +35,9 @@ const ITEMS = [
   { key: 'avg_spend', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'opAvg' }, fields: ['avg_spend'],
     en: 'Average spend per person', fr: 'Dépense moyenne par personne', whyEn: 'One main and a non-alcoholic drink, in dollars.', whyFr: 'Un plat principal et une boisson sans alcool, en dollars.', btnEn: 'Enter amount', btnFr: 'Indiquer', icon: '💵' },
   { key: 'menu', group: 'menu', w: 8, fix: true, target: { href: 'menu' }, fields: ['menu_url'],
-    en: 'Your menu', fr: 'Votre menu', whyEn: 'Add a link, or just take a photo of the menu.', whyFr: 'Ajoutez un lien, ou prenez simplement le menu en photo.', btnEn: 'Add menu', btnFr: 'Ajouter le menu', icon: '📖' },
-  { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
-    en: 'Dietary options', fr: 'Options alimentaires', whyEn: 'Tick vegan, vegetarian or gluten-free if you offer them.', whyFr: 'Cochez végétalien, végétarien ou sans gluten si vous en offrez.', btnEn: 'Tick options', btnFr: 'Cocher', icon: '🥗' },
+    en: 'Link to your menu, or snap a photo of it', fr: 'Lien vers votre menu, ou une photo de celui-ci', whyEn: 'Guests want to see the dishes and prices. A “Menu” line in Plan your visit doesn’t count as the menu.', whyFr: 'Les clients veulent voir les plats et les prix. Une ligne « Menu » dans Planifier la visite ne compte pas comme le menu.', btnEn: 'Add menu', btnFr: 'Ajouter le menu', icon: '📖' },
+  { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 6, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
+    en: 'Dietary options', fr: 'Options alimentaires', whyEn: 'Tick vegan, vegetarian or gluten-free if you offer them. A dietary note in Plan your visit counts too.', whyFr: 'Cochez végétalien, végétarien ou sans gluten si vous en offrez. Une note alimentaire dans Planifier la visite compte aussi.', btnEn: 'Tick options', btnFr: 'Cocher', icon: '🥗' },
   { key: 'happy_hour', noneEn: 'We don’t have a happy hour', noneFr: 'Nous n’avons pas de happy hour', group: 'offers', w: 4, fix: true, target: { task: 'happy', id: 'happy' }, fields: ['happy_hour', 'happy_hour_deals'],
     en: 'Happy hour times and deals', fr: 'Heures et spéciaux du happy hour', whyEn: 'When it runs and what’s on special.', whyFr: 'Quand il a lieu et ce qui est en spécial.', btnEn: 'Add happy hour', btnFr: 'Ajouter', icon: '🍹' },
   { key: 'specials', noneEn: 'We don’t run specials', noneFr: 'Nous n’avons pas de spéciaux', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'specials' }, fields: ['specials'],
@@ -51,8 +51,8 @@ const ITEMS = [
     en: 'Reservations', fr: 'Réservations', whyEn: 'How to book, or walk-ins only.', whyFr: 'Comment réserver, ou sans réservation seulement.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
   { key: 'pyv_takeout', noneEn: 'No takeout or delivery', noneFr: 'Ni plats à emporter ni livraison', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitTakeout' }, fields: ['visit_rows'],
     en: 'Takeout and delivery', fr: 'À emporter et livraison', whyEn: 'Order to go? Which delivery apps?', whyFr: 'Pour emporter? Quelles applis de livraison?', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🥡' },
-  { key: 'pyv_dietary', group: 'visit', w: 2, fix: true, target: { task: 'more', id: 'opVisitDietary' }, fields: ['visit_rows'],
-    en: 'Dietary note', fr: 'Note alimentaire', whyEn: 'What you can do for allergies and diets.', whyFr: 'Ce que vous pouvez faire pour les allergies et les régimes.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🌱' },
+  // The "Dietary" line of Plan your visit is no longer its own item (live check 2026-11-08: owners were asked about
+  // dietary twice). It still counts toward "Dietary options" above, and its box stays optional in Plan your visit.
   { key: 'pyv_groups', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
     en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids, anything that helps.', whyFr: 'Grands groupes, stationnement, enfants, tout ce qui aide.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '👥' },
   { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescription' }, fields: ['description'],
@@ -71,13 +71,23 @@ if (ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-complete
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
 const NONE_KEYS = ITEMS.filter((i) => i.noneEn).map((i) => i.key);
 const NONE_MAX = NONE_KEYS.length;
+// Happy Hour badge on the page but no times or deals (live check 2026-11-08, 21 restaurants): the item asks for the
+// times, and "We don't have a happy hour" is not offered (it would contradict the badge). Still missing, just worded right.
+const HAPPY_HOUR_BADGE_COPY = {
+  en: 'Add your happy hour times', fr: 'Ajoutez les heures de votre happy hour',
+  whyEn: 'Your page shows a Happy Hour badge. Add when it runs and what’s on special.', whyFr: 'Votre fiche affiche un badge Happy hour. Indiquez quand il a lieu et ce qui est en spécial.',
+  btnEn: 'Add the times', btnFr: 'Ajouter les heures',
+};
+// The last steps to 100% for almost every restaurant (live check: 546 of 552 have one photo, and the storefront spot is
+// new), named plainly in the panel so owners know where the ceiling comes from.
+const CEILING_KEYS = ['photo_main', 'photo_extra', 'arrival'];
 
 // "About X minutes left" (2026-11-08): rough seconds an owner needs on a phone to do each item. Estimates, not measured.
 // Free text and photos take longest; one-tap confirms take seconds.
 const SECONDS = {
   address_pin: 60, phone: 20, website: 20, cuisine: 15, hours: 180, hours_fresh: 10, photo_main: 120, photo_extra: 180,
   avg_spend: 10, menu: 120, dietary: 20, happy_hour: 150, specials: 90, entertainment: 60,
-  pyv_known: 45, pyv_reservations: 45, pyv_takeout: 30, pyv_dietary: 45, pyv_groups: 45,
+  pyv_known: 45, pyv_reservations: 45, pyv_takeout: 30, pyv_groups: 45,
   description: 180, instagram: 30, facebook: 30, arrival: 90, owner_confirmed: 0,
 };
 if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
@@ -137,7 +147,6 @@ function doneMap(input, today) {
     pyv_known: labels.has('known for'),
     pyv_reservations: labels.has('reservations') || nonBlank(i.bookingUrl),
     pyv_takeout: labels.has('takeout') || labels.has('to go'),
-    pyv_dietary: labels.has('dietary'),
     pyv_groups: labels.has('groups') || labels.has('good to know'),
     description: String(i.description || '').trim().length >= DESCRIPTION_MIN,
     instagram: nonBlank(i.instagramUrl),
@@ -153,18 +162,29 @@ function doneMap(input, today) {
 function scoreCompleteness(input, opts) {
   const o = opts || {};
   const done = doneMap(input, o.today);
-  const none = new Set(((input && input.declaredNone) || []).filter((k) => NONE_KEYS.includes(k)));
+  const declaredAll = ((input && input.declaredNone) || []).filter((k) => NONE_KEYS.includes(k));
+  const none = new Set(declaredAll);
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
   // Happy hour is only asked of places that serve alcohol: a non-alcoholic place with no happy hour is exempt.
   if (input && input.nonalcoholic && !done.happy_hour) na.happy_hour = true;
+  // A Happy Hour badge with no times: a stored "we don't have one" would contradict the badge, so it doesn't count.
+  const hhBadgeOnly = !!(input && input.happyHourBadge) && !done.happy_hour && !na.happy_hour;
+  if (hhBadgeOnly) none.delete('happy_hour');
   let got = 0, max = 0;
   const per = new Map(GROUPS.map((g) => [g.key, { key: g.key, got: 0, max: 0 }]));
   const missing = [], coming = [];
-  for (const it of ITEMS) {
-    if (na[it.key]) continue;
+  for (const base of ITEMS) {
+    if (na[base.key]) continue;
+    const it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
     const ok = done[it.key] || none.has(it.key);
+    // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
+    // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
+    if (it.key === 'hours_fresh' && !ok && !done.hours) {
+      max += it.w; per.get(it.group).max += it.w;
+      continue;
+    }
     if (!ok && !it.fix) { coming.push({ ...it }); continue; }
     max += it.w; per.get(it.group).max += it.w;
     if (ok) { got += it.w; per.get(it.group).got += it.w; } else {
@@ -195,7 +215,7 @@ function scoreCompleteness(input, opts) {
   // The lighter part of the ring: what will count once we approve what was sent.
   const waitingW = waitingList.reduce((a, it) => a + it.w, 0);
   const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
-  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
+  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
 }
 
 // The weekly hours as one short line for "Are your hours still right?" (fresh-eyes 2026-11-08):
@@ -253,6 +273,9 @@ function renderCompleteness(result, opts) {
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
     : nq
       ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}${waitTxt}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}${waitTxt}. Touchez pour commencer.`)
+      : left && r.missing.filter((it) => !it.waiting).every((it) => CEILING_KEYS.includes(it.key))
+        ? L(`Last steps: ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? 'photos and your storefront spot' : 'your storefront spot') : 'photos'}${waitTxt}. Tap to see.`,
+          `Dernières étapes : ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? 'les photos et l’emplacement de votre devanture' : 'l’emplacement de votre devanture') : 'les photos'}${waitTxt}. Touchez pour voir.`)
       : left
         ? L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes${waitTxt}. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes${waitTxt}. Touchez pour voir.`)
         : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
@@ -296,7 +319,16 @@ function renderCompleteness(result, opts) {
   const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
   const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.map(row).join('')}</ul>` : '';
   const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}</ul>` : '';
-  const still = quickHtml + laterHtml + waitingHtml;
+  // The last steps (live check 2026-11-08): photos and the storefront spot, said plainly once they are among what's left.
+  const leftKeys = r.missing.filter((it) => !it.waiting).map((it) => it.key);
+  const ceilPhotos = leftKeys.includes('photo_main') || leftKeys.includes('photo_extra');
+  const ceilDoor = leftKeys.includes('arrival');
+  const onlyCeiling = leftKeys.length > 0 && leftKeys.every((k) => CEILING_KEYS.includes(k));
+  const ceilingText = ceilPhotos && ceilDoor ? L('Photos and your storefront spot are the last steps to 100%.', 'Les photos et l’emplacement de votre devanture sont les dernières étapes vers 100 %.')
+    : ceilPhotos ? L('Photos are the last step to 100%.', 'Les photos sont la dernière étape vers 100 %.')
+      : ceilDoor ? L('Your storefront spot is the last step to 100%.', 'L’emplacement de votre devanture est la dernière étape vers 100 %.') : '';
+  const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${ceilingText}${onlyCeiling ? '' : L(' Do them when you’re at your place with a few minutes.', ' Faites-les quand vous êtes sur place avec quelques minutes.')}</p>` : '';
+  const still = quickHtml + laterHtml + ceilingHtml + waitingHtml;
   // Items the owner can't fill in yet but CAN already say they don't offer (Reservations, Takeout) get their own short
   // list, so "You can't fill these in yet" never sits next to a button that does something (2026-11-08).
   const comingAsk = r.coming.filter((it) => noneBtn(it));
@@ -528,4 +560,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

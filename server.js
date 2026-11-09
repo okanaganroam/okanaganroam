@@ -44786,8 +44786,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const next = [...x].sort();
       const added = next.filter((k) => !(current.not_offered || []).includes(k));
       if (added.length) {
-        const done = portalCompleteness.doneMap(gatherCompletenessInput(venue, current, happyHourTimes), todayLocal());
-        if (added.some((k) => done[k])) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
+        const inp = gatherCompletenessInput(venue, current, happyHourTimes);
+        const done = portalCompleteness.doneMap(inp, todayLocal());
+        // A Happy Hour badge on the page also "shows this" (live check 2026-11-08): untick it first.
+        if (added.some((k) => done[k] || (k === 'happy_hour' && inp.happyHourBadge))) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
       }
       if (!errors.not_offered && JSON.stringify(next) !== JSON.stringify(current.not_offered || [])) changes.not_offered = next;
     }
@@ -54086,7 +54088,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     avgSpend: live.avg_spend && Number.isInteger(live.avg_spend.amount) ? live.avg_spend.amount : null,
     avgSpendSource: live.avg_spend && live.avg_spend.source ? live.avg_spend.source : null, pendingPhotos,
     menuUrl: links.menu_url, hasPublishedMenu, vegan: venue.vegan, vegetarian: venue.vegetarian, glutenFree: venue.gluten_free,
-    hasHappyHour: !!happyHourTimes || deals.length > 0, nonalcoholic: !!venue.nonalcoholic,
+    hasHappyHour: !!happyHourTimes || deals.length > 0, happyHourBadge: !!venue.happy_hour, nonalcoholic: !!venue.nonalcoholic,
     specialsCount: Array.isArray(live.specials) ? live.specials.length : 0, liveMusic: venue.live_music, sportsTv: venue.sports_tv,
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',

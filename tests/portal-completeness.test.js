@@ -26,14 +26,15 @@ const FULL = {
 };
 const score = (o, opts) => pc.scoreCompleteness({ ...FULL, ...o }, { today: TODAY, ...(opts || {}) });
 
-test('the 24 items are unique and their weights add to 100', () => {
-  assert.equal(pc.ITEMS.length, 24);
-  assert.equal(new Set(pc.ITEMS.map((i) => i.key)).size, 24);
+test('the 23 items are unique and their weights add to 100', () => {
+  // 23 since the live check (2026-11-08): the Plan your visit dietary line counts toward Dietary options (now 6 points).
+  assert.equal(pc.ITEMS.length, 23);
+  assert.equal(new Set(pc.ITEMS.map((i) => i.key)).size, 23);
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.ok(pc.ITEMS.every((i) => pc.GROUPS.some((g) => g.key === i.group)));
   assert.ok(pc.ITEMS.every((i) => i.fix ? i.target && i.btnEn && i.btnFr : true), 'every item the owner can fix has a button');
   const sums = Object.fromEntries(pc.GROUPS.map((g) => [g.key, pc.ITEMS.filter((i) => i.group === g.key).reduce((a, i) => a + i.w, 0)]));
-  assert.deepEqual(sums, { basics: 16, hours: 12, photos: 14, menu: 16, offers: 10, visit: 14, about: 6, social: 6, finding: 3, confirmed: 3 });
+  assert.deepEqual(sums, { basics: 16, hours: 12, photos: 14, menu: 18, offers: 10, visit: 12, about: 6, social: 6, finding: 3, confirmed: 3 });
 });
 
 test('score: everything filled in is 100% and Complete; nothing is missing', () => {
@@ -53,7 +54,8 @@ test('score: an empty restaurant starts low, counts only what it can be asked fo
   // lines. Only "Confirmed by you" is left.)
   assert.deepEqual(r.coming.map((i) => i.key).sort(), ['owner_confirmed']);
   assert.equal(r.max, 100 - 3);
-  assert.equal(r.missing.length, 24 - 1);
+  // Minus Confirmed by you, and the hours check folds into "Add your hours" while there are no hours (live check).
+  assert.equal(r.missing.length, 23 - 2);
   const almost = score({ facebookUrl: '' });
   assert.equal(almost.complete, false);
   assert.ok(almost.pct <= 99, `${almost.pct}`);
@@ -77,7 +79,7 @@ test('score: items we already have count even when the owner cannot edit them ye
   assert.equal(r.complete, true); assert.equal(r.pct, 100);
   assert.equal(score({ claimed: true }).max, 100, 'Confirmed by you counts once we have it');
   // The Plan your visit lines have their own boxes now (2026-11-08): without them they are missing, not coming.
-  assert.deepEqual(score({ visitLabels: ['Known for'] }).missing.map((i) => i.key).sort(), ['pyv_dietary', 'pyv_groups', 'pyv_reservations', 'pyv_takeout']);
+  assert.deepEqual(score({ visitLabels: ['Known for'] }).missing.map((i) => i.key).sort(), ['pyv_groups', 'pyv_reservations', 'pyv_takeout']);
   assert.deepEqual(score({ visitLabels: ['Known for', 'To go', 'Good to know', 'Dietary', 'Reservations'] }).missing, [], '"To go" and "Good to know" count');
   // Cuisine has its picker now (2026-11-08): without one it is missing, not coming.
   assert.deepEqual(score({ cuisine: '' }).missing.map((i) => i.key), ['cuisine']);
@@ -182,7 +184,7 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
   assert.match(html, /<section class="op-cb" id="opComplete" data-task="home all"/);
   const pct = Number(/Your page is (\d+)% complete/.exec(html)[1]);
   assert.ok(pct > 0 && pct < 40, `a bare fixture is low: ${pct}`);
-  for (const w of ['Add hours', 'Add photos', 'Enter amount', 'Add menu', 'Add Instagram', 'At the door']) assert.ok(html.includes(w), w);
+  for (const w of ['Add your hours', 'Add photos', 'Enter amount', 'Add menu', 'Add Instagram', 'At the door']) assert.ok(html.includes(w), w);
   assert.match(html, /data-cb-task="more" data-cb-id="opAvg"/);
   assert.match(html, /We&rsquo;re adding these|We’re adding these/);
   assert.match(html, /\.op-cb-head \{/, 'the bar CSS is on the page');
@@ -191,7 +193,9 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
   // The other-task screens still work: the bar shows on the task list and the full page, not inside a task.
   assert.match(html, /data-task="home all" aria-labelledby="opCbHead"/);
   // The jump targets exist on the page.
-  for (const it of pc.ITEMS.filter((i) => i.target && i.target.id)) assert.ok(html.includes(`id="${it.target.id}"`), `${it.key}: target #${it.target.id}`);
+  // (The fixture has no hours, so "Are your hours still right?" isn't offered and its button isn't on the page: live check.)
+  for (const it of pc.ITEMS.filter((i) => i.target && i.target.id && i.key !== 'hours_fresh')) assert.ok(html.includes(`id="${it.target.id}"`), `${it.key}: target #${it.target.id}`);
+  assert.ok(!html.includes('data-cb-id="opHoursOk"'), 'no hours check without hours');
 });
 
 test('edit page: the bar tracks the data (hours, avg spend, photos, links) and shows Complete when nothing is left', async () => {
