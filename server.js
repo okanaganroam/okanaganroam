@@ -1438,7 +1438,7 @@ const VENUE_DELETE_CHILDREN = [
   ['owner_photos', 'venue_id = ?'], ['owner_videos', 'venue_id = ?'], ['venue_arrival_points', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
-  ['venue_visit_info', 'venue_id = ?'],
+  ['venue_visit_info', 'venue_id = ?'], ['venue_avg_spend', 'venue_id = ?'],
 ];
 const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
@@ -9517,6 +9517,103 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
     db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
       VALUES (?, 'visit_info', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, current, nextJson, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changed: true, info: nextJson };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
+// Average spend per person (2026-11-08): the cost of one main + one non-alcoholic drink, whole dollars ($25). Stored in
+// venue_avg_spend and NOT shown anywhere public until AVG_SPEND_PUBLIC=1 (default off). 'research' values come from
+// menu price research; an 'owner' value is never overwritten by research, and claimed (owner-verified) venues are not
+// written by research either.
+const AVG_SPEND_MIN = 5;
+const AVG_SPEND_MAX = 300;
+function avgSpendPublic() { return process.env.AVG_SPEND_PUBLIC === '1'; }
+function validateAvgSpend(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, detail: 'avg_spend must be an object or null' };
+  const extra = Object.keys(v).filter((k) => !['amount', 'source', 'source_url', 'basis', 'checked_at'].includes(k));
+  if (extra.length) return { ok: false, detail: `Unexpected field(s): ${extra.join(', ')}` };
+  if (!Number.isInteger(v.amount) || v.amount < AVG_SPEND_MIN || v.amount > AVG_SPEND_MAX) {
+    return { ok: false, detail: `amount must be a whole number of dollars from ${AVG_SPEND_MIN} to ${AVG_SPEND_MAX}` };
+  }
+  if (v.source !== 'research' && v.source !== 'owner') return { ok: false, detail: "source must be 'research' or 'owner'" };
+  let sourceUrl = null;
+  if (v.source_url !== undefined && v.source_url !== null) {
+    if (typeof v.source_url !== 'string' || !/^https?:\/\/\S+$/i.test(v.source_url.trim())) return { ok: false, detail: 'source_url must be an http(s) link or null' };
+    sourceUrl = v.source_url.trim();
+  }
+  if (v.source === 'research' && !sourceUrl) return { ok: false, detail: 'source_url is required for research values' };
+  let basis = null;
+  if (v.basis !== undefined && v.basis !== null) {
+    if (typeof v.basis !== 'string' || !v.basis.trim() || v.basis.length > 400 || /[<>]/.test(v.basis)) return { ok: false, detail: 'basis: 1 to 400 characters, without < or >, or null' };
+    basis = v.basis.trim().replace(/\s+/g, ' ');
+  }
+  if (typeof v.checked_at !== 'string' || !parseLocalDate(v.checked_at)) return { ok: false, detail: 'checked_at must be YYYY-MM-DD' };
+  return { ok: true, info: { amount: v.amount, source: v.source, source_url: sourceUrl, basis, checked_at: v.checked_at } };
+}
+function currentAvgSpendJson(venueId) {
+  try { const r = db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
+}
+function venueAvgSpend(venueId) {
+  try { const j = currentAvgSpendJson(venueId); return j ? JSON.parse(j) : null; } catch (e) { return null; }
+}
+// Replaces (or clears, with avgSpend null) a venue's average spend: compare-and-set on expectedCurrent
+// (GET /admin/avg-spend/:id), reason + batch_id required, logged in venue_enrichment_log as 'avg_spend'.
+// -> { ok, changed, info } | { ok: false, reason, detail, live }
+function guardedAvgSpendUpdate(id, expectedCurrent, avgSpend, meta) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  let nextJson = null;
+  let next = null;
+  if (avgSpend !== null) {
+    const checked = validateAvgSpend(avgSpend);
+    if (!checked.ok) return { ok: false, reason: 'invalid_avg_spend', detail: checked.detail };
+    next = checked.info;
+    nextJson = JSON.stringify(next);
+  }
+  const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const current = currentAvgSpendJson(id);
+    if (current !== (expectedCurrent === undefined ? null : expectedCurrent)) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'mismatch', live: { avg_spend: current } };
+    }
+    if (current === nextJson) {
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, changed: false, info: nextJson };
+    }
+    // Owner protection: the owner's own number is only ever replaced by the owner, and research does not write to a
+    // claimed (owner-verified) venue at all.
+    const currentSource = current ? (JSON.parse(current).source || null) : null;
+    if (!next || next.source !== 'owner') {
+      if (currentSource === 'owner') {
+        db.exec('ROLLBACK');
+        txOpen = false;
+        return { ok: false, reason: 'owner_value_protected', detail: "the owner's own number is never replaced by research", live: { avg_spend: current } };
+      }
+      if (next && venueIsClaimed(id)) {
+        db.exec('ROLLBACK');
+        txOpen = false;
+        return { ok: false, reason: 'owner_verified_protected', detail: 'claimed venues are filled in by their owner' };
+      }
+    }
+    if (nextJson === null) db.prepare('DELETE FROM venue_avg_spend WHERE venue_id = ?').run(id);
+    else db.prepare('INSERT INTO venue_avg_spend (venue_id, amount, source, info) VALUES (?, ?, ?, ?) ON CONFLICT(venue_id) DO UPDATE SET amount = excluded.amount, source = excluded.source, info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(id, next.amount, next.source, nextJson);
+    db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'avg_spend', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, current, nextJson, m.reason.trim(), m.batch_id.trim());
     db.exec('COMMIT');
     txOpen = false;
     return { ok: true, changed: true, info: nextJson };
@@ -57008,6 +57105,51 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changed: result.changed, expected_current: result.info, visit: result.info ? JSON.parse(result.info) : null });
     }
 
+    // GET /admin/avg-spend/:id (2026-11-08) -- a venue's average spend with its compare-and-set value:
+    // { id, name, redirect_to, claimed, expected_current: <stored JSON> | null, avg_spend: {...} | null }. Bearer token; never cached.
+    {
+      const asRead = /^\/admin\/avg-spend\/(\d+)$/.exec(pathname);
+      if (asRead && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Avg spend endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        const id = Number(asRead[1]);
+        const v = db.prepare('SELECT id, name, redirect_to FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, { id, name: v.name, redirect_to: v.redirect_to == null ? null : v.redirect_to, claimed: venueIsClaimed(id), expected_current: currentAvgSpendJson(id), avg_spend: venueAvgSpend(id) });
+      }
+    }
+
+    // POST /admin/set-avg-spend (2026-11-08): { id, expected_current, avg_spend: { amount, source: 'research'|'owner',
+    // source_url, basis?, checked_at } | null, reason, batch_id } -> guardedAvgSpendUpdate. avg_spend null clears it.
+    if (pathname === '/admin/set-avg-spend' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Set-avg-spend endpoint is not configured.' });
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'expected_current', 'avg_spend', 'reason', 'batch_id'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current' in body) || (body.expected_current !== null && typeof body.expected_current !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current is required (GET /admin/avg-spend/:id) or null.' });
+      }
+      if (!('avg_spend' in body)) return sendJSON(res, 400, { error: 'avg_spend is required (null clears it).' });
+      let result;
+      try {
+        result = guardedAvgSpendUpdate(body.id, body.expected_current, body.avg_spend, { reason: body.reason, batch_id: body.batch_id });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Avg spend update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_avg_spend: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_value_protected: 409, owner_verified_protected: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, expected_current: result.info, avg_spend: result.info ? JSON.parse(result.info) : null });
+    }
+
     // GET /admin/specials/:id (2026-10-27) -- a venue's weekly specials for a script, with the compare-and-set value:
     // { id, expected_current: <canonical JSON of the current list> | null, specials: [...] }. Same bearer token as the
     // admin writes; never cached.
@@ -57703,6 +57845,11 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET') {
         const venue = getVenue(id);
         if (!venue) return sendJSON(res, 404, { error: 'Venue not found' });
+        // Average spend (2026-11-08): only exposed once AVG_SPEND_PUBLIC=1; absent (not null) while the flag is off.
+        if (avgSpendPublic()) {
+          const spend = venueAvgSpend(id);
+          return sendJSON(res, 200, { ...venue, avg_spend: spend ? { amount: spend.amount, currency: 'CAD', source: spend.source, checked_at: spend.checked_at } : null });
+        }
         return sendJSON(res, 200, venue);
       }
 
@@ -59915,6 +60062,7 @@ module.exports = {
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
+  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)
