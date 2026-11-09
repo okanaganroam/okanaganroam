@@ -17,6 +17,7 @@ const { renderReferralsPage } = require('./referrals-page');
 const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
+const portalCompleteness = require('./portal-completeness');
 const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
@@ -50105,6 +50106,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['depense moyenne', 'depense par personne', 'depense moyenne par personne', 'par personne', 'combien une personne depense', 'combien par personne', 'addition moyenne', 'cout par personne', 'prix moyen par personne', 'c est exact', 'estimation', 'votre estimation', 'notre estimation', 'l estimation est fausse', 'modifier l estimation'],
     a: '<ol><li>{ON}, open <strong>Average spend per person</strong> (it shows for restaurants and pubs).</li><li>Type about what <strong>one person spends on one main and a non-alcoholic drink</strong>, in whole dollars (like <strong>25</strong>, from $5 to $300). If we already worked out an estimate from your menu, it’s filled in: change it if it’s off, or tap <strong>That\'s right</strong>.</li><li>Tap {SEND} if you changed the number. <strong>That\'s right</strong> saves on its own.</li></ol><p>{LIVE} It’s your number from then on: we won’t replace it. Leave the box blank to keep what we have. This is different from <strong>Price range</strong> ($ to $$$$), which stays as it is.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Dépense moyenne par personne</strong> (affichée pour les restaurants et les pubs).</li><li>Indiquez à peu près ce que <strong>dépense une personne pour un plat principal et une boisson sans alcool</strong>, en dollars entiers (par exemple <strong>25</strong>, de 5 $ à 300 $). Si nous avons déjà calculé une estimation d’après votre menu, elle est déjà inscrite : modifiez-la si elle est inexacte, ou touchez <strong>C’est exact</strong>.</li><li>Touchez {SEND} si vous avez changé le nombre. <strong>C’est exact</strong> enregistre tout seul.</li></ol><p>{LIVE} C’est ensuite votre chiffre : nous ne le remplacerons pas. Laissez la case vide pour garder ce que nous avons. Ce n’est pas la même chose que la <strong>Gamme de prix</strong> ($ à $$$$), qui reste telle quelle.</p>' },
+  // Completeness bar (2026-11-08): only offered on the edit page of a restaurant (completenessOnly).
+  { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
+    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage'],
+    keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage'],
+    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right.</li><li>Items marked <strong>We’re adding these</strong> can’t be filled in yet. They’ll count once you can.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact.</li><li>Les éléments sous <strong>Nous ajoutons ceci</strong> ne peuvent pas encore être remplis. Ils compteront dès que ce sera possible.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
   { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
     keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
@@ -50529,7 +50536,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     mode,
     signedIn: !!opts.signedIn,
     start: OWNER_HELP_START[page],
-    topics: OWNER_HELP_TOPICS.filter((t) => !t.avgSpendOnly || opts.avgSpend).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
+    topics: OWNER_HELP_TOPICS.filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
       a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI,
@@ -53659,6 +53666,32 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
     </div>`;
 }
 
+// "Your page is X% complete" (2026-11-08): restaurants only for now; other types add their own item tables later.
+// Owner portal only, never public, never read by ranking, sorting or indexing.
+const COMPLETENESS_TYPES = new Set(['restaurant']);
+function gatherCompletenessInput(venue, live, happyHourTimes) {
+  const visit = venueVisitInfo(venue.id);
+  const links = venueLinks(venue.id);
+  let hoursCheckedAt = null;
+  try { hoursCheckedAt = (db.prepare('SELECT hours_checked_at FROM venues WHERE id = ?').get(venue.id) || {}).hours_checked_at || null; } catch (e) { hoursCheckedAt = null; }
+  let hasArrival = false;
+  try { hasArrival = !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'approved' LIMIT 1").get(venue.id); } catch (e) { hasArrival = false; }
+  let hasPublishedMenu = false;
+  try { hasPublishedMenu = !!publishedMenuRow(venue.id); } catch (e) { hasPublishedMenu = false; }
+  const deals = live.happy_hour_deals && Array.isArray(live.happy_hour_deals.deals) ? live.happy_hour_deals.deals : [];
+  return {
+    address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
+    hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: venueGalleryPhotos(venue).length,
+    avgSpend: live.avg_spend && Number.isInteger(live.avg_spend.amount) ? live.avg_spend.amount : null,
+    menuUrl: links.menu_url, hasPublishedMenu, vegan: venue.vegan, vegetarian: venue.vegetarian, glutenFree: venue.gluten_free,
+    hasHappyHour: !!happyHourTimes || deals.length > 0, nonalcoholic: !!venue.nonalcoholic,
+    specialsCount: Array.isArray(live.specials) ? live.specials.length : 0, liveMusic: venue.live_music, sportsTv: venue.sports_tv,
+    nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
+    visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
+    description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, claimed: venueIsClaimed(venue.id),
+  };
+}
+
 function renderOwnerPage(found, token, pending, lang = 'en') {
   return ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
 }
@@ -53697,6 +53730,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const avgNow = avgSpendOn && snap.avg_spend && Number.isInteger(snap.avg_spend.amount) ? snap.avg_spend : null;
   const avgByOwner = !!avgNow && avgNow.source === 'owner';
   const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
+  // Completeness bar (2026-11-08): restaurants only; everything it adds is inside this flag.
+  const completeOn = COMPLETENESS_TYPES.has(venue.type);
+  const completeHtml = completeOn ? portalCompleteness.renderCompleteness(
+    portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, happyHourTimes), { today: todayLocal(), pending: waitingFields }),
+    { fr, menuHref: token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`) }) : '';
   const parseWeek =(json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
@@ -54042,7 +54080,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
     body.owner-page .op-secnav { position: sticky; top: 0; z-index: 30; flex-wrap: nowrap; overflow-x: auto; margin: 8px -16px; padding: 8px 16px; background: var(--paper, #FBF7F0); box-shadow: 0 6px 12px -10px rgba(0,0,0,0.35); }
     body.owner-page .op-secnav a { flex: 1 0 auto; justify-content: center; }
     body.owner-page .op-photos { grid-template-columns: 1fr 1fr; }
-  }
+  }${completeOn ? portalCompleteness.COMPLETENESS_CSS : ''}
 </style>
 </head>
 <body class="golf-page owner-page">
@@ -54051,7 +54089,7 @@ ${renderGolfHeaderHtml()}
   <div class="op-wrap">
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
-      <h1>${escapeHtml(venue.name)}</h1>
+      <h1>${escapeHtml(venue.name)}</h1>${completeHtml}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
@@ -54442,7 +54480,7 @@ ${ownerFooterHtml(fr)}
     if (!t || t === 'all') window.scrollTo(0, 0);
     else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
   }
-  Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'), function(b){ b.addEventListener('click', function(){ setTask(b.getAttribute('data-pick')); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'), function(b){ b.addEventListener('click', function(){ setTask(b.getAttribute('data-pick')); }); });${completeOn ? portalCompleteness.COMPLETENESS_SCRIPT : ''}
   (function(){
     var hash = (location.hash || '').replace('#', ''), q = location.search || '';
     var start = '';
@@ -55180,7 +55218,7 @@ ${avgSpendOn ? `    if (avgEl) {
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn })}
 </body>
 </html>`;
 }
