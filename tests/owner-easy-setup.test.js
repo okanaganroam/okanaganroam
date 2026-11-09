@@ -160,7 +160,8 @@ test('menu link: "My menu is on my website" uses the reviewed menu link path; th
   const html = await get(`/owner/${t}/setup`).then((x) => x.text());
   assert.equal(requests(), 0, 'opening the setup writes nothing');
   // The email step only shows the address; the page never posts anything for it.
-  assert.match(html, /on\('suEmDone', function\(\)\{ S\.menuDone = true; go\('menuSaved'\); \}\);/);
+  // Full setup (2026-11-09): "I'll email it" only records the answer in the setup's own progress.
+  assert.match(html, /if \(k === 'menuEmailDone'\) return progress\('menu', 'email'\)/);
   const r = await post(`/owner/${t}/changes`, { changes: { menu_url: 'example.com/our-menu' }, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC").get(v.id);
@@ -175,14 +176,14 @@ test('the page shows "Saved" only after the server says ok, and keeps the picks 
   const v = mk('restaurant');
   const html = await get(`/owner/${tokenFor(v.id)}/setup`).then((x) => x.text());
   // Photos: a photo leaves the list only on ok; any error stops, keeps the rest and shows Try again.
-  assert.match(html, /if \(j && j\.ok\) \{ S\.photos\.splice\(S\.photos\.indexOf\(p\), 1\); i\+\+; return next\(\); \}\s+S\.busy = false; S\.error = why\(j\); render\(\);/);
+  assert.match(html, /if \(j && j\.ok\) \{ S\.photos\.splice\(S\.photos\.indexOf\(ph\), 1\); i\+\+; return next\(\); \} S\.busy = false; S\.error = why\(j\); render\(\);/);
   assert.match(html, /S\.error \? T\.tryAgain/);
   // Menu: Saved only after the help request is ok.
-  assert.match(html, /if \(j && j\.ok\) \{ S\.helpSent = true; return finish\(\); \}/);
-  // Menu link: Saved only on ok.
-  assert.match(html, /if \(j && j\.ok\) \{ S\.menuDone = true; return go\('menuSaved'\); \}/);
+  assert.match(html, /if \(j && j\.ok\) \{ items\.length = 0; return progress\(step, 'day'\)/);
+  // Every other save: "Saved" only after /changes answers ok (or "nothing changed").
+  assert.match(html, /return change\(list\[i\]\)\.then\(function\(r\)\{ if \(!r\) \{ S\.busy = false; return render\(\); \}/);
   // The script parses.
-  const script = /<script>(\n\(function\(\)\{\n  var C = window\.SETUP_CFG[\s\S]*?)<\/script>/.exec(html)[1];
+  const script = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
   assert.doesNotThrow(() => new (require('node:vm').Script)(script));
 });
 

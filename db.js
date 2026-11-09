@@ -825,6 +825,17 @@ CREATE TABLE IF NOT EXISTS venue_weekly_nights (
 CREATE INDEX IF NOT EXISTS idx_venue_weekly_nights_venue ON venue_weekly_nights(venue_id);
 `);
 
+// Full easy setup (2026-11-09): which steps a restaurant's owner has answered, sent, skipped or left for later, so the
+// setup can say "Welcome back" and start at the first open step. One row per venue; state is a small JSON object
+// { done: { step: 'live'|'day'|'email'|'skip'|'later' } }. Holds no personal data.
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_setup_progress (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  state TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {
@@ -1511,5 +1522,23 @@ const fillVisitorPin = db.prepare(`
 fillVisitorPin.run('Unit 100, 1546 Harvey Ave', 49.8822793, -119.464409, 'kelowna', 'room-and-pillar-spa');
 // https://okanaganwarriors.ca/qa/
 fillVisitorPin.run('Marron Valley Road', 49.3943595, -119.6916885, 'penticton', 'okanagan-warriors-adventure');
+
+// "Type it up for me" for more than menus (2026-11-09): happy hour and weekly specials sent from the setup as a file,
+// a photo or a website address are kept as their own venue_menus row (help_kind 'happy_hour' | 'specials'), so they
+// never mix with the venue's menu pages. NULL = a menu, as before.
+if (!db.prepare('PRAGMA table_info(venue_menus)').all().some((c) => c.name === 'help_kind')) {
+  db.exec('ALTER TABLE venue_menus ADD COLUMN help_kind TEXT');
+}
+
+// Owner-only restaurant features (Dayton, 2026-11-09): six yes/no answers only the business gives (never researched):
+// local_drinks, heated_patio, wheelchair_accessible, locally_owned, takes_reservations, takeout. Kept in their own table
+// so the venues row, the public API and the badge guide pages don't change. features: JSON { key: true }.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_owner_features (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  features TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
 
 module.exports = db;

@@ -64,7 +64,7 @@ test('edit page: the box shows for a restaurant (with our estimate) and a pub, i
   setResearch(rest.id, 25);
   const html = await get(`/owner/${tokenFor(rest.id)}`);
   assert.match(html, /id="opAvg"/);
-  assert.match(html, /About how much does one person spend\? \(one main and a non-alcoholic drink\)/);
+  assert.match(html, /About how much does one person spend\? \(one main and a soft drink, before tax and tip\)/);
   assert.match(html, /id="opAvg"[^>]*value="25"/, 'the estimate is pre-filled');
   assert.match(html, /Our estimate from your menu: \$25\. Change it if it&rsquo;s off, or tap That's right/);
   assert.match(html, /id="opAvgConfirm"[^>]*>That's right</);
