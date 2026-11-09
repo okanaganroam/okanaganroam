@@ -296,3 +296,25 @@ test('no ranking, sorting or indexing code reads the score', () => {
   const mod = fs.readFileSync(path.join(__dirname, '..', 'portal-completeness.js'), 'utf8');
   assert.ok(!/require\(/.test(mod), 'the module is pure: no requires, no database');
 });
+
+test('minutes left: summed from the missing items, waiting items and fresh-hours-with-no-hours skipped, shown in EN and FR', () => {
+  const mins = (keys) => pc.minutesLeft(keys.map((key) => ({ key })));
+  assert.equal(mins([]), 0);
+  assert.equal(mins(['avg_spend']), 1, 'never less than a minute while something is left');
+  assert.equal(mins(['description', 'photo_extra']), 6);
+  assert.equal(mins(['hours', 'hours_fresh']), mins(['hours']), 'saving hours also makes them fresh');
+  assert.equal(pc.minutesLeft([{ key: 'description', waiting: true }]), 0, 'items waiting for review cost the owner nothing');
+  for (const it of pc.ITEMS) assert.ok(Number.isFinite(pc.SECONDS[it.key]), `${it.key} has an estimate`);
+  const allMissing = pc.ITEMS.filter((it) => it.fix).map((it) => ({ key: it.key }));
+  const total = pc.minutesLeft(allMissing);
+  assert.ok(total >= 20 && total <= 35, `an empty restaurant page is about 20-35 minutes (got ${total})`);
+
+  const r = pc.scoreCompleteness({ address: '1 Main St', latitude: 1, longitude: 1, phone: '250-555-0100' }, { today: TODAY });
+  assert.ok(r.minutes > 0);
+  const en = pc.renderCompleteness(r, {});
+  assert.match(en, new RegExp(`things left, about ${r.minutes} minutes\\. Tap to see what\\.`));
+  const fr = pc.renderCompleteness(r, { fr: true });
+  assert.match(fr, new RegExp(`, environ ${r.minutes} min\\. Touchez pour voir lesquels\\.`));
+  const done = pc.renderCompleteness({ ...r, complete: true, pct: 100, missing: [], minutes: 0 }, {});
+  assert.ok(!/minute/.test(done.slice(0, done.indexOf('op-cb-panel'))), 'no minutes once complete');
+});
