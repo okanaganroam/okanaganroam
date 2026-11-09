@@ -146,10 +146,12 @@ test('HTTP: bearer token, strict keys, GET read shape, 409s; public read stays h
   } finally { await new Promise((resolve) => srv.close(resolve)); }
 });
 
-test('only two code paths read average spend: the admin read and the flagged API read', async () => {
+test('only three code paths read average spend: the admin read, the flagged API read and the owner portal edit page', async () => {
   const v = mk({ name: 'Quiet Spend Grill' });
   assert.equal(app.guardedAvgSpendUpdate(v.id, null, R(27), meta).ok, true);
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const uses = src.split('\n').filter((l) => /venueAvgSpend\(/.test(l) && !/^\s*(\/\/|function )/.test(l)).length;
-  assert.equal(uses, 2, 'only the admin read and the flagged API read call venueAvgSpend');
+  // 2026-11-08: the third is the owner's own edit page (ownerVenueSnapshot, restaurants and pubs only). No public page reads it.
+  assert.equal(uses, 3, 'only the admin read, the flagged API read and the owner portal snapshot call venueAvgSpend');
+  assert.ok(src.split('\n').some((l) => /portalFields\(venue\.type\)\.avgSpend \? \{ avg_spend: venueAvgSpend\(/.test(l)), 'the owner portal snapshot (restaurants and pubs only) is one of them');
 });

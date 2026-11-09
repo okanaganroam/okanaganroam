@@ -61,7 +61,7 @@ test('every Food & Drink type can have a menu and weekly nights', () => {
 });
 
 test('a type nobody has listed gets the plain defaults, and the map cannot be changed', () => {
-  assert.deepEqual({ ...app.portalFields('a-type-added-later') }, { happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: [], arrivalTile: true });
+  assert.deepEqual({ ...app.portalFields('a-type-added-later') }, { happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: [], arrivalTile: true, avgSpend: false });
   assert.deepEqual({ ...app.portalFields('constructor') }, { ...app.portalFields('a-type-added-later') });
   assert.ok(Object.isFrozen(app.PORTAL_FIELDS_BY_TYPE) && Object.isFrozen(app.portalFields('cafe')));
 });
