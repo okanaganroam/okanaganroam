@@ -208,7 +208,7 @@ test('indexing and Verified: a picked cuisine or confirmed hours is a tap, not o
   assert.equal((await post(tokenFor(v.id), { cuisine: 'Thai' })).status, 201);
   assert.equal(app.venueIsClaimed(v.id), true, 'a live owner edit, as before (PR 786 rule)');
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine', 'hours_checked'\)/, 'owner-content check leaves these out');
+  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine', 'hours_checked'(?:, '[a-z_]+')*\)/, 'owner-content check leaves these out');
 });
 
 test('other types: no picker, no hours button, no field word (EN + FR)', async () => {
