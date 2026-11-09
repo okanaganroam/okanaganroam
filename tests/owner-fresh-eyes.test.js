@@ -84,7 +84,9 @@ test('waiting is field-precise: a vegetarian badge flags Dietary options, never 
   const waiting = html.slice(html.indexOf('>Waiting for our check<'));
   assert.ok(waiting.includes('Dietary options'), 'dietary is waiting');
   assert.ok(!waiting.includes('Live music or events'), 'live music is not waiting');
-  assert.match(html, / · 1 waiting for our check\. Tap to start\./);
+  // Final fresh-eyes (2026-11-09): the ticked badges get their own waiting row, so 2 are waiting (Dietary + the badges).
+  assert.match(html, / · 2 waiting for our check\. Tap to start\./);
+  assert.match(waiting, /Badges you ticked<\/strong><span class="op-cb-sent">Vegetarian[^<]*Kid/);
   // Pure: badge keys map to their own items.
   const score = (pending) => pc.scoreCompleteness({ address: 'x', latitude: 1, longitude: 1, phone: 'x', hasHours: true }, { today, pending: new Set(pending) });
   const s1 = score(['badges', 'badge:vegetarian']);
@@ -97,7 +99,7 @@ test('waiting is field-precise: a vegetarian badge flags Dietary options, never 
 
 test('header: quick ones, then "N waiting for our check"; nothing left but waiting says so (EN + FR)', () => {
   const base0 = { address: 'x', latitude: 1, longitude: 1, phone: 'x', website: 'x', cuisine: 'x', hasHours: true, hoursCheckedAt: today, imageUrl: '/images/a.jpg', photoCount: 3, avgSpend: 20, avgSpendSource: 'owner',
-    menuUrl: 'x', vegan: true, hasHappyHour: true, specialsCount: 1, liveMusic: true, visitLabels: ['Known for', 'Reservations', 'Takeout', 'Dietary', 'Groups'], description: 'z'.repeat(130), instagramUrl: 'x', facebookUrl: 'x', hasArrival: true, claimed: true };
+    menuUrl: 'x/menu', vegan: true, hasHappyHour: true, specialsCount: 1, liveMusic: true, visitLabels: ['Known for', 'Reservations', 'Takeout', 'Dietary', 'Groups'], description: 'z'.repeat(130), instagramUrl: 'x', facebookUrl: 'x', hasArrival: true, claimed: true };
   const r = pc.scoreCompleteness({ ...base0, description: '', instagramUrl: '' }, { today, pending: new Set(['description', 'instagram_url']) });
   assert.equal(r.quick.length, 0);
   assert.equal(r.waiting.length, 2);

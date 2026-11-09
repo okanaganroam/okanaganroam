@@ -70,6 +70,20 @@ if (ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-complete
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
 const NONE_KEYS = ITEMS.filter((i) => i.noneEn).map((i) => i.key);
+// In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
+// where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
+const GOT_TEXT = {
+  website: { en: 'Got it: no website', fr: 'C’est noté : pas de site Web' },
+  dietary: { en: 'Got it: no vegan, veggie or gluten-free options', fr: 'C’est noté : pas d’options végé ou sans gluten' },
+  happy_hour: { en: 'Got it: no happy hour', fr: 'C’est noté : pas de happy hour' },
+  specials: { en: 'Got it: no weekly specials', fr: 'C’est noté : pas de spéciaux' },
+  entertainment: { en: 'Got it: no music or events', fr: 'C’est noté : ni musique ni événements' },
+  pyv_reservations: { en: 'Got it: no reservations', fr: 'C’est noté : pas de réservations' },
+  pyv_takeout: { en: 'Got it: no takeout or delivery', fr: 'C’est noté : ni emporter ni livraison' },
+  instagram: { en: 'Got it: not on Instagram', fr: 'C’est noté : pas sur Instagram' },
+  facebook: { en: 'Got it: not on Facebook', fr: 'C’est noté : pas sur Facebook' },
+};
+if (NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;
 // Happy Hour badge on the page but no times or deals (live check 2026-11-08, 21 restaurants): the item asks for the
 // times, and "We don't have a happy hour" is not offered (it would contradict the badge). Still missing, just worded right.
@@ -120,6 +134,16 @@ const GROUPS = [
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
+// A menu link that is just the website (Dayton 2026-11-09): it doesn't count as a menu. Compared without the scheme,
+// "www.", trailing slashes and case, so "https://www.Place.ca/" and "place.ca" are the same address.
+function sameAddress(a, b) {
+  const norm = (u) => String(u || '').trim().toLowerCase().split('#')[0].replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+  return nonBlank(a) && nonBlank(b) && norm(a) === norm(b);
+}
+const MENU_SAME_SITE_COPY = {
+  whyEn: 'Your menu link is the same as your website. Add the page your menu is on.',
+  whyFr: 'Votre lien de menu est le même que votre site Web. Ajoutez la page où se trouve votre menu.',
+};
 const dayNumber = (ymd) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || '')); return m ? Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5) : null; };
 
 // input: plain values gathered by server.js (see gatherCompletenessInput there).
@@ -139,7 +163,7 @@ function doneMap(input, today) {
     photo_extra: Number(i.photoCount) >= PHOTOS_MIN,
     // A research estimate counts once the owner confirms it ("Yes, that's right"), so confirming earns the points.
     avg_spend: Number.isInteger(i.avgSpend) && i.avgSpendSource !== 'research',
-    menu: nonBlank(i.menuUrl) || !!i.hasPublishedMenu,
+    menu: (nonBlank(i.menuUrl) && !sameAddress(i.menuUrl, i.website)) || !!i.hasPublishedMenu,
     dietary: !!(i.vegan || i.vegetarian || i.glutenFree) || labels.has('dietary'),
     happy_hour: !!i.hasHappyHour,
     specials: Number(i.specialsCount) > 0,
@@ -177,7 +201,8 @@ function scoreCompleteness(input, opts) {
   const missing = [], coming = [];
   for (const base of ITEMS) {
     if (na[base.key]) continue;
-    const it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
+    let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
+    if (base.key === 'menu' && !done.menu && input && sameAddress(input.menuUrl, input.website)) it = { ...base, ...MENU_SAME_SITE_COPY };
     const ok = done[it.key] || none.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
@@ -259,9 +284,13 @@ function renderCompleteness(result, opts) {
   const fr = !!o.fr;
   const L = (en, f) => (fr ? f : en);
   const r = result;
+  const gotText = (k) => (GOT_TEXT[k] ? `${fr ? GOT_TEXT[k].fr : GOT_TEXT[k].en} \u2713` : '');
   const waitingList = r.waiting || r.missing.filter((it) => it.waiting);
-  const nw = waitingList.length;
-  const left = r.missing.length - nw;
+  // Ticked badges waiting for our check (final fresh-eyes 2026-11-09): most badges (patio, kid-friendly…) belong to no
+  // checklist item, so they get their own row in the Waiting list and count in "N waiting".
+  const badgeNames = Array.isArray(o.pendingBadges) ? o.pendingBadges.filter((x) => typeof x === 'string' && x) : [];
+  const left = r.missing.length - waitingList.length;
+  const nw = waitingList.length + (badgeNames.length ? 1 : 0);
   const gName = new Map(GROUPS.map((g) => [g.key, fr ? g.fr : g.en]));
   const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
   // Never a big total up front: lead with what takes under a minute or two (2026-11-08).
@@ -281,6 +310,9 @@ function renderCompleteness(result, opts) {
       : left
         ? L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes${waitTxt}. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes${waitTxt}. Touchez pour voir.`)
         : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
+  // While the card is open the "Tap to start." part would be wrong (final fresh-eyes 2026-11-09): the page script swaps in
+  // this version without it.
+  const subOpen = sub.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '');
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -291,7 +323,7 @@ function renderCompleteness(result, opts) {
   // "We don't have one" (2026-11-08): a second, quieter button on the items a place may not offer. Only when the
   // owner can say so (o.canDecline) and nothing is waiting for review on that item.
   const noneBtn = (it) => (o.canDecline && it.noneEn && !it.waiting
-    ? `<button type="button" class="op-cb-none" data-cb-none="${esc(it.key)}">${esc(fr ? it.noneFr : it.noneEn)}</button>` : '');
+    ? `<button type="button" class="op-cb-none" data-cb-none="${esc(it.key)}" data-cb-got="${esc(gotText(it.key))}">${esc(fr ? it.noneFr : it.noneEn)}</button>` : '');
   // One tap right in the row (fresh-eyes 2026-11-08): the hours as text with "Yes, these are right", and the
   // average-spend estimate with "Yes, that's right". "Change them/it" jumps to the editor. Saved in place, no reload.
   const oneTap = (it) => {
@@ -320,7 +352,8 @@ function renderCompleteness(result, opts) {
   };
   const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
   const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.slice(0, LATER_SHOWN).map(row).join('')}</ul>${later.length > LATER_SHOWN ? `<details class="op-cb-all"><summary>${L(`Show all (${later.length - LATER_SHOWN} more)`, `Tout afficher (${later.length - LATER_SHOWN} de plus)`)}</summary><ul class="op-cb-list">${later.slice(LATER_SHOWN).map(row).join('')}</ul></details>` : ''}` : '';
-  const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}</ul>` : '';
+  const badgeRow = badgeNames.length ? `<li><span class="op-cb-ico" aria-hidden="true">🏷️</span><span class="op-cb-dtxt"><strong>${L('Badges you ticked', 'Caractéristiques cochées')}</strong><span class="op-cb-sent">${esc(badgeNames.join(', '))} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>` : '';
+  const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}${badgeRow}</ul>` : '';
   // The last steps (live check 2026-11-08): photos and the storefront spot, said plainly once they are among what's left.
   const leftKeys = r.missing.filter((it) => !it.waiting).map((it) => it.key);
   const ceilPhotos = leftKeys.includes('photo_main') || leftKeys.includes('photo_extra');
@@ -341,12 +374,16 @@ function renderCompleteness(result, opts) {
   const declined = r.declined || [];
   const declinedHtml = o.canDecline && declined.length ? `<h3 class="op-cb-h3">${L('You told us you don’t have these', 'Vous nous avez dit ne pas avoir ceci')}</h3><ul class="op-cb-declined">${declined.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${L('Not offered', 'Non offert')} ✓</span></span><button type="button" class="op-cb-undo" data-cb-undo="${esc(it.key)}">${L('Undo', 'Annuler')}</button></li>`).join('')}</ul><p class="op-cb-note">${L('These count as done. Only you see them: nothing about them shows on your public page.', 'Ils comptent comme faits. Vous seul les voyez : rien n’en paraît sur votre fiche publique.')}</p>` : '';
   // Next to the edit-page fields: the same button, placed by the page script under each field it fills.
-  const inline = o.canDecline ? r.missing.filter((it) => it.noneEn && !it.waiting && it.target && it.target.id).map((it) => ({ key: it.key, id: it.target.id, label: fr ? it.noneFr : it.noneEn })) : [];
-  const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}"` : '';
+  const inline = o.canDecline ? r.missing.filter((it) => it.noneEn && !it.waiting && it.target && it.target.id).map((it) => ({ key: it.key, id: it.target.id, label: fr ? it.noneFr : it.noneEn, got: gotText(it.key) })) : [];
+  const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}" data-cb-undo-text="${esc(L('Undo', 'Annuler'))}"` : '';
+  // A quick one that appears after the owner answers another is said so (final fresh-eyes 2026-11-09), so the count
+  // doesn't look like it started over.
+  const moreAttrs = r.complete ? '' : ` data-cb-quick="${esc(quick.map((it) => it.key).join(' '))}" data-cb-more1="${esc(L('1 more quick one just came up.', '1 autre élément rapide vient de s’ajouter.'))}" data-cb-moren="${esc(L('{n} more quick ones just came up.', '{n} autres éléments rapides viennent de s’ajouter.'))}"`;
   const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
-  return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span>${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
-      <p class="op-cb-yay" id="opCbYay" role="status" hidden></p>
+  const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
+  return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
         ${still}
@@ -414,6 +451,11 @@ const COMPLETENESS_CSS = `
     body.owner-page .op-cb-all, body.owner-page .op-cb-done { margin: 10px 0 0; }
     body.owner-page .op-cb-all > summary, body.owner-page .op-cb-done > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-weight: 800; color: #1E4F4C; cursor: pointer; }
     body.owner-page .op-cb-done[open] > summary { margin-bottom: 6px; }
+    body.owner-page .op-cb-see { margin: -6px 16px 12px; font-size: .9rem; font-weight: 700; }
+    body.owner-page .op-cb-see a { color: #1E4F4C; }
+    body.owner-page .op-cb-got { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; color: #1E6B3A; font-weight: 800; font-size: .92rem; }
+    body.owner-page .op-cb-got .op-cb-undo { min-height: 36px; padding: 0 12px; }
+    body.owner-page .op-cb-gotrow .op-cb-ico { background: none; }
     body.owner-page .op-cb-err { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: #FBE9E7; color: #8A2A1B; font-weight: 700; }
     @media (min-width: 900px) { body.owner-page .op-cb-row { grid-template-columns: 36px 1fr auto; align-items: center; } body.owner-page .op-cb-act { grid-column: 3; } }`;
 
@@ -434,32 +476,43 @@ const COMPLETENESS_SCRIPT = `
     var declared = [];
     function readDeclared(){ try { declared = JSON.parse(sec.getAttribute('data-cb-declared') || '[]') || []; } catch (e) { declared = []; } }
     readDeclared();
-    function setOpen(open){ tg.setAttribute('aria-expanded', open ? 'true' : 'false'); pn.hidden = !open; }
+    function setOpen(open){
+      tg.setAttribute('aria-expanded', open ? 'true' : 'false'); pn.hidden = !open;
+      var sb = document.getElementById('opCbSub');
+      if (sb && sb.hasAttribute('data-opened')) sb.textContent = sb.getAttribute(open ? 'data-opened' : 'data-closed');
+    }
     function storeKey(){ var lp = location.pathname; return 'opCbPct:' + (lp.indexOf('/fr/') === 0 ? lp.slice(3) : lp); }
     // Progress: when the score went up since this owner last saw it, say so once (with what was just saved, if any).
-    function progress(lead){
+    // Only right after a save (final fresh-eyes 2026-11-09): on page load the score is just remembered.
+    function progress(lead, quiet){
       var y = document.getElementById('opCbYay'); if (!y) return;
       var now = Number(sec.getAttribute('data-cb-pct')), msg = lead || '';
       try {
         var was = Number(sessionStorage.getItem(storeKey()) || localStorage.getItem(storeKey()));
-        if (was && now > was) msg = (msg ? msg + ' ' : '') + sec.getAttribute('data-cb-yay').split('{p}').join(String(now));
+        if (!quiet && was && now > was) msg = (msg ? msg + ' ' : '') + sec.getAttribute('data-cb-yay').split('{p}').join(String(now));
         sessionStorage.setItem(storeKey(), String(now)); localStorage.setItem(storeKey(), String(now));
       } catch (e) { /* storage off: only the lead */ }
       if (msg) { y.textContent = msg; y.hidden = false; }
     }
-    progress('');
+    progress('', true);
     try { if (sessionStorage.getItem('opCbOpen') === '1') { sessionStorage.removeItem('opCbOpen'); setOpen(true); } } catch (e) { /* storage off */ }
     // "We don't have one" next to the edit-page fields, placed under each field it answers.
     function placeInline(){
-      Array.prototype.forEach.call(document.querySelectorAll('.op-cb-inline'), function(x){ x.parentNode.removeChild(x); });
+      Array.prototype.forEach.call(document.querySelectorAll('.op-cb-inline'), function(x){
+        var gk = x.getAttribute('data-cb-gotkey');
+        if (gk && declared.indexOf(gk) >= 0) return;
+        x.parentNode.removeChild(x);
+      });
       if (!canDecline) return;
       var inline = []; try { inline = JSON.parse(sec.getAttribute('data-cb-inline') || '[]') || []; } catch (e) { inline = []; }
       inline.forEach(function(x){
         var el = document.getElementById(x.id); if (!el || !el.parentNode) return;
         var p = document.createElement('p'); p.className = 'op-cb-inline';
-        var b = document.createElement('button'); b.type = 'button'; b.className = 'op-cb-none'; b.setAttribute('data-cb-none', x.key); b.textContent = x.label;
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'op-cb-none'; b.setAttribute('data-cb-none', x.key); b.setAttribute('data-cb-got', x.got || ''); b.textContent = x.label;
         // A section (happy hour, specials, nights, badges) gets it inside, so it shows and hides with that section.
         p.appendChild(b); if (el.tagName === 'DETAILS') el.appendChild(p); else el.parentNode.insertBefore(p, el.nextSibling);
+        // A box with something typed in it answers the question, so its "We're not on…" button steps aside.
+        if (el.tagName === 'INPUT') { var sync = function(){ p.hidden = !!el.value.trim(); }; sync(); el.addEventListener('input', sync); }
       });
     }
     placeInline();
@@ -494,6 +547,18 @@ const COMPLETENESS_SCRIPT = `
       }); });
     }
     window.opCbJump = jumpTo;
+    // "Got it: not on Facebook ✓ · Undo", built where the owner tapped.
+    function gotEl(tag, key, text){
+      var g = document.createElement(tag); g.className = (tag === 'li' ? 'op-cb-row ' : 'op-cb-inline ') + 'op-cb-gotrow';
+      g.setAttribute('data-cb-gotkey', key);
+      var sp = document.createElement('span'); sp.className = 'op-cb-got'; sp.setAttribute('role', 'status');
+      var t = document.createElement('span'); t.textContent = text;
+      var u = document.createElement('button'); u.type = 'button'; u.className = 'op-cb-undo'; u.setAttribute('data-cb-undo', key); u.textContent = sec.getAttribute('data-cb-undo-text') || 'Undo';
+      sp.appendChild(t); sp.appendChild(u); g.appendChild(sp);
+      if (tag === 'li') { var ic = document.createElement('span'); ic.className = 'op-cb-ico'; ic.setAttribute('aria-hidden', 'true'); g.insertBefore(ic, sp); }
+      return g;
+    }
+    function quickKeys(){ return (sec.getAttribute('data-cb-quick') || '').split(' ').filter(function(k){ return k; }); }
     function val(id){ var e = document.getElementById(id); return e ? e.value : ''; }
     function post(changes){
       var body = { changes: changes, note: '', contact_name: val('opName'), contact_email: typeof emailVal === 'function' ? emailVal('opEmail') : val('opEmail'),
@@ -506,7 +571,8 @@ const COMPLETENESS_SCRIPT = `
       if (err) { err.textContent = m || sec.getAttribute('data-cb-wrong') || ''; err.hidden = false; setOpen(true); err.scrollIntoView({ block: 'center' }); }
     }
     // Redraw the bar from what is stored now. Keeps it open or shut, and the page view it was in.
-    function refresh(lead){
+    function refresh(lead, got){
+      var oldQuick = quickKeys();
       return fetch(location.pathname + '/completeness', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(j){
@@ -517,7 +583,17 @@ const COMPLETENESS_SCRIPT = `
           n.className = sec.className;
           sec.parentNode.replaceChild(n, sec);
           sec = n; tg = document.getElementById('opCbToggle'); pn = document.getElementById('opCbPanel');
-          readDeclared(); setOpen(wasOpen); placeInline(); progress(lead || '');
+          readDeclared(); setOpen(wasOpen); placeInline();
+          // The Got-it line goes back where the row was: before the row that came after it, or at the end of its list.
+          if (got && got.text && declared.indexOf(got.key) >= 0) {
+            var nb = got.next ? n.querySelector('[data-cb-item="' + got.next + '"]') : null;
+            var g = gotEl('li', got.key, got.text);
+            if (nb && nb.parentNode) nb.parentNode.insertBefore(g, nb);
+            else { var lst = n.querySelector('.op-cb-list'); if (lst) lst.insertBefore(g, lst.firstChild); }
+          }
+          var added = quickKeys().filter(function(k){ return oldQuick.indexOf(k) < 0; }).length;
+          var more = !oldQuick.length || !added ? '' : added === 1 ? sec.getAttribute('data-cb-more1') : (sec.getAttribute('data-cb-moren') || '').split('{n}').join(String(added));
+          progress([lead || '', more || ''].filter(function(x){ return x; }).join(' '));
         })
         .catch(function(){ /* the bar just stays as it was */ });
     }
@@ -525,8 +601,15 @@ const COMPLETENESS_SCRIPT = `
     function saveNone(list, btn){
       var err = document.getElementById('opCbErr'); if (err) err.hidden = true;
       btn.disabled = true;
+      var key = btn.getAttribute('data-cb-none'), text = btn.getAttribute('data-cb-got') || '';
+      var inlineP = btn.closest('.op-cb-inline'), row = btn.closest('[data-cb-item]');
+      var next = row && row.nextElementSibling ? row.nextElementSibling.getAttribute('data-cb-item') : '';
       post({ not_offered: list }).then(function(j){
-        if (j && j.ok) { declared = list; return refresh(''); }
+        if (j && j.ok) {
+          declared = list;
+          if (key && text && inlineP && inlineP.parentNode) inlineP.parentNode.replaceChild(gotEl('p', key, text), inlineP);
+          return refresh('', key && text && row ? { key: key, text: text, next: next } : null);
+        }
         btn.disabled = false;
         showErr((j && j.errors && (j.errors.not_offered || j.errors.form)) || (j && j.error));
       }).catch(function(){ btn.disabled = false; showErr(''); });
@@ -552,6 +635,9 @@ const COMPLETENESS_SCRIPT = `
     }
     document.addEventListener('click', function(e){
       if (!e.target.closest) return;
+      // "Back to the list" (final fresh-eyes 2026-11-09): the card is redrawn, so anything sent meanwhile shows as waiting.
+      var pk = e.target.closest('[data-pick]');
+      if (pk && !pk.getAttribute('data-pick')) refresh('');
       if (e.target.closest('#opCbToggle')) { setOpen(tg.getAttribute('aria-expanded') !== 'true'); return; }
       var j = e.target.closest('#opComplete [data-cb-task]');
       if (j) { setTask(j.getAttribute('data-cb-task')); jumpTo(j.getAttribute('data-cb-id')); return; }
@@ -565,4 +651,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

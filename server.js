@@ -47833,6 +47833,12 @@ const MENU_APP_STRINGS = {
     webGo: 'Get my menu', webLooking: 'Looking at your website&hellip;', webFound: 'We brought your menu in from your website. Please check it, then publish.',
     webNothing: 'We found the page, but couldn&rsquo;t pick out a menu on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
     webCancel: 'Back',
+    // Just a link (final fresh-eyes 2026-11-09): a plain menu link, or the fallback when a website import fails.
+    linkButton: MENU_ICON_LINK + '&nbsp;Just add a link to your menu', linkTitle: 'Add a link to your menu',
+    linkIntro: 'Paste the address of the page your menu is on. It shows as &ldquo;See the menu&rdquo; on your page.', linkLabel: 'Menu link',
+    linkSave: 'Save my menu link', linkFallback: 'Save this as my menu link instead',
+    linkDone: 'Thanks! We&rsquo;ve got your menu link. We check it first, usually within a day.',
+    linkEmpty: 'Please paste the link to your menu.',
     gettingReady: 'Getting the reader ready (first time only, about 10 seconds)&hellip;', checkingPrices: 'Double-checking the prices&hellip;',
     stripHint: 'Under each line you&rsquo;ll see that bit of your photo, so you can check the name and price at a glance.',
     moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Section:',
@@ -47890,6 +47896,11 @@ const MENU_APP_STRINGS = {
     webGo: 'R&eacute;cup&eacute;rer mon menu', webLooking: 'Nous regardons votre site&hellip;', webFound: 'Votre menu a &eacute;t&eacute; import&eacute; depuis votre site. V&eacute;rifiez-le, puis publiez.',
     webNothing: 'Nous avons trouv&eacute; la page, mais pas de menu dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
     webCancel: 'Retour',
+    linkButton: MENU_ICON_LINK + '&nbsp;Ajouter seulement un lien vers votre menu', linkTitle: 'Ajouter un lien vers votre menu',
+    linkIntro: 'Collez l&rsquo;adresse de la page o&ugrave; se trouve votre menu. Elle s&rsquo;affiche comme &laquo;&nbsp;Voir le menu&nbsp;&raquo; sur votre fiche.', linkLabel: 'Lien du menu',
+    linkSave: 'Enregistrer mon lien de menu', linkFallback: 'Enregistrer plut&ocirc;t ce lien comme lien de menu',
+    linkDone: 'Merci! Nous avons re&ccedil;u votre lien de menu. Nous le v&eacute;rifions d&rsquo;abord, habituellement en moins d&rsquo;une journ&eacute;e.',
+    linkEmpty: 'Veuillez coller le lien de votre menu.',
     gettingReady: 'Pr&eacute;paration du lecteur (premi&egrave;re fois seulement, environ 10&nbsp;secondes)&hellip;', checkingPrices: 'V&eacute;rification des prix&hellip;',
     stripHint: 'Sous chaque ligne, vous verrez ce morceau de votre photo pour v&eacute;rifier le nom et le prix d&rsquo;un coup d&rsquo;&oelig;il.',
     moveUp: 'Monter', moveDown: 'Descendre', moveTo: 'Section&nbsp;:',
@@ -48049,6 +48060,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     setScreen('<h1>' + T.title + '</h1><p class="mn-lead">' + T.intro + '</p>' + err(message) + pickers(true)
       + '<button type="button" class="mn-btn mn-plain" data-act="web">' + T.webButton + '</button>'
       + '<button type="button" class="mn-btn mn-plain" data-act="type">' + T.typeButton + '</button>'
+      + (C.linkOk ? '<button type="button" class="mn-btn mn-plain" data-act="link">' + T.linkButton + '</button>' : '')
       + '<p class="mn-tip">' + T.tip + '</p>' + helpBtn() + backLink());
   }
   function publishedScreen(){
@@ -49001,13 +49013,49 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   window.__menuPdfText = pdfTextData;
   // ----- From the owner's website -----
   var notice = null;
+  var lastWebUrl = '';
+  // A pre-filled address is selected when the box is focused, so typing replaces it instead of landing in front of it.
+  // The first tap selects it too (a tap would otherwise put the cursor where the finger landed); later taps place the cursor.
+  function selectOnFocus(id){
+    var wi = el(id); if (!wi) return;
+    var fresh = true;
+    function pick(){ if (!fresh) return; try { wi.select(); } catch (e) {} }
+    wi.addEventListener('focus', function(){ setTimeout(pick, 0); });
+    wi.addEventListener('mouseup', function(e){ if (fresh) { e.preventDefault(); pick(); fresh = false; } });
+    wi.addEventListener('touchend', function(){ setTimeout(function(){ pick(); fresh = false; }, 0); });
+    wi.addEventListener('blur', function(){ fresh = true; });
+  }
   function webScreen(message){
     setScreen('<h1>' + T.webTitle + '</h1><p class="mn-lead">' + T.webIntro + '</p>' + err(message)
-      + '<label class="mn-email">Link<input type="url" id="mnWebUrl" inputmode="url" autocomplete="url" maxlength="500" placeholder="www.yourplace.com/menu" value="' + h(C.website || '') + '"></label>'
+      + '<label class="mn-email">Link<input type="url" id="mnWebUrl" inputmode="url" autocomplete="url" maxlength="500" placeholder="www.yourplace.com/menu" value="' + h(lastWebUrl || C.website || '') + '"></label>'
       + '<button type="button" class="mn-btn mn-big mn-go" data-act="web-go">' + T.webGo + '</button>'
+      + (message && C.linkOk && lastWebUrl ? '<button type="button" class="mn-btn mn-plain" data-act="link-fallback">' + T.linkFallback + '</button>' : '')
       + '<button type="button" class="mn-btn mn-plain" data-act="web-cancel">' + T.webCancel + '</button>' + helpBtn());
+    selectOnFocus('mnWebUrl');
+  }
+  // ----- Just a link -----
+  function linkScreen(message, url){
+    setScreen('<h1>' + T.linkTitle + '</h1><p class="mn-lead">' + T.linkIntro + '</p>' + err(message)
+      + '<label class="mn-email">' + T.linkLabel + '<input type="url" id="mnLinkUrl" inputmode="url" autocomplete="url" maxlength="300" placeholder="www.yourplace.com/menu" value="' + h(url || '') + '"></label>'
+      + '<button type="button" class="mn-btn mn-big mn-go" data-act="link-save">' + T.linkSave + '</button>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="web-cancel">' + T.webCancel + '</button>' + helpBtn() + backLink());
+    selectOnFocus('mnLinkUrl');
+  }
+  var pageStarted = Date.now();
+  // Goes through the listing's own save, so a menu link is checked first like the one under "Name, address & links".
+  function saveLink(url, onErr){
+    url = String(url || '').trim();
+    if (!url) return onErr(T.linkEmpty);
+    return fetch(C.back + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ changes: { menu_url: url }, note: '', contact_name: '', contact_email: C.mode === 'token' ? (C.email || '') : '', company_website: '', started_at: pageStarted }) })
+      .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); }, function(){ return { ok: false, error: T.networkText }; })
+      .then(function(j){
+        if (j && j.ok) return setScreen('<div class="mn-card mn-ok"><p>' + T.linkDone + '</p></div>' + backLink());
+        onErr(h((j && j.errors && (j.errors.menu_url || j.errors.form)) || (j && j.error) || T.failed));
+      });
   }
   function webImport(url){
+    lastWebUrl = url;
     setScreen('<h1 class="mn-center">' + T.webLooking + '</h1><div class="mn-bar"><span style="width:45%" class="mn-pulse"></span></div>');
     api('/import', { url: url }).then(function(r){
       if (!r || !r.ok) return webScreen(r && r.error ? h(r.error) : T.failed);
@@ -49107,6 +49155,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     if (act === 'web') return webScreen();
     if (act === 'web-cancel') return render();
     if (act === 'web-go') { var wu = el('mnWebUrl'); return webImport(wu ? wu.value : ''); }
+    if (act === 'link') return linkScreen('', '');
+    if (act === 'link-fallback') { var fu = el('mnWebUrl'), fv = fu && fu.value ? fu.value : lastWebUrl; t.disabled = true; return saveLink(fv, function(m){ linkScreen(m, fv); }); }
+    if (act === 'link-save') { var lu = el('mnLinkUrl'); t.disabled = true; return saveLink(lu ? lu.value : '', function(m){ linkScreen(m, lu ? lu.value : ''); }); }
     if (act === 'help') return helpScreen();
     if (act === 'help-cancel') return render();
     if (act === 'help-send') {
@@ -49154,6 +49205,7 @@ function renderMenuAppPage(found, opts) {
   const cfg = {
     base: opts.base, mode: opts.mode, lang, back: opts.back || null, website: normalizeWebsiteUrl(venue.website) || '', email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
     kind: menuKind(venue),
+    linkOk: MENU_LINK_TYPES.has(venue.type) && opts.mode !== 'admin' && !!opts.back,
     t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm), firstSectionText: plain(t.firstSection) },
     state,
   };
@@ -54000,6 +54052,8 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 // "Your page is X% complete" (2026-11-08): restaurants only for now; other types add their own item tables later.
 // Owner portal only, never public, never read by ranking, sorting or indexing.
 const COMPLETENESS_TYPES = new Set(['restaurant']);
+// The menu page's "Just add a link to your menu" (final fresh-eyes 2026-11-09): the same types as the completeness bar.
+const MENU_LINK_TYPES = COMPLETENESS_TYPES;
 // Cuisine picker and "These hours are right" (2026-11-08): their styles and page script (restaurants only).
 const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page #ofProgress.op-ok { color: #1E6B3A; font-weight: 800; }
@@ -54028,7 +54082,15 @@ const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page .op-visit-done { color: #1E6B3A; font-weight: 800; }
     body.owner-page .op-live-note { display: inline-block; margin-left: 4px; color: #1E6B3A; font-size: .85rem; font-weight: 800; }
     body.owner-page:not(.op-dirty) .op-send-extra { display: none; }
-    body.owner-page .op-check-note { margin: 8px 0 4px; font-weight: 700; }`;
+    body.owner-page .op-check-note { margin: 8px 0 4px; font-weight: 700; }
+    body.owner-page .op-save-line { margin: 6px 0 10px; padding: 6px 10px; border-radius: 8px; font-size: .88rem; font-weight: 800; }
+    body.owner-page .op-save-line.op-save-live { background: #E7F3EC; color: #1E6B3A; }
+    body.owner-page .op-save-line.op-save-check { background: #F8EBCB; color: #67470C; }
+    body.owner-page textarea.op-visit-ta { width: 100%; min-height: 44px; resize: none; overflow: hidden; line-height: 1.4; }
+    body.owner-page .op-sp-field { display: block; margin: 6px 0 0; }
+    body.owner-page .op-sp .op-sp-lab, body.owner-page .op-sp-field > .op-sp-lab { display: block; font-size: .82rem; font-weight: 800; color: #4A3B32; margin-bottom: 2px; }
+    body.owner-page .op-sp-line .op-sp-field { display: inline-block; vertical-align: top; margin-right: 8px; }
+    body.owner-page.op-submit-seen .op-unsent { display: none; }`;
 // All save at once (like "That's right" for the average spend) and then redraw the completeness bar in place.
 const OWNER_CUISINE_HOURS_SCRIPT = `
   (function(){
@@ -54071,6 +54133,23 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
         if (window.opCbRefresh) window.opCbRefresh('');
       });
     });
+    // Plan your visit boxes grow with what's typed, and stay one line of text (final fresh-eyes 2026-11-09).
+    var NL = String.fromCharCode(10), CR = String.fromCharCode(13);
+    function grow(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    Array.prototype.forEach.call(vin, function(el){
+      if (el.tagName !== 'TEXTAREA') return;
+      el.addEventListener('keydown', function(e){ if (e.key === 'Enter') e.preventDefault(); });
+      el.addEventListener('input', function(){
+        if (el.value.indexOf(NL) >= 0 || el.value.indexOf(CR) >= 0) el.value = el.value.split(CR).join(' ').split(NL).join(' ');
+        grow(el);
+      });
+      grow(el);
+    });
+    var vd = document.getElementById('visit');
+    if (vd) vd.addEventListener('toggle', function(){ Array.prototype.forEach.call(vin, function(el){ if (el.tagName === 'TEXTAREA') grow(el); }); });
+    // The floating "not sent yet" bar hides while the form's own Send button is on screen (no two Send buttons at once).
+    var sb = document.getElementById('opSubmit');
+    if (sb && window.IntersectionObserver) new IntersectionObserver(function(es){ es.forEach(function(x){ document.body.classList.toggle('op-submit-seen', x.isIntersecting); }); }).observe(sb);
     var cs = document.getElementById('opCuisineSave'), cbox = document.getElementById('cuisine'), sel = document.getElementById('opCuisine');
     // The picker has its own Save, so picking doesn't raise the form's "not sent yet" bar. (The form's Save still sends a
     // changed pick along with everything else.)
@@ -54129,6 +54208,17 @@ function ownerCompletenessPendingKeys(live, waitingReq) {
   }
   return keys;
 }
+// The badges an owner ticked (or unticked) that are waiting for our check, by name, for the completeness card.
+function ownerPendingBadgeNames(live, waitingReq, fr) {
+  if (!waitingReq || waitingReq.status !== 'pending' || !waitingReq.changes || typeof waitingReq.changes.badges !== 'object' || !waitingReq.changes.badges) return [];
+  const name = (b) => (fr ? OWNER_BADGE_LABELS_FR[b] || (BADGE_LABELS[b] || {}).title : (BADGE_LABELS[b] || {}).title) || b;
+  const on = [], off = [];
+  for (const [b, v] of Object.entries(waitingReq.changes.badges)) {
+    if (!!v === !!((live && live.badges) || {})[b]) continue;
+    (v ? on : off).push(name(b));
+  }
+  return on.concat(off.map((n) => (fr ? `${n} (retiré)` : `${n} (removed)`)));
+}
 function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang) {
   const fr = lang === 'fr';
   const pending = ownerCompletenessPendingKeys(live, waitingReq);
@@ -54140,6 +54230,9 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
     avgEstimate: input.avgSpendSource === 'research' && !pending.has('avg_spend') ? input.avgSpend : null,
+    // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
+    pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr),
+    pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
   });
 }
 function ownerCompletenessJson(found, token, lang) {
@@ -54190,6 +54283,19 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
   // Completeness bar (2026-11-08): restaurants only; everything it adds is inside this flag.
   const completeOn = COMPLETENESS_TYPES.has(venue.type);
+  // Every block says whether it goes live now or is checked first (final fresh-eyes 2026-11-09), like cuisine and Plan
+  // your visit do. kind: 'own' (the owner's own facts: live on Save for a login, checked first from the edit link),
+  // 'link' (a new name, address, website or link: always checked first), 'photos'. Restaurants only (completeOn).
+  const saveLine = (kind, task) => {
+    if (!completeOn) return '';
+    const live = instantOn && kind !== 'link';
+    const text = kind === 'photos'
+      ? (instantOn ? L('Goes live as soon as you upload.', 'En ligne dès le téléversement.') : L('Sent to us to check, usually within a day.', 'Envoyé pour vérification, habituellement en moins d’une journée.'))
+      : live ? L('Goes live when you press Save changes.', 'En ligne quand vous touchez Enregistrer les modifications.')
+        : kind === 'link' ? L('Checked first, usually within a day. Press Send changes when you’re done.', 'Vérifié d’abord, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.')
+          : L('Sent to us to check, usually within a day. Press Send changes when you’re done.', 'Envoyé pour vérification, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.');
+    return `<p class="op-save-line ${live || (kind === 'photos' && instantOn) ? 'op-save-live' : 'op-save-check'}"${task ? ` data-task="${task}"` : ''}>${text}</p>`;
+  };
   // Price range sits inside the average-spend section for restaurants (polish 2026-11-08), so owners aren't asked "what
   // does one person spend" twice. Still editable there; never derived from average spend automatically (see PR).
   const priceInSpend = completeOn && !!portalFields(venue.type).price && !!portalFields(venue.type).avgSpend;
@@ -54264,7 +54370,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const boxes = OWNER_VISIT_KEYS.map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
-          <input type="text" id="${ids[k]}" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}" value="${escapeHtml(cur[k] || '')}"></div>`).join('');
+          <textarea id="${ids[k]}" class="op-visit-ta" rows="1" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}">${escapeHtml(cur[k] || '')}</textarea></div>`).join('');
     return `
       <details class="op-fold op-sec" id="visit" data-task="more"${filled < OWNER_VISIT_KEYS.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
       <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${OWNER_VISIT_KEYS.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${OWNER_VISIT_KEYS.length} remplie${filled === 1 ? '' : 's'}`) : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
@@ -54301,6 +54407,10 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const showSpecials = portalFields(venue.type).specials;
   const specialsAlcohol = venueServesAlcohol(venue);
   const specialsNow = Array.isArray(snap.specials) ? snap.specials : [];
+  // Restaurants (final fresh-eyes 2026-11-09): each box has visible labels, and the examples say "e.g." so they don't
+  // look like values already filled in.
+  const spLab = (text, inner) => (completeOn ? `<label class="op-sp-field"><span class="op-sp-lab">${text}</span>${inner}</label>` : inner);
+  const spEx = (text) => (completeOn && text ? L('e.g. ', 'p. ex. ') + text : text);
   const specialRows = () => {
     const shown = Math.min(SPECIALS_MAX, Math.max(1, specialsNow.length + (specialsNow.length < SPECIALS_MAX ? 1 : 0)));
     return Array.from({ length: SPECIALS_MAX }, (_, i) => {
@@ -54311,11 +54421,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         ? `<select class="op-sp-kind" aria-label="${L(`Special ${n}: food or drinks`, `Spécial ${n} : nourriture ou boissons`)}">${[['food', L('Food', 'Nourriture')], ['drink', L('Drinks', 'Boissons')], ['both', L('Food &amp; drinks', 'Nourriture et boissons')]].map(([k, t]) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`
         : '<input type="hidden" class="op-sp-kind" value="food">';
       return `<fieldset class="op-sp" data-sp="${n}"${i >= shown ? ' hidden' : ''} data-season-from="${escapeHtml(x.season_from || '')}" data-season-to="${escapeHtml(x.season_to || '')}">
-          <legend>${L(`Special ${n}`, `Spécial ${n}`)}</legend>
+          <legend>${L(`Special ${n}`, `Spécial ${n}`)}</legend>${completeOn ? `<span class="op-sp-lab">${L('Days', 'Jours')}</span>` : ''}
           <div class="op-sp-days" role="group" aria-label="${L(`Special ${n}: days`, `Spécial ${n} : jours`)}">${days}</div>
-          <input type="text" class="op-sp-title" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Special ${n}: name`, `Spécial ${n} : nom`)}" placeholder="${i === 0 ? L('Wing Wednesday', 'Mercredi des ailes') : ''}">
-          <input type="text" class="op-sp-deal" maxlength="${SPECIAL_DEAL_MAX}" value="${escapeHtml(x.deal || '')}" aria-label="${L(`Special ${n}: the deal`, `Spécial ${n} : l’offre`)}" placeholder="${i === 0 ? L('60¢ wings, dine-in only', 'Ailes à 60 ¢, sur place seulement') : ''}">
-          <span class="op-sp-line"><input type="text" class="op-sp-price" maxlength="${SPECIAL_PRICE_MAX}" value="${escapeHtml(x.price || '')}" aria-label="${L(`Special ${n}: price (optional)`, `Spécial ${n} : prix (facultatif)`)}" placeholder="${i === 0 ? L('60¢ each', '60 ¢ chacune') : ''}">${kinds}</span>
+          ${spLab(L('Name', 'Nom'), `<input type="text" class="op-sp-title" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Special ${n}: name`, `Spécial ${n} : nom`)}" placeholder="${spEx(i === 0 ? L('Wing Wednesday', 'Mercredi des ailes') : '')}">`)}
+          ${spLab(L('What you get', 'Ce qui est offert'), `<input type="text" class="op-sp-deal" maxlength="${SPECIAL_DEAL_MAX}" value="${escapeHtml(x.deal || '')}" aria-label="${L(`Special ${n}: the deal`, `Spécial ${n} : l’offre`)}" placeholder="${spEx(i === 0 ? L('60¢ wings, dine-in only', 'Ailes à 60 ¢, sur place seulement') : '')}">`)}
+          <span class="op-sp-line">${spLab(L('Price (optional)', 'Prix (facultatif)'), `<input type="text" class="op-sp-price" maxlength="${SPECIAL_PRICE_MAX}" value="${escapeHtml(x.price || '')}" aria-label="${L(`Special ${n}: price (optional)`, `Spécial ${n} : prix (facultatif)`)}" placeholder="${spEx(i === 0 ? L('60¢ each', '60 ¢ chacune') : '')}">`)}${specialsAlcohol ? spLab(L('Type', 'Type'), kinds) : kinds}</span>
           <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-sp-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`Special ${n}: starts at (optional)`, `Spécial ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-sp-end" value="${escapeHtml(x.end && x.end !== 'close' ? x.end : '')}" aria-label="${L(`Special ${n}: ends at (optional)`, `Spécial ${n} : se termine à (facultatif)`)}"> <label class="op-sp-close"><input type="checkbox" class="op-sp-toclose"${x.end === 'close' ? ' checked' : ''}> ${L('until close', 'jusqu’à la fermeture')}</label></span>
           <details class="op-sp-fr"${x.title_fr ? ' open' : ''}><summary>${L('In French (optional)', 'En français (facultatif)')}</summary>
             <input type="text" class="op-sp-title-fr" lang="fr" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`Special ${n}: name in French`, `Spécial ${n} : nom en français`)}">
@@ -54707,7 +54817,7 @@ ${renderGolfHeaderHtml()}
     <form class="venue-form" id="opForm" novalidate>
       <details class="op-fold op-sec" id="hours" data-task="hours" open>
       <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
-      <p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
+      ${saveLine('own')}<p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}
       ${(() => {
@@ -54727,7 +54837,7 @@ ${renderGolfHeaderHtml()}
       ${ownerClosuresHtml(snap.closures || [], waitChip('closures'), lang)}
       </details>
 
-      <p class="lyv-section-label" data-task="contact">${L('Contact', 'Coordonnées')}</p>
+      <p class="lyv-section-label" data-task="contact">${L('Contact', 'Coordonnées')}</p>${saveLine(instantOn ? 'own' : 'own', 'contact')}
       <div class="form-row" data-task="contact">
         <div class="form-field"><label for="opPhone">${L('Phone', 'Téléphone')}${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
         <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
@@ -54735,7 +54845,7 @@ ${renderGolfHeaderHtml()}
 
       <details class="op-fold" id="opLinksBox" data-task="contact"${portalFields(venue.type).bookingFirst && !snap.booking_url ? ' open' : ''}>
       <summary><span class="lyv-section-label">${portalFields(venue.type).bookingFirst ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${portalFields(venue.type).bookingFirst ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
-      <div class="form-row">
+      ${saveLine('link')}<div class="form-row">
         ${instantOn ? `<p class="op-hint" style="grid-column:1/-1;margin:0">${L('We check a new name, address or link before it goes live, usually within a day.', 'Nous vérifions un nouveau nom, une nouvelle adresse ou un nouveau lien avant sa mise en ligne, en général d’ici un jour.')}</p>` : ''}
         <div class="form-field"><label for="opBizName">${L('Business name', 'Nom de l’entreprise')}${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
         <div class="form-field"><label for="opAddress">${L('Street address', 'Adresse')}${waitChip('address')}</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
@@ -54751,7 +54861,7 @@ ${renderGolfHeaderHtml()}
       </details>
 
       <p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description${waitChip('description')}</p>
-      <div class="form-row full" data-task="contact"><div class="form-field">
+      ${saveLine('own', 'contact')}<div class="form-row full" data-task="contact"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">${L(`A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui rend votre endroit intéressant. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
@@ -54760,7 +54870,7 @@ ${renderGolfHeaderHtml()}
 
 ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
       <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const on = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)); const n = on.length; const nm = on.slice(0, 2).map((f) => (fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)); return n ? L(`${n} ticked: ${nm.join(', ')}${n > 2 ? ' and more' : ''}`, `${n} coché${n === 1 ? '' : 's'} : ${nm.join(', ')}${n > 2 ? ' et plus' : ''}`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
-      <p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
+      ${saveLine('own')}<p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
@@ -54786,7 +54896,7 @@ ${priceFieldHtml}      </details>` : ''}
       ${showHappyHour ? `
       <details class="op-fold op-sec" id="happy" data-task="happy more">
       <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? L(`Set for ${n} day${n === 1 ? '' : 's'}`, `Indiqué pour ${n} jour${n === 1 ? '' : 's'}`) : L('Not set', 'Non indiqué'); })()}</span></summary>
-      <p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
+      ${saveLine('own')}<p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
       <p class="lyv-error" id="opHappyError" hidden></p>
       <p class="lyv-section-label op-deals-label" id="opDealsLabel">${L('Deals', 'Spéciaux')}${waitChip('happy_hour_deals')}</p>
@@ -54800,7 +54910,7 @@ ${priceFieldHtml}      </details>` : ''}
       ${showSpecials ? `
       <details class="op-fold op-sec" id="specials" data-task="more"${waitingFields.has('specials') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opSpecialsLabel">${L('Weekly specials', 'Spéciaux de la semaine')}${waitChip('specials')}</span> <span class="op-fold-hint">${specialsNow.length ? L(`${specialsNow.length} special${specialsNow.length === 1 ? '' : 's'}`, `${specialsNow.length} spécia${specialsNow.length === 1 ? 'l' : 'ux'}`) : L('None yet', 'Aucun pour l’instant')}</span></summary>
-      <p class="op-hint">${specialsAlcohol
+      ${saveLine('own')}<p class="op-hint">${specialsAlcohol
         ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and karaoke go under Weekly nights. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et le karaoké vont sous Soirées de la semaine. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
         : L(`Food deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Soup Monday&rdquo; &middot; &ldquo;$5 soup and a roll&rdquo;, or &ldquo;Kids eat free&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres de nourriture un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Lundi soupe » · « Soupe et pain à 5 $ », ou « Les enfants mangent gratuitement »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
       <div id="opSpecials" role="group" aria-labelledby="opSpecialsLabel">${specialRows()}</div>
@@ -54809,14 +54919,14 @@ ${priceFieldHtml}      </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
-      <p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
+      ${saveLine('own')}<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
 
       <p class="lyv-section-label" data-task="hours contact happy more all">${L('Anything else?', 'Autre chose?')}</p>
       <div class="form-row${completeOn && !instantOn ? ' op-send-extra' : ''}" data-task="hours contact happy more all">
-        <div class="form-field"><label for="opName">${L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
+        <div class="form-field"><label for="opName">${completeOn ? L('Your name (optional)', 'Votre nom (facultatif)') : L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full" data-task="hours contact happy more all"><div class="form-field">
@@ -54833,7 +54943,7 @@ ${priceFieldHtml}      </details>` : ''}
       <span class="op-done-login" id="opDoneLogin">${L('<strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.', '<strong>Plus besoin du lien la prochaine fois :</strong> <a href="#opLogin">créez un compte</a>. Ça prend 30 secondes.')}</span>`}</div>
     <div class="op-unsent" id="opUnsent" hidden role="status"><span>${instantOn ? L('Your listing changes aren&rsquo;t saved yet.', 'Les modifications de votre fiche ne sont pas encore enregistrées.') : L('Your listing changes aren&rsquo;t sent yet.', 'Les modifications de votre fiche ne sont pas encore envoyées.')}${completeOn && !instantOn ? L(' We check them first, usually within a day.', ' Nous les vérifions d’abord, habituellement en moins d’une journée.') : ''}</span> <button type="button" id="opUnsentSend">${instantOn ? L('Save changes', 'Enregistrer') : L('Send changes', 'Envoyer')}</button></div>
     <details class="op-fold op-sec" id="photos" data-task="photos" open>
-    <summary><h2 class="lyv-section-label">Photos</h2></summary>
+    <summary><h2 class="lyv-section-label">Photos</h2></summary>${saveLine('photos')}
     <p class="op-hint">${L('Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best.', 'Envoyez jusqu’à 5 photos à la fois : votre espace, vos plats, vos boissons ou ce que vous offrez. Les photos à l’horizontale donnent les meilleurs résultats.')} ${found.account ? L('Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.', 'Comme vous êtes connecté, vos photos sont mises en ligne tout de suite. Si votre page n’a pas encore sa propre photo, la première devient sa photo principale, avec votre nom en crédit.') : L('We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.', 'Nous vérifions chaque photo; la meilleure peut devenir la photo principale de votre page, avec votre nom en crédit. Avec un compte, vos photos sont mises en ligne tout de suite.')}</p>
     <p class="op-hint op-video-hint">${L('Have a short video (10&ndash;30 seconds) of your space, a dish or a drink? Email it to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we may feature it on our Instagram and Facebook, with credit.', 'Vous avez une courte vidéo (10 à 30 secondes) de votre espace, d’un plat ou d’une boisson? Envoyez-la à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous pourrions la présenter sur notre Instagram et notre Facebook, avec crédit.')}</p>
     <div id="opPhotoBox">${ownerMainPhotoPositionHtml(venue, !!found.account, lang)}${ownerPhotoGridHtml(venue.id, !!found.account, lang)}</div>
@@ -55283,7 +55393,9 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           }
           Object.keys(changes).forEach(function(k){ initial[k] = k === 'hours' || k === 'happy_hour' ? JSON.stringify(changes[k]) : changes[k]; });${avgSpendOn ? `
           if (changes.avg_spend) { initial.avg_spend = { amount: Number(changes.avg_spend), source: 'owner' }; avgSaved(changes.avg_spend); document.getElementById('opAvgDone').hidden = true; }` : ''}
-          setListingDirty(false);
+          setListingDirty(false);${completeOn ? `
+          // Final fresh-eyes (2026-11-09): what was just sent moves to "Waiting for our check" on the card right away.
+          if (window.opCbRefresh) window.opCbRefresh('');` : ''}
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
@@ -55664,7 +55776,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         : (sent === 1 ? T.upRev1 : T.upRevN.replace('{n}', sent)) + (emailVal('ofEmail').trim() ? (sent === 1 ? T.upMail1 : T.upMailN) : '.');
       if (problems.length) show('ofFormError', problems.join(' '));${completeOn ? `
       progress.classList.toggle('op-ok', !!sent);` : ''}
-      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos(); }
+      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos();${completeOn ? ` if (window.opCbRefresh) window.opCbRefresh('');` : ''} }
     }).catch(function(){ btn.disabled = false; show('ofFormError', T.upNet); });
   });
   // Share a video (2026-11-05): ask the server for a permission slip, send the file straight to storage, then confirm.

@@ -76,15 +76,15 @@ test('edit page (restaurant): the buttons show in English and French, never on p
   const p = panel(html);
   for (const [key, words] of [['happy_hour', 'We don’t have a happy hour'], ['specials', 'We don’t run specials'], ['entertainment', 'We don’t host music or events'],
     ['instagram', 'We’re not on Instagram'], ['facebook', 'We’re not on Facebook'], ['website', 'We don’t have a website'], ['pyv_reservations', 'We don’t take reservations'], ['pyv_takeout', 'No takeout or delivery']]) {
-    assert.match(p, new RegExp(`data-cb-none="${key}">${words}<`), key);
+    assert.match(p, new RegExp(`data-cb-none="${key}"[^>]*>${words}<`), key);
   }
   for (const core of ['photo_main', 'photo_extra', 'hours', 'avg_spend', 'menu', 'description', 'phone', 'address_pin']) assert.ok(!p.includes(`data-cb-none="${core}"`), core);
   assert.match(p, /data-cb-declared="\[\]"/);
   assert.match(p, /data-cb-inline="\[/);
   const fr = panel(await get(`/fr/owner/${tokenFor(v.id)}`));
-  assert.match(fr, /data-cb-none="happy_hour">Nous n’avons pas de happy hour</);
-  assert.match(fr, /data-cb-none="instagram">Nous ne sommes pas sur Instagram</);
-  assert.match(fr, /data-cb-none="pyv_takeout">Ni plats à emporter ni livraison</);
+  assert.match(fr, /data-cb-none="happy_hour"[^>]*>Nous n’avons pas de happy hour</);
+  assert.match(fr, /data-cb-none="instagram"[^>]*>Nous ne sommes pas sur Instagram</);
+  assert.match(fr, /data-cb-none="pyv_takeout"[^>]*>Ni plats à emporter ni livraison</);
   // Reservations and Takeout sit in "Still to add" with their own boxes (2026-11-08), never under "We're adding these"
   // ("can't fill these in yet"). The "Don't offer these?" list is only for an item with a button but no box.
   for (const [page, still, soon] of [[p, 'id="opCbPanel"', 'We’re adding these'], [fr, 'id="opCbPanel"', 'Nous ajoutons ceci']]) {
