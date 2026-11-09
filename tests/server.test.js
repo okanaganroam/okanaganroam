@@ -32476,7 +32476,10 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
   const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
   assert.match(box, /<h2 id="venueVisitHead">Plan your visit<\/h2>/);
-  assert.match(box, /<li><span class="visit-label">Tastings<\/span><span>4 wines from \$20 \(Reserve \$35\), about 30 min\. Book ahead online\.<\/span><\/li>/);
+  // The tasting is listed once, in the Tastings card above the box (2026-11-08), never again in the box.
+  assert.doesNotMatch(box, /visit-label">Tastings</);
+  assert.equal(page.split('4 wines from $20 (Reserve $35), about 30 min. Book ahead online.').length - 1, 1);
+  assert.match(page.slice(page.indexOf('id="fdTastings"')), /4 wines from \$20 \(Reserve \$35\), about 30 min\. Book ahead online\./);
   assert.match(box, /<a href="\/kelowna\/restaurants\/visit-fixture-bistro">Visit Fixture Bistro<\/a> on site/, 'the on-site restaurant links to its own listing');
   assert.match(box, /<a href="https:\/\/visit\.example\/bistro" rel="nofollow noopener" target="_blank">More ↗<\/a>/);
   assert.match(box, /From visit\.example, checked Oct 29, 2026/);
@@ -32496,7 +32499,8 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   const page2 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
   const box2 = page2.slice(page2.indexOf('<section class="venue-section venue-visit"'), page2.indexOf('</section>', page2.indexOf('<section class="venue-section venue-visit"')));
   const open = box2.slice(0, box2.indexOf('<details'));
-  assert.match(open, /visit-label">Tastings<.*visit-label">Restaurant<.*visit-label">Winter</s, 'the three key rows stay open, in their stored order');
+  assert.match(open, /visit-label">Restaurant<.*visit-label">Winter</s, 'the key rows stay open, in their stored order (Tastings is in its own card)');
+  assert.doesNotMatch(open, /visit-label">Tastings</);
   assert.match(box2, /<details class="visit-more"><summary>More: wine &amp; cheese, groups<\/summary>/);
   assert.match(box2, /11 AM – 1 PM/);
   // (Winery layout, 2026-11-08: the Menu card in the main column links the menu; the sidebar's own Menu row still goes.)
@@ -32506,7 +32510,7 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   const set3 = app.guardedVisitInfoUpdate(w.id, set2.info, known, meta);
   assert.equal(set3.ok, true, JSON.stringify(set3));
   const page3 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
-  assert.match(page3, /<ul class="visit-list"><li><span class="visit-label">Known for<\/span><span>Pinot Noir and Chardonnay; also the Old Vines Foch\.<\/span><\/li><li><span class="visit-label">Tastings</);
+  assert.match(page3, /<ul class="visit-list"><li><span class="visit-label">Known for<\/span><span>Pinot Noir and Chardonnay; also the Old Vines Foch\.<\/span><\/li><li><span class="visit-label">Restaurant</);
   set2.info = set3.info;
   db.prepare('UPDATE venue_links SET menu_url = ? WHERE venue_id = ?').run('https://visit.example/wine-list', w.id);
   assert.match(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []), /See the menu/, 'a different menu link stays');
