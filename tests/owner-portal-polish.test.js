@@ -92,15 +92,13 @@ test('Help button on phones is a small "?" at the top right that scrolls with th
   assert.doesNotMatch(winery, /position: absolute; top: 88px/);
 });
 
-test('cuisine: Comfort food, Asian and Fast Food are pickable, each with a French name; still one pick', async () => {
-  for (const c of ['Comfort food', 'Asian', 'Fast Food']) {
-    assert.ok(app.OWNER_CUISINES.includes(c), c);
-    assert.ok(frenchText.FR_CUISINE[c], `${c} has French`);
-  }
+// 2026-11-09: the list became 45 food labels (Asian and Fast Food moved out: too general / a kind of place) with up
+// to 3 picks; tests/cuisine-model.test.js covers it. Comfort food stays, with its French name.
+test('cuisine: Comfort food is pickable, with its French name', async () => {
+  assert.ok(app.OWNER_CUISINES.includes('Comfort food'));
   assert.equal(frenchText.FR_CUISINE['Comfort food'], 'Cuisine réconfortante');
   const html = await get(`/owner/${tokenFor(mk('restaurant').id)}`);
-  assert.match(html, /<option value="Comfort food">Comfort food<\/option>/);
-  assert.doesNotMatch(html, /<select[^>]*id="opCuisine"[^>]*multiple/);
+  assert.match(html, /data-cu="Comfort food" data-cu-label="Comfort food" aria-pressed="false"[^>]*>Comfort food</);
 });
 
 test('help answer matches the panel (no "We\'re adding these"); signed-in restaurant intro has no time total', async () => {

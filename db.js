@@ -1091,6 +1091,19 @@ CREATE TABLE IF NOT EXISTS owner_event_changes (
 CREATE INDEX IF NOT EXISTS idx_owner_event_changes_status ON owner_event_changes (status, submitted_at);
 `);
 
+// Restaurant cuisines (2026-11-09): up to 3 food labels and one "kind of place" for a restaurant. venues.cuisine keeps
+// the first label (every existing reader keeps working); cuisines is a JSON list of 1-3 labels, the first equal to
+// venues.cuisine. Kept off the venues table so the venue API and every list that reads venues stay as they are.
+// Written only by server.js writeVenueCuisines() (owner saves) and guardedCuisinesUpdate() (research), both logged.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_cuisines (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  cuisines TEXT,
+  place_type TEXT,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Venue links (2026-10-15): menu, booking and social links an owner sends
 // (approved like every owner change). Kept off the venues table so the
 // venue API and every list that reads venues stay exactly as they are.

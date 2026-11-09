@@ -455,6 +455,12 @@ const CUISINE_SYNONYMS = {
   steakhouse: ['steak', 'steaks'],
   'bubble tea': ['boba'],
   seafood: ['fish and chips'],
+  // The restaurant cuisine list of 2026-11-09 (each only counts once a venue has it).
+  'chicken & wings': ['wings', 'chicken wings', 'fried chicken'],
+  'poke & hawaiian': ['poke', 'poke bowl', 'poke bowls', 'hawaiian'],
+  'spanish & tapas': ['tapas', 'spanish', 'paella'],
+  'fish & chips': ['fish and chips', 'fish n chips', 'fish & chips'],
+  'noodles & ramen': ['ramen', 'noodles', 'noodle bar', 'noodle house'],
 };
 
 const BUDGET_ALIASES = {

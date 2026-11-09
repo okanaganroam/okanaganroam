@@ -1662,7 +1662,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows'))`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -4016,6 +4016,14 @@ function buildDiscoveryTaxonomy() {
     SELECT DISTINCT lower(trim(cuisine)) AS c FROM venues
     WHERE redirect_to IS NULL AND cuisine IS NOT NULL AND trim(cuisine) != ''
   `).all().map((r) => r.c);
+  // Restaurants' second and third cuisines (2026-11-09) are cuisines in use too.
+  try {
+    for (const r of db.prepare(`SELECT vc.cuisines FROM venue_cuisines vc JOIN venues v ON v.id = vc.venue_id
+      WHERE v.redirect_to IS NULL AND v.type = 'restaurant' AND vc.cuisines IS NOT NULL`).all()) {
+      let list = []; try { list = JSON.parse(r.cuisines) || []; } catch (e) { list = []; }
+      for (const c of list) { const k = String(c).toLowerCase().trim(); if (k && !cuisines.includes(k)) cuisines.push(k); }
+    }
+  } catch (e) { /* no table yet */ }
   const venues = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL')
     .all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
@@ -4385,7 +4393,8 @@ function buildDiscoverySearchVenues() {
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
       cuisine: String(row.cuisine || '').toLowerCase().trim(),
-      textName: normalize(row.name || ''), textCuisine: normalize(row.cuisine || ''), textDesc: normalize(row.description || ''), textDescFr: normalize(row.description_fr || ''),
+      cuisines: venueCuisineList(row).map((c) => String(c).toLowerCase().trim()),
+      textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: normalize(row.description || ''), textDescFr: normalize(row.description_fr || ''),
       features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
       rating: row.rating, reviews: row.reviews, price: row.price, row,
     });
@@ -6700,7 +6709,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       price: v.price == null ? null : Number(v.price), address: v.address || null,
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
-      textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(`${v.description || ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}`),
+      cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()),
+      textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}`),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
       ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
@@ -10547,11 +10557,87 @@ function guardedCuisineUpdate(id, expectedCurrent, cuisine, meta) {
     }
     db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
       VALUES (?, 'cuisine', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, existing.cuisine, next, m.reason.trim(), m.batch_id.trim());
+    // A stored cuisine list (2026-11-09) follows the one label set here.
+    db.prepare('UPDATE venue_cuisines SET cuisines = ?, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(next ? JSON.stringify([next]) : null, id);
     db.exec('COMMIT');
+    clearVenueCuisinesCache();
     txOpen = false;
     return { ok: true, changed: true, cuisine: next };
   } catch (err) {
     if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
+// Restaurant cuisines from research (2026-11-09): a guarded, audited, compare-and-set write of up to 3 food labels
+// (OWNER_CUISINES) and the kind of place (RESTAURANT_PLACE_TYPES). `expected` is what the caller read
+// ({ cuisines: [..], place_type: '' } as GET /admin/cuisines/:id returns it); `next` the same shape, either key may be
+// left out to keep it. An owner's pick is never replaced. Logged per field (cuisine, cuisines, place_type) with the
+// batch id, so an Undo is the same call with the old values (the clean-up script's backup).
+function validCuisineList(list, allowLegacy = []) {
+  if (!Array.isArray(list) || list.length > OWNER_CUISINES_MAX) return null;
+  const out = [];
+  for (const c of list) {
+    if (typeof c !== 'string') return null;
+    const t = c.trim();
+    if (!t || (!OWNER_CUISINES.includes(t) && !allowLegacy.includes(t))) return null;
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
+}
+function venueCuisinesState(venue) {
+  return { cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue) };
+}
+function guardedCuisinesUpdate(id, expected, next, meta) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  if (!next || typeof next !== 'object' || (!('cuisines' in next) && !('place_type' in next))) return { ok: false, reason: 'invalid_cuisines', detail: 'send cuisines and/or place_type' };
+  const venue = db.prepare('SELECT id, type, cuisine, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!venue) return { ok: false, reason: 'venue_not_found' };
+  if (venue.redirect_to !== null && venue.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  if (venue.type !== 'restaurant') return { ok: false, reason: 'not_a_restaurant' };
+  const live = venueCuisinesState(venue);
+  const want = {};
+  if ('cuisines' in next) {
+    // An Undo from the clean-up backup (meta.restore) may put an old, off-list label back exactly as it was.
+    const ok = validCuisineList(next.cuisines, m.restore === true && Array.isArray(next.cuisines) ? next.cuisines.filter((c) => typeof c === 'string' && c.trim().length <= 40 && !/[<>\n]/.test(c)) : []);
+    if (!ok) return { ok: false, reason: 'invalid_cuisines', detail: `cuisines must be 0-${OWNER_CUISINES_MAX} labels from the list` };
+    want.cuisines = ok;
+  }
+  if ('place_type' in next) {
+    const p = next.place_type == null ? '' : String(next.place_type).trim();
+    if (p && !RESTAURANT_PLACE_TYPES.includes(p)) return { ok: false, reason: 'invalid_place_type', detail: `place_type must be one of: ${RESTAURANT_PLACE_TYPES.join(', ')}` };
+    want.place_type = p;
+  }
+  const exp = expected && typeof expected === 'object' ? expected : {};
+  const same = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  if ((('cuisines' in want) && !same(exp.cuisines, live.cuisines)) || (('place_type' in want) && (exp.place_type || '') !== live.place_type)) {
+    return { ok: false, reason: 'mismatch', live };
+  }
+  if (('cuisines' in want ? same(want.cuisines, live.cuisines) : true) && ('place_type' in want ? want.place_type === live.place_type : true)) {
+    return { ok: true, changed: false, ...live };
+  }
+  if (ownerCuisineSet(id)) return { ok: false, reason: 'owner_value_protected', detail: "the owner picked these; research doesn't replace them", live };
+  const log = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, ?, ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`);
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const w = writeVenueCuisines(id, want);
+    if ('cuisines' in want) {
+      if ((w.before.cuisines[0] || null) !== (w.after.cuisines[0] || null)) log.run(id, 'cuisine', w.before.cuisines[0] || null, w.after.cuisines[0] || null, m.reason.trim(), m.batch_id.trim());
+      if (!same(w.before.cuisines, w.after.cuisines)) log.run(id, 'cuisines', w.before.cuisines.length ? JSON.stringify(w.before.cuisines) : null, w.after.cuisines.length ? JSON.stringify(w.after.cuisines) : null, m.reason.trim(), m.batch_id.trim());
+    }
+    if ('place_type' in want && w.before.place_type !== w.after.place_type) log.run(id, 'place_type', w.before.place_type || null, w.after.place_type || null, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    clearVenueCuisinesCache();
+    return { ok: true, changed: true, cuisines: w.after.cuisines, place_type: w.after.place_type };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    clearVenueCuisinesCache();
     throw err;
   }
 }
@@ -19284,7 +19370,7 @@ function venueCardHtml(venue, opts = {}) {
     showRegion && REGION_LABELS[venue.region] ? escapeHtml(REGION_LABELS[venue.region]) : null,
     showType && venue.type ? escapeHtml(venue.type) : null,
     showTypeLabel && CATEGORY_LABELS[venue.type] ? escapeHtml(CATEGORY_LABELS[venue.type].singular) : null,
-    venue.cuisine ? escapeHtml(venue.cuisine) : null,
+    venue.cuisine ? venueCuisineList(venue).map(escapeHtml).join(', ') : null,
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
   // Golf-only (2026-09-19): the description is wrapped so the page script
@@ -34269,7 +34355,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // Golf (2026-09-26): the legacy price level is not a green fee, so it is
     // never shown on golf pages; verified green fees are shown instead.
     priceRange: venueShowsPrice(venue) ? '$'.repeat(venue.price) : undefined,
-    servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
+    servesCuisine: venue.type === 'restaurant' && venue.cuisine ? servesCuisineFor(venue) : undefined,
     // No aggregateRating (2026-10-13): the stored rating and review count come from Google reviews, not from Okanagan
     // Roam, and Google's review-snippet rules don't allow marking up ratings collected on another site. The rating is
     // still shown to visitors on the page.
@@ -34472,7 +34558,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     return `<section class="venue-section venue-deals-card" id="venueDeals" aria-labelledby="venueDealsTitle"><h2 id="venueDealsTitle">${title}</h2><div class="venue-deals-blocks">${blocks.map(([k, h, body]) => `<div class="venue-deals-block" data-block="${k}">${blocks.length === 2 ? `<h3>${h}</h3>` : ''}<div class="venue-deals-body">${body}</div></div>`).join('')}</div></section>`;
   })();
   const detailRows = [
-    venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
+    venue.cuisine ? ['Cuisine', venueCuisineList(venue).map((c) => escapeHtml(fr ? frCuisine(c) : c)).join(' \u00b7 ')] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
@@ -34638,7 +34724,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
 
   const relatedStockPhotosUsed = new Set();
   function relatedCard(v) {
-    const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
+    const meta = [v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
     const photo = venueThumbPhoto(v, relatedStockPhotosUsed);
@@ -43793,19 +43879,82 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows'];
-// Cuisine picker (2026-11-08): restaurants only (the types with a completeness list). One value, as venues.cuisine holds one label. Only
-// labels the site already uses for restaurants, each with its French name in french-text.js FR_CUISINE (frCuisine), so a
-// pick never adds a new word to search, the trip planner or the filters. No free text: "not listed?" goes in the note.
-// Polish (2026-11-08): + Asian and Fast Food (already used, with French names) and Comfort food (new, French added in
-// french-text.js). Still one pick: venues.cuisine is one label used as-is by filters, search and servesCuisine, and a
-// combined label ("Italian & Pizza") would split the cuisine filters and have no French name.
-const OWNER_CUISINES = ['American', 'Asian', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Casual dining', 'Chicken',
-  'Chinese', 'Comfort food', 'Contemporary Canadian', 'Cuban', 'Dessert', 'Diner', 'Ethiopian', 'Family dining', 'Farm-to-Table', 'Filipino', 'French', 'German',
-  'Fast Food', 'Greek', 'Healthy', 'Indian', 'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Pizza',
-  'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Spanish', 'Steakhouse', 'Sushi', 'Taiwanese', 'Tapas', 'Thai', 'Turkish',
-  'Ukrainian', 'Vegan', 'Vegetarian', 'Vietnamese', 'West Coast'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'];
+// Cuisine picker (2026-11-08, reworked 2026-11-09): restaurants only (the types with a completeness list). Dayton
+// (Nov 9 2026): up to 3 food labels from this list of 45, plus one "kind of place". The food list is only food (place
+// styles such as "Casual dining" moved to RESTAURANT_PLACE_TYPES; dietary words are badges), every label has a French
+// name (french-text.js FR_CUISINE, frCuisine). venues.cuisine keeps the first pick, so every existing reader (filters,
+// the trip planner, older pages) keeps working; the full list lives in venue_cuisines (venueCuisineList()).
+const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Chicken & Wings', 'Chinese',
+  'Comfort food', 'Contemporary & Global', 'Dessert', 'Ethiopian', 'Farm-to-Table', 'Filipino', 'Fish & Chips', 'French', 'German', 'Greek', 'Indian',
+  'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Noodles & Ramen', 'Pizza',
+  'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
+  'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
+// Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
+const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'West Coast', 'Seafood'];
+const OWNER_CUISINES_MAX = 3;
+const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pub or sports bar', 'Diner', 'Quick bite', 'Winery or brewery restaurant'];
+const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
+  'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie' };
+function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
+// The stored { cuisines: [..], place_type } for a restaurant, or null. Cached per process; every writer clears it.
+let venueCuisinesCache = null;
+function clearVenueCuisinesCache() { venueCuisinesCache = null; }
+function venueCuisinesRow(venueId) {
+  if (!venueCuisinesCache) {
+    venueCuisinesCache = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, cuisines, place_type FROM venue_cuisines').all()) {
+        let list = [];
+        try { list = r.cuisines ? JSON.parse(r.cuisines) : []; } catch (e) { list = []; }
+        venueCuisinesCache.set(r.venue_id, { cuisines: Array.isArray(list) ? list.filter((c) => typeof c === 'string' && c) : [], place_type: r.place_type || '' });
+      }
+    } catch (e) { /* table missing: no extra cuisines */ }
+  }
+  return venueCuisinesCache.get(Number(venueId)) || null;
+}
+// Every cuisine a venue shows, first one first: the stored list when it has one (restaurants), otherwise the single
+// venues.cuisine label (every other type, and restaurants nobody has set a list for). A list always starts with
+// venues.cuisine; if they ever disagree, venues.cuisine wins and leads.
+// schema.org servesCuisine: one label as a string (as before), several as a list (2026-11-09).
+function servesCuisineFor(venue) {
+  const list = venueCuisineList(venue);
+  return list.length > 1 ? list : (list[0] || venue.cuisine);
+}
+function venueCuisineList(venue) {
+  if (!venue) return [];
+  const first = venue.cuisine ? String(venue.cuisine) : '';
+  if (venue.type !== 'restaurant') return first ? [first] : [];
+  const row = venueCuisinesRow(venue.id);
+  const list = row && row.cuisines.length ? row.cuisines : [];
+  if (!list.length) return first ? [first] : [];
+  if (first && list[0] !== first) return [first, ...list.filter((c) => c !== first)].slice(0, OWNER_CUISINES_MAX);
+  return list.slice(0, OWNER_CUISINES_MAX);
+}
+function venuePlaceType(venue) {
+  if (!venue || venue.type !== 'restaurant') return '';
+  const row = venueCuisinesRow(venue.id);
+  return row && row.place_type ? row.place_type : '';
+}
+// Writes a restaurant's cuisines and/or place type (no checks; callers validate and log). `next` holds `cuisines`
+// (array, [] clears) and/or `place_type` ('' clears). venues.cuisine follows the first cuisine. -> { before, after }.
+function writeVenueCuisines(venueId, next) {
+  const v = db.prepare('SELECT id, type, cuisine FROM venues WHERE id = ?').get(venueId);
+  const beforeRow = venueCuisinesRow(venueId) || { cuisines: [], place_type: '' };
+  const before = { cuisines: venueCuisineList(v), place_type: beforeRow.place_type || '' };
+  const after = { cuisines: 'cuisines' in next ? next.cuisines.slice(0, OWNER_CUISINES_MAX) : before.cuisines, place_type: 'place_type' in next ? (next.place_type || '') : before.place_type };
+  db.prepare(`INSERT INTO venue_cuisines (venue_id, cuisines, place_type) VALUES (?, ?, ?)
+    ON CONFLICT(venue_id) DO UPDATE SET cuisines = excluded.cuisines, place_type = excluded.place_type, updated_at = CURRENT_TIMESTAMP`)
+    .run(venueId, after.cuisines.length ? JSON.stringify(after.cuisines) : null, after.place_type || null);
+  if ('cuisines' in next && (v.cuisine || null) !== (after.cuisines[0] || null)) {
+    db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(after.cuisines[0] || null, venueId);
+  }
+  clearVenueCuisinesCache();
+  return { before, after };
+}
 const OWNER_CUISINE_ERROR = 'Please pick what you serve from the list. Not there? Tell us in the note below.';
+const OWNER_CUISINES_ERROR = 'Please pick 1 to 3 kinds of food from the list.';
+const OWNER_PLACE_TYPE_ERROR = 'Please pick the kind of place from the list.';
 // One-tap "These hours are right" (2026-11-08): restaurants only. The owner confirms the hours we show without editing
 // them: hours_checked_at becomes today (Pacific) and hours_source 'venue_owner', exactly what saving the hours does. The
 // hours themselves are never touched.
@@ -44482,7 +44631,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // "We don't have one" (2026-11-08): the sorted item keys; only for the types with a completeness list.
     ...(COMPLETENESS_TYPES.has(venue.type) ? { not_offered: venueNotOffered(venue.id) } : {}),
     // Cuisine and the date the hours were last checked (2026-11-08): only for the types with a completeness list.
-    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
+    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
   };
 }
 // The stored hours_checked_at ('YYYY-MM-DD') or ''.
@@ -44501,7 +44650,7 @@ function ownerHoursWaiting(venueId) {
 // (guardedCuisineUpdate) then leaves it alone.
 function ownerCuisineSet(venueId) {
   try {
-    const r = db.prepare("SELECT source, batch_id FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'cuisine' ORDER BY id DESC LIMIT 1").get(venueId);
+    const r = db.prepare("SELECT source, batch_id FROM venue_enrichment_log WHERE venue_id = ? AND field_name IN ('cuisine', 'cuisines', 'place_type') ORDER BY id DESC LIMIT 1").get(venueId);
     return !!r && r.source === 'venue_owner' && !/^owner-undo-/.test(String(r.batch_id || ''));
   } catch (e) { return false; }
 }
@@ -44829,6 +44978,22 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     else if (c !== (current.cuisine || '') && !OWNER_CUISINES.includes(c)) errors.cuisine = OWNER_CUISINE_ERROR;
     else if (c !== (current.cuisine || '')) changes.cuisine = c;
   }
+  // Cuisines (2026-11-09): up to 3 labels from OWNER_CUISINES, first = main. An old off-list label the page already
+  // shows may be kept as it is. Sending the list already shown changes nothing.
+  if ('cuisines' in input) {
+    const cur = Array.isArray(current.cuisines) ? current.cuisines : [];
+    const list = Array.isArray(input.cuisines) ? input.cuisines.map((c) => (typeof c === 'string' ? c.trim() : '')) : null;
+    const ok = list ? validCuisineList(list, cur) : null;
+    if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
+    else if (!ok || !ok.length) errors.cuisine = OWNER_CUISINES_ERROR;
+    else if (JSON.stringify(ok) !== JSON.stringify(cur)) changes.cuisines = ok;
+  }
+  if ('place_type' in input) {
+    const pt = typeof input.place_type === 'string' ? input.place_type.trim() : '';
+    if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
+    else if (pt && !RESTAURANT_PLACE_TYPES.includes(pt)) errors.place_type = OWNER_PLACE_TYPE_ERROR;
+    else if (pt !== (current.place_type || '')) changes.place_type = pt;
+  }
   // "These hours are right" (2026-11-08): only `true`, only with hours on the page, and not while new hours wait for
   // review (those would be the ones the owner thinks they are confirming). Already checked today: nothing changes.
   if ('hours_checked' in input) {
@@ -44950,15 +45115,15 @@ function listOwnerChanges(status = 'pending') {
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
-  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit' };
+  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', hours_checked: 'hours confirmed', visit_rows: 'plan your visit' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -44982,6 +45147,8 @@ function ownerValueText(field, value) {
     const parts = OWNER_VISIT_SLOTS.filter((x) => value && value[x.key]).map((x) => `${x.def}: ${value[x.key]}`);
     return parts.length ? parts.join(' · ') : '(none)';
   }
+  if (field === 'cuisines') return Array.isArray(value) && value.length ? value.join(', ') : '(none)';
+  if (field === 'place_type') return value || '(none)';
   if (field === 'not_offered') {
     const names = Object.fromEntries(portalCompleteness.ITEMS.map((i) => [i.key, i.en]));
     return Array.isArray(value) && value.length ? `Doesn't offer: ${value.map((k) => names[k] || k).join(', ')}` : '(none)';
@@ -49988,7 +50155,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     url: venueUrl,
     telephone: venue.phone || undefined,
     address: venuePostalAddress(venue.address, regionLabel),
-    servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
+    servesCuisine: venue.type === 'restaurant' && venue.cuisine ? servesCuisineFor(venue) : undefined,
     hasMenu: tours ? undefined : menuSchema(venue, menu, lang),
     hasOfferCatalog: tours ? priceListOfferCatalog(venue, menu, lang) : undefined,
   };
@@ -50916,10 +51083,10 @@ const OWNER_HELP_TOPICS = [
     a: '<p>Tap <strong>Add your photos and menu</strong> at the top of your page settings. It asks one thing at a time:</p><ul><li><strong>Photos:</strong> take a photo or choose some from your phone. Tap ✕ to remove one and <strong>Make main photo</strong> for the big one at the top of your page. A photo that is too small says so straight away.</li><li><strong>Menu:</strong> upload a PDF or photos, snap each page, use the menu on your website, or email it to us.</li><li>Every step has <strong>Skip this for now</strong>, and you can stop at any time.</li><li>When you see <strong>Saved ✓</strong>, we have it. We add it to your page for you.</li></ul>',
     aFr: '<p>Touchez <strong>Ajoutez vos photos et votre menu</strong> en haut des réglages de votre page. Une seule question à la fois :</p><ul><li><strong>Photos :</strong> prenez une photo ou choisissez-en dans votre téléphone. Touchez ✕ pour en retirer une et <strong>Photo principale</strong> pour la grande photo en haut de votre page. Une photo trop petite est signalée tout de suite.</li><li><strong>Menu :</strong> téléversez un PDF ou des photos, photographiez chaque page, utilisez le menu de votre site Web ou envoyez-le-nous par courriel.</li><li>Chaque étape a <strong>Passer pour l’instant</strong>, et vous pouvez arrêter à tout moment.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Nous l’ajoutons à votre page pour vous.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
-    keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed'],
-    keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste'],
-    a: '<p>Open <strong>What you serve</strong>, pick the one that fits your food best, and tap <strong>Save</strong>. It goes live straight away and shows in <strong>Your updates</strong>.</p><ul><li>It shows on your page and helps people find you when they search by food.</li><li>Not on the list? Tell us in <strong>Anything else?</strong> at the bottom of the form and we’ll sort it out.</li></ul>',
-    aFr: '<p>Ouvrez <strong>Ce que vous servez</strong>, choisissez ce qui décrit le mieux votre cuisine et touchez <strong>Enregistrer</strong>. C’est en ligne tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</p><ul><li>Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine.</li><li>Pas dans la liste? Dites-le-nous dans <strong>Autre chose?</strong> au bas du formulaire et nous nous en occuperons.</li></ul>' },
+    keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
+    keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],
+    a: '<p>Open <strong>What you serve</strong>, tap up to <strong>3</strong> kinds of food (the first one you tap leads), tap the <strong>kind of place</strong>, and tap <strong>Save</strong>. It goes live straight away and shows in <strong>Your updates</strong>.</p><ul><li>Don’t see yours? Tap <strong>Show more kinds of food</strong>, or type it in the search box.</li><li>Picked 3 already? Tap one you picked to remove it, then pick another.</li><li>Still not on the list? Tell us in <strong>Anything else?</strong> at the bottom of the form and we’ll sort it out.</li></ul>',
+    aFr: '<p>Ouvrez <strong>Ce que vous servez</strong>, touchez jusqu’à <strong>3</strong> types de cuisine (le premier touché passe en tête), touchez le <strong>genre d’endroit</strong>, puis <strong>Enregistrer</strong>. C’est en ligne tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</p><ul><li>Vous ne voyez pas la vôtre? Touchez <strong>Afficher plus de cuisines</strong> ou tapez-la dans la boîte de recherche.</li><li>Déjà 3 choix? Touchez-en un pour le retirer, puis choisissez-en un autre.</li><li>Toujours pas dans la liste? Dites-le-nous dans <strong>Autre chose?</strong> au bas du formulaire et nous nous en occuperons.</li></ul>' },
   // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
   { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
     keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
@@ -52849,6 +53016,22 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         applied.push(field);
         continue;
       }
+      // Cuisines and kind of place (2026-11-09): restaurants; venues.cuisine follows the first cuisine. An Undo writes the
+      // old list back (which may hold an old off-list label, exactly as it was). A one-label 'cuisine' change from before
+      // the list existed resets the list to that label.
+      if (field === 'cuisines' || field === 'place_type' || field === 'cuisine') {
+        const next = field === 'cuisines' ? { cuisines: Array.isArray(value) ? value.filter((c) => typeof c === 'string' && c) : [] }
+          : field === 'place_type' ? { place_type: value || '' }
+          : { cuisines: value ? [String(value)] : [] };
+        const w = writeVenueCuisines(venue.id, next);
+        if ('cuisines' in next) {
+          if ((w.before.cuisines[0] || null) !== (w.after.cuisines[0] || null)) log.run(venue.id, 'cuisine', w.before.cuisines[0] || null, w.after.cuisines[0] || null, meta.reason, meta.batch_id, reviewer);
+          if (field === 'cuisines' && JSON.stringify(w.before.cuisines) !== JSON.stringify(w.after.cuisines)) log.run(venue.id, 'cuisines', w.before.cuisines.length ? JSON.stringify(w.before.cuisines) : null, w.after.cuisines.length ? JSON.stringify(w.after.cuisines) : null, meta.reason, meta.batch_id, reviewer);
+        } else if (w.before.place_type !== w.after.place_type) log.run(venue.id, 'place_type', w.before.place_type || null, w.after.place_type || null, meta.reason, meta.batch_id, reviewer);
+        venue.cuisine = w.after.cuisines[0] || null;
+        applied.push(field);
+        continue;
+      }
       // "Plan your visit" lines (2026-11-08): the five lines become exactly these (an Undo writes the old ones back).
       if (field === 'visit_rows') {
         const w = writeOwnerVisitRows(venue.id, value, now);
@@ -52930,6 +53113,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     db.exec('RELEASE owner_approve');
   } catch (err) {
     try { db.exec('ROLLBACK TO owner_approve'); db.exec('RELEASE owner_approve'); } catch (_) { /* already gone */ }
+    clearVenueCuisinesCache();
     return { ok: false, reason: 'write_failed', detail: String(err.message || err) };
   }
   if (chosen.includes('hours')) {
@@ -53026,7 +53210,7 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Instagram and Facebook links (Dayton, 2026-11-09) too, for every type, from a login or the edit link: only a real
 // profile/page passes ownerSocialLink(), they're logged, in "Your updates", with Undo, and research can't replace them.
 // Website, menu and booking links still wait for review.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url']);
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -53041,6 +53225,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
   if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+  if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
@@ -54570,6 +54755,18 @@ const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page .op-hours-ok-btn[hidden], body.owner-page .op-hours-ok [hidden] { display: none; }
     body.owner-page .op-hours-ok-done { margin: 0 !important; color: #1E6B3A; font-weight: 800; }
     body.owner-page .op-cuisine-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; }
+    body.owner-page .op-cu-q { margin: 10px 0 6px; font-weight: 800; }
+    body.owner-page .op-cu-picked { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: #E7F3EC; color: #1E6B3A; font-weight: 800; }
+    body.owner-page .op-cu-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+    @media (min-width: 700px) { body.owner-page .op-cu-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    body.owner-page .op-cu-tile { min-height: 52px; padding: 8px 10px; border-radius: 14px; border: 2px solid rgba(42,32,25,.18); background: #fff; color: #2A2019; font: inherit; font-weight: 800; text-align: center; cursor: pointer; }
+    body.owner-page .op-cu-tile[hidden] { display: none; }
+    body.owner-page .op-cu-tile[aria-pressed="true"] { background: #DCEBE8; border-color: #1E4F4C; box-shadow: inset 0 0 0 2px #1E4F4C; }
+    body.owner-page .op-cu-tile[aria-pressed="true"]::before { content: "\u2713 "; color: #1E4F4C; }
+    body.owner-page .op-cu-more { display: block; margin: 0 0 8px; }
+    body.owner-page .op-cu-search { margin: 4px 0 8px; }
+    body.owner-page .op-cu-search label { display: block; font-weight: 800; margin-bottom: 4px; }
+    body.owner-page .op-cu-search input { width: 100%; min-height: 48px; font: inherit; padding: 8px 12px; border-radius: 12px; border: 2px solid rgba(42,32,25,.18); }
     body.owner-page #opCuisine { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }
     body.owner-page #opCuisineSave { min-height: 44px; }
     body.owner-page #opCuisineDone { color: #1E6B3A; font-weight: 800; }
@@ -54605,7 +54802,7 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
           if (j && j.ok) { onOk(); return; }
           btn.disabled = false;
           var errs = (j && j.errors) || {};
-          var m = errs.cuisine || errs.hours_checked || errs.visit_rows || errs.form || (j && j.error) || box.getAttribute('data-wrong');
+          var m = errs.cuisine || errs.place_type || errs.hours_checked || errs.visit_rows || errs.form || (j && j.error) || box.getAttribute('data-wrong');
           if (err) { err.textContent = m; err.hidden = false; }
         })
         .catch(function(){ btn.disabled = false; if (err) { err.textContent = box.getAttribute('data-wrong'); err.hidden = false; } });
@@ -54657,21 +54854,62 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
     // The floating "not sent yet" bar hides while the form's own Send button is on screen (no two Send buttons at once).
     var sb = document.getElementById('opSubmit');
     if (sb && window.IntersectionObserver) new IntersectionObserver(function(es){ es.forEach(function(x){ document.body.classList.toggle('op-submit-seen', x.isIntersecting); }); }).observe(sb);
-    var cs = document.getElementById('opCuisineSave'), cbox = document.getElementById('cuisine'), sel = document.getElementById('opCuisine');
-    // The picker has its own Save, so picking doesn't raise the form's "not sent yet" bar. (The form's Save still sends a
-    // changed pick along with everything else.)
-    if (sel) ['input', 'change'].forEach(function(t){ sel.addEventListener(t, function(e){ e.stopPropagation(); }); });
-    if (cs && cbox && sel) cs.addEventListener('click', function(){
-      if (!sel.value) { var e0 = document.getElementById('opCuisineError'); if (e0) { e0.textContent = cbox.getAttribute('data-empty'); e0.hidden = false; } return; }
-      var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : sel.value;
-      send({ cuisine: sel.value }, cs, 'opCuisineError', cbox, function(){
-        cs.disabled = false;
-        var d = document.getElementById('opCuisineDone'); if (d) { d.textContent = cbox.getAttribute('data-done').replace('{c}', label); d.hidden = false; }
-        var h = document.getElementById('opCuisineHint'); if (h) h.textContent = label;
-        if (typeof initial === 'object' && initial) initial.cuisine = sel.value;
-        if (window.opCbRefresh) window.opCbRefresh('');
+    // Cuisine tiles (2026-11-09): up to 3 kinds of food and one kind of place, saved together by their own Save.
+    var cs = document.getElementById('opCuisineSave'), cbox = document.getElementById('cuisine');
+    if (cs && cbox) {
+      var max = Number(cbox.getAttribute('data-max')) || 3;
+      var tiles = cbox.querySelectorAll('[data-cu]'), places = cbox.querySelectorAll('[data-place]');
+      var picked = [], place = '';
+      Array.prototype.forEach.call(tiles, function(b){ if (b.getAttribute('aria-pressed') === 'true') picked.push(b.getAttribute('data-cu')); });
+      Array.prototype.forEach.call(places, function(b){ if (b.getAttribute('aria-pressed') === 'true') place = b.getAttribute('data-place'); });
+      var labelOf = function(c){ var b = cbox.querySelector('[data-cu="' + c.replace(/"/g, '') + '"]'); return b ? b.getAttribute('data-cu-label') : c; };
+      var lim = document.getElementById('opCuLimit'), pk = document.getElementById('opCuPicked');
+      function showPicked(){
+        if (pk) { pk.hidden = !picked.length; pk.textContent = cbox.getAttribute('data-picked').replace('{c}', picked.map(labelOf).join(', ')); }
+      }
+      Array.prototype.forEach.call(tiles, function(b){ b.addEventListener('click', function(){
+        var c = b.getAttribute('data-cu'), i = picked.indexOf(c);
+        if (lim) lim.hidden = true;
+        if (i >= 0) { picked.splice(i, 1); b.setAttribute('aria-pressed', 'false'); }
+        else if (picked.length >= max) { if (lim) { lim.textContent = cbox.getAttribute('data-limit'); lim.hidden = false; } return; }
+        else { picked.push(c); b.setAttribute('aria-pressed', 'true'); }
+        showPicked();
+      }); });
+      Array.prototype.forEach.call(places, function(b){ b.addEventListener('click', function(){
+        var p = b.getAttribute('data-place');
+        place = place === p ? '' : p;
+        Array.prototype.forEach.call(places, function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-place') === place ? 'true' : 'false'); });
+      }); });
+      var more = document.getElementById('opCuMore'), sr = document.getElementById('opCuSearchRow'), si = document.getElementById('opCuSearch'), none = document.getElementById('opCuNone');
+      if (more) more.addEventListener('click', function(){
+        Array.prototype.forEach.call(tiles, function(b){ if (b.hasAttribute('data-more')) b.hidden = false; });
+        more.hidden = true; if (sr) sr.hidden = false;
       });
-    });
+      if (si) {
+        ['input', 'change'].forEach(function(t){ si.addEventListener(t, function(e){ e.stopPropagation(); }); });
+        si.addEventListener('input', function(){
+          var q = si.value.trim().toLowerCase(), shown = 0;
+          Array.prototype.forEach.call(tiles, function(b){
+            var on = !q || b.getAttribute('data-cu').toLowerCase().indexOf(q) >= 0 || b.getAttribute('data-cu-label').toLowerCase().indexOf(q) >= 0;
+            b.hidden = !on; if (on) shown++;
+          });
+          if (none) none.hidden = shown > 0;
+        });
+      }
+      cs.addEventListener('click', function(){
+        var e0 = document.getElementById('opCuisineError');
+        if (!picked.length) { if (e0) { e0.textContent = cbox.getAttribute('data-empty'); e0.hidden = false; } return; }
+        var label = picked.map(labelOf).join(', ');
+        send({ cuisines: picked.slice(), place_type: place }, cs, 'opCuisineError', cbox, function(){
+          cs.disabled = false;
+          var d = document.getElementById('opCuisineDone'); if (d) { d.textContent = cbox.getAttribute('data-done').replace('{c}', label); d.hidden = false; }
+          var pl = ''; Array.prototype.forEach.call(places, function(x){ if (x.getAttribute('data-place') === place) pl = x.getAttribute('data-place-label'); });
+          var h = document.getElementById('opCuisineHint'); if (h) h.textContent = label + (pl ? ' \u00b7 ' + pl : '');
+          if (typeof initial === 'object' && initial) { initial.cuisine = picked[0]; initial.cuisines = picked.slice(); initial.place_type = place; }
+          if (window.opCbRefresh) window.opCbRefresh('');
+        });
+      });
+    }
   })();`;
 function gatherCompletenessInput(venue, live, happyHourTimes) {
   const visit = venueVisitInfo(venue.id);
@@ -54843,20 +55081,38 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         <p class="lyv-error" id="opHoursOkError" hidden></p>
       </div>`;
   };
+  // Cuisine picker (2026-11-09, from the easy-setup mockup): the 10 most common kinds of food as big tiles, "Show more"
+  // for all 45 with a search box, up to 3 picks ("Picked: ..."), then "What kind of place?" as one-tap tiles. Its own
+  // Save (live at once, like before). An old off-list label already on the page stays picked until the owner removes it.
   const cuisineHtml = () => {
     if (!completeOn) return '';
-    const cur = snap.cuisine || '';
+    const picked = Array.isArray(snap.cuisines) && snap.cuisines.length ? snap.cuisines : (snap.cuisine ? [snap.cuisine] : []);
+    const place = snap.place_type || '';
     const label = (c) => (fr ? frCuisine(c) : c);
-    const list = [...OWNER_CUISINES].sort((a, b) => label(a).localeCompare(label(b), fr ? 'fr' : 'en'));
-    const keepOdd = cur && !OWNER_CUISINES.includes(cur);
-    const opts = `<option value=""${cur ? '' : ' selected'} disabled>${L('Pick one', 'Choisissez')}</option>${keepOdd ? `<option value="${escapeHtml(cur)}" selected>${escapeHtml(label(cur))}</option>` : ''}${list.map((c) => `<option value="${escapeHtml(c)}"${c === cur ? ' selected' : ''}>${escapeHtml(label(c))}</option>`).join('')}`;
+    const placeLabel = (p) => (fr ? frPlaceType(p) : p);
+    const legacy = picked.filter((c) => !OWNER_CUISINES.includes(c));
+    const popular = OWNER_CUISINES_POPULAR.slice();
+    const rest = OWNER_CUISINES.filter((c) => !popular.includes(c)).sort((a, b) => label(a).localeCompare(label(b), fr ? 'fr' : 'en'));
+    const tile = (c, more) => `<button type="button" class="op-cu-tile" data-cu="${escapeHtml(c)}" data-cu-label="${escapeHtml(label(c))}" aria-pressed="${picked.includes(c) ? 'true' : 'false'}"${more && !picked.includes(c) ? ' data-more="1" hidden' : ''}>${escapeHtml(label(c))}</button>`;
+    const hint = picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
     return `
-      <details class="op-fold op-sec" id="cuisine" data-task="more"${cur ? '' : ' open'} data-empty="${escapeHtml(L('Please pick one from the list first.', 'Choisissez d’abord une cuisine dans la liste.'))}" data-done="${escapeHtml(L('Saved. Your page now says {c}.', 'Enregistré. Votre page indique maintenant {c}.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
-      <summary><span class="lyv-section-label" id="opCuisineLabel">${L('What you serve', 'Ce que vous servez')}${waitChip('cuisine')}</span> <span class="op-fold-hint" id="opCuisineHint">${cur ? escapeHtml(label(cur)) : L('Not set: pick your cuisine', 'Non indiquée : choisissez votre cuisine')}</span></summary>
+      <details class="op-fold op-sec" id="cuisine" data-task="more"${picked.length ? '' : ' open'} data-max="${OWNER_CUISINES_MAX}"
+        data-empty="${escapeHtml(L('Please tap at least one kind of food first.', 'Touchez d’abord au moins un type de cuisine.'))}"
+        data-limit="${escapeHtml(L('You can pick up to 3. Tap one you picked to remove it.', 'Vous pouvez en choisir 3 au plus. Touchez-en un choisi pour le retirer.'))}"
+        data-picked="${escapeHtml(L('Picked: {c}', 'Choisi : {c}'))}"
+        data-done="${escapeHtml(L('Saved. Your page now says {c}.', 'Enregistré. Votre page indique maintenant {c}.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+      <summary><span class="lyv-section-label" id="opCuisineLabel">${L('What you serve', 'Ce que vous servez')}${waitChip('cuisine', 'cuisines', 'place_type')}</span> <span class="op-fold-hint" id="opCuisineHint">${escapeHtml(hint)}</span></summary>
       <div class="form-row full"><div class="form-field">
-        <label for="opCuisine">${L('Which one fits your food best?', 'Lequel décrit le mieux votre cuisine?')}</label>
-        <span class="op-cuisine-line"><select id="opCuisine" aria-describedby="opCuisineNote">${opts}</select><button type="button" class="op-btn" id="opCuisineSave">${L('Save', 'Enregistrer')}</button><span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span></span>
-        <p class="op-hint" id="opCuisineNote">${L('It shows on your page and helps people find you when they search by food. Not on the list? Tell us in &ldquo;Anything else?&rdquo; below.', 'Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine. Pas dans la liste? Dites-le-nous dans « Autre chose? » plus bas.')}</p>
+        <p class="op-cu-q" id="opCuisineQ">${L('What kind of food do you serve?', 'Quel type de cuisine servez-vous?')} <span class="op-hint">${L('Pick up to 3.', 'Choisissez-en jusqu’à 3.')}</span></p>
+        <p class="op-cu-picked" id="opCuPicked" role="status"${picked.length ? '' : ' hidden'}>${escapeHtml(L('Picked: {c}', 'Choisi : {c}').replace('{c}', picked.map(label).join(', ')))}</p>
+        <div class="op-cu-tiles" id="opCuTiles" role="group" aria-labelledby="opCuisineQ">${legacy.map((c) => tile(c, false)).join('')}${popular.map((c) => tile(c, false)).join('')}${rest.map((c) => tile(c, true)).join('')}</div>
+        <button type="button" class="op-more op-cu-more" id="opCuMore">${L('Don’t see yours? Show more kinds of food', 'Vous ne la voyez pas? Afficher plus de cuisines')}</button>
+        <p class="op-cu-search" id="opCuSearchRow" hidden><label for="opCuSearch">${L('Or type to find it', 'Ou tapez pour la trouver')}</label><input type="search" id="opCuSearch" autocomplete="off" placeholder="${escapeHtml(L('For example: Thai', 'Par exemple : thaïlandais'))}"><span class="op-hint" id="opCuNone" hidden>${L('Not on the list? Pick the closest one, or tell us in &ldquo;Anything else?&rdquo; below.', 'Pas dans la liste? Choisissez la plus proche, ou dites-le-nous dans « Autre chose? » plus bas.')}</span></p>
+        <p class="lyv-error" id="opCuLimit" role="alert" hidden></p>
+        <p class="op-cu-q" id="opPlaceQ">${L('What kind of place?', 'Quel genre d’endroit?')} <span class="op-hint">${L('Pick one.', 'Choisissez-en un.')}</span></p>
+        <div class="op-cu-tiles" id="opPlaceTiles" role="group" aria-labelledby="opPlaceQ">${RESTAURANT_PLACE_TYPES.map((p) => `<button type="button" class="op-cu-tile" data-place="${escapeHtml(p)}" data-place-label="${escapeHtml(placeLabel(p))}" aria-pressed="${p === place ? 'true' : 'false'}">${escapeHtml(placeLabel(p))}</button>`).join('')}</div>
+        <span class="op-cuisine-line"><button type="button" class="op-btn" id="opCuisineSave">${L('Save', 'Enregistrer')}</button><span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span></span>
+        <p class="op-hint" id="opCuisineNote">${L('It shows on your page and helps people find you when they search by food.', 'Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine.')}</p>
         <p class="lyv-error" id="opCuisineError" hidden></p>
         <p class="op-hint" id="opCuisineDone" role="status" hidden></p>
         <button type="button" class="op-more op-cb-back" data-pick="" data-cb-back="1">${L('Done, back to my list', 'Terminé, retour à ma liste')}</button>
@@ -55037,7 +55293,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'hours_checked', 'visit_rows'].includes(k) || completeOn))),
+    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'].includes(k) || completeOn))),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -58475,6 +58731,54 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changed: result.changed, expected_current: result.info, visit: result.info ? JSON.parse(result.info) : null });
     }
 
+    // GET /admin/cuisines/:id (2026-11-09) -- a restaurant's cuisines and kind of place, which is also the
+    // compare-and-set value for POST /admin/set-cuisines: { id, name, type, redirect_to, claimed, owner_set,
+    // expected_current: { cuisines: [..], place_type } }. Bearer token; never cached.
+    {
+      const cuRead = /^\/admin\/cuisines\/(\d+)$/.exec(pathname);
+      if (cuRead && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Cuisines endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        const id = Number(cuRead[1]);
+        const v = db.prepare('SELECT id, name, type, cuisine, redirect_to FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, { id, name: v.name, type: v.type, redirect_to: v.redirect_to == null ? null : v.redirect_to, claimed: venueIsClaimed(id),
+          owner_set: ownerCuisineSet(id), expected_current: venueCuisinesState(v) });
+      }
+    }
+
+    // POST /admin/set-cuisines (2026-11-09): { id, expected_current: { cuisines, place_type }, cuisines?, place_type?,
+    // reason, batch_id, restore? } -> guardedCuisinesUpdate. restore: true lets a clean-up Undo put an old off-list label
+    // back exactly as it was. 409 on mismatch or an owner's pick.
+    if (pathname === '/admin/set-cuisines' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Set-cuisines endpoint is not configured.' });
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const extra = Object.keys(body || {}).filter((k) => !['id', 'expected_current', 'cuisines', 'place_type', 'reason', 'batch_id', 'restore'].includes(k));
+      if (extra.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${extra.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!body.expected_current || typeof body.expected_current !== 'object') return sendJSON(res, 400, { error: 'expected_current is required (GET /admin/cuisines/:id).' });
+      const next = {};
+      if ('cuisines' in body) next.cuisines = body.cuisines;
+      if ('place_type' in body) next.place_type = body.place_type;
+      let result;
+      try {
+        result = guardedCuisinesUpdate(body.id, body.expected_current, next, { reason: body.reason, batch_id: body.batch_id, restore: body.restore === true });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Cuisines update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_value_protected: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      if (result.changed) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, cuisines: result.cuisines, place_type: result.place_type });
+    }
+
     // GET /admin/avg-spend/:id (2026-11-08) -- a venue's average spend with its compare-and-set value:
     // { id, name, redirect_to, claimed, expected_current: <stored JSON> | null, avg_spend: {...} | null }. Bearer token; never cached.
     {
@@ -61461,7 +61765,8 @@ module.exports = {
   // Verified mark (2026-10-27)
   guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
-  guardedCuisineUpdate,
+  guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
+  OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,
   createOwnerLink,
   revokeOwnerLink,
   ownerLoginsForVenue,
