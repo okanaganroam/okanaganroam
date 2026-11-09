@@ -84,6 +84,15 @@ test('edit page (restaurant): the buttons show in English and French, never on p
   assert.match(fr, /data-cb-none="happy_hour">Nous n’avons pas de happy hour</);
   assert.match(fr, /data-cb-none="instagram">Nous ne sommes pas sur Instagram</);
   assert.match(fr, /data-cb-none="pyv_takeout">Ni plats à emporter ni livraison</);
+  // Reservations and Takeout sit under "Don't offer these?", never under "We're adding these" ("can't fill these in yet").
+  for (const [page, ask, soon] of [[p, 'Don’t offer these?', 'We’re adding these'], [fr, 'Vous n’offrez pas ceci?', 'Nous ajoutons ceci']]) {
+    const a = page.indexOf(ask), s = page.indexOf(soon);
+    assert.ok(a >= 0 && s > a, 'both lists present, ask first');
+    const soonPart = page.slice(s);
+    assert.ok(!soonPart.includes('data-cb-none='), 'no "we don\'t have one" button in "We\'re adding these"');
+    assert.ok(!soonPart.includes('Réservations') && !soonPart.includes('>Reservations<'), 'Reservations not listed as coming');
+    assert.ok(page.slice(a, s).includes('data-cb-none="pyv_reservations"'));
+  }
 });
 
 test('saving from the edit link: live at once, logged, in "Your updates"; the panel shows Not offered with Undo; the score goes up', async () => {
