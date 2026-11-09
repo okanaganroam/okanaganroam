@@ -132,7 +132,7 @@ test('research never replaces a cuisine the owner picked', async () => {
   assert.equal(row(v.id).cuisine, 'Mediterranean');
 });
 
-test('"These hours are right": the date and source only, never the hours; the 90-day item flips; Undo restores', async () => {
+test('"These hours are right": the date and source only, never the hours; the 30-day item flips; Undo restores', async () => {
   const v = mk('restaurant', { hours: week });
   db.prepare('UPDATE venues SET hours_source = ?, hours_checked_at = ? WHERE id = ?').run('official_website', old(200), v.id);
   const token = tokenFor(v.id);
@@ -168,8 +168,8 @@ test('"These hours are right": the date and source only, never the hours; the 90
   assert.equal(u.ok, true, JSON.stringify(u));
   assert.deepEqual({ ...row(v.id) }, { cuisine: null, hours: hoursBefore, hours_source: 'official_website', hours_checked_at: old(200) });
   // Score module agrees: 89 days fresh, 91 stale.
-  assert.equal(pc.doneMap({ hasHours: true, hoursCheckedAt: old(89) }, today).hours_fresh, true);
-  assert.equal(pc.doneMap({ hasHours: true, hoursCheckedAt: old(91) }, today).hours_fresh, false);
+  assert.equal(pc.doneMap({ hasHours: true, hoursCheckedAt: old(29) }, today).hours_fresh, true);
+  assert.equal(pc.doneMap({ hasHours: true, hoursCheckedAt: old(31) }, today).hours_fresh, false);
 });
 
 test('"These hours are right" is refused without hours, while new hours wait for review, and with anything but true', async () => {

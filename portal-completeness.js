@@ -4,12 +4,12 @@
 // Spec: drafts/portal-completeness-2026-11-08/SPEC-restaurants.md (100 points).
 // Rules (Dayton's defaults until he says otherwise):
 //   - owners see it in their portal only; nothing public, and it never feeds ranking, sorting or indexing;
-//   - hours count as fresh for 90 days after they were last checked or saved;
+//   - hours count as fresh for 30 days (Dayton, Nov 9 2026; was 90) after they were last checked or saved;
 //   - "we don't have one" answers (declaredNone) count as done, once a screen to give them exists;
 //   - an item the owner has no way to fix yet (fix: false) counts when we already have it, and when we don't it
 //     is left out of the total and shown under "We're adding these", so 100% is reachable today.
 
-const HOURS_FRESH_DAYS = 90;
+const HOURS_FRESH_DAYS = 30;
 const DESCRIPTION_MIN = 120;
 const PHOTOS_MIN = 3;
 
@@ -188,6 +188,37 @@ function doneMap(input, today) {
 // -> { pct, got, max, complete, groups: [{ key, got, max, full }], missing: [item + {waiting}], coming: [item],
 //      declined: [item] (told us "we don't have one" and we hold nothing for it), declared: [keys as stored] }
 // opts: { today: 'YYYY-MM-DD', pending: Set of fields waiting for review }
+// "Complete & Verified" badge (Dayton, Nov 9 2026). One rule, used by the public page, cards, the map and the portal:
+//   earned  the score is 100% from live items only (anything waiting for our check is still "missing"), the business
+//           manages the listing (claimed), and the hours were checked within HOURS_FRESH_DAYS (that is an item);
+//   paused  everything is done except the hours check;
+//   none    otherwise. Display only: never read by ranking, sorting or indexing.
+function badgeState(result, claimed) {
+  if (!result || !claimed) return 'none';
+  if (result.complete) return 'earned';
+  const left = (result.missing || []).filter((it) => !it.waiting);
+  if (left.length === 1 && left[0].key === 'hours_fresh' && left.length === (result.missing || []).length) return 'paused';
+  return 'none';
+}
+const BADGE_LABEL = { en: 'Complete & Verified', fr: 'Complète et vérifiée' };
+// The chip (public pages, cards, portal): navy with a gold tick and a gold inner ring. `button` makes it the toggle for
+// the short explanation on a venue page.
+function badgeChipHtml(fr, opts) {
+  const o = opts || {};
+  const label = fr ? BADGE_LABEL.fr : BADGE_LABEL.en;
+  const inner = `<span class="cv-tick" aria-hidden="true">&#10003;</span>${esc(label)}`;
+  return o.button
+    ? `<button type="button" class="chip complete-verified-badge" aria-expanded="false" aria-controls="${o.controls || 'cvExplain'}">${inner}</button>`
+    : `<span class="chip complete-verified-badge">${inner}</span>`;
+}
+const BADGE_CSS = `
+  .chip.complete-verified-badge { display: inline-flex; align-items: center; gap: 6px; background: #1B2B3A; color: #FFFDF8; box-shadow: inset 0 0 0 1.5px #C9A34A; border: 0; font: inherit; font-weight: 800; cursor: default; }
+  button.chip.complete-verified-badge { cursor: pointer; min-height: 32px; }
+  button.chip.complete-verified-badge:focus-visible { outline: 3px solid #C9A34A; outline-offset: 2px; }
+  .chip.complete-verified-badge .cv-tick { display: inline-grid; place-items: center; width: 1.15em; height: 1.15em; border-radius: 50%; background: #C9A34A; color: #1B2B3A; font-size: 0.75em; line-height: 1; }
+  .cv-explain { flex-basis: 100%; margin: 6px 0 2px; padding: 10px 12px; border-radius: 12px; background: rgba(27,43,58,0.06); border: 1px solid rgba(27,43,58,0.14); font-size: 0.9rem; line-height: 1.45; }
+  .cv-explain strong { display: block; }`;
+
 function scoreCompleteness(input, opts) {
   const o = opts || {};
   const done = doneMap(input, o.today);
@@ -405,10 +436,20 @@ function renderCompleteness(result, opts) {
   const prov = !r.complete && nw > 0 && r.pctWithWaiting > r.pct ? r.pctWithWaiting : null;
   const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${r.pct}% now</strong> · about <strong>${prov}%</strong> once we check your ${nw} ${nw === 1 ? 'change' : 'changes'}`, `<strong>${r.pct} % maintenant</strong> · environ <strong>${prov} %</strong> une fois vos ${nw} ${nw === 1 ? 'modification vérifiée' : 'modifications vérifiées'}`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
   const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
+  // Complete & Verified (2026-11-09): what the business sees about the badge, under the ring.
+  const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
+  const chip = badgeChipHtml(fr);
+  const badgeBlock = bState === 'earned'
+    ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
+    : bState === 'paused'
+    ? `<div class="op-cb-badge op-cb-badge-paused" id="opCbBadge"><p><span aria-hidden="true">⏰</span> ${L('Your', 'Votre badge')} ${chip} ${L('badge is paused. Are your hours still right?', 'est en pause. Vos heures sont-elles toujours exactes?')}</p><button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify({ hours_checked: true }))}" data-cb-done="${esc(L('Thanks! Your badge is back.', 'Merci! Votre badge est de retour.'))}">${L('Yes, these are right', 'Oui, elles sont exactes')}</button></div>`
+    : bState === 'none'
+    ? `<div class="op-cb-badge" id="opCbBadge"><p>${chip}</p><p class="op-cb-badge-note">${L('Reach 100% to earn the Complete &amp; Verified badge for your page.', 'Atteignez 100 % pour obtenir le badge Complète et vérifiée pour votre fiche.')}</p></div>`
+    : '';
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
       <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
-      ${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
+      ${badgeBlock}${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
         ${still}
@@ -420,7 +461,13 @@ function renderCompleteness(result, opts) {
     </section>`;
 }
 
-const COMPLETENESS_CSS = `
+const COMPLETENESS_CSS = `${BADGE_CSS}
+    body.owner-page .op-cb-badge { margin: 0 16px 12px; padding: 10px 12px; border-radius: 12px; background: rgba(27,43,58,0.05); border: 1px solid rgba(27,43,58,0.12); }
+    body.owner-page .op-cb-badge p { margin: 0 0 6px; font-weight: 700; }
+    body.owner-page .op-cb-badge p:last-child { margin-bottom: 0; }
+    body.owner-page .op-cb-badge-note { color: #5E544C; font-weight: 600 !important; font-size: .92rem; }
+    body.owner-page .op-cb-badge-earned { background: #E3F1E8; border-color: rgba(30,107,58,0.25); }
+    body.owner-page .op-cb-badge-paused { background: #FFF4DE; border-color: rgba(160,122,27,0.35); }
     body.owner-page .op-cb { margin: 14px 0 6px; background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(42,32,25,.06), 0 6px 18px rgba(42,32,25,.06); }
     body.owner-page .op-cb-head { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 44px; padding: 14px 16px; background: none; border: 0; border-radius: 16px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
     body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; --w: 0; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #E2A23B 0 calc(var(--w) * 1%), #EAE6D9 0); }
@@ -744,4 +791,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

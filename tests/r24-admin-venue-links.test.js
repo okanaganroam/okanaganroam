@@ -1,6 +1,6 @@
 // Researched venue links (2026-10-27): GET /admin/venue-links/:id and POST /admin/set-venue-links write a menu or
 // booking link straight to venue_links, one field at a time with compare-and-set, logged as source 'research'. They
-// never touch owner_change_requests, so the venue stays unclaimed (no "Verified by the venue" pill), and a link the
+// never touch owner_change_requests, so the venue stays unclaimed (no "Verified by the business" pill), and a link the
 // owner set last is kept unless force_owner: true.
 // Runs on a throwaway database (like server.test.js); run `git checkout -q okanagan.db` afterwards.
 'use strict';
@@ -165,7 +165,7 @@ test('Owner value wins: a link the owner set last is refused (409 owner_value) u
   });
 });
 
-test('Venue page: a researched menu shows "See the menu" with no "Verified by the venue" pill; venueIsClaimed stays false', async () => {
+test('Venue page: a researched menu shows "See the menu" with no "Verified by the business" pill; venueIsClaimed stays false', async () => {
   const v = mk({ name: 'Links Page Bistro' });
   assert.doesNotMatch(page(v), /See the menu/);
   assert.doesNotMatch(page(v), /<p class="venue-verified-wrap">/);
