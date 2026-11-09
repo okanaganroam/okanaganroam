@@ -19,7 +19,7 @@ function frTime(h, mm, ap) {
 const TIME = '(\\d{1,2})(?::(\\d\\d))? ?(AM|PM|am|pm)';
 
 const FR_CUISINE = {
-  'Italian': 'Italien', 'Pub Fare': 'Cuisine de pub', 'Japanese': 'Japonais', 'Indian': 'Indien', 'Mexican': 'Mexicain', 'Coffee': 'Café',
+  'Italian': 'Italien', 'Comfort food': 'Cuisine réconfortante', 'Pub Fare': 'Cuisine de pub', 'Japanese': 'Japonais', 'Indian': 'Indien', 'Mexican': 'Mexicain', 'Coffee': 'Café',
   'Breakfast & Brunch': 'Déjeuner et brunch', 'Dessert': 'Desserts', 'Chinese': 'Chinois', 'Bakery': 'Boulangerie', 'Café': 'Café',
   'Seafood': 'Poissons et fruits de mer', 'Pizza': 'Pizza', 'West Coast': 'Cuisine de la côte Ouest', 'Vietnamese': 'Vietnamien', 'BBQ': 'BBQ',
   'French': 'Français', 'Farm-to-Table': 'De la ferme à la table', 'Burgers': 'Burgers', 'Thai': 'Thaïlandais', 'Steakhouse': 'Grilladerie',

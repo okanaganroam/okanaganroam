@@ -100,11 +100,13 @@ test('score: hours count as fresh for 90 days, then "Confirm hours" is missing (
   assert.equal(m.pct, Math.floor(((m.got) / m.max) * 100));
 });
 
-test('score: "we don\'t have one" answers count as done; a non-alcoholic place is not asked for a happy hour', () => {
+test('score: "we don\'t have one" answers count as done; the non-alcoholic OPTIONS badge does not exempt happy hour', () => {
   const r = score({ instagramUrl: '', facebookUrl: '', specialsCount: 0, website: '', declaredNone: ['instagram', 'facebook', 'specials', 'website'] });
   assert.deepEqual(r.missing, []); assert.equal(r.pct, 100);
+  // "nonalcoholic" = has mocktails / NA beer (Earls, The Keg...), so happy hour is still asked; "We don't have one" answers it.
   const dry = score({ hasHappyHour: false, nonalcoholic: true });
-  assert.equal(dry.complete, true); assert.equal(dry.max, 96);
+  assert.deepEqual(dry.missing.map((i) => i.key), ['happy_hour']); assert.equal(dry.max, 100);
+  assert.equal(score({ hasHappyHour: false, nonalcoholic: true, declaredNone: ['happy_hour'] }).complete, true);
   const wet = score({ hasHappyHour: false });
   assert.deepEqual(wet.missing.map((i) => i.key), ['happy_hour']);
   // A non-alcoholic place that has a happy hour still gets the credit.
@@ -146,7 +148,7 @@ test('render: ring, headline, missing rows with buttons, done groups, the "only 
   assert.match(en, new RegExp(`Your page is ${r.pct}% complete`));
   assert.match(en, /id="opCbToggle"[^>]*aria-expanded="false"/);
   assert.match(en, /id="opCbPanel" hidden/);
-  assert.match(en, /Quick ones|When you have a few minutes/); assert.match(en, /Done so far/);
+  assert.match(en, /Quick ones|When you have a few minutes/); assert.match(en, /<details class="op-cb-done"><summary>See what’s done<\/summary>/);
   assert.match(en, /data-cb-task="photos" data-cb-id="photos">Add photos</);
   assert.match(en, /data-cb-task="contact" data-cb-id="opInstagram">Add Instagram</);
   assert.match(en, /Only you see this score\. It never changes where you show up in search\./);
@@ -296,7 +298,7 @@ test('no ranking, sorting or indexing code reads the score', () => {
   const lines = (i) => src.slice(0, i).split('\n').length;
   // "We don't have one" (2026-11-08): the owner's own save path also reads the item list (to check, store and describe
   // the answers). These are owner-portal functions only; none feeds ranking, sorting, indexing or a public page.
-  const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText'].map((name) => {
+  const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText', 'function ownerMainPhotoPositionHtml'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
     return [lines(a), lines(src.indexOf('\n}\n', a))];

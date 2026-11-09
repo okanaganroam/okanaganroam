@@ -167,8 +167,8 @@ function scoreCompleteness(input, opts) {
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
-  // Happy hour is only asked of places that serve alcohol: a non-alcoholic place with no happy hour is exempt.
-  if (input && input.nonalcoholic && !done.happy_hour) na.happy_hour = true;
+  // (Polish 2026-11-08) The "nonalcoholic" badge means "has non-alcoholic options" (mocktails, NA beer), not "serves no
+  // alcohol", so it no longer exempts a place from happy hour. A place with no happy hour says so with "We don't have one".
   // A Happy Hour badge with no times: a stored "we don't have one" would contradict the badge, so it doesn't count.
   const hhBadgeOnly = !!(input && input.happyHourBadge) && !done.happy_hour && !na.happy_hour;
   if (hhBadgeOnly) none.delete('happy_hour');
@@ -252,6 +252,8 @@ function hoursLine(week, fr) {
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // The bar and its panel. `menuHref`: where "Add menu" goes. Nothing here is public: it is only ever put in the owner page.
+// Shorter panel (polish 2026-11-08): the quick ones, then the next few longer ones; the rest behind "Show all".
+const LATER_SHOWN = 3;
 function renderCompleteness(result, opts) {
   const o = opts || {};
   const fr = !!o.fr;
@@ -317,7 +319,7 @@ function renderCompleteness(result, opts) {
     return `<li class="op-cb-row" data-cb-item="${esc(it.key)}"><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><div class="op-cb-txt"><strong>${esc(fr ? it.fr : it.en)}</strong>${why}</div><div class="op-cb-act">${act}</div>${noneBtn(it) ? `<div class="op-cb-alt">${noneBtn(it)}</div>` : ''}</li>`;
   };
   const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
-  const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.map(row).join('')}</ul>` : '';
+  const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.slice(0, LATER_SHOWN).map(row).join('')}</ul>${later.length > LATER_SHOWN ? `<details class="op-cb-all"><summary>${L(`Show all (${later.length - LATER_SHOWN} more)`, `Tout afficher (${later.length - LATER_SHOWN} de plus)`)}</summary><ul class="op-cb-list">${later.slice(LATER_SHOWN).map(row).join('')}</ul></details>` : ''}` : '';
   const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}</ul>` : '';
   // The last steps (live check 2026-11-08): photos and the storefront spot, said plainly once they are among what's left.
   const leftKeys = r.missing.filter((it) => !it.waiting).map((it) => it.key);
@@ -348,7 +350,7 @@ function renderCompleteness(result, opts) {
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
         ${still}
-        <h3 class="op-cb-h3">${L('Done so far', 'Déjà fait')}</h3><div class="op-cb-groups">${groups}</div>
+        <details class="op-cb-done"><summary>${L('See what’s done', 'Voir ce qui est fait')}</summary><div class="op-cb-groups">${groups}</div></details>
         ${declinedHtml}
         ${comingHtml}
         <p class="op-cb-note">${L('Only you see this score. It never changes where you show up in search.', 'Vous seul voyez ce pointage. Il ne change jamais votre position dans les recherches.')}</p>
@@ -409,6 +411,9 @@ const COMPLETENESS_CSS = `
     body.owner-page .op-cb-waiting .op-cb-sent { color: #67470C; }
     body.owner-page .op-cb-hl { outline: 3px solid #E9B949; outline-offset: 4px; border-radius: 8px; }
     body.owner-page .op-cb-yay { margin: 0 16px 14px; padding: 10px 12px; border-radius: 10px; background: #E7F3EC; color: #1E6B3A; font-weight: 800; }
+    body.owner-page .op-cb-all, body.owner-page .op-cb-done { margin: 10px 0 0; }
+    body.owner-page .op-cb-all > summary, body.owner-page .op-cb-done > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-weight: 800; color: #1E4F4C; cursor: pointer; }
+    body.owner-page .op-cb-done[open] > summary { margin-bottom: 6px; }
     body.owner-page .op-cb-err { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: #FBE9E7; color: #8A2A1B; font-weight: 700; }
     @media (min-width: 900px) { body.owner-page .op-cb-row { grid-template-columns: 36px 1fr auto; align-items: center; } body.owner-page .op-cb-act { grid-column: 3; } }`;
 
@@ -560,4 +565,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
