@@ -1249,6 +1249,18 @@ CREATE TABLE IF NOT EXISTS venue_avg_spend (
 );
 `);
 
+// "We don't have one" (2026-11-08): items of the owner portal's completeness list that the owner told us their place
+// does not offer (no happy hour, no Instagram, no takeout...). Owner portal only: nothing public reads it. It counts the
+// item as done in their score, and our research never adds that item back while it is here. server.js venueNotOffered.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_not_offered (
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  item TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (venue_id, item)
+);
+`);
+
 // Instant owner edits (2026-10-18): a signed-in owner's hours, season, phone, description, badges, happy hour and
 // price range go live at once. The row is still written to owner_change_requests (status 'approved', instant = 1,
 // reviewed_by 'owner:<email>') as the audit trail, with what it replaced in `previous`; undo_meta keeps the hours
