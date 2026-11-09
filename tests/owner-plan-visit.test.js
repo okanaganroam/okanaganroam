@@ -210,7 +210,7 @@ test('indexing: Plan your visit lines are not owner content (yet); like any live
   assert.equal((await post(tokenFor(v.id), { visit_rows: { known_for: 'Pizza' } })).status, 201);
   assert.equal(app.venueIsClaimed(v.id), true);
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows'\)/);
+  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine', (?:'[a-z_]+', )*'hours_checked', 'visit_rows'\)/);
 });
 
 test('other types: no Plan your visit section, and the field is refused (EN + FR pages)', async () => {

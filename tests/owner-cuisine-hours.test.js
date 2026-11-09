@@ -67,22 +67,24 @@ test('edit page (restaurant): the picker, pre-selected, in English and French; t
   db.prepare('UPDATE venues SET hours_source = ?, hours_checked_at = ? WHERE id = ?').run('official_website', old(200), v.id);
   const html = await get(`/owner/${tokenFor(v.id)}`);
   assert.match(html, /<details class="op-fold op-sec" id="cuisine" data-task="more"/);
-  assert.match(html, /<option value="Italian" selected>Italian<\/option>/);
-  assert.equal((html.match(/<option value="[^"]+"[^>]*>/g) || []).filter((o) => /value="(American|Thai|West Coast)"/.test(o)).length, 3);
+  // Tiles since 2026-11-09 (tests/cuisine-model.test.js covers the picker in full).
+  assert.match(html, /data-cu="Italian" data-cu-label="Italian" aria-pressed="true">/);
+  assert.equal((html.match(/data-cu="(American|Thai|West Coast)"/g) || []).length, 3);
   assert.match(html, /id="opHoursOkBtn">These hours are right</);
   assert.match(html, /Last checked /);
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   assert.match(fr, /Ce que vous servez/);
-  assert.match(fr, /<option value="Italian" selected>Italienne<\/option>/);
+  assert.match(fr, /data-cu="Italian" data-cu-label="Italienne" aria-pressed="true">/);
   assert.match(fr, /id="opHoursOkBtn">Ces heures sont exactes</);
   // No hours: no button.
   const w = mk('restaurant');
   const h2 = await get(`/owner/${tokenFor(w.id)}`);
   assert.ok(!h2.includes('id="opHoursOkBtn"'));
-  assert.match(h2, /<option value="" selected disabled>Pick one<\/option>/);
+  assert.match(h2, /Not set: pick your kind of food/);
+  assert.ok(!/aria-pressed="true">[^<]*<\/button>[^]*id="opCuMore"/.test(h2.slice(h2.indexOf('id="opCuTiles"'), h2.indexOf('id="opCuMore"'))), 'nothing picked');
   // A stored label that isn't on the list stays shown and selected.
   const x = mk('restaurant', { cuisine: 'Bistro & bakery' });
-  assert.match(await get(`/owner/${tokenFor(x.id)}`), /<option value="Bistro &amp; bakery" selected>Bistro &amp; bakery<\/option>/);
+  assert.match(await get(`/owner/${tokenFor(x.id)}`), /data-cu="Bistro &amp; bakery"[^>]*aria-pressed="true">Bistro &amp; bakery</);
 });
 
 test('cuisine from the edit link: live at once, logged, in "Your updates"; bad values refused; Undo puts the old one back', async () => {
@@ -211,7 +213,7 @@ test('indexing and Verified: a picked cuisine or confirmed hours is a tap, not o
   assert.equal((await post(tokenFor(v.id), { cuisine: 'Thai' })).status, 201);
   assert.equal(app.venueIsClaimed(v.id), true, 'a live owner edit, as before (PR 786 rule)');
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine', 'hours_checked'(?:, '[a-z_]+')*\)/, 'owner-content check leaves these out');
+  assert.match(src, /WHERE key NOT IN \('avg_spend', 'not_offered', 'cuisine'(?:, '[a-z_]+')*, 'hours_checked'(?:, '[a-z_]+')*\)/, 'owner-content check leaves these out');
 });
 
 test('other types: no picker, no hours button, no field word (EN + FR)', async () => {

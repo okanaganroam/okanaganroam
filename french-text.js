@@ -40,6 +40,9 @@ const FR_CUISINE = {
   'Casual winery bistro': 'Bistro de vignoble décontracté', 'Casual eatery': 'Restaurant décontracté', 'Café & bubble tea': 'Café et thé aux perles',
   'Brunch': 'Brunch', 'Bistro & bakery': 'Bistro et boulangerie', 'Bakery & breakfast/lunch bistro': 'Boulangerie et bistro déjeuner-dîner',
   'Austrian café and pastry': 'Café et pâtisserie autrichiens',
+  // The restaurant cuisine list of 2026-11-09.
+  'Chicken & Wings': 'Poulet et ailes', 'Fish & Chips': 'Fish and chips', 'Noodles & Ramen': 'Nouilles et ramen', 'Spanish & Tapas': 'Espagnol et tapas',
+  'Poke & Hawaiian': 'Poké et hawaïen', 'Contemporary & Global': 'Contemporain et international',
 };
 
 const FR_TEXT = {

@@ -38,8 +38,10 @@ const termWhere = (m) => [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 
 
 // Build My Trip's food rule (unchanged): the stored cuisine, or the
 // visitor's own word in the venue's name, cuisine or description.
+// A restaurant with up to 3 cuisines (2026-11-09) matches any of them; v.cuisines is the lower-cased list.
+function hasCuisine(v, c) { return v.cuisine === c || (Array.isArray(v.cuisines) && v.cuisines.includes(c)); }
 function foodMatch(v, ft) {
-  if (ft.cuisine && v.cuisine === ft.cuisine) return { cuisine: true };
+  if (ft.cuisine && hasCuisine(v, ft.cuisine)) return { cuisine: true };
   return termMatch(v, ft.term);
 }
 
@@ -169,7 +171,7 @@ function isExcluded(v, plan) {
     if (field === 'type' && hasType(v, [value])) return true;
     if (field === 'primary_type' && v.type === value) return true;
     if (field === 'region' && v.region === value) return true;
-    if (field === 'cuisine' && v.cuisine === value) return true;
+    if (field === 'cuisine' && hasCuisine(v, value)) return true;
     if (field === 'collection' && v.collections.includes(value)) return true;
     if (field === 'activity' && v.activities.includes(value)) return true;
     if (field === 'budget' && v.price != null && Number(v.price) === UPSCALE_PRICE) return true;
@@ -218,7 +220,8 @@ function searchVenues(intent, venues) {
     let tier = 0;
     let cuisineOn = null;
     if (cuisines.length) {
-      if (cuisines.includes(v.cuisine)) { score += 2; cuisineOn = `cuisine:${v.cuisine}`; } else {
+      const cuHit = cuisines.find((c) => hasCuisine(v, c));
+      if (cuHit) { score += 2; cuisineOn = `cuisine:${cuHit}`; } else {
         // A dish word the venue itself uses: the best-placed mention wins.
         let best = null;
         for (const d of dishWords) {
@@ -276,7 +279,7 @@ function searchVenuesAnyWord(intent, venues) {
     if (!F.every((f) => hasFeature(v, f))) continue;
     if (!C.every((c) => v.collections.includes(c))) continue;
     if (A.length && !A.some((a) => v.activities.includes(a))) continue;
-    if (cuisines.length && !cuisines.includes(v.cuisine)) continue;
+    if (cuisines.length && !cuisines.some((c) => hasCuisine(v, c))) continue;
     let hits = 0, score = 0;
     const matchedOn = [];
     for (const term of terms) {
