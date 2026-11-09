@@ -135,7 +135,10 @@ test('"These hours are right": the date and source only, never the hours; the 90
   db.prepare('UPDATE venues SET hours_source = ?, hours_checked_at = ? WHERE id = ?').run('official_website', old(200), v.id);
   const token = tokenFor(v.id);
   const before = await get(`/owner/${token}`);
-  assert.ok(panel(before).includes('data-cb-task="hours" data-cb-id="opHoursOk">Confirm hours<'), 'in Still to add with its button');
+  // One tap right in the row (fresh-eyes 2026-11-08): the hours as text, "Yes, these are right" and "Change them".
+  assert.ok(panel(before).includes('data-cb-save="{&quot;hours_checked&quot;:true}"'), 'the row saves hours_checked in one tap');
+  assert.ok(panel(before).includes('>Yes, these are right<') && panel(before).includes('data-cb-task="hours" data-cb-id="hours">Change them<'));
+  assert.ok(panel(before).includes('Are your hours still right?'));
   const hoursBefore = row(v.id).hours;
   const r = await post(token, { hours_checked: true });
   assert.equal(r.status, 201, JSON.stringify(r.body));
@@ -193,10 +196,10 @@ test('panel: cuisine and fresh hours are in "Still to add", not "We\'re adding t
   const p = panel(await get(`/owner/${tokenFor(v.id)}`));
   const soon = p.slice(p.indexOf('We’re adding these'));
   assert.ok(p.includes('data-cb-task="more" data-cb-id="cuisine">Pick cuisine<'));
-  assert.ok(p.includes('data-cb-task="hours" data-cb-id="opHoursOk">Confirm hours<'));
-  assert.ok(!soon.includes('What you serve') && !soon.includes('Hours checked in the last 90 days'));
+  assert.ok(p.includes('>Yes, these are right<'));
+  assert.ok(!soon.includes('What you serve') && !soon.includes('Are your hours still right?'));
   const fr = panel(await get(`/fr/owner/${tokenFor(v.id)}`));
-  assert.ok(fr.includes('>Choisir<') && fr.includes('>Confirmer<'));
+  assert.ok(fr.includes('>Choisir<') && fr.includes('>Oui, elles sont exactes<') && fr.includes('Vos heures sont-elles toujours exactes?'));
   for (const k of ['cuisine', 'hours_fresh']) assert.equal(pc.ITEMS.find((i) => i.key === k).fix, true);
 });
 
