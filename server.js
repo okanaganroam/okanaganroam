@@ -54764,6 +54764,7 @@ const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page .op-cu-tile[aria-pressed="true"] { background: #DCEBE8; border-color: #1E4F4C; box-shadow: inset 0 0 0 2px #1E4F4C; }
     body.owner-page .op-cu-tile[aria-pressed="true"]::before { content: "\u2713 "; color: #1E4F4C; }
     body.owner-page .op-cu-more { display: block; margin: 0 0 8px; }
+    body.owner-page .op-cu-more[hidden], body.owner-page .op-cu-search[hidden], body.owner-page .op-cu-picked[hidden] { display: none; }
     body.owner-page .op-cu-search { margin: 4px 0 8px; }
     body.owner-page .op-cu-search label { display: block; font-weight: 800; margin-bottom: 4px; }
     body.owner-page .op-cu-search input { width: 100%; min-height: 48px; font: inherit; padding: 8px 12px; border-radius: 12px; border: 2px solid rgba(42,32,25,.18); }
