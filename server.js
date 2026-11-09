@@ -43797,9 +43797,12 @@ const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges
 // Cuisine picker (2026-11-08): restaurants only (the types with a completeness list). One value, as venues.cuisine holds one label. Only
 // labels the site already uses for restaurants, each with its French name in french-text.js FR_CUISINE (frCuisine), so a
 // pick never adds a new word to search, the trip planner or the filters. No free text: "not listed?" goes in the note.
-const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Casual dining', 'Chicken',
-  'Chinese', 'Contemporary Canadian', 'Cuban', 'Dessert', 'Diner', 'Ethiopian', 'Family dining', 'Farm-to-Table', 'Filipino', 'French', 'German',
-  'Greek', 'Healthy', 'Indian', 'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Pizza',
+// Polish (2026-11-08): + Asian and Fast Food (already used, with French names) and Comfort food (new, French added in
+// french-text.js). Still one pick: venues.cuisine is one label used as-is by filters, search and servesCuisine, and a
+// combined label ("Italian & Pizza") would split the cuisine filters and have no French name.
+const OWNER_CUISINES = ['American', 'Asian', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Casual dining', 'Chicken',
+  'Chinese', 'Comfort food', 'Contemporary Canadian', 'Cuban', 'Dessert', 'Diner', 'Ethiopian', 'Family dining', 'Farm-to-Table', 'Filipino', 'French', 'German',
+  'Fast Food', 'Greek', 'Healthy', 'Indian', 'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Pizza',
   'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Spanish', 'Steakhouse', 'Sushi', 'Taiwanese', 'Tapas', 'Thai', 'Turkish',
   'Ukrainian', 'Vegan', 'Vegetarian', 'Vietnamese', 'West Coast'];
 const OWNER_CUISINE_ERROR = 'Please pick what you serve from the list. Not there? Tell us in the note below.';
@@ -50348,10 +50351,10 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, ouvrez <strong>Dépense moyenne par personne</strong> (affichée pour les restaurants et les pubs).</li><li>Indiquez à peu près ce que <strong>dépense une personne pour un plat principal et une boisson sans alcool</strong>, en dollars entiers (par exemple <strong>25</strong>, de 5 $ à 300 $). Si nous avons déjà calculé une estimation d’après votre menu, elle est déjà inscrite : modifiez-la si elle est inexacte, ou touchez <strong>C’est exact</strong>.</li><li>Touchez {SEND} si vous avez changé le nombre. <strong>C’est exact</strong> enregistre tout seul.</li></ol><p>{LIVE} C’est ensuite votre chiffre : nous ne le remplacerons pas. Laissez la case vide pour garder ce que nous avons. Ce n’est pas la même chose que la <strong>Gamme de prix</strong> ($ à $$$$), qui reste telle quelle.</p>' },
   // Completeness bar (2026-11-08): only offered on the edit page of a restaurant (completenessOnly).
   { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
-    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
+    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'show all', 'see what s done', 'last steps', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
     keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage', 'pointage n a pas monte', 'n a pas monte', 'ne monte pas', 'est ce que ca a marche', 'en attente de notre verification', 'en attente de verification'],
-    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Score didn’t go up?</strong> Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the lighter part of the ring) and count once we approve them, usually within a day.</li><li>The one item under <strong>We’re adding these</strong>, <strong>Confirmed by you</strong>, can’t be filled in yet. It counts once you can; saving any change already adds the Verified mark.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
-    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li><strong>Le pointage n’a pas monté?</strong> Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie plus pâle de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée.</li><li>Le seul élément sous <strong>Nous ajoutons ceci</strong>, <strong>Confirmée par vous</strong>, ne peut pas encore être rempli. Il comptera dès que ce sera possible; enregistrer une modification ajoute déjà la mention Vérifiée.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Score didn’t go up?</strong> Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the lighter part of the ring) and count once we approve them, usually within a day.</li><li><strong>Quick ones</strong> come first: each takes a few seconds. The rest are under <strong>When you have a few minutes</strong>; tap <strong>Show all</strong> to see every one, and <strong>See what’s done</strong> for what already counts.</li><li><strong>Photos and your storefront spot</strong> are the last steps to 100% for most places. Do them when you’re at your place with a few minutes.</li><li>Saving any change counts as <strong>Confirmed by you</strong> and adds the Verified mark to your page.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li><strong>Le pointage n’a pas monté?</strong> Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie plus pâle de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée.</li><li>Les <strong>éléments rapides</strong> viennent en premier : chacun prend quelques secondes. Les autres sont sous <strong>Quand vous aurez quelques minutes</strong>; touchez <strong>Tout afficher</strong> pour tous les voir, et <strong>Voir ce qui est fait</strong> pour ce qui compte déjà.</li><li><strong>Les photos et l’emplacement de votre devanture</strong> sont les dernières étapes vers 100 % pour la plupart des établissements. Faites-les quand vous êtes sur place avec quelques minutes.</li><li>Enregistrer une modification compte comme <strong>Confirmée par vous</strong> et ajoute la mention Vérifiée à votre fiche.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
@@ -53968,6 +53971,8 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
   let wide = false;
   try { wide = venueGalleryPhotos({ ...venue, image_url: main }, L).length < 2; } catch (e) { wide = false; }
   const own = /^\/images\/owner\//.test(main);
+  // Restaurant polish (2026-11-08): no "Slide it" on the edit link (sliding needs a login), and say what the previews are.
+  const polish = COMPLETENESS_TYPES.has(venue.type);
   const img = (cls) => `<img src="${escapeHtml(main)}" alt="" loading="lazy" class="op-pos-img ${cls}" style="object-position: 50% ${y}%">`;
   const controls = signedIn
     ? `<div class="op-pos-controls">
@@ -53978,7 +53983,10 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
     : `<p class="op-hint">${L('To move the photo up or down in the banner, <a href="#opLogin">create a login</a> (it takes 30 seconds) and open your listing from <strong>My listings</strong>.', 'Pour monter ou descendre la photo dans la bannière, <a href="#opLogin">créez un compte</a> (ça prend 30 secondes) et ouvrez votre fiche depuis <strong>Mes fiches</strong>.')}</p>`;
   return `<div class="op-pos" id="opPos">
       <h3 class="op-pos-title">${L('Main photo on your page', 'Photo principale de votre page')}</h3>
-      <p class="op-hint">${L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
+      <p class="op-hint">${polish && !signedIn
+        ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone.')
+        : polish ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone. Faites-la glisser pour montrer la meilleure partie.')
+        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
         ? L('We chose this photo for you. To use one of yours instead, tap <strong>Make main photo</strong> on it below.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, touchez <strong>Choisir comme photo principale</strong> sous celle-ci.')
         : L('We chose this photo for you. To use one of yours instead, upload it below, then tap <strong>Make main photo</strong> on it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous, puis touchez <strong>Choisir comme photo principale</strong>.'))}</p>
       <div class="op-pos-previews">
@@ -53994,6 +54002,15 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 const COMPLETENESS_TYPES = new Set(['restaurant']);
 // Cuisine picker and "These hours are right" (2026-11-08): their styles and page script (restaurants only).
 const OWNER_CUISINE_HOURS_CSS = `
+    body.owner-page #ofProgress.op-ok { color: #1E6B3A; font-weight: 800; }
+    @media (max-width: 699px) {
+      /* Restaurant polish (2026-11-08): on phones a floating corner button always sits on top of some field or button
+         as you scroll, so Help is a small round "?" at the top right of the page, beside "Owner edit page", and scrolls
+         with it. Its name stays "Help" for screen readers; the help panel itself still opens over the page. */
+      body.owner-page { position: relative; }
+      body.owner-page .ohb-btn, body.owner-page:has(.op-unsent:not([hidden])) .ohb-btn { position: absolute; top: 88px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; }
+      body.owner-page .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
+    }
     body.owner-page .op-hours-ok { margin: 12px 0 4px; padding: 12px 14px; background: #EEF5F3; border-radius: 12px; }
     body.owner-page .op-hours-ok .op-hint { margin: 0 0 8px; }
     body.owner-page .op-hours-ok-btn { min-height: 44px; }
@@ -54173,6 +54190,18 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
   // Completeness bar (2026-11-08): restaurants only; everything it adds is inside this flag.
   const completeOn = COMPLETENESS_TYPES.has(venue.type);
+  // Price range sits inside the average-spend section for restaurants (polish 2026-11-08), so owners aren't asked "what
+  // does one person spend" twice. Still editable there; never derived from average spend automatically (see PR).
+  const priceInSpend = completeOn && !!portalFields(venue.type).price && !!portalFields(venue.type).avgSpend;
+  const priceHint = snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement');
+  const priceFieldHtml = `      <div class="form-row full"><div class="form-field">
+        <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
+          <option value="">${L('Not set', 'Non indiquée')}</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[n])} ${L('per person', 'par personne')}</option>`).join('')}
+        </select>
+        <p class="op-hint" id="opPriceScale">${L('Pick what one person usually spends on a visit.', 'Choisissez ce qu’une personne dépense habituellement par visite.')}</p>
+        <p class="lyv-error" id="opPriceError" hidden></p>
+      </div></div>
+`;
   // Cuisine picker and "These hours are right" (2026-11-08): restaurants only, inside completeOn like the bar.
   const ymdText = (d) => { const x = new Date(`${d}T12:00:00Z`); return Number.isNaN(x.getTime()) ? '' : x.toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }); };
   const hoursOkHtml = () => {
@@ -54452,7 +54481,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-cl-remove, body.owner-page .op-cl-add { background: none; border: 0; color: var(--ref-navy); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 10px 4px; min-height: 44px; }
   body.owner-page .op-cl-remove { color: #9C2F22; }
   body.owner-page #opSeasonalFields .op-season input[type=text] { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); font: inherit; font-size: 1rem; }
-  body.owner-page #opPrice { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }${avgSpendOn ? `
+  body.owner-page #opPrice { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }${priceInSpend ? `
+  body.owner-page .op-price-sub { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(42,32,25,0.12); }
+  body.owner-page .op-price-sub > summary { min-height: 44px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-weight: 800; cursor: pointer; }` : ''}${avgSpendOn ? `
   body.owner-page .op-money { display: inline-flex; align-items: center; gap: 6px; font-size: 1.1rem; font-weight: 700; margin: 4px 0 2px; }
   body.owner-page #opAvg { width: 7rem; min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1.1rem; }
   body.owner-page .op-avg-est { background: #FFF6E5; border-radius: 12px; padding: 10px 14px; margin: 8px 0; }
@@ -54630,7 +54661,11 @@ ${renderGolfHeaderHtml()}
       <aside class="op-helpme" id="opHelpMe" data-task="home hours photos arrival video events contact happy more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
       })()}
       <div data-task="all">
-      ${instantOn
+      ${instantOn && completeOn
+    ? L(`<p>Your changes go live on <a href="${escapeHtml(listing)}">your page</a> as soon as you save them. A new name, address, website or link is checked first, usually within a day.</p>
+      <p class="op-reassure">Free. Start with the quick ones in the bar above; you can change anything again at any time.</p>`, `<p>Vos modifications sont en ligne sur <a href="${escapeHtml(listing)}">votre fiche</a> dès que vous les enregistrez. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
+      <p class="op-reassure">Gratuit. Commencez par les éléments rapides dans la barre ci-dessus; vous pouvez tout modifier de nouveau en tout temps.</p>`)
+    : instantOn
     ? L(`<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Enregistrer les modifications</strong>. Vos heures, votre saison, votre téléphone, votre description, vos caractéristiques${showHappyHour ? ', votre happy hour' : ''} et votre gamme de prix sont mis en ligne sur <a href="${escapeHtml(listing)}">votre page</a> tout de suite. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
       <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; vous pouvez tout modifier de nouveau en tout temps.</p>`)
@@ -54730,17 +54765,10 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
-      ${!portalFields(venue.type).price ? '' : `
+      ${!portalFields(venue.type).price || priceInSpend ? '' : `
       <details class="op-fold op-sec" id="price" data-task="more"${waitingFields.has('price_range') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement')}</span></summary>
-      <div class="form-row full"><div class="form-field">
-        <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
-          <option value="">${L('Not set', 'Non indiquée')}</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[n])} ${L('per person', 'par personne')}</option>`).join('')}
-        </select>
-        <p class="op-hint" id="opPriceScale">${L('Pick what one person usually spends on a visit.', 'Choisissez ce qu’une personne dépense habituellement par visite.')}</p>
-        <p class="lyv-error" id="opPriceError" hidden></p>
-      </div></div>
-      </details>`}${!avgSpendOn ? '' : `
+      <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${priceHint}</span></summary>
+${priceFieldHtml}      </details>`}${!avgSpendOn ? '' : `
       <details class="op-fold op-sec" id="avgspend" data-task="more"${avgNow && !avgByOwner ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opAvgLabel">${L('Average spend per person', 'Dépense moyenne par personne')}</span> <span class="op-fold-hint" id="opAvgHint">${avgByOwner ? L(`${avgMoney(avgNow.amount)}, set by you`, `${avgMoney(avgNow.amount)}, indiqué par vous`) : avgNow ? L(`About ${avgMoney(avgNow.amount)}, our estimate: please check it`, `Environ ${avgMoney(avgNow.amount)}, notre estimation : veuillez la vérifier`) : L('Not set', 'Non indiqué')}</span></summary>
       <div class="form-row full"><div class="form-field">
@@ -54750,7 +54778,10 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
         <p class="lyv-error" id="opAvgError" hidden></p>
         ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
         <p class="op-hint" id="opAvgDone" role="status" hidden></p>
-      </div></div>
+      </div></div>${priceInSpend ? `
+      <details class="op-price-sub" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
+      <summary><span id="opPriceLabel">${L('Price level on your page', 'Niveau de prix sur votre fiche')}${waitChip('price_range')}</span> <span class="op-fold-hint">${priceHint}</span></summary>
+${priceFieldHtml}      </details>` : ''}
       </details>`}
       ${showHappyHour ? `
       <details class="op-fold op-sec" id="happy" data-task="happy more">
@@ -55631,7 +55662,8 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       btn.disabled = false;
       progress.textContent = !sent ? '' : liveCount ? (sent === 1 ? T.upLive1 : T.upLiveN.replace('{n}', sent))
         : (sent === 1 ? T.upRev1 : T.upRevN.replace('{n}', sent)) + (emailVal('ofEmail').trim() ? (sent === 1 ? T.upMail1 : T.upMailN) : '.');
-      if (problems.length) show('ofFormError', problems.join(' '));
+      if (problems.length) show('ofFormError', problems.join(' '));${completeOn ? `
+      progress.classList.toggle('op-ok', !!sent);` : ''}
       if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos(); }
     }).catch(function(){ btn.disabled = false; show('ofFormError', T.upNet); });
   });

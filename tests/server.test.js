@@ -26072,7 +26072,10 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   assert.equal(made.status, 201);
   const cookie = made.cookie;
   const page = await get(`/owner/account/venue/${v.id}`, cookie);
-  assert.match(page, /go live on <a href="[^"]+">your page<\/a> straight away/);
+  // A restaurant's signed-in intro (portal polish 2026-11-08): live on save, quick ones first, no time total.
+  assert.match(page, /Your changes go live on <a href="[^"]+">your page<\/a> as soon as you save them\./);
+  assert.match(page, /Start with the quick ones in the bar above/);
+  assert.doesNotMatch(page, /about 5 minutes/);
   assert.match(page, /id="opSubmit"[^>]*>Save changes</);
   assert.match(page, /\$\$ &mdash; \$15–30 per person/, 'price range selector with its scale');
   // Portal polish (2026-10-18): the scale shows once, in the choices; the hint no longer repeats it.
