@@ -32329,35 +32329,35 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     app.clearHoursExtraCache();
     const withShut = app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(shut), pick(ok[1]), pick(ok[2]), pick(ok[3])] }, now: new Date() });
     assert.ok(!withShut.includes('Pick Shut This Week'), 'closed today: skipped');
-    // Full rows only: five, six or seven usable picks show four (never a ragged row).
+    // Four picks a week (2026-11-09): however many are usable, the row shows four.
     const five = [add('Pick Five A', 'cafe', '/images/venues/p5a.jpg'), add('Pick Five B', 'cafe', '/images/venues/p5b.jpg'), add('Pick Five C', 'cafe', '/images/venues/p5c.jpg')];
     const sevenHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [...ok, ...five].map(pick) }, now: new Date() });
     assert.equal((sevenHtml.match(/home-editors-card/g) || []).length, 4, 'seven usable picks show four');
-    // Eight usable with a skipped one in front: the backup steps in, and the row is a full eight.
-    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ...ok, ...five, add('Pick Backup', 'cafe', '/images/venues/pb.jpg')].map(pick) }, now: new Date() });
-    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 8, 'the backup fills the eighth card');
-    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week'));
+    // A skipped pick in the first four: the next one on the list (a backup) steps in, and the row is still four.
+    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ok[0], ok[1], ok[2], add('Pick Backup', 'cafe', '/images/venues/pb.jpg'), ok[3], ...five].map(pick) }, now: new Date() });
+    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 4, 'the backup fills the fourth card');
+    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week') && !eightHtml.includes('Pick Bistro Four'));
     // A pick can use another of its own photos; a photo outside the place's own folders is ignored.
     const own = app.renderHomeEditorsPicksHTML({ data: { picks: [{ ...pick(ok[0]), photo: '/images/owner/abcdefabcdefabcdefabcdef.jpg' }, pick(ok[1]), pick(ok[2]), { ...pick(ok[3]), photo: 'https://example.com/x.jpg' }] }, now: new Date() });
     assert.ok(own.includes('/images/owner/abcdefabcdefabcdefabcdef.jpg'));
     assert.ok(!own.includes('example.com') && own.includes('/images/venues/pick-four.jpg'));
-    // Four cards: no arrows; eight: arrows to page through on a computer.
+    // Four cards, all in view: no arrows.
     assert.ok(!own.includes('home-carousel-btn'));
-    assert.ok(eightHtml.includes('class="home-carousel-btn" data-dir="1"') && eightHtml.includes('<script>'));
+    assert.ok(!eightHtml.includes('home-carousel-btn'));
     // Daily rotation: the row shifts one place a day, so every pick takes a turn first; the same day is stable.
     const rotIds = [...ok, ...five, add('Pick Rot', 'cafe', '/images/venues/prot.jpg')].slice(0, 8);
     const rot = (d) => [...app.renderHomeEditorsPicksHTML({ data: { picks: rotIds.map(pick) }, now: new Date(`${d}T12:00:00-08:00`) }).matchAll(/home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
     const day1 = rot('2026-11-10'), day2 = rot('2026-11-11'), day9 = rot('2026-11-18');
-    assert.equal(day1.length, 8);
+    assert.equal(day1.length, 4);
     assert.deepEqual(day2, [...day1.slice(1), day1[0]], 'one place along the next day');
-    assert.deepEqual(day9, day1, 'a full cycle of eight days is back to the start');
+    assert.deepEqual(day9, day1, 'eight days is two full cycles of four, back to the start');
     assert.deepEqual(rot('2026-11-10'), day1, 'stable within a day');
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
-    // The shipped list is well formed: up to eight picks, each with a reason in both languages, no repeats.
+    // The shipped list is well formed: four picks plus backups, each with a reason in both languages, no repeats.
     const shipped = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'editors-picks.json'), 'utf8'));
-    assert.ok(shipped.picks.length >= 8, 'eight picks plus backups');
+    assert.ok(shipped.picks.length >= 5, 'four picks plus at least one backup');
     assert.equal(new Set(shipped.picks.map((p) => p.id)).size, shipped.picks.length);
     for (const p of shipped.picks) { assert.ok(Number.isInteger(p.id) && p.why && p.why_fr && p.why.length <= 60, JSON.stringify(p)); }
     // On the homepage it sits right under This Weekend (when both show), above Hidden Gems.

@@ -13213,7 +13213,7 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
   try { notOperating = advisoryNotOperatingIds(); } catch (e) { /* no advisories */ }
   const picks = [];
   for (const p of (data && Array.isArray(data.picks) ? data.picks : [])) {
-    if (picks.length >= 8) break;
+    if (picks.length >= 4) break;
     let v = null;
     try { v = getVenue(Number(p.id)); } catch (e) { v = null; }
     if (!v || v.redirect_to || !v.slug || !CATEGORY_SLUGS[v.type] || !REGION_LABELS[v.region] || !p.why) continue;
@@ -13227,8 +13227,9 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
     picks.push({ v, photo, why: String(p.why), whyFr: String(p.why_fr || p.why) });
   }
   if (picks.length < 4) return '';
-  // Full rows only (2026-10-28, Dayton: a seven-card row looks unfinished): eight, or four.
-  picks.length = picks.length >= 8 ? 8 : 4;
+  // Four picks a week (2026-11-09, Dayton: with eight, four were always hidden behind the arrows). The first four usable
+  // picks show; the rest of the list are backups that step in when one is skipped.
+  picks.length = 4;
   if (rotate && picks.length > 1) { const k = editorsPicksDayIndex(now) % picks.length; picks.push(...picks.splice(0, k)); }
   const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
   const cards = picks.map(({ v, photo, why, whyFr }) => {
