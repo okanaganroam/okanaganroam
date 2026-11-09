@@ -45474,7 +45474,7 @@ const OWNER_PHOTO_MIN_EDGE = 800;
 const OWNER_PHOTO_MAX_EDGE = 2400;
 const OWNER_PHOTO_PENDING_LIMIT = 12; // per venue, waiting for review
 const OWNER_PHOTO_RATE_LIMIT = 30;
-const OWNER_PHOTO_KEYS = new Set(['image', 'image_w160', 'image_w240', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
+const OWNER_PHOTO_KEYS = new Set(['image', 'image_w160', 'image_w240', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at', 'main']);
 
 function ownerPhotoPath(file) {
   if (!/^[a-z0-9]{24}\.jpg$/.test(file)) return null;
@@ -45891,9 +45891,13 @@ async function handleOwnerPhotoUpload(req, res, token) {
   // the page then uses the original, and the backfill script can add it later.
   saveOwnerPhotoCopies(file, dims, { w160: body.image_w160, w240: body.image_w240, w480: body.image_w480, w960: body.image_w960, w1200: body.image_w1200 });
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
-  const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, contact_email, rights_confirmed_at, ip_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName, contact.email,
-    crypto.createHash('sha256').update(`okanagan-roam-owner-photo:${ip}`).digest('hex')).lastInsertRowid);
+  // Easy setup (2026-11-09): "Make main photo" on the edit link is a wish, kept with the photo and applied when it is
+  // approved. Only one waiting photo per listing holds the wish: the newest pick wins.
+  const wantsMain = body.main === true;
+  if (wantsMain) db.prepare("UPDATE owner_photos SET main_requested = 0 WHERE venue_id = ? AND status = 'pending'").run(venue.id);
+  const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, contact_email, rights_confirmed_at, ip_hash, main_requested)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName, contact.email,
+    crypto.createHash('sha256').update(`okanagan-roam-owner-photo:${ip}`).digest('hex'), wantsMain ? 1 : 0).lastInsertRowid);
   db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
   rememberOwnerContact(venue.id, contact.email);
   ownerMarkFrench(res, 'owner_photos', id);
@@ -45903,7 +45907,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
   const live = typeof token === 'function';
   let main = false;
   if (live) {
-    const r = approveOwnerPhoto(id, `owner:${found.account ? found.account.email : 'session'}`, {});
+    const r = approveOwnerPhoto(id, `owner:${found.account ? found.account.email : 'session'}`, wantsMain ? { main: true } : {});
     main = !!(r.ok && r.main);
   }
   if (body.notify === true) {
@@ -49368,6 +49372,459 @@ async function handleMenuRoute(req, res, method, sub, ctx) {
   return out;
 }
 
+// ----- Easy setup (2026-11-09): photos and menu, one question at a time -----
+// For owners who aren't comfortable on phones or computers (Dayton: "someone who is not good with mobile devices or
+// desktops will say that was very easy"). Restaurants only for now (the completeness types). One question per screen, big
+// buttons, Skip on every step, and the owner only ever sees "Saved ✓": everything still goes through the same server
+// paths as the edit page, with the same checks and the same review (photos: /photos; menu files and menu photos:
+// /menu/pages then /menu/help, the "Can you do it for me?" queue; a menu link: /changes, checked first).
+const OWNER_SETUP_STRINGS = {
+  en: {
+    title: 'Add your photos and menu', step: 'Step {n} of 2', stepPhotos: 'Photos', stepMenu: 'Menu', allDone: 'All done', back: '← Back', skip: 'Skip this for now',
+    hi: 'Hi {name} 👋', hiLead: 'Let’s add your photos and your menu. It takes about 2 minutes. You can stop any time.', start: 'Start',
+    photosTitle: 'Add photos of your place', photosLead: 'Your food, your room, your patio. Three photos is perfect.',
+    take: 'Take a photo', takeSub: 'Opens your camera', choose: 'Choose from my photos',
+    reviewTitle: 'Your photos', reviewLead: 'Tap ✕ to remove one. Tap “Make main photo” to choose the big one at the top of your page.',
+    remove: 'Remove photo {n}', makeMain: 'Make main photo', isMain: '★ Main photo', tooSmall: 'This one is too small. Try another.', cantOpen: 'We couldn’t open this one. Try another.',
+    wontAdd: 'Won’t be added', addAnother: '+ Add another photo', rights: 'These are my photos and Okanagan Roam can use them.',
+    addOne: 'Add this photo', addMany: 'Add these {n} photos', adding: 'Adding photo {i} of {n}…', tooMany: 'That’s plenty for now. We kept the first {n}.',
+    saved: 'Saved', photosSaved: 'Your photos are in. Next, your menu.', nextMenu: 'Next: your menu', menuSaved: 'Your menu is in.', finish: 'Finish',
+    menuTitle: 'How should we add your menu?', menuLead: 'Pick the easiest one for you.',
+    upload: 'Upload my menu', uploadSub: 'A PDF or photos from your phone or computer', snap: 'Take photos of my menu', snapSub: 'Snap each page',
+    web: 'My menu is on my website', email: 'Email it to us',
+    upTitle: 'Upload your menu', upTitleSome: 'Your menu', upLead: 'Pick the file your menu is in. A PDF or photos both work.', upLeadSome: 'Got another file? Add it. If not, tap Done.',
+    upPick: 'Choose my menu file', upMore: 'Add another file', removeFile: 'Remove {name}', done: 'Done',
+    camTitle: 'Snap your first page', camLead: 'Hold your phone over the menu so the whole page fits.', camGot1: 'Got page 1', camGotN: 'Got {n} pages', camLeadSome: 'Got another page? Add it. If not, tap Done.',
+    camTake: 'Take a photo', camMore: 'Add another page', page: 'Menu page {n}',
+    webTitle: 'Is this where your menu is?', webLead: 'We filled in your website. Change it if your menu is on another page.', webLabel: 'Menu web address', useThis: 'Use this',
+    webEmpty: 'Please type the address of your menu, like www.yourplace.com/menu.',
+    emailTitle: 'Email your menu to us', emailLead: 'Send a photo or a PDF of your menu to this address. Put your restaurant’s name in the subject.',
+    copy: 'Copy', copied: 'Copied ✓', selected: 'Selected. Press and hold to copy.',
+    sending: 'Sending…', fileTooBig: '{name} is too big. Try photos of the menu instead.', pageSmall: 'This page is a bit small to read. Try taking it a little closer.',
+    tooManyPages: 'That’s {n} pages, the most for one menu.',
+    failed: 'That didn’t go through. Please check your connection and try again.', tryAgain: 'Try again',
+    allSet: 'You’re all set!', allSetLead: 'Here’s the top of your page.', menuTick: 'Menu ✓', seePage: 'See your page', backToPortal: 'Back to my page settings',
+    noJs: 'Please turn on JavaScript, or email your photos and menu to',
+    menuNote: 'Sent from the easy setup. Please turn these pages into our menu.',
+  },
+  fr: {
+    title: 'Ajoutez vos photos et votre menu', step: 'Étape {n} sur 2', stepPhotos: 'Photos', stepMenu: 'Menu', allDone: 'Terminé', back: '← Retour', skip: 'Passer pour l’instant',
+    hi: 'Bonjour {name} 👋', hiLead: 'Ajoutons vos photos et votre menu. Cela prend environ 2 minutes. Vous pouvez arrêter à tout moment.', start: 'Commencer',
+    photosTitle: 'Ajoutez des photos de votre établissement', photosLead: 'Vos plats, votre salle, votre terrasse. Trois photos, c’est parfait.',
+    take: 'Prendre une photo', takeSub: 'Ouvre votre appareil photo', choose: 'Choisir dans mes photos',
+    reviewTitle: 'Vos photos', reviewLead: 'Touchez ✕ pour en retirer une. Touchez « Photo principale » pour choisir la grande photo en haut de votre page.',
+    remove: 'Retirer la photo {n}', makeMain: 'Photo principale', isMain: '★ Photo principale', tooSmall: 'Celle-ci est trop petite. Essayez-en une autre.', cantOpen: 'Nous n’avons pas pu ouvrir celle-ci. Essayez-en une autre.',
+    wontAdd: 'Ne sera pas ajoutée', addAnother: '+ Ajouter une autre photo', rights: 'Ce sont mes photos et Okanagan Roam peut les utiliser.',
+    addOne: 'Ajouter cette photo', addMany: 'Ajouter ces {n} photos', adding: 'Ajout de la photo {i} sur {n}…', tooMany: 'C’est assez pour l’instant. Nous avons gardé les {n} premières.',
+    saved: 'Enregistré', photosSaved: 'Vos photos sont ajoutées. Maintenant, votre menu.', nextMenu: 'Suivant : votre menu', menuSaved: 'Votre menu est ajouté.', finish: 'Terminer',
+    menuTitle: 'Comment ajouter votre menu?', menuLead: 'Choisissez ce qui est le plus simple pour vous.',
+    upload: 'Téléverser mon menu', uploadSub: 'Un PDF ou des photos de votre téléphone ou ordinateur', snap: 'Photographier mon menu', snapSub: 'Une photo par page',
+    web: 'Mon menu est sur mon site Web', email: 'Vous l’envoyer par courriel',
+    upTitle: 'Téléversez votre menu', upTitleSome: 'Votre menu', upLead: 'Choisissez le fichier de votre menu. Un PDF ou des photos, les deux fonctionnent.', upLeadSome: 'Un autre fichier? Ajoutez-le. Sinon, touchez Terminé.',
+    upPick: 'Choisir le fichier de mon menu', upMore: 'Ajouter un autre fichier', removeFile: 'Retirer {name}', done: 'Terminé',
+    camTitle: 'Photographiez la première page', camLead: 'Tenez votre téléphone au-dessus du menu pour que toute la page soit visible.', camGot1: 'Page 1 reçue', camGotN: '{n} pages reçues', camLeadSome: 'Une autre page? Ajoutez-la. Sinon, touchez Terminé.',
+    camTake: 'Prendre une photo', camMore: 'Ajouter une autre page', page: 'Page de menu {n}',
+    webTitle: 'Votre menu est-il à cette adresse?', webLead: 'Nous avons inscrit votre site Web. Changez-le si votre menu est sur une autre page.', webLabel: 'Adresse Web du menu', useThis: 'Utiliser celle-ci',
+    webEmpty: 'Écrivez l’adresse de votre menu, comme www.votreendroit.com/menu.',
+    emailTitle: 'Envoyez-nous votre menu', emailLead: 'Envoyez une photo ou un PDF de votre menu à cette adresse. Indiquez le nom de votre restaurant dans l’objet.',
+    copy: 'Copier', copied: 'Copié ✓', selected: 'Sélectionné. Appuyez longuement pour copier.',
+    sending: 'Envoi…', fileTooBig: '{name} est trop gros. Essayez plutôt des photos du menu.', pageSmall: 'Cette page est un peu petite pour être lue. Essayez de la prendre de plus près.',
+    tooManyPages: 'Cela fait {n} pages, le maximum pour un menu.',
+    failed: 'Cela n’a pas fonctionné. Vérifiez votre connexion et réessayez.', tryAgain: 'Réessayer',
+    allSet: 'C’est terminé!', allSetLead: 'Voici le haut de votre page.', menuTick: 'Menu ✓', seePage: 'Voir votre page', backToPortal: 'Retour aux réglages de ma page',
+    noJs: 'Activez JavaScript, ou envoyez vos photos et votre menu à',
+    menuNote: 'Envoyé depuis la configuration simple. Merci de faire notre menu à partir de ces pages.',
+  },
+};
+
+// The big first card on a restaurant's edit page.
+function ownerSetupCardHtml(href, lang) {
+  const fr = lang === 'fr';
+  return `<style>
+    body.owner-page .op-setup-card { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; padding: 16px 18px; min-height: 72px; border-radius: 16px; background: #1E4F4C; color: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(42,32,25,.12); }
+    body.owner-page .op-setup-card:focus-visible { outline: 3px solid #C9A34A; outline-offset: 3px; }
+    body.owner-page .op-setup-ico { font-size: 1.8rem; line-height: 1; flex: none; }
+    body.owner-page .op-setup-txt { flex: 1; min-width: 0; }
+    body.owner-page .op-setup-txt strong { display: block; font-size: 1.15rem; }
+    body.owner-page .op-setup-txt span { display: block; font-size: .95rem; opacity: .9; font-weight: 600; }
+    body.owner-page .op-setup-go { font-size: 1.6rem; font-weight: 800; flex: none; }
+  </style>
+  <a class="op-setup-card" id="opSetupCard" href="${escapeHtml(href)}"><span class="op-setup-ico" aria-hidden="true">📷</span><span class="op-setup-txt"><strong>${fr ? 'Ajoutez vos photos et votre menu' : 'Add your photos and menu'}</strong><span>${fr ? 'environ 2 minutes' : 'about 2 minutes'}</span></span><span class="op-setup-go" aria-hidden="true">→</span></a>`;
+}
+
+// GET .../setup: the page for a restaurant; any other type goes back to its edit page (nothing changes for them).
+function sendOwnerSetupPage(req, res, method, found, opts) {
+  const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
+  if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage(opts.lang)); }
+  if (!COMPLETENESS_TYPES.has(found.venue.type)) { res.writeHead(302, { Location: opts.back, 'Cache-Control': 'no-store' }); return res.end(); }
+  res.writeHead(200, headers);
+  return res.end(method === 'HEAD' ? undefined : renderOwnerSetupPage(found, opts));
+}
+function renderOwnerSetupPage(found, opts) {
+  const { venue } = found;
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const t = OWNER_SETUP_STRINGS[lang];
+  const ownImage = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(venue.image_url || '').trim()) ? String(venue.image_url).trim() : '';
+  const typeLabel = (CATEGORY_LABELS[venue.type] || { singular: 'Restaurant' }).singular;
+  const cfg = {
+    base: opts.base, menuBase: `${opts.base}/menu`, back: opts.back, lang, mode: opts.mode,
+    name: venue.name, typeLabel: lang === 'fr' && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
+    image: ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL,
+    pageHref: lang === 'fr' && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
+    credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
+    minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
+    t,
+  };
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { golfTheme: true, noindex: true })}
+<meta name="referrer" content="no-referrer">
+<style>${OWNER_SETUP_CSS}</style>
+</head>
+<body class="golf-page owner-page owner-setup">
+${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main" id="main"><div class="su-wrap">
+    <div class="su-top"><button type="button" class="su-link" id="suBack" hidden>${t.back}</button></div>
+    <div class="su-progress" id="suProg" hidden><small id="suProgText"></small><div class="su-bar"><i id="suProgBar"></i></div></div>
+    <div id="suScreen" aria-live="polite"><p class="su-lead">${t.hiLead}</p></div>
+    <noscript><p class="su-lead">${t.noJs} ${INFO_CONTACT_EMAIL}</p></noscript>
+  </div></main>
+<input type="file" id="suPick" accept="image/*" multiple class="su-file" tabindex="-1" aria-hidden="true">
+<input type="file" id="suTake" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
+<input type="file" id="suMenuCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
+<input type="file" id="suMenuFile" accept="application/pdf,.pdf,image/*" multiple class="su-file" tabindex="-1" aria-hidden="true">
+<script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
+<script>${OWNER_SETUP_SCRIPT}</script>
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true })}
+</body>
+</html>`;
+}
+
+const OWNER_SETUP_CSS = `
+  body.owner-setup { --su-ink: #1B2B3A; --su-soft: #5E544C; --su-line: #DDD5C7; --su-card: #FFFDF8; --su-teal: #1E4F4C; --su-gold: #A07A1B; --su-good: #1E6B3A; --su-good-bg: #E3F1E8; --su-warn: #8A2A1B; --su-warn-bg: #FBE9E5; }
+  body.owner-setup .su-wrap { max-width: 480px; margin: 0 auto; padding: 8px 0 48px; color: var(--su-ink); font-size: 19px; line-height: 1.45; }
+  body.owner-setup .su-top { min-height: 48px; display: flex; align-items: center; }
+  body.owner-setup .su-link { background: none; border: 0; color: var(--su-teal); font: inherit; font-weight: 800; font-size: 17px; padding: 10px 4px; min-height: 48px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  body.owner-setup .su-progress { margin: 4px 0 18px; }
+  body.owner-setup .su-progress small { display: block; font-size: 15px; font-weight: 800; color: var(--su-soft); margin-bottom: 6px; }
+  body.owner-setup .su-bar { height: 8px; background: var(--su-line); border-radius: 99px; overflow: hidden; }
+  body.owner-setup .su-bar i { display: block; height: 100%; width: 0; background: var(--su-teal); border-radius: 99px; transition: width .3s; }
+  body.owner-setup h1 { font-size: 30px; line-height: 1.15; margin: 4px 0 10px; text-wrap: balance; }
+  body.owner-setup .su-lead { margin: 0 0 22px; color: var(--su-soft); font-size: 19px; }
+  body.owner-setup .su-stack { display: flex; flex-direction: column; gap: 14px; }
+  body.owner-setup .su-big { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 14px 18px; border-radius: 18px; border: 2px solid var(--su-teal); background: var(--su-teal); color: #fff; font: inherit; font-weight: 800; font-size: 21px; text-align: left; cursor: pointer; text-decoration: none; box-sizing: border-box; }
+  body.owner-setup .su-big.su-alt { background: var(--su-card); color: var(--su-ink); border-color: var(--su-line); }
+  body.owner-setup .su-big .su-ico { font-size: 30px; line-height: 1; flex: none; width: 40px; text-align: center; }
+  body.owner-setup .su-big small { display: block; font-weight: 600; font-size: 16px; opacity: .85; }
+  body.owner-setup .su-big[disabled] { opacity: .45; cursor: not-allowed; }
+  body.owner-setup button:focus-visible, body.owner-setup a:focus-visible, body.owner-setup input:focus-visible, body.owner-setup label:focus-within { outline: 3px solid var(--su-gold); outline-offset: 3px; }
+  body.owner-setup .su-skip { text-align: center; margin-top: 18px; }
+  body.owner-setup .su-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+  body.owner-setup .su-ph { position: relative; border-radius: 16px; overflow: hidden; background: var(--su-card); border: 3px solid transparent; }
+  body.owner-setup .su-ph img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+  body.owner-setup .su-ph.su-main { border-color: var(--su-gold); }
+  body.owner-setup .su-x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 22px; font-weight: 800; cursor: pointer; }
+  body.owner-setup .su-tag { display: block; width: 100%; min-height: 44px; border: 0; background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 15px; font-weight: 800; padding: 8px; cursor: pointer; }
+  body.owner-setup .su-main .su-tag { color: var(--su-gold); }
+  body.owner-setup .su-ph.su-bad img { filter: grayscale(1) opacity(.45); }
+  body.owner-setup .su-badmsg { position: absolute; left: 0; right: 0; bottom: 44px; background: var(--su-warn-bg); color: var(--su-warn); font-size: 15px; font-weight: 800; padding: 8px; }
+  body.owner-setup .su-tick { display: flex; gap: 14px; align-items: flex-start; background: var(--su-card); border: 2px solid var(--su-line); border-radius: 16px; padding: 16px; margin-bottom: 16px; cursor: pointer; font-weight: 700; }
+  body.owner-setup .su-tick input { width: 30px; height: 30px; flex: none; accent-color: var(--su-teal); margin: 0; }
+  body.owner-setup .su-more { display: block; width: 100%; min-height: 56px; border: 2px dashed var(--su-line); background: none; color: var(--su-teal); font: inherit; font-weight: 800; border-radius: 16px; margin-bottom: 16px; cursor: pointer; }
+  body.owner-setup .su-saved { text-align: center; padding-top: 24px; }
+  body.owner-setup .su-check { width: 110px; height: 110px; border-radius: 50%; background: var(--su-good-bg); color: var(--su-good); display: grid; place-items: center; font-size: 60px; font-weight: 800; margin: 0 auto 16px; animation: suPop .35s ease-out; }
+  @keyframes suPop { from { transform: scale(.6); } to { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { body.owner-setup .su-check { animation: none; } body.owner-setup .su-bar i { transition: none; } }
+  body.owner-setup .su-saved h1 { font-size: 40px; }
+  body.owner-setup .su-field { display: block; width: 100%; box-sizing: border-box; min-height: 64px; font: inherit; font-size: 19px; padding: 12px 16px; border-radius: 14px; border: 2px solid var(--su-line); background: var(--su-card); color: var(--su-ink); margin-bottom: 18px; }
+  body.owner-setup .su-row { display: flex; gap: 10px; align-items: center; background: var(--su-card); border: 2px solid var(--su-line); border-radius: 16px; padding: 12px 14px; font-weight: 800; font-size: 18px; overflow-wrap: anywhere; }
+  body.owner-setup .su-row > span:nth-child(2) { flex: 1; min-width: 0; }
+  body.owner-setup .su-row button { flex: none; min-width: 48px; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--su-teal); background: none; color: var(--su-teal); font: inherit; font-weight: 800; cursor: pointer; }
+  body.owner-setup .su-pages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  body.owner-setup .su-pages div { position: relative; }
+  body.owner-setup .su-pages img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 12px; border: 2px solid var(--su-line); display: block; }
+  body.owner-setup .su-pages span { position: absolute; left: 6px; top: 6px; background: var(--su-teal); color: #fff; font-size: 14px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
+  body.owner-setup .su-preview { background: var(--su-card); border: 2px solid var(--su-line); border-radius: 18px; overflow: hidden; margin: 6px 0 20px; text-align: left; }
+  body.owner-setup .su-preview img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+  body.owner-setup .su-preview div { padding: 14px 16px; }
+  body.owner-setup .su-preview strong { font-size: 24px; display: block; }
+  body.owner-setup .su-preview p { margin: 4px 0 0; color: var(--su-soft); font-size: 16px; }
+  body.owner-setup .su-error { background: var(--su-warn-bg); color: var(--su-warn); font-weight: 800; padding: 12px 14px; border-radius: 12px; margin: 0 0 14px; }
+  body.owner-setup .su-note { font-size: 16px; font-weight: 800; color: var(--su-good); min-height: 24px; margin: 0 0 12px; }
+  body.owner-setup .su-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+  /* Help on phones: a small round "?" at the top right that scrolls with the page (as on the edit page), so it never
+     sits on the big buttons; one layer under the sticky header. */
+  @media (max-width: 699px) {
+    body.owner-setup { position: relative; }
+    body.owner-setup .ohb-btn { position: absolute; top: 64px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; z-index: 59; }
+    body.owner-setup .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
+  }
+`;
+
+// The page script. Plain ES5, no template literals (it lives inside one).
+const OWNER_SETUP_SCRIPT = `
+(function(){
+  var C = window.SETUP_CFG, T = C.t;
+  var el = function(id){ return document.getElementById(id); };
+  var screen = el('suScreen');
+  var started = Date.now();
+  var S = { step: 'start', photos: [], rights: false, menuFiles: [], menuPages: [], history: [], menuDone: false, mainSrc: '', error: '', busy: false };
+  function fill(s, o){ return String(s).replace(/\\{(\\w+)\\}/g, function(m, k){ return o && o[k] != null ? o[k] : m; }); }
+  function h(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  var STEPS = { start: 0, photos: 1, photoReview: 1, photosSaved: 1, menu: 2, menuUp: 2, menuCam: 2, menuWeb: 2, menuEmail: 2, menuSaved: 2, done: 3 };
+  function progress(){
+    var s = STEPS[S.step];
+    el('suProg').hidden = s === 0;
+    el('suProgText').textContent = s === 3 ? T.allDone : fill(T.step, { n: s }) + ' · ' + (s === 1 ? T.stepPhotos : T.stepMenu);
+    el('suProgBar').style.width = (s === 3 ? 100 : s === 2 ? 66 : 33) + '%';
+    el('suBack').hidden = !S.history.length || S.step === 'done' || S.busy;
+  }
+  function go(step, replace){ if (!replace) S.history.push(S.step); S.step = step; S.error = ''; render(); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
+  el('suBack').onclick = function(){ if (S.history.length && !S.busy) { S.step = S.history.pop(); S.error = ''; render(); } };
+  function big(icon, text, sub, alt, id, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" id="' + id + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
+  function skip(to){ return '<div class="su-skip"><button type="button" class="su-link" data-skip="' + to + '">' + h(T.skip) + '</button></div>'; }
+  function err(){ return S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''; }
+  function good(){ return S.photos.filter(function(p){ return !p.bad; }); }
+
+  function render(){
+    progress();
+    var s = S.step, x = '';
+    if (s === 'start') {
+      x = '<h1>' + h(fill(T.hi, { name: C.name })) + '</h1><p class="su-lead">' + h(T.hiLead) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'suStart') + '</div>';
+    } else if (s === 'photos') {
+      x = '<h1>' + h(T.photosTitle) + '</h1><p class="su-lead">' + h(T.photosLead) + '</p>' + err() + '<div class="su-stack">' + big('📷', T.take, T.takeSub, false, 'suTakeBtn') + big('🖼️', T.choose, '', true, 'suChooseBtn') + '</div>' + skip('menu');
+    } else if (s === 'photoReview') {
+      var g = good();
+      if (g.length && !g.some(function(p){ return p.main; })) { S.photos.forEach(function(p){ p.main = false; }); g[0].main = true; }
+      x = '<h1>' + h(T.reviewTitle) + '</h1><p class="su-lead">' + h(T.reviewLead) + '</p>' + err() + '<div class="su-grid">'
+        + S.photos.map(function(p, i){
+          var msg = p.bad === 'small' ? T.tooSmall : T.cantOpen;
+          return '<div class="su-ph' + (p.main ? ' su-main' : '') + (p.bad ? ' su-bad' : '') + '">' + (p.thumb ? '<img src="' + p.thumb + '" alt="">' : '<img alt="">')
+            + '<button type="button" class="su-x" data-del="' + i + '" aria-label="' + h(fill(T.remove, { n: i + 1 })) + '"' + (S.busy ? ' disabled' : '') + '>✕</button>'
+            + (p.bad ? '<div class="su-badmsg">' + h(msg) + '</div><button type="button" class="su-tag" disabled>' + h(T.wontAdd) + '</button>'
+              : '<button type="button" class="su-tag" data-main="' + i + '" aria-pressed="' + (p.main ? 'true' : 'false') + '"' + (S.busy ? ' disabled' : '') + '>' + h(p.main ? T.isMain : T.makeMain) + '</button>') + '</div>';
+        }).join('') + '</div>'
+        + (S.busy ? '' : '<button type="button" class="su-more" id="suMore">' + h(T.addAnother) + '</button>')
+        + '<label class="su-tick"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + (S.busy ? ' disabled' : '') + '><span>' + h(T.rights) + '</span></label>'
+        + '<p class="su-note" id="suProgress" role="status"></p>'
+        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.addOne : fill(T.addMany, { n: g.length }), '', false, 'suAdd', g.length && S.rights && !S.busy ? '' : ' disabled') + '</div>';
+    } else if (s === 'photosSaved' || s === 'menuSaved') {
+      x = '<div class="su-saved"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.saved) + '</h1><p class="su-lead">' + h(s === 'photosSaved' ? T.photosSaved : T.menuSaved) + '</p></div>'
+        + '<div class="su-stack">' + big('➜', s === 'photosSaved' ? T.nextMenu : T.finish, '', false, 'suNext') + '</div>';
+    } else if (s === 'menu') {
+      x = '<h1>' + h(T.menuTitle) + '</h1><p class="su-lead">' + h(T.menuLead) + '</p><div class="su-stack">'
+        + big('📄', T.upload, T.uploadSub, false, 'suMUp') + big('📷', T.snap, T.snapSub, true, 'suMCam')
+        + big('🌐', T.web, '', true, 'suMWeb') + big('✉️', T.email, '', true, 'suMEmail') + '</div>' + skip('done');
+    } else if (s === 'menuUp') {
+      var f = S.menuFiles;
+      x = '<h1>' + h(f.length ? T.upTitleSome : T.upTitle) + '</h1><p class="su-lead">' + h(f.length ? T.upLeadSome : T.upLead) + '</p>' + err()
+        + (f.length ? '<div class="su-stack" style="margin-bottom:14px">' + f.map(function(x2, i){ return '<div class="su-row"><span aria-hidden="true">' + (x2.pdf ? '📄' : '🖼️') + '</span><span>' + h(x2.name) + '</span><button type="button" data-fdel="' + i + '" aria-label="' + h(fill(T.removeFile, { name: x2.name })) + '"' + (S.busy ? ' disabled' : '') + '>✕</button></div>'; }).join('') + '</div>' : '')
+        + '<p class="su-note" id="suProgress" role="status"></p>'
+        + '<div class="su-stack">' + (f.length ? big('✓', S.error ? T.tryAgain : T.done, '', false, 'suUpDone', S.busy ? ' disabled' : '') : '') + (S.busy ? '' : big('📄', f.length ? T.upMore : T.upPick, '', !!f.length, 'suUpPick')) + '</div>';
+    } else if (s === 'menuCam') {
+      var n = S.menuPages.length;
+      x = '<h1>' + h(n ? (n === 1 ? T.camGot1 : fill(T.camGotN, { n: n })) : T.camTitle) + '</h1><p class="su-lead">' + h(n ? T.camLeadSome : T.camLead) + '</p>' + err()
+        + (n ? '<div class="su-pages">' + S.menuPages.map(function(p, i){ return '<div><img src="' + p.thumb + '" alt="' + h(fill(T.page, { n: i + 1 })) + '"><span>' + (i + 1) + '</span></div>'; }).join('') + '</div>' : '')
+        + '<p class="su-note" id="suProgress" role="status"></p>'
+        + '<div class="su-stack">' + (n ? big('✓', S.error ? T.tryAgain : T.done, '', false, 'suCamDone', S.busy ? ' disabled' : '') : '') + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!n, 'suCamSnap')) + '</div>';
+    } else if (s === 'menuWeb') {
+      x = '<h1>' + h(T.webTitle) + '</h1><p class="su-lead">' + h(T.webLead) + '</p>' + err()
+        + '<label for="suUrl" class="su-file">' + h(T.webLabel) + '</label><input class="su-field" id="suUrl" type="text" inputmode="url" autocomplete="url" maxlength="300" value="' + h(S.webUrl != null ? S.webUrl : C.website.replace(/^https?:[/][/]/, '')) + '">'
+        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : T.useThis, '', false, 'suWebSave', S.busy ? ' disabled' : '') + '</div>';
+    } else if (s === 'menuEmail') {
+      x = '<h1>' + h(T.emailTitle) + '</h1><p class="su-lead">' + h(T.emailLead) + '</p>'
+        + '<div class="su-row" style="margin-bottom:8px"><span aria-hidden="true">✉️</span><span id="suEm">' + h(C.email) + '</span><button type="button" id="suCopy">' + h(T.copy) + '</button></div><p class="su-note" id="suCopied" role="status"></p>'
+        + '<div class="su-stack">' + big('✓', T.done, '', false, 'suEmDone') + '</div>';
+    } else if (s === 'done') {
+      var img = S.mainSrc || C.image;
+      x = '<div class="su-saved" style="padding-top:8px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.allSet) + '</h1><p class="su-lead">' + h(T.allSetLead) + '</p></div>'
+        + '<div class="su-preview">' + (img ? '<img src="' + h(img) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>' + h([C.typeLabel, C.regionLabel].filter(Boolean).join(' · ')) + (S.menuDone ? ' · ' + h(T.menuTick) : '') + '</p></div></div>'
+        + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
+        + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backToPortal) + '</span></a></div>';
+    }
+    screen.innerHTML = x;
+    wire();
+    // A problem is read out and shown where the owner is looking.
+    var e2 = screen.querySelector('.su-error');
+    if (e2) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }
+  }
+
+  // ---- Pictures in the browser: read size, make the upload copy (same as the edit page: 1600px JPEG + small copies) ----
+  function loadImage(file){
+    return new Promise(function(ok, no){
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function(){ ok({ img: img, url: url }); };
+      img.onerror = function(){ URL.revokeObjectURL(url); no(new Error('read')); };
+      img.src = url;
+    });
+  }
+  function jpeg(img, maxEdge, q){
+    var w = img.naturalWidth, hh = img.naturalHeight, scale = Math.min(1, maxEdge / Math.max(w, hh));
+    var c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(hh * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  }
+  function photoPayload(p){
+    var c = jpeg(p.img, 1600);
+    var out = { image: c.toDataURL('image/jpeg', 0.85) };
+    [160, 240, 480, 960, 1200].forEach(function(cw){
+      if (cw >= c.width) return;
+      try { var s2 = document.createElement('canvas'); s2.width = cw; s2.height = Math.round(c.height * cw / c.width); var sc = s2.getContext('2d'); sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high'; sc.drawImage(c, 0, 0, s2.width, s2.height); out['image_w' + cw] = s2.toDataURL('image/jpeg', 0.72); } catch (e) {}
+    });
+    return out;
+  }
+  function addPhotoFiles(list){
+    list = Array.prototype.slice.call(list || []);
+    if (!list.length) return;
+    var room = Math.max(0, C.maxPhotos - S.photos.length), extra = list.length > room;
+    list = list.slice(0, room);
+    Promise.all(list.map(function(f){
+      return loadImage(f).then(function(r){
+        var long = Math.max(r.img.naturalWidth, r.img.naturalHeight);
+        return { img: r.img, thumb: r.url, bad: long < C.minEdge ? 'small' : '' };
+      }, function(){ return { bad: 'read', thumb: '' }; });
+    })).then(function(items){
+      items.forEach(function(p){ S.photos.push(p); });
+      S.error = extra ? fill(T.tooMany, { n: C.maxPhotos }) : '';
+      if (S.step === 'photoReview') render(); else go('photoReview');
+    });
+  }
+  // ---- Sending (await every answer; on any problem keep what's left and offer Try again) ----
+  function post(url, body){
+    var attempt = function(){
+      return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
+        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy'); return r.json().catch(function(){ return { ok: false }; }); });
+    };
+    return attempt().catch(function(){ return new Promise(function(ok){ setTimeout(ok, 1500); }).then(attempt); }).catch(function(){ return { ok: false }; });
+  }
+  function why(j){ return (j && j.errors && (j.errors.image || j.errors.rights || j.errors.credit || j.errors.menu_url || j.errors.form || j.errors.contact_email)) || (j && j.error) || T.failed; }
+  function say(id, text){ var n = el(id); if (n) n.textContent = text; }
+  function sendPhotos(){
+    var list = good(), total = list.length, i = 0;
+    S.busy = true; S.error = ''; render();
+    var mainP = list.filter(function(p){ return p.main; })[0];
+    function next(){
+      var p = list[i];
+      if (!p) {
+        S.busy = false;
+        if (mainP) { try { S.mainSrc = jpeg(mainP.img, 1200).toDataURL('image/jpeg', 0.8); } catch (e) {} }
+        S.photos = []; S.rights = false; return go('photosSaved');
+      }
+      say('suProgress', fill(T.adding, { i: i + 1, n: total }));
+      var body = photoPayload(p);
+      body.credit = C.credit; body.rights = true; body.contact_name = ''; body.contact_email = ''; body.company_website = ''; body.started_at = started;
+      body.notify = i === total - 1; body.main = !!p.main;
+      return post(C.base + '/photos', body).then(function(j){
+        if (j && j.ok) { S.photos.splice(S.photos.indexOf(p), 1); i++; return next(); }
+        S.busy = false; S.error = why(j); render();
+      });
+    }
+    next();
+  }
+  function readDataUrl(file){ return new Promise(function(ok, no){ var r = new FileReader(); r.onload = function(){ ok(r.result); }; r.onerror = function(){ no(new Error('read')); }; r.readAsDataURL(file); }); }
+  // A menu page: a PDF as it is, a photo as a JPEG up to 2400px (menus need detail to be read).
+  function menuBody(item){
+    if (item.pdf) {
+      if (item.file.size > C.pdfMax) return Promise.reject(new Error(fill(T.fileTooBig, { name: item.name })));
+      return readDataUrl(item.file).then(function(d){ return { pdf: 'data:application/pdf;base64,' + String(d).split(',')[1] }; });
+    }
+    var src = item.img ? Promise.resolve({ img: item.img }) : loadImage(item.file);
+    return src.then(function(r){
+      if (Math.max(r.img.naturalWidth, r.img.naturalHeight) < C.menuMinEdge) throw new Error(T.pageSmall);
+      return { image: jpeg(r.img, 2400).toDataURL('image/jpeg', 0.85) };
+    });
+  }
+  function sendMenu(list){
+    S.busy = true; S.error = ''; render();
+    var i = 0, total = list.length;
+    function finish(){
+      if (S.helpSent) { S.busy = false; S.menuDone = true; S.menuFiles = []; S.menuPages = []; return go('menuSaved'); }
+      return post(C.menuBase + '/help', { note: T.menuNote, contact_email: '', contact_phone: '' }).then(function(j){
+        if (j && j.ok) { S.helpSent = true; return finish(); }
+        S.busy = false; S.error = why(j); render();
+      });
+    }
+    function next(){
+      var item = list[0];
+      if (!item) return finish();
+      say('suProgress', T.sending + ' ' + (i + 1) + '/' + total);
+      return menuBody(item).then(function(body){ return post(C.menuBase + '/pages', body); }, function(e){ return { ok: false, error: e.message }; }).then(function(j){
+        if (j && j.ok) { list.shift(); i++; return next(); }
+        S.busy = false; S.error = why(j); render();
+      });
+    }
+    S.helpSent = false;
+    next();
+  }
+  function saveWeb(){
+    var u = el('suUrl'); var url = String(u ? u.value : '').trim(); S.webUrl = url;
+    if (!url) { S.error = T.webEmpty; return render(); }
+    S.busy = true; S.error = ''; render();
+    post(C.base + '/changes', { changes: { menu_url: url }, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
+      S.busy = false;
+      if (j && j.ok) { S.menuDone = true; return go('menuSaved'); }
+      S.error = why(j); render();
+    });
+  }
+
+  function wire(){
+    var on = function(id, fn){ var b = el(id); if (b) b.onclick = fn; };
+    on('suStart', function(){ go('photos'); });
+    on('suTakeBtn', function(){ el('suTake').click(); });
+    on('suChooseBtn', function(){ el('suPick').click(); });
+    on('suMore', function(){ el('suPick').click(); });
+    on('suAdd', function(){ if (!S.busy) sendPhotos(); });
+    on('suNext', function(){ go(S.step === 'photosSaved' ? 'menu' : 'done'); });
+    on('suMUp', function(){ go('menuUp'); });
+    on('suUpPick', function(){ el('suMenuFile').click(); });
+    on('suUpDone', function(){ if (!S.busy) sendMenu(S.menuFiles); });
+    on('suMCam', function(){ go('menuCam'); });
+    on('suCamSnap', function(){ el('suMenuCam').click(); });
+    on('suCamDone', function(){ if (!S.busy) sendMenu(S.menuPages); });
+    on('suMWeb', function(){ go('menuWeb'); });
+    on('suWebSave', function(){ if (!S.busy) saveWeb(); });
+    on('suMEmail', function(){ go('menuEmail'); });
+    on('suEmDone', function(){ S.menuDone = true; go('menuSaved'); });
+    on('suCopy', function(){
+      var sel = function(){ var r = document.createRange(); r.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r); say('suCopied', T.selected); };
+      try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); }
+    });
+    var r = el('suRights'); if (r) r.onchange = function(){ S.rights = r.checked; S.error = ''; render(); };
+    var u = el('suUrl'); if (u) { u.onfocus = function(){ setTimeout(function(){ u.select(); }, 0); }; u.onkeydown = function(e){ if (e.key === 'Enter') saveWeb(); }; }
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-del]'), function(b){ b.onclick = function(){ S.photos.splice(+b.getAttribute('data-del'), 1); S.error = ''; if (!S.photos.length) { S.step = 'photos'; } render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-main]'), function(b){ b.onclick = function(){ var k = +b.getAttribute('data-main'); S.photos.forEach(function(p, i){ p.main = i === k; }); render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-fdel]'), function(b){ b.onclick = function(){ S.menuFiles.splice(+b.getAttribute('data-fdel'), 1); S.error = ''; render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-skip]'), function(b){ b.onclick = function(){ go(b.getAttribute('data-skip')); }; });
+  }
+  el('suPick').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
+  el('suTake').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
+  el('suMenuFile').onchange = function(e){
+    var room = C.maxPages - S.menuFiles.length;
+    Array.prototype.slice.call(e.target.files || []).forEach(function(f, i){
+      if (i >= room) { S.error = fill(T.tooManyPages, { n: C.maxPages }); return; }
+      var pdf = f.type === 'application/pdf' || /[.]pdf$/i.test(f.name || '');
+      S.menuFiles.push({ file: f, name: f.name || 'menu', pdf: pdf });
+    });
+    e.target.value = ''; render();
+  };
+  el('suMenuCam').onchange = function(e){
+    var f = (e.target.files || [])[0]; e.target.value = '';
+    if (!f) return;
+    if (S.menuPages.length >= C.maxPages) { S.error = fill(T.tooManyPages, { n: C.maxPages }); return render(); }
+    loadImage(f).then(function(r){
+      if (Math.max(r.img.naturalWidth, r.img.naturalHeight) < C.menuMinEdge) { S.error = T.pageSmall; return render(); }
+      S.error = ''; S.menuPages.push({ file: f, img: r.img, thumb: r.url, name: f.name || 'page', pdf: false }); render();
+    }, function(){ S.error = T.cantOpen; render(); });
+  };
+  // Opened from the checklist: start at that step (#photos or #menu).
+  var start = String(location.hash || '').slice(1);
+  if (start === 'photos' || start === 'menu') { S.history = ['start']; S.step = start; }
+  render();
+  window.addEventListener('beforeunload', function(e){ if (S.busy || S.photos.length || S.menuFiles.length || S.menuPages.length) { e.preventDefault(); e.returnValue = ''; } });
+})();
+`;
+
 // ----- Public menu pages -----
 function menuUpdatedLabel(utc, lang = 'en') {
   const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
@@ -49641,7 +50098,8 @@ function listOwnerPhotos(status = 'pending') {
     return { id: r.id, venue_id: r.venue_id, venue_name: v.name, listing_url: venueListingUrl(v), status: r.status, credit: r.credit,
       width: r.width, height: r.height, submitted_at: r.submitted_at, preview_url: ownerPhotoPreviewUrl(r.preview_key),
       public_url: r.status === 'approved' ? `https://okanaganroam.com/images/owner/${r.file}` : null,
-      is_main: v.image_url === `/images/owner/${r.file}`, venue_has_own_photo: /^(?:https:\/\/|\/images\/)/.test(String(v.image_url || '')) };
+      is_main: v.image_url === `/images/owner/${r.file}`, venue_has_own_photo: /^(?:https:\/\/|\/images\/)/.test(String(v.image_url || '')),
+      main_requested: r.main_requested === 1 };
   });
 }
 
@@ -49660,7 +50118,8 @@ function approveOwnerPhoto(id, reviewer, opts = {}) {
   const url = `/images/owner/${p.file}`;
   const hasOwn = /^(?:https:\/\/|\/images\/)/.test(String(venue.image_url || ''));
   let madeMain = false;
-  if (opts.main === true || (opts.main === undefined && !hasOwn)) {
+  // Easy setup (2026-11-09): the owner's "Make main photo" wish counts when the reviewer doesn't decide otherwise.
+  if (opts.main === true || (opts.main === undefined && (!hasOwn || p.main_requested === 1))) {
     if (venue.image_url !== url) {
       updateVenue(venue.id, { image_url: url });
       db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
@@ -50450,6 +50909,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['planifier la visite', 'planifiez votre visite', 'connu pour', 'sans reservation', 'a emporter', 'livraison', 'note alimentaire', 'allergies', 'groupes', 'grands groupes', 'bon a savoir', 'stationnement'],
     a: '<p>Open <strong>Plan your visit</strong> and write one short line in each box you want on your page: <strong>Known for</strong>, <strong>Reservations</strong>, <strong>Takeout and delivery</strong>, <strong>Dietary note</strong> and <strong>Groups and good to know</strong>. Then tap <strong>Save these lines</strong>.</p><ul><li>They go live straight away in the <strong>Plan your visit</strong> box on your page, and show in <strong>Your updates</strong>.</li><li>Plain words only, up to 180 characters each, no links. Your booking link goes under <strong>Name, address &amp; links</strong>.</li><li>Leave a box empty to take that line off your page. Don’t take reservations or do takeout? Tap <strong>We don’t take reservations</strong> or <strong>No takeout or delivery</strong> instead.</li><li>They’re yours from then on: our research won’t change or bring back a line you wrote or removed.</li></ul>',
     aFr: '<p>Ouvrez <strong>Planifier la visite</strong> et écrivez une courte ligne dans chaque case que vous voulez sur votre page : <strong>Connu pour</strong>, <strong>Réservations</strong>, <strong>À emporter et livraison</strong>, <strong>Note alimentaire</strong> et <strong>Groupes et bon à savoir</strong>. Touchez ensuite <strong>Enregistrer ces lignes</strong>.</p><ul><li>Elles sont en ligne tout de suite dans la case <strong>Planifiez votre visite</strong> de votre page et paraissent dans <strong>Vos mises à jour</strong>.</li><li>Des mots simples seulement, 180 caractères au plus chacune, sans liens. Votre lien de réservation va sous <strong>Nom, adresse et liens</strong>.</li><li>Laissez une case vide pour retirer cette ligne de votre page. Vous ne prenez pas de réservations ou ne faites pas de plats à emporter? Touchez plutôt <strong>Nous ne prenons pas de réservations</strong> ou <strong>Ni plats à emporter ni livraison</strong>.</li><li>Elles sont ensuite à vous : nos recherches ne modifieront ni ne remettront une ligne que vous avez écrite ou retirée.</li></ul><p>Sur la version française de votre page, une ligne paraît une fois que nous l’avons traduite.</p>' },
+  // Easy setup (2026-11-09): the one-question-at-a-time photos and menu screen.
+  { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How do I add my photos and menu the easy way?', qFr: 'Comment ajouter mes photos et mon menu facilement?', pages: ['setup', 'edit'],
+    keys: ['easy setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo'],
+    keysFr: ['configuration simple', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale'],
+    a: '<p>Tap <strong>Add your photos and menu</strong> at the top of your page settings. It asks one thing at a time:</p><ul><li><strong>Photos:</strong> take a photo or choose some from your phone. Tap ✕ to remove one and <strong>Make main photo</strong> for the big one at the top of your page. A photo that is too small says so straight away.</li><li><strong>Menu:</strong> upload a PDF or photos, snap each page, use the menu on your website, or email it to us.</li><li>Every step has <strong>Skip this for now</strong>, and you can stop at any time.</li><li>When you see <strong>Saved ✓</strong>, we have it. We add it to your page for you.</li></ul>',
+    aFr: '<p>Touchez <strong>Ajoutez vos photos et votre menu</strong> en haut des réglages de votre page. Une seule question à la fois :</p><ul><li><strong>Photos :</strong> prenez une photo ou choisissez-en dans votre téléphone. Touchez ✕ pour en retirer une et <strong>Photo principale</strong> pour la grande photo en haut de votre page. Une photo trop petite est signalée tout de suite.</li><li><strong>Menu :</strong> téléversez un PDF ou des photos, photographiez chaque page, utilisez le menu de votre site Web ou envoyez-le-nous par courriel.</li><li>Chaque étape a <strong>Passer pour l’instant</strong>, et vous pouvez arrêter à tout moment.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Nous l’ajoutons à votre page pour vous.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste'],
@@ -50557,6 +51022,8 @@ const OWNER_HELP_START = {
   settings: ['settings', 'logout', 'access', 'more-businesses', 'forgot'],
   edit: ['photo-add', 'hours', 'closures', 'event-add', 'menu-add', 'live-speed'],
   menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
+  // Easy setup (2026-11-09): photos and menu, one question at a time.
+  setup: ['easy-setup', 'photo-small', 'menu-add', 'photo-add'],
   invalid: ['newlink', 'claim', 'signin'],
   claim: ['claim', 'noemail', 'staff', 'dispute', 'cost'],
 };
@@ -50865,7 +51332,7 @@ function ownerHelpAnswer(a, lang, mode) {
 // How the owner reached this page: signed in, the edit link (the edit and menu pages without a login), or neither.
 function ownerHelpMode(page, signedIn) {
   if (signedIn) return 'in';
-  return page === 'edit' || page === 'menu' ? 'link' : 'out';
+  return page === 'edit' || page === 'menu' || page === 'setup' ? 'link' : 'out';
 }
 // The help button + panel for a business portal page (page: one of the OWNER_HELP_START keys; lang 'fr' on the
 // French entry pages and the French claim form).
@@ -51250,7 +51717,7 @@ function ownerFrJson(body) {
 // Which portal requests are French (or English pages that get the switch). -> { lang, enPath, enUrl } or null.
 // /fr/owner/login, /link and /forgot pages are French twins (FR_TWIN_STATIC); their form posts come here.
 const OWNER_FR_PORTAL_RE = /^\/fr(\/owner\/(?:account(?:\/[^?#]*)?|reset\/[A-Za-z0-9_-]+|help|logout|login|link|forgot|[A-Za-z0-9_-]{32}(?:\/[^?#]*)?))(\?[^#]*)?$/;
-const OWNER_EN_PORTAL_PAGE_RE = /^\/owner\/(?:account(?:\/settings|\/venue\/\d+(?:\/menu)?)?|reset\/[A-Za-z0-9_-]+|[A-Za-z0-9_-]{32}(?:\/menu)?)$/;
+const OWNER_EN_PORTAL_PAGE_RE = /^\/owner\/(?:account(?:\/settings|\/venue\/\d+(?:\/menu|\/setup)?)?|reset\/[A-Za-z0-9_-]+|[A-Za-z0-9_-]{32}(?:\/menu|\/setup)?)$/;
 function ownerPortalLangRequest(method, rawUrl) {
   const getLike = method === 'GET' || method === 'HEAD';
   const m = OWNER_FR_PORTAL_RE.exec(String(rawUrl || ''));
@@ -53312,7 +53779,7 @@ function renderAdminPhotoCard(p, live) {
   const main = live ? '' : `<label class="rv-opt"><input type="checkbox" name="main"${p.venue_has_own_photo ? '' : ' checked'}>Make it the main photo</label>`;
   return `<article class="rv-card" data-kind="photo" data-id="${p.id}">
       <h3>${adminReviewEsc(p.venue_name)}</h3>
-      <p class="rv-meta">Photo #${p.id} · ${p.width}×${p.height} · sent ${adminReviewEsc(adminReviewTime(p.submitted_at))} · credit “${adminReviewEsc(p.credit)}”${p.is_main ? ' · <strong>main photo</strong>' : ''} · <a href="${adminReviewEsc(p.listing_url)}" target="_blank" rel="noopener">listing</a></p>
+      <p class="rv-meta">Photo #${p.id} · ${p.width}×${p.height} · sent ${adminReviewEsc(adminReviewTime(p.submitted_at))} · credit “${adminReviewEsc(p.credit)}”${p.is_main ? ' · <strong>main photo</strong>' : ''}${!p.is_main && p.main_requested && p.status === 'pending' ? ' · <strong>owner wants this as the main photo</strong> (Approve makes it main)' : ''} · <a href="${adminReviewEsc(p.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <img class="rv-photo" src="${adminReviewEsc(preview)}" alt="" loading="lazy">
       ${live ? '' : `<label class="rv-field">Credit ${adminEditBox('credit', p.credit, { max: 80 })}</label>`}
       ${adminReviewActions('photo', p.id, { remove: live, options: main, dismiss: !live })}
@@ -54275,6 +54742,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     fr, canDecline: true,
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
+    setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
     avgEstimate: input.avgSpendSource === 'research' && !pending.has('avg_spend') ? input.avgSpend : null,
     avgPublic: avgSpendPublic(),
@@ -54800,7 +55268,7 @@ ${renderGolfHeaderHtml()}
   <div class="op-wrap">
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
-      <h1>${escapeHtml(venue.name)}</h1>${completeHtml}
+      <h1>${escapeHtml(venue.name)}</h1>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang) : ''}${completeHtml}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
@@ -59498,6 +59966,13 @@ const server = http.createServer(async (req, res) => {
           base: ownerPath(`/owner/account/venue/${id}/menu`, res.ownerLang), back: ownerPath(`/owner/account/venue/${id}`, res.ownerLang),
         });
       }
+      // Easy setup (2026-11-09): photos and menu, one question at a time (restaurants).
+      const su = /^\/owner\/account\/venue\/(\d+)\/setup$/.exec(pathname);
+      if (su && (method === 'GET' || method === 'HEAD')) {
+        const back = ownerPath(`/owner/account/venue/${su[1]}`, res.ownerLang);
+        if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
+        return sendOwnerSetupPage(req, res, method, venueForOwnerAccount(account, Number(su[1])), { base: back, back, mode: 'account', lang: res.ownerLang });
+      }
       const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|arrival|video\/start|video\/done|completeness))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
@@ -59552,6 +60027,11 @@ const server = http.createServer(async (req, res) => {
           found: venueForOwnerToken(menuMatch[1]), live: false, mode: 'token', actor: 'owner-link',
           base: ownerPath(`${OWNER_LINK_PATH}${menuMatch[1]}/menu`, res.ownerLang), back: ownerPath(`${OWNER_LINK_PATH}${menuMatch[1]}`, res.ownerLang),
         });
+      }
+      const setupMatch = /^([A-Za-z0-9_-]+)\/setup$/.exec(rest);
+      if (setupMatch && (method === 'GET' || method === 'HEAD')) {
+        const back = ownerPath(`${OWNER_LINK_PATH}${setupMatch[1]}`, res.ownerLang);
+        return sendOwnerSetupPage(req, res, method, venueForOwnerToken(setupMatch[1]), { base: back, back, mode: 'token', lang: res.ownerLang });
       }
       const accountMatch = /^([A-Za-z0-9_-]+)\/account$/.exec(rest);
       if (accountMatch && method === 'POST') return await handleOwnerAccountSetup(req, res, accountMatch[1]);

@@ -1041,6 +1041,9 @@ for (const table of ['owner_change_requests', 'owner_photos']) {
 {
   const cols = db.prepare('PRAGMA table_info(owner_photos)').all().map((c) => c.name);
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE owner_photos ADD COLUMN sort_order INTEGER');
+  // Easy setup (2026-11-09): an owner on the edit link picked this photo as their main one ("Make main photo"). It
+  // stays a wish until the photo is approved; approving it then makes it the main photo unless the reviewer says no.
+  if (!cols.includes('main_requested')) db.exec('ALTER TABLE owner_photos ADD COLUMN main_requested INTEGER NOT NULL DEFAULT 0');
 }
 // Event partners (2026-10-19, JoieFarm asked): other listed businesses an owner tagged on their event. The event
 // also shows on their venue pages. No foreign keys, so deleting an event or a venue never fails on this table

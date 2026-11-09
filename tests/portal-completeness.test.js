@@ -298,7 +298,9 @@ test('no ranking, sorting or indexing code reads the score', () => {
   const lines = (i) => src.slice(0, i).split('\n').length;
   // "We don't have one" (2026-11-08): the owner's own save path also reads the item list (to check, store and describe
   // the answers). These are owner-portal functions only; none feeds ranking, sorting, indexing or a public page.
-  const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText', 'function ownerMainPhotoPositionHtml'].map((name) => {
+  const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText', 'function ownerMainPhotoPositionHtml',
+    // Easy setup (2026-11-09): COMPLETENESS_TYPES only decides which owners get the setup page.
+    'function sendOwnerSetupPage'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
     return [lines(a), lines(src.indexOf('\n}\n', a))];
