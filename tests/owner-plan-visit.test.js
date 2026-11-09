@@ -145,7 +145,9 @@ test('research never replaces, removes or brings back a row the owner wrote or c
 });
 
 test('completeness: all five Plan your visit items are in "Still to add" with buttons; only "Confirmed by you" is still coming', async () => {
-  for (const k of ['pyv_known', 'pyv_reservations', 'pyv_takeout', 'pyv_dietary', 'pyv_groups']) assert.equal(pc.ITEMS.find((i) => i.key === k).fix, true, k);
+  // The dietary line counts toward Dietary options since the live check (2026-11-08); its box stays.
+  assert.ok(!pc.ITEMS.some((i) => i.key === 'pyv_dietary'));
+  for (const k of ['pyv_known', 'pyv_reservations', 'pyv_takeout', 'pyv_groups']) assert.equal(pc.ITEMS.find((i) => i.key === k).fix, true, k);
   const v = mk('restaurant');
   const p = panel(await get(`/owner/${tokenFor(v.id)}`));
   assert.ok(p.includes('data-cb-task="more" data-cb-id="opVisitKnown">Write it<'));

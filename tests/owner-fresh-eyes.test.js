@@ -131,7 +131,7 @@ test('"Are your hours still right?": the hours as text with one-tap yes; not off
   // No hours on file: "Add hours" only, never "Yes, these are right".
   const bare = (await bar(tokenFor(mk('restaurant').id))).body.html;
   assert.ok(!bare.includes('Yes, these are right'));
-  assert.ok(bare.includes('>Add hours<'));
+  assert.ok(bare.includes('>Add your hours<'));
   // New hours waiting for review: no one-tap yes on the old ones.
   const w = mk('restaurant', { hours: week });
   assert.equal((await post(tokenFor(w.id), { hours: JSON.parse(week.replace('"21:00"', '"20:00"')) })).status, 201);
