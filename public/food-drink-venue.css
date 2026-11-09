@@ -135,7 +135,7 @@ body.fd-venue-page .fd-section-nav a {padding:10px 4px;font-size:13px}
 body.fd-venue-page .fd-section-nav a {font-size:12px}
 body.fd-venue-page .venue-cta-row .cta {font-size:11px;padding:10px 6px!important}
 }
-body.fd-venue-page .fd-deals>.venue-section,body.fd-venue-page .fd-editorial .venue-section {border:0;box-shadow:none;padding:0;margin:0 0 6px;background:none;max-width:none!important}
+body.fd-venue-page .fd-deals>.venue-section,body.fd-venue-page .fd-visit>.venue-section,body.fd-venue-page .fd-editorial .venue-section {border:0;box-shadow:none;padding:0;margin:0 0 6px;background:none;max-width:none!important}
 body.fd-venue-page .fd-deals>.venue-section+.venue-section {margin-top:16px;padding-top:16px;border-top:1px solid #eee6d8}
 body.fd-venue-page .fd-recognition {margin:0 0 10px}
 body.fd-venue-page .fd-editorial h2 {font-size:22px}

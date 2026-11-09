@@ -73,12 +73,14 @@ test('every winery page uses the shared layout, with the tasting card first and 
   assert.ok(order.some((t) => /Directions|Google Maps/.test(t)), 'Directions is among the main buttons');
 });
 
-test('the introduction is one sentence; the whole description and the Plan your visit box are under More about', () => {
+test('the introduction is one sentence; the whole description is under More about; the Plan your visit box is open above it', () => {
   const body = layoutOf(page(rich));
   assert.match(body, /<p class="venue-description">A family estate on a south-facing slope\.<\/p>/);
   const more = body.slice(body.indexOf('<summary>More about'));
   assert.match(more, /Its wines are made from the vineyards around the tasting room\. Visitors can stay for lunch\./);
-  assert.match(more, /id="venueVisit"/);
+  // 2026-11-08: the box left the fold so visitors see it without a tap.
+  assert.doesNotMatch(more, /id="venueVisit"/);
+  assert.ok(body.indexOf('id="venueVisit"') > 0 && body.indexOf('id="venueVisit"') < body.indexOf('<summary>More about'));
 });
 
 test('the tastings card shows what is recorded, as written, with where it came from', () => {

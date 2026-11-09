@@ -174,9 +174,13 @@ function renderFoodDrinkVenueLayout(parts) {
       + nearbyList(parts.nearbyCards.slice(0, 3))
       + fold('More nearby places', nearbyList(parts.nearbyCards.slice(3)) + parts.relatedHtml + parts.nearbyHtml) + '</section>' : '';
 
+  // Plan your visit (2026-11-08): its own open card after the menu and deals, not inside "More about" where most
+  // visitors never saw it. Same box, same rows: its own "More: ..." line still folds the extra rows in place.
+  const visit = parts.visitHtml ? '<div class="fd-card fd-visit">' + parts.visitHtml + '</div>' : '';
+
   // More about the venue: the full description and everything that is not shown above
   const more = fold('More about ' + (short || name) + ' &amp; all venue features',
-    parts.descriptionHtml + parts.badgesHtml + parts.dogNoteHtml + parts.visitHtml + (profile.stripVerifiedDate ? parts.verifiedHtml : '') + parts.guideLinks + parts.ownerCtaHtml, 'fd-card');
+    parts.descriptionHtml + parts.badgesHtml + parts.dogNoteHtml + (profile.stripVerifiedDate ? parts.verifiedHtml : '') + parts.guideLinks + parts.ownerCtaHtml, 'fd-card');
 
   // Save and contact
   const contactRow = parts.contactActions.length ? '<div class="fd-actions fd-contact-actions"' + parts.ctaRowAttrs + '>' + parts.contactActions.join('') + '</div>' : '';
@@ -201,7 +205,7 @@ function renderFoodDrinkVenueLayout(parts) {
     recognition, parts.venueAdvisoryHtml || '',
     intro ? '<p class="venue-description">' + esc(intro) + '</p>' : '', parts.whyHtml || '',
     ctaRow, highlights, profile.happyHourLink ? happyLink : '', verifiedInSummary, '</section>',
-    nav, parts.experienceHtml || '', menu, deals, editorial, more,
+    nav, parts.experienceHtml || '', menu, deals, ...(visit ? [visit] : []), editorial, more,
     fold('Upcoming events at ' + (short || name), parts.eventsHtml, 'fd-card'), profile.visitorFirst ? parts.visitorHtml : '',
     // The facts (map, phone, hours, save buttons) come before the visitor photos and tips in the page itself, for keyboard
     // and screen reader order (round 9 accessibility rule); Copper keeps its approved order.
