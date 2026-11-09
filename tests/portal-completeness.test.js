@@ -302,7 +302,10 @@ test('no ranking, sorting or indexing code reads the score', () => {
     // Easy setup (2026-11-09): COMPLETENESS_TYPES only decides which owners get the setup page.
     'function sendOwnerSetupPage',
     // Complete & Verified badge (2026-11-09): display only (its own test checks ranking, sitemap and robots never read it).
-    'function venueBadgeState', 'function completeVerifiedPageHtml', 'function badgeRemindersDue', 'function renderBadgeReminderPage'].map((name) => {
+    'function venueBadgeState', 'function completeVerifiedPageHtml', 'function badgeRemindersDue', 'function renderBadgeReminderPage',
+    // Full easy setup (2026-11-09): the setup's own score/progress, its page, the setup-only live rule in the owner save,
+    // and the owner-only restaurant features (which restaurants get them). None feeds ranking, sorting or indexing.
+    'function setupScore', 'function handleOwnerSetupProgress', 'function renderOwnerSetupPage', 'async function handleOwnerChangeSubmission', 'function ownerFeatureChipsHtml'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
     return [lines(a), lines(src.indexOf('\n}\n', a))];

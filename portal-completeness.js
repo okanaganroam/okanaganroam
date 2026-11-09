@@ -33,7 +33,7 @@ const ITEMS = [
   { key: 'photo_extra', group: 'photos', w: 6, fix: true, target: { task: 'photos', id: 'photos' }, fields: [],
     en: 'At least 3 photos', fr: 'Au moins 3 photos', whyEn: 'Food, your room, your patio.', whyFr: 'Plats, salle, terrasse.', btnEn: 'Add photos', btnFr: 'Ajouter des photos', icon: '📷' },
   { key: 'avg_spend', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'opAvg' }, fields: ['avg_spend'],
-    en: 'Average spend per person', fr: 'Dépense moyenne par personne', whyEn: 'One main and a non-alcoholic drink, in dollars.', whyFr: 'Un plat principal et une boisson sans alcool, en dollars.', btnEn: 'Enter amount', btnFr: 'Indiquer', icon: '💵' },
+    en: 'Average spend per person', fr: 'Dépense moyenne par personne', whyEn: 'One main and a soft drink, before tax and tip, in dollars.', whyFr: 'Un plat principal et une boisson sans alcool, avant taxes et pourboire, en dollars.', btnEn: 'Enter amount', btnFr: 'Indiquer', icon: '💵' },
   { key: 'menu', group: 'menu', w: 8, fix: true, target: { href: 'menu' }, fields: ['menu_url'],
     en: 'Link to your menu, or snap a photo of it', fr: 'Lien vers votre menu, ou une photo de celui-ci', whyEn: 'Guests want to see the dishes and prices. A “Menu” line in Plan your visit doesn’t count as the menu.', whyFr: 'Les clients veulent voir les plats et les prix. Une ligne « Menu » dans Planifier la visite ne compte pas comme le menu.', btnEn: 'Add menu', btnFr: 'Ajouter le menu', icon: '📖' },
   { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 6, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
