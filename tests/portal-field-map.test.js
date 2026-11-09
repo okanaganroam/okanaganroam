@@ -17,7 +17,8 @@ const LEGACY = {
   activityBadges: new Set(['outdoor', 'indoor', 'beach', 'tour', 'sport']),
 };
 // Old inline rule in the owner form: food-only badges were hidden for booking-first types except golf.
-const legacyFoodBadgesHidden = (type) => LEGACY.bookingFirst.has(type) && type !== 'golf';
+// PR 2 (2026-11-08) deliberately also hides them for beaches and shops (see portal-hide-irrelevant.test.js).
+const legacyFoodBadgesHidden = (type) => (LEGACY.bookingFirst.has(type) && type !== 'golf') || type === 'beach' || type === 'shop';
 
 const TYPES = [...new Set([...Object.keys(app.CATEGORY_SLUGS), ...Object.keys(app.PORTAL_FIELDS_BY_TYPE), 'a-type-added-later'])];
 
@@ -60,7 +61,7 @@ test('every Food & Drink type can have a menu and weekly nights', () => {
 });
 
 test('a type nobody has listed gets the plain defaults, and the map cannot be changed', () => {
-  assert.deepEqual({ ...app.portalFields('a-type-added-later') }, { happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false });
+  assert.deepEqual({ ...app.portalFields('a-type-added-later') }, { happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: [], arrivalTile: true });
   assert.deepEqual({ ...app.portalFields('constructor') }, { ...app.portalFields('a-type-added-later') });
   assert.ok(Object.isFrozen(app.PORTAL_FIELDS_BY_TYPE) && Object.isFrozen(app.portalFields('cafe')));
 });
