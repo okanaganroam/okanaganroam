@@ -71,4 +71,14 @@ function wineryTastingsHtml(info, esc, prices = null) {
     + '<ul class="fd-tasting-list">' + items + '</ul>'
     + '<p class="fd-note">' + (host ? 'From ' + esc(host) : 'From the winery') + (checked ? ' \u00b7 checked ' + esc(checked) : '') + '. Confirm current options when booking.</p></section>';
 }
-module.exports = { nicheTastingsHtml, nicheVisitInfoWithPrices, wineryTastingsHtml };
+// The Plan your visit box under the Tastings card (2026-11-08): leave out the rows the card already shows, so a winery
+// page never lists the same tasting twice. The card's own rows: the priced Niche card shows Tastings and Vineyard walk;
+// every other card shows TASTING_ROW_LABELS. No card (no Tastings row) means nothing is left out.
+function withoutTastingCardRows(info, esc, prices = null) {
+  const rows = info && Array.isArray(info.rows) ? info.rows : [];
+  if (!rows.some((r) => r.label === 'Tastings')) return info;
+  const priced = prices ? nicheTastingsHtml(info, esc, prices) : '';
+  const inCard = new Set(priced.includes('fd-tasting-option') ? ['Tastings', 'Vineyard walk'] : TASTING_ROW_LABELS);
+  return { ...info, rows: rows.filter((r) => !inCard.has(r.label)) };
+}
+module.exports = { nicheTastingsHtml, nicheVisitInfoWithPrices, wineryTastingsHtml, withoutTastingCardRows, TASTING_ROW_LABELS };
