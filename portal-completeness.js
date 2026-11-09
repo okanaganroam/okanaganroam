@@ -327,6 +327,9 @@ function renderCompleteness(result, opts) {
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
+    // Easy setup (2026-11-09): photos and the menu open the one-question-at-a-time setup at that step.
+    const setupStep = o.setupHref ? { photo_main: 'photos', photo_extra: 'photos', menu: 'menu' }[it.key] : null;
+    if (setupStep) return `<a class="op-cb-btn" href="${esc(o.setupHref)}#${setupStep}">${label}</a>`;
     if (it.target && it.target.href) return `<a class="op-cb-btn" href="${esc(o.menuHref || '#')}">${label}</a>`;
     if (it.target) return `<button type="button" class="op-cb-btn" data-cb-task="${esc(it.target.task)}" data-cb-id="${esc(it.target.id || '')}">${label}</button>`;
     return '';
