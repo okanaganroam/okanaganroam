@@ -112,6 +112,11 @@ if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness
 const QUICK_SECONDS = 30;
 const QUICK_CAP_SECONDS = 60;
 const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
+// What each quick item saves (fresh-eyes 3, 2026-11-09): "Quick answers go live right away", so an item is only a quick
+// one when that field goes live for this owner (opts.liveFields). Phone, website and dietary ticks wait for our check
+// from an edit link, so there they sit under "When you have a few minutes".
+const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', hours_fresh: 'hours_checked', avg_spend: 'avg_spend', dietary: 'badges',
+  instagram: 'instagram_url', facebook: 'facebook_url', pyv_known: 'visit_rows', pyv_reservations: 'visit_rows', pyv_takeout: 'visit_rows', pyv_groups: 'visit_rows' };
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
   if (!keys.size) return 0;
@@ -219,6 +224,8 @@ function scoreCompleteness(input, opts) {
       let sent = 0;
       if (it.key === 'photo_main' && photosWaiting > 0) { waiting = true; sent = photosWaiting; }
       if (it.key === 'photo_extra' && photosWaiting > 0 && Number(input && input.photoCount || 0) + photosWaiting >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
+      // A storefront spot the owner sent is waiting for our check (fresh-eyes 3, 2026-11-09), not "left".
+      if (it.key === 'arrival' && input && input.pendingArrival) waiting = true;
       missing.push({ ...it, waiting, sent });
     }
   }
@@ -231,14 +238,18 @@ function scoreCompleteness(input, opts) {
   // Capped at a minute (Dayton): the quickest ones that fit in 60 seconds; the rest wait in the second list.
   const quick = [];
   let quickSeconds = 0;
-  for (const it of missing.filter(isQuick).sort((x, y) => (SECONDS[x.key] - SECONDS[y.key]) || (y.w - x.w))) {
+  const liveFields = o.liveFields instanceof Set ? o.liveFields : null;
+  const quickHere = (it) => isQuick(it) && (!liveFields || (QUICK_FIELD[it.key] && liveFields.has(QUICK_FIELD[it.key])));
+  for (const it of missing.filter(quickHere).sort((x, y) => (SECONDS[x.key] - SECONDS[y.key]) || (y.w - x.w))) {
     if (quickSeconds + SECONDS[it.key] > QUICK_CAP_SECONDS) break;
     quick.push(it); quickSeconds += SECONDS[it.key];
   }
   const waitingList = missing.filter((it) => it.waiting);
   const later = missing.filter((it) => !it.waiting && !quick.includes(it));
   // The lighter part of the ring: what will count once we approve what was sent.
-  const waitingW = waitingList.reduce((a, it) => a + it.w, 0);
+  // Hours sent while the page had none: once checked they're fresh too, so the provisional score counts both.
+  const hoursFreshW = waitingList.some((it) => it.key === 'hours') && !done.hours ? (ITEMS.find((i) => i.key === 'hours_fresh') || { w: 0 }).w : 0;
+  const waitingW = waitingList.reduce((a, it) => a + it.w, 0) + hoursFreshW;
   const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
   return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
 }
@@ -336,7 +347,11 @@ function renderCompleteness(result, opts) {
     if (it.key === 'avg_spend' && Number.isInteger(o.avgEstimate)) {
       const money = fr ? `${o.avgEstimate} $` : `$${o.avgEstimate}`;
       return { val: L(`Our estimate from your menu: about ${money}`, `Notre estimation selon votre menu : environ ${money}`), save: { avg_spend: String(o.avgEstimate) },
-        yes: L('Yes, that’s right', 'Oui, c’est exact'), done: L(`Thanks! Your page shows about ${money}.`, `Merci! Votre fiche indique environ ${money}.`),
+        yes: L('Yes, that’s right', 'Oui, c’est exact'),
+        // Only say it's on the page when it is (fresh-eyes 3, 2026-11-09): average spend is hidden publicly while
+        // AVG_SPEND_PUBLIC is off.
+        done: o.avgPublic ? L(`Thanks! Your page shows about ${money}.`, `Merci! Votre fiche indique environ ${money}.`)
+          : L(`Thanks! Saved. It’ll show on your page soon.`, `Merci! C’est enregistré. Cela s’affichera bientôt sur votre fiche.`),
         change: L('Change it', 'La modifier'), task: 'more', id: 'opAvg' };
     }
     return null;
@@ -362,7 +377,9 @@ function renderCompleteness(result, opts) {
   const ceilingText = ceilPhotos && ceilDoor ? L('Photos and your storefront spot are the last steps to 100%.', 'Les photos et l’emplacement de votre devanture sont les dernières étapes vers 100 %.')
     : ceilPhotos ? L('Photos are the last step to 100%.', 'Les photos sont la dernière étape vers 100 %.')
       : ceilDoor ? L('Your storefront spot is the last step to 100%.', 'L’emplacement de votre devanture est la dernière étape vers 100 %.') : '';
-  const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${ceilingText}${onlyCeiling ? '' : L(' Do them when you’re at your place with a few minutes.', ' Faites-les quand vous êtes sur place avec quelques minutes.')}</p>` : '';
+  const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${ceilingText}${onlyCeiling ? '' : ceilPhotos && ceilDoor
+    ? L(' Do them when you’re at your place with a few minutes.', ' Faites-les quand vous êtes sur place avec quelques minutes.')
+    : L(' Do it when you’re at your place with a few minutes.', ' Faites-le quand vous êtes sur place avec quelques minutes.')}</p>` : '';
   const still = quickHtml + laterHtml + ceilingHtml + waitingHtml;
   // Items the owner can't fill in yet but CAN already say they don't offer (Reservations, Takeout) get their own short
   // list, so "You can't fill these in yet" never sits next to a button that does something (2026-11-08).
@@ -379,11 +396,16 @@ function renderCompleteness(result, opts) {
   // A quick one that appears after the owner answers another is said so (final fresh-eyes 2026-11-09), so the count
   // doesn't look like it started over.
   const moreAttrs = r.complete ? '' : ` data-cb-quick="${esc(quick.map((it) => it.key).join(' '))}" data-cb-more1="${esc(L('1 more quick one just came up.', '1 autre élément rapide vient de s’ajouter.'))}" data-cb-moren="${esc(L('{n} more quick ones just came up.', '{n} autres éléments rapides viennent de s’ajouter.'))}"`;
+  // Score while waiting (fresh-eyes 3, 2026-11-09): what the owner sent doesn't count until we check it, so the bar says
+  // where they'll land: "61% now · about 95% once we check your 8 changes", with a legend for the ring's two colours.
+  // The real score (r.pct) never counts waiting items.
+  const prov = !r.complete && nw > 0 && r.pctWithWaiting > r.pct ? r.pctWithWaiting : null;
+  const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${r.pct}% now</strong> · about <strong>${prov}%</strong> once we check your ${nw} ${nw === 1 ? 'change' : 'changes'}`, `<strong>${r.pct} % maintenant</strong> · environ <strong>${prov} %</strong> une fois vos ${nw} ${nw === 1 ? 'modification vérifiée' : 'modifications vérifiées'}`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
   const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
       <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
-      <p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
+      ${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
         ${still}
@@ -398,7 +420,26 @@ function renderCompleteness(result, opts) {
 const COMPLETENESS_CSS = `
     body.owner-page .op-cb { margin: 14px 0 6px; background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(42,32,25,.06), 0 6px 18px rgba(42,32,25,.06); }
     body.owner-page .op-cb-head { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 44px; padding: 14px 16px; background: none; border: 0; border-radius: 16px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-    body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; --w: 0; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #A9CFC9 0 calc(var(--w) * 1%), #EAE6D9 0); }
+    body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; --w: 0; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #E2A23B 0 calc(var(--w) * 1%), #EAE6D9 0); }
+    body.owner-page .op-cb-back { display: block; margin: 12px 0 4px; }
+    body.owner-page .op-desc-goal { margin-top: 2px; font-weight: 700; color: #67470C; }
+    body.owner-page .op-desc-goal.op-desc-ok { color: #1E6B3A; }
+    body.owner-page .op-copy-row { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.8); margin-top: 6px; }
+    body.owner-page .op-copy-row button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 14px; min-height: 40px; margin: 2px 4px 2px 0; font: inherit; font-weight: 700; cursor: pointer; }
+    body.owner-page #opHappy.op-hh-stable .op-day.is-off .op-times, body.owner-page #opHappy.op-hh-stable .op-day.is-off .op-copy-row { display: flex; visibility: hidden; }
+    body.owner-page .op-file-previews { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    body.owner-page .op-file-previews img { width: 76px; height: 76px; object-fit: cover; border-radius: 10px; border: 1px solid rgba(42,32,25,.15); }
+    body.owner-page .op-tips { margin: 0 0 10px; }
+    body.owner-page .op-tips summary { cursor: pointer; font-weight: 700; color: #1E4F4C; min-height: 32px; }
+    body.owner-page .op-toast { position: fixed; top: 10px; left: 12px; right: 12px; z-index: 60; max-width: 560px; margin: 0 auto; padding: 12px 14px; border-radius: 12px; background: #1E6B3A; color: #fff; font-weight: 700; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+    body.owner-page .op-toast[hidden] { display: none; }
+    body.owner-page .op-save-sent { color: #67470C; background: #FFF6E3; }
+    body.owner-page .op-cb-prov { margin: 0 16px 12px; padding: 10px 12px; border-radius: 10px; background: #FFF6E3; color: #4A3B32; font-size: .92rem; line-height: 1.4; }
+    body.owner-page .op-cb-prov strong { color: #1B2B3A; }
+    body.owner-page .op-cb-legend { display: block; margin-top: 4px; font-size: .82rem; color: #6B5D54; font-weight: 700; }
+    body.owner-page .op-cb-key { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 0; border-radius: 50%; vertical-align: -1px; }
+    body.owner-page .op-cb-key-done { background: #2A6B67; }
+    body.owner-page .op-cb-key-wait { background: #E2A23B; margin-left: 10px; }
     body.owner-page .op-cb-ring::before { content: ""; position: absolute; inset: 7px; background: #fff; border-radius: 50%; }
     body.owner-page .op-cb-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1rem; font-weight: 800; color: #1E4F4C; }
     body.owner-page .op-cb-ring-100 b { font-size: .8rem; }
@@ -547,6 +588,50 @@ const COMPLETENESS_SCRIPT = `
       }); });
     }
     window.opCbJump = jumpTo;
+    // Photos (fresh-eyes 3, 2026-11-09): small previews of what was picked, before Upload (it only said "3 files").
+    (function(){
+      var f = document.getElementById('ofFiles'), box = document.getElementById('ofPreviews'); if (!f || !box || !window.URL) return;
+      f.addEventListener('change', function(){
+        while (box.firstChild) box.removeChild(box.firstChild);
+        Array.prototype.slice.call(f.files || [], 0, 5).forEach(function(file){
+          if (String(file.type).indexOf('image/') !== 0) return;
+          var im = document.createElement('img'); im.alt = ''; im.src = URL.createObjectURL(file); im.onload = function(){ URL.revokeObjectURL(im.src); };
+          box.appendChild(im);
+        });
+      });
+      var form = document.getElementById('ofForm');
+      if (form) form.addEventListener('reset', function(){ while (box.firstChild) box.removeChild(box.firstChild); });
+    })();
+    // Happy hour (fresh-eyes 3, 2026-11-09): any day copies to Mon–Fri or every day (Monday is usually "None", which
+    // hid the old Monday-only copy), and a row keeps its height when "None" is unticked, so the next tap lands right.
+    Array.prototype.forEach.call(document.querySelectorAll('#opHappy [data-copy-from]'), function(b){
+      b.addEventListener('click', function(){
+        var src = b.closest('.op-day'), list = Array.prototype.slice.call(document.querySelectorAll('#opHappy .op-day'));
+        var st = src.querySelectorAll('.op-t'), two = !src.querySelector('.op-second').hidden && (st[2].value || st[3].value);
+        list.slice(0, b.getAttribute('data-copy-from') === 'all' ? 7 : 5).forEach(function(row){
+          if (row === src) return;
+          row.querySelector('.op-off').checked = src.querySelector('.op-off').checked;
+          var t = row.querySelectorAll('.op-t');
+          for (var i = 0; i < 4; i++) t[i].value = (i < 2 || two) ? st[i].value : '';
+          row.querySelector('.op-second').hidden = !two; row.querySelector('.op-add').hidden = !!two;
+          if (typeof syncRow === 'function') syncRow(row);
+        });
+        if (typeof setListingDirty === 'function') setListingDirty(true);
+        var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
+        note.className = 'op-copy-done'; note.textContent = (typeof T !== 'undefined' && T.copied) || 'Copied.';
+      });
+    });
+    // Description (fresh-eyes 3, 2026-11-09): the cursor starts at the end of what's there, never in front of it, and a
+    // line shows the progress toward the 120 characters the score asks for ("222/120 ✓").
+    (function(){
+      var d = document.getElementById('opDescription'), g = document.getElementById('opDescGoal'); if (!d) return;
+      var first = true;
+      d.addEventListener('focus', function(){ if (!first) return; first = false; var n = d.value.length; setTimeout(function(){ try { d.setSelectionRange(n, n); } catch (e) { /* not a text box */ } }, 0); });
+      function goal(){ if (!g) return; var min = Number(g.getAttribute('data-min')) || 120, n = d.value.trim().length;
+        g.textContent = (n >= min ? g.getAttribute('data-ok') : g.getAttribute('data-low')).split('{n}').join(String(n)).split('{min}').join(String(min)).split('{left}').join(String(Math.max(0, min - n)));
+        g.classList.toggle('op-desc-ok', n >= min); }
+      d.addEventListener('input', goal); goal();
+    })();
     // "Got it: not on Facebook ✓ · Undo", built where the owner tapped.
     function gotEl(tag, key, text){
       var g = document.createElement(tag); g.className = (tag === 'li' ? 'op-cb-row ' : 'op-cb-inline ') + 'op-cb-gotrow';
@@ -637,7 +722,12 @@ const COMPLETENESS_SCRIPT = `
       if (!e.target.closest) return;
       // "Back to the list" (final fresh-eyes 2026-11-09): the card is redrawn, so anything sent meanwhile shows as waiting.
       var pk = e.target.closest('[data-pick]');
-      if (pk && !pk.getAttribute('data-pick')) refresh('');
+      // "Done, back to my list" (fresh-eyes 3, 2026-11-09): back to the card, open, with the updated score in view.
+      // Instant, not smooth (the page scrolls smoothly, and two smooth scrolls at once stop half way).
+      var toCard = function(){ setOpen(true); var root = document.documentElement, prev = root.style.scrollBehavior; root.style.scrollBehavior = 'auto';
+        window.scrollTo({ top: Math.max(0, sec.getBoundingClientRect().top + window.pageYOffset - headerOffset()), behavior: 'instant' }); root.style.scrollBehavior = prev; };
+      if (pk && pk.hasAttribute('data-cb-back')) { setTimeout(toCard, 60); refresh('').then(toCard); }
+      else if (pk && !pk.getAttribute('data-pick')) refresh('');
       if (e.target.closest('#opCbToggle')) { setOpen(tg.getAttribute('aria-expanded') !== 'true'); return; }
       var j = e.target.closest('#opComplete [data-cb-task]');
       if (j) { setTask(j.getAttribute('data-cb-task')); jumpTo(j.getAttribute('data-cb-id')); return; }
@@ -651,4 +741,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

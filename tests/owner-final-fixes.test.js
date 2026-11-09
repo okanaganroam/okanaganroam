@@ -73,7 +73,8 @@ test('sent for review shows as waiting straight away: GET .../completeness after
   const page = await get(`/owner/${token}`);
   assert.match(page, /setListingDirty\(false\);\s*\/\/ Final fresh-eyes[^\n]*\n\s*if \(window\.opCbRefresh\) window\.opCbRefresh\(''\);/);
   assert.match(page, /refreshPhotos\(\); if \(window\.opCbRefresh\) window\.opCbRefresh\(''\);/);
-  assert.match(pc.COMPLETENESS_SCRIPT, /var pk = e\.target\.closest\('\[data-pick\]'\);\s*if \(pk && !pk\.getAttribute\('data-pick'\)\) refresh\(''\);/);
+  // "Back to the list" refreshes the card (fresh-eyes 3: "Done, back to my list" refreshes it too, then scrolls to it).
+  assert.match(pc.COMPLETENESS_SCRIPT, /var pk = e\.target\.closest\('\[data-pick\]'\);[\s\S]{0,900}if \(pk && pk\.hasAttribute\('data-cb-back'\)\) \{ setTimeout\(toCard, 60\); refresh\(''\)\.then\(toCard\); \}\s*else if \(pk && !pk\.getAttribute\('data-pick'\)\) refresh\(''\);/);
 });
 
 test('ticked badges waiting for our check get their own row and count; a dietary badge also moves Dietary options to waiting', async () => {
@@ -101,7 +102,8 @@ test('every block says whether it goes live now or is checked first (restaurants
   const at = (id) => { const i = page.search(new RegExp(`<details class="op-fold[^"]*" id="${id}"`)); assert.ok(i > 0, id); return page.slice(i, i + 1500); };
   for (const id of ['hours', 'badges', 'specials', 'weekly-nights']) assert.ok(at(id).includes(check), `${id} says it is checked first`);
   if (page.includes('id="happy"')) assert.ok(at('happy').includes(check), 'happy hour too');
-  assert.ok(at('opLinksBox').includes('Checked first, usually within a day. Press Send changes when you’re done.'), 'links are checked first');
+  // Fresh-eyes 3 (2026-11-09): Instagram and Facebook go live straight away; the other links are checked first.
+  assert.ok(at('opLinksBox').includes('Checked first, usually within a day (Instagram and Facebook go live straight away). Press Send changes when you’re done.'), 'links are checked first');
   assert.ok(page.slice(page.indexOf('id="opDescriptionLabel"'), page.indexOf('id="opDescription"', page.indexOf('id="opDescriptionLabel"') + 30)).includes(check), 'description');
   assert.ok(at('photos').includes('Sent to us to check, usually within a day.'), 'photos');
   assert.ok(page.includes('Saves now and goes live'), 'cuisine and Plan your visit keep theirs');
