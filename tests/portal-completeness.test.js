@@ -127,13 +127,15 @@ test('score: the other rules (real photo, 3 photos, description length, dietary,
   assert.ok(score({ latitude: null }).missing.some((i) => i.key === 'address_pin'));
 });
 
-test('score: an item waiting for review is flagged and sorted last, not hidden', () => {
+test('score: an item waiting for review is flagged, never "left", and listed under "Waiting for our check"', () => {
   const r = score({ phone: '', instagramUrl: '' }, { pending: new Set(['phone']) });
   const phone = r.missing.find((i) => i.key === 'phone');
   assert.equal(phone.waiting, true);
-  assert.equal(r.missing[r.missing.length - 1].key, 'phone');
+  assert.deepEqual(r.waiting.map((i) => i.key), ['phone']);
+  assert.ok(!r.quick.includes(phone) && !r.later.includes(phone), 'not in the lists of things to do');
   const html = pc.renderCompleteness(r, {});
-  assert.match(html, /Waiting for review/);
+  assert.match(html, />Waiting for our check</);
+  assert.match(html, /· 1 waiting for our check\. Tap to start\./);
 });
 
 test('render: ring, headline, missing rows with buttons, done groups, the "only you see this" line; English and French', () => {
@@ -181,7 +183,7 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
   const pct = Number(/Your page is (\d+)% complete/.exec(html)[1]);
   assert.ok(pct > 0 && pct < 40, `a bare fixture is low: ${pct}`);
   for (const w of ['Add hours', 'Add photos', 'Enter amount', 'Add menu', 'Add Instagram', 'At the door']) assert.ok(html.includes(w), w);
-  assert.match(html, /data-cb-task="more" data-cb-id="avgspend"/);
+  assert.match(html, /data-cb-task="more" data-cb-id="opAvg"/);
   assert.match(html, /We&rsquo;re adding these|We’re adding these/);
   assert.match(html, /\.op-cb-head \{/, 'the bar CSS is on the page');
   assert.match(html, /getElementById\('opCbToggle'\)/, 'the bar script is on the page');
@@ -189,7 +191,7 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
   // The other-task screens still work: the bar shows on the task list and the full page, not inside a task.
   assert.match(html, /data-task="home all" aria-labelledby="opCbHead"/);
   // The jump targets exist on the page.
-  for (const id of ['opAddress', 'opPhone', 'opWebsite', 'hours', 'photos', 'avgspend', 'badges', 'happy', 'specials', 'weekly-nights', 'opDescriptionLabel', 'opInstagram', 'opFacebook']) assert.ok(html.includes(`id="${id}"`), `target #${id}`);
+  for (const it of pc.ITEMS.filter((i) => i.target && i.target.id)) assert.ok(html.includes(`id="${it.target.id}"`), `${it.key}: target #${it.target.id}`);
 });
 
 test('edit page: the bar tracks the data (hours, avg spend, photos, links) and shows Complete when nothing is left', async () => {
@@ -201,10 +203,19 @@ test('edit page: the bar tracks the data (hours, avg spend, photos, links) and s
   assert.ok(withHours >= before, `${before} -> ${withHours}`);
   const r = app.guardedAvgSpendUpdate(v.id, app.currentAvgSpendJson(v.id), { amount: 25, source: 'research', source_url: 'https://example.com/menu', basis: 'Estimated from the menu: median main $20 plus a soft drink', checked_at: today }, { reason: 'fixture', batch_id: 'test-complete' });
   assert.equal(r.ok, true);
-  const withSpend = Number(/Your page is (\d+)% complete/.exec(await get(`/owner/${tokenFor(v.id)}`))[1]);
-  assert.ok(withSpend > withHours, `average spend adds points: ${withHours} -> ${withSpend}`);
+  // A research estimate counts once the owner confirms it (fresh-eyes 2026-11-08): the row offers "Yes, that's right".
+  const est = await get(`/owner/${tokenFor(v.id)}`);
+  const withEstimate = Number(/Your page is (\d+)% complete/.exec(est)[1]);
+  assert.equal(withEstimate, withHours, 'an unconfirmed estimate adds nothing yet');
+  assert.match(est, /data-cb-save="\{&quot;avg_spend&quot;:&quot;25&quot;\}"[^>]*>Yes, that’s right</);
+  assert.match(est, /Our estimate from your menu: about \$25/);
+  const ok = await fetch(`${base}/owner/${tokenFor(v.id)}/changes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.9.0.1' },
+    body: JSON.stringify({ changes: { avg_spend: '25' }, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 }) });
+  assert.equal(ok.status, 201);
   const html = await get(`/owner/${tokenFor(v.id)}`);
-  assert.doesNotMatch(html, /data-cb-id="avgspend"/, 'the average spend row is gone once it is filled in');
+  const withSpend = Number(/Your page is (\d+)% complete/.exec(html)[1]);
+  assert.ok(withSpend > withHours, `confirming the average spend adds points: ${withHours} -> ${withSpend}`);
+  assert.doesNotMatch(html, /data-cb-id="opAvg"/, 'the average spend row is gone once it is confirmed');
 });
 
 test('edit page: French restaurant page has the bar and the French help topic', async () => {
@@ -349,16 +360,17 @@ test('quick ones first (busy owners): the bar never shows a big total; quick ite
 test('edit page intro: a restaurant on the edit link says which quick answers go live; other types keep the old wording', async () => {
   const r = mk('restaurant');
   const en = await get(`/owner/${tokenFor(r.id)}`);
-  assert.match(en, /We check most changes \(usually within a day\) before they go on your page\. Quick answers from the checklist above/);
+  // One short line (fresh-eyes 2026-11-08), in both places, with a link to the public page.
+  assert.equal(en.split('Quick answers go live right away. Other changes go live after a quick check, usually within a day.').length - 1, 2);
+  assert.match(en, /usually within a day\. <a href="[^"]+">See your page<\/a>/);
   assert.ok(!en.includes('Nothing changes until you press the Send button'), 'the old "nothing changes" line is gone for restaurants');
   assert.ok(!en.includes('We review every change'), 'and so is "we review every change"');
-  assert.match(en, /Quick answers from the checklist at the top go live as soon as you save them\./);
   const fr = await get(`/fr/owner/${tokenFor(r.id)}`);
-  assert.match(fr, /Les réponses rapides de la liste ci-dessus/);
+  assert.match(fr, /Les réponses rapides sont en ligne tout de suite\./);
   for (const type of ['pub', 'cafe', 'winery']) {
     const html = await get(`/owner/${tokenFor(mk(type).id)}`);
     assert.ok(html.includes('Nothing changes until you press the Send button'), `${type} keeps its wording`);
-    assert.ok(!html.includes('Quick answers from the checklist above'), `${type} has no checklist line`);
+    assert.ok(!html.includes('Quick answers go live right away'), `${type} has no checklist line`);
     assert.ok(html.includes('We review every change, usually within a day'), `${type} keeps the review line`);
   }
 });

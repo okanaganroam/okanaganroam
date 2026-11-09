@@ -27,22 +27,22 @@ const ITEMS = [
   { key: 'hours', group: 'hours', w: 8, fix: true, target: { task: 'hours', id: 'hours' }, fields: ['hours'],
     en: 'Weekly opening hours', fr: 'Heures d’ouverture', whyEn: 'The times you’re open each day.', whyFr: 'Vos heures d’ouverture chaque jour.', btnEn: 'Add hours', btnFr: 'Ajouter', icon: '🕑' },
   { key: 'hours_fresh', group: 'hours', w: 4, fix: true, target: { task: 'hours', id: 'opHoursOk' }, fields: ['hours', 'hours_checked'],
-    en: 'Hours checked in the last 90 days', fr: 'Heures vérifiées ces 90 derniers jours', whyEn: 'Still right? One tap tells visitors they were checked today.', whyFr: 'Toujours exactes? Un seul toucher indique aux visiteurs qu’elles ont été vérifiées aujourd’hui.', btnEn: 'Confirm hours', btnFr: 'Confirmer', icon: '🔄' },
+    en: 'Are your hours still right?', fr: 'Vos heures sont-elles toujours exactes?', whyEn: 'If nothing has changed, one tap is enough.', whyFr: 'Si rien n’a changé, un seul toucher suffit.', btnEn: 'Check them', btnFr: 'Vérifier', icon: '🔄' },
   { key: 'photo_main', group: 'photos', w: 8, fix: true, target: { task: 'photos', id: 'photos' }, fields: [],
     en: 'A real photo of your place', fr: 'Une vraie photo de votre établissement', whyEn: 'Real photos only, taken by you. Never a stand-in.', whyFr: 'De vraies photos seulement, prises par vous.', btnEn: 'Add photos', btnFr: 'Ajouter des photos', icon: '📷' },
   { key: 'photo_extra', group: 'photos', w: 6, fix: true, target: { task: 'photos', id: 'photos' }, fields: [],
     en: 'At least 3 photos', fr: 'Au moins 3 photos', whyEn: 'Food, your room, your patio.', whyFr: 'Plats, salle, terrasse.', btnEn: 'Add photos', btnFr: 'Ajouter des photos', icon: '📷' },
-  { key: 'avg_spend', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'avgspend' }, fields: ['avg_spend'],
+  { key: 'avg_spend', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'opAvg' }, fields: ['avg_spend'],
     en: 'Average spend per person', fr: 'Dépense moyenne par personne', whyEn: 'One main and a non-alcoholic drink, in dollars.', whyFr: 'Un plat principal et une boisson sans alcool, en dollars.', btnEn: 'Enter amount', btnFr: 'Indiquer', icon: '💵' },
   { key: 'menu', group: 'menu', w: 8, fix: true, target: { href: 'menu' }, fields: ['menu_url'],
     en: 'Your menu', fr: 'Votre menu', whyEn: 'Add a link, or just take a photo of the menu.', whyFr: 'Ajoutez un lien, ou prenez simplement le menu en photo.', btnEn: 'Add menu', btnFr: 'Ajouter le menu', icon: '📖' },
-  { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badges'],
+  { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 4, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
     en: 'Dietary options', fr: 'Options alimentaires', whyEn: 'Tick vegan, vegetarian or gluten-free if you offer them.', whyFr: 'Cochez végétalien, végétarien ou sans gluten si vous en offrez.', btnEn: 'Tick options', btnFr: 'Cocher', icon: '🥗' },
   { key: 'happy_hour', noneEn: 'We don’t have a happy hour', noneFr: 'Nous n’avons pas de happy hour', group: 'offers', w: 4, fix: true, target: { task: 'happy', id: 'happy' }, fields: ['happy_hour', 'happy_hour_deals'],
     en: 'Happy hour times and deals', fr: 'Heures et spéciaux du happy hour', whyEn: 'When it runs and what’s on special.', whyFr: 'Quand il a lieu et ce qui est en spécial.', btnEn: 'Add happy hour', btnFr: 'Ajouter', icon: '🍹' },
   { key: 'specials', noneEn: 'We don’t run specials', noneFr: 'Nous n’avons pas de spéciaux', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'specials' }, fields: ['specials'],
     en: 'Weekly specials', fr: 'Spéciaux de la semaine', whyEn: 'Nightly deals or a weekly feature.', whyFr: 'Spéciaux du soir ou de la semaine.', btnEn: 'Add specials', btnFr: 'Ajouter', icon: '⭐' },
-  { key: 'entertainment', noneEn: 'We don’t host music or events', noneFr: 'Ni musique ni événements chez nous', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'weekly-nights' }, fields: ['weekly_nights', 'badges'],
+  { key: 'entertainment', noneEn: 'We don’t host music or events', noneFr: 'Ni musique ni événements chez nous', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'weekly-nights' }, fields: ['weekly_nights', 'badge:live_music', 'badge:sports_tv'],
     en: 'Live music or events', fr: 'Musique en direct ou événements', whyEn: 'Trivia night, live music, sports on the TV.', whyFr: 'Soirée-questionnaire, musique en direct, sports à la télé.', btnEn: 'Add a night', btnFr: 'Ajouter', icon: '🎶' },
   // "Plan your visit" lines (2026-11-08): the owner writes them in the "Plan your visit" section of the edit page.
   { key: 'pyv_known', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitKnown' }, fields: ['visit_rows'],
@@ -55,7 +55,7 @@ const ITEMS = [
     en: 'Dietary note', fr: 'Note alimentaire', whyEn: 'What you can do for allergies and diets.', whyFr: 'Ce que vous pouvez faire pour les allergies et les régimes.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🌱' },
   { key: 'pyv_groups', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
     en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids, anything that helps.', whyFr: 'Grands groupes, stationnement, enfants, tout ce qui aide.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '👥' },
-  { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescriptionLabel' }, fields: ['description'],
+  { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescription' }, fields: ['description'],
     en: 'A description (120+ characters)', fr: 'Une description (120 caractères ou plus)', whyEn: 'A few sentences about your place, in your words.', whyFr: 'Quelques phrases sur votre établissement, dans vos mots.', btnEn: 'Write it', btnFr: 'Écrire', icon: '✍️' },
   { key: 'instagram', noneEn: 'We’re not on Instagram', noneFr: 'Nous ne sommes pas sur Instagram', group: 'social', w: 3, fix: true, target: { task: 'contact', id: 'opInstagram' }, fields: ['instagram_url'],
     en: 'Instagram link', fr: 'Lien Instagram', whyEn: 'Paste your @name or the link to your profile.', whyFr: 'Collez votre @nom ou le lien de votre profil.', btnEn: 'Add Instagram', btnFr: 'Ajouter', icon: '📸' },
@@ -127,7 +127,8 @@ function doneMap(input, today) {
     hours_fresh: !!i.hasHours && a != null && b != null && b - a <= HOURS_FRESH_DAYS,
     photo_main: ownPhoto,
     photo_extra: Number(i.photoCount) >= PHOTOS_MIN,
-    avg_spend: Number.isInteger(i.avgSpend),
+    // A research estimate counts once the owner confirms it ("Yes, that's right"), so confirming earns the points.
+    avg_spend: Number.isInteger(i.avgSpend) && i.avgSpendSource !== 'research',
     menu: nonBlank(i.menuUrl) || !!i.hasPublishedMenu,
     dietary: !!(i.vegan || i.vegetarian || i.glutenFree) || labels.has('dietary'),
     happy_hour: !!i.hasHappyHour,
@@ -154,6 +155,7 @@ function scoreCompleteness(input, opts) {
   const done = doneMap(input, o.today);
   const none = new Set(((input && input.declaredNone) || []).filter((k) => NONE_KEYS.includes(k)));
   const pending = o.pending || new Set();
+  const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
   // Happy hour is only asked of places that serve alcohol: a non-alcoholic place with no happy hour is exempt.
   if (input && input.nonalcoholic && !done.happy_hour) na.happy_hour = true;
@@ -166,7 +168,13 @@ function scoreCompleteness(input, opts) {
     if (!ok && !it.fix) { coming.push({ ...it }); continue; }
     max += it.w; per.get(it.group).max += it.w;
     if (ok) { got += it.w; per.get(it.group).got += it.w; } else {
-      missing.push({ ...it, waiting: (it.fields || []).some((f) => pending.has(f)) });
+      // Waiting = something the owner already sent for this item is in our review queue (field-precise: a badge only
+      // flags the item that badge belongs to). Photos count by uploads waiting (fresh-eyes 2026-11-08).
+      let waiting = (it.fields || []).some((f) => pending.has(f));
+      let sent = 0;
+      if (it.key === 'photo_main' && photosWaiting > 0) { waiting = true; sent = photosWaiting; }
+      if (it.key === 'photo_extra' && photosWaiting > 0 && Number(input && input.photoCount || 0) + photosWaiting >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
+      missing.push({ ...it, waiting, sent });
     }
   }
   const complete = missing.length === 0;
@@ -182,8 +190,43 @@ function scoreCompleteness(input, opts) {
     if (quickSeconds + SECONDS[it.key] > QUICK_CAP_SECONDS) break;
     quick.push(it); quickSeconds += SECONDS[it.key];
   }
-  const later = missing.filter((it) => !quick.includes(it));
-  return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing), quick, later, quickSeconds };
+  const waitingList = missing.filter((it) => it.waiting);
+  const later = missing.filter((it) => !it.waiting && !quick.includes(it));
+  // The lighter part of the ring: what will count once we approve what was sent.
+  const waitingW = waitingList.reduce((a, it) => a + it.w, 0);
+  const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
+  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
+}
+
+// The weekly hours as one short line for "Are your hours still right?" (fresh-eyes 2026-11-08):
+// "Mon closed · Tue–Thu 11:30 AM–9 PM · Fri 11:30 AM–10 PM". Days with the same times are grouped.
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_EN = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+const DAY_FR = { mon: 'lun.', tue: 'mar.', wed: 'mer.', thu: 'jeu.', fri: 'ven.', sat: 'sam.', sun: 'dim.' };
+function clockText(t, fr) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+  if (!m) return String(t || '');
+  const h = Number(m[1]), mi = m[2];
+  if (fr) return mi === '00' ? `${h} h` : `${h} h ${mi}`;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${mi === '00' ? '' : `:${mi}`} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
+}
+function hoursLine(week, fr) {
+  if (!week || typeof week !== 'object') return '';
+  const key = (d) => JSON.stringify(Array.isArray(week[d]) ? week[d] : []);
+  const parts = [];
+  let i = 0;
+  while (i < WEEK.length) {
+    let j = i;
+    while (j + 1 < WEEK.length && key(WEEK[j + 1]) === key(WEEK[i])) j++;
+    const names = fr ? DAY_FR : DAY_EN;
+    const days = i === j ? names[WEEK[i]] : `${names[WEEK[i]]}–${names[WEEK[j]]}`;
+    const ranges = Array.isArray(week[WEEK[i]]) ? week[WEEK[i]] : [];
+    const times = ranges.length ? ranges.map((r) => `${clockText(r[0], fr)}–${clockText(r[1], fr)}`).join(fr ? ' et ' : ' and ') : (fr ? 'fermé' : 'closed');
+    parts.push(`${days} ${times}`);
+    i = j + 1;
+  }
+  return parts.join(' · ');
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -194,7 +237,9 @@ function renderCompleteness(result, opts) {
   const fr = !!o.fr;
   const L = (en, f) => (fr ? f : en);
   const r = result;
-  const left = r.missing.length;
+  const waitingList = r.waiting || r.missing.filter((it) => it.waiting);
+  const nw = waitingList.length;
+  const left = r.missing.length - nw;
   const gName = new Map(GROUPS.map((g) => [g.key, fr ? g.fr : g.en]));
   const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
   // Never a big total up front: lead with what takes under a minute or two (2026-11-08).
@@ -202,11 +247,15 @@ function renderCompleteness(result, opts) {
   const nq = quick.length;
   const qMin = Math.ceil((r.quickSeconds || 0) / 60);
   const qTime = qMin <= 1 ? L('under a minute', 'moins d’une minute') : L(`about ${qMin} minutes`, `environ ${qMin} min`);
+  // Things already sent and waiting for our check are never "left" (fresh-eyes 2026-11-08): they get their own count.
+  const waitTxt = nw ? L(` · ${nw} waiting for our check${left ? '' : ' (usually within a day)'}`, ` · ${nw} en attente de notre vérification${left ? '' : ' (habituellement en moins d’une journée)'}`) : '';
   const sub = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
     : nq
-      ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}. Touchez pour commencer.`)
-      : L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes. Touchez pour voir.`);
+      ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}${waitTxt}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}${waitTxt}. Touchez pour commencer.`)
+      : left
+        ? L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes${waitTxt}. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes${waitTxt}. Touchez pour voir.`)
+        : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -218,10 +267,36 @@ function renderCompleteness(result, opts) {
   // owner can say so (o.canDecline) and nothing is waiting for review on that item.
   const noneBtn = (it) => (o.canDecline && it.noneEn && !it.waiting
     ? `<button type="button" class="op-cb-none" data-cb-none="${esc(it.key)}">${esc(fr ? it.noneFr : it.noneEn)}</button>` : '');
-  const row = (it) => `<li class="op-cb-row"><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><div class="op-cb-txt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${esc(fr ? it.whyFr : it.whyEn)}</span></div><div class="op-cb-act"><span class="op-cb-pts">+${it.w}</span>${btn(it)}</div>${noneBtn(it) ? `<div class="op-cb-alt">${noneBtn(it)}</div>` : ''}</li>`;
+  // One tap right in the row (fresh-eyes 2026-11-08): the hours as text with "Yes, these are right", and the
+  // average-spend estimate with "Yes, that's right". "Change them/it" jumps to the editor. Saved in place, no reload.
+  const oneTap = (it) => {
+    if (it.waiting) return null;
+    if (it.key === 'hours_fresh' && o.hoursText) {
+      return { val: o.hoursText, save: { hours_checked: true }, yes: L('Yes, these are right', 'Oui, elles sont exactes'),
+        done: L('Thanks! Your hours are marked as checked today.', 'Merci! Vos heures sont marquées comme vérifiées aujourd’hui.'),
+        change: L('Change them', 'Les modifier'), task: 'hours', id: 'hours' };
+    }
+    if (it.key === 'avg_spend' && Number.isInteger(o.avgEstimate)) {
+      const money = fr ? `${o.avgEstimate} $` : `$${o.avgEstimate}`;
+      return { val: L(`Our estimate from your menu: about ${money}`, `Notre estimation selon votre menu : environ ${money}`), save: { avg_spend: String(o.avgEstimate) },
+        yes: L('Yes, that’s right', 'Oui, c’est exact'), done: L(`Thanks! Your page shows about ${money}.`, `Merci! Votre fiche indique environ ${money}.`),
+        change: L('Change it', 'La modifier'), task: 'more', id: 'opAvg' };
+    }
+    return null;
+  };
+  const row = (it) => {
+    const t = oneTap(it);
+    // The hours read one day group per line.
+    const why = t ? `<span>${esc(fr ? it.whyFr : it.whyEn)}</span><span class="op-cb-val">${esc(t.val).split(' · ').join('<br>')}</span>` : `<span>${esc(fr ? it.whyFr : it.whyEn)}</span>`;
+    const act = t
+      ? `<button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify(t.save))}" data-cb-done="${esc(t.done)}">${esc(t.yes)}</button><button type="button" class="op-cb-link" data-cb-task="${esc(t.task)}" data-cb-id="${esc(t.id)}">${esc(t.change)}</button>`
+      : btn(it);
+    return `<li class="op-cb-row" data-cb-item="${esc(it.key)}"><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><div class="op-cb-txt"><strong>${esc(fr ? it.fr : it.en)}</strong>${why}</div><div class="op-cb-act">${act}</div>${noneBtn(it) ? `<div class="op-cb-alt">${noneBtn(it)}</div>` : ''}</li>`;
+  };
   const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
   const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.map(row).join('')}</ul>` : '';
-  const still = quickHtml + laterHtml;
+  const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}</ul>` : '';
+  const still = quickHtml + laterHtml + waitingHtml;
   // Items the owner can't fill in yet but CAN already say they don't offer (Reservations, Takeout) get their own short
   // list, so "You can't fill these in yet" never sits next to a button that does something (2026-11-08).
   const comingAsk = r.coming.filter((it) => noneBtn(it));
@@ -236,7 +311,7 @@ function renderCompleteness(result, opts) {
   const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}"` : '';
   const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span>${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span>${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
       <p class="op-cb-yay" id="opCbYay" role="status" hidden></p>
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
@@ -252,7 +327,7 @@ function renderCompleteness(result, opts) {
 const COMPLETENESS_CSS = `
     body.owner-page .op-cb { margin: 14px 0 6px; background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(42,32,25,.06), 0 6px 18px rgba(42,32,25,.06); }
     body.owner-page .op-cb-head { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 44px; padding: 14px 16px; background: none; border: 0; border-radius: 16px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-    body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #EAE6D9 0); }
+    body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; --w: 0; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #A9CFC9 0 calc(var(--w) * 1%), #EAE6D9 0); }
     body.owner-page .op-cb-ring::before { content: ""; position: absolute; inset: 7px; background: #fff; border-radius: 50%; }
     body.owner-page .op-cb-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1rem; font-weight: 800; color: #1E4F4C; }
     body.owner-page .op-cb-ring-100 b { font-size: .8rem; }
@@ -295,65 +370,157 @@ const COMPLETENESS_CSS = `
     body.owner-page .op-cb-dtxt strong { display: block; font-weight: 800; }
     body.owner-page .op-cb-dtxt span { display: block; color: #1E6B3A; font-size: .88rem; font-weight: 800; }
     body.owner-page .op-cb-lead { margin: 0 0 6px; }
+    body.owner-page .op-cb-txt .op-cb-val { margin-top: 4px; color: #1B2B3A; font-weight: 800; }
+    body.owner-page .op-cb-act { flex-wrap: wrap; justify-content: flex-start; }
+    body.owner-page .op-cb-link { min-height: 44px; padding: 0 12px; border: 0; background: none; color: #1E4F4C; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
+    body.owner-page .op-cb-btn:disabled { opacity: .6; cursor: progress; }
+    body.owner-page .op-cb-waiting .op-cb-sent { color: #67470C; }
+    body.owner-page .op-cb-hl { outline: 3px solid #E9B949; outline-offset: 4px; border-radius: 8px; }
     body.owner-page .op-cb-yay { margin: 0 16px 14px; padding: 10px 12px; border-radius: 10px; background: #E7F3EC; color: #1E6B3A; font-weight: 800; }
     body.owner-page .op-cb-err { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: #FBE9E7; color: #8A2A1B; font-weight: 700; }
     @media (min-width: 900px) { body.owner-page .op-cb-row { grid-template-columns: 36px 1fr auto; align-items: center; } body.owner-page .op-cb-act { grid-column: 3; } }`;
 
 // Runs inside the owner page script (setTask and TASK_OF are in scope there).
+// Fresh-eyes fixes (2026-11-08):
+//   - every answer saved from the bar ("We don't have one", Undo, "Yes, these are right", "Yes, that's right") saves in
+//     place and redraws the bar from /completeness: no reload, so nothing the owner typed elsewhere is ever lost and the
+//     browser never asks "Leave site?";
+//   - jump buttons open the section, scroll the named field just under the header (no smooth-scroll drift), focus it
+//     and highlight it for a moment;
+//   - window.opCbRefresh() lets the page's other live saves (cuisine, Plan your visit, average spend) redraw the bar.
+// No backslashes or regexes in here: this text is pasted into a template literal.
 const COMPLETENESS_SCRIPT = `
   (function(){
-    var tg = document.getElementById('opCbToggle'), pn = document.getElementById('opCbPanel');
-    if (!tg || !pn) return;
-    tg.addEventListener('click', function(){ var open = tg.getAttribute('aria-expanded') !== 'true'; tg.setAttribute('aria-expanded', open ? 'true' : 'false'); pn.hidden = !open; });
-    Array.prototype.forEach.call(pn.querySelectorAll('[data-cb-task]'), function(b){
-      b.addEventListener('click', function(){
-        var id = b.getAttribute('data-cb-id');
-        setTask(b.getAttribute('data-cb-task'));
-        if (id) setTimeout(function(){ var el = document.getElementById(id); if (el) { if (el.tagName === 'DETAILS') el.open = true; var dd = el.closest ? el.closest('details') : null; if (dd) dd.open = true; el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); var f = el.matches('input,select,textarea') ? el : null; if (f) f.focus({ preventScroll: true }); } }, 60);
-      });
-    });
-    // "We don't have one" (2026-11-08): saves the whole list (it goes live at once, like the average spend), then
-    // reloads so the score, the panel and the field buttons all start from what is now stored. The panel reopens.
-    var sec = document.getElementById('opComplete');
-    // Progress (2026-11-08): when the score went up since this owner last saw the page, say so once.
-    (function(){
-      var y = document.getElementById('opCbYay'); if (!sec || !y) return;
-      var now = Number(sec.getAttribute('data-cb-pct')), lp = location.pathname, key = 'opCbPct:' + (lp.indexOf('/fr/') === 0 ? lp.slice(3) : lp);
+    var sec = document.getElementById('opComplete'), tg = document.getElementById('opCbToggle'), pn = document.getElementById('opCbPanel');
+    if (!sec || !tg || !pn) return;
+    var canDecline = sec.hasAttribute('data-cb-declared');
+    var declared = [];
+    function readDeclared(){ try { declared = JSON.parse(sec.getAttribute('data-cb-declared') || '[]') || []; } catch (e) { declared = []; } }
+    readDeclared();
+    function setOpen(open){ tg.setAttribute('aria-expanded', open ? 'true' : 'false'); pn.hidden = !open; }
+    function storeKey(){ var lp = location.pathname; return 'opCbPct:' + (lp.indexOf('/fr/') === 0 ? lp.slice(3) : lp); }
+    // Progress: when the score went up since this owner last saw it, say so once (with what was just saved, if any).
+    function progress(lead){
+      var y = document.getElementById('opCbYay'); if (!y) return;
+      var now = Number(sec.getAttribute('data-cb-pct')), msg = lead || '';
       try {
-        var was = Number(sessionStorage.getItem(key) || localStorage.getItem(key));
-        if (was && now > was) { y.textContent = sec.getAttribute('data-cb-yay').replace('{p}', String(now)); y.hidden = false; }
-        sessionStorage.setItem(key, String(now)); localStorage.setItem(key, String(now));
-      } catch (e) { /* storage off: no message */ }
-    })();
-    try { if (sessionStorage.getItem('opCbOpen') === '1') { sessionStorage.removeItem('opCbOpen'); tg.setAttribute('aria-expanded', 'true'); pn.hidden = false; } } catch (e) { /* storage off */ }
-    if (!sec || !sec.hasAttribute('data-cb-declared')) return;
-    var declared = []; try { declared = JSON.parse(sec.getAttribute('data-cb-declared')) || []; } catch (e) { declared = []; }
-    var inline = []; try { inline = JSON.parse(sec.getAttribute('data-cb-inline')) || []; } catch (e) { inline = []; }
-    inline.forEach(function(x){
-      var el = document.getElementById(x.id); if (!el || !el.parentNode) return;
-      var p = document.createElement('p'); p.className = 'op-cb-inline';
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'op-cb-none'; b.setAttribute('data-cb-none', x.key); b.textContent = x.label;
-      p.appendChild(b); el.parentNode.insertBefore(p, el.nextSibling);
-    });
-    var err = document.getElementById('opCbErr');
+        var was = Number(sessionStorage.getItem(storeKey()) || localStorage.getItem(storeKey()));
+        if (was && now > was) msg = (msg ? msg + ' ' : '') + sec.getAttribute('data-cb-yay').split('{p}').join(String(now));
+        sessionStorage.setItem(storeKey(), String(now)); localStorage.setItem(storeKey(), String(now));
+      } catch (e) { /* storage off: only the lead */ }
+      if (msg) { y.textContent = msg; y.hidden = false; }
+    }
+    progress('');
+    try { if (sessionStorage.getItem('opCbOpen') === '1') { sessionStorage.removeItem('opCbOpen'); setOpen(true); } } catch (e) { /* storage off */ }
+    // "We don't have one" next to the edit-page fields, placed under each field it answers.
+    function placeInline(){
+      Array.prototype.forEach.call(document.querySelectorAll('.op-cb-inline'), function(x){ x.parentNode.removeChild(x); });
+      if (!canDecline) return;
+      var inline = []; try { inline = JSON.parse(sec.getAttribute('data-cb-inline') || '[]') || []; } catch (e) { inline = []; }
+      inline.forEach(function(x){
+        var el = document.getElementById(x.id); if (!el || !el.parentNode) return;
+        var p = document.createElement('p'); p.className = 'op-cb-inline';
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'op-cb-none'; b.setAttribute('data-cb-none', x.key); b.textContent = x.label;
+        // A section (happy hour, specials, nights, badges) gets it inside, so it shows and hides with that section.
+        p.appendChild(b); if (el.tagName === 'DETAILS') el.appendChild(p); else el.parentNode.insertBefore(p, el.nextSibling);
+      });
+    }
+    placeInline();
+    // Jumps land on the field: open every enclosing section, put it just under the header, focus, highlight.
+    function headerOffset(){
+      var h = document.querySelector('header'); var off = 16;
+      if (h) { var cs = getComputedStyle(h); if (cs.position === 'fixed' || cs.position === 'sticky') off += Math.max(0, h.getBoundingClientRect().bottom); }
+      return off;
+    }
+    function jumpTo(id){
+      var el = id ? document.getElementById(id) : null; if (!el) return;
+      if (el.tagName === 'DETAILS') el.open = true;
+      var d = el.parentElement ? el.parentElement.closest('details') : null;
+      while (d) { d.open = true; d = d.parentElement ? d.parentElement.closest('details') : null; }
+      var root = document.documentElement;
+      // A text box lines up with its label, so the owner sees what it is for.
+      var box = (el.matches('input,select,textarea') && el.closest('.form-field,.op-visit-field')) || el;
+      var lb = el.getAttribute('aria-labelledby'); var lab = lb ? document.getElementById(lb) : null;
+      function go(){
+        var prev = root.style.scrollBehavior; root.style.scrollBehavior = 'auto';
+        var top = box.getBoundingClientRect().top;
+        if (lab && lab.getBoundingClientRect().height) top = Math.min(top, lab.getBoundingClientRect().top);
+        window.scrollTo(0, Math.max(0, top + window.pageYOffset - headerOffset()));
+        root.style.scrollBehavior = prev;
+      }
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        go();
+        var f = el.matches('input,select,textarea') ? el : null;
+        if (f) { try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }
+        el.classList.add('op-cb-hl'); setTimeout(function(){ el.classList.remove('op-cb-hl'); }, 1800);
+        setTimeout(go, 300);
+      }); });
+    }
+    window.opCbJump = jumpTo;
     function val(id){ var e = document.getElementById(id); return e ? e.value : ''; }
-    function saveNone(list, btn){
-      if (err) err.hidden = true;
-      btn.disabled = true;
-      var body = { changes: { not_offered: list }, note: '', contact_name: val('opName'), contact_email: typeof emailVal === 'function' ? emailVal('opEmail') : val('opEmail'),
+    function post(changes){
+      var body = { changes: changes, note: '', contact_name: val('opName'), contact_email: typeof emailVal === 'function' ? emailVal('opEmail') : val('opEmail'),
         company_website: val('opHp'), started_at: typeof startedAt !== 'undefined' ? startedAt : Date.now() };
-      fetch(location.pathname + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
+      return fetch(location.pathname + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
+        .then(function(r){ return r.json(); });
+    }
+    function showErr(m){
+      var err = document.getElementById('opCbErr');
+      if (err) { err.textContent = m || sec.getAttribute('data-cb-wrong') || ''; err.hidden = false; setOpen(true); err.scrollIntoView({ block: 'center' }); }
+    }
+    // Redraw the bar from what is stored now. Keeps it open or shut, and the page view it was in.
+    function refresh(lead){
+      return fetch(location.pathname + '/completeness', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(j){
-          if (j && j.ok) { try { sessionStorage.setItem('opCbOpen', '1'); } catch (e) { /* storage off */ } location.reload(); return; }
-          btn.disabled = false;
-          var m = (j && j.errors && (j.errors.not_offered || j.errors.form)) || (j && j.error) || sec.getAttribute('data-cb-wrong');
-          if (err) { err.textContent = m; err.hidden = false; tg.setAttribute('aria-expanded', 'true'); pn.hidden = false; err.scrollIntoView({ block: 'center' }); }
+          if (!j || !j.ok || !j.html) return;
+          var wasOpen = tg.getAttribute('aria-expanded') === 'true';
+          var tmp = document.createElement('div'); tmp.innerHTML = j.html;
+          var n = tmp.querySelector('#opComplete'); if (!n) return;
+          n.className = sec.className;
+          sec.parentNode.replaceChild(n, sec);
+          sec = n; tg = document.getElementById('opCbToggle'); pn = document.getElementById('opCbPanel');
+          readDeclared(); setOpen(wasOpen); placeInline(); progress(lead || '');
         })
-        .catch(function(){ btn.disabled = false; if (err) { err.textContent = sec.getAttribute('data-cb-wrong'); err.hidden = false; } });
+        .catch(function(){ /* the bar just stays as it was */ });
+    }
+    window.opCbRefresh = refresh;
+    function saveNone(list, btn){
+      var err = document.getElementById('opCbErr'); if (err) err.hidden = true;
+      btn.disabled = true;
+      post({ not_offered: list }).then(function(j){
+        if (j && j.ok) { declared = list; return refresh(''); }
+        btn.disabled = false;
+        showErr((j && j.errors && (j.errors.not_offered || j.errors.form)) || (j && j.error));
+      }).catch(function(){ btn.disabled = false; showErr(''); });
+    }
+    function saveOne(btn){
+      var changes; try { changes = JSON.parse(btn.getAttribute('data-cb-save')); } catch (e) { return; }
+      var err = document.getElementById('opCbErr'); if (err) err.hidden = true;
+      btn.disabled = true;
+      post(changes).then(function(j){
+        if (j && j.ok) {
+          // Keep the matching boxes further down the page in step.
+          if (changes.hours_checked) {
+            var hb = document.getElementById('opHoursOkBtn'), hn = document.getElementById('opHoursOkNote'), hd = document.getElementById('opHoursOkDone'), hx = document.getElementById('opHoursOk');
+            if (hb) hb.hidden = true; if (hn) hn.hidden = true; if (hd && hx) { hd.textContent = hx.getAttribute('data-done'); hd.hidden = false; }
+          }
+          if (changes.avg_spend && typeof avgSaved === 'function') avgSaved(Number(changes.avg_spend));
+          return refresh(btn.getAttribute('data-cb-done') || '');
+        }
+        btn.disabled = false;
+        var e2 = (j && j.errors) || {};
+        showErr(e2.hours_checked || e2.avg_spend || e2.form || (j && j.error));
+      }).catch(function(){ btn.disabled = false; showErr(''); });
     }
     document.addEventListener('click', function(e){
-      var b = e.target.closest && e.target.closest('[data-cb-none],[data-cb-undo]'); if (!b) return;
+      if (!e.target.closest) return;
+      if (e.target.closest('#opCbToggle')) { setOpen(tg.getAttribute('aria-expanded') !== 'true'); return; }
+      var j = e.target.closest('#opComplete [data-cb-task]');
+      if (j) { setTask(j.getAttribute('data-cb-task')); jumpTo(j.getAttribute('data-cb-id')); return; }
+      var sv = e.target.closest('#opComplete [data-cb-save]');
+      if (sv) { saveOne(sv); return; }
+      var b = e.target.closest('[data-cb-none],[data-cb-undo]'); if (!b || !canDecline) return;
       var k = b.getAttribute('data-cb-none');
       if (k) { if (declared.indexOf(k) < 0) saveNone(declared.concat([k]), b); return; }
       k = b.getAttribute('data-cb-undo');
@@ -361,4 +528,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

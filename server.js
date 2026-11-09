@@ -50344,10 +50344,10 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, ouvrez <strong>Dépense moyenne par personne</strong> (affichée pour les restaurants et les pubs).</li><li>Indiquez à peu près ce que <strong>dépense une personne pour un plat principal et une boisson sans alcool</strong>, en dollars entiers (par exemple <strong>25</strong>, de 5 $ à 300 $). Si nous avons déjà calculé une estimation d’après votre menu, elle est déjà inscrite : modifiez-la si elle est inexacte, ou touchez <strong>C’est exact</strong>.</li><li>Touchez {SEND} si vous avez changé le nombre. <strong>C’est exact</strong> enregistre tout seul.</li></ol><p>{LIVE} C’est ensuite votre chiffre : nous ne le remplacerons pas. Laissez la case vide pour garder ce que nous avons. Ce n’est pas la même chose que la <strong>Gamme de prix</strong> ($ à $$$$), qui reste telle quelle.</p>' },
   // Completeness bar (2026-11-08): only offered on the edit page of a restaurant (completenessOnly).
   { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
-    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage'],
-    keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage'],
-    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right.</li><li>The one item under <strong>We’re adding these</strong>, <strong>Confirmed by you</strong>, can’t be filled in yet. It counts once you can; saving any change already adds the Verified mark.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
-    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact.</li><li>Le seul élément sous <strong>Nous ajoutons ceci</strong>, <strong>Confirmée par vous</strong>, ne peut pas encore être rempli. Il comptera dès que ce sera possible; enregistrer une modification ajoute déjà la mention Vérifiée.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
+    keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage', 'pointage n a pas monte', 'n a pas monte', 'ne monte pas', 'est ce que ca a marche', 'en attente de notre verification', 'en attente de verification'],
+    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Score didn’t go up?</strong> Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the lighter part of the ring) and count once we approve them, usually within a day.</li><li>The one item under <strong>We’re adding these</strong>, <strong>Confirmed by you</strong>, can’t be filled in yet. It counts once you can; saving any change already adds the Verified mark.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li><strong>Le pointage n’a pas monté?</strong> Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie plus pâle de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée.</li><li>Le seul élément sous <strong>Nous ajoutons ceci</strong>, <strong>Confirmée par vous</strong>, ne peut pas encore être rempli. Il comptera dès que ce sera possible; enregistrer une modification ajoute déjà la mention Vérifiée.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
@@ -54004,8 +54004,11 @@ const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page .op-visit-field .op-hint { display: block; margin: 2px 0 6px; }
     body.owner-page .op-visit-field input { width: 100%; min-height: 44px; box-sizing: border-box; }
     body.owner-page #opVisitSave { min-height: 44px; margin-top: 4px; }
-    body.owner-page .op-visit-done { color: #1E6B3A; font-weight: 800; }`;
-// Both save at once (like "That's right" for the average spend) and then reload, so the bar starts from what is stored.
+    body.owner-page .op-visit-done { color: #1E6B3A; font-weight: 800; }
+    body.owner-page .op-live-note { display: inline-block; margin-left: 4px; color: #1E6B3A; font-size: .85rem; font-weight: 800; }
+    body.owner-page:not(.op-dirty) .op-send-extra { display: none; }
+    body.owner-page .op-check-note { margin: 8px 0 4px; font-weight: 700; }`;
+// All save at once (like "That's right" for the average spend) and then redraw the completeness bar in place.
 const OWNER_CUISINE_HOURS_SCRIPT = `
   (function(){
     function val(id){ var e = document.getElementById(id); return e ? e.value : ''; }
@@ -54031,19 +54034,20 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
         hb.hidden = true;
         var n = document.getElementById('opHoursOkNote'); if (n) n.hidden = true;
         var d = document.getElementById('opHoursOkDone'); if (d) { d.textContent = hbox.getAttribute('data-done'); d.hidden = false; }
+        if (window.opCbRefresh) window.opCbRefresh('');
       });
     });
     // "Plan your visit" lines (2026-11-08): their own Save sends all five; typing in them doesn't raise the form's
-    // "not sent yet" bar. Saved -> reload with the bar open, so the score and the field buttons start from what is stored.
+    // "not sent yet" bar. Saved -> the bar is redrawn in place (no reload, so other unsent typing is kept).
     var vs = document.getElementById('opVisitSave'), vbox = document.getElementById('visit');
     var vin = vbox ? vbox.querySelectorAll('[data-visit-key]') : [];
     Array.prototype.forEach.call(vin, function(el){ ['input', 'change'].forEach(function(t){ el.addEventListener(t, function(e){ e.stopPropagation(); }); }); });
     if (vs && vbox) vs.addEventListener('click', function(){
       var rows = {}; Array.prototype.forEach.call(vin, function(el){ rows[el.getAttribute('data-visit-key')] = el.value; });
       send({ visit_rows: rows }, vs, 'opVisitError', vbox, function(){
+        vs.disabled = false;
         var d = document.getElementById('opVisitDone'); if (d) { d.textContent = vbox.getAttribute('data-done'); d.hidden = false; }
-        try { sessionStorage.setItem('opCbOpen', '1'); } catch (e) { /* storage off */ }
-        setTimeout(function(){ location.reload(); }, 900);
+        if (window.opCbRefresh) window.opCbRefresh('');
       });
     });
     var cs = document.getElementById('opCuisineSave'), cbox = document.getElementById('cuisine'), sel = document.getElementById('opCuisine');
@@ -54058,6 +54062,7 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
         var d = document.getElementById('opCuisineDone'); if (d) { d.textContent = cbox.getAttribute('data-done').replace('{c}', label); d.hidden = false; }
         var h = document.getElementById('opCuisineHint'); if (h) h.textContent = label;
         if (typeof initial === 'object' && initial) initial.cuisine = sel.value;
+        if (window.opCbRefresh) window.opCbRefresh('');
       });
     });
   })();`;
@@ -54071,10 +54076,13 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   let hasPublishedMenu = false;
   try { hasPublishedMenu = !!publishedMenuRow(venue.id); } catch (e) { hasPublishedMenu = false; }
   const deals = live.happy_hour_deals && Array.isArray(live.happy_hour_deals.deals) ? live.happy_hour_deals.deals : [];
+  let pendingPhotos = 0;
+  try { pendingPhotos = db.prepare("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'").get(venue.id).n; } catch (e) { pendingPhotos = 0; }
   return {
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
     hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: venueGalleryPhotos(venue).length,
     avgSpend: live.avg_spend && Number.isInteger(live.avg_spend.amount) ? live.avg_spend.amount : null,
+    avgSpendSource: live.avg_spend && live.avg_spend.source ? live.avg_spend.source : null, pendingPhotos,
     menuUrl: links.menu_url, hasPublishedMenu, vegan: venue.vegan, vegetarian: venue.vegetarian, glutenFree: venue.gluten_free,
     hasHappyHour: !!happyHourTimes || deals.length > 0, nonalcoholic: !!venue.nonalcoholic,
     specialsCount: Array.isArray(live.specials) ? live.specials.length : 0, liveMusic: venue.live_music, sportsTv: venue.sports_tv,
@@ -54083,6 +54091,42 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, claimed: venueIsClaimed(venue.id),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
   };
+}
+
+// The completeness bar for a restaurant (2026-11-08), used by the edit page and by GET .../completeness, which the page
+// calls to redraw the bar after a live save instead of reloading (fresh-eyes fixes: a reload lost unsent typing).
+// Pending keys are field-precise: a badge waiting for review flags only the item it belongs to ("badge:vegan").
+function ownerCompletenessPendingKeys(live, waitingReq) {
+  const keys = new Set();
+  if (!waitingReq || waitingReq.status !== 'pending') return keys;
+  for (const [k, v] of Object.entries(waitingReq.changes || {})) {
+    if (!(k in live)) continue;
+    keys.add(k);
+    if (k === 'badges' && v && typeof v === 'object') {
+      for (const [b, on] of Object.entries(v)) if (!!on !== !!(live.badges || {})[b]) keys.add(`badge:${b}`);
+    }
+  }
+  return keys;
+}
+function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang) {
+  const fr = lang === 'fr';
+  const pending = ownerCompletenessPendingKeys(live, waitingReq);
+  const input = gatherCompletenessInput(venue, live, happyHourTimes);
+  let week = null;
+  try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
+  return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending }), {
+    fr, canDecline: true,
+    menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
+    hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
+    avgEstimate: input.avgSpendSource === 'research' && !pending.has('avg_spend') ? input.avgSpend : null,
+  });
+}
+function ownerCompletenessJson(found, token, lang) {
+  if (!found || !COMPLETENESS_TYPES.has(found.venue.type)) return null;
+  const live = ownerVenueSnapshot(found.venue, found.happyHourTimes);
+  const pending = pendingOwnerChange(found.venue.id);
+  const waitingReq = pending ? getOwnerChange(pending.id) : null;
+  return { ok: true, html: ownerA11y(ownerCompletenessHtmlFor(found.venue, live, found.happyHourTimes, waitingReq, token, lang === 'fr' ? 'fr' : 'en')) };
 }
 
 function renderOwnerPage(found, token, pending, lang = 'en') {
@@ -54155,7 +54199,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       <summary><span class="lyv-section-label" id="opCuisineLabel">${L('What you serve', 'Ce que vous servez')}${waitChip('cuisine')}</span> <span class="op-fold-hint" id="opCuisineHint">${cur ? escapeHtml(label(cur)) : L('Not set: pick your cuisine', 'Non indiquée : choisissez votre cuisine')}</span></summary>
       <div class="form-row full"><div class="form-field">
         <label for="opCuisine">${L('Which one fits your food best?', 'Lequel décrit le mieux votre cuisine?')}</label>
-        <span class="op-cuisine-line"><select id="opCuisine" aria-describedby="opCuisineNote">${opts}</select><button type="button" class="op-btn" id="opCuisineSave">${L('Save', 'Enregistrer')}</button></span>
+        <span class="op-cuisine-line"><select id="opCuisine" aria-describedby="opCuisineNote">${opts}</select><button type="button" class="op-btn" id="opCuisineSave">${L('Save', 'Enregistrer')}</button><span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span></span>
         <p class="op-hint" id="opCuisineNote">${L('It shows on your page and helps people find you when they search by food. Not on the list? Tell us in &ldquo;Anything else?&rdquo; below.', 'Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine. Pas dans la liste? Dites-le-nous dans « Autre chose? » plus bas.')}</p>
         <p class="lyv-error" id="opCuisineError" hidden></p>
         <p class="op-hint" id="opCuisineDone" role="status" hidden></p>
@@ -54195,14 +54239,12 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       <div class="form-row full op-visit-rows">${boxes}
       </div>
       <p class="op-hint">${L('Your booking link goes under &ldquo;Name, address &amp; links&rdquo;: it adds a Reserve button.', 'Votre lien de réservation va sous « Nom, adresse et liens » : il ajoute un bouton Réserver.')}</p>
-      <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button>
+      <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button> <span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span>
       <p class="lyv-error" id="opVisitError" hidden></p>
       <p class="op-hint op-visit-done" id="opVisitDone" role="status" hidden></p>
       </details>`;
   };
-  const completeHtml = completeOn ? portalCompleteness.renderCompleteness(
-    portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, happyHourTimes), { today: todayLocal(), pending: waitingFields }),
-    { fr, canDecline: true, menuHref: token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`) }) : '';
+  const completeHtml = completeOn ? ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang) : '';
   const parseWeek =(json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
@@ -54539,7 +54581,8 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
     body.owner-page .op-day-name { width: 92px; }
     body.owner-page .op-day.is-off .op-day-name { width: 92px; }
     body.owner-page .op-times { flex-basis: 100%; }
-    body.owner-page .op-times input { min-width: 0; flex: 1 1 96px; }
+    body.owner-page .op-times input { min-width: 0; flex: 1 1 96px; padding: 6px 4px 6px 8px; }
+    body.owner-page .op-times input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 14px; }
     body.owner-page .op-times .op-second { display: contents; }
     body.owner-page .op-times .op-second[hidden] { display: none; }
     /* "+ second time" shrinks to a "+" beside the times (its words stay for screen readers). */
@@ -54565,7 +54608,7 @@ ${renderGolfHeaderHtml()}
         const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(`Please update ${venue.name}`)}`;
         return `<section class="op-tasks" id="opTasks" data-task="home" hidden aria-labelledby="opTasksHead">
         <h2 id="opTasksHead">${L('What would you like to do today?', 'Que souhaitez-vous faire aujourd’hui?')}</h2>
-        <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : completeOn ? L('Pick one. We check most changes (usually within a day) before they go on your page. Quick answers from the checklist above, like your cuisine, average spend and Plan your visit lines, go live as soon as you save them.', 'Choisissez une option. Nous vérifions la plupart des modifications (habituellement en moins d’une journée) avant leur mise en ligne. Les réponses rapides de la liste ci-dessus, comme votre cuisine, la dépense moyenne et les lignes Planifier la visite, sont en ligne dès que vous les enregistrez.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>
+        <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : completeOn ? L('Quick answers go live right away. Other changes go live after a quick check, usually within a day.', 'Les réponses rapides sont en ligne tout de suite. Les autres modifications le sont après une courte vérification, habituellement en moins d’une journée.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>
         <div class="op-task-grid">
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
@@ -54587,8 +54630,8 @@ ${renderGolfHeaderHtml()}
     ? L(`<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Enregistrer les modifications</strong>. Vos heures, votre saison, votre téléphone, votre description, vos caractéristiques${showHappyHour ? ', votre happy hour' : ''} et votre gamme de prix sont mis en ligne sur <a href="${escapeHtml(listing)}">votre page</a> tout de suite. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
       <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; vous pouvez tout modifier de nouveau en tout temps.</p>`)
-    : completeOn ? L(`<p>Update your listing below and press <strong>Send changes</strong>. We review most changes, usually within a day, and then they go live on <a href="${escapeHtml(listing)}">your page</a>. Quick answers from the checklist at the top go live as soon as you save them.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
-      <p class="op-reassure">Free. Want all your changes to go live straight away? <a href="#opLogin" data-open-login>Create a login</a> below.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions la plupart des modifications, en général d’ici un jour, puis elles sont mises en ligne sur <a href="${escapeHtml(listing)}">votre page</a>. Les réponses rapides de la liste en haut sont en ligne dès que vous les enregistrez.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
+    : completeOn ? L(`<p>Quick answers go live right away. Other changes go live after a quick check, usually within a day. <a href="${escapeHtml(listing)}">See your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
+      <p class="op-reassure">Free. Want all your changes to go live straight away? <a href="#opLogin" data-open-login>Create a login</a> below.</p>`, `<p>Les réponses rapides sont en ligne tout de suite. Les autres modifications le sont après une courte vérification, habituellement en moins d’une journée. <a href="${escapeHtml(listing)}">Voir votre fiche</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
       <p class="op-reassure">Gratuit. Pour que toutes vos modifications soient en ligne tout de suite, <a href="#opLogin" data-open-login>créez un compte</a> ci-dessous.</p>`)
     : L(`<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
       <p class="op-reassure">Free &middot; about 5 minutes. Want your changes to go live straight away? <a href="#opLogin" data-open-login>Create a login</a> below.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions chaque modification, en général d’ici un jour, puis elle est mise en ligne sur <a href="${escapeHtml(listing)}">votre page</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
@@ -54677,7 +54720,7 @@ ${renderGolfHeaderHtml()}
       </div></div>
 
 ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
-      <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? L(`${n} ticked, like dog friendly or patio`, `${n} coché${n === 1 ? '' : 's'}, comme chiens acceptés ou terrasse`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
+      <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const on = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)); const n = on.length; const nm = on.slice(0, 2).map((f) => (fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)); return n ? L(`${n} ticked: ${nm.join(', ')}${n > 2 ? ' and more' : ''}`, `${n} coché${n === 1 ? '' : 's'} : ${nm.join(', ')}${n > 2 ? ' et plus' : ''}`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
       <p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
@@ -54699,7 +54742,7 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
       <div class="form-row full"><div class="form-field">
         <label for="opAvg">${L('About how much does one person spend? (one main and a non-alcoholic drink)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool)')}</label>
         <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="numeric" min="${AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="1" autocomplete="off" value="${avgNow ? avgNow.amount : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
-        <p class="op-hint" id="opAvgNote">${L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`)}</p>
+        <p class="op-hint" id="opAvgNote">${L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`)}${completeOn ? ` <span class="op-live-note">${L('Goes live as soon as you save it.', 'En ligne dès que vous l’enregistrez.')}</span>` : ''}</p>
         <p class="lyv-error" id="opAvgError" hidden></p>
         ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
         <p class="op-hint" id="opAvgDone" role="status" hidden></p>
@@ -54737,7 +54780,7 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
       </details>` : ''}
 
       <p class="lyv-section-label" data-task="hours contact happy more all">${L('Anything else?', 'Autre chose?')}</p>
-      <div class="form-row" data-task="hours contact happy more all">
+      <div class="form-row${completeOn && !instantOn ? ' op-send-extra' : ''}" data-task="hours contact happy more all">
         <div class="form-field"><label for="opName">${L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
@@ -54747,13 +54790,13 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
       </div></div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="opSubmit" data-task="hours contact happy more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
+      ${completeOn && !instantOn ? `<p class="op-hint op-send-extra op-check-note" data-task="hours contact happy more all">${L('Sent to us to check, usually within a day.', 'Envoyé pour vérification, habituellement en moins d’une journée.')}</p>` : ''}<button type="submit" class="venue-form-submit${completeOn && !instantOn ? ' op-send-extra' : ''}" id="opSubmit" data-task="hours contact happy more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
     </form>
     <div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
       <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>
       <button type="button" class="op-more" data-pick="">${L('Back to the list', 'Retour à la liste')}</button>${found.account || viewer ? '' : `
       <span class="op-done-login" id="opDoneLogin">${L('<strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.', '<strong>Plus besoin du lien la prochaine fois :</strong> <a href="#opLogin">créez un compte</a>. Ça prend 30 secondes.')}</span>`}</div>
-    <div class="op-unsent" id="opUnsent" hidden role="status"><span>${instantOn ? L('Your listing changes aren&rsquo;t saved yet.', 'Les modifications de votre fiche ne sont pas encore enregistrées.') : L('Your listing changes aren&rsquo;t sent yet.', 'Les modifications de votre fiche ne sont pas encore envoyées.')}</span> <button type="button" id="opUnsentSend">${instantOn ? L('Save changes', 'Enregistrer') : L('Send changes', 'Envoyer')}</button></div>
+    <div class="op-unsent" id="opUnsent" hidden role="status"><span>${instantOn ? L('Your listing changes aren&rsquo;t saved yet.', 'Les modifications de votre fiche ne sont pas encore enregistrées.') : L('Your listing changes aren&rsquo;t sent yet.', 'Les modifications de votre fiche ne sont pas encore envoyées.')}${completeOn && !instantOn ? L(' We check them first, usually within a day.', ' Nous les vérifions d’abord, habituellement en moins d’une journée.') : ''}</span> <button type="button" id="opUnsentSend">${instantOn ? L('Save changes', 'Enregistrer') : L('Send changes', 'Envoyer')}</button></div>
     <details class="op-fold op-sec" id="photos" data-task="photos" open>
     <summary><h2 class="lyv-section-label">Photos</h2></summary>
     <p class="op-hint">${L('Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best.', 'Envoyez jusqu’à 5 photos à la fois : votre espace, vos plats, vos boissons ou ce que vous offrez. Les photos à l’horizontale donnent les meilleurs résultats.')} ${found.account ? L('Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.', 'Comme vous êtes connecté, vos photos sont mises en ligne tout de suite. Si votre page n’a pas encore sa propre photo, la première devient sa photo principale, avec votre nom en crédit.') : L('We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.', 'Nous vérifions chaque photo; la meilleure peut devenir la photo principale de votre page, avec votre nom en crédit. Avec un compte, vos photos sont mises en ligne tout de suite.')}</p>
@@ -55106,7 +55149,7 @@ ${ownerFooterHtml(fr)}
       .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
       .then(function(r){
         avgConfirm.disabled = false;
-        if (r.body && r.body.ok) { avgSaved(avgInit); return; }
+        if (r.body && r.body.ok) { avgSaved(avgInit);${completeOn ? " if (window.opCbRefresh) window.opCbRefresh('');" : ''} return; }
         var errs = (r.body && r.body.errors) || {};
         show('opAvgError', errs.avg_spend || errs.form || (r.body && r.body.error) || T.wrong);
       })
@@ -55497,7 +55540,8 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   var listingDirty = false, eventDirty = false;
   function setListingDirty(v){
     listingDirty = v;
-    var bar = document.getElementById('opUnsent'); if (bar) bar.hidden = !v || form.style.display === 'none';
+    var bar = document.getElementById('opUnsent'); if (bar) bar.hidden = !v || form.style.display === 'none';${completeOn && !instantOn ? `
+    document.body.classList.toggle('op-dirty', !!v);` : ''}
   }
   form.addEventListener('input', function(e){ if (e.target.id !== 'opHp') setListingDirty(true); });
   form.addEventListener('change', function(){ setListingDirty(true); });
@@ -59233,9 +59277,14 @@ const server = http.createServer(async (req, res) => {
           base: ownerPath(`/owner/account/venue/${id}/menu`, res.ownerLang), back: ownerPath(`/owner/account/venue/${id}`, res.ownerLang),
         });
       }
-      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|arrival|video\/start|video\/done))?$/.exec(pathname);
+      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|arrival|video\/start|video\/done|completeness))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
+        if (vm[2] === 'completeness' && method === 'GET') {
+          const out = account ? ownerCompletenessJson(resolve(), null, res.ownerLang) : null;
+          res.writeHead(out ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
+          return res.end(JSON.stringify(out || { ok: false }));
+        }
         if (vm[2] && method === 'POST') {
           if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
           if (vm[2] === 'changes') return await handleOwnerChangeSubmission(req, res, resolve);
@@ -59260,6 +59309,12 @@ const server = http.createServer(async (req, res) => {
       const rest = pathname.slice(OWNER_LINK_PATH.length);
       const changesMatch = /^([A-Za-z0-9_-]+)\/changes$/.exec(rest);
       if (changesMatch && method === 'POST') return await handleOwnerChangeSubmission(req, res, changesMatch[1]);
+      const completeMatch = /^([A-Za-z0-9_-]+)\/completeness$/.exec(rest);
+      if (completeMatch && method === 'GET') {
+        const out = ownerCompletenessJson(venueForOwnerToken(completeMatch[1]), completeMatch[1], res.ownerLang);
+        res.writeHead(out ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+        return res.end(JSON.stringify(out || { ok: false }));
+      }
       const eventCancel = /^([A-Za-z0-9_-]+)\/events\/(\d+)\/cancel$/.exec(rest);
       if (eventCancel && method === 'POST') return await handleOwnerEventCancel(req, res, eventCancel[1], Number(eventCancel[2]));
       const eventsMatch = /^([A-Za-z0-9_-]+)\/events$/.exec(rest);
