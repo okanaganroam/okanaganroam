@@ -53,8 +53,9 @@ test('edit page (restaurant): the five boxes, pre-filled from the box we hold, w
   assert.equal(research(v.id, box([{ label: 'Known for', text: 'Smash burgers' }, { label: 'To go', text: 'Order by phone' }, { label: 'Patio', text: 'Heated patio' }])).ok, true);
   const html = await get(`/owner/${tokenFor(v.id)}`);
   for (const id of ['opVisitKnown', 'opVisitReservations', 'opVisitTakeout', 'opVisitDietary', 'opVisitGroups']) assert.ok(html.includes(`id="${id}"`), id);
-  assert.match(html, /id="opVisitKnown" data-visit-key="known_for" maxlength="180"[^>]*placeholder="e\.g\. Wood-fired pizza and the lakeside patio" value="Smash burgers"/);
-  assert.match(html, /id="opVisitTakeout"[^>]*value="Order by phone"/, 'reads the "To go" row');
+  // Final fresh-eyes (2026-11-09): the boxes are textareas that grow as the owner types (still one line of text, 180 max).
+  assert.match(html, /<textarea id="opVisitKnown" class="op-visit-ta" rows="1" data-visit-key="known_for" maxlength="180"[^>]*placeholder="e\.g\. Wood-fired pizza and the lakeside patio">Smash burgers<\/textarea>/);
+  assert.match(html, /id="opVisitTakeout"[^>]*>Order by phone<\/textarea>/, 'reads the "To go" row');
   assert.ok(html.includes('Save these lines'));
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   assert.ok(fr.includes('Planifier la visite') && fr.includes('Enregistrer ces lignes') && fr.includes('Connu pour'));
