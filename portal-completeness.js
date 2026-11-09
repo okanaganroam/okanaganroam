@@ -72,6 +72,25 @@ if (ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-complete
 const NONE_KEYS = ITEMS.filter((i) => i.noneEn).map((i) => i.key);
 const NONE_MAX = NONE_KEYS.length;
 
+// "About X minutes left" (2026-11-08): rough seconds an owner needs on a phone to do each item. Estimates, not measured.
+// Free text and photos take longest; one-tap confirms take seconds.
+const SECONDS = {
+  address_pin: 60, phone: 20, website: 20, cuisine: 15, hours: 180, hours_fresh: 10, photo_main: 120, photo_extra: 180,
+  avg_spend: 10, menu: 120, dietary: 20, happy_hour: 150, specials: 90, entertainment: 60,
+  pyv_known: 45, pyv_reservations: 45, pyv_takeout: 30, pyv_dietary: 45, pyv_groups: 45,
+  description: 180, instagram: 30, facebook: 30, arrival: 90, owner_confirmed: 0,
+};
+if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+// Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
+// fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
+function minutesLeft(missing) {
+  const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
+  if (!keys.size) return 0;
+  let s = 0;
+  for (const k of keys) if (!(k === 'hours_fresh' && keys.has('hours'))) s += SECONDS[k] || 0;
+  return Math.max(1, Math.round(s / 60));
+}
+
 const GROUPS = [
   { key: 'basics', en: 'Basics', fr: 'Essentiel' },
   { key: 'hours', en: 'Hours', fr: 'Heures' },
@@ -151,7 +170,7 @@ function scoreCompleteness(input, opts) {
   // Biggest first, then the order of the spec.
   missing.sort((x, y) => (x.waiting - y.waiting) || (y.w - x.w));
   const declined = ITEMS.filter((it) => none.has(it.key) && !done[it.key] && !na[it.key]).map((it) => ({ ...it }));
-  return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none] };
+  return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing) };
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -167,7 +186,10 @@ function renderCompleteness(result, opts) {
   const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
   const sub = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
-    : L(`${left} ${left === 1 ? 'thing' : 'things'} left. Tap to see what.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'}. Touchez pour voir lesquels.`);
+    : r.minutes
+      ? L(`${left} ${left === 1 ? 'thing' : 'things'} left, about ${r.minutes} ${r.minutes === 1 ? 'minute' : 'minutes'}. Tap to see what.`,
+        `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'}, environ ${r.minutes} min. Touchez pour voir lesquels.`)
+      : L(`${left} ${left === 1 ? 'thing' : 'things'} left. Tap to see what.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'}. Touchez pour voir lesquels.`);
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -306,4 +328,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
