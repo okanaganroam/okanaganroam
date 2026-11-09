@@ -1,5 +1,5 @@
 // Verified mark (2026-10-27): a listing the business manages (venueIsClaimed: an owner login on it, an approved claim
-// or an approved owner update) shows a "Verified by the venue" pill under its name, with the date of the last approved
+// or an approved owner update) shows a "Verified by the business" pill under its name, with the date of the last approved
 // owner update when there is one. Deals and weekly specials the owner entered (source 'venue_owner') say "Confirmed by
 // <venue> · date" instead of the grey checked date. Roam Now ([18] = 1) and the town Happy Hour pages put a small
 // green tick after the name.
@@ -48,30 +48,30 @@ const ownerLogin = (v) => {
 const pill = (html) => (/<p class="venue-verified-wrap">([\s\S]*?)<\/p>/.exec(html) || [])[1] || '';
 const dealsBody = (html, block) => (new RegExp(`<div class="venue-deals-block" data-block="${block}">(?:<h3>[^<]*</h3>)?<div class="venue-deals-body">([\\s\\S]*?)</div></div>`).exec(html) || [])[1] || '';
 
-test('Venue page pill: "Verified by the venue" on a claimed listing (EN/FR, with and without a date), none on an unclaimed one', () => {
+test('Venue page pill: "Verified by the business" on a claimed listing (EN/FR, with and without a date), none on an unclaimed one', () => {
   const plain = mk({ name: 'Verified Plain Pub' });
   assert.equal(app.venueIsClaimed(plain.id), false);
   assert.equal(pill(page(plain)), '');
-  assert.doesNotMatch(page(plain), /Verified by the venue|venue-owner-updated|Updated by the business/);
-  assert.doesNotMatch(page(plain, 'fr'), /Vérifié par l’établissement/);
+  assert.doesNotMatch(page(plain), /Verified by the business|venue-owner-updated|Updated by the business/);
+  assert.doesNotMatch(page(plain, 'fr'), /Vérifié par l’entreprise/);
 
   // An approved claim: the pill, no date.
   const claimed = mk({ name: 'Verified Claimed Pub' });
   approveClaim(claimed);
   assert.equal(app.venueIsClaimed(claimed.id), true);
-  assert.equal(pill(page(claimed)), '<span class="venue-verified" title="The business manages this listing on Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>Verified by the venue</span>');
-  assert.equal(pill(page(claimed, 'fr')), '<span class="venue-verified" title="L’établissement gère cette fiche sur Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>Vérifié par l’établissement</span>');
+  assert.equal(pill(page(claimed)), '<span class="venue-verified" title="The business manages this listing on Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>Verified by the business</span>');
+  assert.equal(pill(page(claimed, 'fr')), '<span class="venue-verified" title="L’établissement gère cette fiche sur Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>Vérifié par l’entreprise</span>');
 
   // An owner login on it counts too.
   const login = mk({ name: 'Verified Login Pub' });
   ownerLogin(login);
-  assert.match(pill(page(login)), /Verified by the venue<\/span>$/);
+  assert.match(pill(page(login)), /Verified by the business<\/span>$/);
 
   // An approved owner update: the pill with its date (Okanagan time, the same date text as before).
   const dated = mk({ name: 'Verified Dated Pub' });
   approveOwnerUpdate(dated, '2026-10-20 18:30:00');
-  assert.match(pill(page(dated)), /Verified by the venue <span class="venue-verified-date">&middot; updated Oct 20, 2026<\/span><\/span>$/);
-  assert.match(pill(page(dated, 'fr')), /Vérifié par l’établissement <span class="venue-verified-date">&middot; mis à jour le 20 oct\. 2026<\/span><\/span>$/);
+  assert.match(pill(page(dated)), /Verified by the business <span class="venue-verified-date">&middot; updated Oct 20, 2026<\/span><\/span>$/);
+  assert.match(pill(page(dated, 'fr')), /Vérifié par l’entreprise <span class="venue-verified-date">&middot; mis à jour le 20 oct\. 2026<\/span><\/span>$/);
   // A rejected update alone does not count.
   const rejected = mk({ name: 'Verified Rejected Pub' });
   db.prepare("INSERT INTO owner_change_requests (venue_id, status, changes, previous) VALUES (?, 'rejected', '{}', '{}')").run(rejected.id);
@@ -127,8 +127,8 @@ test('Roam Now: [18] = 1 on a claimed place (others keep their length), and the 
   const html = app.renderPlacesMapPage();
   assert.ok(html.includes('vf: a[18] || 0'));
   assert.ok(html.includes(`(x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '')`));
-  assert.ok(html.includes("verified: 'Verified by the venue'"));
-  assert.ok(html.includes("verified: 'Vérifié par l’établissement'"));
+  assert.ok(html.includes("verified: 'Verified by the business'"));
+  assert.ok(html.includes("verified: 'Vérifié par l’entreprise'"));
   assert.match(html, /body\.map-page \.pm-vf \{ margin-left: 4px; font-size: 0\.8em; font-weight: 800; color: #1E6B3A; \}/);
 });
 
@@ -139,11 +139,11 @@ test('Town Happy Hour page: a small green tick after the name of a claimed place
   const list = [claimed, plain].map((v) => app.getVenue(v.id));
   const cardOf = (html, v) => { const i = html.indexOf(`data-venue-id="${v.id}"`); return html.slice(i, html.indexOf('</li>', i)); };
   const html = app.renderGuidePage('kelowna', 'happy_hour', list, null, new Date());
-  assert.match(cardOf(html, claimed), /Town Verified Pub[\s\S]*? <span class="guide-hh-vf" role="img" aria-label="Verified by the venue" title="Verified by the venue">&#10003;<\/span><\/h2>/);
+  assert.match(cardOf(html, claimed), /Town Verified Pub[\s\S]*? <span class="guide-hh-vf" role="img" aria-label="Verified by the business" title="Verified by the business">&#10003;<\/span><\/h2>/);
   assert.doesNotMatch(cardOf(html, plain), /guide-hh-vf/);
   assert.match(html, /body\.guide-page \.guide-hh-vf \{ font-size: 0\.8em; font-weight: 800; color: #1E6B3A; \}/);
   const fr = app.renderGuidePage('kelowna', 'happy_hour', list, null, new Date(), { lang: 'fr' });
-  assert.match(cardOf(fr, claimed), /<span class="guide-hh-vf" role="img" aria-label="Vérifié par l’établissement" title="Vérifié par l’établissement">&#10003;<\/span><\/h2>/);
+  assert.match(cardOf(fr, claimed), /<span class="guide-hh-vf" role="img" aria-label="Vérifié par l’entreprise" title="Vérifié par l’entreprise">&#10003;<\/span><\/h2>/);
   // Other guide pages are unchanged.
   assert.doesNotMatch(app.renderGuidePage('kelowna', 'patio', list, null, new Date()), /guide-hh-vf/);
 });

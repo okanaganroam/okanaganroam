@@ -87,10 +87,10 @@ test('score: items we already have count even when the owner cannot edit them ye
   assert.ok(!withBooking.coming.some((i) => i.key === 'pyv_reservations') && !withBooking.missing.some((i) => i.key === 'pyv_reservations'), 'a booking link answers Reservations');
 });
 
-test('score: hours count as fresh for 90 days, then "Confirm hours" is missing (one tap, or saving the hours)', () => {
+test('score: hours count as fresh for 30 days, then "Confirm hours" is missing (one tap, or saving the hours)', () => {
   const day = (n) => { const d = new Date(Date.UTC(2026, 10, 8) - n * 864e5); return d.toISOString().slice(0, 10); };
-  assert.equal(score({ hoursCheckedAt: day(90) }).missing.length, 0, '90 days old is still fresh');
-  const stale = score({ hoursCheckedAt: day(91) });
+  assert.equal(score({ hoursCheckedAt: day(30) }).missing.length, 0, '30 days old is still fresh');
+  const stale = score({ hoursCheckedAt: day(31) });
   assert.deepEqual(stale.missing.map((i) => i.key), ['hours_fresh']);
   assert.equal(stale.coming.length, 0);
   assert.equal(stale.max, 100); assert.equal(stale.pct, 96);
@@ -300,7 +300,9 @@ test('no ranking, sorting or indexing code reads the score', () => {
   // the answers). These are owner-portal functions only; none feeds ranking, sorting, indexing or a public page.
   const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText', 'function ownerMainPhotoPositionHtml',
     // Easy setup (2026-11-09): COMPLETENESS_TYPES only decides which owners get the setup page.
-    'function sendOwnerSetupPage'].map((name) => {
+    'function sendOwnerSetupPage',
+    // Complete & Verified badge (2026-11-09): display only (its own test checks ranking, sitemap and robots never read it).
+    'function venueBadgeState', 'function completeVerifiedPageHtml', 'function badgeRemindersDue', 'function renderBadgeReminderPage'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
     return [lines(a), lines(src.indexOf('\n}\n', a))];
@@ -310,7 +312,8 @@ test('no ranking, sorting or indexing code reads the score', () => {
     const inRender = l >= lines(renderFn) && l <= lines(renderEnd);
     const inRequire = l === 20;
     const inOwnerSave = ownerFns.some(([a, b]) => l >= a && l <= b);
-    assert.ok(inDef || inRender || inRequire || inOwnerSave, `line ${l} uses the score outside the portal edit page`);
+    const badgeDisplay = /completeVerified|cvChipHtml|cvParts|showCv|cvRel/.test(src.split('\n')[l - 1]);
+    assert.ok(inDef || inRender || inRequire || inOwnerSave || badgeDisplay, `line ${l} uses the score outside the portal edit page`);
   }
   const mod = fs.readFileSync(path.join(__dirname, '..', 'portal-completeness.js'), 'utf8');
   assert.ok(!/require\(/.test(mod), 'the module is pure: no requires, no database');

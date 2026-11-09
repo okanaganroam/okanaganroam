@@ -10903,6 +10903,12 @@ function hiddenGemBadgeHtml() {
 
 // Second editorial badge (2026-09-19), same chip convention. Membership is
 // the 'local_favorite' collection kind, read via getCollectionVenueIds().
+// Complete & Verified on cards (2026-11-09): the same chip as the venue page. Its look is set inline (with !important) so
+// the card rules that flatten other chips don't touch it, and every other card page's CSS stays exactly as it was.
+function completeVerifiedCardChipHtml(fr) {
+  const label = fr ? 'Compl\u00e8te et v\u00e9rifi\u00e9e' : 'Complete & Verified';
+  return `<span class="chip complete-verified-badge" style="display:inline-flex !important;align-items:center;gap:5px;background:#1B2B3A !important;color:#FFFDF8 !important;box-shadow:inset 0 0 0 1.5px #C9A34A !important;border:0 !important;border-radius:999px !important;padding:4px 10px !important;font-weight:800 !important"><span aria-hidden="true" style="display:inline-grid;place-items:center;width:1.1em;height:1.1em;border-radius:50%;background:#C9A34A;color:#1B2B3A;font-size:.75em">&#10003;</span>${escapeHtml(label)}</span>`;
+}
 function localFavouriteBadgeHtml() {
   return `<span class="chip local-favourite-badge">${uiIcon('heart', '1.15em', true)} Local Favourite</span>`;
 }
@@ -19419,7 +19425,9 @@ function venueCardHtml(venue, opts = {}) {
   const showBadge = isHiddenGem && !venue.redirect_to && !hideHiddenGemBadge;
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to && !hideLocalFavouriteBadge;
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
-  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const showCv = !venue.redirect_to && COMPLETENESS_TYPES.has(venue.type) && completeVerifiedIds().has(venue.id);
+  const cvCardChip = showCv ? completeVerifiedCardChipHtml(false) + ' ' : '';
+  const editorialChips = cvCardChip + (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
   const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
     ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogFriendlyNote).trim())}</p>`
     : '';
@@ -19456,7 +19464,7 @@ function venueCardHtml(venue, opts = {}) {
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
-  const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
+  const photoTagChips = cvCardChip + (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   const tourFacts = isTourCard ? { ...tourCardFacts(tourInfo), price: cardPriceFor(venue.id) } : null;
   const tourFactChips = isTourCard
     ? [tourFacts.price ? `<span class="chip chip-feat chip-price">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
@@ -20816,6 +20824,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   .pm-pin-golf span { background: #65A30D; }
   .pm-pin-do span { background: #6D28D9; }
   .pm-pin-event span { background: #DB2777; border-radius: 4px; transform: rotate(45deg); }
+  /* Complete & Verified (2026-11-09): navy with a gold edge. */
+  .pm-pin-cv span { background: #1B2B3A; border-color: #C9A34A; }
   /* Phone map (2026-10-19, round 8): each pin keeps its 16px dot but takes taps over a 44px circle (an invisible
      ring around the 24px icon), and a keyboard-focused pin shows a 3px ring, as the popup's links do. */
   .leaflet-marker-icon.pm-pin::before { content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px; border-radius: 50%; }
@@ -20969,7 +20979,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // (nothing in the 7 days the map holds) said it under the 7-day notice.
     noEventsHere: 'Aucun événement cette semaine ici.', noEventsWeek: 'Aucun événement de ce genre sur la carte cette semaine.', noEventsSoon: 'Aucun événement de ce genre sur la carte dans les semaines à venir.', ahead: 'À venir',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
-    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: 'Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', verified: 'Vérifié par l’établissement', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
+    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: 'Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', verified: 'Vérifié par l’entreprise', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
@@ -21006,7 +21016,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     noEventsHere: 'No events here this week.', noEventsWeek: 'No events like that on the map this week.', noEventsSoon: 'No events like that on the map in the coming weeks.', ahead: 'Coming up',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
-    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: 'Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', verified: 'Verified by the venue', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
+    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: 'Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', verified: 'Verified by the business', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
   };
   var TYPES = CONF.t[FR ? 'fr' : 'en'];
   var mapEl = document.getElementById('okMap');
@@ -22650,7 +22660,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       // Tonight's weekly nights (2026-10-27): [weekday, [[kind, time, every other week, title]]]; their kind words join the deal search.
       if (a[20]) p.ar = { lat: a[20][0], lng: a[20][1], img: a[20][2] };
       if (a[19] && a[19][1]) { p.wnDay = a[19][0]; p.wn = a[19][1]; p.dk = (p.dk || ' ') + mapNameKey(p.wn.map(function(n){ return (WN_WORDS[n[0]] || '') + ' ' + (n[3] || ''); }).join(' ')).slice(1); }
-      p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
+      p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.vf === 2 ? 'cv' : p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
     events = []; d.e.forEach(function(a){ addEvent(a, false); });
@@ -22723,7 +22733,7 @@ function mapDataVersion(now = new Date()) {
   let wn = { u: null, n: 0 };
   try { wn = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_weekly_nights').get(); } catch (err) { /* an older database */ }
   // Verified mark (2026-10-27): the claimed places too, so a new claim shows its tick without waiting for another change.
-  const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',');
+  const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',') + '|cv:' + [...completeVerifiedIds(now)].sort((a, b) => a - b).join(',');
   const visit = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_visit_info').get();
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
   return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}`).digest('hex').slice(0, 12);
@@ -22872,6 +22882,7 @@ function mapPlacesData(now = new Date()) {
   const viewpointIds = getCollectionVenueIds('activity_viewpoints');
   const specials = specialsTodayFor(venues, now);
   const claimed = claimedVenueIds();
+  const cvIds = completeVerifiedIds(now);
   const nightsToday = weeklyNightsTodayFor(venues, now);
   return venues.map((v) => {
     const st = open.byId.get(v.id);
@@ -22913,9 +22924,10 @@ function mapPlacesData(now = new Date()) {
     }
     // [18] Verified mark (2026-10-27): 1 when the business manages the listing (venueIsClaimed), shown as a small tick
     // after the name. Only on those rows ([16] and [17] are 0 when the place has none), so the others keep their length.
+    // Complete & Verified (2026-11-09): 2 instead of 1, so the pin turns navy with a gold edge (rows stay the same length).
     if (claimed.has(v.id)) {
       while (row.length < 18) row.push(0);
-      row.push(1);
+      row.push(cvIds.has(v.id) ? 2 : 1);
     }
     // [19] Weekly nights (2026-10-27): tonight's only (up to three), as [weekday, [[kind, 'HH:MM' or 0, every other
     // week 1/0, title (an 'other' night only)], ...]]; the page words them ("Tonight: Trivia 7 PM"). Only on a place with
@@ -33994,7 +34006,7 @@ function guideHappyHourInfo(venues, fr, now = new Date()) {
   const order = (list) => list.map((v, i) => [rank.has(v.id) ? rank.get(v.id) : 2, i, v]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
   // Verified mark (2026-10-27): a small green tick after the name of each place the business manages.
   const claimed = claimedVenueIds();
-  const label = fr ? 'Vérifié par l’établissement' : 'Verified by the venue';
+  const label = fr ? 'Vérifié par l’entreprise' : 'Verified by the business';
   const nameMarkById = new Map(ids.filter((id) => claimed.has(id)).map((id) => [id, ` <span class="guide-hh-vf" role="img" aria-label="${label}" title="${label}">&#10003;</span>`]));
   return { order, htmlById, nameMarkById };
 }
@@ -34270,7 +34282,14 @@ function foodDrinkPageApplies(venue) {
   if (!venue || venue.redirect_to) return false;
   return FOOD_DRINK_TYPES.includes(venue.type) || getFoodDrinkCategoriesForVenueIds([venue.id]).has(venue.id);
 }
+// Complete & Verified (2026-11-09): the page is built as before; with the badge it carries the chip and the other
+// "verified" lines are left out (stripVerifiedRepeats), so it says it once.
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
+  const cv = !!venue && venueBadgeState(venue, opts.now || new Date()) === 'earned';
+  const html = renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, cv ? { ...opts, completeVerified: true } : opts);
+  return cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html;
+}
+function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
   const fr = opts.lang === 'fr';
   // Food & Drink venue layout (2026-11-07): every English Food & Drink page uses Copper's approved layout, built from the
@@ -34407,6 +34426,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const venueWhyHtml = whyGem || whyLocal
     ? `\n    <div class="venue-why" style="margin:14px 0 4px;padding:12px 16px;background:rgba(42,107,103,0.07);border-left:4px solid var(--teal, #2A6B67);border-radius:10px;max-width:720px"><p style="margin:0 0 3px;font-family:'Nunito','Nunito Fallback',sans-serif;font-size:0.74rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--teal-deep, #1F5450)">${whyGem ? L('Why it\u2019s a Hidden Gem', 'Pourquoi c\u2019est un tr\u00e9sor cach\u00e9') : L('Why locals love it', 'Pourquoi les gens d\u2019ici l\u2019adorent')}</p><p style="margin:0;font-size:1rem;line-height:1.5">${escapeHtml(whyGem || whyLocal)}</p></div>`
     : '';
+  const cvParts = opts.completeVerified ? completeVerifiedPageHtml(venue, fr) : null;
+  const cvChipHtml = cvParts ? `<style id="cv-badge">${portalCompleteness.BADGE_CSS} .cv-explain:not([hidden]){display:block}</style>${cvParts.chip} ${cvParts.explain}${cvParts.script}` : '';
   const hiddenGemChip = frChip((isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(fr && dogFriendlyNote ? frTextOr(String(dogFriendlyNote).trim()) : dogFriendlyNote) + ' ' : ''));
 
   // Stage 2 (2026-09-29): read through hours.js like Open Now and the
@@ -34725,7 +34746,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const relatedStockPhotosUsed = new Set();
   function relatedCard(v) {
     const meta = [v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
-    const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
+    const cvRel = !v.redirect_to && COMPLETENESS_TYPES.has(v.type) && completeVerifiedIds().has(v.id);
+    const badge = (cvRel ? completeVerifiedCardChipHtml(fr) + ' ' : '') + ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
     const photo = venueThumbPhoto(v, relatedStockPhotosUsed);
     const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
@@ -34931,7 +34953,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       if (!venueIsClaimed(venue.id)) return '';
       const last = ownerLastUpdatedAt(venue.id);
       const date = last ? ownerUpdatedDate(last, fr) : '';
-      return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the venue', 'V\u00e9rifi\u00e9 par l\u2019\u00e9tablissement')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
+      return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the business', 'V\u00e9rifi\u00e9 par l\u2019entreprise')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
     })();
   const ownerCtaHtml = venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:6px 0 18px;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
@@ -35006,7 +35028,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
-      recognitionHtml: (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
+      recognitionHtml: cvChipHtml + (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
       // Winery: the box leaves out the rows the Tastings card above already shows (no tasting listed twice, 2026-11-08).
       visitHtml: winery ? visitInfoHtml(require('./niche-tastings').withoutTastingCardRows(nichePrices ? require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices) : visitInfoRaw, escapeHtml, nichePrices), false)
         : nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false) : visitHtml, descriptionHtml: (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
@@ -35029,14 +35051,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     glanceRows:venue.type === 'golf' ? GOLF_AT_A_GLANCE_FACTS[`${venue.region}/${venue.slug}`] : null,
     detailRows, locationHtml, hoursHtml:showDatesHtml || hoursHtml, guideLinks, nearbyCards:fdNearbyCards, eventsHtml:venueEventsHtml,
     visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '', ownerCtaHtml,
-    regionLabel, openStatusHtml, chipsHtml:`${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`,
+    regionLabel, openStatusHtml, chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`,
   }) : '';
   const outdoorBody = outdoorLayout ? require('./outdoor-venue-layout').renderOutdoorLayout({
     venue, escapeHtml, facts:OUTDOOR_FACTS[String(venue.id)], factRows:outdoorFactRows(venue), visitInfo:visitInfoRaw, advisoryHtml:venueAdvisoryHtml,
     actions:ctaEntries, ctaRowAttrs, guideLinks, nearbyCards:fdNearbyCards,
     visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
     park:parkLayout, regionLabel, categorySlug:catSlug, openStatusHtml, glanceHtml:hikeGlanceHtml,
-    chipsHtml:`${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
+    chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
     locationHtml, detailRows, hoursHtml:showDatesHtml || hoursHtml, visitHtml, eventsHtml:venueEventsHtml, ownerCtaHtml,
   }) : '';
   const page = `<!DOCTYPE html>
@@ -35078,7 +35100,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1 class="venue-desktop-title">${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${verifiedHtml}
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${verifiedHtml}
   </div>
   <!-- Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip come straight after the name,
        hours and badges (and any check-before-you-go notice), before the description, so they are on the first screen of
@@ -44164,7 +44186,7 @@ function venueSocialLinks(venueId) {
 function clearVenueSocialCache() { venueSocialCache = null; }
 // Researched venue links (2026-10-27): our own menu / booking links, written straight to venue_links by
 // POST /admin/set-venue-links -- never through an owner change request, so the venue is not "claimed" and gets no
-// "Verified by the venue" pill. One field at a time with compare-and-set on the live value; logged as source
+// "Verified by the business" pill. One field at a time with compare-and-set on the live value; logged as source
 // 'research'. A link the owner set last (venue_owner in venue_enrichment_log) wins unless opts.force_owner.
 // Instagram / Facebook (2026-11-07): researched social links too, stored in the same canonical form the owner portal
 // uses (normalizeInstagram / normalizeFacebook), so a card's "Instagram · Facebook" line reads the same either way.
@@ -51067,9 +51089,9 @@ const OWNER_HELP_TOPICS = [
   // "These hours are right" and the cuisine picker (2026-11-08): only on a restaurant's edit page (completenessOnly).
   { id: 'hours-right', completenessOnly: true, over: ['hours', 'page-complete'], q: 'My hours haven’t changed. How do I confirm them?', qFr: 'Mes heures n’ont pas changé. Comment les confirmer?', pages: ['edit'],
     keys: ['hours are right', 'hours are correct', 'confirm hours', 'confirm my hours', 'hours havent changed', 'hours have not changed', 'hours still right', 'same hours', 'hours checked', 'checked in the last 90 days', '90 days', 'last checked', 'hours fresh', 'verify hours', 'verify my hours'],
-    keysFr: ['heures sont exactes', 'confirmer mes heures', 'confirmer les heures', 'heures n ont pas change', 'memes heures', 'heures verifiees', '90 jours', 'derniere verification', 'verifier mes heures'],
-    a: '<p>Under <strong>Opening hours</strong>, tap <strong>These hours are right</strong>. Your hours stay exactly as they are, and your page shows they were checked today.</p><ul><li>It counts toward your page being complete for 90 days. After that, the bar asks you to check them again.</li><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Hours changed? Edit the times above and save instead: that marks them checked too.</li></ul>',
-    aFr: '<p>Sous <strong>Heures d’ouverture</strong>, touchez <strong>Ces heures sont exactes</strong>. Vos heures restent exactement les mêmes, et votre page indique qu’elles ont été vérifiées aujourd’hui.</p><ul><li>Cela compte pour une fiche complète pendant 90 jours. Ensuite, la barre vous demande de les vérifier de nouveau.</li><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vos heures ont changé? Modifiez-les plus haut et enregistrez : elles sont alors aussi marquées comme vérifiées.</li></ul>' },
+    keysFr: ['heures sont exactes', 'confirmer mes heures', 'confirmer les heures', 'heures n ont pas change', 'memes heures', 'heures verifiees', '30 jours', '90 jours', 'derniere verification', 'verifier mes heures'],
+    a: '<p>Under <strong>Opening hours</strong>, tap <strong>These hours are right</strong>. Your hours stay exactly as they are, and your page shows they were checked today.</p><ul><li>It counts toward your page being complete for 30 days. After that, the bar asks you to check them again.</li><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Hours changed? Edit the times above and save instead: that marks them checked too.</li></ul>',
+    aFr: '<p>Sous <strong>Heures d’ouverture</strong>, touchez <strong>Ces heures sont exactes</strong>. Vos heures restent exactement les mêmes, et votre page indique qu’elles ont été vérifiées aujourd’hui.</p><ul><li>Cela compte pour une fiche complète pendant 30 jours. Ensuite, la barre vous demande de les vérifier de nouveau.</li><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vos heures ont changé? Modifiez-les plus haut et enregistrez : elles sont alors aussi marquées comme vérifiées.</li></ul>' },
   // "Plan your visit" lines (2026-11-08): only on a restaurant's edit page (completenessOnly).
   { id: 'plan-visit', completenessOnly: true, over: ['page-complete'], q: 'How do I fill in “Plan your visit”?', qFr: 'Comment remplir « Planifier la visite »?', pages: ['edit'],
     keys: ['plan your visit', 'known for', 'reservations line', 'walk ins', 'walk-ins', 'takeout', 'take out', 'delivery', 'doordash', 'skip the dishes', 'dietary note', 'allergies', 'groups', 'large party', 'large parties', 'good to know', 'parking', 'visit box'],
@@ -52967,6 +52989,7 @@ function renderOwnerResetPage(valid, lang = 'en') {
 // changed fields. Each field goes through its guarded writer; any failure
 // rolls the whole approval back and leaves the request pending.
 function approveOwnerChange(id, reviewer, fields, now = new Date()) {
+  resetCompleteVerifiedCache(); // Complete & Verified: a live owner change can earn or pause the badge.
   const req = getOwnerChange(id);
   if (!req) return { ok: false, reason: 'not_found' };
   if (req.status !== 'pending') return { ok: false, reason: 'not_pending', status: req.status };
@@ -54988,7 +55011,159 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
     pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
+    // Complete & Verified (2026-11-09): the badge block under the ring (earned, paused, or how to earn it).
+    claimed: venueIsClaimed(venue.id),
   });
+}
+// ---------- Complete & Verified badge (2026-11-09) ----------
+// One rule for every place the badge shows: portalCompleteness.badgeState() on the same score the portal shows, from live
+// data only (nothing waiting for our check counts) and only for a listing the business manages. Display only: ranking,
+// sorting, indexing, the sitemap and robots never read it.
+function venueBadgeState(venue, now = new Date()) {
+  if (!venue || venue.redirect_to || !COMPLETENESS_TYPES.has(venue.type)) return 'none';
+  if (!venueIsClaimed(venue.id)) return 'none';
+  let hh = null;
+  try { hh = (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(venue.id) || {}).happy_hour_times || null; } catch (e) { hh = null; }
+  const live = ownerVenueSnapshot(venue, hh);
+  return portalCompleteness.badgeState(portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, hh), { today: todayLocal(now) }), true);
+}
+// The ids that show the badge on cards and the map: only claimed restaurants can have it, so this stays small. Kept for
+// five minutes (and per day), and reset whenever an owner change goes live, so a new badge shows quickly.
+let completeVerifiedCache = { key: '', at: 0, ids: new Set() };
+function completeVerifiedIds(now = new Date()) {
+  const key = todayLocal(now);
+  if (completeVerifiedCache.key === key && Date.now() - completeVerifiedCache.at < 5 * 60 * 1000) return completeVerifiedCache.ids;
+  const ids = new Set();
+  for (const id of claimedVenueIds()) {
+    const v = getVenue(id);
+    if (v && venueBadgeState(v, now) === 'earned') ids.add(id);
+  }
+  completeVerifiedCache = { key, at: Date.now(), ids };
+  return ids;
+}
+function resetCompleteVerifiedCache() { completeVerifiedCache = { key: '', at: 0, ids: new Set() }; }
+
+// ---------- Complete & Verified reminders (2026-11-09) ----------
+// Five days before a badge would pause (hours checked 25-29 days ago), the business gets one short email with a private
+// one-tap "my hours are right" link. Off unless BADGE_REMINDERS=1. Never twice per address per check cycle
+// (badge_reminders), never to an address that opted out (badge_reminder_optout), only to addresses we already hold
+// (their login, or the email on their edit link). GET /admin/badge-reminders/preview lists today's without sending.
+const BADGE_REMINDER_PATH = '/owner/hours-check/';
+const BADGE_REMINDER_DAYS = 14;
+function badgeRemindersOn() { return process.env.BADGE_REMINDERS === '1'; }
+function badgeReminderEmails(venueId) {
+  const out = new Set();
+  try { for (const r of db.prepare('SELECT a.email FROM owner_account_venues av JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ?').all(venueId)) if (r.email) out.add(String(r.email).trim().toLowerCase()); } catch (e) { /* no logins yet */ }
+  try { const l = db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(venueId); if (l && l.contact_email) out.add(String(l.contact_email).trim().toLowerCase()); } catch (e) { /* no link */ }
+  return [...out].filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
+function badgeReminderOptedOut(email) {
+  try { return !!db.prepare('SELECT 1 FROM badge_reminder_optout WHERE email = ?').get(String(email).trim().toLowerCase()); } catch (e) { return false; }
+}
+// Who gets a reminder today: [{ venue_id, name, email, cycle_key, age }].
+function badgeRemindersDue(now = new Date()) {
+  const today = todayLocal(now), due = [];
+  for (const id of claimedVenueIds()) {
+    const v = getVenue(id);
+    if (!v || v.redirect_to || !COMPLETENESS_TYPES.has(v.type)) continue;
+    const checked = venueHoursCheckedAt(id);
+    if (!parseLocalDate(checked)) continue;
+    const age = localDateToDayNumber(today) - localDateToDayNumber(checked);
+    if (age < portalCompleteness.HOURS_FRESH_DAYS - 5 || age >= portalCompleteness.HOURS_FRESH_DAYS) continue;
+    if (venueBadgeState(v, now) !== 'earned') continue;
+    for (const email of badgeReminderEmails(id)) {
+      if (badgeReminderOptedOut(email)) continue;
+      if (db.prepare('SELECT 1 FROM badge_reminders WHERE venue_id = ? AND cycle_key = ? AND email = ?').get(id, checked, email)) continue;
+      due.push({ venue_id: id, name: v.name, email, cycle_key: checked, age });
+    }
+  }
+  return due;
+}
+function badgeReminderText(name, url, stopUrl) {
+  return [`Hi ${name},`, '', 'Your page on Okanagan Roam has the Complete & Verified badge. To keep it, please check your opening hours are still right.', '',
+    'One tap does it:', url, '', 'If your hours changed, you can update them from the same link.', '',
+    'Thanks,', 'Okanagan Roam', 'okanaganroam.com', '', `Don’t want these reminders? ${stopUrl}`].join('\n');
+}
+// Sends today's reminders (only with BADGE_REMINDERS=1 and a mail transport). Returns { sent, skipped }.
+async function badgeReminderTick(now = new Date(), opts = {}) {
+  if (!badgeRemindersOn() && !opts.force) return { sent: 0, skipped: 'off' };
+  const send = ownerDirectEmail();
+  if (!send) return { sent: 0, skipped: 'no_transport' };
+  let sent = 0;
+  for (const d of badgeRemindersDue(now)) {
+    const token = crypto.randomBytes(24).toString('base64url');
+    const expires = new Date(now.getTime() + BADGE_REMINDER_DAYS * 864e5).toISOString().replace('T', ' ').slice(0, 19);
+    try {
+      db.prepare('INSERT INTO badge_reminders (venue_id, cycle_key, email, token_hash, expires_at) VALUES (?, ?, ?, ?, ?)').run(d.venue_id, d.cycle_key, d.email, ownerTokenHash(token), expires);
+    } catch (e) { continue; } // already sent for this cycle (UNIQUE)
+    const url = `https://okanaganroam.com${BADGE_REMINDER_PATH}${token}`;
+    try {
+      await send({ to: d.email, subject: 'Are your hours still right? One tap keeps your badge', text: badgeReminderText(d.name, url, `${url}/stop`) });
+      sent += 1;
+    } catch (e) { console.error(`[badge-reminder] venue #${d.venue_id}: ${e.message}`); }
+  }
+  return { sent };
+}
+function badgeReminderByToken(token) {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(String(token || ''))) return null;
+  return db.prepare("SELECT * FROM badge_reminders WHERE token_hash = ? AND expires_at > datetime('now')").get(ownerTokenHash(token)) || null;
+}
+// The private one-tap page: the hours as they are, "Yes, these are right" (confirms them as the business, through the
+// same path as the portal's button: an instant owner change, logged, in Your updates, with Undo), or a link to change them.
+function renderBadgeReminderPage(rem, state) {
+  if (!rem) return ownerSimplePage('Link expired', `<span class="eyebrow">For businesses</span><h1>This link has expired</h1><p>Reminder links work for ${BADGE_REMINDER_DAYS} days. Sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>, or reply to the email and we’ll help.</p>`);
+  const v = getVenue(rem.venue_id);
+  if (state === 'stopped') return ownerSimplePage('Reminders stopped', `<span class="eyebrow">For businesses</span><h1>No more reminders</h1><p>We won’t send hours reminders to this address again.</p>`);
+  let week = null; try { week = v && v.hours ? JSON.parse(v.hours) : null; } catch (e) { week = null; }
+  const hours = week ? portalCompleteness.hoursLine(week, false) : '';
+  if (state === 'done') return ownerSimplePage('Thanks!', `<span class="eyebrow">${escapeHtml(v ? v.name : '')}</span><h1>Thanks! Your hours are marked as checked today.</h1><p>Your Complete &amp; Verified badge stays on your page.</p><p><a href="${v ? escapeHtml(venueListingUrl(v)) : '/'}">See your page</a></p>`);
+  return ownerSimplePage('Are your hours still right?', `<span class="eyebrow">${escapeHtml(v ? v.name : '')}</span>
+    <h1>Are your hours still right?</h1>
+    ${hours ? `<p style="font-size:1.15rem;font-weight:700;white-space:pre-line">${escapeHtml(hours)}</p>` : ''}
+    <form method="post" action="${BADGE_REMINDER_PATH}${'${TOKEN}'}"><button type="submit" class="venue-form-submit">Yes, these are right</button></form>
+    <p class="op-hint" style="margin-top:16px">Hours changed? <a href="/owner/login">Sign in</a> or use the edit link from our earlier email to update them.</p>`);
+}
+function confirmHoursFromReminder(rem, now = new Date()) {
+  const v = getVenue(rem.venue_id);
+  if (!v || !v.hours) return { ok: false, reason: 'no_hours' };
+  const today = todayLocal(now);
+  const prov = db.prepare('SELECT hours_source, hours_checked_at FROM venues WHERE id = ?').get(v.id) || {};
+  const id = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash, instant, undo_meta) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)')
+    .run(v.id, JSON.stringify({ hours_checked: today }), JSON.stringify({ hours_checked: prov.hours_checked_at || '' }), null, null, rem.email, null,
+      JSON.stringify({ hours_source: prov.hours_source || null, hours_checked_at: prov.hours_checked_at || null })).lastInsertRowid);
+  const r = approveOwnerChange(id, 'owner:badge-reminder');
+  if (!r.ok) return r;
+  db.prepare('UPDATE badge_reminders SET used_at = CURRENT_TIMESTAMP WHERE id = ?').run(rem.id);
+  resetCompleteVerifiedCache();
+  return { ok: true };
+}
+// The venue page's chip and its short explanation (a button toggles it; closed until tapped).
+function completeVerifiedPageHtml(venue, fr) {
+  const last = ownerLastUpdatedAt(venue.id);
+  let checked = '';
+  try { checked = (db.prepare('SELECT hours_checked_at FROM venues WHERE id = ?').get(venue.id) || {}).hours_checked_at || ''; } catch (e) { checked = ''; }
+  // The newer of the last approved owner update and the last hours check.
+  const lastDay = last ? String(last).slice(0, 10) : '';
+  const latest = [lastDay, checked].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() || '';
+  const date = latest ? ownerUpdatedDate(`${latest} 19:00:00`, fr) : '';
+  const text = fr
+    ? `Chaque détail de cette fiche a été vérifié par l’entreprise.${date ? ` Dernière mise à jour le ${escapeHtml(date)}.` : ''}`
+    : `Every detail on this page was checked by the business.${date ? ` Last updated ${escapeHtml(date)}.` : ''}`;
+  return {
+    chip: portalCompleteness.badgeChipHtml(fr, { button: true, controls: 'cvExplain' }),
+    explain: `<span class="cv-explain" id="cvExplain" hidden><strong>${escapeHtml(fr ? portalCompleteness.BADGE_LABEL.fr : portalCompleteness.BADGE_LABEL.en)}</strong>${text}</span>`,
+    script: `<script>(function(){var b=document.querySelector('button.complete-verified-badge'),x=document.getElementById('cvExplain');if(!b||!x)return;b.addEventListener('click',function(){var o=x.hidden;x.hidden=!o;b.setAttribute('aria-expanded',o?'true':'false');});})();</script>`,
+  };
+}
+// Say it once (Dayton): on a page with the badge, the other "verified" lines are left out, because the badge covers them:
+// the "Verified by the business" pill, the "Confirmed by <venue>" lines (deals, specials, nights) and "Hours checked".
+function stripVerifiedRepeats(html) {
+  return html
+    .replace(/\n?\s*<p class="venue-verified-wrap">[\s\S]*?<\/p>/g, '')
+    .replace(/<span class="venue-confirmed"><span class="venue-confirmed-tick"[^>]*>&#10003;<\/span><span>[^<]*<span class="venue-confirmed-date">[^<]*<\/span><\/span><\/span>/g, '')
+    .replace(/<span class="venue-confirmed"><span class="venue-confirmed-tick"[^>]*>&#10003;<\/span><span>[^<]*<\/span><\/span>/g, '')
+    .replace(/<span class="venue-hours-checked(?: [a-z-]+)*"><\/span>/g, '')
+    .replace(/<p class="venue-hours-checked">[^<]*<\/p>/g, '');
 }
 function ownerCompletenessJson(found, token, lang) {
   if (!found || !COMPLETENESS_TYPES.has(found.venue.type)) return null;
@@ -58972,7 +59147,7 @@ const server = http.createServer(async (req, res) => {
     // POST /admin/set-venue-links (2026-10-27) -- researched venue links, the HTTP route for guardedVenueLinkUpdate():
     // { id, field: 'menu_url' | 'booking_url' | 'instagram_url' | 'facebook_url', expected_current, value: <http(s) URL> | null, reason, batch_id,
     // source_url?, force_owner? }. One field per call; expected_current is the live value from GET /admin/venue-links/:id
-    // (null when unset). Logged as 'research', not 'venue_owner', so the venue does not become "Verified by the venue".
+    // (null when unset). Logged as 'research', not 'venue_owner', so the venue does not become "Verified by the business".
     if (pathname === '/admin/set-venue-links' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-venue-links endpoint is not configured.' });
@@ -60225,6 +60400,25 @@ const server = http.createServer(async (req, res) => {
         return res.end(method === 'HEAD' ? undefined : renderOwnerResetPage(valid, res.ownerLang));
       }
     }
+    if (pathname.startsWith(BADGE_REMINDER_PATH)) {
+      const rest = pathname.slice(BADGE_REMINDER_PATH.length);
+      const stop = rest.endsWith('/stop');
+      const token = stop ? rest.slice(0, -5) : rest;
+      const rem = badgeReminderByToken(token);
+      const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
+      if (stop && rem) {
+        db.prepare('INSERT OR IGNORE INTO badge_reminder_optout (email) VALUES (?)').run(rem.email);
+        res.writeHead(200, headers); return res.end(renderBadgeReminderPage(rem, 'stopped'));
+      }
+      if (method === 'POST' && rem && !stop) {
+        const r = confirmHoursFromReminder(rem);
+        res.writeHead(r.ok ? 200 : 400, headers); return res.end(renderBadgeReminderPage(rem, r.ok ? 'done' : 'ask').replace('${TOKEN}', escapeHtml(token)));
+      }
+      if (method === 'GET' || method === 'HEAD') {
+        res.writeHead(rem ? 200 : 410, headers);
+        return res.end(method === 'HEAD' ? undefined : renderBadgeReminderPage(rem, 'ask').replace('${TOKEN}', escapeHtml(token)));
+      }
+    }
     if (pathname === '/owner/logout' && method === 'POST') {
       const value = readCookie(req, OWNER_SESSION_COOKIE);
       if (value) db.prepare('DELETE FROM owner_sessions WHERE token_hash = ?').run(ownerSessionHash(value));
@@ -60350,6 +60544,10 @@ const server = http.createServer(async (req, res) => {
         if (found.viewer) found.viewerManages = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(found.viewer.id, found.venue.id);
         return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id), res.ownerLang));
       }
+    }
+    if (pathname === '/admin/badge-reminders/preview' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      return sendJSON(res, 200, { on: badgeRemindersOn(), today: todayLocal(), due: badgeRemindersDue() });
     }
     if (pathname === '/admin/owner-links' && method === 'POST') {
       if (!requireAdminToken(req, res)) return;
@@ -61460,9 +61658,16 @@ async function healthAlertTick(now = new Date()) {
     return result;
   } finally { healthBusy = false; }
 }
+function okanaganHourNow(now = new Date()) {
+  return Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', hour: 'numeric', hourCycle: 'h23' }).format(now));
+}
 function startDigestTimer() {
   if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
-  const t = setInterval(() => { digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message)); }, 15 * 60 * 1000);
+  const t = setInterval(() => {
+    digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message));
+    // Complete & Verified reminders (2026-11-09): from 10 AM Okanagan time, only with BADGE_REMINDERS=1.
+    if (badgeRemindersOn() && okanaganHourNow() >= 10) badgeReminderTick().then((r) => { if (r.sent) console.log(`[badge-reminder] sent ${r.sent}`); }).catch((e) => console.error('[badge-reminder]', e.message));
+  }, 15 * 60 * 1000);
   t.unref();
   if (process.env.PRICE_CHECK_DISABLED !== '1') {
     const pc = setInterval(() => { const r = priceCheck.tick(); if (r) r.catch((e) => console.error('[price-check]', e.message)); }, 15 * 60 * 1000);
@@ -61766,6 +61971,7 @@ module.exports = {
   // Verified mark (2026-10-27)
   guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
+  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
   guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
   OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,
   createOwnerLink,

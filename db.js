@@ -1104,6 +1104,27 @@ CREATE TABLE IF NOT EXISTS venue_cuisines (
 );
 `);
 
+// Complete & Verified reminders (2026-11-09): one email per business address per hours-check cycle (cycle_key is the
+// hours_checked_at date the reminder was about), so a reminder never goes twice. token_hash is the private one-tap
+// "my hours are right" link (only its hash stored), good for 14 days. Opt-outs: addresses that said "no more reminders".
+db.exec(`
+CREATE TABLE IF NOT EXISTS badge_reminders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  cycle_key TEXT NOT NULL,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  UNIQUE (venue_id, cycle_key, email)
+);
+CREATE TABLE IF NOT EXISTS badge_reminder_optout (
+  email TEXT PRIMARY KEY,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Venue links (2026-10-15): menu, booking and social links an owner sends
 // (approved like every owner change). Kept off the venues table so the
 // venue API and every list that reads venues stay exactly as they are.
