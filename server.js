@@ -1152,6 +1152,8 @@ function validateVenueWebsite(website) {
 function guardedWebsiteEnrichUpdate(id, website, meta) {
   const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
   if (!existing) return { found: false };
+  // "We don't have one" (2026-11-08): the owner told us they have no website.
+  if (website && notOfferedBlocked(id, 'website')) return { found: true, changed: false, blocked: 'owner_marked_not_offered', live: getVenue(id) };
 
   let txOpen = false;
   try {
@@ -1371,6 +1373,12 @@ function guardedAmenityCorrectUpdate(id, fieldValues, meta) {
       if (!(field in fieldValues)) continue;
       const { expectedCurrent, corrected } = fieldValues[field];
 
+      // "We don't have one" (2026-11-08): research never turns on a badge for something the owner said they don't offer.
+      if (corrected === true && expectedCurrent !== true && NOT_OFFERED_BADGE_ITEM[field] && notOfferedBlocked(id, NOT_OFFERED_BADGE_ITEM[field])) {
+        results[field] = 'rejected_owner_not_offered';
+        continue;
+      }
+
       // Never permit setting an existing true back to false via this
       // mechanism, regardless of what expected_current claims.
       if (corrected === false && expectedCurrent === true) {
@@ -1441,7 +1449,7 @@ const VENUE_DELETE_CHILDREN = [
   ['owner_photos', 'venue_id = ?'], ['owner_videos', 'venue_id = ?'], ['venue_arrival_points', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
-  ['venue_visit_info', 'venue_id = ?'], ['venue_avg_spend', 'venue_id = ?'],
+  ['venue_visit_info', 'venue_id = ?'], ['venue_avg_spend', 'venue_id = ?'], ['venue_not_offered', 'venue_id = ?'],
 ];
 const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
@@ -1640,7 +1648,7 @@ const MIN_INDEXABLE_CATEGORY_VENUES = 3;
 // and no owner content (an approved owner photo, a published menu or price list, an approved owner edit). It becomes
 // indexable again by itself as soon as it gains any of them. A closed-for-season place with stored hours stays indexable.
 // (2026-11-08: an owner edit that is only the average spend number does not count -- tapping "That's right" must not turn a
-// thin page indexable.)
+// thin page indexable. Nor does one that is only "we don't have one" answers, which are never public.)
 const MIN_INDEXABLE_VENUE_DESC_WORDS = 45;
 let venueOwnerContentCache = null, venueOwnerContentVersionStmt = null;
 function venueOwnerContentIds() {
@@ -1651,7 +1659,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key != 'avg_spend')`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -8966,6 +8974,7 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
   }
   const v = input || {};
+  if (v.times !== null && notOfferedBlocked(id, 'happy_hour')) return NOT_OFFERED_BLOCK('happy_hour');
   let next = { happy_hour_times: null, happy_hour_source: null, happy_hour_checked_at: null };
   if (v.times !== null) {
     if (!v.times || typeof v.times !== 'object' || Array.isArray(v.times)) return { ok: false, reason: 'invalid_times', detail: 'times must be an object keyed by day, or null' };
@@ -9073,6 +9082,7 @@ function guardedHappyHourDealsUpdate(id, expectedCurrent, input, meta, now = new
     return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
   }
   const v = input || {};
+  if (v.deals !== null && notOfferedBlocked(id, 'happy_hour')) return NOT_OFFERED_BLOCK('happy_hour');
   let next = { happy_hour_deals: null, happy_hour_deals_fr: null, happy_hour_deals_source: null, happy_hour_deals_checked_at: null };
   if (v.deals !== null) {
     const en = validateHappyHourDeals(v.deals);
@@ -9390,6 +9400,7 @@ function guardedSpecialsUpdate(id, expectedCurrent, input, meta, now = new Date(
     return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
   }
   const v = input || {};
+  if (v.specials !== null && notOfferedBlocked(id, 'specials')) return NOT_OFFERED_BLOCK('specials');
   let next = [];
   if (v.specials !== null) {
     const checked = validateSpecials(v.specials, { source: v.source_url, checked_at: v.checked_at }, now);
@@ -9498,6 +9509,9 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
   if (visit !== null) {
     const checked = validateVisitInfo(visit);
     if (!checked.ok) return { ok: false, reason: 'invalid_visit', detail: checked.detail };
+    // "We don't have one" (2026-11-08): no booking button once the owner said they don't take reservations. (A row that
+    // says "walk-ins only" still goes in: it agrees with them.)
+    if (checked.info.booking_url && notOfferedBlocked(id, 'pyv_reservations')) return NOT_OFFERED_BLOCK('pyv_reservations');
     nextJson = JSON.stringify(checked.info);
   }
   const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
@@ -9566,6 +9580,21 @@ function currentAvgSpendJson(venueId) {
 function venueAvgSpend(venueId) {
   try { const j = currentAvgSpendJson(venueId); return j ? JSON.parse(j) : null; } catch (e) { return null; }
 }
+// "We don't have one" (2026-11-08): the completeness items an owner told us their place does not offer (venue_not_offered).
+// Owner portal only; nothing public reads it. -> sorted array of item keys.
+function venueNotOffered(venueId) {
+  try { return db.prepare('SELECT item FROM venue_not_offered WHERE venue_id = ? ORDER BY item').all(venueId).map((r) => r.item); } catch (e) { return []; }
+}
+// Research never adds back what the owner said they don't have. The owner's own saves (applyOwnerFields, which sets
+// ownerFieldsWriteDepth while it runs, also for an approval or an Undo of an owner change) are not blocked.
+let ownerFieldsWriteDepth = 0;
+function notOfferedBlocked(venueId, item) {
+  if (ownerFieldsWriteDepth > 0) return false;
+  try { return !!db.prepare('SELECT 1 FROM venue_not_offered WHERE venue_id = ? AND item = ?').get(venueId, item); } catch (e) { return false; }
+}
+const NOT_OFFERED_BLOCK = (item) => ({ ok: false, reason: 'owner_marked_not_offered', detail: `the owner told us they don't offer this (${item}); research doesn't add it back` });
+// Which "not offered" item a researched badge belongs to.
+const NOT_OFFERED_BADGE_ITEM = { vegan: 'dietary', vegetarian: 'dietary', gluten_free: 'dietary', live_music: 'entertainment', sports_tv: 'entertainment', happy_hour: 'happy_hour' };
 // Replaces (or clears, with avgSpend null) a venue's average spend: compare-and-set on expectedCurrent
 // (GET /admin/avg-spend/:id), reason + batch_id required, logged in venue_enrichment_log as 'avg_spend'.
 // -> { ok, changed, info } | { ok: false, reason, detail, live }
@@ -10141,6 +10170,7 @@ function guardedWeeklyNightsUpdate(id, expectedCurrent, input, meta, now = new D
   }
   const existing = db.prepare('SELECT id, type, redirect_to FROM venues WHERE id = ?').get(id);
   const v = input || {};
+  if (v.nights !== null && notOfferedBlocked(id, 'entertainment')) return NOT_OFFERED_BLOCK('entertainment');
   let next = [];
   if (v.nights !== null) {
     const checked = validateWeeklyNights(v.nights, { source: v.source_url, checked_at: v.checked_at, ...(existing ? { type: existing.type } : {}) }, now);
@@ -43735,7 +43765,7 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered'];
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
 const OWNER_NOTHING_NEW_WAITING = 'Your earlier changes are already waiting for review. There is nothing new to send.';
 // Price range (2026-10-18): the owner picks one, per person.
@@ -43744,6 +43774,10 @@ const OWNER_PRICE_SCALE_FR = { 1: 'moins de 15 $', 2: '15 à 30 $', 3: '30 à 60
 // Average spend per person (2026-11-08): restaurants and pubs (portalFields(type).avgSpend). Whole dollars, 5 to 300.
 // The owner's number goes live at once (edit link or login: it is one number, and Undo puts the old one back), is stored
 // with source 'owner' and today's date, and is never replaced by research afterwards.
+const OWNER_NOT_OFFERED_ERRORS = {
+  unreadable: 'Some of the information could not be read. Please reload the page and try again.',
+  has: 'Your page already shows this. To say you don’t have it, remove it from your page first, then try again.',
+};
 const OWNER_AVG_SPEND_ERROR = 'Please enter a whole number of dollars from $' + AVG_SPEND_MIN + ' to $' + AVG_SPEND_MAX + ', like 25.';
 const OWNER_AVG_SPEND_ERROR_FR = 'Entrez un nombre entier de dollars, de ' + AVG_SPEND_MIN + ' $ à ' + AVG_SPEND_MAX + ' $, par exemple 25.';
 // -> { blank: true } | { amount } | { error }. Accepts 25, "25", "$25", " 25 $ ". Not 25.50, 2,5, 1e2 or 0x19.
@@ -43906,6 +43940,9 @@ function guardedVenueLinkUpdate(id, field, expectedCurrent, value, meta, opts = 
     value = social;
   }
   if (m.source_url != null && !researchLinkValid(m.source_url)) return { ok: false, reason: 'invalid_source_url', detail: 'source_url must be an http(s) URL' };
+  // "We don't have one" (2026-11-08): no Instagram, Facebook or reservations from research once the owner said so.
+  const noneItem = { instagram_url: 'instagram', facebook_url: 'facebook', booking_url: 'pyv_reservations' }[field];
+  if (value !== null && noneItem && notOfferedBlocked(id, noneItem)) return NOT_OFFERED_BLOCK(noneItem);
   const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
   if (!existing) return { ok: false, reason: 'venue_not_found' };
   if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
@@ -44297,6 +44334,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     weekly_nights: venueWeeklyNightsList(venue.id),
     // Average spend per person (2026-11-08): the stored { amount, source, ... } or null; only for the types offered it.
     ...(portalFields(venue.type).avgSpend ? { avg_spend: venueAvgSpend(venue.id) } : {}),
+    // "We don't have one" (2026-11-08): the sorted item keys; only for the types with a completeness list.
+    ...(COMPLETENESS_TYPES.has(venue.type) ? { not_offered: venueNotOffered(venue.id) } : {}),
   };
 }
 // Weekly nights from the owner (2026-10-27): the keys an owner sends for each night (never a source or date).
@@ -44595,6 +44634,24 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount)) changes.avg_spend = { amount: a.amount };
     }
   }
+  // "We don't have one" (2026-11-08): the whole list of items the owner says their place doesn't offer. A new one is
+  // only taken while we hold nothing for it: with a happy hour on the page, "we don't have one" would contradict it, so
+  // the owner removes that first (the edit page does that already) instead of us hiding it from here.
+  if ('not_offered' in input) {
+    const x = input.not_offered;
+    if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
+    else if (!Array.isArray(x) || x.length > portalCompleteness.NONE_MAX || x.some((k) => typeof k !== 'string' || !portalCompleteness.NONE_KEYS.includes(k)) || new Set(x).size !== x.length) {
+      errors.not_offered = OWNER_NOT_OFFERED_ERRORS.unreadable;
+    } else {
+      const next = [...x].sort();
+      const added = next.filter((k) => !(current.not_offered || []).includes(k));
+      if (added.length) {
+        const done = portalCompleteness.doneMap(gatherCompletenessInput(venue, current, happyHourTimes), todayLocal());
+        if (added.some((k) => done[k])) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
+      }
+      if (!errors.not_offered && JSON.stringify(next) !== JSON.stringify(current.not_offered || [])) changes.not_offered = next;
+    }
+  }
   if ('price_range' in input) {
     const raw = input.price_range == null ? '' : String(input.price_range).trim();
     if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
@@ -44691,15 +44748,15 @@ function listOwnerChanges(status = 'pending') {
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
-  avg_spend: 'Average spend per person' };
+  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -44718,6 +44775,10 @@ function ownerValueText(field, value) {
   if (field === 'hours' || field === 'happy_hour') return ownerWeekText(value);
   if (field === 'open_months') return value ? openMonthsText(value) : 'Open all year';
   if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
+  if (field === 'not_offered') {
+    const names = Object.fromEntries(portalCompleteness.ITEMS.map((i) => [i.key, i.en]));
+    return Array.isArray(value) && value.length ? `Doesn't offer: ${value.map((k) => names[k] || k).join(', ')}` : '(none)';
+  }
   if (field === 'avg_spend') return value && Number.isInteger(value.amount) ? `$${value.amount} per person${value.source ? ` (${value.source === 'owner' ? 'owner' : 'our research'}${value.checked_at ? `, ${value.checked_at}` : ''})` : ''}` : '(none)';
   if (field === 'hours_seasons') {
     return Array.isArray(value) && value.length
@@ -50112,6 +50173,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage'],
     a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right.</li><li>Items marked <strong>We’re adding these</strong> can’t be filled in yet. They’ll count once you can.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
     aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact.</li><li>Les éléments sous <strong>Nous ajoutons ceci</strong> ne peuvent pas encore être remplis. Ils compteront dès que ce sera possible.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+  // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
+  { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
+    keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
+    keysFr: ['nous n en avons pas', 'n en avons pas', 'on n en a pas', 'non offert', 'nous n offrons pas', 'ne s applique pas', 'pas applicable', 'pas de site web', 'pas sur instagram', 'pas sur facebook', 'pas de livraison', 'pas de reservations'],
+    a: '<p>Some items in <strong>Still to add</strong> have a second button, like <strong>We don’t have a happy hour</strong> or <strong>We’re not on Instagram</strong>. Tap it and that item counts as done.</p><ul><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Changed your mind? Open the bar, find <strong>You told us you don’t have these</strong> and tap <strong>Undo</strong>.</li><li>Only you see these answers. Nothing about them shows on your public page.</li><li>If your page already shows something (say, happy hour times), remove it from your page first.</li></ul>',
+    aFr: '<p>Certains éléments sous <strong>Reste à ajouter</strong> ont un deuxième bouton, comme <strong>Nous n’avons pas de happy hour</strong> ou <strong>Nous ne sommes pas sur Instagram</strong>. Touchez-le et l’élément compte comme fait.</p><ul><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vous changez d’idée? Ouvrez la barre, trouvez <strong>Vous nous avez dit ne pas avoir ceci</strong> et touchez <strong>Annuler</strong>.</li><li>Vous seul voyez ces réponses. Rien n’en paraît sur votre fiche publique.</li><li>Si votre fiche montre déjà quelque chose (par exemple des heures de happy hour), retirez-le d’abord de votre fiche.</li></ul>' },
   // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
   { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
     keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
@@ -51997,6 +52064,10 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
 // to venue_enrichment_log as 'venue_owner'. Used by approval, by a signed-in owner's instant save (2026-10-18), and
 // by Undo (opts.undo: `values` are the old values; hours get their old provenance back from opts.undoMeta).
 function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(), opts = {}) {
+  ownerFieldsWriteDepth++;
+  try { return applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now, opts); } finally { ownerFieldsWriteDepth--; }
+}
+function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new Date(), opts = {}) {
   const listing = venueListingUrl(venue);
   const applied = [];
   const log = db.prepare(`INSERT INTO venue_enrichment_log
@@ -52013,6 +52084,17 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
         continue;
       }
       if (field === 'happy_hour' || field === 'happy_hour_deals' || field === 'specials' || field === 'weekly_nights' || field === 'avg_spend') continue; // same reason; written below
+      // "We don't have one" (2026-11-08): the stored list becomes exactly this one (an Undo puts the old list back).
+      if (field === 'not_offered') {
+        const before = venueNotOffered(venue.id);
+        const next = Array.isArray(value) ? [...new Set(value.filter((k) => portalCompleteness.NONE_KEYS.includes(k)))].sort() : [];
+        db.prepare('DELETE FROM venue_not_offered WHERE venue_id = ?').run(venue.id);
+        const ins = db.prepare('INSERT INTO venue_not_offered (venue_id, item) VALUES (?, ?)');
+        for (const k of next) ins.run(venue.id, k);
+        log.run(venue.id, 'not_offered', before.length ? JSON.stringify(before) : null, next.length ? JSON.stringify(next) : null, meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
@@ -52157,7 +52239,8 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
 const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights']);
 // Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
 // address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend']);
+// "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -52171,6 +52254,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'specials') return sameSpecials(a || null, b || null);
   if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
   if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
+  if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -53206,7 +53290,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas' };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -53296,6 +53380,9 @@ function ownerActivityHtml(items, lang = 'en', now = new Date()) {
 // -> 'YYYY-MM-DD HH:MM:SS' (UTC) | null
 // Claimed (2026-10-22): a business that already manages its listing -- a login on it, an approved claim, or an owner
 // update or photo that went live. Its page stops showing visitors "Claim this listing".
+// An owner change that is only "we don't have one" answers (2026-11-08) is private to the portal: it doesn't make the
+// listing claimed or Verified, or give it a "Last updated" date.
+const OWNER_CHANGE_PUBLIC_SQL = "(NOT EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key = 'not_offered') OR EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key != 'not_offered'))";
 function venueIsClaimed(venueId) {
   try {
     return !!(db.prepare('SELECT 1 FROM owner_account_venues WHERE venue_id = ? LIMIT 1').get(venueId)
@@ -53309,7 +53396,7 @@ function claimedVenueIds() {
   const ids = new Set();
   for (const sql of ['SELECT DISTINCT venue_id FROM owner_account_venues',
     "SELECT DISTINCT venue_id FROM venue_claims WHERE status = 'approved'",
-    "SELECT DISTINCT venue_id FROM owner_change_requests WHERE status = 'approved'",
+    `SELECT DISTINCT venue_id FROM owner_change_requests WHERE status = 'approved' AND ${OWNER_CHANGE_PUBLIC_SQL}`,
     "SELECT DISTINCT venue_id FROM owner_photos WHERE status = 'approved'"]) {
     try { for (const r of db.prepare(sql).all()) if (r.venue_id != null) ids.add(r.venue_id); } catch (e) { /* table not there yet */ }
   }
@@ -53317,7 +53404,7 @@ function claimedVenueIds() {
 }
 function ownerLastUpdatedAt(venueId) {
   const row = db.prepare(`SELECT MAX(t) AS t FROM (
-    SELECT submitted_at AS t FROM owner_change_requests WHERE venue_id = ? AND status = 'approved'
+    SELECT submitted_at AS t FROM owner_change_requests WHERE venue_id = ? AND status = 'approved' AND ${OWNER_CHANGE_PUBLIC_SQL}
     UNION ALL SELECT submitted_at FROM owner_photos WHERE venue_id = ? AND status = 'approved')`).get(venueId, venueId);
   return (row && row.t) || null;
 }
@@ -53689,6 +53776,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, claimed: venueIsClaimed(venue.id),
+    declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
   };
 }
 
@@ -53734,7 +53822,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const completeOn = COMPLETENESS_TYPES.has(venue.type);
   const completeHtml = completeOn ? portalCompleteness.renderCompleteness(
     portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, happyHourTimes), { today: todayLocal(), pending: waitingFields }),
-    { fr, menuHref: token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`) }) : '';
+    { fr, canDecline: true, menuHref: token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`) }) : '';
   const parseWeek =(json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
@@ -53864,7 +53952,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: avgSpendOn ? OWNER_FIELD_WORDS[fr ? 'fr' : 'en'] : Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => k !== 'avg_spend')),
+    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (k !== 'not_offered' || completeOn))),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -57035,6 +57123,9 @@ const server = http.createServer(async (req, res) => {
       if (!result.found) {
         return sendJSON(res, 404, { error: 'Venue not found.' });
       }
+      if (result.blocked) {
+        return sendJSON(res, 409, { error: 'The owner told us they have no website; nothing was changed.', reason: result.blocked });
+      }
       if (!result.changed) {
         return sendJSON(res, 409, {
           error: 'The venue already has a website; nothing was changed.',
@@ -57167,7 +57258,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Happy hour update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_times: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        const statusMap = { invalid_meta: 400, invalid_times: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
@@ -57210,7 +57301,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Happy hour deals update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_deals: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        const statusMap = { invalid_meta: 400, invalid_deals: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       if (result.changedFields.length) indexNowVenueChanged(req, body.id);
@@ -57256,7 +57347,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Visit info update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_visit: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        const statusMap = { invalid_meta: 400, invalid_visit: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       if (result.changed) indexNowVenueChanged(req, body.id);
@@ -57364,7 +57455,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Specials update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_specials: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        const statusMap = { invalid_meta: 400, invalid_specials: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       if (result.changedFields.length) indexNowVenueChanged(req, body.id);
@@ -57426,7 +57517,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Weekly nights update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_nights: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        const statusMap = { invalid_meta: 400, invalid_nights: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       if (result.changedFields.length) indexNowVenueChanged(req, body.id);
@@ -57485,7 +57576,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 500, { error: 'Venue link update failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
-        const statusMap = { invalid_meta: 400, invalid_field: 400, invalid_expected: 400, invalid_value: 400, invalid_source_url: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_value: 409 };
+        const statusMap = { invalid_meta: 400, invalid_field: 400, invalid_expected: 400, invalid_value: 400, invalid_source_url: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_value: 409, owner_marked_not_offered: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
       if (result.changedFields.length) indexNowVenueChanged(req, body.id);
@@ -60220,7 +60311,7 @@ module.exports = {
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
-  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS,
+  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)

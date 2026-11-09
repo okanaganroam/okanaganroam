@@ -270,11 +270,19 @@ test('no ranking, sorting or indexing code reads the score', () => {
   const defStart = src.indexOf('const COMPLETENESS_TYPES');
   const defEnd = src.indexOf('function renderOwnerPage(', defStart);
   const lines = (i) => src.slice(0, i).split('\n').length;
+  // "We don't have one" (2026-11-08): the owner's own save path also reads the item list (to check, store and describe
+  // the answers). These are owner-portal functions only; none feeds ranking, sorting, indexing or a public page.
+  const ownerFns = ['function validateOwnerChanges', 'function ownerVenueSnapshot', 'function applyOwnerFieldsInner', 'function ownerValueText'].map((name) => {
+    const a = src.indexOf(name);
+    assert.ok(a > 0, `${name} exists`);
+    return [lines(a), lines(src.indexOf('\n}\n', a))];
+  });
   for (const l of uses) {
     const inDef = l >= lines(defStart) && l <= lines(defEnd);
     const inRender = l >= lines(renderFn) && l <= lines(renderEnd);
     const inRequire = l === 20;
-    assert.ok(inDef || inRender || inRequire, `line ${l} uses the score outside the portal edit page`);
+    const inOwnerSave = ownerFns.some(([a, b]) => l >= a && l <= b);
+    assert.ok(inDef || inRender || inRequire || inOwnerSave, `line ${l} uses the score outside the portal edit page`);
   }
   const mod = fs.readFileSync(path.join(__dirname, '..', 'portal-completeness.js'), 'utf8');
   assert.ok(!/require\(/.test(mod), 'the module is pure: no requires, no database');
