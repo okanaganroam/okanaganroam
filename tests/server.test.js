@@ -21859,8 +21859,12 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
       booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: '@links.fixture', facebook_url: 'facebook.com/linksfixture' });
     assert.equal(ok.status, 201, JSON.stringify(ok.body));
     const req = app.getOwnerChange(ok.body.id);
+    // Instagram and Facebook go live straight away (Dayton, 2026-11-09); name, address, menu and booking wait for review.
     assert.deepEqual(req.changes, { name: 'Links Fixture Cafe & Bakery', address: '1475 Fairview Road, Kelowna, BC', menu_url: 'https://linksfixture.ca/menu',
-      booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: 'https://www.instagram.com/links.fixture/', facebook_url: 'https://facebook.com/linksfixture' });
+      booking_url: 'https://www.opentable.ca/r/links-fixture' });
+    assert.deepEqual([...ok.body.live].sort(), ['facebook_url', 'instagram_url']);
+    assert.equal(app.venueLinks(v.id).instagram_url, 'https://www.instagram.com/links.fixture/');
+    assert.equal(app.venueLinks(v.id).facebook_url, 'https://www.facebook.com/linksfixture');
     // Nothing shows until approved.
     let listing = await fetch(`${base}/kelowna/cafes/links-fixture-cafe`).then((r) => r.text());
     assert.doesNotMatch(listing, /See the menu/);
@@ -21869,7 +21873,7 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
     assert.match(review, /check the map pin/);
     assert.match(review, /the page address \(URL\) stays the same/);
-    assert.match(review, /name="instagram_url" value="https:\/\/www\.instagram\.com\/links\.fixture\/"/);
+    assert.doesNotMatch(review, /name="instagram_url"/, 'Instagram went live, so it is not in the review');
     const appr = await post(`/admin/review/change/${ok.body.id}/approve`, {}, { Cookie: cookie });
     assert.equal(appr.status, 200, JSON.stringify(appr.body));
     const row = db.prepare('SELECT name, address, slug FROM venues WHERE id = ?').get(v.id);
@@ -21880,7 +21884,7 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     assert.match(listing, /<h1>Links Fixture Cafe &amp; Bakery<\/h1>|Links Fixture Cafe &amp; Bakery/);
     assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
     assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank" data-track="booking">Book<\/a>/);
-    assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
+    assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/www\.facebook\.com\/linksfixture"/);
     // Listing cards no longer show them (2026-10-29): Instagram and Facebook are on the venue page only.
     const cards = await fetch(`${base}/kelowna/cafes`).then((r) => r.text());
     assert.doesNotMatch(cards, /class="card-social"/);

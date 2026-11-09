@@ -44119,6 +44119,30 @@ function socialLinkFromSubmission(value) {
   const fb = normalizeFacebook(url);
   return fb ? { field: 'facebook_url', url: fb } : null;
 }
+// An owner's Instagram or Facebook link (2026-11-09): these go live straight away, so only a real profile or page is
+// accepted. Instagram: "@handle" or (https://)(www.|m.)instagram.com/<handle>, never a post, reel or the explore page ->
+// https://www.instagram.com/<handle>/. Facebook: (https://)(www.|m.|web.)facebook.com/<page> or profile.php?id=<n>,
+// never a share, login, search, event or group link -> https://www.facebook.com/<page>. Anything else -> null.
+function ownerSocialLink(field, raw) {
+  const v = String(raw || '').trim();
+  if (!v || v.length > 300 || /\s/.test(v)) return null;
+  if (field === 'instagram_url') {
+    const m = /^@([A-Za-z0-9._]{1,30})$/.exec(v) || /^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([A-Za-z0-9._]{1,30})\/?(?:[?#].*)?$/i.exec(v);
+    if (!m || INSTAGRAM_NON_PROFILE.has(m[1].toLowerCase())) return null;
+    return `https://www.instagram.com/${m[1]}/`;
+  }
+  if (field !== 'facebook_url') return null;
+  const m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?facebook\.com(\/[^?#]*)?(\?[^#]*)?(?:#.*)?$/i.exec(v);
+  if (!m) return null;
+  const path = (m[1] || '').replace(/\/+$/, '');
+  if (!path || FACEBOOK_NON_PAGE.test(path)) return null;
+  if (/^\/profile\.php$/i.test(path)) {
+    const id = /[?&]id=(\d{3,25})(?:&|$)/.exec(m[2] || '');
+    return id ? `https://www.facebook.com/profile.php?id=${id[1]}` : null;
+  }
+  if (!/^\/[A-Za-z0-9.\-_]{2,80}(?:\/[A-Za-z0-9.\-_]{1,80}){0,2}$/.test(path)) return null;
+  return `https://www.facebook.com${path}`;
+}
 // "@woodfire.bakery", "woodfire.bakery" or any instagram.com link -> https://www.instagram.com/woodfire.bakery/
 function normalizeInstagram(value) {
   const v = String(value || '').trim();
@@ -44670,9 +44694,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     const raw = typeof input[f] === 'string' ? input[f].trim() : '';
     let url = '';
     if (raw) {
-      url = f === 'instagram_url' ? normalizeInstagram(raw) : f === 'facebook_url' ? normalizeFacebook(raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
+      // Instagram and Facebook go live straight away (Dayton, 2026-11-09), so only a real profile or page is accepted.
+      url = (f === 'instagram_url' || f === 'facebook_url') ? ownerSocialLink(f, raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
       if (!url) {
-        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name, like @yourbusiness.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.' : 'Please check the link, for example yourbusiness.com/menu.';
+        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name with @, like @yourbusiness, or your profile link.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.' : 'Please check the link, for example yourbusiness.com/menu.';
         continue;
       }
     }
@@ -50405,8 +50430,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
     keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'show all', 'see what s done', 'last steps', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
     keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage', 'pointage n a pas monte', 'n a pas monte', 'ne monte pas', 'est ce que ca a marche', 'en attente de notre verification', 'en attente de verification'],
-    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Score didn’t go up?</strong> Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the lighter part of the ring) and count once we approve them, usually within a day.</li><li><strong>Quick ones</strong> come first: each takes a few seconds. The rest are under <strong>When you have a few minutes</strong>; tap <strong>Show all</strong> to see every one, and <strong>See what’s done</strong> for what already counts.</li><li><strong>Photos and your storefront spot</strong> are the last steps to 100% for most places. Do them when you’re at your place with a few minutes.</li><li>Saving any change counts as <strong>Confirmed by you</strong> and adds the Verified mark to your page.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
-    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li><strong>Le pointage n’a pas monté?</strong> Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie plus pâle de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée.</li><li>Les <strong>éléments rapides</strong> viennent en premier : chacun prend quelques secondes. Les autres sont sous <strong>Quand vous aurez quelques minutes</strong>; touchez <strong>Tout afficher</strong> pour tous les voir, et <strong>Voir ce qui est fait</strong> pour ce qui compte déjà.</li><li><strong>Les photos et l’emplacement de votre devanture</strong> sont les dernières étapes vers 100 % pour la plupart des établissements. Faites-les quand vous êtes sur place avec quelques minutes.</li><li>Enregistrer une modification compte comme <strong>Confirmée par vous</strong> et ajoute la mention Vérifiée à votre fiche.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+    a: '<p><strong>Score didn’t go up?</strong> It worked. Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the orange part of the ring) and count once we approve them, usually within a day. The bar says where you’ll land, like “61% now · about 95% once we check your 8 changes”.</p><p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Quick ones</strong> come first: each takes a few seconds. The rest are under <strong>When you have a few minutes</strong>; tap <strong>Show all</strong> to see every one, and <strong>See what’s done</strong> for what already counts.</li><li><strong>Photos and your storefront spot</strong> are the last steps to 100% for most places. Do them when you’re at your place with a few minutes.</li><li>Saving any change counts as <strong>Confirmed by you</strong> and adds the Verified mark to your page.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p><strong>Le pointage n’a pas monté?</strong> Ça a marché. Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie orange de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée. La barre indique où vous arriverez, par exemple « 61 % maintenant · environ 95 % une fois vos 8 modifications vérifiées ».</p><p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li>Les <strong>éléments rapides</strong> viennent en premier : chacun prend quelques secondes. Les autres sont sous <strong>Quand vous aurez quelques minutes</strong>; touchez <strong>Tout afficher</strong> pour tous les voir, et <strong>Voir ce qui est fait</strong> pour ce qui compte déjà.</li><li><strong>Les photos et l’emplacement de votre devanture</strong> sont les dernières étapes vers 100 % pour la plupart des établissements. Faites-les quand vous êtes sur place avec quelques minutes.</li><li>Enregistrer une modification compte comme <strong>Confirmée par vous</strong> et ajoute la mention Vérifiée à votre fiche.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
@@ -51059,6 +51084,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'Please enter your business name (2 to 100 characters).': 'Entrez le nom de votre entreprise (de 2 à 100 caractères).',
   'Please enter the full street address, like 1475 Fairview Rd, Penticton.': 'Entrez l’adresse complète, comme 1475 Fairview Rd, Penticton.',
   'Please enter your Instagram name, like @yourbusiness.': 'Entrez votre nom Instagram, comme @votreentreprise.',
+  'Please enter your Instagram name with @, like @yourbusiness, or your profile link.': 'Entrez votre nom Instagram avec @, comme @votreentreprise, ou le lien de votre profil.',
   'Please enter your Facebook page link, like facebook.com/yourbusiness.': 'Entrez le lien de votre page Facebook, comme facebook.com/votreentreprise.',
   'Please check the link, for example yourbusiness.com/menu.': 'Vérifiez le lien, par exemple votreentreprise.com/menu.',
   'Please pick the first and last month you’re open.': 'Choisissez le premier et le dernier mois où vous êtes ouverts.',
@@ -52530,7 +52556,10 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // link, name or free text either; both are logged, in "Your updates", and have Undo.
 // "Plan your visit" lines (2026-11-08) too, as Dayton asked: plain short text with no links or < >, logged, in "Your
 // updates", with Undo (OWNER_INSTANT_DAILY_LIMIT still applies).
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows']);
+// Instagram and Facebook links (Dayton, 2026-11-09) too, for every type, from a login or the edit link: only a real
+// profile/page passes ownerSocialLink(), they're logged, in "Your updates", with Undo, and research can't replace them.
+// Website, menu and booking links still wait for review.
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -54038,8 +54067,9 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
       <p class="op-hint">${polish && !signedIn
         ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone.')
         : polish ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone. Faites-la glisser pour montrer la meilleure partie.')
-        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
+        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (!(polish && !signedIn) && ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
         ? L('We chose this photo for you. To use one of yours instead, tap <strong>Make main photo</strong> on it below.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, touchez <strong>Choisir comme photo principale</strong> sous celle-ci.')
+        : polish && !signedIn ? L('We chose this photo for you. To use one of yours instead, upload it below; once we’ve checked it, <a href="#opLogin">create a login</a> to make it your main photo, or email us and we’ll do it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous; une fois vérifiée, <a href="#opLogin">créez un compte</a> pour en faire votre photo principale, ou écrivez-nous et nous le ferons.')
         : L('We chose this photo for you. To use one of yours instead, upload it below, then tap <strong>Make main photo</strong> on it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous, puis touchez <strong>Choisir comme photo principale</strong>.'))}</p>
       <div class="op-pos-previews">
         <figure class="op-pos-computer${wide ? ' op-pos-wide' : ''}">${img('')}<figcaption>${L('Computer', 'Ordinateur')}</figcaption></figure>
@@ -54062,7 +54092,9 @@ const OWNER_CUISINE_HOURS_CSS = `
          as you scroll, so Help is a small round "?" at the top right of the page, beside "Owner edit page", and scrolls
          with it. Its name stays "Help" for screen readers; the help panel itself still opens over the page. */
       body.owner-page { position: relative; }
-      body.owner-page .ohb-btn, body.owner-page:has(.op-unsent:not([hidden])) .ohb-btn { position: absolute; top: 88px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; }
+      body.owner-page .ohb-btn, body.owner-page:has(.op-unsent:not([hidden])) .ohb-btn { position: absolute; top: 88px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; z-index: 59; }
+      /* One layer under the sticky site header (z-index 60), so when the page scrolls the "?" slides under the header
+         instead of sitting on top of the menu button (fresh-eyes 3, 2026-11-09). */
       body.owner-page .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
     }
     body.owner-page .op-hours-ok { margin: 12px 0 4px; padding: 12px 14px; background: #EEF5F3; border-radius: 12px; }
@@ -54135,10 +54167,16 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
     });
     // Plan your visit boxes grow with what's typed, and stay one line of text (final fresh-eyes 2026-11-09).
     var NL = String.fromCharCode(10), CR = String.fromCharCode(13);
-    function grow(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    // An empty box is sized to its example (fresh-eyes 3, 2026-11-09: two-line examples were cut in half).
+    function grow(el){
+      el.style.height = 'auto';
+      if (!el.value && el.placeholder) { el.value = el.placeholder; var h = el.scrollHeight; el.value = ''; el.style.height = h + 'px'; return; }
+      el.style.height = el.scrollHeight + 'px';
+    }
     Array.prototype.forEach.call(vin, function(el){
       if (el.tagName !== 'TEXTAREA') return;
       el.addEventListener('keydown', function(e){ if (e.key === 'Enter') e.preventDefault(); });
+      el.addEventListener('focus', function(){ grow(el); });
       el.addEventListener('input', function(){
         if (el.value.indexOf(NL) >= 0 || el.value.indexOf(CR) >= 0) el.value = el.value.split(CR).join(' ').split(NL).join(' ');
         grow(el);
@@ -54147,6 +54185,8 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
     });
     var vd = document.getElementById('visit');
     if (vd) vd.addEventListener('toggle', function(){ Array.prototype.forEach.call(vin, function(el){ if (el.tagName === 'TEXTAREA') grow(el); }); });
+    // Sized once the section is on screen (a box measured while its task view is hidden reads 0).
+    if (window.IntersectionObserver && vd) new IntersectionObserver(function(es){ es.forEach(function(x){ if (x.isIntersecting) Array.prototype.forEach.call(vin, function(el){ if (el.tagName === 'TEXTAREA') grow(el); }); }); }).observe(vd);
     // The floating "not sent yet" bar hides while the form's own Send button is on screen (no two Send buttons at once).
     var sb = document.getElementById('opSubmit');
     if (sb && window.IntersectionObserver) new IntersectionObserver(function(es){ es.forEach(function(x){ document.body.classList.toggle('op-submit-seen', x.isIntersecting); }); }).observe(sb);
@@ -54178,6 +54218,9 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   const deals = live.happy_hour_deals && Array.isArray(live.happy_hour_deals.deals) ? live.happy_hour_deals.deals : [];
   let pendingPhotos = 0;
   try { pendingPhotos = db.prepare("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'").get(venue.id).n; } catch (e) { pendingPhotos = 0; }
+  // A storefront spot sent and waiting for our check (fresh-eyes 3, 2026-11-09).
+  let pendingArrival = false;
+  try { pendingArrival = !hasArrival && !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id); } catch (e) { pendingArrival = false; }
   return {
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
     hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: venueGalleryPhotos(venue).length,
@@ -54188,7 +54231,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     specialsCount: Array.isArray(live.specials) ? live.specials.length : 0, liveMusic: venue.live_music, sportsTv: venue.sports_tv,
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
-    description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, claimed: venueIsClaimed(venue.id),
+    description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
   };
 }
@@ -54219,17 +54262,22 @@ function ownerPendingBadgeNames(live, waitingReq, fr) {
   }
   return on.concat(off.map((n) => (fr ? `${n} (retiré)` : `${n} (removed)`)));
 }
-function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang) {
+// signedIn: a login's own facts go live too (OWNER_INSTANT_FIELDS), so more of them can be quick ones.
+function ownerCompletenessLiveFields(signedIn) {
+  return new Set([...OWNER_LINK_INSTANT_FIELDS, ...(signedIn ? OWNER_INSTANT_FIELDS : [])]);
+}
+function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang, signedIn = false) {
   const fr = lang === 'fr';
   const pending = ownerCompletenessPendingKeys(live, waitingReq);
   const input = gatherCompletenessInput(venue, live, happyHourTimes);
   let week = null;
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
-  return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending }), {
+  return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     fr, canDecline: true,
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
     avgEstimate: input.avgSpendSource === 'research' && !pending.has('avg_spend') ? input.avgSpend : null,
+    avgPublic: avgSpendPublic(),
     // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
     pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
@@ -54240,7 +54288,7 @@ function ownerCompletenessJson(found, token, lang) {
   const live = ownerVenueSnapshot(found.venue, found.happyHourTimes);
   const pending = pendingOwnerChange(found.venue.id);
   const waitingReq = pending ? getOwnerChange(pending.id) : null;
-  return { ok: true, html: ownerA11y(ownerCompletenessHtmlFor(found.venue, live, found.happyHourTimes, waitingReq, token, lang === 'fr' ? 'fr' : 'en')) };
+  return { ok: true, html: ownerA11y(ownerCompletenessHtmlFor(found.venue, live, found.happyHourTimes, waitingReq, token, lang === 'fr' ? 'fr' : 'en', !!found.account)) };
 }
 
 function renderOwnerPage(found, token, pending, lang = 'en') {
@@ -54286,15 +54334,16 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // Every block says whether it goes live now or is checked first (final fresh-eyes 2026-11-09), like cuisine and Plan
   // your visit do. kind: 'own' (the owner's own facts: live on Save for a login, checked first from the edit link),
   // 'link' (a new name, address, website or link: always checked first), 'photos'. Restaurants only (completeOn).
-  const saveLine = (kind, task) => {
+  // fields: what the block sends, so after a send its line turns into "Sent Nov 9 · waiting for our check" (fresh-eyes 3).
+  const saveLine = (kind, task, fields) => {
     if (!completeOn) return '';
     const live = instantOn && kind !== 'link';
     const text = kind === 'photos'
       ? (instantOn ? L('Goes live as soon as you upload.', 'En ligne dès le téléversement.') : L('Sent to us to check, usually within a day.', 'Envoyé pour vérification, habituellement en moins d’une journée.'))
       : live ? L('Goes live when you press Save changes.', 'En ligne quand vous touchez Enregistrer les modifications.')
-        : kind === 'link' ? L('Checked first, usually within a day. Press Send changes when you’re done.', 'Vérifié d’abord, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.')
+        : kind === 'link' ? L('Checked first, usually within a day (Instagram and Facebook go live straight away). Press Send changes when you’re done.', 'Vérifié d’abord, habituellement en moins d’une journée (Instagram et Facebook sont en ligne tout de suite). Touchez Envoyer les modifications quand vous avez terminé.')
           : L('Sent to us to check, usually within a day. Press Send changes when you’re done.', 'Envoyé pour vérification, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.');
-    return `<p class="op-save-line ${live || (kind === 'photos' && instantOn) ? 'op-save-live' : 'op-save-check'}"${task ? ` data-task="${task}"` : ''}>${text}</p>`;
+    return `<p class="op-save-line ${live || (kind === 'photos' && instantOn) ? 'op-save-live' : 'op-save-check'}"${task ? ` data-task="${task}"` : ''}${fields ? ` data-fields="${fields}"` : ''}>${text}</p>`;
   };
   // Price range sits inside the average-spend section for restaurants (polish 2026-11-08), so owners aren't asked "what
   // does one person spend" twice. Still editable there; never derived from average spend automatically (see PR).
@@ -54342,6 +54391,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         <p class="op-hint" id="opCuisineNote">${L('It shows on your page and helps people find you when they search by food. Not on the list? Tell us in &ldquo;Anything else?&rdquo; below.', 'Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine. Pas dans la liste? Dites-le-nous dans « Autre chose? » plus bas.')}</p>
         <p class="lyv-error" id="opCuisineError" hidden></p>
         <p class="op-hint" id="opCuisineDone" role="status" hidden></p>
+        <button type="button" class="op-more op-cb-back" data-pick="" data-cb-back="1">${L('Done, back to my list', 'Terminé, retour à ma liste')}</button>
       </div></div>
       </details>`;
   };
@@ -54381,9 +54431,10 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button> <span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span>
       <p class="lyv-error" id="opVisitError" hidden></p>
       <p class="op-hint op-visit-done" id="opVisitDone" role="status" hidden></p>
+      <button type="button" class="op-more op-cb-back" data-pick="" data-cb-back="1">${L('Done, back to my list', 'Terminé, retour à ma liste')}</button>
       </details>`;
   };
-  const completeHtml = completeOn ? ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang) : '';
+  const completeHtml = completeOn ? ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token, lang, !!found.account) : '';
   const parseWeek =(json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
@@ -54478,7 +54529,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
             <span class="op-second"${w[1] ? '' : ' hidden'}>${L('and', 'et')} <input type="time" class="op-t" data-i="2" value="${escapeHtml(w2[0])}" aria-label="${L(`${dayLabel(d)} second range from`, `${dayLabel(d)}, deuxième plage, de`)}"> ${L('to', 'à')}
             <input type="time" class="op-t" data-i="3" value="${escapeHtml(w2[1])}" aria-label="${L(`${dayLabel(d)} second range until`, `${dayLabel(d)}, deuxième plage, jusqu’à`)}"></span>
             <button type="button" class="op-add"${w[1] ? ' hidden' : ''}>${L('+ second time', '+ deuxième plage')}</button>
-          </span>${d === 'mon' ? `
+          </span>${prefix === 'happy' && completeOn ? `
+          <span class="op-copy-row">${L('Copy this day to:', 'Copier ce jour sur :')} <button type="button" data-copy-from="weekdays">${L('Mon&ndash;Fri', 'lun.&ndash;ven.')}</button> <button type="button" data-copy-from="all">${L('every day', 'tous les jours')}</button></span>` : ''}${d === 'mon' && !(prefix === 'happy' && completeOn) ? `
           <span class="op-copy">${L('Copy Monday to:', 'Copier le lundi sur :')} <button type="button" data-copy="weekdays">${L('Tue&ndash;Fri', 'mar.&ndash;ven.')}</button> <button type="button" data-copy="all">${L('every day', 'tous les jours')}</button></span>` : ''}
         </div>`;
   }).join('');
@@ -54524,13 +54576,16 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonMonths: L('Please pick two different months, or choose Open all year.', 'Choisissez deux mois différents, ou Ouvert toute l’année.'),
     happyBoth: L('Please fill in both times for each happy hour.', 'Indiquez les deux heures pour chaque happy hour.'),
     liveNow: L('Live now: {fields}. Your page shows it straight away. ', 'En ligne maintenant : {fields}. Votre page l’affiche tout de suite. '),
+    ...(completeOn ? { sentLine: L('Sent {date} · waiting for our check', 'Envoyé le {date} · en attente de notre vérification'), locale: L('en-CA', 'fr-CA') } : {}),
     review: L('We\u2019ll review this within a day: {fields}. ', 'Nous vérifierons ceci d’ici un jour : {fields}. '),
     saved: L('Saved. ', 'Enregistré. '),
     fix: L('Please fix the highlighted fields.', 'Corrigez les champs indiqués.'),
     wrong: L('Sorry, something went wrong. Please try again.', 'Désolés, un problème est survenu. Veuillez réessayer.'),
     sendNet: L('Could not send. Please check your connection and try again.', 'Envoi impossible. Vérifiez votre connexion Internet et réessayez.'),
     ...(avgSpendOn ? {
-      avgThanks: L('Thanks! Your page now shows {amount} as the average spend per person.', 'Merci! Votre page affiche maintenant {amount} comme dépense moyenne par personne.'),
+      // Only claim the page shows it when it does (fresh-eyes 3, 2026-11-09): hidden publicly while AVG_SPEND_PUBLIC is off.
+      avgThanks: avgSpendPublic() ? L('Thanks! Your page now shows {amount} as the average spend per person.', 'Merci! Votre page affiche maintenant {amount} comme dépense moyenne par personne.')
+        : L('Thanks! Saved {amount} as the average spend per person. It’ll show on your page soon.', 'Merci! {amount} est enregistré comme dépense moyenne par personne. Cela s’affichera bientôt sur votre fiche.'),
       avgOwnerHint: L('{amount}, set by you', '{amount}, indiqué par vous'),
       avgBad: L(OWNER_AVG_SPEND_ERROR, OWNER_AVG_SPEND_ERROR_FR),
     } : {}),
@@ -54817,7 +54872,7 @@ ${renderGolfHeaderHtml()}
     <form class="venue-form" id="opForm" novalidate>
       <details class="op-fold op-sec" id="hours" data-task="hours" open>
       <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
-      ${saveLine('own')}<p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
+      ${saveLine('own', '', 'hours open_months hours_seasons closures')}<p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}
       ${(() => {
@@ -54837,40 +54892,41 @@ ${renderGolfHeaderHtml()}
       ${ownerClosuresHtml(snap.closures || [], waitChip('closures'), lang)}
       </details>
 
-      <p class="lyv-section-label" data-task="contact">${L('Contact', 'Coordonnées')}</p>${saveLine(instantOn ? 'own' : 'own', 'contact')}
+      <p class="lyv-section-label" data-task="contact">${L('Contact', 'Coordonnées')}</p>${saveLine('own', 'contact', 'phone')}
       <div class="form-row" data-task="contact">
         <div class="form-field"><label for="opPhone">${L('Phone', 'Téléphone')}${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
-        <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
+        <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="text" inputmode="url" spellcheck="false" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
       <details class="op-fold" id="opLinksBox" data-task="contact"${portalFields(venue.type).bookingFirst && !snap.booking_url ? ' open' : ''}>
       <summary><span class="lyv-section-label">${portalFields(venue.type).bookingFirst ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${portalFields(venue.type).bookingFirst ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
-      ${saveLine('link')}<div class="form-row">
+      ${saveLine('link', '', 'name address website menu_url booking_url')}<div class="form-row">
         ${instantOn ? `<p class="op-hint" style="grid-column:1/-1;margin:0">${L('We check a new name, address or link before it goes live, usually within a day.', 'Nous vérifions un nouveau nom, une nouvelle adresse ou un nouveau lien avant sa mise en ligne, en général d’ici un jour.')}</p>` : ''}
         <div class="form-field"><label for="opBizName">${L('Business name', 'Nom de l’entreprise')}${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
         <div class="form-field"><label for="opAddress">${L('Street address', 'Adresse')}${waitChip('address')}</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label for="opMenu">${L('Menu link (optional)', 'Lien du menu (facultatif)')}</label><input type="url" id="opMenu" maxlength="300" placeholder="${L('yourbusiness.com/menu', 'votreentreprise.com/menu')}" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
-        <div class="form-field"><label for="opBooking">${L('Booking or tickets link (optional)', 'Lien de réservation ou de billets (facultatif)')}</label><input type="url" id="opBooking" maxlength="300" placeholder="opentable.ca/…" autocapitalize="off" value="${escapeHtml(snap.booking_url)}"><p class="lyv-error" id="opBookingError" hidden></p></div>
+        <div class="form-field"><label for="opMenu">${L('Menu link (optional)', 'Lien du menu (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opMenu" maxlength="300" placeholder="${L('yourbusiness.com/menu', 'votreentreprise.com/menu')}" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
+        <div class="form-field"><label for="opBooking">${L('Booking or tickets link (optional)', 'Lien de réservation ou de billets (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opBooking" maxlength="300" placeholder="opentable.ca/…" autocapitalize="off" value="${escapeHtml(snap.booking_url)}"><p class="lyv-error" id="opBookingError" hidden></p></div>
       </div>
       <div class="form-row">
         <div class="form-field"><label for="opInstagram">${L('Instagram (optional)', 'Instagram (facultatif)')}</label><input type="text" id="opInstagram" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
-        <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="url" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
+        <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
       </div>
       </details>
 
       <p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description${waitChip('description')}</p>
-      ${saveLine('own', 'contact')}<div class="form-row full" data-task="contact"><div class="form-field">
+      ${saveLine('own', 'contact', 'description')}<div class="form-row full" data-task="contact"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">${L(`A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui rend votre endroit intéressant. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
-        <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
+        <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>${completeOn ? `
+        <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('{n}/{min} ✓ long enough for your score', '{n}/{min} ✓ assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
 ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
       <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const on = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)); const n = on.length; const nm = on.slice(0, 2).map((f) => (fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)); return n ? L(`${n} ticked: ${nm.join(', ')}${n > 2 ? ' and more' : ''}`, `${n} coché${n === 1 ? '' : 's'} : ${nm.join(', ')}${n > 2 ? ' et plus' : ''}`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
-      ${saveLine('own')}<p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
+      ${saveLine('own', '', 'badges')}<p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
@@ -54884,10 +54940,11 @@ ${priceFieldHtml}      </details>`}${!avgSpendOn ? '' : `
       <div class="form-row full"><div class="form-field">
         <label for="opAvg">${L('About how much does one person spend? (one main and a non-alcoholic drink)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool)')}</label>
         <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="numeric" min="${AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="1" autocomplete="off" value="${avgNow ? avgNow.amount : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
-        <p class="op-hint" id="opAvgNote">${L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`)}${completeOn ? ` <span class="op-live-note">${L('Goes live as soon as you save it.', 'En ligne dès que vous l’enregistrez.')}</span>` : ''}</p>
+        <p class="op-hint" id="opAvgNote">${avgSpendPublic() ? L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`) : L(`A whole number of dollars, like 25. Leave it blank to keep what we have now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous avons.`)}${completeOn ? ` <span class="op-live-note">${avgSpendPublic() ? L('Goes live as soon as you save it.', 'En ligne dès que vous l’enregistrez.') : L('Saved as soon as you tap Save. It’ll show on your page soon.', 'Enregistré dès que vous touchez Enregistrer. Cela s’affichera bientôt sur votre fiche.')}</span>` : ''}</p>
         <p class="lyv-error" id="opAvgError" hidden></p>
         ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
-        <p class="op-hint" id="opAvgDone" role="status" hidden></p>
+        <p class="op-hint" id="opAvgDone" role="status" hidden></p>${completeOn ? `
+        <button type="button" class="op-more op-cb-back" data-pick="" data-cb-back="1">${L('Done, back to my list', 'Terminé, retour à ma liste')}</button>` : ''}
       </div></div>${priceInSpend ? `
       <details class="op-price-sub" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
       <summary><span id="opPriceLabel">${L('Price level on your page', 'Niveau de prix sur votre fiche')}${waitChip('price_range')}</span> <span class="op-fold-hint">${priceHint}</span></summary>
@@ -54896,8 +54953,8 @@ ${priceFieldHtml}      </details>` : ''}
       ${showHappyHour ? `
       <details class="op-fold op-sec" id="happy" data-task="happy more">
       <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? L(`Set for ${n} day${n === 1 ? '' : 's'}`, `Indiqué pour ${n} jour${n === 1 ? '' : 's'}`) : L('Not set', 'Non indiqué'); })()}</span></summary>
-      ${saveLine('own')}<p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
-      <div id="opHappy">${dayRows('happy', hh, false)}</div>
+      ${saveLine('own', '', 'happy_hour happy_hour_deals')}<p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
+      <div id="opHappy"${completeOn ? ' class="op-hh-stable"' : ''}>${dayRows('happy', hh, false)}</div>
       <p class="lyv-error" id="opHappyError" hidden></p>
       <p class="lyv-section-label op-deals-label" id="opDealsLabel">${L('Deals', 'Spéciaux')}${waitChip('happy_hour_deals')}</p>
       <p class="op-hint">${L(`What&rsquo;s on special during happy hour, up to ${HH_DEALS_MAX}: what it is and the price, as you&rsquo;d write it (&ldquo;House pints (20 oz)&rdquo; &middot; &ldquo;$6&rdquo;, or &ldquo;Appies&rdquo; &middot; &ldquo;half price&rdquo;). We show them under your happy hour times and on the map. Leave out links, phone numbers and emoji. Clear every row to remove them.`, `Ce qui est en spécial pendant le happy hour, jusqu’à ${HH_DEALS_MAX} : ce que c’est et le prix, comme vous l’écririez (« Pintes maison (20 oz) » · « 6 $ », ou « Bouchées » · « moitié prix »). Nous les affichons sous vos heures de happy hour et sur la carte. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les lignes pour les retirer.`)}</p>
@@ -54910,16 +54967,18 @@ ${priceFieldHtml}      </details>` : ''}
       ${showSpecials ? `
       <details class="op-fold op-sec" id="specials" data-task="more"${waitingFields.has('specials') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opSpecialsLabel">${L('Weekly specials', 'Spéciaux de la semaine')}${waitChip('specials')}</span> <span class="op-fold-hint">${specialsNow.length ? L(`${specialsNow.length} special${specialsNow.length === 1 ? '' : 's'}`, `${specialsNow.length} spécia${specialsNow.length === 1 ? 'l' : 'ux'}`) : L('None yet', 'Aucun pour l’instant')}</span></summary>
-      ${saveLine('own')}<p class="op-hint">${specialsAlcohol
+      ${saveLine('own', '', 'specials')}${completeOn ? `<p class="op-hint">${L(`Deals on a day of the week, like &ldquo;Wing Wednesday&rdquo;. Tick the days and fill in each box.`, `Des offres un jour de la semaine, comme « Mercredi des ailes ». Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${specialsAlcohol
         ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and karaoke go under Weekly nights. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et le karaoké vont sous Soirées de la semaine. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
-        : L(`Food deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Soup Monday&rdquo; &middot; &ldquo;$5 soup and a roll&rdquo;, or &ldquo;Kids eat free&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres de nourriture un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Lundi soupe » · « Soupe et pain à 5 $ », ou « Les enfants mangent gratuitement »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
+        : L(`Food deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Soup Monday&rdquo; &middot; &ldquo;$5 soup and a roll&rdquo;, or &ldquo;Kids eat free&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres de nourriture un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Lundi soupe » · « Soupe et pain à 5 $ », ou « Les enfants mangent gratuitement »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${specialsAlcohol
+        ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and karaoke go under Weekly nights. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et le karaoké vont sous Soirées de la semaine. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
+        : L(`Food deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Soup Monday&rdquo; &middot; &ldquo;$5 soup and a roll&rdquo;, or &ldquo;Kids eat free&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres de nourriture un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Lundi soupe » · « Soupe et pain à 5 $ », ou « Les enfants mangent gratuitement »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opSpecials" role="group" aria-labelledby="opSpecialsLabel">${specialRows()}</div>
       <p class="lyv-error" id="opSpecialsError" hidden></p>
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
-      ${saveLine('own')}<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
+      ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
@@ -54927,7 +54986,7 @@ ${priceFieldHtml}      </details>` : ''}
       <p class="lyv-section-label" data-task="hours contact happy more all">${L('Anything else?', 'Autre chose?')}</p>
       <div class="form-row${completeOn && !instantOn ? ' op-send-extra' : ''}" data-task="hours contact happy more all">
         <div class="form-field"><label for="opName">${completeOn ? L('Your name (optional)', 'Votre nom (facultatif)') : L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
-        ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
+        ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${completeOn ? L('Add your email and we&rsquo;ll tell you when it&rsquo;s live. Leave it blank and we won&rsquo;t email you.', 'Ajoutez votre courriel et nous vous dirons quand ce sera en ligne. Laissez-le vide et nous ne vous écrirons pas.') : L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full" data-task="hours contact happy more all"><div class="form-field">
         <label for="opNote">${L('Note for us (optional)', 'Note pour nous (facultatif)')}</label>
@@ -54937,7 +54996,7 @@ ${priceFieldHtml}      </details>` : ''}
       <p class="lyv-error" id="opFormError" hidden></p>
       ${completeOn && !instantOn ? `<p class="op-hint op-send-extra op-check-note" data-task="hours contact happy more all">${L('Sent to us to check, usually within a day.', 'Envoyé pour vérification, habituellement en moins d’une journée.')}</p>` : ''}<button type="submit" class="venue-form-submit${completeOn && !instantOn ? ' op-send-extra' : ''}" id="opSubmit" data-task="hours contact happy more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
     </form>
-    <div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
+    ${completeOn ? `<p class="op-toast" id="opToast" role="status" hidden></p>` : ''}<div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
       <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>
       <button type="button" class="op-more" data-pick="">${L('Back to the list', 'Retour à la liste')}</button>${found.account || viewer ? '' : `
       <span class="op-done-login" id="opDoneLogin">${L('<strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.', '<strong>Plus besoin du lien la prochaine fois :</strong> <a href="#opLogin">créez un compte</a>. Ça prend 30 secondes.')}</span>`}</div>
@@ -54952,7 +55011,7 @@ ${priceFieldHtml}      </details>` : ''}
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
         <label for="ofFiles">${L('Choose photos', 'Choisir des photos')}</label>
-        <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp" multiple>
+        <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp" multiple>${completeOn ? `<div class="op-file-previews" id="ofPreviews" aria-live="polite"></div>` : ''}
         <p class="lyv-error" id="ofFilesError" hidden></p>
       </div></div>
       <div class="form-row">
@@ -55383,7 +55442,11 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           shareEmail(emailVal('opEmail'));
           // Instant saves (2026-10-18): say what is live now and what still waits for review.
           var liveF = r.body.live || [], revF = r.body.review || [];
-          if (INSTANT${avgSpendOn ? ' || liveF.length' : ''}) {
+          // The thanks starts from its first wording each time (a live Instagram save, then a send that only waits for
+          // review, used to keep saying "Live now: Instagram").
+          var dtx = document.getElementById('opDoneText'); if (!dtx.hasAttribute('data-first')) dtx.setAttribute('data-first', dtx.textContent);
+          dtx.textContent = dtx.getAttribute('data-first');
+          if (INSTANT || liveF.length) {
             var msg = '';
             if (liveF.length) msg += T.liveNow.replace('{fields}', fieldList(liveF));
             if (revF.length) msg += T.review.replace('{fields}', fieldList(revF));
@@ -55395,7 +55458,17 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           if (changes.avg_spend) { initial.avg_spend = { amount: Number(changes.avg_spend), source: 'owner' }; avgSaved(changes.avg_spend); document.getElementById('opAvgDone').hidden = true; }` : ''}
           setListingDirty(false);${completeOn ? `
           // Final fresh-eyes (2026-11-09): what was just sent moves to "Waiting for our check" on the card right away.
-          if (window.opCbRefresh) window.opCbRefresh('');` : ''}
+          if (window.opCbRefresh) window.opCbRefresh('');
+          // Fresh-eyes 3 (2026-11-09): each block just sent says so ("Sent Nov 9 · waiting for our check"), and the thanks
+          // shows at the top of the screen, where the owner is looking (it used to land off screen from the list).
+          if (revF.length) Array.prototype.forEach.call(document.querySelectorAll('.op-save-check[data-fields]'), function(p){
+            if (p.getAttribute('data-fields').split(' ').some(function(f){ return revF.indexOf(f) >= 0; })) {
+              p.textContent = T.sentLine.replace('{date}', new Date().toLocaleDateString(T.locale, { month: 'short', day: 'numeric' }));
+              p.className = 'op-save-line op-save-sent';
+            }
+          });
+          var tt = document.getElementById('opToast');
+          if (tt) { tt.textContent = document.getElementById('opDoneText').textContent; tt.hidden = false; clearTimeout(window.opToastT); window.opToastT = setTimeout(function(){ tt.hidden = true; }, 8000); }` : ''}
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
@@ -60924,7 +60997,7 @@ module.exports = {
   undoOwnerInstantChange,
   recentInstantOwnerChanges,
   pendingOwnerChange,
-  OWNER_INSTANT_FIELDS,
+  OWNER_INSTANT_FIELDS, ownerSocialLink, ownerCompletenessLiveFields,
   publishPendingOwnerInstant,
   ownerAccessCountText,
   hoursWithExtras,
