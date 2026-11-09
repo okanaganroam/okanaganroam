@@ -83,6 +83,10 @@ const SECONDS = {
 if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
+// Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
+// so an owner can raise the score in under a minute; the longer jobs are offered for "when you have a few minutes".
+const QUICK_SECONDS = 30;
+const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
   if (!keys.size) return 0;
@@ -170,7 +174,10 @@ function scoreCompleteness(input, opts) {
   // Biggest first, then the order of the spec.
   missing.sort((x, y) => (x.waiting - y.waiting) || (y.w - x.w));
   const declined = ITEMS.filter((it) => none.has(it.key) && !done[it.key] && !na[it.key]).map((it) => ({ ...it }));
-  return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing) };
+  const quick = missing.filter(isQuick).sort((x, y) => (SECONDS[x.key] - SECONDS[y.key]) || (y.w - x.w));
+  const later = missing.filter((it) => !isQuick(it));
+  const quickSeconds = quick.reduce((a, it) => a + SECONDS[it.key], 0);
+  return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing), quick, later, quickSeconds };
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -184,12 +191,16 @@ function renderCompleteness(result, opts) {
   const left = r.missing.length;
   const gName = new Map(GROUPS.map((g) => [g.key, fr ? g.fr : g.en]));
   const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
+  // Never a big total up front: lead with what takes under a minute or two (2026-11-08).
+  const quick = r.quick || [], later = r.later || r.missing;
+  const nq = quick.length;
+  const qMin = Math.ceil((r.quickSeconds || 0) / 60);
+  const qTime = qMin <= 1 ? L('under a minute', 'moins d’une minute') : L(`about ${qMin} minutes`, `environ ${qMin} min`);
   const sub = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
-    : r.minutes
-      ? L(`${left} ${left === 1 ? 'thing' : 'things'} left, about ${r.minutes} ${r.minutes === 1 ? 'minute' : 'minutes'}. Tap to see what.`,
-        `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'}, environ ${r.minutes} min. Touchez pour voir lesquels.`)
-      : L(`${left} ${left === 1 ? 'thing' : 'things'} left. Tap to see what.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'}. Touchez pour voir lesquels.`);
+    : nq
+      ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}. Touchez pour commencer.`)
+      : L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes. Touchez pour voir.`);
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -202,7 +213,9 @@ function renderCompleteness(result, opts) {
   const noneBtn = (it) => (o.canDecline && it.noneEn && !it.waiting
     ? `<button type="button" class="op-cb-none" data-cb-none="${esc(it.key)}">${esc(fr ? it.noneFr : it.noneEn)}</button>` : '');
   const row = (it) => `<li class="op-cb-row"><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><div class="op-cb-txt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${esc(fr ? it.whyFr : it.whyEn)}</span></div><div class="op-cb-act"><span class="op-cb-pts">+${it.w}</span>${btn(it)}</div>${noneBtn(it) ? `<div class="op-cb-alt">${noneBtn(it)}</div>` : ''}</li>`;
-  const still = r.missing.length ? `<h3>${L('Still to add', 'Reste à ajouter')}</h3><ul class="op-cb-list">${r.missing.map(row).join('')}</ul>` : '';
+  const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
+  const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.map(row).join('')}</ul>` : '';
+  const still = quickHtml + laterHtml;
   // Items the owner can't fill in yet but CAN already say they don't offer (Reservations, Takeout) get their own short
   // list, so "You can't fill these in yet" never sits next to a button that does something (2026-11-08).
   const comingAsk = r.coming.filter((it) => noneBtn(it));
@@ -215,8 +228,10 @@ function renderCompleteness(result, opts) {
   // Next to the edit-page fields: the same button, placed by the page script under each field it fills.
   const inline = o.canDecline ? r.missing.filter((it) => it.noneEn && !it.waiting && it.target && it.target.id).map((it) => ({ key: it.key, id: it.target.id, label: fr ? it.noneFr : it.noneEn })) : [];
   const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}"` : '';
-  return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}>
+  const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
+  return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}>
       <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span>${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <p class="op-cb-yay" id="opCbYay" role="status" hidden></p>
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
         ${still}
@@ -273,6 +288,8 @@ const COMPLETENESS_CSS = `
     body.owner-page .op-cb-declined li:first-child { border-top: 0; }
     body.owner-page .op-cb-dtxt strong { display: block; font-weight: 800; }
     body.owner-page .op-cb-dtxt span { display: block; color: #1E6B3A; font-size: .88rem; font-weight: 800; }
+    body.owner-page .op-cb-lead { margin: 0 0 6px; }
+    body.owner-page .op-cb-yay { margin: 0 16px 14px; padding: 10px 12px; border-radius: 10px; background: #E7F3EC; color: #1E6B3A; font-weight: 800; }
     body.owner-page .op-cb-err { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: #FBE9E7; color: #8A2A1B; font-weight: 700; }
     @media (min-width: 900px) { body.owner-page .op-cb-row { grid-template-columns: 36px 1fr auto; align-items: center; } body.owner-page .op-cb-act { grid-column: 3; } }`;
 
@@ -292,6 +309,16 @@ const COMPLETENESS_SCRIPT = `
     // "We don't have one" (2026-11-08): saves the whole list (it goes live at once, like the average spend), then
     // reloads so the score, the panel and the field buttons all start from what is now stored. The panel reopens.
     var sec = document.getElementById('opComplete');
+    // Progress (2026-11-08): when the score went up since this owner last saw the page, say so once.
+    (function(){
+      var y = document.getElementById('opCbYay'); if (!sec || !y) return;
+      var now = Number(sec.getAttribute('data-cb-pct')), lp = location.pathname, key = 'opCbPct:' + (lp.indexOf('/fr/') === 0 ? lp.slice(3) : lp);
+      try {
+        var was = Number(sessionStorage.getItem(key) || localStorage.getItem(key));
+        if (was && now > was) { y.textContent = sec.getAttribute('data-cb-yay').replace('{p}', String(now)); y.hidden = false; }
+        sessionStorage.setItem(key, String(now)); localStorage.setItem(key, String(now));
+      } catch (e) { /* storage off: no message */ }
+    })();
     try { if (sessionStorage.getItem('opCbOpen') === '1') { sessionStorage.removeItem('opCbOpen'); tg.setAttribute('aria-expanded', 'true'); pn.hidden = false; } } catch (e) { /* storage off */ }
     if (!sec || !sec.hasAttribute('data-cb-declared')) return;
     var declared = []; try { declared = JSON.parse(sec.getAttribute('data-cb-declared')) || []; } catch (e) { declared = []; }
@@ -328,4 +355,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, QUICK_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

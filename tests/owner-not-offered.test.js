@@ -87,7 +87,7 @@ test('edit page (restaurant): the buttons show in English and French, never on p
   assert.match(fr, /data-cb-none="pyv_takeout">Ni plats à emporter ni livraison</);
   // Reservations and Takeout sit in "Still to add" with their own boxes (2026-11-08), never under "We're adding these"
   // ("can't fill these in yet"). The "Don't offer these?" list is only for an item with a button but no box.
-  for (const [page, still, soon] of [[p, 'Still to add', 'We’re adding these'], [fr, 'Reste à ajouter', 'Nous ajoutons ceci']]) {
+  for (const [page, still, soon] of [[p, 'id="opCbPanel"', 'We’re adding these'], [fr, 'id="opCbPanel"', 'Nous ajoutons ceci']]) {
     const a = page.indexOf(still), s = page.indexOf(soon);
     assert.ok(a >= 0 && s > a, 'both lists present');
     const soonPart = page.slice(s);

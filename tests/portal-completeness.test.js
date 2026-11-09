@@ -142,7 +142,7 @@ test('render: ring, headline, missing rows with buttons, done groups, the "only 
   assert.match(en, new RegExp(`Your page is ${r.pct}% complete`));
   assert.match(en, /id="opCbToggle"[^>]*aria-expanded="false"/);
   assert.match(en, /id="opCbPanel" hidden/);
-  assert.match(en, /Still to add/); assert.match(en, /Done so far/);
+  assert.match(en, /Quick ones|When you have a few minutes/); assert.match(en, /Done so far/);
   assert.match(en, /data-cb-task="photos" data-cb-id="photos">Add photos</);
   assert.match(en, /data-cb-task="contact" data-cb-id="opInstagram">Add Instagram</);
   assert.match(en, /Only you see this score\. It never changes where you show up in search\./);
@@ -151,7 +151,7 @@ test('render: ring, headline, missing rows with buttons, done groups, the "only 
   assert.match(fr, /Vous seul voyez ce pointage/);
   assert.match(fr, />Ajouter des photos</);
   const done = pc.renderCompleteness(score({}), {});
-  assert.match(done, /Your page is complete/); assert.doesNotMatch(done, /Still to add/); assert.match(done, /<b>100%<\/b>/);
+  assert.match(done, /Your page is complete/); assert.doesNotMatch(done, /Quick ones|When you have a few minutes/); assert.match(done, /<b>100%<\/b>/);
   assert.match(pc.renderCompleteness(score({}), { fr: true }), /Votre fiche est complète</);
   const menu = pc.renderCompleteness(score({ menuUrl: '', hasPublishedMenu: false }), { menuHref: '/owner/abc/menu' });
   assert.match(menu, /<a class="op-cb-btn" href="\/owner\/abc\/menu">Add menu<\/a>/);
@@ -211,7 +211,7 @@ test('edit page: French restaurant page has the bar and the French help topic', 
   const v = mk('restaurant');
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   assert.match(fr, /Votre fiche est complète à \d+ %/);
-  assert.match(fr, /Reste à ajouter/);
+  assert.match(fr, /Rapides|Quand vous aurez quelques minutes/);
   assert.match(fr, /Vous seul voyez ce pointage/);
   assert.match(fr, /Ajouter des photos/);
   const t = app.OWNER_HELP_TOPICS.find((x) => x.id === 'page-complete');
@@ -309,14 +309,41 @@ test('minutes left: summed from the missing items, waiting items and fresh-hours
   const total = pc.minutesLeft(allMissing);
   assert.ok(total >= 20 && total <= 35, `an empty restaurant page is about 20-35 minutes (got ${total})`);
 
+});
+
+test('quick ones first (busy owners): the bar never shows a big total; quick items lead, longer ones are "when you have a few minutes"', () => {
   const r = pc.scoreCompleteness({ address: '1 Main St', latitude: 1, longitude: 1, phone: '250-555-0100' }, { today: TODAY });
-  assert.ok(r.minutes > 0);
+  assert.ok(r.quick.length > 0 && r.later.length > 0);
+  assert.ok(r.quick.every((it) => pc.SECONDS[it.key] <= pc.QUICK_SECONDS), 'quick = half a minute or less');
+  assert.ok(r.later.every((it) => pc.SECONDS[it.key] > pc.QUICK_SECONDS));
+  for (let i = 1; i < r.quick.length; i++) assert.ok(pc.SECONDS[r.quick[i - 1].key] <= pc.SECONDS[r.quick[i].key], 'quickest first');
+  assert.equal(r.quick.length + r.later.length, r.missing.length);
+  const head = (h) => h.slice(0, h.indexOf('op-cb-panel'));
   const en = pc.renderCompleteness(r, {});
-  assert.match(en, new RegExp(`things left, about ${r.minutes} minutes\\. Tap to see what\\.`));
+  const qMin = Math.ceil(r.quickSeconds / 60);
+  const qText = qMin <= 1 ? 'under a minute' : `about ${qMin} minutes`;
+  assert.match(head(en), new RegExp(`${r.quick.length} quick ones, ${qText}\\. Tap to start\\.`));
+  assert.ok(!head(en).includes('things left'), 'no "N things left, about X minutes" total');
+  assert.ok(en.indexOf('>Quick ones<') < en.indexOf('>When you have a few minutes<'), 'quick list first');
+  assert.match(en, /Photos and a description make the biggest difference\./);
   const fr = pc.renderCompleteness(r, { fr: true });
-  assert.match(fr, new RegExp(`, environ ${r.minutes} min\\. Touchez pour voir lesquels\\.`));
-  const done = pc.renderCompleteness({ ...r, complete: true, pct: 100, missing: [], minutes: 0 }, {});
-  assert.ok(!/minute/.test(done.slice(0, done.indexOf('op-cb-panel'))), 'no minutes once complete');
+  assert.match(head(fr), new RegExp(`${r.quick.length} éléments rapides, .+\\. Touchez pour commencer\\.`));
+  assert.match(fr, />Quand vous aurez quelques minutes</);
+  // One quick one, under a minute.
+  const one = pc.renderCompleteness({ ...r, quick: [r.quick[0]], quickSeconds: 10 }, {});
+  assert.match(head(one), /1 quick one, under a minute\. Tap to start\./);
+  // Nothing quick left: no time at all, just "for when you have a few minutes".
+  const none = pc.renderCompleteness({ ...r, quick: [], quickSeconds: 0, later: r.missing }, {});
+  assert.match(head(none), new RegExp(`${r.missing.length} things left for when you have a few minutes\\. Tap to see\\.`));
+  assert.ok(!/>Quick ones</.test(none));
+  // Waiting items are never "quick" (nothing the owner can do).
+  assert.ok(!pc.isQuick({ key: 'avg_spend', waiting: true }));
+  // Progress message: data for the page script, EN and FR.
+  assert.match(en, /data-cb-pct="\d+" data-cb-yay="Nice! You’re now at \{p\}%\."/);
+  assert.match(fr, /data-cb-yay="Bravo! Vous êtes maintenant à \{p\} %\."/);
+  assert.match(en, /<p class="op-cb-yay" id="opCbYay" role="status" hidden><\/p>/);
+  const done = pc.renderCompleteness({ ...r, complete: true, pct: 100, missing: [], quick: [], later: [] }, {});
+  assert.ok(!/quick|minute/.test(head(done)), 'nothing about time once complete');
 });
 
 test('edit page intro: a restaurant on the edit link says which quick answers go live; other types keep the old wording', async () => {
