@@ -320,14 +320,16 @@ const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture', 'beginner', 
 //   foodBadgesHidden  food-only badges (vegan, gluten free, sports TV...) are kept but not offered
 //   hiddenBadges  more badges that make no sense for the type; kept if already set, otherwise not offered
 //   arrivalTile  "Help people find your door" (storefront photo): only for places with a door to find
+//   avgSpend     "Average spend per person" (one main + a non-alcoholic drink, whole dollars): restaurants and pubs first;
+//                cafes, breweries, wineries and distilleries need their own wording before they are switched on
 // Types not listed here (a type added later) get PORTAL_FIELDS_DEFAULT: nothing optional, price shown.
-const PORTAL_FIELDS_DEFAULT = Object.freeze({ happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: Object.freeze([]), arrivalTile: true });
+const PORTAL_FIELDS_DEFAULT = Object.freeze({ happyHour: false, specials: false, nights: false, menu: false, bookingFirst: false, price: true, activityBadges: false, foodBadgesHidden: false, hiddenBadges: Object.freeze([]), arrivalTile: true, avgSpend: false });
 const portalRow = (flags) => Object.freeze({ ...PORTAL_FIELDS_DEFAULT, ...flags });
 const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   // Food & drink (key order is the old NIGHT_TYPES order)
-  restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   cafe: portalRow({ specials: true, nights: true, menu: true }),
-  pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   distillery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
@@ -1636,6 +1638,8 @@ const MIN_INDEXABLE_CATEGORY_VENUES = 3;
 // visitors -- when it has no stored opening hours, an English description under MIN_INDEXABLE_VENUE_DESC_WORDS words
 // and no owner content (an approved owner photo, a published menu or price list, an approved owner edit). It becomes
 // indexable again by itself as soon as it gains any of them. A closed-for-season place with stored hours stays indexable.
+// (2026-11-08: an owner edit that is only the average spend number does not count -- tapping "That's right" must not turn a
+// thin page indexable.)
 const MIN_INDEXABLE_VENUE_DESC_WORDS = 45;
 let venueOwnerContentCache = null, venueOwnerContentVersionStmt = null;
 function venueOwnerContentIds() {
@@ -1645,7 +1649,8 @@ function venueOwnerContentIds() {
     if (venueOwnerContentCache && venueOwnerContentCache.version === version) return venueOwnerContentCache.ids;
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
-      UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'`).all().map((r) => r.venue_id));
+      UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key != 'avg_spend')`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -9597,7 +9602,8 @@ function guardedAvgSpendUpdate(id, expectedCurrent, avgSpend, meta) {
     // Owner protection: the owner's own number is only ever replaced by the owner, and research does not write to a
     // claimed (owner-verified) venue at all.
     const currentSource = current ? (JSON.parse(current).source || null) : null;
-    if (!next || next.source !== 'owner') {
+    // (m.undo: an owner change being put back by us restores exactly what was there, owner value or not.)
+    if (!m.undo && (!next || next.source !== 'owner')) {
       if (currentSource === 'owner') {
         db.exec('ROLLBACK');
         txOpen = false;
@@ -9613,7 +9619,7 @@ function guardedAvgSpendUpdate(id, expectedCurrent, avgSpend, meta) {
     else db.prepare('INSERT INTO venue_avg_spend (venue_id, amount, source, info) VALUES (?, ?, ?, ?) ON CONFLICT(venue_id) DO UPDATE SET amount = excluded.amount, source = excluded.source, info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(id, next.amount, next.source, nextJson);
     db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
-      VALUES (?, 'avg_spend', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, current, nextJson, m.reason.trim(), m.batch_id.trim());
+      VALUES (?, 'avg_spend', ?, ?, ?, ?, 'high', ?, 0, ?)`).run(id, current, nextJson, m.log_source || 'manual_research', m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
     db.exec('COMMIT');
     txOpen = false;
     return { ok: true, changed: true, info: nextJson };
@@ -43728,12 +43734,27 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend'];
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
 const OWNER_NOTHING_NEW_WAITING = 'Your earlier changes are already waiting for review. There is nothing new to send.';
 // Price range (2026-10-18): the owner picks one, per person.
 const OWNER_PRICE_SCALE = { 1: 'under $15', 2: '$15–30', 3: '$30–60', 4: 'over $60' };
 const OWNER_PRICE_SCALE_FR = { 1: 'moins de 15 $', 2: '15 à 30 $', 3: '30 à 60 $', 4: 'plus de 60 $' };
+// Average spend per person (2026-11-08): restaurants and pubs (portalFields(type).avgSpend). Whole dollars, 5 to 300.
+// The owner's number goes live at once (edit link or login: it is one number, and Undo puts the old one back), is stored
+// with source 'owner' and today's date, and is never replaced by research afterwards.
+const OWNER_AVG_SPEND_ERROR = 'Please enter a whole number of dollars from $' + AVG_SPEND_MIN + ' to $' + AVG_SPEND_MAX + ', like 25.';
+const OWNER_AVG_SPEND_ERROR_FR = 'Entrez un nombre entier de dollars, de ' + AVG_SPEND_MIN + ' $ à ' + AVG_SPEND_MAX + ' $, par exemple 25.';
+// -> { blank: true } | { amount } | { error }. Accepts 25, "25", "$25", " 25 $ ". Not 25.50, 2,5, 1e2 or 0x19.
+function ownerAvgSpendAmount(raw) {
+  if (raw == null) return { blank: true };
+  if (typeof raw !== 'number' && typeof raw !== 'string') return { error: OWNER_AVG_SPEND_ERROR };
+  const t = String(raw).trim().replace(/^[$]\s*/, '').replace(/\s*[$]$/, '');
+  if (t === '') return { blank: true };
+  if (!/^\d{1,3}$/.test(t)) return { error: OWNER_AVG_SPEND_ERROR };
+  const amount = Number(t);
+  return amount >= AVG_SPEND_MIN && amount <= AVG_SPEND_MAX ? { amount } : { error: OWNER_AVG_SPEND_ERROR };
+}
 // 'MM-DD' for a real day of the year (Feb 29 allowed), or null.
 function ownerMonthDay(value) {
   const m = /^(\d{2})-(\d{2})$/.exec(typeof value === 'string' ? value.trim() : '');
@@ -44273,6 +44294,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     specials: venueSpecialsList(venue.id),
     // Weekly nights (2026-10-27): the stored list the same way, [] when none.
     weekly_nights: venueWeeklyNightsList(venue.id),
+    // Average spend per person (2026-11-08): the stored { amount, source, ... } or null; only for the types offered it.
+    ...(portalFields(venue.type).avgSpend ? { avg_spend: venueAvgSpend(venue.id) } : {}),
   };
 }
 // Weekly nights from the owner (2026-10-27): the keys an owner sends for each night (never a source or date).
@@ -44561,6 +44584,16 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       }
     }
   }
+  // Average spend per person (2026-11-08): blank keeps what is stored. Typing the number we already show (or tapping
+  // "That's right") is a change when the stored one is our research: it becomes the owner's own and research stops touching it.
+  if ('avg_spend' in input) {
+    if (!portalFields(venue.type).avgSpend) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
+    else {
+      const a = ownerAvgSpendAmount(input.avg_spend);
+      if (a.error) errors.avg_spend = a.error;
+      else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount)) changes.avg_spend = { amount: a.amount };
+    }
+  }
   if ('price_range' in input) {
     const raw = input.price_range == null ? '' : String(input.price_range).trim();
     if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
@@ -44656,15 +44689,16 @@ function listOwnerChanges(status = 'pending') {
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
-  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights' };
+  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
+  avg_spend: 'Average spend per person' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -44683,6 +44717,7 @@ function ownerValueText(field, value) {
   if (field === 'hours' || field === 'happy_hour') return ownerWeekText(value);
   if (field === 'open_months') return value ? openMonthsText(value) : 'Open all year';
   if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
+  if (field === 'avg_spend') return value && Number.isInteger(value.amount) ? `$${value.amount} per person${value.source ? ` (${value.source === 'owner' ? 'owner' : 'our research'}${value.checked_at ? `, ${value.checked_at}` : ''})` : ''}` : '(none)';
   if (field === 'hours_seasons') {
     return Array.isArray(value) && value.length
       ? value.map((x) => `${x.label || 'Seasonal hours'} ${hoursExtraRangeText(x.from, x.to)}: ${ownerWeekText(JSON.stringify(x.hours))}`).join(' | ')
@@ -44768,6 +44803,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const badgeReverts = waitingChanges.badges ? checked.badgesSame.filter((k) => k in waitingChanges.badges) : [];
   // Instant (2026-10-18): a signed-in owner's own facts go live now; the rest waits for review as before.
   const instantOk = !!found.account && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT;
+  // Average spend (2026-11-08) is one number that goes live from the edit link too (same daily limit); Undo puts the old one back.
+  const linkInstantOk = ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT;
   // Waiting edit-link changes go out with a signed-in Save (2026-10-18): the form shows them (pending pre-fill) but
   // only sends fields changed on the page, so the instant-eligible ones still waiting are added to this save, unless
   // the owner changed or set back that field now. The page says so above the form.
@@ -44794,7 +44831,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
   const live = {}, livePrev = {}, review = {}, reviewPrev = {};
   for (const k of Object.keys(changes)) {
-    if (instantOk && OWNER_INSTANT_FIELDS.has(k)) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
+    if ((instantOk && OWNER_INSTANT_FIELDS.has(k)) || (linkInstantOk && OWNER_LINK_INSTANT_FIELDS.has(k))) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
   }
   for (const k of Object.keys(carried)) {
     if (k === 'badges') { live.badges = { ...carried.badges, ...(live.badges || {}) }; livePrev.badges = { ...carriedPrev.badges, ...(livePrev.badges || {}) }; }
@@ -44853,7 +44890,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
     return sendSubmissionResponse(res, 500, { ok: false, error: generic });
   }
   if (liveId) {
-    const r = approveOwnerChange(liveId, `owner:${found.account.email}`);
+    const r = approveOwnerChange(liveId, found.account ? `owner:${found.account.email}` : 'owner:edit-link');
     if (!r.ok) {
       db.prepare("UPDATE owner_change_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = 'system', rejection_reason = ? WHERE id = ?")
         .run(`instant save failed: ${r.reason}${r.detail ? ` (${String(r.detail).slice(0, 120)})` : ''}`, liveId);
@@ -50061,6 +50098,13 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['gamme de prix', 'fourchette de prix', 'niveau de prix', 'echelle de prix', 'prix', 'cher', 'pas cher', 'abordable', 'haut de gamme', 'signe de dollar', 'signes de dollar'],
     a: '<ol><li>{ON}, open <strong>Price range</strong>.</li><li>Pick what one person usually spends: <strong>$</strong> under $15, <strong>$$</strong> $15–30, <strong>$$$</strong> $30–60, <strong>$$$$</strong> over $60.</li><li>Tap {SEND}.</li></ol><p>{LIVE} It shows on your listing. Want your actual dishes and prices listed? Use <strong>Add your menu</strong>.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Gamme de prix</strong>.</li><li>Choisissez ce qu’une personne dépense habituellement : <strong>$</strong> moins de 15 $, <strong>$$</strong> 15 à 30 $, <strong>$$$</strong> 30 à 60 $, <strong>$$$$</strong> plus de 60 $.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Elle s’affiche sur votre fiche. Vous voulez afficher vos plats et vos prix? Utilisez <strong>Ajouter votre menu</strong>.</p>' },
+  // Average spend per person (2026-11-08): only offered on the edit page of a restaurant or pub (avgSpendOnly), the same
+  // places that have the box. A short, real answer; "price range" keeps its own topic.
+  { id: 'avg-spend', avgSpendOnly: true, over: ['price-range', 'cost', 'menu-add'], q: 'Set the average spend per person ($25)', qFr: 'Indiquer la dépense moyenne par personne (25 $)', pages: ['edit'],
+    keys: ['average spend', 'avg spend', 'spend per person', 'average spend per person', 'per person', 'how much does one person spend', 'how much per person', 'what a person spends', 'what one person spends', 'average bill', 'average check', 'average cost per person', 'cost per person', 'average price per person', 'thats right', 'estimate', 'your estimate', 'our estimate', 'the estimate is wrong', 'estimate is off', 'estimate from my menu', 'change the estimate'],
+    keysFr: ['depense moyenne', 'depense par personne', 'depense moyenne par personne', 'par personne', 'combien une personne depense', 'combien par personne', 'addition moyenne', 'cout par personne', 'prix moyen par personne', 'c est exact', 'estimation', 'votre estimation', 'notre estimation', 'l estimation est fausse', 'modifier l estimation'],
+    a: '<ol><li>{ON}, open <strong>Average spend per person</strong> (it shows for restaurants and pubs).</li><li>Type about what <strong>one person spends on one main and a non-alcoholic drink</strong>, in whole dollars (like <strong>25</strong>, from $5 to $300). If we already worked out an estimate from your menu, it’s filled in: change it if it’s off, or tap <strong>That\'s right</strong>.</li><li>Tap {SEND} if you changed the number. <strong>That\'s right</strong> saves on its own.</li></ol><p>{LIVE} It’s your number from then on: we won’t replace it. Leave the box blank to keep what we have. This is different from <strong>Price range</strong> ($ to $$$$), which stays as it is.</p>',
+    aFr: '<ol><li>{ON}, ouvrez <strong>Dépense moyenne par personne</strong> (affichée pour les restaurants et les pubs).</li><li>Indiquez à peu près ce que <strong>dépense une personne pour un plat principal et une boisson sans alcool</strong>, en dollars entiers (par exemple <strong>25</strong>, de 5 $ à 300 $). Si nous avons déjà calculé une estimation d’après votre menu, elle est déjà inscrite : modifiez-la si elle est inexacte, ou touchez <strong>C’est exact</strong>.</li><li>Touchez {SEND} si vous avez changé le nombre. <strong>C’est exact</strong> enregistre tout seul.</li></ol><p>{LIVE} C’est ensuite votre chiffre : nous ne le remplacerons pas. Laissez la case vide pour garder ce que nous avons. Ce n’est pas la même chose que la <strong>Gamme de prix</strong> ($ à $$$$), qui reste telle quelle.</p>' },
   // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
   { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
     keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
@@ -50485,7 +50529,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     mode,
     signedIn: !!opts.signedIn,
     start: OWNER_HELP_START[page],
-    topics: OWNER_HELP_TOPICS.map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
+    topics: OWNER_HELP_TOPICS.filter((t) => !t.avgSpendOnly || opts.avgSpend).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
       a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI,
@@ -51961,7 +52005,7 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
         // outside it (below).
         continue;
       }
-      if (field === 'happy_hour' || field === 'happy_hour_deals' || field === 'specials' || field === 'weekly_nights') continue; // same reason; written below
+      if (field === 'happy_hour' || field === 'happy_hour_deals' || field === 'specials' || field === 'weekly_nights' || field === 'avg_spend') continue; // same reason; written below
       if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
@@ -52084,6 +52128,18 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
     if (!r.ok) return { ok: false, reason: 'weekly_nights_failed', detail: r.reason, applied };
     applied.push('weekly_nights');
   }
+  // Average spend per person (2026-11-08): from the owner, source 'owner' and today's date (Pacific); it goes through the
+  // same guarded writer as our research, logged as 'avg_spend' by venue_owner. An Undo puts back exactly what was there
+  // (our research value with its own source and date, or nothing).
+  if (chosen.includes('avg_spend')) {
+    const value = values.avg_spend;
+    const next = opts.undo
+      ? (value && Number.isInteger(value.amount) ? value : null)
+      : { amount: value.amount, source: 'owner', source_url: null, basis: 'Entered by the owner', checked_at: todayLocal(now) };
+    const r = guardedAvgSpendUpdate(venue.id, currentAvgSpendJson(venue.id), next, { reason: meta.reason, batch_id: meta.batch_id, log_source: 'venue_owner', reviewed_by: reviewer, undo: !!opts.undo });
+    if (!r.ok) return { ok: false, reason: 'avg_spend_failed', detail: r.reason, applied };
+    applied.push('avg_spend');
+  }
   return { ok: true, applied, listing };
 }
 
@@ -52092,6 +52148,9 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
 const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights']);
+// Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
+// address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -52104,6 +52163,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'happy_hour_deals') return sameHappyHourDeals(a || null, b || null);
   if (field === 'specials') return sameSpecials(a || null, b || null);
   if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
+  if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -53139,7 +53199,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne' };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -53631,7 +53691,13 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const dayLabel = (d) => (fr ? OWNER_DAY_LABELS_FR[d].charAt(0).toUpperCase() + OWNER_DAY_LABELS_FR[d].slice(1) : OWNER_DAY_LABELS[d]);
   const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
   const showHappyHour = portalFields(venue.type).happyHour;
-  const parseWeek = (json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
+  // Average spend per person (2026-11-08): restaurants and pubs only. Everything it adds to the page is inside this flag,
+  // so the edit page of every other type is byte for byte what it was.
+  const avgSpendOn = !!portalFields(venue.type).avgSpend;
+  const avgNow = avgSpendOn && snap.avg_spend && Number.isInteger(snap.avg_spend.amount) ? snap.avg_spend : null;
+  const avgByOwner = !!avgNow && avgNow.source === 'owner';
+  const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
+  const parseWeek =(json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
   const hoursKnown = !!parseWeek(snap.hours);
@@ -53760,7 +53826,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: OWNER_FIELD_WORDS[fr ? 'fr' : 'en'],
+    fields: avgSpendOn ? OWNER_FIELD_WORDS[fr ? 'fr' : 'en'] : Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => k !== 'avg_spend')),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -53772,6 +53838,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     fix: L('Please fix the highlighted fields.', 'Corrigez les champs indiqués.'),
     wrong: L('Sorry, something went wrong. Please try again.', 'Désolés, un problème est survenu. Veuillez réessayer.'),
     sendNet: L('Could not send. Please check your connection and try again.', 'Envoi impossible. Vérifiez votre connexion Internet et réessayez.'),
+    ...(avgSpendOn ? {
+      avgThanks: L('Thanks! Your page now shows {amount} as the average spend per person.', 'Merci! Votre page affiche maintenant {amount} comme dépense moyenne par personne.'),
+      avgOwnerHint: L('{amount}, set by you', '{amount}, indiqué par vous'),
+      avgBad: L(OWNER_AVG_SPEND_ERROR, OWNER_AVG_SPEND_ERROR_FR),
+    } : {}),
     sendEvent: L('Send event', 'Envoyer l’événement'), addEvent: L('Add an event', 'Ajouter un événement'),
     partnerRemove: L('Remove {name}', 'Retirer {name}'), partnerMax: L(`You can add up to ${EVENT_PARTNER_MAX} partner businesses.`, `Vous pouvez ajouter jusqu’à ${EVENT_PARTNER_MAX} entreprises partenaires.`),
     partnerNone: L('No listing by that name yet.', 'Aucune fiche à ce nom pour l’instant.'),
@@ -53829,7 +53900,11 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-cl-remove, body.owner-page .op-cl-add { background: none; border: 0; color: var(--ref-navy); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 10px 4px; min-height: 44px; }
   body.owner-page .op-cl-remove { color: #9C2F22; }
   body.owner-page #opSeasonalFields .op-season input[type=text] { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); font: inherit; font-size: 1rem; }
-  body.owner-page #opPrice { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }
+  body.owner-page #opPrice { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }${avgSpendOn ? `
+  body.owner-page .op-money { display: inline-flex; align-items: center; gap: 6px; font-size: 1.1rem; font-weight: 700; margin: 4px 0 2px; }
+  body.owner-page #opAvg { width: 7rem; min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1.1rem; }
+  body.owner-page .op-avg-est { background: #FFF6E5; border-radius: 12px; padding: 10px 14px; margin: 8px 0; }
+  body.owner-page .op-avg-est .op-hint { margin: 0 0 8px; color: rgba(42,32,25,0.85); }` : ''}
   body.owner-page .op-season { margin: 14px 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   body.owner-page .op-season select { width: auto; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; }
   body.owner-page .op-season .op-hint { flex-basis: 100%; margin: 2px 0 0; }
@@ -54108,6 +54183,17 @@ ${renderGolfHeaderHtml()}
         </select>
         <p class="op-hint" id="opPriceScale">${L('Pick what one person usually spends on a visit.', 'Choisissez ce qu’une personne dépense habituellement par visite.')}</p>
         <p class="lyv-error" id="opPriceError" hidden></p>
+      </div></div>
+      </details>`}${!avgSpendOn ? '' : `
+      <details class="op-fold op-sec" id="avgspend" data-task="more"${avgNow && !avgByOwner ? ' open' : ''}>
+      <summary><span class="lyv-section-label" id="opAvgLabel">${L('Average spend per person', 'Dépense moyenne par personne')}</span> <span class="op-fold-hint" id="opAvgHint">${avgByOwner ? L(`${avgMoney(avgNow.amount)}, set by you`, `${avgMoney(avgNow.amount)}, indiqué par vous`) : avgNow ? L(`About ${avgMoney(avgNow.amount)}, our estimate: please check it`, `Environ ${avgMoney(avgNow.amount)}, notre estimation : veuillez la vérifier`) : L('Not set', 'Non indiqué')}</span></summary>
+      <div class="form-row full"><div class="form-field">
+        <label for="opAvg">${L('About how much does one person spend? (one main and a non-alcoholic drink)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool)')}</label>
+        <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="numeric" min="${AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="1" autocomplete="off" value="${avgNow ? avgNow.amount : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
+        <p class="op-hint" id="opAvgNote">${L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`)}</p>
+        <p class="lyv-error" id="opAvgError" hidden></p>
+        ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
+        <p class="op-hint" id="opAvgDone" role="status" hidden></p>
       </div></div>
       </details>`}
       ${showHappyHour ? `
@@ -54491,12 +54577,38 @@ ${ownerFooterHtml(fr)}
     var rows = document.querySelectorAll('.op-deal[data-deal="' + b.getAttribute('data-deal-add') + '"]');
     for (var i = 0; i < rows.length; i++) { if (rows[i].hidden) { rows[i].hidden = false; rows[i].querySelector('.op-deal-text').focus(); if (i === rows.length - 1) b.hidden = true; break; } }
   });
-  var FIELD_NAMES = T.fields;
+  ${avgSpendOn ? `// Average spend per person (2026-11-08): sent only when the number was changed; "That's right" saves the estimate as the owner's own at once.
+  var avgEl = document.getElementById('opAvg'), avgInit = avgEl ? avgEl.value : '';
+  function avgMoney(n){ return ${fr ? "n + ' $'" : "'$' + n"}; }
+  function avgSaved(n){
+    avgInit = String(n);
+    var est = document.getElementById('opAvgEst'); if (est) est.hidden = true;
+    var h = document.getElementById('opAvgHint'); if (h) h.textContent = T.avgOwnerHint.replace('{amount}', avgMoney(n));
+    var d = document.getElementById('opAvgDone'); if (d) { d.textContent = T.avgThanks.replace('{amount}', avgMoney(n)); d.hidden = false; }
+    if (avgEl) avgEl.value = String(n);
+  }
+  var avgConfirm = document.getElementById('opAvgConfirm');
+  if (avgConfirm) avgConfirm.addEventListener('click', function(){
+    show('opAvgError', '');
+    avgConfirm.disabled = true;
+    fetch(location.pathname + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ changes: { avg_spend: avgInit }, note: '', contact_name: document.getElementById('opName').value, contact_email: emailVal('opEmail'),
+        company_website: document.getElementById('opHp').value, started_at: startedAt }) })
+      .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
+      .then(function(r){
+        avgConfirm.disabled = false;
+        if (r.body && r.body.ok) { avgSaved(avgInit); return; }
+        var errs = (r.body && r.body.errors) || {};
+        show('opAvgError', errs.avg_spend || errs.form || (r.body && r.body.error) || T.wrong);
+      })
+      .catch(function(){ avgConfirm.disabled = false; show('opAvgError', T.sendNet); });
+  });
+  ` : ''}var FIELD_NAMES = T.fields;
   function fieldList(list){ var n = (list || []).map(function(f){ return FIELD_NAMES[f] || f; }); return n.length > 1 ? n.slice(0, -1).join(', ') + T.and + n[n.length - 1] : (n[0] || ''); }
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -54521,7 +54633,14 @@ ${ownerFooterHtml(fr)}
     if (cv.list !== undefined && JSON.stringify(cv.list) !== JSON.stringify(initial.closures || [])) changes.closures = cv.list;
     var priceEl = document.getElementById('opPrice');
     if (priceEl && priceEl.value !== (initial.price_range || '')) changes.price_range = priceEl.value;
-    if (document.getElementById('opHappy')) {
+${avgSpendOn ? `    if (avgEl) {
+      var avgTyped = avgEl.value.trim();
+      if (avgTyped !== '' && avgTyped !== avgInit) {
+        if (!/^\\d{1,3}$/.test(avgTyped)) { show('opAvgError', T.avgBad); var avgBox = document.getElementById('avgspend'); if (avgBox) avgBox.open = true; jumpToError(form); return; }
+        changes.avg_spend = avgTyped;
+      }
+    }
+` : ''}    if (document.getElementById('opHappy')) {
       var hh = week('opHappy');
       if (hh.bad) { show('opHappyError', T.happyBoth); jumpToError(form); return; }
       changes.happy_hour = hh.week;
@@ -54562,7 +54681,7 @@ ${ownerFooterHtml(fr)}
           shareEmail(emailVal('opEmail'));
           // Instant saves (2026-10-18): say what is live now and what still waits for review.
           var liveF = r.body.live || [], revF = r.body.review || [];
-          if (INSTANT) {
+          if (INSTANT${avgSpendOn ? ' || liveF.length' : ''}) {
             var msg = '';
             if (liveF.length) msg += T.liveNow.replace('{fields}', fieldList(liveF));
             if (revF.length) msg += T.review.replace('{fields}', fieldList(revF));
@@ -54570,7 +54689,8 @@ ${ownerFooterHtml(fr)}
             document.getElementById('opDoneText').textContent = msg.trim();
             document.getElementById('opDoneMail').hidden = !revF.length;
           }
-          Object.keys(changes).forEach(function(k){ initial[k] = k === 'hours' || k === 'happy_hour' ? JSON.stringify(changes[k]) : changes[k]; });
+          Object.keys(changes).forEach(function(k){ initial[k] = k === 'hours' || k === 'happy_hour' ? JSON.stringify(changes[k]) : changes[k]; });${avgSpendOn ? `
+          if (changes.avg_spend) { initial.avg_spend = { amount: Number(changes.avg_spend), source: 'owner' }; avgSaved(changes.avg_spend); document.getElementById('opAvgDone').hidden = true; }` : ''}
           setListingDirty(false);
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
@@ -54578,7 +54698,7 @@ ${ownerFooterHtml(fr)}
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
-        show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);
+        show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
         jumpToError(form);
       })
@@ -55060,7 +55180,7 @@ ${ownerFooterHtml(fr)}
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn })}
 </body>
 </html>`;
 }
@@ -60062,7 +60182,7 @@ module.exports = {
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
-  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic,
+  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)
