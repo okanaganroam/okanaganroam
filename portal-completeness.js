@@ -86,6 +86,7 @@ if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
 // so an owner can raise the score in under a minute; the longer jobs are offered for "when you have a few minutes".
 const QUICK_SECONDS = 30;
+const QUICK_CAP_SECONDS = 60;
 const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -174,9 +175,14 @@ function scoreCompleteness(input, opts) {
   // Biggest first, then the order of the spec.
   missing.sort((x, y) => (x.waiting - y.waiting) || (y.w - x.w));
   const declined = ITEMS.filter((it) => none.has(it.key) && !done[it.key] && !na[it.key]).map((it) => ({ ...it }));
-  const quick = missing.filter(isQuick).sort((x, y) => (SECONDS[x.key] - SECONDS[y.key]) || (y.w - x.w));
-  const later = missing.filter((it) => !isQuick(it));
-  const quickSeconds = quick.reduce((a, it) => a + SECONDS[it.key], 0);
+  // Capped at a minute (Dayton): the quickest ones that fit in 60 seconds; the rest wait in the second list.
+  const quick = [];
+  let quickSeconds = 0;
+  for (const it of missing.filter(isQuick).sort((x, y) => (SECONDS[x.key] - SECONDS[y.key]) || (y.w - x.w))) {
+    if (quickSeconds + SECONDS[it.key] > QUICK_CAP_SECONDS) break;
+    quick.push(it); quickSeconds += SECONDS[it.key];
+  }
+  const later = missing.filter((it) => !quick.includes(it));
   return { pct, got, max, complete, groups, missing, coming, declined, declared: [...none], minutes: minutesLeft(missing), quick, later, quickSeconds };
 }
 
@@ -355,4 +361,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, QUICK_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

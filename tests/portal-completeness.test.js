@@ -315,14 +315,14 @@ test('quick ones first (busy owners): the bar never shows a big total; quick ite
   const r = pc.scoreCompleteness({ address: '1 Main St', latitude: 1, longitude: 1, phone: '250-555-0100' }, { today: TODAY });
   assert.ok(r.quick.length > 0 && r.later.length > 0);
   assert.ok(r.quick.every((it) => pc.SECONDS[it.key] <= pc.QUICK_SECONDS), 'quick = half a minute or less');
-  assert.ok(r.later.every((it) => pc.SECONDS[it.key] > pc.QUICK_SECONDS));
+  assert.ok(r.quickSeconds <= pc.QUICK_CAP_SECONDS, `capped at a minute (got ${r.quickSeconds}s)`);
+  assert.ok(r.later.some((it) => pc.SECONDS[it.key] <= pc.QUICK_SECONDS), 'quick items past the minute wait in the second list');
   for (let i = 1; i < r.quick.length; i++) assert.ok(pc.SECONDS[r.quick[i - 1].key] <= pc.SECONDS[r.quick[i].key], 'quickest first');
   assert.equal(r.quick.length + r.later.length, r.missing.length);
   const head = (h) => h.slice(0, h.indexOf('op-cb-panel'));
   const en = pc.renderCompleteness(r, {});
-  const qMin = Math.ceil(r.quickSeconds / 60);
-  const qText = qMin <= 1 ? 'under a minute' : `about ${qMin} minutes`;
-  assert.match(head(en), new RegExp(`${r.quick.length} quick ones, ${qText}\\. Tap to start\\.`));
+  assert.match(head(en), new RegExp(`${r.quick.length} quick ones, under a minute\\. Tap to start\\.`));
+  assert.match(en, /Under a minute for all of them\./);
   assert.ok(!head(en).includes('things left'), 'no "N things left, about X minutes" total');
   assert.ok(en.indexOf('>Quick ones<') < en.indexOf('>When you have a few minutes<'), 'quick list first');
   assert.match(en, /Photos and a description make the biggest difference\./);
