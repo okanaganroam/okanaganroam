@@ -1235,6 +1235,20 @@ CREATE TABLE IF NOT EXISTS venue_visit_info (
 );
 `);
 
+// Average spend per person (2026-11-08): one main + one non-alcoholic drink, whole dollars. Stored only; nothing shows
+// it publicly until AVG_SPEND_PUBLIC=1. source 'research' (menu price research) or 'owner' (the owner's own number,
+// which research never overwrites). info: canonical JSON { amount, source, source_url, basis, checked_at };
+// server.js guardedAvgSpendUpdate.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_avg_spend (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  amount INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  info TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Instant owner edits (2026-10-18): a signed-in owner's hours, season, phone, description, badges, happy hour and
 // price range go live at once. The row is still written to owner_change_requests (status 'approved', instant = 1,
 // reviewed_by 'owner:<email>') as the audit trail, with what it replaced in `previous`; undo_meta keeps the hours
