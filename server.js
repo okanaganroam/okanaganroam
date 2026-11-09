@@ -54092,7 +54092,9 @@ const OWNER_CUISINE_HOURS_CSS = `
          as you scroll, so Help is a small round "?" at the top right of the page, beside "Owner edit page", and scrolls
          with it. Its name stays "Help" for screen readers; the help panel itself still opens over the page. */
       body.owner-page { position: relative; }
-      body.owner-page .ohb-btn, body.owner-page:has(.op-unsent:not([hidden])) .ohb-btn { position: absolute; top: 88px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; }
+      body.owner-page .ohb-btn, body.owner-page:has(.op-unsent:not([hidden])) .ohb-btn { position: absolute; top: 88px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; z-index: 59; }
+      /* One layer under the sticky site header (z-index 60), so when the page scrolls the "?" slides under the header
+         instead of sitting on top of the menu button (fresh-eyes 3, 2026-11-09). */
       body.owner-page .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
     }
     body.owner-page .op-hours-ok { margin: 12px 0 4px; padding: 12px 14px; background: #EEF5F3; border-radius: 12px; }
