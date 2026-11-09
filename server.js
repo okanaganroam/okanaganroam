@@ -1649,7 +1649,9 @@ const MIN_INDEXABLE_CATEGORY_VENUES = 3;
 // indexable again by itself as soon as it gains any of them. A closed-for-season place with stored hours stays indexable.
 // (2026-11-08: an owner edit that is only the average spend number does not count -- tapping "That's right" must not turn a
 // thin page indexable. Nor does one that is only "we don't have one" answers, which are never public. Nor a cuisine
-// picked from the list or a one-tap "These hours are right": a tap, not content.)
+// picked from the list or a one-tap "These hours are right": a tap, not content. Nor (for now) the owner's own
+// "Plan your visit" lines: a few short lines, the same size as the research rows they replace; whether they should
+// count is Dayton's call, so they don't flip a page to indexable yet.)
 const MIN_INDEXABLE_VENUE_DESC_WORDS = 45;
 let venueOwnerContentCache = null, venueOwnerContentVersionStmt = null;
 function venueOwnerContentIds() {
@@ -1660,7 +1662,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'hours_checked'))`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -9498,6 +9500,22 @@ function venueVisitInfo(venueId) {
 function currentVisitInfoJson(venueId) {
   try { const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
 }
+// Research's next box (JSON or null) with the owner's rows put back: every label in the stored owner_labels -- and the
+// other labels of the same "Plan your visit" slot (Takeout / To go, Good to know / Groups) -- comes from the stored box,
+// never from research. -> JSON or null.
+function mergeOwnerVisitRows(currentJson, nextJson) {
+  let cur = null;
+  try { cur = currentJson ? JSON.parse(currentJson) : null; } catch (e) { cur = null; }
+  const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
+  if (!owned.size) return nextJson;
+  const blocked = new Set(owned);
+  for (const slot of OWNER_VISIT_SLOTS) if (slot.labels.some((l) => owned.has(l))) slot.labels.forEach((l) => blocked.add(l));
+  const next = nextJson ? JSON.parse(nextJson) : { rows: [], booking_url: cur.booking_url || null, source_url: cur.source_url || null, checked_at: cur.checked_at };
+  const ownerRows = (cur.rows || []).filter((r) => blocked.has(r.label));
+  const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
+  const rows = [...ownerRows, ...researchRows].slice(0, VISIT_ROWS_MAX);
+  return JSON.stringify({ ...next, rows, owner_labels: [...owned].sort() });
+}
 // Replaces (or clears, with visit null) a venue's box: compare-and-set on expected_current (GET /admin/visit-info/:id),
 // reason + batch_id required, logged in venue_enrichment_log as 'visit_info'.
 // -> { ok, changed, info } | { ok: false, reason, detail, live }
@@ -9528,6 +9546,9 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
       txOpen = false;
       return { ok: false, reason: 'mismatch', live: { visit: current } };
     }
+    // The owner's own "Plan your visit" lines (2026-11-08): research never replaces, removes or brings back a row the
+    // owner wrote or cleared (owner_labels). Its other rows still go in around them; clearing the box keeps the owner's.
+    nextJson = mergeOwnerVisitRows(current, nextJson);
     if (current === nextJson) {
       db.exec('COMMIT');
       txOpen = false;
@@ -9753,6 +9774,8 @@ function visitInfoHtml(info, fr = false) {
     : '';
   let host = '';
   try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
+  // The owner wrote some of these lines (2026-11-08): the box then says "From the venue", not their website.
+  if (Array.isArray(info.owner_labels) && info.owner_labels.length) host = '';
   const frDate = (d) => `${Number(d.slice(8, 10)) === 1 ? '1er' : Number(d.slice(8, 10))} ${FR_SHORT_MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
   const when = info.checked_at && parseLocalDate(info.checked_at) ? (fr ? frDate(info.checked_at) : `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}`) : '';
   return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
@@ -43768,7 +43791,7 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'hours_checked'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows'];
 // Cuisine picker (2026-11-08): restaurants only (the types with a completeness list). One value, as venues.cuisine holds one label. Only
 // labels the site already uses for restaurants, each with its French name in french-text.js FR_CUISINE (frCuisine), so a
 // pick never adds a new word to search, the trip planner or the filters. No free text: "not listed?" goes in the note.
@@ -43785,6 +43808,80 @@ const OWNER_HOURS_CHECKED_ERRORS = {
   none: 'We don’t have your hours yet. Add them above, then save.',
   waiting: 'Your new hours are waiting for review. Once they’re live, you can confirm them here.',
 };
+// "Plan your visit" lines (2026-11-08): restaurants only. Five short lines the owner writes for the box on their public
+// page (venue_visit_info), each one row of the box. A slot reads its row by any of its labels (research wrote "To go" or
+// "Groups" on some pages) and a new row gets `def`. Plain text, at most VISIT_TEXT_MAX characters (the box's own limit),
+// no < or > and no links (the booking link has its own field). Live at once, logged, in "Your updates", Undo works.
+// Research never replaces or brings back a row the owner wrote or cleared (owner_labels in the stored box).
+const VISIT_TEXT_MAX = 180;
+const OWNER_VISIT_SLOTS = [
+  { key: 'known_for', labels: ['Known for'], def: 'Known for', item: 'pyv_known' },
+  { key: 'reservations', labels: ['Reservations'], def: 'Reservations', item: 'pyv_reservations' },
+  { key: 'takeout', labels: ['Takeout', 'To go'], def: 'Takeout', item: 'pyv_takeout' },
+  { key: 'dietary', labels: ['Dietary'], def: 'Dietary', item: 'pyv_dietary' },
+  { key: 'groups', labels: ['Good to know', 'Groups'], def: 'Good to know', item: 'pyv_groups' },
+];
+const OWNER_VISIT_KEYS = OWNER_VISIT_SLOTS.map((x) => x.key);
+const OWNER_VISIT_ERRORS = {
+  long: `Please keep each line to ${VISIT_TEXT_MAX} characters or less.`,
+  html: 'Please use plain words only, without < or >.',
+  link: 'Please leave links out of these lines. Your booking link has its own box under “Name, address & links”.',
+  unreadable: 'Some of the information could not be read. Please reload the page and try again.',
+};
+// One line, cleaned: { text } or { error }.
+function ownerVisitText(raw) {
+  if (raw == null) return { text: '' };
+  if (typeof raw !== 'string') return { error: OWNER_VISIT_ERRORS.unreadable };
+  const t = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/\s+/g, ' ');
+  if (/[<>]/.test(t)) return { error: OWNER_VISIT_ERRORS.html };
+  if (/(?:https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|ca|net|org|io|co|app|menu|restaurant|site|online|shop)\b)/i.test(t)) return { error: OWNER_VISIT_ERRORS.link };
+  if (t.length > VISIT_TEXT_MAX) return { error: OWNER_VISIT_ERRORS.long };
+  return { text: t };
+}
+// The five lines as the box holds them now: { known_for, reservations, takeout, dietary, groups } ('' when none).
+function ownerVisitRows(venueId) {
+  const rows = ((venueVisitInfo(venueId) || {}).rows) || [];
+  const out = {};
+  for (const slot of OWNER_VISIT_SLOTS) {
+    const r = slot.labels.map((l) => rows.find((x) => x.label === l)).find(Boolean);
+    out[slot.key] = r ? r.text : '';
+  }
+  return out;
+}
+// Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
+// Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
+function writeOwnerVisitRows(venueId, value, now = new Date()) {
+  const cur = venueVisitInfo(venueId);
+  const before = currentVisitInfoJson(venueId);
+  const rows = cur && Array.isArray(cur.rows) ? cur.rows.map((r) => ({ ...r })) : [];
+  const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
+  const slotLabels = new Set(OWNER_VISIT_SLOTS.flatMap((x) => x.labels));
+  for (const slot of OWNER_VISIT_SLOTS) {
+    const next = typeof (value || {})[slot.key] === 'string' ? value[slot.key] : '';
+    const i = rows.findIndex((r) => slot.labels.includes(r.label));
+    const old = i >= 0 ? rows[i].text : '';
+    if (next === old) continue;
+    const label = i >= 0 ? rows[i].label : slot.def;
+    if (next) {
+      if (i >= 0) rows[i] = { label, text: next }; else rows.push({ label, text: next });
+    } else if (i >= 0) rows.splice(i, 1);
+    owned.add(label);
+  }
+  // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop.
+  while (rows.length > VISIT_ROWS_MAX) {
+    let j = -1;
+    for (let k = rows.length - 1; k >= 0; k--) if (!slotLabels.has(rows[k].label)) { j = k; break; }
+    rows.splice(j >= 0 ? j : rows.length - 1, 1);
+  }
+  const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
+  if (!rows.length && !info.booking_url && !info.owner_labels.length) {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
+    return { before, after: null };
+  }
+  const json = JSON.stringify(info);
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, json);
+  return { before, after: json };
+}
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
 const OWNER_NOTHING_NEW_WAITING = 'Your earlier changes are already waiting for review. There is nothing new to send.';
 // Price range (2026-10-18): the owner picks one, per person.
@@ -44356,7 +44453,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // "We don't have one" (2026-11-08): the sorted item keys; only for the types with a completeness list.
     ...(COMPLETENESS_TYPES.has(venue.type) ? { not_offered: venueNotOffered(venue.id) } : {}),
     // Cuisine and the date the hours were last checked (2026-11-08): only for the types with a completeness list.
-    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', hours_checked: venueHoursCheckedAt(venue.id) } : {}),
+    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
   };
 }
 // The stored hours_checked_at ('YYYY-MM-DD') or ''.
@@ -44709,6 +44806,22 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     else if (ownerHoursWaiting(venue.id)) errors.hours_checked = OWNER_HOURS_CHECKED_ERRORS.waiting;
     else if (current.hours_checked !== todayLocal() || (ownerHoursSource(venue.id) !== 'venue_owner')) changes.hours_checked = todayLocal();
   }
+  // "Plan your visit" lines (2026-11-08): an object with any of the five keys; a missing key keeps its line, '' clears it.
+  if ('visit_rows' in input) {
+    const x = input.visit_rows;
+    if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => !OWNER_VISIT_KEYS.includes(k))) errors.visit_rows = OWNER_VISIT_ERRORS.unreadable;
+    else {
+      const cur = current.visit_rows || ownerVisitRows(venue.id);
+      const next = { ...cur };
+      for (const k of Object.keys(x)) {
+        const t = ownerVisitText(x[k]);
+        if (t.error) { errors.visit_rows = t.error; errors.visit_rows_key = k; break; }
+        next[k] = t.text;
+      }
+      if (!errors.visit_rows && OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k])) changes.visit_rows = next;
+    }
+  }
   if ('price_range' in input) {
     const raw = input.price_range == null ? '' : String(input.price_range).trim();
     if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
@@ -44805,15 +44918,15 @@ function listOwnerChanges(status = 'pending') {
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
-  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', hours_checked: 'Hours confirmed' };
+  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', hours_checked: 'heures confirmées' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', hours_checked: 'hours confirmed' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', hours_checked: 'hours confirmed', visit_rows: 'plan your visit' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -44833,6 +44946,10 @@ function ownerValueText(field, value) {
   if (field === 'open_months') return value ? openMonthsText(value) : 'Open all year';
   if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
   if (field === 'hours_checked') return value ? `Hours confirmed as right (checked ${value})` : '(not checked)';
+  if (field === 'visit_rows') {
+    const parts = OWNER_VISIT_SLOTS.filter((x) => value && value[x.key]).map((x) => `${x.def}: ${value[x.key]}`);
+    return parts.length ? parts.join(' · ') : '(none)';
+  }
   if (field === 'not_offered') {
     const names = Object.fromEntries(portalCompleteness.ITEMS.map((i) => [i.key, i.en]));
     return Array.isArray(value) && value.length ? `Doesn't offer: ${value.map((k) => names[k] || k).join(', ')}` : '(none)';
@@ -50229,8 +50346,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
     keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage'],
     keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage'],
-    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right.</li><li>Items marked <strong>We’re adding these</strong> can’t be filled in yet. They’ll count once you can.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
-    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact.</li><li>Les éléments sous <strong>Nous ajoutons ceci</strong> ne peuvent pas encore être remplis. Ils compteront dès que ce sera possible.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+    a: '<p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right.</li><li>The one item under <strong>We’re adding these</strong>, <strong>Confirmed by you</strong>, can’t be filled in yet. It counts once you can; saving any change already adds the Verified mark.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact.</li><li>Le seul élément sous <strong>Nous ajoutons ceci</strong>, <strong>Confirmée par vous</strong>, ne peut pas encore être rempli. Il comptera dès que ce sera possible; enregistrer une modification ajoute déjà la mention Vérifiée.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
@@ -50243,6 +50360,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['heures sont exactes', 'confirmer mes heures', 'confirmer les heures', 'heures n ont pas change', 'memes heures', 'heures verifiees', '90 jours', 'derniere verification', 'verifier mes heures'],
     a: '<p>Under <strong>Opening hours</strong>, tap <strong>These hours are right</strong>. Your hours stay exactly as they are, and your page shows they were checked today.</p><ul><li>It counts toward your page being complete for 90 days. After that, the bar asks you to check them again.</li><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Hours changed? Edit the times above and save instead: that marks them checked too.</li></ul>',
     aFr: '<p>Sous <strong>Heures d’ouverture</strong>, touchez <strong>Ces heures sont exactes</strong>. Vos heures restent exactement les mêmes, et votre page indique qu’elles ont été vérifiées aujourd’hui.</p><ul><li>Cela compte pour une fiche complète pendant 90 jours. Ensuite, la barre vous demande de les vérifier de nouveau.</li><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vos heures ont changé? Modifiez-les plus haut et enregistrez : elles sont alors aussi marquées comme vérifiées.</li></ul>' },
+  // "Plan your visit" lines (2026-11-08): only on a restaurant's edit page (completenessOnly).
+  { id: 'plan-visit', completenessOnly: true, over: ['page-complete'], q: 'How do I fill in “Plan your visit”?', qFr: 'Comment remplir « Planifier la visite »?', pages: ['edit'],
+    keys: ['plan your visit', 'known for', 'reservations line', 'walk ins', 'walk-ins', 'takeout', 'take out', 'delivery', 'doordash', 'skip the dishes', 'dietary note', 'allergies', 'groups', 'large party', 'large parties', 'good to know', 'parking', 'visit box'],
+    keysFr: ['planifier la visite', 'planifiez votre visite', 'connu pour', 'sans reservation', 'a emporter', 'livraison', 'note alimentaire', 'allergies', 'groupes', 'grands groupes', 'bon a savoir', 'stationnement'],
+    a: '<p>Open <strong>Plan your visit</strong> and write one short line in each box you want on your page: <strong>Known for</strong>, <strong>Reservations</strong>, <strong>Takeout and delivery</strong>, <strong>Dietary note</strong> and <strong>Groups and good to know</strong>. Then tap <strong>Save these lines</strong>.</p><ul><li>They go live straight away in the <strong>Plan your visit</strong> box on your page, and show in <strong>Your updates</strong>.</li><li>Plain words only, up to 180 characters each, no links. Your booking link goes under <strong>Name, address &amp; links</strong>.</li><li>Leave a box empty to take that line off your page. Don’t take reservations or do takeout? Tap <strong>We don’t take reservations</strong> or <strong>No takeout or delivery</strong> instead.</li><li>They’re yours from then on: our research won’t change or bring back a line you wrote or removed.</li></ul>',
+    aFr: '<p>Ouvrez <strong>Planifier la visite</strong> et écrivez une courte ligne dans chaque case que vous voulez sur votre page : <strong>Connu pour</strong>, <strong>Réservations</strong>, <strong>À emporter et livraison</strong>, <strong>Note alimentaire</strong> et <strong>Groupes et bon à savoir</strong>. Touchez ensuite <strong>Enregistrer ces lignes</strong>.</p><ul><li>Elles sont en ligne tout de suite dans la case <strong>Planifiez votre visite</strong> de votre page et paraissent dans <strong>Vos mises à jour</strong>.</li><li>Des mots simples seulement, 180 caractères au plus chacune, sans liens. Votre lien de réservation va sous <strong>Nom, adresse et liens</strong>.</li><li>Laissez une case vide pour retirer cette ligne de votre page. Vous ne prenez pas de réservations ou ne faites pas de plats à emporter? Touchez plutôt <strong>Nous ne prenons pas de réservations</strong> ou <strong>Ni plats à emporter ni livraison</strong>.</li><li>Elles sont ensuite à vous : nos recherches ne modifieront ni ne remettront une ligne que vous avez écrite ou retirée.</li></ul><p>Sur la version française de votre page, une ligne paraît une fois que nous l’avons traduite.</p>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste'],
@@ -50993,6 +51116,12 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [OWNER_CUISINE_ERROR]: 'Choisissez votre cuisine dans la liste. Elle n’y est pas? Dites-le-nous dans la note plus bas.',
   [OWNER_HOURS_CHECKED_ERRORS.none]: 'Nous n’avons pas encore vos heures. Ajoutez-les plus haut, puis enregistrez.',
   [OWNER_HOURS_CHECKED_ERRORS.waiting]: 'Vos nouvelles heures attendent notre vérification. Une fois en ligne, vous pourrez les confirmer ici.',
+  // "We don't have one" (2026-11-08): the French was missing.
+  [OWNER_NOT_OFFERED_ERRORS.has]: 'Votre fiche le montre déjà. Pour dire que vous ne l’avez pas, retirez-le d’abord de votre fiche, puis réessayez.',
+  // "Plan your visit" lines (2026-11-08).
+  [OWNER_VISIT_ERRORS.long]: `Gardez chaque ligne à ${VISIT_TEXT_MAX} caractères ou moins.`,
+  [OWNER_VISIT_ERRORS.html]: 'Utilisez seulement des mots, sans < ni >.',
+  [OWNER_VISIT_ERRORS.link]: 'Laissez les liens hors de ces lignes. Votre lien de réservation a sa propre case sous « Nom, adresse et liens ».',
 };
 const OWNER_PORTAL_MESSAGES_FR_MAP = new Map(Object.entries(OWNER_PORTAL_MESSAGES_FR).map(([k, v]) => [k.replace(/[’']/g, '’'), v]));
 const OWNER_DAY_LABELS_FR = { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' };
@@ -52168,6 +52297,13 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         applied.push(field);
         continue;
       }
+      // "Plan your visit" lines (2026-11-08): the five lines become exactly these (an Undo writes the old ones back).
+      if (field === 'visit_rows') {
+        const w = writeOwnerVisitRows(venue.id, value, now);
+        if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       // "These hours are right" (2026-11-08): only the check date and its source; the hours stay exactly as they are.
       // New hours in the same save already carry today's check, so this one is then skipped. An Undo puts back the old
       // date and source (from undo_meta).
@@ -52333,7 +52469,9 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
 // And (2026-11-08) a cuisine picked from a fixed list, and "These hours are right" (a date, the hours untouched): no
 // link, name or free text either; both are logged, in "Your updates", and have Undo.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'hours_checked']);
+// "Plan your visit" lines (2026-11-08) too, as Dayton asked: plain short text with no links or < >, logged, in "Your
+// updates", with Undo (OWNER_INSTANT_DAILY_LIMIT still applies).
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'hours_checked', 'visit_rows']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -52348,6 +52486,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
   if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+  if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -53383,7 +53522,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite' };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -53859,7 +53998,13 @@ const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page .op-cuisine-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; }
     body.owner-page #opCuisine { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }
     body.owner-page #opCuisineSave { min-height: 44px; }
-    body.owner-page #opCuisineDone { color: #1E6B3A; font-weight: 800; }`;
+    body.owner-page #opCuisineDone { color: #1E6B3A; font-weight: 800; }
+    body.owner-page .op-visit-rows { display: grid; gap: 14px; }
+    body.owner-page .op-visit-field label { font-weight: 800; }
+    body.owner-page .op-visit-field .op-hint { display: block; margin: 2px 0 6px; }
+    body.owner-page .op-visit-field input { width: 100%; min-height: 44px; box-sizing: border-box; }
+    body.owner-page #opVisitSave { min-height: 44px; margin-top: 4px; }
+    body.owner-page .op-visit-done { color: #1E6B3A; font-weight: 800; }`;
 // Both save at once (like "That's right" for the average spend) and then reload, so the bar starts from what is stored.
 const OWNER_CUISINE_HOURS_SCRIPT = `
   (function(){
@@ -53875,7 +54020,7 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
           if (j && j.ok) { onOk(); return; }
           btn.disabled = false;
           var errs = (j && j.errors) || {};
-          var m = errs.cuisine || errs.hours_checked || errs.form || (j && j.error) || box.getAttribute('data-wrong');
+          var m = errs.cuisine || errs.hours_checked || errs.visit_rows || errs.form || (j && j.error) || box.getAttribute('data-wrong');
           if (err) { err.textContent = m; err.hidden = false; }
         })
         .catch(function(){ btn.disabled = false; if (err) { err.textContent = box.getAttribute('data-wrong'); err.hidden = false; } });
@@ -53886,6 +54031,19 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
         hb.hidden = true;
         var n = document.getElementById('opHoursOkNote'); if (n) n.hidden = true;
         var d = document.getElementById('opHoursOkDone'); if (d) { d.textContent = hbox.getAttribute('data-done'); d.hidden = false; }
+      });
+    });
+    // "Plan your visit" lines (2026-11-08): their own Save sends all five; typing in them doesn't raise the form's
+    // "not sent yet" bar. Saved -> reload with the bar open, so the score and the field buttons start from what is stored.
+    var vs = document.getElementById('opVisitSave'), vbox = document.getElementById('visit');
+    var vin = vbox ? vbox.querySelectorAll('[data-visit-key]') : [];
+    Array.prototype.forEach.call(vin, function(el){ ['input', 'change'].forEach(function(t){ el.addEventListener(t, function(e){ e.stopPropagation(); }); }); });
+    if (vs && vbox) vs.addEventListener('click', function(){
+      var rows = {}; Array.prototype.forEach.call(vin, function(el){ rows[el.getAttribute('data-visit-key')] = el.value; });
+      send({ visit_rows: rows }, vs, 'opVisitError', vbox, function(){
+        var d = document.getElementById('opVisitDone'); if (d) { d.textContent = vbox.getAttribute('data-done'); d.hidden = false; }
+        try { sessionStorage.setItem('opCbOpen', '1'); } catch (e) { /* storage off */ }
+        setTimeout(function(){ location.reload(); }, 900);
       });
     });
     var cs = document.getElementById('opCuisineSave'), cbox = document.getElementById('cuisine'), sel = document.getElementById('opCuisine');
@@ -54002,6 +54160,44 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         <p class="lyv-error" id="opCuisineError" hidden></p>
         <p class="op-hint" id="opCuisineDone" role="status" hidden></p>
       </div></div>
+      </details>`;
+  };
+  // "Plan your visit" lines (2026-11-08): restaurants only, inside completeOn like the bar. Five short boxes, each one
+  // line of the box on the public page; their own Save (live at once, like the cuisine).
+  const visitRowsHtml = () => {
+    if (!completeOn) return '';
+    const cur = snap.visit_rows || {};
+    const filled = OWNER_VISIT_KEYS.filter((k) => cur[k]).length;
+    const fieldsEn = {
+      known_for: ['Known for', 'What people come back for, in one line.', 'Wood-fired pizza and the lakeside patio'],
+      reservations: ['Reservations', 'How to book, or say walk-ins only.', 'Book online or call; walk-ins welcome at the bar'],
+      takeout: ['Takeout and delivery', 'Can people order to go? Which delivery apps?', 'Takeout by phone; delivery on DoorDash and Skip'],
+      dietary: ['Dietary note', 'What you can do for allergies and diets.', 'Gluten-free pasta and a vegan menu; tell your server about allergies'],
+      groups: ['Groups and good to know', 'Large parties, parking, kids, anything else that helps.', 'Groups of 10+ please call ahead; free parking out back'],
+    };
+    const fieldsFr = {
+      known_for: ['Connu pour', 'Ce pour quoi les gens reviennent, en une ligne.', 'Pizza au four à bois et terrasse au bord du lac'],
+      reservations: ['Réservations', 'Comment réserver, ou sans réservation seulement.', 'Réservez en ligne ou par téléphone; sans réservation au bar'],
+      takeout: ['À emporter et livraison', 'Peut-on commander pour emporter? Quelles applis de livraison?', 'À emporter par téléphone; livraison avec DoorDash et Skip'],
+      dietary: ['Note alimentaire', 'Ce que vous pouvez faire pour les allergies et les régimes.', 'Pâtes sans gluten et menu végane; parlez de vos allergies au serveur'],
+      groups: ['Groupes et bon à savoir', 'Grands groupes, stationnement, enfants, tout ce qui aide.', 'Groupes de 10 et plus : appelez d’avance; stationnement gratuit derrière'],
+    };
+    const words = fr ? fieldsFr : fieldsEn;
+    const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups' };
+    const boxes = OWNER_VISIT_KEYS.map((k) => `
+        <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
+          <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
+          <input type="text" id="${ids[k]}" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}" value="${escapeHtml(cur[k] || '')}"></div>`).join('');
+    return `
+      <details class="op-fold op-sec" id="visit" data-task="more"${filled < OWNER_VISIT_KEYS.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${OWNER_VISIT_KEYS.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${OWNER_VISIT_KEYS.length} remplie${filled === 1 ? '' : 's'}`) : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
+      <p class="op-hint">${L('These short lines show in the &ldquo;Plan your visit&rdquo; box on your page. One line each, plain words, no links. Leave a box empty to leave that line off.', 'Ces courtes lignes paraissent dans la case « Planifiez votre visite » de votre page. Une ligne chacune, des mots simples, sans liens. Laissez une case vide pour ne pas afficher cette ligne.')}</p>
+      <div class="form-row full op-visit-rows">${boxes}
+      </div>
+      <p class="op-hint">${L('Your booking link goes under &ldquo;Name, address &amp; links&rdquo;: it adds a Reserve button.', 'Votre lien de réservation va sous « Nom, adresse et liens » : il ajoute un bouton Réserver.')}</p>
+      <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button>
+      <p class="lyv-error" id="opVisitError" hidden></p>
+      <p class="op-hint op-visit-done" id="opVisitDone" role="status" hidden></p>
       </details>`;
   };
   const completeHtml = completeOn ? portalCompleteness.renderCompleteness(
@@ -54136,7 +54332,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'hours_checked'].includes(k) || completeOn))),
+    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'hours_checked', 'visit_rows'].includes(k) || completeOn))),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -54477,7 +54673,7 @@ ${renderGolfHeaderHtml()}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
-${cuisineHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
+${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
       <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? L(`${n} ticked, like dog friendly or patio`, `${n} coché${n === 1 ? '' : 's'}, comme chiens acceptés ou terrasse`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
       <p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
@@ -54945,6 +55141,9 @@ ${ownerFooterHtml(fr)}
     if (priceEl && priceEl.value !== (initial.price_range || '')) changes.price_range = priceEl.value;
 ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     if (cuEl && cuEl.value && cuEl.value !== (initial.cuisine || '')) changes.cuisine = cuEl.value;
+    var vRows = {}, vDiff = false;
+    Array.prototype.forEach.call(document.querySelectorAll('#visit [data-visit-key]'), function(el){ var k = el.getAttribute('data-visit-key'); vRows[k] = el.value; if (el.value.trim() !== ((initial.visit_rows || {})[k] || '')) vDiff = true; });
+    if (vDiff) changes.visit_rows = vRows;
 ` : ''}${avgSpendOn ? `    if (avgEl) {
       var avgTyped = avgEl.value.trim();
       if (avgTyped !== '' && avgTyped !== avgInit) {
@@ -55010,7 +55209,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
-        show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}${completeOn ? " show('opCuisineError', errs.cuisine);" : ''}
+        show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}${completeOn ? " show('opCuisineError', errs.cuisine); show('opVisitError', errs.visit_rows);" : ''}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
         jumpToError(form);
       })

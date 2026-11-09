@@ -49,10 +49,11 @@ test('score: an empty restaurant starts low, counts only what it can be asked fo
   assert.equal(r.pct, 0);
   assert.equal(r.complete, false);
   // Items the owner cannot fill in yet are left out of the total, not counted against them.
-  // (2026-11-08: cuisine and fresh hours have their own screens now, so they count.)
-  assert.deepEqual(r.coming.map((i) => i.key).sort(), ['owner_confirmed', 'pyv_dietary', 'pyv_groups', 'pyv_known', 'pyv_reservations', 'pyv_takeout']);
-  assert.equal(r.max, 100 - 3 - 3 - 3 - 2 - 3 - 3);
-  assert.equal(r.missing.length, 24 - 6);
+  // (2026-11-08: cuisine and fresh hours have their own screens now, so they count; so do the five Plan your visit
+  // lines. Only "Confirmed by you" is left.)
+  assert.deepEqual(r.coming.map((i) => i.key).sort(), ['owner_confirmed']);
+  assert.equal(r.max, 100 - 3);
+  assert.equal(r.missing.length, 24 - 1);
   const almost = score({ facebookUrl: '' });
   assert.equal(almost.complete, false);
   assert.ok(almost.pct <= 99, `${almost.pct}`);
@@ -70,14 +71,18 @@ test('score: the percentage is points done over points possible', () => {
 });
 
 test('score: items we already have count even when the owner cannot edit them yet; items we lack are "coming", not missing', () => {
-  const r = score({ visitLabels: ['Known for'], claimed: false });
+  const r = score({ claimed: false });
   assert.deepEqual(r.missing, []);
-  assert.deepEqual(r.coming.map((i) => i.key).sort(), ['owner_confirmed', 'pyv_dietary', 'pyv_groups', 'pyv_reservations', 'pyv_takeout']);
+  assert.deepEqual(r.coming.map((i) => i.key).sort(), ['owner_confirmed']);
   assert.equal(r.complete, true); assert.equal(r.pct, 100);
+  assert.equal(score({ claimed: true }).max, 100, 'Confirmed by you counts once we have it');
+  // The Plan your visit lines have their own boxes now (2026-11-08): without them they are missing, not coming.
+  assert.deepEqual(score({ visitLabels: ['Known for'] }).missing.map((i) => i.key).sort(), ['pyv_dietary', 'pyv_groups', 'pyv_reservations', 'pyv_takeout']);
+  assert.deepEqual(score({ visitLabels: ['Known for', 'To go', 'Good to know', 'Dietary', 'Reservations'] }).missing, [], '"To go" and "Good to know" count');
   // Cuisine has its picker now (2026-11-08): without one it is missing, not coming.
   assert.deepEqual(score({ cuisine: '' }).missing.map((i) => i.key), ['cuisine']);
   const withBooking = score({ visitLabels: [], bookingUrl: 'https://example.com/book' });
-  assert.ok(!withBooking.coming.some((i) => i.key === 'pyv_reservations'), 'a booking link answers Reservations');
+  assert.ok(!withBooking.coming.some((i) => i.key === 'pyv_reservations') && !withBooking.missing.some((i) => i.key === 'pyv_reservations'), 'a booking link answers Reservations');
 });
 
 test('score: hours count as fresh for 90 days, then "Confirm hours" is missing (one tap, or saving the hours)', () => {

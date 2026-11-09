@@ -44,16 +44,17 @@ const ITEMS = [
     en: 'Weekly specials', fr: 'Spéciaux de la semaine', whyEn: 'Nightly deals or a weekly feature.', whyFr: 'Spéciaux du soir ou de la semaine.', btnEn: 'Add specials', btnFr: 'Ajouter', icon: '⭐' },
   { key: 'entertainment', noneEn: 'We don’t host music or events', noneFr: 'Ni musique ni événements chez nous', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'weekly-nights' }, fields: ['weekly_nights', 'badges'],
     en: 'Live music or events', fr: 'Musique en direct ou événements', whyEn: 'Trivia night, live music, sports on the TV.', whyFr: 'Soirée-questionnaire, musique en direct, sports à la télé.', btnEn: 'Add a night', btnFr: 'Ajouter', icon: '🎶' },
-  { key: 'pyv_known', group: 'visit', w: 3, fix: false,
-    en: 'Known for', fr: 'Reconnu pour', whyEn: 'One line on what you’re famous for. Coming soon.', whyFr: 'Une ligne sur ce qui vous rend célèbre. Bientôt.', icon: '👍' },
-  { key: 'pyv_reservations', noneEn: 'We don’t take reservations', noneFr: 'Nous ne prenons pas de réservations', group: 'visit', w: 3, fix: false,
-    en: 'Reservations', fr: 'Réservations', whyEn: 'How to book. Coming soon.', whyFr: 'Comment réserver. Bientôt.', icon: '📅' },
-  { key: 'pyv_takeout', noneEn: 'No takeout or delivery', noneFr: 'Ni plats à emporter ni livraison', group: 'visit', w: 3, fix: false,
-    en: 'Takeout and delivery', fr: 'À emporter et livraison', whyEn: 'Coming soon.', whyFr: 'Bientôt.', icon: '🥡' },
-  { key: 'pyv_dietary', group: 'visit', w: 2, fix: false,
-    en: 'Dietary note', fr: 'Note alimentaire', whyEn: 'Coming soon.', whyFr: 'Bientôt.', icon: '🌱' },
-  { key: 'pyv_groups', group: 'visit', w: 3, fix: false,
-    en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids’ menu. Coming soon.', whyFr: 'Grands groupes, stationnement, menu enfants. Bientôt.', icon: '👥' },
+  // "Plan your visit" lines (2026-11-08): the owner writes them in the "Plan your visit" section of the edit page.
+  { key: 'pyv_known', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitKnown' }, fields: ['visit_rows'],
+    en: 'Known for', fr: 'Connu pour', whyEn: 'One line on what people come back for.', whyFr: 'Une ligne sur ce pour quoi les gens reviennent.', btnEn: 'Write it', btnFr: 'Écrire', icon: '👍' },
+  { key: 'pyv_reservations', noneEn: 'We don’t take reservations', noneFr: 'Nous ne prenons pas de réservations', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitReservations' }, fields: ['visit_rows', 'booking_url'],
+    en: 'Reservations', fr: 'Réservations', whyEn: 'How to book, or walk-ins only.', whyFr: 'Comment réserver, ou sans réservation seulement.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
+  { key: 'pyv_takeout', noneEn: 'No takeout or delivery', noneFr: 'Ni plats à emporter ni livraison', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitTakeout' }, fields: ['visit_rows'],
+    en: 'Takeout and delivery', fr: 'À emporter et livraison', whyEn: 'Order to go? Which delivery apps?', whyFr: 'Pour emporter? Quelles applis de livraison?', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🥡' },
+  { key: 'pyv_dietary', group: 'visit', w: 2, fix: true, target: { task: 'more', id: 'opVisitDietary' }, fields: ['visit_rows'],
+    en: 'Dietary note', fr: 'Note alimentaire', whyEn: 'What you can do for allergies and diets.', whyFr: 'Ce que vous pouvez faire pour les allergies et les régimes.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🌱' },
+  { key: 'pyv_groups', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
+    en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids, anything that helps.', whyFr: 'Grands groupes, stationnement, enfants, tout ce qui aide.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '👥' },
   { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescriptionLabel' }, fields: ['description'],
     en: 'A description (120+ characters)', fr: 'Une description (120 caractères ou plus)', whyEn: 'A few sentences about your place, in your words.', whyFr: 'Quelques phrases sur votre établissement, dans vos mots.', btnEn: 'Write it', btnFr: 'Écrire', icon: '✍️' },
   { key: 'instagram', noneEn: 'We’re not on Instagram', noneFr: 'Nous ne sommes pas sur Instagram', group: 'social', w: 3, fix: true, target: { task: 'contact', id: 'opInstagram' }, fields: ['instagram_url'],
@@ -263,7 +264,7 @@ const COMPLETENESS_SCRIPT = `
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-cb-id');
         setTask(b.getAttribute('data-cb-task'));
-        if (id) setTimeout(function(){ var el = document.getElementById(id); if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); var f = el.matches('input,select,textarea') ? el : null; if (f) f.focus({ preventScroll: true }); } }, 60);
+        if (id) setTimeout(function(){ var el = document.getElementById(id); if (el) { if (el.tagName === 'DETAILS') el.open = true; var dd = el.closest ? el.closest('details') : null; if (dd) dd.open = true; el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); var f = el.matches('input,select,textarea') ? el : null; if (f) f.focus({ preventScroll: true }); } }, 60);
       });
     });
     // "We don't have one" (2026-11-08): saves the whole list (it goes live at once, like the average spend), then

@@ -58,10 +58,11 @@ test('score: a "not offered" answer counts as done, and lists under declined; da
   assert.ok(after.pct > before.pct);
   assert.deepEqual(after.declined.map((i) => i.key).sort(), ['happy_hour', 'instagram']);
   assert.ok(!after.missing.some((i) => i.key === 'happy_hour' || i.key === 'instagram'));
-  // Reservations is a "coming" item: answering it makes it count (no longer left out of the total).
+  // Reservations (a Plan your visit line, its own box since 2026-11-08): answering it makes it done.
   const r = pc.scoreCompleteness({ ...input, declaredNone: ['pyv_reservations'] }, { today });
-  assert.equal(r.max, before.max + 3);
-  assert.ok(!r.coming.some((i) => i.key === 'pyv_reservations'));
+  assert.equal(r.max, before.max);
+  assert.equal(r.got, before.got + 3);
+  assert.ok(!r.coming.some((i) => i.key === 'pyv_reservations') && !r.missing.some((i) => i.key === 'pyv_reservations'));
   // Unknown or core keys are ignored.
   assert.equal(pc.scoreCompleteness({ ...input, declaredNone: ['hours', 'photo_main', 'nope'] }, { today }).got, before.got);
   // Instagram on file and an old "not on Instagram" answer: it is simply done, not shown as declined.
@@ -84,10 +85,11 @@ test('edit page (restaurant): the buttons show in English and French, never on p
   assert.match(fr, /data-cb-none="happy_hour">Nous n’avons pas de happy hour</);
   assert.match(fr, /data-cb-none="instagram">Nous ne sommes pas sur Instagram</);
   assert.match(fr, /data-cb-none="pyv_takeout">Ni plats à emporter ni livraison</);
-  // Reservations and Takeout sit under "Don't offer these?", never under "We're adding these" ("can't fill these in yet").
-  for (const [page, ask, soon] of [[p, 'Don’t offer these?', 'We’re adding these'], [fr, 'Vous n’offrez pas ceci?', 'Nous ajoutons ceci']]) {
-    const a = page.indexOf(ask), s = page.indexOf(soon);
-    assert.ok(a >= 0 && s > a, 'both lists present, ask first');
+  // Reservations and Takeout sit in "Still to add" with their own boxes (2026-11-08), never under "We're adding these"
+  // ("can't fill these in yet"). The "Don't offer these?" list is only for an item with a button but no box.
+  for (const [page, still, soon] of [[p, 'Still to add', 'We’re adding these'], [fr, 'Reste à ajouter', 'Nous ajoutons ceci']]) {
+    const a = page.indexOf(still), s = page.indexOf(soon);
+    assert.ok(a >= 0 && s > a, 'both lists present');
     const soonPart = page.slice(s);
     assert.ok(!soonPart.includes('data-cb-none='), 'no "we don\'t have one" button in "We\'re adding these"');
     assert.ok(!soonPart.includes('Réservations') && !soonPart.includes('>Reservations<'), 'Reservations not listed as coming');
