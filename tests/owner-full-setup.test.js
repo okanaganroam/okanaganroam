@@ -40,17 +40,22 @@ const post = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Content-
 const change = (t, changes, setup = true) => post(`/owner/${t}/changes${setup ? '?from=setup' : ''}`, { changes, ...(setup ? { from_setup: true } : {}), note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 });
 const cfgOf = (html) => JSON.parse(/window\.SETUP_CFG = (\{.*?\});<\/script>/.exec(html)[1]);
 
-test('the page: 20 steps in order, the approved words, "before tax and tip", French, setup-only header', async () => {
+test('the page: the steps in two parts, the approved words, "before tax and tip", French, setup-only header', async () => {
   const v = mk('restaurant');
   const html = await get(`/owner/${tokenFor(v.id)}/setup`).then((r) => r.text());
   const cfg = cfgOf(html);
-  assert.deepEqual(cfg.steps, ['basics', 'hours', 'season', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer', 'happy', 'specials', 'music', 'story', 'book', 'takeout', 'known', 'groups', 'instagram', 'facebook', 'door']);
+  // Split in two (2026-11-09): Part 1 the essentials (8, in order), Part 2 optional (11, any order). Seasons are part of closures.
+  assert.deepEqual(cfg.part1, ['basics', 'hours', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer']);
+  assert.deepEqual(cfg.part2, ['happy', 'specials', 'music', 'story', 'book', 'takeout', 'known', 'groups', 'instagram', 'facebook', 'door']);
+  assert.deepEqual(cfg.steps, cfg.part1.concat(cfg.part2));
   assert.equal(cfg.t.spendLead, 'One main and a soft drink, before tax and tip.');
   assert.equal(cfg.t.spendQ, 'About how much does one person spend?');
-  assert.match(cfg.t.hiLead, /about 10 minutes/);
+  assert.match(cfg.t.hiLead, /The essentials take about 10 minutes/);
   assert.equal(cfg.t.savedEmail, 'Great. Once you’ve emailed it, we’ll add it within a day.');
   assert.equal(cfg.offerGroups.length, 3);
-  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 18);
+  // Happy hour and Takeout aren't tiles any more (asked twice): their own questions in Part 2 set them.
+  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 16);
+  assert.ok(!cfg.offerGroups.some((g) => g.keys.includes('happy_hour') || g.keys.includes('takeout')));
   assert.equal(cfg.offerLabels.wheelchair_accessible, 'Wheelchair accessible');
   assert.equal(cfg.cuisines.length, 45);
   assert.match(html, /<header class="su-head">.*Exit setup/s);
@@ -120,9 +125,9 @@ test('progress: answers are remembered for Welcome back; bad steps refused; the 
   assert.ok(Number.isInteger(j.score.pct) && j.score.soon >= j.score.pct && ['none', 'paused', 'earned'].includes(j.score.badge));
   const html = await get(`/owner/${t}/setup`).then((r) => r.text());
   assert.deepEqual(cfgOf(html).progress.done, { hours: 'live', door: 'later' });
-  // The portal card: "Set up your page" until every step is answered.
+  // The portal card: "Carry on where you left off" once something is answered.
   const portal = await get(`/owner/${t}`).then((r) => r.text());
-  assert.match(portal, /Set up your page/);
+  assert.match(portal, /Carry on where you left off/);
   for (const s of cfgOf(html).steps) await post(`/owner/${t}/setup/progress`, { step: s, status: 'skip' });
   assert.match(await get(`/owner/${t}`).then((r) => r.text()), /Your page is set up[\s\S]*Change something\?/);
   // Help: "did it go through?" answers with what was sent.

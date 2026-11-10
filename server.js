@@ -43966,7 +43966,7 @@ const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch',
   'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
   'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
 // Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
-const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'West Coast', 'Seafood'];
+const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food'];
 const OWNER_CUISINES_MAX = 3;
 const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pub or sports bar', 'Diner', 'Quick bite', 'Winery or brewery restaurant'];
 const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
@@ -44994,6 +44994,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     } else if (!Array.isArray(x) || x.some((s) => !s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some((k) => !OWNER_SPECIAL_KEYS.includes(k)))) {
       errors.specials = OWNER_SPECIALS_ERRORS.unreadable;
     } else {
+      // "18" -> "$18" (2026-11-09): a bare number typed as a price gets its dollar sign.
+      for (const sp of x) if (typeof sp.price === 'string' && /^\s*\d{1,4}(?:\.\d{1,2})?\s*$/.test(sp.price)) sp.price = `$${sp.price.trim()}`;
       const checked = validateSpecials(x, { source: 'venue_owner', checked_at: todayLocal() });
       if (!checked.ok) errors.specials = ownerSpecialsError(checked.detail);
       else if (!venueServesAlcohol(venue) && checked.specials.some((s) => s.kind !== 'food')) errors.specials = OWNER_SPECIALS_ERRORS.drink;
@@ -47551,7 +47553,16 @@ function menuFiles(menuId) {
 }
 // Full easy setup (2026-11-09): happy hour and weekly specials sent as a file, photo or website to type up.
 const SETUP_SHEET_KINDS = ['happy_hour', 'specials'];
-const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials' };
+const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials', facebook: 'Facebook page', instagram: 'Instagram name' };
+// A page name instead of a link (2026-11-09): "What's your Facebook page called?" answered with plain words is a note
+// for us to find the link (never published as typed). Same queue, no pages.
+const SETUP_NOTE_KINDS = ['facebook', 'instagram'];
+// -> { facebook: true, instagram: true } for names sent and still waiting for us.
+function setupSocialNotes(venueId) {
+  const out = {};
+  try { for (const r of db.prepare("SELECT DISTINCT help_kind FROM venue_menus WHERE venue_id = ? AND status = 'help' AND help_kind IN ('facebook', 'instagram')").all(venueId)) out[r.help_kind] = true; } catch (e) { /* none */ }
+  return out;
+}
 // The open happy hour / specials request a new page joins (a sent one starts a new request).
 function setupSheetDraft(venueId, sheet) {
   return db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status = 'draft' ORDER BY id DESC LIMIT 1").get(venueId, sheet) || null;
@@ -47615,7 +47626,7 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
   const items = menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' ? (menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
+    _subject: kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
@@ -48060,7 +48071,7 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     return send(200, { ok: true, live: false });
   }
   if (action === 'help') {
-    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) ? body.sheet : null;
+    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) || (SETUP_NOTE_KINDS.includes(body.sheet) && venue.type === 'restaurant') ? body.sheet : null;
     const note = typeof body.note === 'string' ? body.note.replace(/[<>]/g, '').trim().slice(0, 1000) : '';
     const contact = ctx.found.account ? { email: ctx.found.account.email } : ownerOptionalEmail(body.contact_email);
     if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
@@ -49655,8 +49666,13 @@ const OWNER_SETUP_STRINGS = require('./owner-setup-text');
 // ----- Full easy setup (2026-11-09): progress and score -----
 // The 20 steps, in order, and how each was answered: 'live' (on the page now), 'day' (sent; on the page within a day),
 // 'email' (they'll email it), 'skip' (skipped for now) or 'later' (the front door, next time they're at their place).
-const SETUP_STEPS = ['basics', 'hours', 'season', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer', 'happy', 'specials', 'music', 'story', 'book', 'takeout', 'known', 'groups', 'instagram', 'facebook', 'door'];
-const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later'];
+// Split in two (2026-11-09, fresh-eyes on the 20 steps: "it was OK, but long"): Part 1 "the essentials" is asked in
+// order; Part 2 "more about your place" is optional, in any order, from a menu of tiles. Seasons are part of the
+// closures step. 'no' = the owner said they don't have it ("We're not on Instagram").
+const SETUP_PART1 = ['basics', 'hours', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer'];
+const SETUP_PART2 = ['happy', 'specials', 'music', 'story', 'book', 'takeout', 'known', 'groups', 'instagram', 'facebook', 'door'];
+const SETUP_STEPS = SETUP_PART1.concat(SETUP_PART2);
+const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no'];
 const SETUP_RATE_LIMIT = 80;
 const ownerSetupAttempts = new Map();
 function ownerSetupRateLimited(ip, now = Date.now()) {
@@ -49687,6 +49703,13 @@ function setupFinished(venueId) {
   const { done } = setupProgress(venueId);
   return SETUP_STEPS.every((k) => done[k]);
 }
+// Where the owner is: 'none' (not started), 'partial' (some answered), 'essentials' (Part 1 answered), 'done' (all).
+function setupState(venueId) {
+  const { done } = setupProgress(venueId);
+  if (SETUP_STEPS.every((k) => done[k])) return 'done';
+  if (SETUP_PART1.every((k) => done[k])) return 'essentials';
+  return SETUP_STEPS.some((k) => done[k]) ? 'partial' : 'none';
+}
 // The same score the portal shows: % now, % once we check what was sent, and the badge state.
 function setupScore(found) {
   const { venue, happyHourTimes } = found;
@@ -49714,8 +49737,16 @@ async function handleOwnerSetupProgress(req, res, method, found) {
 }
 
 // The big first card on a restaurant's edit page.
-function ownerSetupCardHtml(href, lang, finished = false) {
+function ownerSetupCardHtml(href, lang, state = 'none') {
   const fr = lang === 'fr';
+  if (state === true) state = 'done'; else if (!state) state = 'none';
+  const finished = state === 'done';
+  const [cardTitle, cardSub] = {
+    none: fr ? ['Configurez votre page', 'Une question à la fois. L’essentiel prend environ 10 minutes'] : ['Set up your page', 'One question at a time. The essentials take about 10 minutes'],
+    partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
+    essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
+    done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
+  }[state] || [];
   return `<style>
     body.owner-page .op-setup-card { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; padding: 16px 18px; min-height: 72px; border-radius: 16px; background: #1E4F4C; color: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(42,32,25,.12); }
     body.owner-page .op-setup-card:focus-visible { outline: 3px solid #C9A34A; outline-offset: 3px; }
@@ -49725,7 +49756,7 @@ function ownerSetupCardHtml(href, lang, finished = false) {
     body.owner-page .op-setup-txt span { display: block; font-size: .95rem; opacity: .9; font-weight: 600; }
     body.owner-page .op-setup-go { font-size: 1.6rem; font-weight: 800; flex: none; }
   </style>
-  <a class="op-setup-card" id="opSetupCard" href="${escapeHtml(href)}"><span class="op-setup-ico" aria-hidden="true">${finished ? '✓' : '📋'}</span><span class="op-setup-txt"><strong>${finished ? (fr ? 'Votre page est configurée' : 'Your page is set up') : (fr ? 'Configurez votre page' : 'Set up your page')}</strong><span>${finished ? (fr ? 'Changer quelque chose?' : 'Change something?') : (fr ? 'Une question à la fois, environ 10 minutes' : 'One question at a time, about 10 minutes')}</span></span><span class="op-setup-go" aria-hidden="true">→</span></a>`;
+  <a class="op-setup-card" id="opSetupCard" href="${escapeHtml(href)}"><span class="op-setup-ico" aria-hidden="true">${finished || state === 'essentials' ? '✓' : '📋'}</span><span class="op-setup-txt"><strong>${cardTitle}</strong><span>${cardSub}</span></span><span class="op-setup-go" aria-hidden="true">→</span></a>`;
 }
 
 // GET .../setup: the page for a restaurant; any other type goes back to its edit page (nothing changes for them).
@@ -49746,13 +49777,16 @@ function renderOwnerSetupPage(found, opts) {
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
   const progress = setupProgress(venue.id);
   const score = setupScore(found);
+  // The preview shows the photo the owner chose as their main one, even while we're still checking it.
+  let pendingMain = '';
+  try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
     address: snap.address, phone: snap.phone, description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
     hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
     specials: (snap.specials || []).map((x) => ({ days: x.days, title: x.title, deal: x.deal, price: x.price })),
-    weekly_nights: (snap.weekly_nights || []).map((x) => ({ days: x.days, kind: x.kind, title: x.title })),
+    weekly_nights: (snap.weekly_nights || []).map((x) => ({ days: x.days, kind: x.kind, title: x.title, start: x.start || '' })),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
@@ -49760,24 +49794,25 @@ function renderOwnerSetupPage(found, opts) {
     Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
   const offerGroups = [
-    { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'local_drinks', 'happy_hour'] },
+    // Happy hour and Takeout are not tiles (asked twice, fresh-eyes 2026-11-09): their own questions in Part 2 set them.
+    { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'local_drinks'] },
     { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'sports_tv', 'live_music', 'wheelchair_accessible', 'locally_owned'] },
-    { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'great_groups', 'takes_reservations', 'takeout'] },
-  ].map((g) => ({ ...g, keys: g.keys.filter((k) => k !== 'happy_hour' || portalFields(venue.type).happyHour) }));
+    { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'great_groups', 'takes_reservations'] },
+  ];
   const offerLabels = { ...t.offers };
   for (const k of OWNER_EXTRA_BADGES) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
   const cfg = {
-    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, progress: { done: progress.done, score },
+    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: SETUP_PART1, part2: SETUP_PART2, progress: { done: progress.done, score },
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
-    image: ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
+    image: pendingMain || ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
-    cur, cuisines: OWNER_CUISINES, popular: OWNER_CUISINES_POPULAR, cuisineIcons,
+    cur, cuisines: OWNER_CUISINES, popular: OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     placeTypes: RESTAURANT_PLACE_TYPES, placeNames: Object.fromEntries(RESTAURANT_PLACE_TYPES.map((p) => [p, fr ? frPlaceType(p) : p])),
     offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡' },
@@ -49789,14 +49824,15 @@ function renderOwnerSetupPage(found, opts) {
     menuBase: `${opts.base}/menu`,
     badgeChip: portalCompleteness.badgeChipHtml(fr), t,
   };
-  // Help: "did it go through?" answers with what this business has sent so far (as of opening the page).
-  const sent = SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(t.st[progress.done[k]])}</li>`).join('');
+  // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
+  // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
+  const sent = SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(progress.done[k] === 'no' ? (t.noLabels[k] || t.st.no) : t.st[progress.done[k]])}</li>`).join('');
   const statusTopic = {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
     a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu, your address, phone and description show on your page within a day. Everything else is on your page right away.</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(OWNER_SETUP_STRINGS.fr.st[progress.done[k]])}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(progress.done[k] === 'no' ? (OWNER_SETUP_STRINGS.fr.noLabels[k] || OWNER_SETUP_STRINGS.fr.st.no) : OWNER_SETUP_STRINGS.fr.st[progress.done[k]])}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -49931,7 +49967,11 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-score span { color: var(--su-soft); font-weight: 700; font-size: 16px; }
   body.owner-setup .su-ring { flex: none; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; }
   body.owner-setup .su-ring b { width: 70px; height: 70px; border-radius: 50%; background: var(--su-card); display: grid; place-items: center; font-size: 22px; }
-  body.owner-setup .su-badge-line { font-weight: 700; color: var(--su-ink); margin: 0 0 14px; }
+  body.owner-setup .su-badge-line { margin: 0 0 6px; }
+  body.owner-setup .su-badge-text { font-weight: 700; color: var(--su-ink); margin: 0 0 14px; }
+  /* The main button stays in reach on long screens (holidays, kinds of food, what you offer). */
+  body.owner-setup .su-sticky { position: sticky; bottom: 0; z-index: 5; background: #F4F1EA; padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)); margin-top: 6px; }
+  body.owner-setup .su-tile .su-tile-sub { font-size: 13px; }
   body.owner-setup .su-map { height: 280px; border-radius: 16px; margin-bottom: 14px; border: 2px solid var(--su-line); }
   body.owner-setup .su-door { width: 100%; border-radius: 16px; display: block; margin-bottom: 14px; }
   body.owner-setup .su-tick.su-need { border-color: var(--su-warn); box-shadow: 0 0 0 3px var(--su-warn-bg); }
@@ -51037,11 +51077,11 @@ const OWNER_HELP_TOPICS = [
     a: '<p>Open <strong>Plan your visit</strong> and write one short line in each box you want on your page: <strong>Known for</strong>, <strong>Reservations</strong>, <strong>Takeout and delivery</strong>, <strong>Dietary note</strong> and <strong>Groups and good to know</strong>. Then tap <strong>Save these lines</strong>.</p><ul><li>They go live straight away in the <strong>Plan your visit</strong> box on your page, and show in <strong>Your updates</strong>.</li><li>Plain words only, up to 180 characters each, no links. Your booking link goes under <strong>Name, address &amp; links</strong>.</li><li>Leave a box empty to take that line off your page. Don’t take reservations or do takeout? Tap <strong>We don’t take reservations</strong> or <strong>No takeout or delivery</strong> instead.</li><li>They’re yours from then on: our research won’t change or bring back a line you wrote or removed.</li></ul>',
     aFr: '<p>Ouvrez <strong>Planifier la visite</strong> et écrivez une courte ligne dans chaque case que vous voulez sur votre page : <strong>Connu pour</strong>, <strong>Réservations</strong>, <strong>À emporter et livraison</strong>, <strong>Note alimentaire</strong> et <strong>Groupes et bon à savoir</strong>. Touchez ensuite <strong>Enregistrer ces lignes</strong>.</p><ul><li>Elles sont en ligne tout de suite dans la case <strong>Planifiez votre visite</strong> de votre page et paraissent dans <strong>Vos mises à jour</strong>.</li><li>Des mots simples seulement, 180 caractères au plus chacune, sans liens. Votre lien de réservation va sous <strong>Nom, adresse et liens</strong>.</li><li>Laissez une case vide pour retirer cette ligne de votre page. Vous ne prenez pas de réservations ou ne faites pas de plats à emporter? Touchez plutôt <strong>Nous ne prenons pas de réservations</strong> ou <strong>Ni plats à emporter ni livraison</strong>.</li><li>Elles sont ensuite à vous : nos recherches ne modifieront ni ne remettront une ligne que vous avez écrite ou retirée.</li></ul><p>Sur la version française de votre page, une ligne paraît une fois que nous l’avons traduite.</p>' },
   // Easy setup (2026-11-09): the one-question-at-a-time photos and menu screen.
-  { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How do I add my photos and menu the easy way?', qFr: 'Comment ajouter mes photos et mon menu facilement?', pages: ['setup', 'edit'],
-    keys: ['easy setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo'],
-    keysFr: ['configuration simple', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale'],
-    a: '<p>Tap <strong>Add your photos and menu</strong> at the top of your page settings. It asks one thing at a time:</p><ul><li><strong>Photos:</strong> take a photo or choose some from your phone. Tap ✕ to remove one and <strong>Make main photo</strong> for the big one at the top of your page. A photo that is too small says so straight away.</li><li><strong>Menu:</strong> upload a PDF or photos, snap each page, use the menu on your website, or email it to us.</li><li>Every step has <strong>Skip this for now</strong>, and you can stop at any time.</li><li>When you see <strong>Saved ✓</strong>, we have it. We add it to your page for you.</li></ul>',
-    aFr: '<p>Touchez <strong>Ajoutez vos photos et votre menu</strong> en haut des réglages de votre page. Une seule question à la fois :</p><ul><li><strong>Photos :</strong> prenez une photo ou choisissez-en dans votre téléphone. Touchez ✕ pour en retirer une et <strong>Photo principale</strong> pour la grande photo en haut de votre page. Une photo trop petite est signalée tout de suite.</li><li><strong>Menu :</strong> téléversez un PDF ou des photos, photographiez chaque page, utilisez le menu de votre site Web ou envoyez-le-nous par courriel.</li><li>Chaque étape a <strong>Passer pour l’instant</strong>, et vous pouvez arrêter à tout moment.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Nous l’ajoutons à votre page pour vous.</li></ul>' },
+  { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
+    keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
+    keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your page settings. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut des réglages de votre page. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (environ 10 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],
@@ -51255,7 +51295,9 @@ const OWNER_HELP_SCRIPT = String.raw`
   function answer(id, asked, related){
     var t = byId[id]; if (!t) return;
     var first = asked ? say(esc(asked), 'ohb-me') : null;
-    var a = say(curLang === 'fr' ? t.aFr : t.a);
+    // A page can answer a topic itself with what is true right now (the setup's "did it go through?").
+    var lv = (window.ohbLive || {})[id];
+    var a = say(lv ? lv(curLang, function(html){ a.innerHTML = html; }) : curLang === 'fr' ? t.aFr : t.a);
     var seen = {}; seen[id] = 1;
     var more = (related || []).concat(cfg.start || []).filter(function(x){ if (seen[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
     say(ui('more'));
@@ -53915,13 +53957,13 @@ function renderAdminMenuCard(m) {
   const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(m.venue_id);
   const pages = menuFiles(m.id);
   const items = menuItemCount(parseMenuData(m.data));
-  const what = m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const what = m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? (m.help_kind === 'happy_hour' ? 'Happy hour' : 'Weekly specials') : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -54260,8 +54302,22 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
     items.push({ kind: 'photo', at: ph.reviewed_at || ph.submitted_at, sent: ph.submitted_at, status: ph.reviewed_by === 'owner' && ph.status === 'rejected' ? 'removed' : ph.status,
       reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? (fr ? 'Photo (photo principale)' : 'Photo (main photo)') : 'Photo' });
   }
+  // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
+  try {
+    for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
+      const t = { happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: t });
+    }
+  } catch (e) { /* no menus table */ }
   items.sort((a, b) => String(b.sent).localeCompare(String(a.sent)));
-  return items.slice(0, limit);
+  // The same update sent several times in a row (the setup saves one answer per screen) is one line.
+  const merged = [];
+  for (const it of items) {
+    const last = merged[merged.length - 1];
+    if (last && it.kind === 'change' && last.kind === 'change' && last.title === it.title && last.status === it.status && String(last.sent).slice(0, 10) === String(it.sent).slice(0, 10)) continue;
+    merged.push(it);
+  }
+  return merged.slice(0, limit);
 }
 
 function ownerStatusLabel(item, lang = 'en') {
@@ -54897,7 +54953,12 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   // A storefront spot sent and waiting for our check (fresh-eyes 3, 2026-11-09).
   let pendingArrival = false;
   try { pendingArrival = !hasArrival && !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id); } catch (e) { pendingArrival = false; }
+  // Sent through "do it for me" (the easy setup's menu photos or files, happy hour or specials sheets, a Facebook or
+  // Instagram name): waiting for us, not "left" (fresh-eyes on the full setup, 2026-11-09).
+  const pendingHelp = {};
+  try { for (const r of db.prepare("SELECT help_kind, status FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) { if (r.status === 'help' || !r.help_kind) pendingHelp[r.help_kind || 'menu'] = true; } } catch (e) { /* none */ }
   return {
+    pendingHelp,
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
     hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: venueGalleryPhotos(venue).length,
     avgSpend: live.avg_spend && Number.isInteger(live.avg_spend.amount) ? live.avg_spend.amount : null,
@@ -54956,7 +55017,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     avgEstimate: input.avgSpendSource === 'research' && !pending.has('avg_spend') ? input.avgSpend : null,
     avgPublic: avgSpendPublic(),
     // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
-    pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr),
+    pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr), plainWaiting: setupState(venue.id) !== 'none',
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     // Complete & Verified (2026-11-09): the badge block under the ring (earned, paused, or how to earn it).
     claimed: venueIsClaimed(venue.id),
@@ -55650,7 +55711,7 @@ ${renderGolfHeaderHtml()}
   <div class="op-wrap">
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
-      <h1>${escapeHtml(venue.name)}</h1>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupFinished(venue.id)) : ''}${completeHtml}
+      <h1>${escapeHtml(venue.name)}</h1>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
@@ -56044,6 +56105,8 @@ ${ownerFooterHtml(fr)}
     });
     var bar = document.getElementById('opTaskBar'); if (bar) bar.hidden = !(t && t !== 'all');
     if (fm && (t === 'photos' || t === 'arrival' || t === 'video' || t === 'events')) fm.classList.add('op-hide'); else if (fm) fm.classList.remove('op-hide');
+    // Nothing of the form shows in this view (the task list): no empty rounded box at the bottom of the page (2026-11-09).
+    if (fm && !fm.classList.contains('op-hide') && fm.style.display !== 'none' && !Array.prototype.some.call(fm.children, function(c){ return c.offsetHeight > 2; })) fm.classList.add('op-hide');
     if (t && t !== 'all') Array.prototype.forEach.call(document.querySelectorAll('details[data-task~="' + t + '"]'), function(d){ d.open = true; });
     if (!t || t === 'all') window.scrollTo(0, 0);
     else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
@@ -61920,7 +61983,7 @@ module.exports = {
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
-  SETUP_STEPS, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
+  SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
   validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,

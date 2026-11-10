@@ -177,4 +177,59 @@ const fr = {
   whatHappy: 'happy hour', whatSpecials: 'spéciaux de la semaine',
 };
 
+// ----- Split in two + fresh-eyes fixes (2026-11-09) -----
+// Part 1 "the essentials" (8 questions, in order), then Part 2 "more about your place" (optional, any order).
+Object.assign(en, {
+  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 minutes. You can stop any time and carry on later.',
+  welcomeLead: 'Your answers so far are saved.',
+  essBar: 'The essentials: done', moreProg: 'More about your place · {n} of {total} done', moreDone: 'Optional · {n} of {total} done',
+  essQ: 'The essentials are done!', moreOpt: 'Add more about your place', moreOptSub: 'Optional: happy hour, specials, your story and more', doneNow: 'I’m done for now',
+  moreQ: 'More about your place', moreLead: 'All optional. Tap any one, in any order. Each takes a minute or two.', backToMore: 'Back to the list',
+  finishQ: 'Everything is done!', finishHome: 'Everything you can do from home is done', finishSoFar: 'Here’s your page so far',
+  gotIt: 'Got it.', savedNo: 'Thanks for telling us.', youSaid: '✓ Saved. You said: {a}. You can change it here.',
+  noLabels: { closures: 'nothing coming up', happy: 'no happy hour', specials: 'no weekly specials', music: 'no weekly events', book: 'walk-ins only', takeout: 'no takeout or delivery', groups: 'no big groups', instagram: 'not on Instagram', facebook: 'not on Facebook' },
+  helpYes: 'Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you right now:', helpNone: 'Nothing yet. Start with the first question.',
+  helpTail: 'Photos, your menu, your address, phone and description show on your page within a day. Everything else is on your page right away.',
+  closuresLead: 'Tap the holidays you’re closed. Closing for longer? Add the dates below.', anotherDay: '+ Closed for a week or two (or other dates)', wholeMonths: '+ We close for whole months each year',
+  monthsRow: 'Open {a} to {b} each year', monthsUse: 'Use these months', allYearBtn: 'We’re open all year',
+  closeAddLead: 'For a winter break, renovations, a private event or a holiday that’s not on the list.', howLong: 'How long are you closed?', len1: '1 day', len7: '1 week', len14: '2 weeks', lenPick: 'Pick the last day', lastDay: 'Last day closed',
+  uploadSub: 'A file or photos from your phone or computer', upLead: 'Pick the file your menu is in. A file or photos both work.', sendMenu: 'Send my menu',
+  emailLead: 'Send a photo or a file of your menu. Put “{name}” in the subject.', upSub: 'A file or a photo from your phone', sheetLead: 'A file, a photo of a sign, a table card or a chalkboard all work. We’ll type it up for you.',
+  dogLead: 'One short line is perfect.',
+  whatsOnEx: '$6 pints and half-price appetizers', specialEx: 'Taco Tuesday, 3 tacos', priceEx: '$12', eventEx: 'Trivia night, free to play', eventTime: 'What time does it start? (optional)',
+  storyCount: 'A bit more would be great.', storyGood: 'Great length ✓',
+  bookQ: 'Can people book a table?', bookYes: 'Yes', bookNo: 'No, walk-ins only', bookNoLink: 'Actually, we don’t take bookings', takeoutNoLink: 'Actually, we don’t do takeout', groupsNoLink: 'Actually, we can’t take big groups',
+  groupsQ: 'Can you take groups of 10 or more?',
+  igLead: 'Type your Instagram name, like @yourrestaurant.', fbQ: 'What’s your Facebook page called?', fbLead: 'Type the name of your page. If you have its link, you can paste that instead.', fbLabel: 'Facebook page name or link',
+  socialSent: '✓ You told us the name. We’ll add the link within a day.', savedFbName: 'We’ll add your Facebook link within a day.', savedIgName: 'We’ll add your Instagram link within a day.',
+  fbNote: 'Our Facebook page is called: “{name}”. Please find the link and add it to our page.', igNote: 'Our Instagram name is: “{name}”. Please find the link and add it to our page.',
+});
+en.st.no = 'no';
+Object.assign(fr, {
+  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend environ 10 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  welcomeLead: 'Vos réponses sont enregistrées.',
+  essBar: 'L’essentiel : terminé', moreProg: 'Plus de détails · {n} sur {total}', moreDone: 'Facultatif · {n} sur {total}',
+  essQ: 'L’essentiel est fait!', moreOpt: 'Ajouter plus de détails', moreOptSub: 'Facultatif : happy hour, spéciaux, votre histoire et plus', doneNow: 'J’ai terminé pour l’instant',
+  moreQ: 'Plus de détails sur votre établissement', moreLead: 'Tout est facultatif. Touchez-en un, dans l’ordre que vous voulez. Chacun prend une minute ou deux.', backToMore: 'Retour à la liste',
+  finishQ: 'Tout est fait!', finishHome: 'Tout ce que vous pouvez faire de chez vous est fait', finishSoFar: 'Voici votre page jusqu’ici',
+  gotIt: 'C’est noté.', savedNo: 'Merci de nous l’avoir dit.', youSaid: '✓ Enregistré. Vous avez répondu : {a}. Vous pouvez le modifier ici.',
+  noLabels: { closures: 'rien à venir', happy: 'pas de happy hour', specials: 'pas de spéciaux', music: 'pas d’événements', book: 'sans réservation', takeout: 'pas de commandes à emporter', groups: 'pas de grands groupes', instagram: 'pas sur Instagram', facebook: 'pas sur Facebook' },
+  helpYes: 'Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous en ce moment :', helpNone: 'Rien encore. Commencez par la première question.',
+  helpTail: 'Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.',
+  closuresLead: 'Touchez les jours fériés où vous êtes fermé. Fermé plus longtemps? Ajoutez les dates ci-dessous.', anotherDay: '+ Fermé une semaine ou deux (ou d’autres dates)', wholeMonths: '+ Nous fermons des mois entiers chaque année',
+  monthsRow: 'Ouvert de {a} à {b} chaque année', monthsUse: 'Utiliser ces mois', allYearBtn: 'Nous sommes ouverts toute l’année',
+  closeAddLead: 'Pour une pause hivernale, des rénovations, un événement privé ou un jour férié qui n’est pas sur la liste.', howLong: 'Combien de temps êtes-vous fermé?', len1: '1 jour', len7: '1 semaine', len14: '2 semaines', lenPick: 'Choisir le dernier jour', lastDay: 'Dernier jour de fermeture',
+  uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur', upLead: 'Choisissez le fichier de votre menu. Un fichier ou des photos, les deux fonctionnent.', sendMenu: 'Envoyer mon menu',
+  emailLead: 'Envoyez une photo ou un fichier de votre menu. Indiquez « {name} » dans l’objet.', upSub: 'Un fichier ou une photo de votre téléphone', sheetLead: 'Un fichier, une photo d’affiche, de chevalet ou de tableau, tout fonctionne. Nous le retranscrirons pour vous.',
+  dogLead: 'Une courte ligne, c’est parfait.',
+  whatsOnEx: 'Pintes à 6 $ et entrées à moitié prix', specialEx: 'Mardi tacos, 3 tacos', priceEx: '12 $', eventEx: 'Soirée quiz, gratuit', eventTime: 'À quelle heure ça commence? (facultatif)',
+  storyCount: 'Un peu plus, ce serait parfait.', storyGood: 'Belle longueur ✓',
+  bookQ: 'Peut-on réserver une table?', bookYes: 'Oui', bookNo: 'Non, sans réservation', bookNoLink: 'En fait, nous ne prenons pas de réservations', takeoutNoLink: 'En fait, nous ne faisons pas de commandes à emporter', groupsNoLink: 'En fait, nous ne pouvons pas accueillir de grands groupes',
+  groupsQ: 'Pouvez-vous accueillir des groupes de 10 personnes ou plus?',
+  igLead: 'Écrivez votre nom Instagram, comme @votrerestaurant.', fbQ: 'Comment s’appelle votre page Facebook?', fbLead: 'Écrivez le nom de votre page. Si vous avez son lien, vous pouvez le coller.', fbLabel: 'Nom ou lien de la page Facebook',
+  socialSent: '✓ Vous nous avez donné le nom. Nous ajouterons le lien d’ici un jour.', savedFbName: 'Nous ajouterons votre lien Facebook d’ici un jour.', savedIgName: 'Nous ajouterons votre lien Instagram d’ici un jour.',
+  fbNote: 'Notre page Facebook s’appelle : « {name} ». Merci de trouver le lien et de l’ajouter à notre page.', igNote: 'Notre nom Instagram est : « {name} ». Merci de trouver le lien et de l’ajouter à notre page.',
+});
+fr.st.no = 'non';
+
 module.exports = { en, fr };
