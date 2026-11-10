@@ -24610,7 +24610,11 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     return [feeHtml, golfData.golfCardValueHtml(d, golfOpts.today)].filter(Boolean).join('\n        ');
   };
   // Season-only notices render as a compact tag on list cards (2026-10-11).
+  // Closed on the photo (2026-11-10): a place closed for the season gets the photo tag even when it also has a written
+  // advisory, so every closed card reads "Closed for the season" on the picture; the written advisory stays on the
+  // venue page.
   const seasonTags = seasonOnlyStates();
+  for (const [id, st] of getSeasonStates()) if (st.kind === 'closed' && !seasonTags.has(id)) seasonTags.set(id, st);
   // Seasons everywhere (2026-10-18): places closed for the season are listed last. cardOpts.keepOrder: the caller
   // has its own order (the Food & Drink style hubs, which rank and page the cards themselves).
   const keepOrder = !!cardOpts.keepOrder;
