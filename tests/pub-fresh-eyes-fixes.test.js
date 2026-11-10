@@ -183,7 +183,8 @@ test('hours editor, happy hour and closures: Same every day, Same as Monday, Ope
   const s = scriptOf(html), cfg = cfgOf(html);
   assert.equal(cfg.t.sameEvery, 'Copy Monday to every day'); assert.equal(cfg.t.sameAsMon, 'Same as Monday');
   assert.equal(cfg.t.openOn, 'Open ✓'); assert.equal(cfg.t.closedOff, 'Closed');
-  assert.match(s, /data-act="sameEvery"/); assert.match(s, /data-samemon/); assert.match(s, /data-dayopen/); assert.match(s, /data-dayclosed/);
+  // Pub test 4: the Monday-only copy button became "Copy these hours to: Every day / Mon–Fri" on any open day.
+  assert.match(s, /data-copyall="/); assert.match(s, /data-samemon/); assert.match(s, /data-dayopen/); assert.match(s, /data-dayclosed/);
   assert.match(s, /function t12[\s\S]{0,400}'Midnight'[\s\S]{0,200}'Noon'/);
   // All day (open to close) takes the opening hours of the picked days.
   assert.equal(cfg.t.allDay, 'All day (open to close)');

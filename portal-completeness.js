@@ -111,9 +111,12 @@ const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
 // NONE_KEYS stays the restaurant list; noneKeysFor(type) is what a type may answer, ALL_NONE_KEYS every type's together.
-const noneKeysFor = (type) => itemsFor(type).filter((i) => i.noneEn).map((i) => i.key);
-const NONE_KEYS = noneKeysFor('restaurant');
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS].filter((i) => i.noneEn).map((i) => i.key))];
+// Answers with no checklist item of their own (pub test 4, 2026-11-10): "No dogs allowed" on "What you offer". Stored
+// with the others (an explicit answer, kept apart from "not ticked") but never scored and never in the checklist.
+const EXTRA_NONE_KEYS = ['dogs'];
+const noneKeysFor = (type) => itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS);
+const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -130,6 +133,7 @@ const GOT_TEXT = {
   cuisine: { en: 'Got it: no food', fr: 'C’est noté : pas de nourriture' },
   sports: { en: 'Got it: no sports on TV', fr: 'C’est noté : pas de sports à la télé' },
   games: { en: 'Got it: no games', fr: 'C’est noté : pas de jeux' },
+  dogs: { en: 'Got it: no dogs allowed', fr: 'C’est noté : chiens non admis' },
 };
 if (ALL_NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;

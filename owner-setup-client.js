@@ -32,10 +32,12 @@
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
+    // "No dogs allowed" (pub test 4, 2026-11-10): the not-offered answer 'dogs'; never together with Dog friendly.
+    noDogs: (CUR.not_offered || []).indexOf('dogs') >= 0 && !(CUR.badges || {}).dog_friendly,
   };
   // Pubs (2026-11-10): the kitchen, who's welcome and the sports, as stored (venue_pub_info); Pub Fare picked to start.
   S.pubInfo = clone(CUR.pub_info || {});
-  S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '22:00', note: (S.pubInfo.kitchen || {}).note || '' };
+  S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '', note: (S.pubInfo.kitchen || {}).note || '' };
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
@@ -288,6 +290,8 @@
     var nd = DAYS[(DAYS.indexOf(d) + 1) % 7], dn = (C.longDays || {})[nd] || dayName(nd);
     return fill(T.earlyNote, { t: t12(c), day: C.lang === 'fr' ? dn.toLowerCase() : dn });
   }
+  // Folds an open day back into its one-line row (pub test 4).
+  function hDone(d){ return '<button type="button" class="su-toggle su-hdone" data-hclose="' + d + '">' + h(T.hoursDoneDay) + '</button>'; }
   // "Closes at midnight or later?" Midnight · 1 AM · 2 AM: one tap sets that day's closing time.
   var LATE = ['00:00', '01:00', '02:00'];
   function lateBtns(d, j, y){
@@ -362,11 +366,12 @@
     var tickedBy = { book: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' };
     STEPS.forEach(function(k){
       if (S.done[k] && S.done[k] !== 'skip' && S.done[k] !== 'later') return;
+      if (k === 'spend' && S.spendNotSure) return; // "Not sure? Skip": not asked again on this screen
       if (tickedBy[k] && S.badges[tickedBy[k]]) return;
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k]; if (!st || seen[st]) return; if (st.indexOf(':') < 0 && answered(st)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k]; if (!st || seen[st] || (st === 'spend' && S.spendNotSure)) return; if (st.indexOf(':') < 0 && answered(st)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
     return out;
   }
   // One "To reach 100%" row (pub test 3, 2026-11-10). The front door says it waits for a visit; the average spend, when
@@ -377,7 +382,10 @@
     if (o.step === 'spend' && spendGuess()) {
       var n = spendGuess();
       return '<div class="su-day su-spendask" id="suSpendAsk"><p class="su-q" style="margin-top:0">' + h(fill(T.spendAsk, { n: n })) + '</p><p class="su-hint">' + h(T.spendAskSub) + '</p><div class="su-stack">'
-        + big('✓', fill(T.spendAskYes, { n: n }), '', false, 'spendConfirm') + big('✎', T.spendAskNo, '', true, 'jump:spend') + '</div></div>';
+        + big('✓', fill(T.spendAskYes, { n: n }), '', false, 'spendConfirm') + big('✎', T.spendAskNo, '', true, 'jump:spend') + '</div>'
+        // Pub test 4 (2026-11-10): "Not sure? Skip" leaves the question open: no change to the score, and this screen
+        // doesn't ask again (it's still under "More about your place").
+        + '<div class="su-skip" style="margin-top:10px"><button type="button" class="su-link" data-act="spendSkip">' + h(T.spendSkip) + '</button></div></div>';
     }
     return big('➜', o.label, S.done[o.step] === 'later' ? T.laterSub : '', true, 'jump:' + o.step);
   }
@@ -477,12 +485,20 @@
       // Pub test 3 (2026-11-10): "1 AM" on the iPhone time wheel meant rolling the hour and switching PM to AM, and the
       // "(early Saturday morning)" note only showed once it was right. The hint now says it up front, and each day's
       // last closing time has quick buttons: Midnight, 1 AM, 2 AM (restaurants too: the screen is shared).
+      // Pub test 4 (2026-11-10): the 7 full day cards were about 3 phone screens for someone changing 3 days. The screen
+      // now starts from the current hours as a short list, one row a day with a big Change button; only the days tapped
+      // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
+      // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
+      if (!S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
       x = q(T.hoursEditQ, T.hoursEditLead) + '<p class="su-hint" id="suLateHint">' + h(T.lateHint) + '</p>' + msgs() + DAYS.map(function(d, i){
         var w = S.week[d], prev = i > 0 ? S.week[DAYS[i - 1]] : null, mon = i > 1 ? S.week.mon : null;
-        return '<div class="su-day"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
+        if (!S.hoursOpen[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
+          + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
+          + '<button type="button" class="su-hchg" data-hopen="' + d + '" aria-label="' + h(fill(T.hoursChangeDay, { day: (C.longDays || {})[d] || dayName(d) })) + '"><span aria-hidden="true">✎</span> ' + h(T.hoursChange) + '</button></div>';
+        return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
-            + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '') : '') + '</div>'
-          + (d === 'mon' && w ? '<div class="su-samerow" style="margin:-4px 0 12px"><button type="button" class="su-toggle" data-act="sameEvery">' + h(T.sameEvery) + '</button></div>' : '');
+            + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
+            + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(T.copyAll) + '</button><button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>' + hDone(d) + '</div>' : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
         + '<div class="su-day"><div class="su-dh"><span>' + h(T.winterQ) + '</span><button type="button" class="su-toggle" data-act="winter" aria-pressed="' + (S.winter.on ? 'true' : 'false') + '">' + h(S.winter.on ? T.yes : T.no) + '</button></div>'
         + (S.winter.on ? '<p class="su-hint">' + h(T.winterHint) + '</p><p class="su-q">' + h(T.whichMonths) + '</p>' + monthChips(S.winter.months, 'winter') + '<p class="su-q">' + h(T.hoursThen) + '</p><div class="su-times"><label class="su-sr" for="wf">' + h(T.starts) + '</label><input type="time" id="wf" value="' + S.winter.from + '"> ' + h(T.to) + ' <label class="su-sr" for="wt">' + h(T.ends) + '</label><input type="time" id="wt" value="' + S.winter.to + '"></div>' : '')
@@ -571,13 +587,18 @@
       var title = isMenu ? (files.length ? T.upQSome : T.upQ) : p[0] === 'happy' ? T.sheetHappyQ : T.sheetSpecialsQ;
       var lead = isMenu ? (files.length ? T.upLeadSome : T.upLead) : files.length ? T.sheetLeadSome : T.sheetLead;
       x = q(title, lead) + msgs() + files.map(function(f, i){ return '<div class="su-row"><span aria-hidden="true">' + (f.pdf ? '📄' : '🖼️') + '</span><span>' + h(f.name) + '</span><button type="button" data-fdel="' + i + '" aria-label="' + h(fill(T.removeFile, { name: f.name })) + '"' + (S.busy ? ' disabled' : '') + '>✕</button></div>'; }).join('')
-        + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (files.length ? big('✓', S.error ? T.tryAgain : isMenu ? T.sendMenu : T.sendIt, '', false, isMenu ? 'sendMenuFiles' : 'sendSheet:' + p[0]) : '')
-        + (S.busy ? '' : big('📄', files.length ? T.upMore : isMenu ? T.upPick : T.chooseFile, '', !!files.length, isMenu ? 'menuFile' : 'sheetFile') + (isMenu ? '' : big('📷', T.camTake, '', true, 'sheetCam'))) + '</div>';
+        // The menu (pub test 4): "Add another file" first, "Send my menu" second (first only to try a failed send again).
+        + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (files.length && !(isMenu && !S.error && !S.busy) ? big('✓', S.error ? T.tryAgain : isMenu ? T.sendMenu : T.sendIt, '', false, isMenu ? 'sendMenuFiles' : 'sendSheet:' + p[0]) : '')
+        + (S.busy ? '' : big('📄', files.length ? T.upMore : isMenu ? T.upPick : T.chooseFile, '', !!files.length && !(isMenu && !S.error), isMenu ? 'menuFile' : 'sheetFile') + (isMenu ? '' : big('📷', T.camTake, '', true, 'sheetCam')))
+        + (isMenu && files.length && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuFiles') : '') + '</div>';
     } else if (s === 'menu:cam') {
       var n = S.menuPages.length;
       x = q(n ? (n === 1 ? T.camGot1 : fill(T.camGotN, { n: n })) : T.camQ, n ? T.camLeadSome : T.camLead) + msgs()
         + (n ? '<p class="su-hint">' + h(T.tapBigger) + '</p><div class="su-pages su-pages-big">' + S.menuPages.map(function(pg, i){ return '<div><img data-zoom="1" src="' + pg.thumb + '" alt="' + h(fill(T.page, { n: i + 1 })) + '"><span>' + (i + 1) + '</span><button type="button" class="su-x" data-pdel="' + i + '" aria-label="' + h(fill(T.removePage, { n: i + 1 })) + '"' + (S.busy ? ' disabled' : '') + '>✕</button></div>'; }).join('') + '</div>' : '')
-        + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '') + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!n, 'menuCam')) + '</div>';
+        // Pub test 4 (2026-11-10): "Add another page" comes first and is the main button, so a 2-page menu isn't sent
+        // after page 1; "Send my menu" is second (first only to try a failed send again).
+        + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n && (S.error || S.busy) ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '')
+        + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
       var site = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
       var lead2 = s === 'menu:web' ? T.webLead : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
@@ -591,7 +612,8 @@
         + '<div class="su-stack"><a class="su-big su-alt" href="' + h(mail) + '"><span class="su-ico" aria-hidden="true">✉️</span><span>' + h(T.openMail) + '<small>' + h(T.openMailSub) + '</small></span></a>' + big('✓', T.willEmail, '', false, 'menuEmailDone') + '</div>';
     } else if (s === 'offer') {
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
-          + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '') + '</div>'; }).join('')
+          + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
+          + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>' : '') + '</div>'; }).join('')
         + '<div class="su-stack su-offer-save">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:dogs') {
       x = q(T.dogQ, T.dogLead) + msgs() + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
@@ -969,7 +991,8 @@
     if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ kitchenSaid(km); S.kitchen.note = ''; }); }
     if (k === 'kitchenSave') {
       var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value.trim();
-      if (!/^\d{2}:\d{2}$/.test(S.kitchen.closes)) { S.nudge = T.kitchenAt; return render(); }
+      // Never pre-filled (pub test 4): a blank time asks gently, and nothing is saved.
+      if (!/^\d{2}:\d{2}$/.test(S.kitchen.closes)) { S.nudge = T.kitchenNeed; return render(); }
       return saveAll('hours', [{ pub_info: { kitchen: { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note } } }], null, null, function(){ kitchenSaid('earlier'); });
     }
     if (k === 'noFood') return saveAll('cuisine', [{ pub_info: { kitchen: { mode: 'none' } } }], 'no', null, function(){ kitchenSaid('none'); });
@@ -1003,7 +1026,6 @@
     }
     if (k === 'keepMain') { S.keepMain = true; S.photos.forEach(function(ph){ ph.main = false; }); return render(); }
     if (k === 'hhDays') { readEntries(); var sp = String(v).split(','), eh = S.happy[+sp[0]]; if (!eh) return; eh.days = {}; DAYS.forEach(function(d){ if (sp[1] === 'all' || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(d) >= 0) eh.days[d] = true; }); mark(); var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
-    if (k === 'sameEvery') { readTimes(); var src = S.week.mon || S.week[DAYS.filter(function(x){ return S.week[x]; })[0]]; if (src) DAYS.forEach(function(d){ S.week[d] = clone(src); }); mark(); return render(); }
     if (k === 'monthsUse') { var r = monthRun(S.months); if (r.none) { S.nudge = T.monthsNeed; return render(); } if (r.bad) { S.nudge = T.monthsInRow; return render(); } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'monthsClear') { S.months = {}; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
@@ -1025,6 +1047,7 @@
     }
     if (k === 'spend') { S.spend = Math.max(5, Math.min(300, S.spend + (+v))); return render(); }
     if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
+    if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
@@ -1059,9 +1082,12 @@
       // A dietary tile ticked takes back an earlier "None of these".
       var diet = badges.vegan || badges.vegetarian || badges.gluten_free;
       if ((diet || !S.noDiet) && S.notOffered.indexOf('dietary') >= 0) { var cur0 = list.length ? list[list.length - 1].not_offered : S.notOffered; list.push({ not_offered: cur0.filter(function(z){ return z !== 'dietary'; }) }); }
+      // "No dogs allowed" (pub test 4): taken back before Dog friendly is saved, given after it is turned off.
+      if ((badges.dog_friendly || !S.noDogs) && S.notOffered.indexOf('dogs') >= 0) list.push({ not_offered: { remove: ['dogs'] } });
       list.push({ badges: badges });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
+      if (!badges.dog_friendly && S.noDogs && S.notOffered.indexOf('dogs') < 0) list.push({ not_offered: { add: ['dogs'] } });
       // Dogs un-ticked: the "where are dogs allowed" line goes too. Ticked: that's the next small screen.
       if (!S.badges.dog_friendly && (CUR.visit_rows || {}).dogs) { list.push({ visit_rows: { dogs: '' } }); S.dogNote = ''; }
       // Pubs (2026-11-10): saving this screen with no game ticked = "No games"; Sports on TV not ticked = "We don't show
@@ -1113,6 +1139,13 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'); if (S.week[d]) { S.week[d] = null; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-samemon]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-samemon'); if (S.week.mon) { S.week[d] = clone(S.week.mon); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-late]'), function(b){ b.onclick = function(){ readTimes(); var q4 = b.getAttribute('data-late').split(':'), d4 = q4[0], w4 = S.week[d4] && S.week[d4][+q4[1]]; if (!w4) return; w4[1] = q4[2] + ':' + q4[3]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    // Hours (pub test 4): open one day's card, fold it back, or copy an open day's hours to every day or Mon–Fri.
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-hopen]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-hopen'); S.hoursOpen[d] = true; render(); var r = el('suRow' + d); if (r) { r.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); var f = r.querySelector('input[type=time]') || r.querySelector('button'); if (f) try { f.focus({ preventScroll: true }); } catch (e) {} } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-hclose]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-hclose'); delete S.hoursOpen[d]; var y = window.scrollY; render(); window.scrollTo(0, y); var r = el('suRow' + d); if (r && r.getBoundingClientRect().top < 60) { r.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk]'), function(b){ b.onclick = function(){
+      readTimes(); var all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : 'data-copywk'), src = S.week[d]; if (!src) return;
+      DAYS.forEach(function(x){ if (x !== d && (all || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(x) >= 0)) S.week[x] = clone(src); });
+      mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d); S.week[d] = clone(S.week[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hol]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-hol'), i = S.closures.indexOf(k); if (i >= 0) S.closures.splice(i, 1); else S.closures.push(k); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -1129,7 +1162,10 @@
       var k = b.getAttribute('data-off');
       var press = function(key, on){ var n = screen.querySelector('[data-off="' + key + '"]'); if (n) n.setAttribute('aria-pressed', on ? 'true' : 'false'); };
       if (k === 'none_diet') { S.noDiet = !S.noDiet; press('none_diet', S.noDiet); if (S.noDiet) ['vegan', 'vegetarian', 'gluten_free'].forEach(function(d){ S.badges[d] = false; press(d, false); }); return; }
+      // "No dogs allowed" and "Dog friendly": picking one turns the other off.
+      if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
+      if (k === 'dog_friendly' && S.badges[k]) { S.noDogs = false; press('no_dogs', false); }
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
@@ -1194,7 +1230,7 @@
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-sport],[data-tv],[data-minors]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-sport],[data-tv],[data-minors]') : null; if (t) mark(); }, true);
   render();
   window.addEventListener('beforeunload', function(e){ if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

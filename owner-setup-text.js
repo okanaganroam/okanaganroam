@@ -442,5 +442,28 @@ Object.assign(fr, {
   phoneRestBoth: 'Votre nouvelle adresse et votre site web s’afficheront en moins d’un jour, après vérification.',
 });
 
-module.exports = { en, fr };
+// Fourth first-time pub test (2026-11-10; drafts/fresh-eyes-pub4-2026-11-10/REPORT.md). Shared with restaurants.
+Object.assign(en, {
+  // Hours: a short list of the 7 days with a Change button each; only the days tapped open up.
+  hoursEditLead: 'Tap Change beside any day that’s different. The other days stay as they are.',
+  hoursChange: 'Change', hoursChangeDay: 'Change {day}', hoursDoneDay: 'Done ✓', copyTo: 'Copy these hours to:', copyAll: 'Every day', copyWeek: 'Mon–Fri',
+  // Menu photos: "Add another page" comes first.
+  camLeadSome: 'Got another page? Add it first. When every page is here, tap Send. Tap ✕ to retake one.',
+  // No dogs: its own answer on "What you offer".
+  noDogs: 'No dogs allowed', noDogsSub: 'Not inside or on the patio',
+  // "About $24 a person?": Not sure? Skip.
+  spendSkip: 'Not sure? Skip',
+  fbWhy: 'We find your Facebook link for you, so it shows within a day.',
+  kitchenNeed: 'Please pick the time your kitchen closes.',
+});
+Object.assign(fr, {
+  hoursEditLead: 'Touchez Modifier à côté d’une journée différente. Les autres journées restent telles quelles.',
+  hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven',
+  camLeadSome: 'Une autre page? Ajoutez-la d’abord. Quand toutes les pages sont là, touchez Envoyer. Touchez ✕ pour en reprendre une.',
+  noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse',
+  spendSkip: 'Pas certain? Passer',
+  fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
+  kitchenNeed: 'Choisissez l’heure à laquelle votre cuisine ferme.',
+});
 
+module.exports = { en, fr };

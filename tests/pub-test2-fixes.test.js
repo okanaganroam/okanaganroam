@@ -69,7 +69,8 @@ test('1: closing times after midnight get a plain note (EN+FR); "Copy Monday to 
     // The note is in the time row, updates as the owner types, and the copy button is after Monday's card, not at the top.
     assert.match(s, /id="suLate' \+ d \+ j \+ '"/);
     assert.match(s, /n3\.textContent = t3; n3\.hidden = !t3;/);
-    assert.match(s, /\(d === 'mon' && w \? '<div class="su-samerow"[^>]*><button type="button" class="su-toggle" data-act="sameEvery">/);
+    // Pub test 4: the copy buttons are on every open day ("Copy these hours to: Every day / Mon–Fri").
+    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(T\.copyAll\)/);
     assert.doesNotMatch(s, /msgs\(\) \+ \(anyOpenDay/);
   }
   assert.equal(TEXT.en.sameEvery, 'Copy Monday to every day');
@@ -116,7 +117,7 @@ test('4: "Save these" is not sticky on What you offer; a pub\'s wine tile is jus
   assert.doesNotMatch(s, /su-sticky su-sticky-clear">' \+ big\('✓', T\.saveOffer/);
   const pub = cfgOf(pubHtml);
   assert.equal(pub.offerLabels.local_drinks, 'Local wine');
-  assert.equal(pub.offerLabels.local_beer_taps, 'Local beer on tap');
+  assert.equal(pub.offerLabels.local_beer_taps, 'Local or craft beer on tap'); // pub test 4
   const pubFr = cfgOf(await text(`/fr/owner/${tokenFor(mk('pub').id)}/setup`).catch(() => ''));
   assert.equal(pubFr.offerLabels.local_drinks, 'Vins locaux');
   const rest = cfgOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
