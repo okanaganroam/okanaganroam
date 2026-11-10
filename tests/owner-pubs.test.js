@@ -253,7 +253,7 @@ test('setup: the pub parts and screens; restaurants keep theirs', async () => {
   const cfg = cfgOf(s.text);
   assert.deepEqual(cfg.part1, ['basics', 'hours', 'closures', 'happy', 'cuisine', 'photos', 'menu', 'offer']);
   assert.deepEqual(cfg.part2, ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door']);
-  assert.deepEqual(cfg.top2, ['music', 'specials', 'story', 'groups']);
+  assert.deepEqual(cfg.top2, ['music', 'specials', 'story', 'groups', 'facebook']);
   assert.equal(cfg.pub, true);
   assert.equal(cfg.popular[0], 'Pub Fare');
   assert.deepEqual(cfg.placeTypes, app.PUB_PLACE_TYPES);

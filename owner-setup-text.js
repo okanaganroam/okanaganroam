@@ -369,4 +369,30 @@ Object.assign(fr, {
 });
 fr.pub.hiLead = 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.';
 
+// Second first-time pub test (2026-11-10). Shared with restaurants (same setup), except the pub-only lines.
+Object.assign(en, {
+  midnightNote: '= midnight', earlyNote: '{t} (early {day} morning)',
+  sameEvery: 'Copy Monday to every day',
+  tooSmall: 'This one would look blurry. Pick a different one.',
+  reviewLeadKeep: 'Tap ✕ to remove one. Your main photo stays the same unless you pick a new one.',
+  curMain: 'Your main photo now', keepMain: 'Keep my current main photo',
+  everyDay: 'Every day', monFri: 'Mon–Fri',
+  badgeReach: 'Reach 100% to earn it',
+  spendGuess: 'We guessed ${n} from what we found online.',
+  sentMeans: 'Sent means we check it first, usually within a day.',
+});
+Object.assign(fr, {
+  midnightNote: '= minuit', earlyNote: '{t} (tôt {day} matin)',
+  sameEvery: 'Copier lundi à tous les jours',
+  tooSmall: 'Celle-ci serait floue. Choisissez-en une autre.',
+  reviewLeadKeep: 'Touchez ✕ pour en retirer une. Votre photo principale reste la même, sauf si vous en choisissez une nouvelle.',
+  curMain: 'Votre photo principale actuelle', keepMain: 'Garder ma photo principale actuelle',
+  everyDay: 'Tous les jours', monFri: 'Lun–ven',
+  badgeReach: 'Atteignez 100 % pour l’obtenir',
+  spendGuess: 'Nous avons estimé {n} $ d’après ce que nous avons trouvé en ligne.',
+  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord, habituellement en moins d’un jour.',
+});
+en.pub.sportsEx = 'Do you turn the sound on for big games? You can add that later under “Weekly events”.';
+fr.pub.sportsEx = 'Vous mettez le son pour les grands matchs? Vous pourrez l’ajouter plus tard dans « Événements de la semaine ».';
+
 module.exports = { en, fr };

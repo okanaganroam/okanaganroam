@@ -9069,7 +9069,10 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     if (!days.some((d) => week[d])) return { ok: false, reason: 'invalid_times', detail: 'at least one day needs a window (use times: null to clear)' };
     const checked = validateVerifiedHours(week);
     if (!checked.ok) return { ok: false, reason: 'invalid_times', detail: checked.detail };
-    if (typeof v.source_url !== 'string' || !/^https?:\/\/[^\s]+$/.test(v.source_url) || v.source_url.length > 500) {
+    // Times the business typed in itself (owner saves) carry the owner marker, never our own listing page (pub
+    // fresh-eyes 2, 2026-11-10: the setup stored okanaganroam.com/... as the source of the owner's own happy hour).
+    const ownerSource = m.log_source === 'venue_owner' && v.source_url === 'venue_owner';
+    if (!ownerSource && (typeof v.source_url !== 'string' || !/^https?:\/\/[^\s]+$/.test(v.source_url) || v.source_url.length > 500)) {
       return { ok: false, reason: 'invalid_source', detail: 'source_url must be the http(s) page the times were read on' };
     }
     if (!parseLocalDate(v.checked_at) || v.checked_at > todayLocal(now)) {
@@ -34758,7 +34761,16 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
 
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
-  const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
+  let dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
+  // A pub whose owner said dogs are welcome on the patio only says so in the highlights ("Dogs on the patio"), instead
+  // of a plain "Dog-friendly" that oversells it (pub fresh-eyes 2, 2026-11-10).
+  if (!venue.redirect_to && venue.type === 'pub' && venue.dog_friendly) {
+    try {
+      const dogRow = ((venueVisitInfo(venue.id) || {}).rows || []).find((r) => r.label === 'Dogs');
+      const dt = dogRow ? String(dogRow.text || '') : '';
+      if (/patio|terrasse/i.test(dt) && !/inside|indoor|int[ée]rieur/i.test(dt)) dogFriendlyNote = fr ? 'Chiens sur la terrasse' : 'Dogs on the patio';
+    } catch (e) { /* no visit info */ }
+  }
   const attributeChipsFor = (skipHappyHour) => venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour });
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
@@ -50056,7 +50068,9 @@ const SETUP_STEPS = SETUP_PART1.concat(SETUP_PART2);
 // the most-asked pub question) and average spend among "A few more". Part 2 leads with events, specials, story, groups.
 const PUB_SETUP_PART1 = ['basics', 'hours', 'closures', 'happy', 'cuisine', 'photos', 'menu', 'offer'];
 const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door'];
-const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story'], pub: ['music', 'specials', 'story', 'groups'] };
+// Facebook joins the top tiles for both (pub fresh-eyes 2, 2026-11-10: most pubs and restaurants post their specials
+// and events there, and the tester hunted for it under "A few more"). Shown in Part 2's order, so it comes last of the five.
+const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'facebook'] };
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no'];
@@ -50208,13 +50222,22 @@ function ownerSetupCardHtml(href, lang, state = 'none') {
   <a class="op-setup-card" id="opSetupCard" href="${escapeHtml(href)}"><span class="op-setup-ico" aria-hidden="true">${finished || state === 'essentials' ? '✓' : '📋'}</span><span class="op-setup-txt"><strong>${cardTitle}</strong><span>${cardSub}</span></span><span class="op-setup-go" aria-hidden="true">→</span></a>`;
 }
 
+// Owner pages on a local server (dev, tests, walkthroughs): "See your page" links point at this server, not the live
+// site (pub fresh-eyes 2, 2026-11-10). Only for localhost-style hosts; in production the HTML is returned untouched.
+function ownerLinksForRequest(req, html) {
+  const host = String((req && req.headers && req.headers.host) || '').toLowerCase();
+  const name = host.replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  if (!html || !(name === 'localhost' || name === '127.0.0.1' || name === '::1' || name.endsWith('.localhost'))) return html;
+  return String(html).replace(/https:\/\/okanaganroam\.com(?=\/)/g, `http://${host}`);
+}
+
 // GET .../setup: the page for a restaurant; any other type goes back to its edit page (nothing changes for them).
 function sendOwnerSetupPage(req, res, method, found, opts) {
   const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
   if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage(opts.lang)); }
   if (!COMPLETENESS_TYPES.has(found.venue.type)) { res.writeHead(302, { Location: opts.back, 'Cache-Control': 'no-store' }); return res.end(); }
   res.writeHead(200, headers);
-  return res.end(method === 'HEAD' ? undefined : renderOwnerSetupPage(found, opts));
+  return res.end(method === 'HEAD' ? undefined : ownerLinksForRequest(req, renderOwnerSetupPage(found, opts)));
 }
 function renderOwnerSetupPage(found, opts) {
   const { venue, happyHourTimes } = found;
@@ -50261,6 +50284,8 @@ function renderOwnerSetupPage(found, opts) {
   ];
   const offerLabels = { ...t.offers };
   for (const k of ownerExtraBadgesFor(venue.type)) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
+  // A pub has its own "Local beer on tap" tile, so this one is just the wine (pub fresh-eyes 2, 2026-11-10).
+  if (pub && offerLabels.local_beer_taps) offerLabels.local_drinks = fr ? 'Vins locaux' : 'Local wine';
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
@@ -50367,7 +50392,16 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-tag { display: block; width: 100%; min-height: 44px; border: 0; background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 15px; font-weight: 800; padding: 8px; cursor: pointer; }
   body.owner-setup .su-main .su-tag { color: var(--su-gold); }
   body.owner-setup .su-ph.su-bad img { filter: grayscale(1) opacity(.45); }
-  body.owner-setup .su-badmsg { position: absolute; left: 0; right: 0; bottom: 44px; background: var(--su-warn-bg); color: var(--su-warn); font-size: 15px; font-weight: 800; padding: 8px; }
+  body.owner-setup .su-badmsg { position: static; background: var(--su-warn-bg); color: var(--su-warn); font-size: 15px; font-weight: 800; padding: 8px; }
+  body.owner-setup .su-ph .su-x { z-index: 2; }
+  body.owner-setup .su-curmain { display: flex; gap: 12px; align-items: center; background: var(--su-card); border: 3px solid var(--su-gold); border-radius: 16px; padding: 10px; margin: 0 0 16px; }
+  body.owner-setup .su-curmain .su-toggle[aria-pressed="true"] { background: #fff; color: var(--su-ink); border-color: var(--su-gold); }
+  body.owner-setup .su-curmain img { width: 112px; aspect-ratio: 4/3; object-fit: cover; border-radius: 10px; flex: none; }
+  body.owner-setup .su-late { margin: 4px 0 8px; font-weight: 700; }
+  body.owner-setup .su-offer-save { margin-top: 24px; }
+  body.owner-setup .su-badge-pill { display: inline-block; }
+  body.owner-setup .su-badge-off { filter: grayscale(1); opacity: .5; }
+  body.owner-setup .su-badge-reach { display: block; font-weight: 800; color: var(--su-ink); margin-top: 6px; }
   body.owner-setup .su-tick { display: flex; gap: 14px; align-items: flex-start; background: var(--su-card); border: 2px solid var(--su-line); border-radius: 16px; padding: 16px; margin-bottom: 16px; cursor: pointer; font-weight: 700; }
   body.owner-setup .su-tick input { width: 30px; height: 30px; flex: none; accent-color: var(--su-teal); margin: 0; }
   body.owner-setup .su-more { display: block; width: 100%; min-height: 56px; border: 2px dashed var(--su-line); background: none; color: var(--su-teal); font: inherit; font-weight: 800; border-radius: 16px; margin-bottom: 16px; cursor: pointer; }
@@ -53670,7 +53704,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
       if (!Object.keys(times).length) times = null;
     }
-    const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
+    const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: times ? 'venue_owner' : listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
     applied.push('happy_hour');
   }
@@ -54812,7 +54846,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const items = [];
   let plain = false;
   try { const vt = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId); plain = !!vt && COMPLETENESS_TYPES.has(vt.type); } catch (e) { plain = false; }
-  for (const r of db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
+  for (const r of db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT ?").all(venueId, Math.max(10, limit))) {
     let fields = [];
     let none = null;
     try {
@@ -54836,7 +54870,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       title: none ? (fields.length ? `${base}. ${none}` : none) : base });
   }
   const today = todayLocal();
-  for (const e of db.prepare('SELECT id, name, start_date, end_date, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, event_id FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
+  for (const e of db.prepare('SELECT id, name, start_date, end_date, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, event_id FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 60').all(venueId)) {
     let status = e.status;
     const ev = e.event_id ? db.prepare('SELECT name, status FROM events WHERE id = ?').get(e.event_id) : null;
     const title = `${fr ? 'Événement : ' : 'Event: '}${ev ? ev.name : e.name}`;
@@ -54848,7 +54882,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       canEdit: upcoming && ['pending', 'approved', 'changewait'].includes(status) });
   }
   const main = ownerVenueMainImage(venueId);
-  for (const ph of db.prepare("SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? AND COALESCE(reviewed_by, '') != ? ORDER BY id DESC LIMIT 20").all(venueId, OWNER_PHOTO_DISMISSED_BY)) {
+  for (const ph of db.prepare("SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? AND COALESCE(reviewed_by, '') != ? ORDER BY id DESC LIMIT 60").all(venueId, OWNER_PHOTO_DISMISSED_BY)) {
     items.push({ kind: 'photo', at: ph.reviewed_at || ph.submitted_at, sent: ph.submitted_at, status: ph.reviewed_by === 'owner' && ph.status === 'rejected' ? 'removed' : ph.status,
       reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? (fr ? 'Photo (photo principale)' : 'Photo (main photo)') : 'Photo' });
   }
@@ -54890,11 +54924,21 @@ function ownerActivityIsOld(item, now = new Date()) {
   const t = new Date(`${String(item.sent || '').replace(' ', 'T')}Z`).getTime();
   return !Number.isNaN(t) && now.getTime() - t > 24 * 3600 * 1000;
 }
-function ownerActivityHtml(items, lang = 'en', now = new Date()) {
-  if (!items.length) return '';
+function ownerActivityHtml(itemsIn, lang = 'en', now = new Date()) {
+  if (!itemsIn.length) return '';
   const fr = lang === 'fr';
   const L = (en, f) => (fr ? f : en);
-  const old = items.map((it) => ownerActivityIsOld(it, now));
+  // The same line twice on the same day (e.g. "Kitchen, who's welcome and sports" saved twice in the setup) shows once;
+  // the list is no longer cut at 12 -- the rest folds behind "Show all (N)" (pub fresh-eyes 2, 2026-11-10).
+  const seenLine = new Set();
+  const items = itemsIn.filter((it) => {
+    if (it.kind === 'event') return true;
+    const k = `${it.title}|${it.status}|${ownerLocalDate(it.sent, fr)}`;
+    if (seenLine.has(k)) return false;
+    seenLine.add(k); return true;
+  });
+  const OWNER_ACTIVITY_SHOWN = 12;
+  const old = items.map((it, i) => ownerActivityIsOld(it, now) || (i >= OWNER_ACTIVITY_SHOWN && it.status !== 'pending' && it.status !== 'changewait'));
   if (old.every(Boolean)) old[0] = false;
   const folded = old.filter(Boolean).length;
   return `<section class="op-activity" aria-labelledby="opActivityHead">
@@ -56316,7 +56360,7 @@ ${renderGolfHeaderHtml()}
       ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       <div data-task="home all">${pendingNote}
-      ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}</div>
+      ${ownerActivityHtml(ownerVenueActivity(venue.id, 200, lang), lang)}</div>
       ${found.account ? `<p class="op-bar-in">${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="${P('/owner/account')}">${L('My listings', 'Mes fiches')}</a> &middot; <a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a></p>` : viewer && found.viewerManages ? `
       <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${portalFields(venue.type).menu ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${portalFields(venue.type).menu ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
       <div class="op-login" id="opAddLogin" data-task="home all">
@@ -56934,7 +56978,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           // shows at the top of the screen, where the owner is looking (it used to land off screen from the list).
           if (revF.length) Array.prototype.forEach.call(document.querySelectorAll('.op-save-check[data-fields]'), function(p){
             if (p.getAttribute('data-fields').split(' ').some(function(f){ return revF.indexOf(f) >= 0; })) {
-              p.textContent = T.sentLine.replace('{date}', new Date().toLocaleDateString(T.locale, { month: 'short', day: 'numeric' }));
+              p.textContent = T.sentLine.replace('{date}', new Date().toLocaleDateString(T.locale, { month: 'short', day: 'numeric', timeZone: 'America/Vancouver' }));
               p.className = 'op-save-line op-save-sent';
             }
           });
@@ -61090,7 +61134,7 @@ const server = http.createServer(async (req, res) => {
         if (vm[2] === 'completeness' && method === 'GET') {
           const out = account ? ownerCompletenessJson(resolve(), null, res.ownerLang) : null;
           res.writeHead(out ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
-          return res.end(JSON.stringify(out || { ok: false }));
+          return res.end(ownerLinksForRequest(req, JSON.stringify(out || { ok: false })));
         }
         if (vm[2] && method === 'POST') {
           if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
@@ -61107,7 +61151,7 @@ const server = http.createServer(async (req, res) => {
           // Just signed up from the edit link (2026-10-27): a welcome note, naming what went live.
           if (query && query.welcome === '1') found.welcome = { live: String(query.live || '').split(',').filter((f) => OWNER_FIELD_WORDS.en[f]) };
           res.writeHead(200, headers);
-          return res.end(renderOwnerPage(found, null, pendingOwnerChange(found.venue.id), res.ownerLang));
+          return res.end(ownerLinksForRequest(req, renderOwnerPage(found, null, pendingOwnerChange(found.venue.id), res.ownerLang)));
         }
       }
     }
@@ -61120,7 +61164,7 @@ const server = http.createServer(async (req, res) => {
       if (completeMatch && method === 'GET') {
         const out = ownerCompletenessJson(venueForOwnerToken(completeMatch[1]), completeMatch[1], res.ownerLang);
         res.writeHead(out ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
-        return res.end(JSON.stringify(out || { ok: false }));
+        return res.end(ownerLinksForRequest(req, JSON.stringify(out || { ok: false })));
       }
       const eventCancel = /^([A-Za-z0-9_-]+)\/events\/(\d+)\/cancel$/.exec(rest);
       if (eventCancel && method === 'POST') return await handleOwnerEventCancel(req, res, eventCancel[1], Number(eventCancel[2]));
@@ -61157,7 +61201,7 @@ const server = http.createServer(async (req, res) => {
         if (method === 'GET') recordOwnerLinkOpen(req, found.venue.id);
         found.viewer = ownerAccountForRequest(req);
         if (found.viewer) found.viewerManages = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(found.viewer.id, found.venue.id);
-        return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id), res.ownerLang));
+        return res.end(method === 'HEAD' ? undefined : ownerLinksForRequest(req, renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id), res.ownerLang)));
       }
     }
     if (pathname === '/admin/badge-reminders/preview' && method === 'GET') {
