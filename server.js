@@ -58011,7 +58011,10 @@ const server = http.createServer(async (req, res) => {
         // design). Scoped to this one wrapper on the homepage's own
         // `footer` variable only -- renderGuideFooterHTML() itself is
         // untouched, so /browse's copy is completely unaffected.
-        const footer = `<div style="display:none">${renderGuideFooterHTML()}</div>`;
+        // Homepage polish (2026-11-10): the guide index is a visible section of the page now (town tabs with a chip per
+        // guide, built by home-polish.js from this same markup), so the hidden copy is gone.
+        const homeGuideIndex = renderGuideFooterHTML();
+        const footer = '';
         // Open Now removed from the homepage only (2026-09-17) -- see
         // renderOpenNowScript() for why: the homepage has no .venue-card
         // results to filter (those only exist at /browse), so the button
@@ -58126,7 +58129,7 @@ const server = http.createServer(async (req, res) => {
         html = wrapHomeMain(html);
         // Owner-approved simpler photo-led homepage, preserving the existing live content providers.
         html = homeSimple.apply(html, { mood: moodCards, editors: editorsPicks, events: thisWeekend,
-          gems: hiddenGemsSection, destinations: exploreRegions, stats: statsHtml, trip: buildTripSection });
+          gems: hiddenGemsSection, destinations: exploreRegions, stats: statsHtml, trip: buildTripSection, guides: homeGuideIndex });
         // Homepage weight (2026-10-18): smaller card photos, and the sideways rows' off-screen cards wait (see withHomeCardPhotos).
         html = withHomeCardPhotos(html);
         // Hero first (2026-10-19): no Leaflet on the homepage, and the hero-ready signal first in <head> (see withHomeHeroFirst).
