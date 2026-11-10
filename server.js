@@ -19460,15 +19460,18 @@ function writeVenuePubInfo(venueId, info) {
 // Kid-friendly on pubs (Dayton, 2026-11-10): the researched badge is never shown for a pub (it stays stored). A pub
 // counts as welcoming kids only when the business itself says minors are welcome (all ages, or with an adult until a
 // time). Read by every public reader of the field: venue objects (rowToVenue), filters and guides (kidFriendlySql), the map.
+// The one list of "Who's welcome?" answers that count as kid-friendly (pub test 3 check, 2026-11-10): all ages, or minors
+// with an adult until a set time. "Adults only (19+)" doesn't, and a pub that hasn't answered isn't shown as kid-friendly
+// (its researched flag stays stored, unchanged). KID_FRIENDLY_SQL below is built from the same list.
+const PUB_KIDS_WELCOME_POLICIES = ['all_ages', 'minors_until'];
 function pubKidsWelcome(venueId) {
-  const p = (venuePubInfo(venueId).minors || {}).policy;
-  return p === 'all_ages' || p === 'minors_until';
+  return PUB_KIDS_WELCOME_POLICIES.includes((venuePubInfo(venueId).minors || {}).policy);
 }
 function kidFriendlyPublic(row) {
   if (!row) return false;
   return row.type === 'pub' ? pubKidsWelcome(row.id) : !!Number(row.kid_friendly);
 }
-const KID_FRIENDLY_SQL = "((kid_friendly = 1 AND type <> 'pub') OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN ('all_ages', 'minors_until'))))";
+const KID_FRIENDLY_SQL = `((kid_friendly = 1 AND type <> 'pub') OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')}))))`;
 // "<field> = 1" for a badge in a WHERE clause; kid_friendly follows the pub rule above.
 function badgeTrueSql(f) { return f === 'kid_friendly' ? KID_FRIENDLY_SQL : `${f} = 1`; }
 const pubClock = (t, fr) => {
@@ -19544,7 +19547,18 @@ function pubOwnerHighlights(venue, fr = false) {
 // A pub's visible highlights (pub fresh-eyes, 2026-11-10): Sports on TV first (it was cut by the four-item cap and only
 // showed in the folded list), then the usual ones, then Local beer on tap and the games. Never Kid-friendly (a pub says
 // who's welcome in its own line).
-function pubHighlights(venue, dogNote, profile = {}) {
+// A heated or covered patio the business ticked (pub test 3, 2026-11-10): the top chip reads "Heated patio", not plain
+// "Patio", and leads the highlights. -> [venue, profile] for highlightsFor (unchanged when it isn't ticked).
+function heatedPatioHighlight(venue, profile = {}) {
+  if (!venue || !venueOwnerFeatures(venue.id).heated_patio) return [venue, profile];
+  return [{ ...venue, patio: true }, { ...profile, highlightFirst: ['patio'].concat(profile.highlightFirst || []), highlightLabels: { ...(profile.highlightLabels || {}), patio: 'Heated patio' } }];
+}
+function foodDrinkHighlights(venue, dogNote, profile = {}) {
+  const [v, pr] = heatedPatioHighlight(venue, profile);
+  return require('./food-drink-venue-layout').highlightsFor(v, dogNote, pr);
+}
+function pubHighlights(venue0, dogNote, profile0 = {}) {
+  const [venue, profile] = heatedPatioHighlight(venue0, profile0);
   const sports = pubSportsText(venue, false);
   const base = require('./food-drink-venue-layout').highlightsFor({ ...venue, kid_friendly: false }, dogNote, { ...profile, highlightMax: 99,
     highlightLabels: sports ? { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${sports}` } : profile.highlightLabels });
@@ -35389,7 +35403,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
       // tap and the games show in the visible highlights too, not only in the folded features list.
-      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : fdLib.highlightsFor(venue, dogFriendlyNote, profile),
+      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : foodDrinkHighlights(venue, dogFriendlyNote, profile),
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
@@ -45223,6 +45237,21 @@ function sameJsonWeek(a, b) {
 
 // Validates an owner's proposed changes against the live venue. Returns
 // { changes, previous, errors }: only fields that actually differ are kept.
+// A North American phone number, written the one way the site uses ("250-555-0123", "250-555-0123 ext. 4"), or null.
+// Ten digits (a leading 1 is dropped); area code and exchange can't start with 0 or 1. Pub test 3 (2026-11-10): a phone
+// sent from the easy setup goes live straight away, so only a real number like this is accepted there.
+function ownerNanpPhone(raw) {
+  const text = typeof raw === 'string' ? raw.trim().replace(/\s+/g, ' ') : '';
+  if (!text || text.length > 40) return null;
+  const m = /^(.*?)(?:\s*(?:ext\.?|extension|x|#)\s*(\d{1,6}))?$/i.exec(text);
+  const main = m ? m[1] : text;
+  if (!/^[0-9+().\-\s]+$/.test(main)) return null;
+  let d = main.replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  if (d.length !== 10 || !/^[2-9]\d{2}[2-9]\d{6}$/.test(d)) return null;
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}${m && m[2] ? ` ext. ${m[2]}` : ''}`;
+}
+const OWNER_SETUP_PHONE_ERROR = 'Please enter a 10-digit phone number with the area code, like 250-555-0123.';
 function validateOwnerChanges(venue, happyHourTimes, body) {
   const errors = {};
   const changes = {};
@@ -45237,7 +45266,13 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     if (!w.ok) errors.hours = w.detail;
     else if (!sameJsonWeek(w.json, current.hours)) changes.hours = w.json;
   }
-  if ('phone' in input) {
+  if ('phone' in input && body.from_setup === true) {
+    // From the easy setup: a real North American number, written 250-555-0123 (it goes live straight away). The same
+    // number typed another way is not a change.
+    const phone = ownerNanpPhone(input.phone);
+    if (!phone) errors.phone = OWNER_SETUP_PHONE_ERROR;
+    else if (phone !== current.phone && (ownerNanpPhone(current.phone || '') || '') !== phone) changes.phone = phone;
+  } else if ('phone' in input) {
     const phone = typeof input.phone === 'string' ? input.phone.trim().replace(/\s+/g, ' ') : '';
     const digits = phone.replace(/\D/g, '');
     if (!phone || phone.length > 40 || !/^[0-9+().\-\s]+(\s*(ext\.?|x)\s*\d{1,6})?$/i.test(phone) || digits.length < 10 || digits.length > 15) {
@@ -50070,7 +50105,8 @@ const PUB_SETUP_PART1 = ['basics', 'hours', 'closures', 'happy', 'cuisine', 'pho
 const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door'];
 // Facebook joins the top tiles for both (pub fresh-eyes 2, 2026-11-10: most pubs and restaurants post their specials
 // and events there, and the tester hunted for it under "A few more"). Shown in Part 2's order, so it comes last of the five.
-const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'facebook'] };
+// Instagram sits next to Facebook in the top tiles (pub test 3, 2026-11-10: the tester hunted for it under "A few more").
+const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'] };
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no'];
@@ -50166,6 +50202,23 @@ function setupScore(found) {
   return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)),
     left: r.missing.filter((it) => !it.waiting).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
 }
+// "I'll email it" for the menu (pub test 3, 2026-11-10): it used to live only in the owner's setup progress, so a menu
+// that never arrived went unnoticed. It is now a row in the menu queue on /admin/review (venue_menus, status 'help',
+// help_kind 'menu_email', "Menu expected by email"), with no email to anyone. Saying it again only refreshes the date;
+// sending the menu from the setup later (pages, a file or a link: status 'day') closes it.
+const MENU_EMAIL_KIND = 'menu_email';
+function setupMenuEmailRecord(venue, status) {
+  try {
+    const open = db.prepare("SELECT id FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status = 'help' ORDER BY id DESC LIMIT 1").get(venue.id, MENU_EMAIL_KIND);
+    if (status === 'email') {
+      const note = `They chose “I’ll email it” for their menu in the easy setup (${todayLocal()}). Check ${INFO_CONTACT_EMAIL} for it; if nothing arrives in a few days, follow up.`;
+      if (open) db.prepare("UPDATE venue_menus SET help_note = ?, submitted_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(note, open.id);
+      else db.prepare("INSERT INTO venue_menus (venue_id, status, submitted_by, help_kind, help_note, submitted_at) VALUES (?, 'help', 'owner:setup', ?, ?, datetime('now'))").run(venue.id, MENU_EMAIL_KIND, note);
+    } else if (open && (status === 'day' || status === 'live')) {
+      db.prepare("UPDATE venue_menus SET status = 'removed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(open.id);
+    }
+  } catch (e) { console.error(`[owner-setup] menu-by-email record for venue #${venue.id} failed: ${e.message}`); }
+}
 // GET/POST <base>/setup/progress. GET -> { progress, score }. POST { step, status } records one answer.
 async function handleOwnerSetupProgress(req, res, method, found) {
   const send = (status, data) => sendSubmissionResponse(res, status, data);
@@ -50184,6 +50237,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   }
   if (!body || !SETUP_STEPS.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
   let progress = saveSetupProgress(found.venue.id, body.step, body.status);
+  if (body.step === 'menu') setupMenuEmailRecord(found.venue, progress.done.menu);
   if (body.step === 'happy') {
     // Typed happy hours: keep the rows as typed (see setupHappyBlocks). Anything else (a "No", a sheet sent) drops them.
     const entries = body.status === 'live' && body.blocks !== undefined ? cleanSetupHappyBlocks(body.blocks) : null;
@@ -50322,8 +50376,8 @@ function renderOwnerSetupPage(found, opts) {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
-    a: `<p>Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
+    a: `<p>Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -50463,6 +50517,14 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-example { font-size: 16px; color: var(--su-soft); background: var(--su-card); border-left: 4px solid var(--su-gold); padding: 10px 12px; border-radius: 0 12px 12px 0; margin: -8px 0 18px; }
   body.owner-setup .su-hint { font-size: 16px; color: var(--su-soft); margin: 6px 0 10px; }
   body.owner-setup .su-q { display: block; font-weight: 800; margin: 6px 0 6px; }
+  body.owner-setup .su-fwrap { position: relative; margin-bottom: 18px; }
+  body.owner-setup .su-fwrap > .su-field { margin-bottom: 0; padding-right: 64px; }
+  body.owner-setup .su-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border: 0; border-radius: 50%; background: #EDE7DC; color: var(--su-ink); font: inherit; font-size: 22px; font-weight: 800; line-height: 1; cursor: pointer; }
+  body.owner-setup .su-clear[hidden] { display: none; }
+  body.owner-setup .su-laterow { align-items: center; margin: 2px 0 8px; }
+  body.owner-setup .su-latelbl { flex-basis: 100%; font-size: 16px; font-weight: 700; color: var(--su-soft); }
+  body.owner-setup .su-latebtn[aria-pressed="true"] { background: var(--su-teal); color: #fff; border-color: var(--su-teal); }
+  body.owner-setup .su-spendask { margin-bottom: 0; }
   body.owner-setup .su-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   body.owner-setup .su-num { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 10px 0 24px; }
   body.owner-setup .su-num button { width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--su-teal); background: var(--su-card); color: var(--su-teal); font: inherit; font-size: 36px; font-weight: 800; cursor: pointer; }
@@ -52257,6 +52319,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [OWNER_NOTHING_CHANGED]: 'Rien n’a encore changé. Modifiez un champ, puis envoyez-le.',
   [OWNER_NOTHING_NEW_WAITING]: 'Vos modifications précédentes sont déjà en attente de révision. Il n’y a rien de nouveau à envoyer.',
   'Please enter a phone number, like 250-555-0123.': 'Entrez un numéro de téléphone, comme 250-555-0123.',
+  [OWNER_SETUP_PHONE_ERROR]: 'Entrez un numéro de téléphone à 10 chiffres avec l’indicatif régional, comme 250-555-0123.',
   'Please check the web address, for example yourbusiness.com': 'Vérifiez l’adresse Web, par exemple votreentreprise.com',
   [`Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`]: `Votre description doit compter de ${OWNER_DESCRIPTION_MIN} à ${frNumber(OWNER_DESCRIPTION_MAX.toLocaleString('en-CA'))} caractères.`,
   'Please leave out < and > characters.': 'N’utilisez pas les caractères < et >.',
@@ -53781,7 +53844,10 @@ const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine'
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
 // with Undo, under the same OWNER_INSTANT_DAILY_LIMIT. Address, phone, description, website, menu and booking links
 // still wait for review. The classic edit page doesn't send from_setup, so its rules don't change.
-const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info']);
+// Phone (pub test 3, 2026-11-10) too: the old number stayed on the public "Call" button until someone reviewed the change.
+// Only a real North American number passes from the setup (ownerNanpPhone), and like every instant save it is logged with
+// the number it replaced, in "Your updates", with Undo.
+const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'phone']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -54517,13 +54583,13 @@ function renderAdminMenuCard(m) {
   const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(m.venue_id);
   const pages = menuFiles(m.id);
   const items = menuItemCount(parseMenuData(m.data));
-  const what = m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -54889,7 +54955,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
     for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: t });
     }
   } catch (e) { /* no menus table */ }
@@ -55616,6 +55682,8 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     avgPublic: avgSpendPublic(),
     // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
     pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr), plainWaiting: setupState(venue.id) !== 'none',
+    // Every field still waiting for our check (pub test 3, 2026-11-10), so the "… sent" line names exactly what is pending.
+    pendingFields: [...pending].filter((k) => !k.includes(':')),
     // Until the setup is finished (or "I'm done for now"), the green "Set up your page" card is the one way in: this
     // card keeps its % but not its own "Tap to start" (fresh-eyes 2026-11-10: two "start here" boxes competed).
     quietCta: setupState(venue.id) !== 'done' && !setupProgress(venue.id).done_for_now,
@@ -62654,7 +62722,7 @@ module.exports = {
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
-  pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
+  pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
   validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,

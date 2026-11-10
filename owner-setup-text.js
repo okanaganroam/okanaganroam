@@ -395,4 +395,37 @@ Object.assign(fr, {
 en.pub.sportsEx = 'Do you turn the sound on for big games? You can add that later under “Weekly events”.';
 fr.pub.sportsEx = 'Vous mettez le son pour les grands matchs? Vous pourrez l’ajouter plus tard dans « Événements de la semaine ».';
 
+// Third first-time pub test (2026-11-10; drafts/fresh-eyes-pub3-2026-11-10/REPORT.md). Shared with restaurants except the
+// pub-only lines.
+Object.assign(en, {
+  clearField: 'Clear this box',
+  lateHint: 'Open after midnight? Tap Midnight, 1 AM or 2 AM under that day. Friday until 1 AM means 1 AM early Saturday morning.',
+  lateLbl: 'Closes later?', lateQ: '{day}: closes at midnight or later',
+  essReady: 'The essentials are done', finishBar: 'Your answers are saved',
+  sentMeans: 'Sent means we check it first. It’ll show on your page within a day.',
+  fbWhy: 'We find your Facebook link for you, so it shows within a day. Instagram goes on your page right away.',
+  savedFbName: 'We find your Facebook link for you, so it shows within a day.',
+  doorNextTime: 'Do this next time you’re at your {type}',
+  spendAsk: 'About ${n} a person?', spendAskSub: 'That’s what we found online, for one main and a soft drink before tax and tip.', spendAskYes: 'Yes, about ${n}', spendAskNo: 'No, change it',
+  saveKitchen: 'Save kitchen time',
+  helpTail: 'Photos, your menu and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.',
+});
+Object.assign(fr, {
+  clearField: 'Effacer ce champ',
+  lateHint: 'Ouvert après minuit? Touchez minuit, 1 h ou 2 h sous cette journée. Vendredi jusqu’à 1 h veut dire 1 h tôt samedi matin.',
+  lateLbl: 'Ferme plus tard?', lateQ: '{day} : ferme à minuit ou plus tard',
+  essReady: 'L’essentiel est fait', finishBar: 'Vos réponses sont enregistrées',
+  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord. Cela s’affichera sur votre page d’ici un jour.',
+  fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour. Instagram s’affiche sur votre page tout de suite.',
+  savedFbName: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
+  doorNextTime: 'À faire la prochaine fois que vous serez à votre {type}',
+  spendAsk: 'Environ {n} $ par personne?', spendAskSub: 'C’est ce que nous avons trouvé en ligne, pour un plat principal et une boisson sans alcool, avant taxes et pourboire.', spendAskYes: 'Oui, environ {n} $', spendAskNo: 'Non, le changer',
+  saveKitchen: 'Enregistrer l’heure de la cuisine',
+  helpTail: 'Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
+});
+Object.assign(en.pub, { saveKitchen: 'Save kitchen time', saveMyHours: 'Save kitchen time',
+  sportsEx: 'Tip: if you turn the sound on for big games, you can add that later under “Weekly events”.' });
+Object.assign(fr.pub, { saveKitchen: 'Enregistrer l’heure de la cuisine', saveMyHours: 'Enregistrer l’heure de la cuisine',
+  sportsEx: 'Astuce : si vous mettez le son pour les grands matchs, vous pourrez l’ajouter plus tard dans « Événements de la semaine ».' });
+
 module.exports = { en, fr };

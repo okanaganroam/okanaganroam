@@ -122,16 +122,20 @@ test('score while waiting: "61% now · about 95% once we check your N changes", 
   const r = await post(token, { description: 'A family-run spot on Main Street with wood-fired pizza, house-made pasta and a sunny patio for long summer evenings with friends.', menu_url: 'fe3w.example/menu' });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const after = await bar(token);
-  const pct = Number(/Your page is (\d+)% complete/.exec(after)[1]);
-  const m = /<strong>(\d+)% now<\/strong> · about <strong>(\d+)%<\/strong> once we check your (\d+) changes/.exec(after);
+  // Pub test 3 (2026-11-10): one number. The headline and ring count what was sent; the ring's dark part stays the real score.
+  const pct = Number(/--p:(\d+);/.exec(after)[1]);
+  const shown = Number(/Your page is about (\d+)% complete/.exec(after)[1]);
+  const m = /<strong>(\d+)%<\/strong> counts what you sent\. We check your (\d+) changes, usually within a day\./.exec(after);
   assert.ok(m, 'provisional line shown');
-  assert.equal(Number(m[1]), pct, 'the real score is unchanged');
-  assert.ok(Number(m[2]) > pct);
-  assert.equal(Number(m[3]), 2);
+  assert.equal(Number(/--p:(\d+);/.exec(before)[1]), pct, 'the real score is unchanged');
+  assert.ok(shown > pct);
+  assert.equal(Number(m[1]), shown);
+  assert.equal(Number(m[2]), 2);
+  assert.match(after, new RegExp(`<b>${shown}%</b>`));
   assert.match(after, /class="op-cb-key op-cb-key-done"><\/i>Done <i class="op-cb-key op-cb-key-wait"><\/i>Sent, we’re checking/);
   assert.match(after, /--w:\d+/);
   const fr = (await fetch(`${base}/fr/owner/${token}/completeness`).then((x) => x.json())).html;
-  assert.match(fr, /% maintenant<\/strong> · environ <strong>\d+ %<\/strong> une fois vos 2 modifications vérifiées/);
+  assert.match(fr, /<strong>\d+ %<\/strong> compte ce que vous avez envoyé\. Nous vérifions vos 2 modifications, habituellement d’ici un jour\./);
 });
 
 test('storefront: a spot sent for our check shows as waiting and counts in the provisional score', () => {

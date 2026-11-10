@@ -183,7 +183,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Essentials finish: "Your page is ready. N of 8 essentials done.", then one number.
   assert.match(s, /h\(T\.essReady\)/); assert.match(s, /fill\(T\.essCount, \{ n: nd, total: P1\.length \}\)/); assert.match(s, /'jumpEss:' \+ k/);
   assert.doesNotMatch(s, /T\.pctRightNow/);
-  assert.equal(cfg.t.essReady, 'Your page is ready'); assert.equal(cfg.t.essCount, '{n} of {total} essentials done.');
+  assert.equal(cfg.t.essReady, 'The essentials are done'); // pub test 3: never "ready" beside a low number assert.equal(cfg.t.essCount, '{n} of {total} essentials done.');
   assert.equal(cfg.t.pctAbout, 'About {n}% complete'); assert.equal(cfg.t.pctAboutSub, 'once we add what you sent (usually within a day).'); assert.equal(cfg.t.pctRaise, 'Add more about your place to raise it.');
   // Part 2: no counter, four tiles then "A few more" folded.
   assert.doesNotMatch(s, /T\.moreProg|T\.moreDone/);
@@ -212,7 +212,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(html, /body\.owner-setup \.su-pages img \{ object-fit: contain;/);
   assert.match(html, /body\.owner-setup \.ohb-x \{ width: 44px; height: 44px; \}/);
   const frHtml = await text(`/fr/owner/${tokenFor(v.id)}/setup`);
-  assert.equal(cfgOf(frHtml).t.essReady, 'Votre page est prête');
+  assert.equal(cfgOf(frHtml).t.essReady, 'L’essentiel est fait');
   for (const k of Object.keys(strings.en)) assert.ok(k in strings.fr, `French has ${k}`);
 });
 

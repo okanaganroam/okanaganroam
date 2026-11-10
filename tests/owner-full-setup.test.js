@@ -87,11 +87,11 @@ test('setup-only live rule: from the setup, hours, season, closures, badges, hap
   const live = app.getVenue(v.id);
   assert.match(live.hours, /12:00/);
   assert.equal(!!live.patio, true);
-  // Address, phone and the description still wait for our check, even from the setup.
+  // Address and the description still wait for our check, even from the setup. The phone goes live (pub test 3, 2026-11-10).
   const r2 = await change(t, { address: '300 Front St, Penticton', phone: '250-555-0199', description: 'A family bistro on the lake with handmade pasta and a sunny patio.' });
   assert.equal(r2.status, 201, JSON.stringify(r2.body));
-  assert.deepEqual(r2.body.live, []);
-  assert.deepEqual(r2.body.review.sort(), ['address', 'description', 'phone']);
+  assert.deepEqual(r2.body.live, ['phone']);
+  assert.deepEqual(r2.body.review.sort(), ['address', 'description']);
 });
 
 test('the classic edit page keeps its rules: the same fields without the setup flag wait for review', async () => {
