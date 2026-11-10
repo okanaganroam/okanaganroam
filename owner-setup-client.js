@@ -32,6 +32,13 @@
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
   };
+  // Pubs (2026-11-10): the kitchen, who's welcome and the sports, as stored (venue_pub_info); Pub Fare picked to start.
+  S.pubInfo = clone(CUR.pub_info || {});
+  S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '22:00', note: (S.pubInfo.kitchen || {}).note || '' };
+  S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
+  S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
+  ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
+  if (C.pub && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
   // Season months from "5-10".
   (function(){ var m = /^(\d+)-(\d+)$/.exec(CUR.open_months || ''); if (!m) return; var a = +m[1], b = +m[2], i = a; for (var n = 0; n < 12; n++) { S.months[i] = true; if (i === b) break; i = i % 12 + 1; } })();
   // Seasonal hours: the first one, as months + one time.
@@ -121,6 +128,13 @@
   // One save through /changes. -> 'live' | 'day' | null (error shown).
   function change(changes){
     if (changes.not_offered === 'ADD_DIETARY') changes = { not_offered: addNot('dietary') };
+    // { add: [...], remove: [...] }: worked out from the list as it is when this save is sent (pubs, 2026-11-10).
+    if (changes.not_offered && typeof changes.not_offered === 'object' && !Array.isArray(changes.not_offered)) {
+      var ao = changes.not_offered, nl = S.notOffered.filter(function(z){ return (ao.remove || []).indexOf(z) < 0; });
+      (ao.add || []).forEach(function(z){ if (nl.indexOf(z) < 0) nl.push(z); });
+      if (nl.slice().sort().join() === S.notOffered.slice().sort().join()) return Promise.resolve('live');
+      changes = { not_offered: nl };
+    }
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
       if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); return j.review && j.review.length ? 'day' : 'live'; }
       if (nothingChanged(j)) return 'live';
@@ -158,6 +172,17 @@
     };
     next(0);
   }
+  // "We don't serve food" also clears the food labels (the server does it with the answer); serving food again brings
+  // the food question back, with Pub Fare picked to start (Dayton, Nov 10).
+  function kitchenSaid(mode){
+    var was = S.kitchen.mode; S.kitchen.mode = mode;
+    // No food: the food question is answered too ("no food"), so Part 1 doesn't ask it again.
+    if (mode === 'none') { S.cuis = []; if (S.done.cuisine !== 'no') progress('cuisine', 'no'); return; }
+    if (was === 'none') { if (S.done.cuisine === 'no') delete S.done.cuisine; if (!S.cuis.length) S.cuis = ['Pub Fare']; }
+  }
+  // A pub that said "We don't serve food" and now picks its food: that answer goes (the kitchen question is asked again).
+  function foodAgain(list){ if (C.pub && S.kitchen.mode === 'none') { list.unshift({ pub_info: { kitchen: null } }); S.kitchen.mode = ''; } return list; }
+  function readMinors(){ var mt = el('suMto'), mn = el('suMnote'); if (mt) S.minors.until = mt.value; if (mn) S.minors.note = mn.value.trim(); }
   function addNot(key){ var l = S.notOffered.slice(); if (l.indexOf(key) < 0) l.push(key); return l; }
 
   // ---------- Navigation ----------
@@ -244,7 +269,12 @@
       return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
-  var TOP2 = ['happy', 'specials', 'music', 'story'];
+  var TOP2 = C.top2 || ['happy', 'specials', 'music', 'story'];
+  // After "What you offer": the follow-up screens, in this order (pubs: sports, dogs, then always "Who's welcome?").
+  function offerNext(from){
+    var seq = []; if (C.pub && S.badges.sports_tv) seq.push('offer:sports'); if (S.badges.dog_friendly) seq.push('offer:dogs'); if (C.pub) seq.push('offer:minors');
+    return seq[(from === 'offer' ? -1 : seq.indexOf(from)) + 1] || null;
+  }
   var P2_ICONS = { happy: '🍻', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
@@ -264,7 +294,8 @@
   // What is left to reach 100%: the setup's own open steps, plus anything the portal's checklist still asks for (so the
   // two always agree). Each is a button that opens the step that answers it.
   var ITEM_STEP = { arrival: 'door', photo_main: 'photos', photo_extra: 'photos', menu: 'menu', happy_hour: 'happy', specials: 'specials', entertainment: 'music', description: 'story', pyv_reservations: 'book',
-    pyv_takeout: 'takeout', pyv_known: 'known', pyv_groups: 'groups', instagram: 'instagram', facebook: 'facebook', hours: 'hours', hours_fresh: 'hours', avg_spend: 'spend', cuisine: 'cuisine', dietary: 'offer', address_pin: 'basics', phone: 'basics' };
+    pyv_takeout: 'takeout', pyv_known: 'known', pyv_groups: 'groups', instagram: 'instagram', facebook: 'facebook', hours: 'hours', hours_fresh: 'hours', avg_spend: 'spend', cuisine: 'cuisine', dietary: 'offer', address_pin: 'basics', phone: 'basics',
+    kitchen: 'hours:kitchen', sports: 'offer:sports', games: 'offer', minors: 'offer:minors' };
   function leftList(){
     var out = [], seen = {};
     STEPS.forEach(function(k){ if (!S.done[k] || S.done[k] === 'skip' || S.done[k] === 'later') { seen[k] = true; out.push({ step: k, label: T.labels[k] }); } });
@@ -278,7 +309,8 @@
     var here = { 'hours:edit': 'hoursSave', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
       'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook',
       'menu:web': 'menuWebSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
-      'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave' }[st];
+      'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave',
+      'hours:kitchentime': 'kitchenSave', 'offer:sports': 'sportsSave', 'offer:minors': 'minorsSave' }[st];
     if (here) return here;
     var d = S.dirty || b;
     if (d === 'offer') return 'offerSave'; if (d === 'closures') return 'closuresSave'; if (d === 'spend') return 'spendSave'; if (d === 'cuisine') return 'cuisineExit';
@@ -359,6 +391,22 @@
         + '<div class="su-day"><div class="su-dh"><span>' + h(T.winterQ) + '</span><button type="button" class="su-toggle" data-act="winter" aria-pressed="' + (S.winter.on ? 'true' : 'false') + '">' + h(S.winter.on ? T.yes : T.no) + '</button></div>'
         + (S.winter.on ? '<p class="su-hint">' + h(T.winterHint) + '</p><p class="su-q">' + h(T.whichMonths) + '</p>' + monthChips(S.winter.months, 'winter') + '<p class="su-q">' + h(T.hoursThen) + '</p><div class="su-times"><label class="su-sr" for="wf">' + h(T.starts) + '</label><input type="time" id="wf" value="' + S.winter.from + '"> ' + h(T.to) + ' <label class="su-sr" for="wt">' + h(T.ends) + '</label><input type="time" id="wt" value="' + S.winter.to + '"></div>' : '')
         + '</div><div class="su-stack">' + big('✓', T.saveHours, '', false, 'hoursSave') + '</div>';
+    } else if (s === 'hours:kitchen') {
+      var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
+      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big('🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
+        + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:hours">' + h(T.skip) + '</button></div>';
+    } else if (s === 'hours:kitchentime') {
+      x = q(T.kitchenTimeQ, T.kitchenTimeLead) + msgs() + '<div class="su-day"><div class="su-times"><label class="su-q" for="suKto" style="margin:0">' + h(T.kitchenAt) + '</label> <input type="time" id="suKto" value="' + h(S.kitchen.closes) + '"></div></div>'
+        + field('suKnote', T.kitchenNoteLabel, S.kitchen.note, { max: 120 }) + ex(T.kitchenNoteEx) + '<div class="su-stack">' + big('✓', T.saveMyHours, '', false, 'kitchenSave') + '</div>';
+    } else if (s === 'offer:sports') {
+      x = q(T.sportsQ, T.sportsLead) + msgs() + '<div class="su-chips" role="group" aria-label="' + h(T.sportsQ) + '">' + C.sports.map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.sports.list[o.k] ? 'true' : 'false') + '" data-sport="' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
+        + '<p class="su-q">' + h(T.tvsQ) + '</p><div class="su-chips" role="group" aria-label="' + h(T.tvsQ) + '">' + C.tvs.map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.sports.tvs === o.k ? 'true' : 'false') + '" data-tv="' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
+        + ex(T.sportsEx) + '<div class="su-stack">' + big('➜', T.nextPlain, '', false, 'sportsSave') + '</div>';
+    } else if (s === 'offer:minors') {
+      x = q(T.minorsQ, T.minorsLead) + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
+        + (S.minors.policy === 'minors_until' ? '<div class="su-day" style="margin-top:14px"><div class="su-times"><label class="su-q" for="suMto" style="margin:0">' + h(T.minorsUntil) + '</label> <input type="time" id="suMto" value="' + h(S.minors.until) + '"></div></div>' : '')
+        + field('suMnote', T.minorsNoteLabel, S.minors.note, { max: 120 }) + ex(T.minorsNoteEx) + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'minorsSave') + '</div>'
+        + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
     } else if (s === 'closures') {
       var mr = monthRun(S.months), monthsOn = !mr.none && !mr.all && !mr.bad;
       var nothing = !S.closures.length && !S.extra.length && !monthsOn;
@@ -384,12 +432,13 @@
     } else if (s === 'cuisine') {
       var showAll = S.cuiAll || S.cuiQ.trim();
       var shown = showAll ? C.cuisines : C.popular.concat(S.cuis.filter(function(c){ return C.popular.indexOf(c) < 0; }));
-      x = doneLine('cuisine') + q(T.cuisineQ, T.cuisineLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
+      x = doneLine('cuisine') + q(T.cuisineQ, C.pub && !S.cuis.length ? T.cuisineLeadEmpty : T.cuisineLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
         + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'search', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
         + '<div class="su-tiles" id="suCuiTiles">' + shown.map(function(c){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cuis.indexOf(c) >= 0 ? 'true' : 'false') + '" data-cui="' + h(c) + '"><span class="su-e" aria-hidden="true">' + (C.cuisineIcons[c] || '🍽️') + '</span>' + h(C.cuisineNames[c] || c) + '</button>'; }).join('') + '</div>'
         + '<p class="su-lead" id="suCuiNone" hidden>' + h(T.notOnList) + '</p>'
         + (showAll ? '' : '<button type="button" class="su-more" data-act="cuiAll">' + h(T.showMore) + '</button>')
-        + '<div class="su-stack' + (S.cuis.length ? ' su-sticky' : '') + '">' + big('➜', T.cuisineNext, '', false, 'cuisineNext') + '</div>' + skip('cuisine');
+        + '<div class="su-stack' + (S.cuis.length ? ' su-sticky' : '') + '">' + big('➜', T.cuisineNext, '', false, 'cuisineNext') + '</div>'
+        + (C.pub && S.kitchen.mode !== 'none' ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
     } else if (s === 'cuisine:place') {
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
@@ -442,7 +491,7 @@
         + '<div class="su-stack su-sticky su-sticky-clear">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:dogs') {
       x = q(T.dogQ, T.dogLead) + msgs() + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
-        + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
+        + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:' + (offerNext('offer:dogs') || 'saved:offer') + '">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';
     } else if (s === 'happy:yes' || s === 'specials:yes') {
       var hk = p[0];
@@ -484,7 +533,7 @@
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'lineSave:' + base(s) + ':' + cfg[0]) + '</div>'
         + (s === 'known' ? skip('known') : '<div class="su-skip"><button type="button" class="su-link" data-act="no:' + base(s) + '">' + h({ book: T.bookNoLink, takeout: T.takeoutNoLink, groups: T.groupsNoLink }[base(s)]) + '</button></div>');
     } else if (s === 'takeout') { x = yesNo('takeout', T.takeoutQ);
-    } else if (s === 'groups') { x = yesNo('groups', T.groupsQ);
+    } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
       x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
@@ -640,7 +689,7 @@
       var pad = function(n){ return ('0' + n).slice(-2); };
       ch.hours_seasons = [{ from: pad(r.a) + '-01', to: pad(r.b) + '-' + LAST[r.b - 1], label: ((CUR.hours_seasons || [])[0] || {}).label || '', hours: sw }].concat((CUR.hours_seasons || []).slice(1));
     } else if ((CUR.hours_seasons || []).length) ch.hours_seasons = (CUR.hours_seasons || []).slice(1);
-    saveAll('hours', [ch]);
+    saveAll('hours', [ch], null, C.pub ? 'hours:kitchen' : null);
   }
   function readTimes(){ Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (S.week[q2[0]] && S.week[q2[0]][+q2[1]]) S.week[q2[0]][+q2[1]][+q2[2]] = inp.value; }); var wf = el('wf'), wt = el('wt'); if (wf) S.winter.from = wf.value; if (wt) S.winter.to = wt.value; }
   function happySave(){
@@ -759,7 +808,7 @@
     if (k === 'edit') { S.toList = true; S.toFinish = false; S.hist = ['start']; S.step = 'start'; return go(filled(v)); }
     if (k === 'closureAddSave') { act('closureAdd'); if (!S.nudge) act('closuresSave'); return; }
     if (k === 'monthsUseSave') { act('monthsUse'); if (!S.nudge) act('closuresSave'); return; }
-    if (k === 'cuisineExit') { if (!S.cuis.length) return leave(); return saveAll('cuisine', [S.place ? { cuisines: S.cuis, place_type: S.place } : { cuisines: S.cuis }]); }
+    if (k === 'cuisineExit') { if (!S.cuis.length) return leave(); return saveAll('cuisine', foodAgain([S.place ? { cuisines: S.cuis, place_type: S.place } : { cuisines: S.cuis }])); }
     if (k === 'spend' || k === 'add' || k === 'winter' || k === 'closureAdd' || k === 'monthsUse' || k === 'monthsClear') mark();
     if (k === 'later') return record(v, 'later');
     if (k === 'open') { S.toList = false; S.hist = ['more']; S.step = 'more'; return go(filled(v)); }
@@ -772,7 +821,26 @@
     if (k === 'no') return sayNo(v);
     if (k === 'basicsOk') return record('basics', 'live');
     if (k === 'basicsSave') { S.addr = el('suAddr').value; S.phone = el('suPhone').value; var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) ch.phone = S.phone; if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); } return saveAll('basics', [ch]); }
-    if (k === 'hoursOk') return saveAll('hours', [{ hours_checked: true }]);
+    if (k === 'hoursOk') return saveAll('hours', [{ hours_checked: true }], null, C.pub ? 'hours:kitchen' : null);
+    // Pubs (2026-11-10): the kitchen, the sports and who's welcome.
+    if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ kitchenSaid(km); S.kitchen.note = ''; }); }
+    if (k === 'kitchenSave') {
+      var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value.trim();
+      if (!/^\d{2}:\d{2}$/.test(S.kitchen.closes)) { S.nudge = T.kitchenAt; return render(); }
+      return saveAll('hours', [{ pub_info: { kitchen: { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note } } }], null, null, function(){ kitchenSaid('earlier'); });
+    }
+    if (k === 'noFood') return saveAll('cuisine', [{ pub_info: { kitchen: { mode: 'none' } } }], 'no', null, function(){ kitchenSaid('none'); });
+    if (k === 'sportsSave') {
+      var sl = C.sports.map(function(o){ return o.k; }).filter(function(z){ return S.sports.list[z]; });
+      if (!sl.length) { S.nudge = T.sportsNeed; return render(); }
+      return saveAll('offer', [{ pub_info: { sports: { list: sl, tvs: S.sports.tvs } } }], null, offerNext('offer:sports'));
+    }
+    if (k === 'minorsSave') {
+      readMinors();
+      if (!S.minors.policy) { S.nudge = T.minorsNeed; return render(); }
+      var mv = { policy: S.minors.policy, note: S.minors.note }; if (S.minors.policy === 'minors_until') mv.until = S.minors.until;
+      return saveAll('offer', [{ pub_info: { minors: mv } }]);
+    }
     if (k === 'hoursSave') return hoursSave();
     if (k === 'winter') { readTimes(); S.winter.on = !S.winter.on; return render(); }
     if (k === 'monthsUse') { var r = monthRun(S.months); if (r.none) { S.nudge = T.monthsNeed; return render(); } if (r.bad) { S.nudge = T.monthsInRow; return render(); } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
@@ -797,7 +865,7 @@
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
-    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', [{ cuisines: S.cuis, place_type: S.place }]); }
+    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', foodAgain([{ cuisines: S.cuis, place_type: S.place }])); }
     if (k === 'take') return el('suTake').click();
     if (k === 'pick') return el('suPick').click();
     if (k === 'sendPhotos') return sendPhotos();
@@ -833,12 +901,19 @@
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
       // Dogs un-ticked: the "where are dogs allowed" line goes too. Ticked: that's the next small screen.
       if (!S.badges.dog_friendly && (CUR.visit_rows || {}).dogs) { list.push({ visit_rows: { dogs: '' } }); S.dogNote = ''; }
-      return saveAll('offer', list, null, S.badges.dog_friendly ? 'offer:dogs' : null);
+      // Pubs (2026-11-10): no game ticked = "No games"; Sports on TV not ticked = "We don't show sports" (and its sports go).
+      if (C.pub) {
+        var gameOn = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'].some(function(g){ return badges[g]; }), add = [], rem = [];
+        if (gameOn) rem.push('games'); else add.push('games');
+        if (badges.sports_tv) rem.push('sports'); else { add.push('sports'); if (S.pubInfo.sports) { list.push({ pub_info: { sports: null } }); S.sports = { list: {}, tvs: '' }; } }
+        list.push({ not_offered: { add: add, remove: rem } });
+      }
+      return saveAll('offer', list, null, offerNext('offer'));
     }
     if (k === 'dogSave') {
       S.dogNote = el('suDog').value.trim();
-      if (S.dogNote === ((CUR.visit_rows || {}).dogs || '')) return go('saved:offer');
-      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
+      if (S.dogNote === ((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
+      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '' } : { days: {}, kind: '', what: '' }); return render(); }
     if (k === 'happySave') return happySave();
@@ -895,6 +970,9 @@
       Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', has(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tv]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-tv'); S.sports.tvs = S.sports.tvs === k ? '' : k; Array.prototype.forEach.call(screen.querySelectorAll('[data-tv]'), function(c){ c.setAttribute('aria-pressed', c.getAttribute('data-tv') === S.sports.tvs ? 'true' : 'false'); }); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-minors]'), function(b){ b.onclick = function(){ readMinors(); S.minors.policy = b.getAttribute('data-minors'); S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-zoom]'), function(im){ im.onclick = function(){ var bx = im.parentNode; bx.className = bx.className === 'su-zoomed' ? '' : 'su-zoomed'; }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-kind]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-kind').split(':'), e = S.nights[+q2[0]]; e.kind = q2[1]; if (!e.what) e.what = T.kinds[q2[1]]; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-rm]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-rm').split(':'); S[q2[0]].splice(+q2[1], 1); render(); }; });
@@ -926,9 +1004,11 @@
   var startAt = String(location.hash || '').slice(1);
   if (startAt === 'season') startAt = 'closures';
   if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
+  // Pubs: the checklist's kitchen, sports and who's-welcome rows open their own screens.
+  else if (C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) { S.hist = ['start']; S.step = startAt; S.toList = true; }
   // Answers tapped or typed but not saved yet (for "Exit setup").
   screen.addEventListener('input', function(e){ if (e.target && e.target.id !== 'suCq') mark(); });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-sport],[data-tv],[data-minors]') : null; if (t) mark(); }, true);
   render();
   window.addEventListener('beforeunload', function(e){ if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

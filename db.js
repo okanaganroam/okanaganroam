@@ -1545,4 +1545,15 @@ CREATE TABLE IF NOT EXISTS venue_owner_features (
 );
 `);
 
+// Pub answers only the business gives (Dayton, 2026-11-10; never researched): when the kitchen closes, who's welcome
+// (adults only / minors with an adult until a time / all ages) and which sports are shown on how many TVs.
+// info: JSON { kitchen: { mode, closes, note }, minors: { policy, until, note }, sports: { list, tvs } } (keys optional).
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_pub_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 module.exports = db;

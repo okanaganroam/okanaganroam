@@ -211,7 +211,7 @@ test('last step wording: "Do it" for one step, "Do them" for two', () => {
 });
 
 test('other types: no completeness extras on a pub or a cafe edit page', async () => {
-  for (const type of ['pub', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'cafe', 'winery']) {
     const page = await get(`/owner/${tokenFor(mk(type, { hours: week }).id)}`);
     for (const s of ['op-cb-prov', 'opToast', 'data-cb-back', 'opDescGoal', 'op-hh-stable', 'data-copy-from', 'ofPreviews', 'op-tips', 'data-fields=']) assert.ok(!page.includes(s), `${type}: no ${s}`);
   }

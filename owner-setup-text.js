@@ -301,4 +301,45 @@ Object.assign(fr, {
 });
 fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
 
+// Pubs (Dayton, 2026-11-10; mockup drafts/pub-portal-2026-11-10/pub-setup.html): pub examples and the pub-only screens,
+// laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
+en.pub = {
+  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', cuisineLeadEmpty: 'Pick up to 3. Serving food now? Pick what you serve.', noFood: 'We don’t serve food',
+  placeQ: 'What kind of pub is it?', placeLead: 'Pick the one that fits best.',
+  groupsLead: 'Birthdays, work parties, team nights.', knownEx: 'Wing night and the hockey on the big screen', igLead: 'Type your Instagram name, like @yourpub.',
+  kitchenQ: 'Does your kitchen close before the bar?', kitchenLead: 'Lots of pubs stop serving food before last call. Visitors want to know before they come in hungry.',
+  kitchenEarlier: 'Yes, the kitchen closes earlier', kitchenSame: 'No, food until we close', kitchenNone: 'We don’t serve food',
+  kitchenTimeQ: 'When does the kitchen close?', kitchenTimeLead: 'The same time every night is fine. If it changes on weekends, add a note.',
+  kitchenAt: 'Kitchen closes at', kitchenNoteLabel: 'Different on some nights? (optional)', kitchenNoteEx: 'Fri and Sat, food until 11 PM', saveMyHours: 'Save my hours',
+  kitchenSaid: { same: 'You said: food until you close.', earlier: 'You said: the kitchen closes at {t}.', none: 'You said: you don’t serve food.' },
+  sportsQ: 'Which sports do you show?', sportsLead: 'Tap all that apply. Fans search for “where to watch the game”.', tvsQ: 'How many TVs?',
+  sportsEx: 'Big games with sound? Say so in “Weekly events” later.', sportsNeed: 'Please tap at least one sport, or go back and untick Sports on TV.',
+  minorsQ: 'Who’s welcome?', minorsLead: 'Families often check this before they come. Tell us your own rule.',
+  minorsOpts: { adults: 'Adults only (19+)', minors_until: 'Minors welcome with an adult, until a set time', all_ages: 'All ages welcome' },
+  minorsUntil: 'Minors welcome until', minorsNoteLabel: 'Anything else? (optional)', minorsNoteEx: 'Kids welcome in the dining room until 9 PM; patio is 19+.',
+  minorsNeed: 'Please tap one of the three, so families know before they come.', saveThese: 'Save these', nextPlain: 'Next',
+  noLabels: { cuisine: 'no food' },
+  quick: Object.assign({}, en.quick, { groups: ['Call ahead for 10 or more', 'Private room available', 'Book the patio'] }),
+};
+fr.pub = {
+  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', cuisineLeadEmpty: 'Choisissez-en jusqu’à 3. Vous servez à manger maintenant? Choisissez ce que vous servez.', noFood: 'Nous ne servons pas de nourriture',
+  placeQ: 'Quel genre de pub est-ce?', placeLead: 'Choisissez celui qui convient le mieux.',
+  groupsLead: 'Anniversaires, fêtes de bureau, soirées d’équipe.', knownEx: 'La soirée ailes de poulet et le hockey sur grand écran', igLead: 'Écrivez votre nom Instagram, comme @votrepub.',
+  kitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', kitchenLead: 'Bien des pubs cessent de servir à manger avant le dernier service. Les visiteurs veulent le savoir avant d’arriver affamés.',
+  kitchenEarlier: 'Oui, la cuisine ferme plus tôt', kitchenSame: 'Non, on sert à manger jusqu’à la fermeture', kitchenNone: 'Nous ne servons pas de nourriture',
+  kitchenTimeQ: 'À quelle heure la cuisine ferme-t-elle?', kitchenTimeLead: 'La même heure tous les soirs, c’est parfait. Si elle change la fin de semaine, ajoutez une note.',
+  kitchenAt: 'La cuisine ferme à', kitchenNoteLabel: 'Différent certains soirs? (facultatif)', kitchenNoteEx: 'Ven. et sam., nourriture jusqu’à 23 h', saveMyHours: 'Enregistrer mes heures',
+  kitchenSaid: { same: 'Vous avez dit : nourriture jusqu’à la fermeture.', earlier: 'Vous avez dit : la cuisine ferme à {t}.', none: 'Vous avez dit : vous ne servez pas de nourriture.' },
+  sportsQ: 'Quels sports diffusez-vous?', sportsLead: 'Touchez tout ce qui s’applique. Les amateurs cherchent « où regarder le match ».', tvsQ: 'Combien de téléviseurs?',
+  sportsEx: 'De grands matchs avec le son? Dites-le plus tard dans « Événements de la semaine ».', sportsNeed: 'Touchez au moins un sport, ou revenez en arrière et décochez Sports à la télé.',
+  minorsQ: 'Qui est le bienvenu?', minorsLead: 'Les familles vérifient souvent avant de venir. Dites-nous votre propre règle.',
+  minorsOpts: { adults: 'Adultes seulement (19 ans et plus)', minors_until: 'Mineurs bienvenus avec un adulte, jusqu’à une heure donnée', all_ages: 'Tous les âges sont bienvenus' },
+  minorsUntil: 'Mineurs bienvenus jusqu’à', minorsNoteLabel: 'Autre chose? (facultatif)', minorsNoteEx: 'Enfants bienvenus dans la salle à manger jusqu’à 21 h; terrasse 19 ans et plus.',
+  minorsNeed: 'Touchez l’une des trois réponses, pour que les familles le sachent avant de venir.', saveThese: 'Enregistrer', nextPlain: 'Suivant',
+  noLabels: { cuisine: 'pas de nourriture' },
+  quick: Object.assign({}, fr.quick, { groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible', 'Réservez la terrasse'] }),
+};
+
 module.exports = { en, fr };

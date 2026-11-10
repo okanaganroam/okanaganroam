@@ -33,7 +33,8 @@ test('the 23 items are unique and their weights add to 100', () => {
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.ok(pc.ITEMS.every((i) => pc.GROUPS.some((g) => g.key === i.group)));
   assert.ok(pc.ITEMS.every((i) => i.fix ? i.target && i.btnEn && i.btnFr : true), 'every item the owner can fix has a button');
-  const sums = Object.fromEntries(pc.GROUPS.map((g) => [g.key, pc.ITEMS.filter((i) => i.group === g.key).reduce((a, i) => a + i.w, 0)]));
+  // Pub groups (2026-11-10) have no restaurant items and are left out.
+  const sums = Object.fromEntries(pc.GROUPS.filter((g) => pc.ITEMS.some((i) => i.group === g.key)).map((g) => [g.key, pc.ITEMS.filter((i) => i.group === g.key).reduce((a, i) => a + i.w, 0)]));
   assert.deepEqual(sums, { basics: 16, hours: 12, photos: 14, menu: 18, offers: 10, visit: 12, about: 6, social: 6, finding: 3, confirmed: 3 });
 });
 
@@ -237,7 +238,7 @@ test('edit page: French restaurant page has the bar and the French help topic', 
 });
 
 test('edit page: every other type (pubs, cafes, wineries, breweries, beaches, shops...) has no bar, no CSS, no script, no help topic; English and French', async () => {
-  for (const t of ['pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
+  for (const t of ['cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
     const v = mk(t);
     for (const prefix of ['/owner/', '/fr/owner/']) {
       const html = await get(`${prefix}${tokenFor(v.id)}`);
@@ -383,7 +384,7 @@ test('edit page intro: a restaurant on the edit link says which quick answers go
   assert.ok(!en.includes('We review every change'), 'and so is "we review every change"');
   const fr = await get(`/fr/owner/${tokenFor(r.id)}`);
   assert.match(fr, /Les réponses rapides sont en ligne tout de suite\./);
-  for (const type of ['pub', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'cafe', 'winery']) {
     const html = await get(`/owner/${tokenFor(mk(type).id)}`);
     assert.ok(html.includes('Nothing changes until you press the Send button'), `${type} keeps its wording`);
     assert.ok(!html.includes('Quick answers go live right away'), `${type} has no checklist line`);
