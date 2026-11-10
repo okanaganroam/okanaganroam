@@ -50232,7 +50232,7 @@ function renderOwnerSetupPage(found, opts) {
   let pendingMain = '';
   try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
-    address: snap.address, phone: snap.phone, description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
+    address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
     hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,

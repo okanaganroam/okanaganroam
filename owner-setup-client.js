@@ -282,6 +282,10 @@
   function chips(obj, key, list, label){ return '<div class="su-chips" role="group" aria-label="' + h(label || '') + '">' + list.map(function(d){ return '<button type="button" class="su-chip" aria-pressed="' + (obj[d.k] ? 'true' : 'false') + '" data-chip="' + key + ':' + d.k + '">' + h(d.t) + '</button>'; }).join('') + '</div>'; }
   function dayChips(obj, key){ return chips(obj, key, DAYS.map(function(d){ return { k: d, t: dayName(d) }; }), T.whichDays); }
   function monthChips(obj, key){ var l = []; for (var i = 1; i <= 12; i++) l.push({ k: i, t: monthName(i - 1) }); return chips(obj, key, l, T.whichMonths); }
+  // Website shown as a plain domain ("tapsidepub.ca"), or "No website yet" / "You don't have a website".
+  function siteDomain(u){ return String(u || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, ''); }
+  function siteOk(u){ var d = siteDomain(u); return /^[^\s\/]+\.[^\s\/]{2,}(\/\S*)?$/.test(d) && d.length <= 290; }
+  function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
   function field(id, label, value, opts){ opts = opts || {}; return '<label class="su-q" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
@@ -410,11 +414,12 @@
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div><details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>'
         + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), allDone() ? 'go:finish' : 'doneNow2') + '</div>';
     } else if (s === 'basics') {
-      x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div></div>'
+      x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div><div><span>' + h(T.website) + '</span><span>' + h(siteShown()) + '</span></div></div>'
         + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'basicsOk') + big('✎', T.changeThem, '', true, 'go:basics:edit') + '</div>' + skip('basics');
     } else if (s === 'basics:edit') {
       x = q(T.basicsEditQ) + msgs() + field('suAddr', T.streetLabel, S.addr != null ? S.addr : CUR.address || '', { max: 200 }) + field('suPhone', T.phoneLabel, S.phone != null ? S.phone : CUR.phone || '', { type: 'tel', max: 40 })
-        + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + '</div>';
+        + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
+        + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + big('✕', T.noWebsiteBtn, '', true, 'basicsNoSite') + '</div>';
     } else if (s === 'hours') {
       x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
         : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + '</div>') + skip('hours');
@@ -882,7 +887,25 @@
     if (k === 'doneNow' || k === 'doneNow2') { if (S.busy) return; S.busy = true; return post(C.base + '/setup/progress', { done_for_now: true }).then(function(){ S.busy = false; if (k === 'doneNow') return leave(); go('finish'); }); }
     if (k === 'no') return sayNo(v);
     if (k === 'basicsOk') return record('basics', 'live');
-    if (k === 'basicsSave') { S.addr = el('suAddr').value; S.phone = el('suPhone').value; var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) ch.phone = S.phone; if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); } return saveAll('basics', [ch]); }
+    if (k === 'basicsSave') {
+      S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = el('suSite').value;
+      var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) ch.phone = S.phone;
+      // Website (2026-11-10): typed as "example.com" is fine (the server adds https://); it's checked first, like today.
+      var site = S.site.trim(); if (site && !siteOk(site)) { S.nudge = T.websiteBad; return render(); }
+      if (siteDomain(site) !== siteDomain(CUR.website)) ch.website = site;
+      if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); }
+      var listB = [ch]; if (site && S.notOffered.indexOf('website') >= 0) listB.unshift({ not_offered: S.notOffered.filter(function(z){ return z !== 'website'; }) });
+      return saveAll('basics', listB);
+    }
+    // "We don't have a website": with none on file it's the existing not-offered answer (live); with one on file the
+    // removal is a website change, checked first like any other (Sent ✓ within a day).
+    if (k === 'basicsNoSite') {
+      S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = '';
+      var chN = {}; if (S.addr.trim() !== (CUR.address || '')) chN.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) chN.phone = S.phone;
+      if (CUR.website) { chN.website = ''; return saveAll('basics', [chN]); }
+      var listN = [{ not_offered: addNot('website') }]; if (Object.keys(chN).length) listN.push(chN);
+      return saveAll('basics', listN);
+    }
     if (k === 'hoursOk') return saveAll('hours', [{ hours_checked: true }], null, C.pub ? 'hours:kitchen' : null);
     // Pubs (2026-11-10): the kitchen, the sports and who's welcome.
     if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ kitchenSaid(km); S.kitchen.note = ''; }); }
