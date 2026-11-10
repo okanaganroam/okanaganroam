@@ -58,3 +58,16 @@ test('page: a single-site view hides the other column', () => {
   const html = renderDashboardPage({ sites: [{ key: 'okanagan', name: 'Okanagan Roam', data }, { key: 'whistler', name: 'Whistler Roam', error: 'x' }], days: 7, site: 'okanagan' });
   assert.ok(!html.includes('<section class="col"><h2>Whistler Roam'));
 });
+
+test('collect: portal links sent, opened ever and opened in the period', () => {
+  const d = db();
+  d.exec(`CREATE TABLE venue_owner_links (venue_id INTEGER PRIMARY KEY, first_opened_at TEXT, last_opened_at TEXT, open_count INTEGER NOT NULL DEFAULT 0);
+  INSERT INTO venue_owner_links VALUES (1,'2026-11-04 09:00:00','2026-11-05 10:00:00',3),(2,'2026-09-01 09:00:00','2026-09-02 10:00:00',1),(3,NULL,NULL,0);`);
+  const o = collect(d, { site: 'okanagan', days: 7, now: NOW });
+  assert.equal(o.inbox.portal_links, 3);
+  assert.equal(o.inbox.portal_links_opened, 2);
+  assert.equal(o.inbox.portal_opens_in_window, 1);
+  const html = renderDashboardPage({ sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: o }], days: 7, site: 'okanagan' });
+  assert.match(html, /links sent/);
+  assert.match(html, /opened in this period/);
+});

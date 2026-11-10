@@ -94,7 +94,10 @@ function siteColumn(s, days) {
     parts.push(`<div class="card"><h3>Waiting on you</h3>
       <div class="stats">${stat(i.venue_submissions_pending, 'venue submissions')}${stat(i.event_submissions_pending, 'event submissions')}${stat(i.claims_pending, 'claims')}${stat(i.visitor_contributions_pending, 'visitor tips/photos')}</div>
       <h4>Owners and activity</h4>
-      <div class="stats">${stat(i.claims_approved, 'claims approved')}${stat(i.owner_accounts, 'owner accounts')}${stat(i.owners_active_in_window, 'owners active')}${stat(i.menu_reads_in_window, 'menu scans')}</div></div>`);
+      <div class="stats">${stat(i.claims_approved, 'claims approved')}${stat(i.owner_accounts, 'owner accounts')}${stat(i.owners_active_in_window, 'owners active')}${stat(i.menu_reads_in_window, 'menu scans')}</div>
+      <h4>Portal links</h4>
+      <div class="stats">${stat(i.portal_links, 'links sent')}${stat(i.portal_links_opened, 'opened ever')}${stat(i.portal_opens_in_window, 'opened in this period')}</div>
+      <p class="n">Counts businesses that opened their private link (not crawlers or our own testing). Opens before Nov 9 were not recorded.</p></div>`);
   }
 
   if (d.listings) parts.push(`<div class="card"><h3>Listings</h3><div class="stats">${stat(d.listings.venues, 'businesses')}${stat(d.listings.events, 'events')}</div></div>`);

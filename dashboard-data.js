@@ -85,6 +85,9 @@ function collect(db, { site = 'site', days = 30, now = new Date() } = {}) {
       owner_accounts: count('owner_accounts', '1=1'),
       owners_active_in_window: count('owner_accounts', 'last_login_at >= ?', [sinceTs]),
       menu_reads_in_window: count('menu_reads', 'created_at >= ?', [sinceTs]),
+      portal_links: count('venue_owner_links', '1=1'),
+      portal_links_opened: count('venue_owner_links', 'first_opened_at IS NOT NULL'),
+      portal_opens_in_window: count('venue_owner_links', 'last_opened_at >= ?', [sinceTs]),
     };
   });
 

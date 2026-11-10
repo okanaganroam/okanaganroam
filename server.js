@@ -44679,6 +44679,16 @@ function venueForOwnerToken(token) {
   return { venue: rowToVenue(row), happyHourTimes: row.happy_hour_times || null, contactEmail: link.contact_email };
 }
 
+// A business opened its private link (2026-11-09): counted for the dashboard's "portal opens". Crawlers, mail-scanner
+// bots and our own testing (INTERNAL_IPS or the internal cookie) are not opens.
+function recordOwnerLinkOpen(req, venueId) {
+  try {
+    if (tripDemand.isBot(req) || tripDemand.isInternal(req)) return;
+    db.prepare(`UPDATE venue_owner_links SET open_count = open_count + 1, last_opened_at = CURRENT_TIMESTAMP,
+      first_opened_at = COALESCE(first_opened_at, CURRENT_TIMESTAMP) WHERE venue_id = ?`).run(venueId);
+  } catch (e) { /* counting never breaks the page */ }
+}
+
 // What the owner sees and can change, in the same shapes the form submits.
 function ownerVenueSnapshot(venue, happyHourTimes) {
   const badges = {};
@@ -60494,6 +60504,7 @@ const server = http.createServer(async (req, res) => {
         if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage(res.ownerLang)); }
         res.writeHead(200, headers);
         // Already signed in (2026-10-18): offer "Add to my login" instead of "Create a login".
+        if (method === 'GET') recordOwnerLinkOpen(req, found.venue.id);
         found.viewer = ownerAccountForRequest(req);
         if (found.viewer) found.viewerManages = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(found.viewer.id, found.venue.id);
         return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id), res.ownerLang));
