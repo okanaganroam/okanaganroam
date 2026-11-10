@@ -218,6 +218,26 @@ function nextOpening(parsed, weekday, now) {
   return null;
 }
 
+// The next opening by calendar date (pub test 5, 2026-11-10): with special closures, the weekday lookahead above
+// can land inside a closure ("Opens Sun 12 PM" on Jan 4 when Jan 5-20 is closed: Sunday Jan 10 is closed), or on the
+// slot hoursForClock fills with yesterday. This walks the real dates instead: closure days are skipped and don't count
+// toward the usual week of lookahead, so a multi-day closure is stepped over to the first open day after it. Stops
+// (null) at the first unknown day, like nextOpening. -> { weekday, minutes, date, daysAhead } | null
+function nextOpeningByDate(parsed, date, now) {
+  let budget = 8;
+  for (let off = 0; off <= 400 && budget > 0; off++) {
+    const d = shiftDate(date, off);
+    const day = dayOnDate(parsed, d);
+    if (!day || day.status === 'unknown') return null;
+    if (day.closure) continue;
+    budget--;
+    if (day.status !== 'open') continue;
+    const start = day.ranges.map(([a]) => a).find((a) => off > 0 || a > now);
+    if (start !== undefined) return { weekday: dateWeekday(d), minutes: start, date: d, daysAhead: off };
+  }
+  return null;
+}
+
 // parsed: parseHours() output; clock: okanaganClock() output.
 // -> {
 //      state: 'open' | 'closed' | 'unknown',
@@ -230,6 +250,8 @@ function nextOpening(parsed, weekday, now) {
 function statusAt(parsed, clock) {
   const base = { state: 'unknown', closesAt: null, opensAt: null, closedToday: false, allDay: false };
   if (!parsed || !parsed.days || !validClock(clock)) return base;
+  const byDate = !!(parsed.closures && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || ''));
+  const undated = parsed;
   parsed = hoursForClock(parsed, clock);
   const today = clock.weekday;
   const now = clock.minutes;
@@ -254,7 +276,7 @@ function statusAt(parsed, clock) {
   const out = {
     ...base,
     state: 'closed',
-    opensAt: nextOpening(parsed, today, now),
+    opensAt: byDate ? nextOpeningByDate(undated, clock.date, now) : nextOpening(parsed, today, now),
     closedToday: current.status === 'closed',
   };
   // A special closure today names itself: "Closed today (Thanksgiving)", or "(holiday)" without a note.
@@ -284,7 +306,10 @@ function formatClockMinutes(minutes) {
 // never worded as closed.
 function hoursStatusLabel(status, clock) {
   const DAY_NAMES = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const when = (at) => {
+    // A week or more away (past a closure, pub test 5): the date too, "Thu, Jan 21, 12 PM".
+    if (at.date && at.daysAhead >= 7) return DAY_NAMES[at.weekday] + ', ' + MONTHS[Number(at.date.slice(5, 7)) - 1] + ' ' + Number(at.date.slice(8, 10)) + ', ' + formatClockMinutes(at.minutes);
     if (at.weekday === clock.weekday) return formatClockMinutes(at.minutes);
     if (at.weekday === shiftWeekday(clock.weekday, 1)) return 'tomorrow ' + formatClockMinutes(at.minutes);
     return DAY_NAMES[at.weekday] + ' ' + formatClockMinutes(at.minutes);
@@ -380,7 +405,7 @@ function openingPeriods(parsed) {
 const HOURS_CLIENT_SRC = [
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
   ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, seasonOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
-    validClock, resolveClose, nextOpening, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
+    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
 ].join('\n');
 
 module.exports = {
@@ -393,6 +418,7 @@ module.exports = {
   dayOnDate,
   isTemporaryClosure,
   hoursForClock,
+  nextOpeningByDate,
   statusAt,
   formatClockMinutes,
   hoursStatusLabel,

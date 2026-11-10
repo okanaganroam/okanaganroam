@@ -62,9 +62,10 @@ test('1: hours start as a short list of the 7 days, each with a big Change butto
     assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/);
     assert.match(s, /data-same="' \+ d \+ '"/); assert.match(s, /data-samemon="' \+ d \+ '"/);
     // Copy shortcuts: every day, or Mon–Fri.
-    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(T\.copyAll\)/);
+    // Pub test 5: "Every open day" unless no other day is open; a day marked Closed is never reopened by a copy.
+    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
     assert.match(s, /data-copywk="' \+ d \+ '">' \+ h\(T\.copyWeek\)/);
-    assert.match(s, /DAYS\.forEach\(function\(x\)\{ if \(x !== d && \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\)\) S\.week\[x\] = clone\(src\); \}\);/);
+    assert.match(s, /DAYS\.forEach\(function\(x\)\{ if \(x !== d && \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\) && \(fresh \|\| S\.week\[x\]\)\) S\.week\[x\] = clone\(src\); \}\);/);
     // Saving sends the whole week as before (every day, opened or not).
     assert.match(s, /var week = \{\}; DAYS\.forEach\(function\(d\)\{ week\[d\] = S\.week\[d\] \|\| \[\]; \}\);/);
     assert.match(html, /\.su-hchg \{[^}]*min-height: 56px;/, 'the Change button is big enough to tap');

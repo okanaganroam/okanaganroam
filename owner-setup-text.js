@@ -466,4 +466,34 @@ Object.assign(fr, {
   kitchenNeed: 'Choisissez l’heure à laquelle votre cuisine ferme.',
 });
 
+// Fifth first-time pub test (2026-11-10; drafts/fresh-eyes-pub5-2026-11-10/REPORT.md). Shared with restaurants.
+Object.assign(en.holidays, { victoria: 'Victoria Day', canada: 'Canada Day', bcDay: 'BC Day', labour: 'Labour Day', truth: 'Truth and Reconciliation Day', thanks: 'Thanksgiving', remembrance: 'Remembrance Day' });
+Object.assign(fr.holidays, { victoria: 'Fête de la Reine', canada: 'Fête du Canada', bcDay: 'Jour de la Colombie-Britannique', labour: 'Fête du Travail', truth: 'Journée de la vérité et de la réconciliation', thanks: 'Action de grâce', remembrance: 'Jour du Souvenir' });
+Object.assign(en, {
+  // Hours: copying never reopens a closed day.
+  copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.',
+  // Closures: the next few holidays, then the rest.
+  holAll: 'Show all holidays ({n})', holFewer: 'Show fewer holidays',
+  // Menu on Facebook or Instagram; no website filled in when there is none.
+  menuSocial: 'My menu is on Facebook or Instagram', menuSocialQ: 'Where is your menu?', menuSocialLead: 'Paste the link to your Facebook or Instagram page or post with the menu. Or type the page name and we’ll find it.',
+  menuSocialLabel: 'Link or page name', menuSocialEx: 'facebook.com/yourpub or @yourpub', menuSocialEmpty: 'Please paste the link, or type the name of your page.',
+  menuSocialNote: 'Our menu is on our Facebook or Instagram page: “{name}”. Please find it and add it as our menu link.', savedMenuSocialName: 'We’ll find your menu on that page. It’ll show on your page within a day.',
+  webQEmpty: 'Where is your menu online?', webLeadEmpty: 'Type the address of the page your menu is on.',
+  // "What you offer": ticks from research; a description that still mentions sports.
+  researchLine: 'We ticked these from what we found online. Untick anything that’s wrong.',
+  storySportsQ: 'Your description still mentions sports', storySportsLead: 'It says “{bit}”. You can change that in your description.', storySportsBtn: 'Fix my description',
+  storySportsHint: 'You said you don’t show sports, but your description says “{bit}”. Change or remove that part, then save. We check it first.',
+});
+Object.assign(fr, {
+  copyOpen: 'Chaque jour ouvert', copyClosedNote: 'Les journées marquées Fermé restent fermées.',
+  holAll: 'Voir tous les jours fériés ({n})', holFewer: 'Voir moins de jours fériés',
+  menuSocial: 'Mon menu est sur Facebook ou Instagram', menuSocialQ: 'Où est votre menu?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec le menu. Ou tapez le nom de la page et nous le trouverons.',
+  menuSocialLabel: 'Lien ou nom de la page', menuSocialEx: 'facebook.com/votrepub ou @votrepub', menuSocialEmpty: 'Collez le lien ou tapez le nom de votre page.',
+  menuSocialNote: 'Notre menu est sur notre page Facebook ou Instagram : « {name} ». Merci de le trouver et de l’ajouter comme lien de notre menu.', savedMenuSocialName: 'Nous trouverons votre menu sur cette page. Il s’affichera sur votre page d’ici un jour.',
+  webQEmpty: 'Où est votre menu en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouve votre menu.',
+  researchLine: 'Nous avons coché ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.',
+  storySportsQ: 'Votre description parle encore de sports', storySportsLead: 'Elle dit « {bit} ». Vous pouvez changer cela dans votre description.', storySportsBtn: 'Corriger ma description',
+  storySportsHint: 'Vous avez indiqué ne pas diffuser de sports, mais votre description dit « {bit} ». Modifiez ou retirez ce passage, puis enregistrez. Nous le vérifions d’abord.',
+});
+
 module.exports = { en, fr };

@@ -192,7 +192,8 @@ test('hours editor, happy hour and closures: Same every day, Same as Monday, Ope
   assert.match(s, /if \(k === 'allDay'\)/);
   // Recurring holidays: closures are stored as dates (no repeat rule), so next year's date is saved too, on by default.
   assert.equal(cfg.t.everyYear, 'This year and next');
-  assert.match(s, /yearly: key === 'xmas' \|\| key === 'boxing' \|\| key === 'nyd'/);
+  // Pub test 5: every stat holiday repeats (its own date next year); the eves stay one-off.
+  assert.match(s, /yearly: key !== 'xmasEve' && key !== 'nye'/);
   assert.match(s, /S\.everyYear\[key\] !== false/);
   assert.match(s, /data-yearly/); assert.match(s, /mapFailQ/);
   assert.equal(cfgOf(await text(`/fr/owner/${tokenFor(mk('pub').id)}/setup`)).t.everyYear, 'Cette année et l’an prochain');

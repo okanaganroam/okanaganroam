@@ -108,6 +108,15 @@ function visitorNote(h) {
   return (h && h.field === 'occasion' && OCCASION_VISITOR_NOTES[h.value]) || h.note;
 }
 const KIDS_EXCLUDED_TYPES = ['cocktail', 'pub', 'distillery'];
+// With kids (pub test 5, 2026-11-10): the one rule every planner path uses when kids are asked for. Never a cocktail bar
+// or distillery; a pub or a brewery only when it has the Kid-Friendly badge as the public sees it (features.kid_friendly,
+// built by the server's kidFriendlyPublic: for a pub that is the business's own "Who's welcome?" answer, so an adults-only
+// (19+) pub, or one that hasn't answered, is never planned for a family).
+function kidsAllowed(v) {
+  if (!v) return false;
+  if (v.type === 'pub' || v.type === 'brewery') return !!(v.features && v.features.kid_friendly);
+  return !KIDS_EXCLUDED_TYPES.includes(v.type);
+}
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
 // ---------- small helpers ----------
@@ -870,8 +879,7 @@ function eligible(v, ctx, strict) {
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
   if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || '')))) return false;
   if (ctx.kids) {
-    if (KIDS_EXCLUDED_TYPES.includes(v.type)) return false;
-    if (v.type === 'brewery' && !v.features.kid_friendly) return false;
+    if (!kidsAllowed(v)) return false;
   }
   // Teenagers can't go to bars (2026-10-14).
   if (['pub', 'cocktail', 'distillery'].includes(v.type) && /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '') && !ctx.types.has(v.type)) return false;
@@ -6161,7 +6169,7 @@ function rainBackups(result, input, intent) {
   const text = (v) => `${v.textName || ''} ${v.textDesc || ''}`;
   const scored = (input.facts || []).filter((v) => regions.has(v.region) && !used.has(v.id) && tripRequirements.matches(v, { kind: 'rainy' }) && !['restaurant', 'cafe'].includes(v.type)
     && !(v.advisory && advisoryUnavailable(v.advisory.note))
-    && !(party.kids && (KIDS_EXCLUDED_TYPES.includes(v.type) || /\bcasino\b/.test(text(v))))
+    && !(party.kids && (!kidsAllowed(v) || /\bcasino\b/.test(text(v))))
     && !(noDrink && RAIN_BACKUP_DRINK_TYPES.includes(v.type))
     && !(party.dog && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))))
     .map((v) => {
@@ -7477,6 +7485,11 @@ function planItinerary(input) {
 
   // Events first: the event anchors when and where the rest of the evening happens.
   const parts = trip.components.map((c, i) => ({ c: { ...c }, i }));
+  // With kids anywhere in the request (pub test 5, 2026-11-10): every part is planned for kids, not only the part the
+  // words were next to ("craft beer and live music in West Kelowna with my kids" put a 19+ pub in every plan through the
+  // live-music fallback, whose part didn't carry the kids).
+  const tripKids = !!(intent.party && intent.party.kids) || intent.occasion === 'family';
+  if (tripKids) for (const p of parts) p.c.kids = true;
   const stops = [];
   let anchor = null;
   for (const p of parts) {

@@ -458,6 +458,8 @@ function rowToVenue(row) {
   // Pubs (Dayton, 2026-11-10): the researched Kid-friendly badge stays stored but is never shown; the business's own
   // "Who's welcome?" answer decides it (pubKidsWelcome).
   if (row.type === 'pub') v.kid_friendly = pubKidsWelcome(row.id);
+  // A heated or covered patio the business ticked counts as a patio (pub test 5, 2026-11-10; patioPublic).
+  if (!v.patio && ownerHeatedPatio(row.id)) v.patio = true;
   // Seasonal hours and special closures (2026-10-18), only on the few venues that have them (keeps API pages
   // small): the lists themselves, and hours_live -- the hours JSON hours.js reads with both applied.
   if (row.hours) {
@@ -4454,7 +4456,7 @@ function buildDiscoverySearchVenues() {
   for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all()) {
     if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
     const features = {};
-    for (const f of BOOL_FIELDS) if (f === 'kid_friendly' ? kidFriendlyPublic(row) : Number(row[f]) === 1) features[f] = true;
+    for (const f of BOOL_FIELDS) if (badgeOnPublic(row, f)) features[f] = true;
     const m = member.get(row.id) || { collections: [], activities: [], fdTypes: [] };
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
@@ -6767,7 +6769,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
     const plannerType = v.type === 'sport' ? tripSportPlannerType(v) : v.type === 'shop' ? 'indoor' : v.type;
     if (!plannerType || TRIP_PLANNER_DROPPED_TYPES.has(plannerType)) continue;
     const features = {};
-    for (const f of BOOL_FIELDS) if (f === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f]) === 1) features[f] = true;
+    for (const f of BOOL_FIELDS) if (badgeOnPublic(v, f)) features[f] = true;
     const m = memberships.get(v.id) || { collections: [], activities: [], fdTypes: [] };
     facts.push({
       id: v.id, name: v.name, region: v.region, type: plannerType, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -19474,7 +19476,24 @@ function kidFriendlyPublic(row) {
 }
 const KID_FRIENDLY_SQL = `((kid_friendly = 1 AND type <> 'pub') OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')}))))`;
 // "<field> = 1" for a badge in a WHERE clause; kid_friendly follows the pub rule above.
-function badgeTrueSql(f) { return f === 'kid_friendly' ? KID_FRIENDLY_SQL : `${f} = 1`; }
+// Heated or covered patio counts as a patio (pub test 5, 2026-11-10): a business that ticked "Heated or covered patio"
+// (owner-only, venue_owner_features) has a patio for the Patio guide, the API patio filter and the map's Patio filter,
+// even when the researched patio column is 0. Applied at read time only; the stored patio value is never changed here.
+function patioPublic(row) {
+  if (!row) return false;
+  return Number(row.patio) === 1 || row.patio === true || ownerHeatedPatio(row.id);
+}
+function ownerHeatedPatio(venueId) {
+  try { return !!venueOwnerFeatures(venueId).heated_patio; } catch (e) { return false; } // before the table/cache exist
+}
+const PATIO_SQL = `(patio = 1 OR id IN (SELECT venue_id FROM venue_owner_features WHERE json_extract(features, '$.heated_patio') = 1))`;
+// One badge as the public sees it: kid_friendly follows the pub rule, patio includes a heated patio, the rest are stored.
+function badgeOnPublic(row, f) {
+  if (f === 'kid_friendly') return kidFriendlyPublic(row);
+  if (f === 'patio') return patioPublic(row);
+  return Number(row[f]) === 1;
+}
+function badgeTrueSql(f) { return f === 'kid_friendly' ? KID_FRIENDLY_SQL : f === 'patio' ? PATIO_SQL : `${f} = 1`; }
 const pubClock = (t, fr) => {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
   if (!m) return '';
@@ -23289,7 +23308,7 @@ function mapPlacesData(now = new Date()) {
     const blocked = !!((st && st.reason === 'advisory') || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current))));
     v.hikeList = hikeIds.has(v.id);
     v.viewpointList = viewpointIds.has(v.id);
-    let bits = MAP_FEATURES.reduce((b, f) => ((f.field === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.field]) === 1) ? b | f.bit : b), 0);
+    let bits = MAP_FEATURES.reduce((b, f) => (badgeOnPublic(v, f.field) ? b | f.bit : b), 0);
     if (OWNER_FEATURE_TYPES.has(v.type)) { const of = venueOwnerFeatures(v.id); const mine = ownerExtraBadgesFor(v.type); bits = MAP_OWNER_FEATURES.reduce((b, f) => ((f.owners || [f.owner]).some((k) => mine.includes(k) && of[k]) ? b | f.bit : b), bits); }
     const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
@@ -26591,7 +26610,7 @@ function foodDrinkCategoriesByVenue(venues) {
 // venue id -> the feature keys that venue actually has set.
 function foodDrinkFeaturesByVenue(venues) {
   const map = new Map();
-  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => (f.key === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.key]) === 1)).map((f) => f.key));
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => badgeOnPublic(v, f.key)).map((f) => f.key));
   return map;
 }
 
@@ -29136,7 +29155,7 @@ function dogHubCategoriesByVenue(venues, beachIds) {
 }
 function dogHubFeaturesByVenue(venues) {
   const map = new Map();
-  for (const v of venues) map.set(v.id, DOG_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  for (const v of venues) map.set(v.id, DOG_HUB_FEATURES.filter((f) => badgeOnPublic(v, f.key)).map((f) => f.key));
   return map;
 }
 
@@ -33920,6 +33939,8 @@ function frStatusText(text) {
     .replace('Closed now', 'Ferm\u00e9 en ce moment')
     .replace('Hours not listed for today', 'Heures non indiqu\u00e9es pour aujourd\u2019hui')
     .replace(/\btomorrow /, 'demain \u00e0 ')
+    // Past a closure (pub test 5, 2026-11-10): "Opens Thu, Jan 21, 12 PM" -> "ouvre jeu. 21 janv. \u00e0 12 h".
+    .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}), /, (m, d, mo, n) => `${FR_STATUS_DAYS[d]} ${day1(n)} ${FR_STATUS_MONTHS[mo]} \u00e0 `)
     .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, (m, d) => `${FR_STATUS_DAYS[d]} \u00e0 `)
     .replace(/ouvre (\d)/, 'ouvre \u00e0 $1')
     // A close after midnight on another day: "ferme demain \u00e0 1 h 30", not "ferme \u00e0 demain \u00e0" (2026-10-18).
@@ -38936,7 +38957,7 @@ function browseCategoriesByVenue(venues, also = new Map()) {
 }
 function browseFeaturesByVenue(venues) {
   const map = new Map();
-  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => (f.key === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.key]) === 1)).map((f) => f.key));
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => badgeOnPublic(v, f.key)).map((f) => f.key));
   return map;
 }
 function browseCuisines(venues) {
@@ -44362,26 +44383,28 @@ const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch',
 const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food'];
 const OWNER_CUISINES_MAX = 3;
 // Pubs (2026-11-10, SPEC-pubs.md): pub-friendly labels first; Pub Fare is picked for them in the easy setup.
-const PUB_CUISINES_POPULAR = ['Pub Fare', 'Burgers', 'Chicken & Wings', 'Pizza', 'Fish & Chips', 'Comfort food', 'Canadian', 'Contemporary & Global', 'Mexican', 'Steakhouse'];
+// Pub test 5 (2026-11-10): BBQ in the short list (it was only under "Show more"); Chicken & Wings stays near the top.
+const PUB_CUISINES_POPULAR = ['Pub Fare', 'Burgers', 'Chicken & Wings', 'BBQ', 'Pizza', 'Fish & Chips', 'Comfort food', 'Canadian', 'Contemporary & Global', 'Mexican', 'Steakhouse'];
 const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pub or sports bar', 'Diner', 'Quick bite', 'Winery or brewery restaurant'];
 // Pubs (Dayton, 2026-11-10): their own short list of kinds, stored and shown the same way (venue_cuisines.place_type).
-const PUB_PLACE_TYPES = ['Neighbourhood pub', 'Sports bar', 'Gastropub', 'Irish or British pub', 'Brewpub', 'Clubhouse'];
+// "Taphouse / craft beer bar" (pub test 5, 2026-11-10: a taphouse picked Brewpub, which says it brews its own beer).
+const PUB_PLACE_TYPES = ['Neighbourhood pub', 'Sports bar', 'Gastropub', 'Irish or British pub', 'Brewpub', 'Taphouse', 'Clubhouse'];
 function placeTypesFor(type) { return type === 'pub' ? PUB_PLACE_TYPES : RESTAURANT_PLACE_TYPES; }
 // The types whose cuisines and kind of place come from venue_cuisines (restaurants; pubs since 2026-11-10).
 const CUISINE_LIST_TYPES = new Set(['restaurant', 'pub']);
 const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
   'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
-  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Clubhouse': 'Club-house (golf ou ski)' };
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Clubhouse': 'Club-house (golf ou ski)' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
 // Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
 // read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
 // no matching property, so nothing is added to the JSON-LD.
 const PLACE_TYPE_DISPLAY = { 'Casual': 'Casual dining', 'Family': 'Family restaurant', 'Fine dining': 'Fine dining', 'Bistro': 'Bistro',
   'Pub or sports bar': 'Pub or sports bar', 'Diner': 'Diner', 'Quick bite': 'Quick bite', 'Winery or brewery restaurant': 'Winery or brewery restaurant',
-  'Neighbourhood pub': 'Neighbourhood pub', 'Sports bar': 'Sports bar', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Irish or British pub', 'Brewpub': 'Brewpub', 'Clubhouse': 'Golf or ski clubhouse' };
+  'Neighbourhood pub': 'Neighbourhood pub', 'Sports bar': 'Sports bar', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Irish or British pub', 'Brewpub': 'Brewpub', 'Taphouse': 'Taphouse / craft beer bar', 'Clubhouse': 'Golf or ski clubhouse' };
 const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family': 'Restaurant familial', 'Fine dining': 'Restaurant gastronomique', 'Bistro': 'Bistro',
   'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
-  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Clubhouse': 'Club-house de golf ou de ski' };
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Clubhouse': 'Club-house de golf ou de ski' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -45111,6 +45134,9 @@ function recordOwnerLinkOpen(req, venueId) {
 function ownerVenueSnapshot(venue, happyHourTimes) {
   const badges = {};
   for (const f of RESEARCHED_BOOL_FIELDS) badges[f] = !!venue[f];
+  // Patio as stored (pub test 5): rowToVenue reads a heated patio as a patio for visitors; the owner's tick, its undo and
+  // the review compare against the stored column, so nothing is written back from that read-time rule.
+  if ('patio' in badges && venue.id != null) { try { const r = db.prepare('SELECT patio FROM venues WHERE id = ?').get(venue.id); if (r) badges.patio = Number(r.patio) === 1; } catch (e) { /* keep */ } }
   // Pubs (2026-11-10): no Kid-friendly tick ("Who's welcome?" replaces it), so an owner's save never touches the stored one.
   if (venue.type === 'pub') delete badges.kid_friendly;
   if (COMPLETENESS_TYPES.has(venue.type)) Object.assign(badges, venueOwnerFeaturesFor(venue));
@@ -45152,6 +45178,27 @@ function venueHoursCheckedAt(venueId) {
 }
 function ownerHoursSource(venueId) {
   try { return (db.prepare('SELECT hours_source FROM venues WHERE id = ?').get(venueId) || {}).hours_source || null; } catch (e) { return null; }
+}
+// A website removal ("We don't have a website") still waiting for review? (pub test 5, 2026-11-10)
+function ownerWebsiteRemovalWaiting(venueId) {
+  try {
+    const w = db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(venueId);
+    if (!w) return false;
+    const c = JSON.parse(w.changes);
+    return !!c && 'website' in c && !String(c.website || '').trim();
+  } catch (e) { return false; }
+}
+// The researched badges among `keys` that are on and that the owner never set themselves (no venue_owner log row).
+function setupResearchTicks(venue, keys) {
+  let row = null;
+  try { row = db.prepare('SELECT * FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
+  if (!row) return [];
+  const on = keys.filter((k) => RESEARCHED_BOOL_FIELDS.includes(k) && Number(row[k]) === 1 && !(venue.type === 'pub' && k === 'kid_friendly'));
+  if (!on.length) return [];
+  try {
+    const owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name));
+    return on.filter((k) => !owned.has(k));
+  } catch (e) { return on; }
 }
 // New hours from the edit link still waiting for review?
 function ownerHoursWaiting(venueId) {
@@ -50419,7 +50466,10 @@ function renderOwnerSetupPage(found, opts) {
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
     typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub' })[venue.type] || (fr ? 'établissement' : 'place'),
-    image: pendingMain || ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
+    // Never a website the owner just asked to remove (still waiting for review) or said they don't have (pub test 5).
+    image: pendingMain || ownImage, website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
+    // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
+    researchTicks: setupResearchTicks(venue, offerGroups.flatMap((g) => g.keys)),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
@@ -50652,6 +50702,9 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-pages img { object-fit: contain; background: #fff; }
   body.owner-setup .ohb-x { width: 44px; height: 44px; }
   @media (max-width: 699px) { body.owner-setup .ohb-btn { top: 92px; } }
+  /* Pub test 5 (2026-11-10): on a 412px phone the "?" sat over the step line and the bar. It now sits in the Back row,
+     which is empty on the right, under "Exit setup"; the step line and the bar start below it. */
+  @media (max-width: 699px) { body.owner-setup .ohb-btn { top: 72px; } body.owner-setup .su-top { min-height: 52px; padding-right: 56px; } }
   body.owner-setup .su-fold { margin: 18px 0; }
   body.owner-setup .su-fold summary { display: flex; align-items: center; min-height: 56px; padding: 0 16px; border: 2px dashed var(--su-line); border-radius: 16px; color: var(--su-teal); font-weight: 800; cursor: pointer; }
   body.owner-setup .su-fold[open] summary { margin-bottom: 12px; }
@@ -62804,7 +62857,7 @@ module.exports = {
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
-  pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
+  pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
   validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
