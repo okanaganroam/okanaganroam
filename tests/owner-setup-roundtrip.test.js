@@ -201,7 +201,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /quick\(cfg\[0\], 'suLine'/); assert.match(s, /quick\('dogs', 'suDog'/);
   // Menu after sending; honest words; names.
   assert.equal(cfg.t.menuSentQ, 'Your menu is sent ✓'); assert.equal(cfg.t.menuNewer, 'Want to send a newer menu?');
-  assert.match(s, /S\.savedLine\.cuisine = T\.savedCuisine/); assert.equal(cfg.t.savedCuisine, 'Your food types are on your page now.');
+  assert.match(s, /S\.savedLine\.cuisine = T\.savedCuisine/); assert.equal(cfg.t.savedCuisine, 'Your food types and kind of place are on your page now.');
   assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'on your page soon');
   assert.equal(cfg.t.sentTitle, 'Sent');
   assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just the patio)');
