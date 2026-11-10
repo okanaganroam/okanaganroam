@@ -38,7 +38,7 @@
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
-  if (C.pub && !S.cuis.length) S.cuis = ['Pub Fare'];
+  if (C.pub && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
   // Season months from "5-10".
   (function(){ var m = /^(\d+)-(\d+)$/.exec(CUR.open_months || ''); if (!m) return; var a = +m[1], b = +m[2], i = a; for (var n = 0; n < 12; n++) { S.months[i] = true; if (i === b) break; i = i % 12 + 1; } })();
   // Seasonal hours: the first one, as months + one time.
@@ -172,6 +172,16 @@
     };
     next(0);
   }
+  // "We don't serve food" also clears the food labels (the server does it with the answer); serving food again brings
+  // the food question back, with Pub Fare picked to start (Dayton, Nov 10).
+  function kitchenSaid(mode){
+    var was = S.kitchen.mode; S.kitchen.mode = mode;
+    // No food: the food question is answered too ("no food"), so Part 1 doesn't ask it again.
+    if (mode === 'none') { S.cuis = []; if (S.done.cuisine !== 'no') progress('cuisine', 'no'); return; }
+    if (was === 'none') { if (S.done.cuisine === 'no') delete S.done.cuisine; if (!S.cuis.length) S.cuis = ['Pub Fare']; }
+  }
+  // A pub that said "We don't serve food" and now picks its food: that answer goes (the kitchen question is asked again).
+  function foodAgain(list){ if (C.pub && S.kitchen.mode === 'none') { list.unshift({ pub_info: { kitchen: null } }); S.kitchen.mode = ''; } return list; }
   function readMinors(){ var mt = el('suMto'), mn = el('suMnote'); if (mt) S.minors.until = mt.value; if (mn) S.minors.note = mn.value.trim(); }
   function addNot(key){ var l = S.notOffered.slice(); if (l.indexOf(key) < 0) l.push(key); return l; }
 
@@ -422,13 +432,13 @@
     } else if (s === 'cuisine') {
       var showAll = S.cuiAll || S.cuiQ.trim();
       var shown = showAll ? C.cuisines : C.popular.concat(S.cuis.filter(function(c){ return C.popular.indexOf(c) < 0; }));
-      x = doneLine('cuisine') + q(T.cuisineQ, T.cuisineLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
+      x = doneLine('cuisine') + q(T.cuisineQ, C.pub && !S.cuis.length ? T.cuisineLeadEmpty : T.cuisineLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
         + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'search', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
         + '<div class="su-tiles" id="suCuiTiles">' + shown.map(function(c){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cuis.indexOf(c) >= 0 ? 'true' : 'false') + '" data-cui="' + h(c) + '"><span class="su-e" aria-hidden="true">' + (C.cuisineIcons[c] || '🍽️') + '</span>' + h(C.cuisineNames[c] || c) + '</button>'; }).join('') + '</div>'
         + '<p class="su-lead" id="suCuiNone" hidden>' + h(T.notOnList) + '</p>'
         + (showAll ? '' : '<button type="button" class="su-more" data-act="cuiAll">' + h(T.showMore) + '</button>')
         + '<div class="su-stack' + (S.cuis.length ? ' su-sticky' : '') + '">' + big('➜', T.cuisineNext, '', false, 'cuisineNext') + '</div>'
-        + (C.pub ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
+        + (C.pub && S.kitchen.mode !== 'none' ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
     } else if (s === 'cuisine:place') {
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
@@ -798,7 +808,7 @@
     if (k === 'edit') { S.toList = true; S.toFinish = false; S.hist = ['start']; S.step = 'start'; return go(filled(v)); }
     if (k === 'closureAddSave') { act('closureAdd'); if (!S.nudge) act('closuresSave'); return; }
     if (k === 'monthsUseSave') { act('monthsUse'); if (!S.nudge) act('closuresSave'); return; }
-    if (k === 'cuisineExit') { if (!S.cuis.length) return leave(); return saveAll('cuisine', [S.place ? { cuisines: S.cuis, place_type: S.place } : { cuisines: S.cuis }]); }
+    if (k === 'cuisineExit') { if (!S.cuis.length) return leave(); return saveAll('cuisine', foodAgain([S.place ? { cuisines: S.cuis, place_type: S.place } : { cuisines: S.cuis }])); }
     if (k === 'spend' || k === 'add' || k === 'winter' || k === 'closureAdd' || k === 'monthsUse' || k === 'monthsClear') mark();
     if (k === 'later') return record(v, 'later');
     if (k === 'open') { S.toList = false; S.hist = ['more']; S.step = 'more'; return go(filled(v)); }
@@ -813,13 +823,13 @@
     if (k === 'basicsSave') { S.addr = el('suAddr').value; S.phone = el('suPhone').value; var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) ch.phone = S.phone; if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); } return saveAll('basics', [ch]); }
     if (k === 'hoursOk') return saveAll('hours', [{ hours_checked: true }], null, C.pub ? 'hours:kitchen' : null);
     // Pubs (2026-11-10): the kitchen, the sports and who's welcome.
-    if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ S.kitchen.mode = km; S.kitchen.note = ''; }); }
+    if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ kitchenSaid(km); S.kitchen.note = ''; }); }
     if (k === 'kitchenSave') {
       var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value.trim();
       if (!/^\d{2}:\d{2}$/.test(S.kitchen.closes)) { S.nudge = T.kitchenAt; return render(); }
-      return saveAll('hours', [{ pub_info: { kitchen: { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note } } }], null, null, function(){ S.kitchen.mode = 'earlier'; });
+      return saveAll('hours', [{ pub_info: { kitchen: { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note } } }], null, null, function(){ kitchenSaid('earlier'); });
     }
-    if (k === 'noFood') return saveAll('cuisine', [{ pub_info: { kitchen: { mode: 'none' } } }], 'no', null, function(){ S.kitchen.mode = 'none'; });
+    if (k === 'noFood') return saveAll('cuisine', [{ pub_info: { kitchen: { mode: 'none' } } }], 'no', null, function(){ kitchenSaid('none'); });
     if (k === 'sportsSave') {
       var sl = C.sports.map(function(o){ return o.k; }).filter(function(z){ return S.sports.list[z]; });
       if (!sl.length) { S.nudge = T.sportsNeed; return render(); }
@@ -855,7 +865,7 @@
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
-    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', [{ cuisines: S.cuis, place_type: S.place }]); }
+    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', foodAgain([{ cuisines: S.cuis, place_type: S.place }])); }
     if (k === 'take') return el('suTake').click();
     if (k === 'pick') return el('suPick').click();
     if (k === 'sendPhotos') return sendPhotos();

@@ -19529,6 +19529,13 @@ function minorsLineText(m, fr) {
   if (m.policy === 'minors_until') return fr ? `Mineurs bienvenus avec un adulte jusqu’à ${pubClock(m.until, true)}` : `Minors welcome with an adult until ${pubClock(m.until)}`;
   return '';
 }
+// A pub's own features as page highlights ([icon, label]): Local beer on tap, then the games the business ticked.
+const PUB_HIGHLIGHT_ICONS = { local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' };
+function pubOwnerHighlights(venue, fr = false) {
+  if (!venue || venue.type !== 'pub') return [];
+  const f = venueOwnerFeatures(venue.id);
+  return PUB_OWNER_BADGES.filter((k) => f[k]).map((k) => [PUB_HIGHLIGHT_ICONS[k], OWNER_EXTRA_BADGE_LABELS[k][fr ? 'fr' : 'en']]);
+}
 // "hockey, football · 6 to 10 TVs" ('' when the business hasn't said).
 function pubSportsText(venue, fr) {
   const s = venue && venue.type === 'pub' ? venuePubInfo(venue.id).sports : null;
@@ -35344,9 +35351,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
-      // Its Sports TV highlight names the sports and TVs when the business has said.
+      // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
+      // tap and the games show in the visible highlights too, not only in the folded features list.
       highlights: fdLib.highlightsFor(venue.type === 'pub' ? { ...venue, kid_friendly: false } : venue, dogFriendlyNote,
-        venue.type === 'pub' && pubSportsText(venue, false) ? { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${pubSportsText(venue, false)}` } } : profile),
+        venue.type === 'pub' && pubSportsText(venue, false) ? { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${pubSportsText(venue, false)}` } } : profile)
+        .concat(pubOwnerHighlights(venue)),
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
@@ -45479,6 +45488,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         if (c.value) next[k] = c.value; else delete next[k];
       }
       if (!errors.pub_info && JSON.stringify(next) !== JSON.stringify(cur)) changes.pub_info = next;
+      // "We don't serve food" (Dayton, Nov 10): the food labels go too, so the page no longer says "Pub Fare". The kind
+      // of pub stays. Saved with the answer (one change: logged, in "Your updates", one Undo puts both back).
+      const noFood = (x) => !!(x && x.kitchen && x.kitchen.mode === 'none');
+      if (changes.pub_info && noFood(next) && !noFood(cur) && !('cuisines' in input) && !('cuisine' in input) && (current.cuisines || []).length) changes.cuisines = [];
     }
   }
   // Takes reservations / Takeout (2026-11-09) never contradict a "we don't have one" answer: say it plainly instead.
@@ -53501,6 +53514,11 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         const before = venuePubInfo(venue.id);
         writeVenuePubInfo(venue.id, value && typeof value === 'object' ? value : {});
         const after = venuePubInfo(venue.id);
+        // Serving food again after "We don't serve food": the easy setup asks the food question again.
+        if ((before.kitchen || {}).mode === 'none' && (after.kitchen || {}).mode !== 'none') {
+          const p = setupProgress(venue.id);
+          if (p.done.cuisine === 'no') { delete p.done.cuisine; writeSetupProgress(venue.id, p); }
+        }
         if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, 'pub_info', Object.keys(before).length ? JSON.stringify(before) : null, Object.keys(after).length ? JSON.stringify(after) : null, meta.reason, meta.batch_id, reviewer);
         applied.push(field);
         continue;

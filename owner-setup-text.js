@@ -305,7 +305,7 @@ fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
 // laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
 en.pub = {
   hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
-  cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', noFood: 'We don’t serve food',
+  cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', cuisineLeadEmpty: 'Pick up to 3. Serving food now? Pick what you serve.', noFood: 'We don’t serve food',
   placeQ: 'What kind of pub is it?', placeLead: 'Pick the one that fits best.',
   groupsLead: 'Birthdays, work parties, team nights.', knownEx: 'Wing night and the hockey on the big screen', igLead: 'Type your Instagram name, like @yourpub.',
   kitchenQ: 'Does your kitchen close before the bar?', kitchenLead: 'Lots of pubs stop serving food before last call. Visitors want to know before they come in hungry.',
@@ -324,7 +324,7 @@ en.pub = {
 };
 fr.pub = {
   hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', noFood: 'Nous ne servons pas de nourriture',
+  cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', cuisineLeadEmpty: 'Choisissez-en jusqu’à 3. Vous servez à manger maintenant? Choisissez ce que vous servez.', noFood: 'Nous ne servons pas de nourriture',
   placeQ: 'Quel genre de pub est-ce?', placeLead: 'Choisissez celui qui convient le mieux.',
   groupsLead: 'Anniversaires, fêtes de bureau, soirées d’équipe.', knownEx: 'La soirée ailes de poulet et le hockey sur grand écran', igLead: 'Écrivez votre nom Instagram, comme @votrepub.',
   kitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', kitchenLead: 'Bien des pubs cessent de servir à manger avant le dernier service. Les visiteurs veulent le savoir avant d’arriver affamés.',

@@ -359,3 +359,72 @@ test('admin remove-amenities: removes and logs; refuses a mismatch and the owner
   assert.deepEqual(r.body.results, { happy_hour: 'skipped_changed_since' });
   assert.equal(sent.filter((m) => /remove/i.test(JSON.stringify(m))).length, 0, 'no emails');
 });
+
+// ---------- Dayton's answers (Nov 10): no food clears the food labels; pub features in the visible highlights ----------
+test('"We don\'t serve food" clears the food labels (kind of pub stays), logged, one Undo; serving food again asks the food question', async () => {
+  const v = mk('pub', { cuisine: 'Pub Fare' }); const t = tokenFor(v.id);
+  assert.equal((await change(t, { cuisines: ['Pub Fare', 'Chicken & Wings'], place_type: 'Sports bar' })).status, 200);
+  app.saveSetupProgress(v.id, 'cuisine', 'live');
+  assert.match(page(v, 'en'), /Pub Fare · Chicken &amp; Wings · Sports bar/);
+  const r = await change(t, { pub_info: { kitchen: { mode: 'none' } } });
+  assert.equal(r.status, 200);
+  const after = app.getVenue(v.id);
+  assert.equal(after.cuisine, null);
+  assert.ok(!/Pub Fare|Chicken &amp; Wings/.test(page(v, 'en')), 'the page no longer says Pub Fare');
+  assert.match(page(v, 'en'), /No food served/);
+  assert.equal(db.prepare('SELECT place_type FROM venue_cuisines WHERE venue_id = ?').get(v.id).place_type, 'Sports bar', 'kind of pub stays');
+  assert.ok(db.prepare("SELECT 1 FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'cuisines' AND new_value IS NULL AND source = 'venue_owner'").get(v.id), 'logged');
+  const ch = db.prepare("SELECT id, changes FROM owner_change_requests WHERE venue_id = ? AND instant = 1 ORDER BY id DESC").get(v.id);
+  assert.deepEqual(Object.keys(JSON.parse(ch.changes)).sort(), ['cuisines', 'pub_info'], 'one change, one Undo');
+  // The setup reads it back: no food labels, the kitchen answer.
+  let cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.cur.cuisines, []); assert.deepEqual(cfg.cur.pub_info.kitchen, { mode: 'none' });
+  // The checklist counts the food type as answered.
+  assert.ok(!/data-cb-item="cuisine"/.test((await get(`/owner/${t}`)).text));
+  // Undo puts both back.
+  assert.equal(app.undoOwnerInstantChange(ch.id, 'test').ok, true);
+  assert.equal(app.getVenue(v.id).cuisine, 'Pub Fare');
+  assert.match(page(v, 'en'), /Pub Fare · Chicken &amp; Wings · Sports bar/);
+  // No food again (from the setup's food screen), then serving food again: the food question comes back.
+  await change(t, { pub_info: { kitchen: { mode: 'none' } } });
+  app.saveSetupProgress(v.id, 'cuisine', 'no');
+  assert.equal((await change(t, { pub_info: { kitchen: { mode: 'same' } } })).status, 200);
+  assert.equal(app.setupProgress(v.id).done.cuisine, undefined, 'the setup asks the food question again');
+  assert.match((await get(`/owner/${t}`)).text, /data-cb-item="cuisine"/, 'and the checklist asks for the food type');
+  cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.cur.cuisines, []);
+  // Already no food labels: nothing extra is sent. A restaurant never gets this.
+  const bare = mk('pub', { cuisine: null }); const r2 = await change(tokenFor(bare.id), { pub_info: { kitchen: { mode: 'none' } } });
+  assert.equal(r2.status, 200);
+  assert.ok(!('cuisines' in JSON.parse(db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? ORDER BY id DESC").get(bare.id).changes)));
+  // The page script: no food clears the picks; serving food again brings Pub Fare back as the start.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /if \(mode === 'none'\) \{ S\.cuis = \[\];/);
+  assert.match(js, /if \(was === 'none'\) \{ if \(S\.done\.cuisine === 'no'\) delete S\.done\.cuisine; if \(!S\.cuis\.length\) S\.cuis = \['Pub Fare'\]; \}/);
+});
+
+test('pub page: Local beer on tap and the games are in the visible highlights; restaurants unchanged', async () => {
+  const v = mk('pub', { sports_tv: 1, patio: 1 }); const t = tokenFor(v.id);
+  await change(t, { badges: { local_beer_taps: true, darts: true, board_games: true } });
+  const html = page(v, 'en');
+  const hl = (/<div class="fd-highlights">([\s\S]*?)<\/div>/.exec(html) || [])[1] || '';
+  for (const w of ['🍺 Local beer on tap', '🎯 Darts', '🎲 Board games']) assert.ok(hl.includes(w), w);
+  assert.ok(!hl.includes('Pool'), 'only what the business ticked');
+  const rest = mk('restaurant', { patio: 1 }); await change(tokenFor(rest.id), { badges: { local_drinks: true } });
+  const rhl = (/<div class="fd-highlights">([\s\S]*?)<\/div>/.exec(page(rest, 'en')) || [])[1] || '';
+  assert.ok(!/Local wine|Local beer/.test(rhl), 'restaurant highlights unchanged');
+});
+
+test('no food, then picking food in the setup: the no-food answer goes and the food labels are saved', async () => {
+  const v = mk('pub', { cuisine: 'Pub Fare' }); const t = tokenFor(v.id);
+  await change(t, { pub_info: { kitchen: { mode: 'none' } } });
+  assert.equal(app.getVenue(v.id).cuisine, null);
+  // What the page script sends (foodAgain): clear the kitchen answer, then the food.
+  assert.equal((await change(t, { pub_info: { kitchen: null } })).status, 200);
+  assert.equal((await change(t, { cuisines: ['Burgers'] })).status, 200);
+  assert.equal(app.getVenue(v.id).cuisine, 'Burgers');
+  assert.equal(app.venuePubInfo(v.id).kitchen, undefined);
+  assert.match((await get(`/owner/${t}`)).text, /data-cb-item="kitchen"/, 'the kitchen question is asked again');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /function foodAgain\(list\)\{ if \(C\.pub && S\.kitchen\.mode === 'none'\) \{ list\.unshift\(\{ pub_info: \{ kitchen: null \} \}\);/);
+});
