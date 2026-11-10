@@ -171,7 +171,9 @@ test('public page: one cuisine is unchanged; several show as "Pizza · Pub Fare"
   assert.deepEqual(serves(twoHtml), ['Pizza', 'Pub Fare']);
   const fr = page(two, 'fr');
   assert.match(fr, /Pizza · Cuisine de pub/);
-  assert.ok(!/Pub or sports bar/.test(twoHtml), 'the kind of place is stored, not shown on the page (yet)');
+  // 2026-11-10 (Dayton): the kind of place now shows after the cuisines; never in schema.org.
+  assert.match(twoHtml, /Pizza · Pub Fare · Pub or sports bar/);
+  assert.deepEqual(serves(twoHtml), ['Pizza', 'Pub Fare']);
 });
 
 test('search finds a restaurant by its second cuisine; new words (poke, wings) reach the new labels', async () => {

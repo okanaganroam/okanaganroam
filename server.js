@@ -8918,6 +8918,10 @@ const UI_ICON_PATHS = {
   volume: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path>',
   mute: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M16 9.5l5 5M21 9.5l-5 5"></path>',
   palette: '<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.7-1-2.9 0-1 .8-1.8 1.8-1.8h2.2a3.5 3.5 0 0 0 3.5-3.5c0-3.9-3.8-7-8.5-7z"></path><circle cx="7.8" cy="11.5" r="1"></circle><circle cx="10.5" cy="7.5" r="1"></circle><circle cx="15" cy="7.8" r="1"></circle>',
+  // Owner-only map filters (2026-11-10): line icons, like every other filter chip (no emoji).
+  access: '<circle cx="13" cy="4.5" r="1.6"></circle><path d="M13 7.5v5.5h4.5l2 5.5"></path><path d="M10 10.5a5.5 5.5 0 1 0 6.3 7.8"></path>',
+  bag: '<path d="M6 8h12l-1 12H7L6 8z"></path><path d="M9 8V6.5a3 3 0 0 1 6 0V8"></path>',
+  home: '<path d="M3 11l9-7 9 7"></path><path d="M5.5 9.5V20h4.5v-6h4v6h4.5V9.5"></path>',
 };
 // inline (emoji pass 2): app.css draws every svg as a block, which is fine inside the flex buttons and chips but puts
 // the icon on a line of its own in an inline run of text (a badge chip, "Closed for the season", a plain button).
@@ -19428,6 +19432,7 @@ function venueCardHtml(venue, opts = {}) {
     showType && venue.type ? escapeHtml(venue.type) : null,
     showTypeLabel && CATEGORY_LABELS[venue.type] ? escapeHtml(CATEGORY_LABELS[venue.type].singular) : null,
     venue.cuisine ? venueCuisineList(venue).map(escapeHtml).join(', ') : null,
+    venue.cuisine && placeTypeDisplay(venue) && venueCuisineList(venue).length <= CARD_PLACE_TYPE_MAX_CUISINES ? escapeHtml(placeTypeDisplay(venue)) : null,
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
   // Golf-only (2026-09-19): the description is wrapped so the page script
@@ -20995,7 +21000,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale' }, spToday: 'Aujourd’hui :',
     wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
@@ -21036,7 +21041,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned' }, spToday: 'Today:',
     wnMore: function(n){ return '+' + n + ' more'; }, hhLaterNote: 'No happy hour on right now. These places have one later today.', openMicWords: 'open mic',
     wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
@@ -21323,7 +21328,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + (st.season ? '${uiIcon('leaf', 15, true)} ' : '') + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
-  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc'];
+  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal'];
   function featHtml(p){
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
@@ -22203,6 +22208,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     groups: 'group groups party parties groupe groupes',
     sports: 'sports sport tv game games hockey football',
     free: 'free gratuit gratuits gratuite gratuites gratis',
+    access: 'wheelchair accessible accessibility accessibilité', booking: 'reservation reservations réservation réservations',
+    takeout: 'takeout pickup emporter', heated: 'heated', localdrinks: 'localdrinks', ownlocal: 'ownlocal',
     open: 'open ouvert ouverts', nearme: 'nearme'
   };
   // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
@@ -22210,6 +22217,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '], [/ happy\\s+(?:specials?|spéciaux|speciaux|spécial|deals?)(?=\\s)/g, ' happy '], [/(?:daily|weekly|nightly|today'?s|tonight'?s|dinner|lunch|food|drink) specials?|specials? (?:today|tonight)|spéciaux du jour|speciaux du jour|plats? du jour/g, ' specials '],
     [/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
+    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:wine|wines|beer|beers|craft beers?)|craft beers?|vins? locaux|bi[èe]res? artisanales?/g, ' localdrinks '],
+    [/locally[ -]?owned|independently owned|propri[ée]t[ée] locale/g, ' ownlocal '], [/take[ -]?out|pour emporter/g, ' takeout '], [/wheel ?chair/g, ' wheelchair '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
     // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
     [/(sugar|dairy|nut|peanut|lactose|egg|smoke|scent|fragrance)[ -]?free/g, ' $1 '], [/free (parking|wifi|wi-fi|wi fi|refills?|delivery|shipping)/g, ' $1 '],
@@ -22771,7 +22780,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 20; // 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 21; // 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -22786,8 +22795,11 @@ function mapDataVersion(now = new Date()) {
   // Verified mark (2026-10-27): the claimed places too, so a new claim shows its tick without waiting for another change.
   const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',') + '|cv:' + [...completeVerifiedIds(now)].sort((a, b) => a - b).join(',');
   const visit = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_visit_info').get();
+  // Owner-only features (2026-11-10): their own table, so a business ticking one shows on the map without another change.
+  let of = { u: null, n: 0 };
+  try { of = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_owner_features').get(); } catch (err) { /* an older database */ }
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
@@ -22802,6 +22814,14 @@ const MAP_FEATURES = [
   { key: 'sports', field: 'sports_tv', bit: 4096 }, { key: 'nonalc', field: 'nonalcoholic', bit: 8192 },
   // Round 11 (2026-10-20): "free", "free things" and « gratuit » acted as no filter; the 322 Free to visit places.
   { key: 'free', field: 'free_entry', bit: 16384 },
+];
+// The six owner-only restaurant features (Dayton, 2026-11-10), as map filters: bits above specials/nights, set only from
+// venue_owner_features (never researched), restaurants only. No pages or URLs are made from them (the /map ?f= link is
+// the map's own, noindexed as before).
+const MAP_OWNER_FEATURES = [
+  { key: 'localdrinks', owner: 'local_drinks', bit: 1 << 17 }, { key: 'heated', owner: 'heated_patio', bit: 1 << 18 },
+  { key: 'access', owner: 'wheelchair_accessible', bit: 1 << 19 }, { key: 'ownlocal', owner: 'locally_owned', bit: 1 << 20 },
+  { key: 'booking', owner: 'takes_reservations', bit: 1 << 21 }, { key: 'takeout', owner: 'takeout', bit: 1 << 22 },
 ];
 // "Specials today" (2026-10-27): a filter key like the features (?f=specials, the words "specials" / « spéciaux »), but read
 // from today's specials ([17]), never from a stored bit, so no place carries it in [7].
@@ -22828,6 +22848,13 @@ const MAP_MUST_HAVES = [
   { key: 'late', label: 'Open late', icon: uiIcon('moon') }, { key: 'early', label: 'Open early', icon: uiIcon('sunrise') },
   { key: 'groups', label: 'Good for groups', icon: uiIcon('group') }, { key: 'sports', label: 'Sports on TV', icon: uiIcon('tv') },
   { key: 'nonalc', label: 'Alcohol-free drinks', icon: uiIcon('juice') }, { key: 'free', label: 'Free to visit', icon: uiIcon('ticket') },
+  // Owner-only restaurant features (2026-11-10).
+  { key: 'heated', label: 'Heated or covered patio', icon: uiIcon('roof') },
+  { key: 'localdrinks', label: 'Local wine & craft beer', icon: uiIcon('wine') },
+  { key: 'access', label: 'Wheelchair accessible', icon: uiIcon('access') },
+  { key: 'booking', label: 'Takes reservations', icon: uiIcon('calendar') },
+  { key: 'takeout', label: 'Takeout', icon: uiIcon('bag') },
+  { key: 'ownlocal', label: 'Locally owned', icon: uiIcon('home') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -22943,7 +22970,8 @@ function mapPlacesData(now = new Date()) {
     const blocked = !!((st && st.reason === 'advisory') || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current))));
     v.hikeList = hikeIds.has(v.id);
     v.viewpointList = viewpointIds.has(v.id);
-    const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
+    let bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
+    if (COMPLETENESS_TYPES.has(v.type)) { const of = venueOwnerFeatures(v.id); bits = MAP_OWNER_FEATURES.reduce((b, f) => (of[f.owner] ? b | f.bit : b), bits); }
     const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
@@ -23162,7 +23190,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const ver = mapDataVersion(now);
   const conf = JSON.stringify({ dest: mapDestination(opts.directions,now,opts.entrance==null?null:opts.entrance),directionRequested:!!opts.directions,src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
-    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT, nights: MAP_NIGHTS_BIT },
+    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT, nights: MAP_NIGHTS_BIT, ...Object.fromEntries(MAP_OWNER_FEATURES.map((f) => [f.key, f.bit])) },
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // The food types' line icons, once each (the tags carry only the icon's name).
     ic: Object.fromEntries([...new Set(MAP_TAGS.map((t) => t.icon))].map((n) => [n, uiIcon(n)])),
@@ -34630,7 +34658,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     return `<section class="venue-section venue-deals-card" id="venueDeals" aria-labelledby="venueDealsTitle"><h2 id="venueDealsTitle">${title}</h2><div class="venue-deals-blocks">${blocks.map(([k, h, body]) => `<div class="venue-deals-block" data-block="${k}">${blocks.length === 2 ? `<h3>${h}</h3>` : ''}<div class="venue-deals-body">${body}</div></div>`).join('')}</div></section>`;
   })();
   const detailRows = [
-    venue.cuisine ? ['Cuisine', venueCuisineList(venue).map((c) => escapeHtml(fr ? frCuisine(c) : c)).join(' \u00b7 ')] : null,
+    venue.cuisine ? ['Cuisine', venueCuisineList(venue).map((c) => escapeHtml(fr ? frCuisine(c) : c)).concat(placeTypeDisplay(venue, fr) ? [escapeHtml(placeTypeDisplay(venue, fr))] : []).join(' \u00b7 ')] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
@@ -34796,7 +34824,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
 
   const relatedStockPhotosUsed = new Set();
   function relatedCard(v) {
-    const meta = [v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
+    const meta = [v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null,
+      v.cuisine && placeTypeDisplay(v, fr) && venueCuisineList(v).length <= CARD_PLACE_TYPE_MAX_CUISINES ? placeTypeDisplay(v, fr) : null,
+      v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const cvRel = !v.redirect_to && COMPLETENESS_TYPES.has(v.type) && completeVerifiedIds().has(v.id);
     const badge = (cvRel ? completeVerifiedCardChipHtml(fr) + ' ' : '') + ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
@@ -43975,6 +44005,20 @@ const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pu
 const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
   'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
+// Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
+// read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
+// no matching property, so nothing is added to the JSON-LD.
+const PLACE_TYPE_DISPLAY = { 'Casual': 'Casual dining', 'Family': 'Family restaurant', 'Fine dining': 'Fine dining', 'Bistro': 'Bistro',
+  'Pub or sports bar': 'Pub or sports bar', 'Diner': 'Diner', 'Quick bite': 'Quick bite', 'Winery or brewery restaurant': 'Winery or brewery restaurant' };
+const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family': 'Restaurant familial', 'Fine dining': 'Restaurant gastronomique', 'Bistro': 'Bistro',
+  'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie' };
+function placeTypeDisplay(venue, fr = false) {
+  const p = venuePlaceType(venue);
+  if (!p) return '';
+  return (fr ? PLACE_TYPE_DISPLAY_FR[p] : PLACE_TYPE_DISPLAY[p]) || p;
+}
+// Cards stay short: the kind of place follows the cuisines only when there are at most two of them.
+const CARD_PLACE_TYPE_MAX_CUISINES = 2;
 // The stored { cuisines: [..], place_type } for a restaurant, or null. Cached per process; every writer clears it.
 let venueCuisinesCache = null;
 function clearVenueCuisinesCache() { venueCuisinesCache = null; }
@@ -60695,6 +60739,34 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdminToken(req, res)) return;
       return sendJSON(res, 200, { on: badgeRemindersOn(), today: todayLocal(), due: badgeRemindersDue() });
     }
+    // Badge reminder opt-outs (2026-11-10): Dayton's do-not-contact list goes in before reminders are switched on.
+    // GET lists them; POST adds { emails: [...], reason } (lowercased, checked, INSERT OR IGNORE), logged.
+    if (pathname === '/admin/badge-reminders/optout' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const rows = db.prepare('SELECT email, created_at FROM badge_reminder_optout ORDER BY email').all();
+      return sendJSON(res, 200, { count: rows.length, emails: rows });
+    }
+    if (pathname === '/admin/badge-reminders/optout' && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const unexpected = Object.keys(body || {}).filter((k) => !['emails', 'reason'].includes(k));
+      if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      if (!Array.isArray(body.emails) || !body.emails.length || body.emails.length > 1000) return sendJSON(res, 400, { error: 'emails must be a list of 1 to 1000 addresses.' });
+      if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 200) return sendJSON(res, 400, { error: 'reason is required (up to 200 characters).' });
+      const valid = []; const invalid = [];
+      for (const e of body.emails) {
+        const em = typeof e === 'string' ? e.trim().toLowerCase() : '';
+        if (/^[^\s@<>"']{1,64}@[^\s@<>"']{1,255}\.[a-z]{2,}$/.test(em)) valid.push(em); else invalid.push(String(e).slice(0, 80));
+      }
+      const ins = db.prepare('INSERT OR IGNORE INTO badge_reminder_optout (email) VALUES (?)');
+      let added = 0;
+      db.exec('BEGIN');
+      try { for (const em of [...new Set(valid)]) added += ins.run(em).changes; db.exec('COMMIT'); } catch (err) { try { db.exec('ROLLBACK'); } catch (e2) { /* nothing */ } return sendJSON(res, 500, { error: 'Could not save the opt-outs.' }); }
+      const already = new Set(valid).size - added;
+      console.log(`[badge-reminders] opt-out import: ${added} added, ${already} already there, ${invalid.length} invalid (${body.reason.trim().slice(0, 80)})`);
+      return sendJSON(res, 200, { added, already, invalid, total: db.prepare('SELECT COUNT(*) AS n FROM badge_reminder_optout').get().n });
+    }
     if (pathname === '/admin/owner-links' && method === 'POST') {
       if (!requireAdminToken(req, res)) return;
       let body;
@@ -62121,6 +62193,7 @@ module.exports = {
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
   venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
   guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
+  placeTypeDisplay, PLACE_TYPE_DISPLAY, PLACE_TYPE_DISPLAY_FR, MAP_OWNER_FEATURES, mapDataVersion, MAP_DATA_FORMAT, MAP_MUST_HAVES, writeVenueOwnerFeatures, badgeReminderOptedOut,
   OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,
   createOwnerLink,
   revokeOwnerLink,
