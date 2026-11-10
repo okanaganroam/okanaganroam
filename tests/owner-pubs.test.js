@@ -60,7 +60,7 @@ test('checklist: pub weights sum to 100 in the spec groups; restaurants keep the
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.deepEqual(pc.ITEMS.map((i) => i.key), ['address_pin', 'phone', 'website', 'cuisine', 'hours', 'hours_fresh', 'photo_main', 'photo_extra', 'avg_spend', 'menu', 'dietary', 'happy_hour', 'specials', 'entertainment', 'pyv_known', 'pyv_reservations', 'pyv_takeout', 'pyv_groups', 'description', 'instagram', 'facebook', 'arrival', 'owner_confirmed']);
   assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
-  assert.deepEqual(pc.noneKeysFor('pub').sort(), ['cuisine', 'dietary', 'entertainment', 'facebook', 'games', 'happy_hour', 'instagram', 'pyv_groups', 'specials', 'sports', 'website']);
+  assert.deepEqual(pc.noneKeysFor('pub').sort(), ['cuisine', 'dietary', 'dogs', 'entertainment', 'facebook', 'games', 'happy_hour', 'instagram', 'pyv_groups', 'specials', 'sports', 'website']); // dogs: pub test 4, never scored
   for (const it of pc.PUB_ITEMS) assert.ok(it.en && it.fr && it.whyEn && it.whyFr && (it.fix === false || (it.btnEn && it.btnFr)), `${it.key} has its words in both languages`);
 });
 
@@ -164,7 +164,7 @@ test('pub features: local beer on tap and the games save as owner features and s
   const r = await change(t, { badges: { local_beer_taps: true, darts: true, pool: true } });
   assert.equal(r.status, 200);
   const html = page(v, 'en');
-  for (const w of ['Local beer on tap', 'Darts', 'Pool']) assert.ok(html.includes(w), w);
+  for (const w of ['Local or craft beer on tap', 'Darts', 'Pool']) assert.ok(html.includes(w), w);
   assert.ok(page(v, 'fr').includes('Fléchettes'));
   // A restaurant can't tick the pub-only ones, and a pub can't tick Kid-friendly (Who's welcome replaces it).
   assert.equal((await change(tokenFor(mk('restaurant').id), { badges: { darts: true } })).status, 400);
@@ -409,7 +409,7 @@ test('pub page: Local beer on tap and the games are in the visible highlights; r
   await change(t, { badges: { local_beer_taps: true, darts: true, board_games: true } });
   const html = page(v, 'en');
   const hl = (/<div class="fd-highlights">([\s\S]*?)<\/div>/.exec(html) || [])[1] || '';
-  for (const w of ['🍺 Local beer on tap', '🎯 Darts', '🎲 Board games']) assert.ok(hl.includes(w), w);
+  for (const w of ['🍺 Local or craft beer on tap', '🎯 Darts', '🎲 Board games']) assert.ok(hl.includes(w), w);
   assert.ok(!hl.includes('Pool'), 'only what the business ticked');
   const rest = mk('restaurant', { patio: 1 }); await change(tokenFor(rest.id), { badges: { local_drinks: true } });
   const rhl = (/<div class="fd-highlights">([\s\S]*?)<\/div>/.exec(page(rest, 'en')) || [])[1] || '';

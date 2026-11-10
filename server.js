@@ -9704,7 +9704,7 @@ function notOfferedBlocked(venueId, item) {
 }
 const NOT_OFFERED_BLOCK = (item) => ({ ok: false, reason: 'owner_marked_not_offered', detail: `the owner told us they don't offer this (${item}); research doesn't add it back` });
 // Which "not offered" item a researched badge belongs to.
-const NOT_OFFERED_BADGE_ITEM = { vegan: 'dietary', vegetarian: 'dietary', gluten_free: 'dietary', live_music: 'entertainment', sports_tv: 'entertainment', happy_hour: 'happy_hour' };
+const NOT_OFFERED_BADGE_ITEM = { vegan: 'dietary', vegetarian: 'dietary', gluten_free: 'dietary', live_music: 'entertainment', sports_tv: 'entertainment', happy_hour: 'happy_hour', dog_friendly: 'dogs' };
 // Replaces (or clears, with avgSpend null) a venue's average spend: compare-and-set on expectedCurrent
 // (GET /admin/avg-spend/:id), reason + batch_id required, logged in venue_enrichment_log as 'avg_spend'.
 // -> { ok, changed, info } | { ok: false, reason, detail, live }
@@ -19357,7 +19357,8 @@ const OWNER_EXTRA_BADGE_LABELS = {
   takes_reservations: { en: 'Takes reservations', fr: 'Prend les réservations', icon: null, group: 'people' },
   takeout: { en: 'Takeout', fr: 'Pour emporter', icon: null, group: 'people' },
   // Pubs (Dayton, 2026-11-10): local beer on tap and five games, owner-only like the six above.
-  local_beer_taps: { en: 'Local beer on tap', fr: 'Bière locale en fût', icon: null, group: 'food' },
+  // "Local or craft beer on tap" (pub test 4, 2026-11-10: a pub with craft beer doubted "Local beer"). Key unchanged.
+  local_beer_taps: { en: 'Local or craft beer on tap', fr: 'Bière locale ou artisanale en fût', icon: null, group: 'food' },
   pool: { en: 'Pool', fr: 'Billard', icon: null, group: 'place' },
   darts: { en: 'Darts', fr: 'Fléchettes', icon: null, group: 'place' },
   shuffleboard: { en: 'Shuffleboard', fr: 'Jeu de palets', icon: null, group: 'place' },
@@ -21263,7 +21264,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale en fût' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût' }, spToday: 'Aujourd’hui :',
     wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
@@ -21304,7 +21305,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local beer on tap' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local or craft beer on tap' }, spToday: 'Today:',
     wnMore: function(n){ return '+' + n + ' more'; }, hhLaterNote: 'No happy hour on right now. These places have one later today.', openMicWords: 'open mic',
     wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
@@ -22481,7 +22482,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '], [/ happy\\s+(?:specials?|spéciaux|speciaux|spécial|deals?)(?=\\s)/g, ' happy '], [/(?:daily|weekly|nightly|today'?s|tonight'?s|dinner|lunch|food|drink) specials?|specials? (?:today|tonight)|spéciaux du jour|speciaux du jour|plats? du jour/g, ' specials '],
     [/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
-    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:beers? on tap|taps?)|bi[èe]res? locales? en f[ûu]ts?/g, ' localbeer '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
+    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:or craft )?(?:beers? on tap|taps?)|craft beers? on tap|bi[èe]res? locales?(?: ou artisanales?)? en f[ûu]ts?/g, ' localbeer '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
     [/board ?games?|pool tables?|tables? de billard|jeux de soci[ée]t[ée]/g, ' games '],
     [/locally[ -]?owned|independently owned|propri[ée]t[ée] locale/g, ' ownlocal '], [/take[ -]?out|pour emporter/g, ' takeout '], [/wheel ?chair/g, ' wheelchair '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
@@ -23126,7 +23127,7 @@ const MAP_MUST_HAVES = [
   { key: 'ownlocal', label: 'Locally owned', icon: uiIcon('home') },
   // Owner-only pub features (2026-11-10).
   { key: 'games', label: 'Pool, darts & games', icon: uiIcon('target') },
-  { key: 'localbeer', label: 'Local beer on tap', icon: uiIcon('cocktail') },
+  { key: 'localbeer', label: 'Local or craft beer on tap', icon: uiIcon('cocktail') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -45570,6 +45571,16 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     for (const [badge, none] of [['takes_reservations', 'pyv_reservations'], ['takeout', 'pyv_takeout'], ['great_groups', 'pyv_groups']]) {
       if (nextBadges[badge] && nextNone.includes(none) && (('badges' in changes && changes.badges[badge]) || 'not_offered' in changes)) errors.badges = OWNER_FEATURE_CONTRADICTION[badge];
     }
+    // "No dogs allowed" (pub test 4, 2026-11-10) and Dog friendly are never both. Saying "no dogs" while the page shows
+    // Dog friendly is refused (untick it first, as the setup does); ticking Dog friendly takes back an earlier "no dogs"
+    // (the edit page has no Undo for it, so it is never in the way).
+    if (nextBadges.dog_friendly && nextNone.includes('dogs')) {
+      if (Array.isArray(changes.not_offered) && changes.not_offered.includes('dogs') && !(current.not_offered || []).includes('dogs')) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
+      else if (changes.badges && changes.badges.dog_friendly) {
+        const kept = nextNone.filter((k) => k !== 'dogs');
+        if (JSON.stringify(kept) !== JSON.stringify(current.not_offered || [])) changes.not_offered = kept; else delete changes.not_offered;
+      }
+    }
   }
   const previous = {};
   for (const k of Object.keys(changes)) {
@@ -50592,6 +50603,15 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-kinds[open] summary { margin-bottom: 10px; }
   body.owner-setup .su-score small { display: block; margin-top: 4px; color: var(--su-soft); font-weight: 700; font-size: 15px; }
   body.owner-setup .su-tile.su-tile-wide { grid-column: 1 / -1; }
+  body.owner-setup .su-hrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; margin-bottom: 8px; }
+  body.owner-setup .su-hsum { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; min-width: 0; font-size: 17px; line-height: 1.3; }
+  body.owner-setup .su-hsum b { font-size: 18px; min-width: 44px; }
+  body.owner-setup .su-hsum small { flex-basis: 100%; font-size: 14px; color: var(--su-soft); font-weight: 700; }
+  body.owner-setup .su-hchg { flex: none; min-height: 56px; min-width: 112px; padding: 0 14px; border-radius: 14px; border: 2px solid var(--su-teal); background: #fff; color: var(--su-teal); font: inherit; font-weight: 800; font-size: 17px; cursor: pointer; }
+  body.owner-setup .su-hopen { border-color: var(--su-teal); }
+  body.owner-setup .su-copyrow { align-items: center; }
+  body.owner-setup .su-hdonerow { justify-content: flex-end; }
+  body.owner-setup .su-hdone { margin-left: auto; border-color: var(--su-teal); color: var(--su-teal); }
 `;
 
 // The page script (owner-setup-client.js), read once and served inline. It never contains "</script".
@@ -54905,7 +54925,7 @@ const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
-  pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
+  pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
   cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'] };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
