@@ -267,8 +267,11 @@ function statusAt(parsed, clock) {
 // ---- Wording (Open Now, 2026-09-26) ----
 // Clock minutes (0-1439) as a 12-hour time: 540 -> "9 AM", 1290 -> "9:30 PM",
 // 0 -> "12 AM", 720 -> "12 PM".
+// Midnight says "midnight" (pub fresh-eyes, 2026-11-10: "12 AM" read as noon or midnight to an owner, and "11 AM – 12 AM"
+// on the page). Noon stays "12 PM": "Opens noon" reads oddly in the status line.
 function formatClockMinutes(minutes) {
   const m = ((minutes % 1440) + 1440) % 1440;
+  if (m === 0) return 'midnight';
   const h = Math.floor(m / 60);
   const mm = m % 60;
   const h12 = h % 12 === 0 ? 12 : h % 12;

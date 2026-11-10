@@ -165,7 +165,8 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.doesNotMatch(s, /deals\.join\('; '\)/);
   assert.doesNotMatch(s, /e\.what\.trim\(\)\)\.slice\(0, 60\)/); assert.doesNotMatch(s, /deals\.slice\(0, 6\)/);
   assert.match(s, /CUR\.happy_blocks && CUR\.happy_blocks\.length/);
-  assert.match(s, /d\.text\.slice\(dayPrefix\(hit\)\.length\)/);
+  // Pub fresh-eyes (2026-11-10): either day prefix ("Mon–Fri: " or the older "Mon, Tue, …: ") is taken off again.
+  assert.match(s, /d\.text\.slice\(prefixOf\(hit, d\.text\)\.length\)/);
   assert.match(s, /deals = deals\.concat\(S\.happyKeep\)/);
   assert.match(s, /fill\(T\.dealLong, \{ n: i \+ 1, max: 60 - pre\.length \}\)/, 'a deal that is too long says so; it is never cut');
   assert.match(s, /body\.blocks = happyBlocks\(\)/);

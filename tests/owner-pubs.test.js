@@ -307,7 +307,8 @@ test('setup: what you offer with no game and no sports ticked says so; a later t
   assert.ok(!/data-cb-item="games"/.test(bar), 'games done');
   // The client works the answers out when it sends them ({ add, remove }), never sending a stale list.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
-  assert.match(js, /if \(gameOn\) rem\.push\('games'\); else add\.push\('games'\)/);
+  // Pub fresh-eyes (2026-11-10, bug B): Save and exit never records an implicit "not offered".
+  assert.match(js, /if \(gameOn\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/);
   assert.match(js, /function offerNext\(from\)/);
   assert.match(js, /'offer:sports'.*'offer:dogs'.*'offer:minors'/s);
 });

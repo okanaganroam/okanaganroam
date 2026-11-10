@@ -15,7 +15,8 @@
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
   function dayName(d){ return C.dayNames[d]; }
   function monthName(i){ return C.monthNames[i]; }
-  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
+  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
 
   // ---------- State ----------
@@ -54,22 +55,42 @@
   // ("Staff party") stays a row of its own, so saving again never rewrites it.
   function holNote(key){ return String(T.holidays[key]).replace(/[()&<>]/g, ''); }
   S.holNotes = {};
+  // Recurring holidays (pub fresh-eyes, 2026-11-10): Christmas Day, Boxing Day and New Year's Day are the same date every
+  // year. A closure is stored as dates only (no repeat rule), so "This year and next" also saves next year's date; it
+  // is on by default for these three. A stored next-year date of a ticked holiday is that choice, not a row of its own.
+  S.everyYear = {};
+  var holOk = function(key, note){ return !note || note === holNote(key) || note === String((C.holidayAlt || {})[key] || '').replace(/[()&<>]/g, ''); };
+  var nextYear = HOL.filter(function(o){ return o.yearly; }).map(function(o){ return { key: o.key, date: ymd(new Date(o.d.getFullYear() + 1, o.d.getMonth(), o.d.getDate())) }; });
+  var seenNext = {};
+  (CUR.closures || []).forEach(function(c){ var n = nextYear.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from && holOk(x.key, c.note || ''); })[0]; if (n) seenNext[n.key] = true; });
   (CUR.closures || []).forEach(function(c){
+    var nx = nextYear.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from && holOk(x.key, c.note || ''); })[0];
+    if (nx && (CUR.closures || []).some(function(c2){ var t = HOL.filter(function(o){ return o.key === nx.key; })[0]; return t && c2.from === t.date; })) return;
     var hit = HOL.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from; })[0], note = c.note || '';
-    if (hit && (!note || note === holNote(hit.key) || note === String((C.holidayAlt || {})[hit.key] || '').replace(/[()&<>]/g, ''))) { S.closures.push(hit.key); S.holNotes[hit.key] = note; }
+    if (hit && (!note || note === holNote(hit.key) || note === String((C.holidayAlt || {})[hit.key] || '').replace(/[()&<>]/g, ''))) { S.closures.push(hit.key); S.holNotes[hit.key] = note; if (hit.yearly) S.everyYear[hit.key] = !!seenNext[hit.key]; }
     else S.extra.push({ from: c.from, to: c.to || c.from, note: note });
   });
-  function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.extra, monthRun(S.months)]); }
+  function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
+  function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
   // what they made); otherwise rebuilt from the page: days with the same times are one happy hour, a deal that starts
   // with a row's days ("Tue, Wed, Thu: …") goes back into that row without the days, and any other deal on the page
   // (ours, with prices) is kept as it is. Nothing is ever cut short or joined together.
   S.happyKeep = [];
-  function dayPrefix(e){ return DAYS.filter(function(d){ return e.days[d]; }).map(dayName).join(', ') + ': '; }
+  // "Mon–Fri: …" (pub fresh-eyes, 2026-11-10: "Mon, Tue, Wed, Thu, Fri: …" read clunky). Runs of 3+ days become a range.
+  // Deals saved before this used the long list; both are recognised, so old ones still come back as typed.
+  function dayPrefix(e){
+    var on = DAYS.map(function(d){ return !!e.days[d]; }), out = [], i = 0;
+    while (i < 7) { if (!on[i]) { i++; continue; } var j = i; while (j + 1 < 7 && on[j + 1]) j++;
+      if (j - i >= 2) out.push(dayName(DAYS[i]) + '–' + dayName(DAYS[j])); else for (var k = i; k <= j; k++) out.push(dayName(DAYS[k])); i = j + 1; }
+    return out.join(', ') + ': ';
+  }
+  function oldPrefix(e){ return DAYS.filter(function(d){ return e.days[d]; }).map(dayName).join(', ') + ': '; }
+  function prefixOf(e, text){ var a = dayPrefix(e), b = oldPrefix(e); return text.indexOf(a) === 0 ? a : text.indexOf(b) === 0 ? b : null; }
   (function(){
     if (CUR.happy_blocks && CUR.happy_blocks.length) {
       CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what }); });
-      var mine = {}; S.happy.forEach(function(e){ if (e.what) mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; });
+      var mine = {}; S.happy.forEach(function(e){ if (e.what) { mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? oldPrefix(e) : '') + e.what] = true; } });
       S.happyKeep = (CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : []).filter(function(d){ return d.price || !mine[d.text]; });
       S.happyTyped = true; return;
     }
@@ -79,10 +100,10 @@
     deals.forEach(function(d){
       var hit = null;
       if (!d.price) {
-        if (S.happy.length > 1) hit = S.happy.filter(function(e){ return !e.what && d.text.indexOf(dayPrefix(e)) === 0; })[0];
+        if (S.happy.length > 1) hit = S.happy.filter(function(e){ return !e.what && prefixOf(e, d.text); })[0];
         else if (S.happy.length === 1 && deals.length === 1) hit = S.happy[0];
       }
-      if (hit) hit.what = S.happy.length > 1 ? d.text.slice(dayPrefix(hit).length) : d.text; else S.happyKeep.push(d);
+      if (hit) hit.what = S.happy.length > 1 ? d.text.slice(prefixOf(hit, d.text).length) : d.text; else S.happyKeep.push(d);
     });
   })();
   // Specials and weekly events: each row remembers the stored line it came from. A row the owner doesn't touch is sent
@@ -99,7 +120,7 @@
   function thirdMonday(y, mo){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === 3) return d; d.setDate(d.getDate() + 1); } }
   function holidays(){
     var today = new Date(); today.setHours(0, 0, 0, 0); var y = today.getFullYear();
-    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d }; };
+    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, yearly: key === 'xmas' || key === 'boxing' || key === 'nyd' }; };
     var list = [
       make('xmasEve', function(yy){ return new Date(yy, 11, 24); }), make('xmas', function(yy){ return new Date(yy, 11, 25); }), make('boxing', function(yy){ return new Date(yy, 11, 26); }),
       make('nye', function(yy){ return new Date(yy, 11, 31); }), make('nyd', function(yy){ return new Date(yy, 0, 1); }), make('family', function(yy){ return thirdMonday(yy, 1); }),
@@ -275,7 +296,7 @@
     var seq = []; if (C.pub && S.badges.sports_tv) seq.push('offer:sports'); if (S.badges.dog_friendly) seq.push('offer:dogs'); if (C.pub) seq.push('offer:minors');
     return seq[(from === 'offer' ? -1 : seq.indexOf(from)) + 1] || null;
   }
-  var P2_ICONS = { happy: '🍻', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
+  var P2_ICONS = { happy: '🍻', spend: '💵', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
@@ -296,10 +317,25 @@
   var ITEM_STEP = { arrival: 'door', photo_main: 'photos', photo_extra: 'photos', menu: 'menu', happy_hour: 'happy', specials: 'specials', entertainment: 'music', description: 'story', pyv_reservations: 'book',
     pyv_takeout: 'takeout', pyv_known: 'known', pyv_groups: 'groups', instagram: 'instagram', facebook: 'facebook', hours: 'hours', hours_fresh: 'hours', avg_spend: 'spend', cuisine: 'cuisine', dietary: 'offer', address_pin: 'basics', phone: 'basics',
     kitchen: 'hours:kitchen', sports: 'offer:sports', games: 'offer', minors: 'offer:minors' };
+  // "Optional: weekly specials, weekly events, your story and more": only Part 2 items not done yet (never happy hour
+  // right after she did it).
+  function moreSub(){
+    var open2 = P2.filter(function(k){ return !answered(k) && !(C.pub && (k === 'book' || k === 'takeout')); }).slice(0, 3).map(function(k){ return String(T.labels[k]).toLowerCase(); });
+    if (!open2.length) return '';
+    return T.optional + ': ' + open2.join(', ') + (P2.filter(function(k){ return !answered(k); }).length > 3 ? ' ' + T.andMore : '');
+  }
   function leftList(){
     var out = [], seen = {};
-    STEPS.forEach(function(k){ if (!S.done[k] || S.done[k] === 'skip' || S.done[k] === 'later') { seen[k] = true; out.push({ step: k, label: T.labels[k] }); } });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k]; if (!st || seen[st]) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
+    // Never an item she already answered or sent (pub fresh-eyes, 2026-11-10: Takeout ticked on "What you offer" and a
+    // Facebook name sent were still listed).
+    var tickedBy = { book: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' };
+    STEPS.forEach(function(k){
+      if (S.done[k] && S.done[k] !== 'skip' && S.done[k] !== 'later') return;
+      if (tickedBy[k] && S.badges[tickedBy[k]]) return;
+      if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
+      seen[k] = true; out.push({ step: k, label: T.labels[k] });
+    });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k]; if (!st || seen[st]) return; if (st.indexOf(':') < 0 && answered(st)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
     return out;
   }
   // ---------- "Exit setup" with answers not saved yet: "Save these first?" ----------
@@ -348,10 +384,12 @@
       x = any ? q(nxt === 'finish' ? T.changeQ : S.fresh ? T.welcome : T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
           + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
-        : q(fill(T.hi, { name: C.name }), T.hiLead) + '<div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
+        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
     } else if (p[0] === 'saved') {
       var how = S.done[p[1]];
-      var sentStep = how === 'day' && ['photos', 'menu', 'door', 'happy', 'specials', 'instagram', 'facebook'].indexOf(p[1]) >= 0;
+      // Two phrases only (pub fresh-eyes, 2026-11-10): "Saved ✓ It's on your page now." or "Sent ✓ It'll show on your page
+      // within a day." (plus "soon" for the average spend while it isn't shown publicly).
+      var sentStep = how === 'day';
       var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' ? T.gotIt : sentStep ? T.sentTitle : T.savedTitle;
       var line = S.savedLine[p[1]] || (how === 'day' ? T.savedDay : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
       x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead">' + h(line) + '</p></div>'
@@ -363,10 +401,10 @@
       x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.essReady) + '</h1><p class="su-lead" id="suEssCount">' + h(fill(T.essCount, { n: nd, total: P1.length })) + '</p></div>'
         + (open1.length ? '<p class="su-q">' + h(T.essSkipped) + '</p><div class="su-stack" style="margin-bottom:18px">' + open1.map(function(k){ return big('➜', T.labels[k], '', true, 'jumpEss:' + k); }).join('') + '</div>' : '')
         + preview() + scoreBox(true)
-        + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, T.moreOptSub, false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>';
+        + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, moreSub(), false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
-      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + P2_ICONS[k] + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
+      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
       var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div><details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>'
@@ -382,11 +420,14 @@
         : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + '</div>') + skip('hours');
     } else if (s === 'hours:edit') {
       if (!S.week) { S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); }
-      x = q(T.hoursEditQ, T.hoursEditLead) + msgs() + DAYS.map(function(d, i){
-        var w = S.week[d], prev = i > 0 ? S.week[DAYS[i - 1]] : null;
-        return '<div class="su-day"><div class="su-dh"><span>' + h(dayName(d)) + '</span><button type="button" class="su-toggle" aria-pressed="' + (w ? 'false' : 'true') + '" data-closed="' + d + '">' + h(w ? T.open : T.closed) + '</button></div>'
-          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + y[1] + '"></div>'; }).join('')
-            + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') : '') + '</div>';
+      // A clear Open ✓ / Closed switch, "Same every day" at the top, and "Same as Monday" on every later day (pub
+      // fresh-eyes, 2026-11-10: Sunday could only copy Saturday, and "Open" read like a label).
+      var anyOpenDay = DAYS.filter(function(d){ return S.week[d]; })[0];
+      x = q(T.hoursEditQ, T.hoursEditLead) + msgs() + (anyOpenDay ? '<div class="su-samerow" style="margin:0 0 12px"><button type="button" class="su-toggle" data-act="sameEvery">' + h(T.sameEvery) + '</button></div>' : '') + DAYS.map(function(d, i){
+        var w = S.week[d], prev = i > 0 ? S.week[DAYS[i - 1]] : null, mon = i > 1 ? S.week.mon : null;
+        return '<div class="su-day"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
+          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div>'; }).join('')
+            + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '') : '') + '</div>';
       }).join('')
         + '<div class="su-day"><div class="su-dh"><span>' + h(T.winterQ) + '</span><button type="button" class="su-toggle" data-act="winter" aria-pressed="' + (S.winter.on ? 'true' : 'false') + '">' + h(S.winter.on ? T.yes : T.no) + '</button></div>'
         + (S.winter.on ? '<p class="su-hint">' + h(T.winterHint) + '</p><p class="su-q">' + h(T.whichMonths) + '</p>' + monthChips(S.winter.months, 'winter') + '<p class="su-q">' + h(T.hoursThen) + '</p><div class="su-times"><label class="su-sr" for="wf">' + h(T.starts) + '</label><input type="time" id="wf" value="' + S.winter.from + '"> ' + h(T.to) + ' <label class="su-sr" for="wt">' + h(T.ends) + '</label><input type="time" id="wt" value="' + S.winter.to + '"></div>' : '')
@@ -417,6 +458,8 @@
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         + '<button type="button" class="su-more" data-act="go:closures:months">' + h(T.wholeMonths) + '</button>'
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
+        + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(T.holidays[o.key] + ': ' + T.everyYear) + '</span></label>'; }).join('')
+        + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0; }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
         + '<div class="su-stack su-sticky">' + (nothing ? big('✕', T.nothingComing, '', false, 'closuresNone') : big('✓', newC > 0 ? fill(newC === 1 ? T.saveClosures1 : T.saveClosuresN, { n: newC }) : T.saveClosures, '', false, 'closuresSave')) + '</div>' + skip('closures');
     } else if (s === 'closures:months') {
       x = q(T.monthsQ, T.monthsLead) + msgs() + monthChips(S.months, 'months') + '<div class="su-stack">' + big('✓', T.monthsUse, '', false, 'monthsUse') + big('✕', T.allYearBtn, '', true, 'monthsClear') + '</div>';
@@ -501,7 +544,8 @@
       if (!S.happy.length) S.happy.push({ days: {}, from: '15:00', to: '17:00', what: '' });
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          + '<p class="su-q">' + h(T.whichDays) + '</p>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p><div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' <label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '"></div>'
+          + '<p class="su-q">' + h(T.whichDays) + '</p>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
+          + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' <label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '"></div>'
           + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what"' }) + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
@@ -517,7 +561,14 @@
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
       x = q(T.musicTypeQ, T.upTo7) + msgs() + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          + '<p class="su-q">' + h(T.whatEvent) + '</p><details class="su-kinds"><summary>' + h(e.kind ? fill(T.kindIs, { k: T.kinds[e.kind] }) : T.pickKind) + '</summary><div class="su-chips">' + C.nightKinds.map(function(k){ return '<button type="button" class="su-chip" aria-pressed="' + (e.kind === k ? 'true' : 'false') + '" data-kind="' + i + ':' + k + '">' + h(T.kinds[k]) + '</button>'; }).join('') + '</div></details>'
+          + '<p class="su-q">' + h(T.whatEvent) + '</p>' + (function(){
+            // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
+            // show open; the rest wait under "More kinds" (open when the picked kind is one of them).
+            var chip = function(k){ return '<button type="button" class="su-chip" aria-pressed="' + (e.kind === k ? 'true' : 'false') + '" data-kind="' + i + ':' + k + '">' + h(T.kinds[k]) + '</button>'; };
+            var top = C.nightKinds.slice(0, 6), rest = C.nightKinds.slice(6);
+            return '<div class="su-chips su-kinds">' + top.map(chip).join('') + '</div>'
+              + (rest.length ? '<details class="su-kinds"' + (rest.indexOf(e.kind) >= 0 ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + rest.map(chip).join('') + '</div></details>' : '');
+          })()
           + '<label class="su-sr" for="nt' + i + '">' + h(T.whatEvent) + '</label><input class="su-field" id="nt' + i + '" data-nt="' + i + '" type="text" maxlength="40" value="' + h(e.what) + '">' + (i === 0 ? ex(T.eventEx) : '')
           + '<p class="su-q">' + h(T.whichNights) + '</p>' + dayChips(e.days, 'nights.' + i)
           + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div></div>';
@@ -539,14 +590,14 @@
       x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s) + '</div>' + skip(s);
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, T.doorLead) + '<h2 class="su-h2">' + h(T.doorHere) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
+      x = doneLine('door') + q(T.doorQ, fill(T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
       x = q(T.doorPhotoQ, T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';
     } else if (s === 'door:pin') {
-      x = q(T.pinQ, T.pinLead) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p><div id="suMap" class="su-map"></div>' + msgs()
+      x = (S.door.mapFail ? q(T.mapFailQ, '') : q(T.pinQ, T.pinLead)) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.mapFail ? T.mapFail : S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p>' + (S.door.mapFail ? '' : '<div id="suMap" class="su-map"></div>') + msgs()
         + '<label class="su-tick' + (S.nudge === T.doorRightsNeed ? ' su-need' : '') + '"><input type="checkbox" id="suDoorRights"' + (S.door.rights ? ' checked' : '') + '><span>' + h(T.doorRights) + '</span></label>'
-        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : T.doorSend, '', false, 'doorSend') + '</div>';
+        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : S.door.mapFail ? T.mapFailSend : T.doorSend, '', false, 'doorSend') + '</div>';
     } else if (s === 'finish') {
       var sc = S.score || { pct: 0, soon: 0, badge: 'none' }, left = leftList();
       var onlyDoor = left.every(function(o){ return o.step === 'door'; });
@@ -649,10 +700,18 @@
     setTimeout(function(){ if (!S.door.best) { S.door.noLoc = true; say('suGps', T.noGps); } }, 10000); }
   function stopGps(){ if (watch !== null && navigator.geolocation) navigator.geolocation.clearWatch(watch); watch = null; }
   function leaflet(cb){ var b = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/', ready = function(){ L.Icon.Default.imagePath = b + 'images/'; cb(); }; if (window.L) return ready();
-    var l = document.createElement('link'), sc = document.createElement('script'); l.rel = 'stylesheet'; l.href = b + 'leaflet.min.css'; sc.src = b + 'leaflet.min.js'; sc.onload = ready; document.head.appendChild(l); document.head.appendChild(sc); }
+    var l = document.createElement('link'), sc = document.createElement('script'); l.rel = 'stylesheet'; l.href = b + 'leaflet.min.css'; sc.src = b + 'leaflet.min.js'; sc.onload = ready; sc.onerror = mapFailed; document.head.appendChild(l); document.head.appendChild(sc); }
+  // The map can't load (blocked, offline, slow): never "Please wait for the map…" forever (pub fresh-eyes, 2026-11-10).
+  // She sends the photo with the listing's own pin; it waits for us, and we place the pin from the photo.
+  function mapFailed(){
+    if (S.door.mapFail || map || S.step !== 'door:pin') return;
+    S.door.mapFail = true; if (!S.door.spot && C.pin) S.door.spot = { lat: C.pin.lat, lng: C.pin.lng };
+    var y = window.scrollY; render(); window.scrollTo(0, y);
+  }
   function doorMap(){
     var at = S.door.spot || S.door.best || C.pin; var box = el('suMap'); if (!box || !at) return;
     map = null; marker = null;
+    setTimeout(function(){ if (!map) mapFailed(); }, 8000);
     leaflet(function(){ if (!el('suMap')) return; map = L.map('suMap', { zoomControl: true }).setView([at.lat, at.lng], 19);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'origin', attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
       marker = L.marker([at.lat, at.lng], { draggable: true, autoPan: true }).addTo(map); S.door.spot = S.door.spot || { lat: at.lat, lng: at.lng };
@@ -700,7 +759,7 @@
       var e = S.happy[i], ds = DAYS.filter(function(d){ return e.days[d]; });
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       for (var k = 0; k < ds.length; k++) { if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); } week[ds[k]].push([e.from, e.to]); }
-      var pre = many ? ds.map(dayName).join(', ') + ': ' : '', what = e.what.trim();
+      var pre = many ? dayPrefix(e) : '', what = e.what.trim();
       // Never cut short: a deal that doesn't fit says so, with how much room there is.
       if (what && (pre + what).length > 60) { S.nudge = fill(T.dealLong, { n: i + 1, max: 60 - pre.length }); return render(); }
       if (what) deals.push({ text: pre + what });
@@ -731,7 +790,10 @@
       if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price) { out.push(e.orig); continue; }
       if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
       var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
-      out.push({ days: ds, title: sameText ? o0.title : text.split(',')[0].trim().slice(0, 40), deal: sameText ? o0.deal : text, price: money(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
+      // "Wing night, 60¢ a wing" → title "Wing night", deal "60¢ a wing" (pub fresh-eyes, 2026-11-10: the deal used to
+      // repeat the title). With no comma the deal is the whole line (it's required; the page never shows a repeat).
+      var cut = text.indexOf(','), t1 = (cut > 0 ? text.slice(0, cut) : text).trim().slice(0, 40), rest = cut > 0 ? text.slice(cut + 1).trim() : '';
+      out.push({ days: ds, title: sameText ? o0.title : t1, deal: sameText ? o0.deal : (rest || text), price: money(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
         start: o0.start || null, end: o0.end || null, title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: o0.season_from || null, season_to: o0.season_to || null });
     }
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
@@ -843,10 +905,27 @@
     }
     if (k === 'hoursSave') return hoursSave();
     if (k === 'winter') { readTimes(); S.winter.on = !S.winter.on; return render(); }
+    // "All day (open to close)" (pub fresh-eyes, 2026-11-10): the happy hour runs from the earliest opening to the latest
+    // closing of the days picked (or of the whole week when no day is picked yet).
+    if (k === 'allDay') {
+      // Days with different hours get a happy hour each (Mon–Thu 11 AM–11 PM, Fri–Sat 11 AM–1 AM), same deal.
+      readEntries(); var i9 = +v, e9 = S.happy[i9]; if (!e9) return;
+      var picked = DAYS.filter(function(d){ return e9.days[d] && S.week && S.week[d]; });
+      var use = picked.length ? picked : DAYS.filter(function(d){ return S.week && S.week[d]; }); if (!use.length) return;
+      var groups9 = [], byKey = {};
+      use.forEach(function(d){ var w9 = S.week[d], key9 = w9[0][0] + '-' + w9[w9.length - 1][1];
+        if (!byKey[key9]) { byKey[key9] = { days: {}, from: w9[0][0], to: w9[w9.length - 1][1] === '24:00' ? '00:00' : w9[w9.length - 1][1] }; groups9.push(byKey[key9]); } byKey[key9].days[d] = true; });
+      e9.days = groups9[0].days; e9.from = groups9[0].from; e9.to = groups9[0].to;
+      var add9 = groups9.slice(1, 1 + Math.max(0, 6 - S.happy.length)).map(function(g){ return { days: g.days, from: g.from, to: g.to, what: e9.what }; });
+      Array.prototype.splice.apply(S.happy, [i9 + 1, 0].concat(add9));
+      mark(); var y9 = window.scrollY; render(); window.scrollTo(0, y9); return;
+    }
+    if (k === 'sameEvery') { readTimes(); var src = S.week.mon || S.week[DAYS.filter(function(x){ return S.week[x]; })[0]]; if (src) DAYS.forEach(function(d){ S.week[d] = clone(src); }); mark(); return render(); }
     if (k === 'monthsUse') { var r = monthRun(S.months); if (r.none) { S.nudge = T.monthsNeed; return render(); } if (r.bad) { S.nudge = T.monthsInRow; return render(); } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'monthsClear') { S.months = {}; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; }).concat(S.extra);
+      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key); }).map(function(o){ var nd = ymd(new Date(o.d.getFullYear() + 1, o.d.getMonth(), o.d.getDate())); return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
       var mr2 = monthRun(S.months); if (mr2.bad) { S.nudge = T.monthsInRow; return render(); }
       var om = k === 'closuresNone' || mr2.none || mr2.all ? '' : mr2.a + '-' + mr2.b;
       var cl = [{ closures: out }]; if (om !== (CUR.open_months || '')) cl.push({ open_months: om });
@@ -901,11 +980,13 @@
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
       // Dogs un-ticked: the "where are dogs allowed" line goes too. Ticked: that's the next small screen.
       if (!S.badges.dog_friendly && (CUR.visit_rows || {}).dogs) { list.push({ visit_rows: { dogs: '' } }); S.dogNote = ''; }
-      // Pubs (2026-11-10): no game ticked = "No games"; Sports on TV not ticked = "We don't show sports" (and its sports go).
+      // Pubs (2026-11-10): saving this screen with no game ticked = "No games"; Sports on TV not ticked = "We don't show
+      // sports" (and its sports go). Only from the screen's own Save: "Save and exit" with picks half done never records
+      // a "we don't" answer the owner didn't give (fresh-eyes pub test) — it only takes back ones a tick contradicts.
       if (C.pub) {
-        var gameOn = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'].some(function(g){ return badges[g]; }), add = [], rem = [];
-        if (gameOn) rem.push('games'); else add.push('games');
-        if (badges.sports_tv) rem.push('sports'); else { add.push('sports'); if (S.pubInfo.sports) { list.push({ pub_info: { sports: null } }); S.sports = { list: {}, tvs: '' }; } }
+        var gameOn = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'].some(function(g){ return badges[g]; }), add = [], rem = [], partial = !!S.exitAfter;
+        if (gameOn) rem.push('games'); else if (!partial) add.push('games');
+        if (badges.sports_tv) rem.push('sports'); else if (!partial) { add.push('sports'); if (S.pubInfo.sports) { list.push({ pub_info: { sports: null } }); S.sports = { list: {}, tvs: '' }; } }
         list.push({ not_offered: { add: add, remove: rem } });
       }
       return saveAll('offer', list, null, offerNext('offer'));
@@ -944,7 +1025,11 @@
       obj[key] = !obj[key]; b.setAttribute('aria-pressed', obj[key] ? 'true' : 'false'); S.nudge = '';
     }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-closed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-closed'); S.week[d] = S.week[d] ? null : [['11:00', '21:00']]; render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-dayopen]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayopen'); if (!S.week[d]) { var tpl = S.week.mon || S.week[DAYS.filter(function(x){ return S.week[x]; })[0]]; S.week[d] = tpl ? clone(tpl) : [['11:00', '21:00']]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'); if (S.week[d]) { S.week[d] = null; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-samemon]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-samemon'); if (S.week.mon) { S.week[d] = clone(S.week.mon); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d); S.week[d] = clone(S.week[DAYS[i - 1]]); render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hol]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-hol'), i = S.closures.indexOf(k); if (i >= 0) S.closures.splice(i, 1); else S.closures.push(k); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-len]'), function(b){ b.onclick = function(){ S.addFrom = el('suCf').value; S.addNote = el('suCn').value; var ct = el('suCt'); if (ct) S.addTo = ct.value; S.addLen = b.getAttribute('data-len'); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-xdel]'), function(b){ b.onclick = function(){ S.extra.splice(+b.getAttribute('data-xdel'), 1); S.added = ''; render(); }; });

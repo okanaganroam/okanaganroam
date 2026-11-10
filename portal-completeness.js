@@ -448,7 +448,10 @@ function renderCompleteness(result, opts) {
   // minute. Menu and photos sent. … Tap to start." ran three thoughts together).
   const subOpen = sub0.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '');
   // o.quietCta: the setup card above is the way in, so this line doesn't ask to be tapped as well.
-  const sub = o.quietCta ? subOpen : sub0;
+  // Pub fresh-eyes (2026-11-10): "4 quick ones" under the setup card read as a second to-do list, so until the setup is
+  // finished (or "I'm done for now") the line only says the setup above fills this in.
+  const quietSub = L(`Your page so far${waitTxt}. The setup above fills this in.`, `Votre fiche jusqu’ici${waitTxt}. La configuration ci-dessus la remplit.`);
+  const sub = o.quietCta ? (r.complete ? sub0 : quietSub) : sub0;
   const sentLineHtml = sentSentence ? `<span class="op-cb-sentline">${esc(sentSentence.trim())}</span>` : '';
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
@@ -544,7 +547,7 @@ function renderCompleteness(result, opts) {
     : '';
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(o.quietCta && !r.complete ? quietSub : subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
       ${badgeBlock}${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
