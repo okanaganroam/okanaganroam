@@ -234,7 +234,7 @@ fr.st.no = 'non';
 
 // Fresh-eyes fixes (2026-11-10).
 Object.assign(en, {
-  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
   nextPlain: 'Next', backToList: 'Back to the list', changeQ: 'Change something?', changeLead: 'Tap anything to change it.', welcomeLead: 'Your answers are saved. Tap any line to change it.',
   menuSentEmail: '✓ You said you’ll email your menu.',
   pctWill: 'Your page will be about {n}% complete', pctWillSub: 'once we add what you sent, usually within a day.', pctRightNow: 'It’s {n}% right now.',
@@ -249,7 +249,7 @@ Object.assign(en, {
 });
 en.noLabels = Object.assign({}, en.noLabels, { groups: 'no big groups' });
 Object.assign(fr, {
-  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
   nextPlain: 'Suivant', backToList: 'Retour à la liste', changeQ: 'Changer quelque chose?', changeLead: 'Touchez une ligne pour la modifier.', welcomeLead: 'Vos réponses sont enregistrées. Touchez une ligne pour la modifier.',
   menuSentEmail: '✓ Vous avez dit que vous enverrez votre menu par courriel.',
   pctWill: 'Votre fiche sera complète à environ {n} %', pctWillSub: 'dès que nous aurons ajouté ce que vous avez envoyé, habituellement d’ici un jour.', pctRightNow: 'Elle est à {n} % en ce moment.',
@@ -304,7 +304,7 @@ fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
 // Pubs (Dayton, 2026-11-10; mockup drafts/pub-portal-2026-11-10/pub-setup.html): pub examples and the pub-only screens,
 // laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
 en.pub = {
-  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
   cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', cuisineLeadEmpty: 'Pick up to 3. Serving food now? Pick what you serve.', noFood: 'We don’t serve food',
   placeQ: 'What kind of pub is it?', placeLead: 'Pick the one that fits best.',
   groupsLead: 'Birthdays, work parties, team nights.', knownEx: 'Wing night and the hockey on the big screen', igLead: 'Type your Instagram name, like @yourpub.',
@@ -323,7 +323,7 @@ en.pub = {
   quick: Object.assign({}, en.quick, { groups: ['Call ahead for 10 or more', 'Private room available', 'Book the patio'] }),
 };
 fr.pub = {
-  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
   cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', cuisineLeadEmpty: 'Choisissez-en jusqu’à 3. Vous servez à manger maintenant? Choisissez ce que vous servez.', noFood: 'Nous ne servons pas de nourriture',
   placeQ: 'Quel genre de pub est-ce?', placeLead: 'Choisissez celui qui convient le mieux.',
   groupsLead: 'Anniversaires, fêtes de bureau, soirées d’équipe.', knownEx: 'La soirée ailes de poulet et le hockey sur grand écran', igLead: 'Écrivez votre nom Instagram, comme @votrepub.',

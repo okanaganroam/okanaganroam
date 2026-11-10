@@ -181,13 +181,13 @@ test('the portal bar: the "sent" sentence is on its own line; the honest time on
   assert.doesNotMatch(sub, /Tap to/, 'no second call to action while the setup card is the way in (fresh-eyes 3)');
   const fresh = mk('restaurant');
   const card = (/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/owner/${tokenFor(fresh.id)}`)) || [])[1];
-  assert.match(card, /The essentials take about 10 to 15 minutes/);
-  assert.match((/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/fr/owner/${tokenFor(fresh.id)}`)) || [])[1], /de 10 à 15 minutes/);
-  assert.match(strings.en.hiLead, /about 10 to 15 minutes/);
-  assert.match(strings.fr.hiLead, /de 10 à 15 minutes/);
+  assert.match(card, /The essentials take about 10 to 15 minutes \(a bit longer if you change your hours\)/, 'card matches the start screen');
+  assert.match((/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/fr/owner/${tokenFor(fresh.id)}`)) || [])[1], /de 10 à 15 minutes \(un peu plus si vous changez vos heures\)/);
+  assert.match(strings.en.hiLead, /about 10 to 15 minutes \(a bit longer if you change your hours\)/);
+  assert.match(strings.fr.hiLead, /de 10 à 15 minutes \(un peu plus si vous changez vos heures\)/);
   const topic = app.OWNER_HELP_TOPICS.find((x) => x.id === 'easy-setup');
-  assert.match(topic.a, /about 10 to 15 minutes/);
-  assert.match(topic.aFr, /de 10 à 15 minutes/);
+  assert.match(topic.a, /about 10 to 15 minutes, a bit longer if you change your hours/);
+  assert.match(topic.aFr, /de 10 à 15 minutes, un peu plus si vous changez vos heures/);
 });
 
 test('the page script: answered steps offer Next (never Skip), Exit asks to save, lists are tappable, Yes comes first', async () => {
