@@ -67,7 +67,7 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   assert.equal(fr.t.spendLead, 'Un plat principal et une boisson sans alcool, avant taxes et pourboire.');
   assert.equal(fr.offerLabels.takes_reservations, 'Prend les réservations');
   // Other types never get it.
-  const pub = mk('pub');
+  const pub = mk('brewery');
   assert.equal((await get(`/owner/${tokenFor(pub.id)}/setup`)).status, 302);
 });
 
@@ -106,7 +106,7 @@ test('the classic edit page keeps its rules: the same fields without the setup f
   assert.equal(r2.status, 201, JSON.stringify(r2.body));
   assert.deepEqual(r2.body.live, []);
   // A pub sending from the setup address gets no setup rule.
-  const pub = mk('pub');
+  const pub = mk('brewery');
   const r3 = await change(tokenFor(pub.id), { open_months: '5-10' });
   assert.equal(r3.status, 201, JSON.stringify(r3.body));
   assert.deepEqual(r3.body.live, []);
@@ -177,7 +177,7 @@ test('owner-only features: stored apart, shown as chips, no new pages; reservati
   const ok = await change(t, { not_offered: [], badges: { takes_reservations: true } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   // Other types can't send them.
-  const pub = mk('pub');
+  const pub = mk('brewery');
   assert.equal((await change(tokenFor(pub.id), { badges: { takeout: true } })).status, 400);
   // The restaurant edit page shows the six boxes; a pub's doesn't.
   assert.match(await get(`/owner/${t}`).then((x) => x.text()), /value="takes_reservations"/);

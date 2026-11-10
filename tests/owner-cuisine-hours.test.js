@@ -217,7 +217,7 @@ test('indexing and Verified: a picked cuisine or confirmed hours is a tap, not o
 });
 
 test('other types: no picker, no hours button, no field word (EN + FR)', async () => {
-  for (const t of ['pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
+  for (const t of ['cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
     const v = mk(t, { hours: week });
     for (const lang of ['', '/fr']) {
       const html = await get(`${lang}/owner/${tokenFor(v.id)}`);

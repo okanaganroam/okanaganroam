@@ -66,9 +66,9 @@ test('rule: earned at 100% (live only) + managed by the business + hours checked
   // Waiting items never count: the storefront spot only sent (pending), not approved.
   const w = full(); db.prepare("UPDATE venue_arrival_points SET status = 'pending' WHERE venue_id = ?").run(w.id); app.resetCompleteVerifiedCache();
   assert.equal(app.venueBadgeState(app.getVenue(w.id)), 'none');
-  // Other types never get it.
-  const pub = app.createVenue({ name: 'Complete Pub', slug: 'complete-pub', region: 'penticton', type: 'pub', latitude: 49.5, longitude: -119.6 });
-  assert.equal(app.venueBadgeState(pub), 'none');
+  // Other types never get it (pubs can since 2026-11-10: tests/owner-pubs.test.js).
+  const brew = app.createVenue({ name: 'Complete Brewery', slug: 'complete-brewery', region: 'penticton', type: 'brewery', latitude: 49.5, longitude: -119.6 });
+  assert.equal(app.venueBadgeState(brew), 'none');
   assert.equal(pc.badgeState({ complete: false, missing: [{ key: 'hours_fresh', waiting: false }] }, true), 'paused');
   assert.equal(pc.badgeState({ complete: false, missing: [{ key: 'hours_fresh' }, { key: 'arrival' }] }, true), 'none');
   assert.equal(pc.badgeState({ complete: true, missing: [] }, false), 'none');

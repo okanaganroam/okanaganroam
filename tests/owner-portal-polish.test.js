@@ -64,7 +64,7 @@ test('price range sits inside Average spend for a restaurant (asked once); other
   assert.match(html, /<option value="2" selected>/);
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   assert.match(fr, /Niveau de prix sur votre fiche/);
-  const pub = mk('pub', { price: 2 });
+  const pub = mk('brewery', { price: 2 });
   const pubHtml = await get(`/owner/${tokenFor(pub.id)}`);
   assert.match(pubHtml, /<details class="op-fold op-sec" id="price" data-task="more">/, 'pubs keep the section');
   assert.doesNotMatch(pubHtml, /op-price-sub/);

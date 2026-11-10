@@ -153,7 +153,7 @@ test('"I’m done for now": the portal’s own card asks to be tapped again only
   await prog(t, { step: 'basics', status: 'live' });
   assert.equal(app.setupProgress(v.id).done_for_now, true);
   // Other types have no setup card and keep their own line.
-  const pub = mk('pub');
+  const pub = mk('brewery');
   assert.doesNotMatch(await text(`/owner/${tokenFor(pub.id)}`), /opSetupCard/);
 });
 
@@ -223,7 +223,7 @@ test('help: average spend says "soon" while it isn’t shown publicly; other typ
   const html = await text(`/owner/${t}/setup`);
   assert.match(html, /Average spend: on your page soon/);
   assert.match(html, /Your average spend will show on your page soon\./);
-  for (const type of ['pub', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'cafe', 'winery']) {
     const o = mk(type);
     const r = await fetch(`${base}/owner/${tokenFor(o.id)}/setup`, { redirect: 'manual' });
     assert.equal(r.status, 302, `${type} goes back to its edit page`);

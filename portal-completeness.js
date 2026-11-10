@@ -67,9 +67,53 @@ const ITEMS = [
     en: 'Confirmed by you', fr: 'Confirmée par vous', whyEn: 'Saving a change to your page adds the Verified mark. A one-tap “my page is right” button is coming.', whyFr: 'Enregistrer une modification ajoute la mention Vérifiée. Un bouton « ma fiche est exacte » s’en vient.', icon: '✅' },
 ];
 if (ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: weights must sum to 100');
+
+// Pubs (Dayton, Nov 10 2026; drafts/pub-portal-2026-11-10/SPEC-pubs.md): the same engine with their own 100 points.
+// Restaurant items are reused by key with pub weights and groups; four items are new and owner-only (never researched):
+// kitchen hours, sports detail, games and who's welcome. Booking and takeout aren't scored for pubs.
+const R = (key, over) => ({ ...ITEMS.find((i) => i.key === key), ...over });
+const PUB_ITEMS = [
+  R('address_pin', { w: 4 }),
+  R('phone', { w: 4 }),
+  R('website', { w: 3 }),
+  R('cuisine', { w: 3, noneEn: 'We don’t serve food', noneFr: 'Nous ne servons pas de nourriture', target: { setup: 'cuisine' },
+    en: 'Your food', fr: 'Votre nourriture', whyEn: 'Pub fare, burgers, wings and so on. Pick up to 3.', whyFr: 'Cuisine de pub, burgers, ailes, etc. Choisissez-en jusqu’à 3.' }),
+  R('hours', { w: 7 }),
+  R('hours_fresh', { w: 4 }),
+  { key: 'kitchen', group: 'hours', w: 3, fix: true, target: { setup: 'hours:kitchen' }, fields: ['pub_info'],
+    en: 'Kitchen hours', fr: 'Heures de la cuisine', whyEn: 'Does the kitchen close before the bar? Guests check before they come to eat.', whyFr: 'La cuisine ferme-t-elle avant le bar? Les clients vérifient avant de venir manger.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍳' },
+  R('photo_main', { w: 8, whyEn: 'Real photos only, taken by you. Your room, the bar, the patio.', whyFr: 'De vraies photos seulement, prises par vous. La salle, le bar, la terrasse.' }),
+  R('photo_extra', { w: 6, whyEn: 'Your room, the bar, the patio, the food.', whyFr: 'La salle, le bar, la terrasse, les plats.' }),
+  R('menu', { group: 'food', w: 7 }),
+  R('happy_hour', { group: 'food', w: 6 }),
+  R('avg_spend', { group: 'food', w: 2 }),
+  R('dietary', { group: 'food', w: 2, noneEn: 'None of these', noneFr: 'Aucune de ces options' }),
+  R('entertainment', { group: 'whatson', w: 5, fields: ['weekly_nights', 'badge:live_music'], noneEn: 'We don’t host events', noneFr: 'Nous n’organisons pas d’événements',
+    en: 'Weekly events', fr: 'Événements de la semaine', whyEn: 'Trivia, live music, karaoke: what’s on each week.', whyFr: 'Questionnaire, musique en direct, karaoké : ce qui se passe chaque semaine.' }),
+  { key: 'sports', group: 'whatson', w: 4, fix: true, target: { setup: 'offer:sports' }, fields: ['pub_info', 'badge:sports_tv'], noneEn: 'We don’t show sports', noneFr: 'Nous ne diffusons pas de sports',
+    en: 'Sports on TV', fr: 'Sports à la télé', whyEn: 'Which sports you show, and how many TVs.', whyFr: 'Quels sports vous diffusez, et combien de téléviseurs.', btnEn: 'Pick sports', btnFr: 'Choisir', icon: '📺' },
+  R('specials', { group: 'whatson', w: 3 }),
+  { key: 'games', group: 'whatson', w: 2, fix: true, target: { setup: 'offer' }, fields: ['owner_features'], noneEn: 'No games', noneFr: 'Pas de jeux',
+    en: 'Games', fr: 'Jeux', whyEn: 'Pool, darts, shuffleboard, arcade or board games.', whyFr: 'Billard, fléchettes, jeu de palets, jeux d’arcade ou de société.', btnEn: 'Tick games', btnFr: 'Cocher', icon: '🎯' },
+  { key: 'minors', group: 'yourvisit', w: 4, fix: true, target: { setup: 'offer:minors' }, fields: ['pub_info'],
+    en: 'Who’s welcome?', fr: 'Qui est le bienvenu?', whyEn: 'Adults only, minors with an adult until a set time, or all ages. Families check this before they come.', whyFr: 'Adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Les familles vérifient avant de venir.', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
+  R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups', fr: 'Groupes', whyEn: 'Can you take groups of 10 or more? Birthdays, work parties, team nights.', whyFr: 'Pouvez-vous accueillir des groupes de 10 ou plus? Anniversaires, fêtes de bureau, soirées d’équipe.' }),
+  R('pyv_known', { group: 'yourvisit', w: 3 }),
+  R('description', { w: 5 }),
+  R('instagram', { w: 3 }),
+  R('facebook', { w: 3 }),
+  R('arrival', { w: 3 }),
+  R('owner_confirmed', { w: 3 }),
+];
+if (PUB_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: pub weights must sum to 100');
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS };
+const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
-const NONE_KEYS = ITEMS.filter((i) => i.noneEn).map((i) => i.key);
+// NONE_KEYS stays the restaurant list; noneKeysFor(type) is what a type may answer, ALL_NONE_KEYS every type's together.
+const noneKeysFor = (type) => itemsFor(type).filter((i) => i.noneEn).map((i) => i.key);
+const NONE_KEYS = noneKeysFor('restaurant');
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS].filter((i) => i.noneEn).map((i) => i.key))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -83,8 +127,11 @@ const GOT_TEXT = {
   pyv_groups: { en: 'Got it: no big groups', fr: 'C’est noté : pas de grands groupes' },
   instagram: { en: 'Got it: not on Instagram', fr: 'C’est noté : pas sur Instagram' },
   facebook: { en: 'Got it: not on Facebook', fr: 'C’est noté : pas sur Facebook' },
+  cuisine: { en: 'Got it: no food', fr: 'C’est noté : pas de nourriture' },
+  sports: { en: 'Got it: no sports on TV', fr: 'C’est noté : pas de sports à la télé' },
+  games: { en: 'Got it: no games', fr: 'C’est noté : pas de jeux' },
 };
-if (NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
+if (ALL_NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;
 // Happy Hour badge on the page but no times or deals (live check 2026-11-08, 21 restaurants): the item asks for the
 // times, and "We don't have a happy hour" is not offered (it would contradict the badge). Still missing, just worded right.
@@ -104,8 +151,9 @@ const SECONDS = {
   avg_spend: 10, menu: 120, dietary: 20, happy_hour: 150, specials: 90, entertainment: 60,
   pyv_known: 45, pyv_reservations: 45, pyv_takeout: 30, pyv_groups: 45,
   description: 180, instagram: 30, facebook: 30, arrival: 90, owner_confirmed: 0,
+  kitchen: 20, sports: 30, games: 15, minors: 20,
 };
-if (ITEMS.some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -117,7 +165,8 @@ const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
 // one when that field goes live for this owner (opts.liveFields). Phone, website and dietary ticks wait for our check
 // from an edit link, so there they sit under "When you have a few minutes".
 const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', hours_fresh: 'hours_checked', avg_spend: 'avg_spend', dietary: 'badges',
-  instagram: 'instagram_url', facebook: 'facebook_url', pyv_known: 'visit_rows', pyv_reservations: 'visit_rows', pyv_takeout: 'visit_rows', pyv_groups: 'visit_rows' };
+  instagram: 'instagram_url', facebook: 'facebook_url', pyv_known: 'visit_rows', pyv_reservations: 'visit_rows', pyv_takeout: 'visit_rows', pyv_groups: 'visit_rows',
+  kitchen: 'pub_info', sports: 'pub_info', minors: 'pub_info', games: 'owner_features' };
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
   if (!keys.size) return 0;
@@ -137,6 +186,10 @@ const GROUPS = [
   { key: 'social', en: 'Social links', fr: 'Réseaux sociaux' },
   { key: 'finding', en: 'Finding you', fr: 'Vous trouver' },
   { key: 'confirmed', en: 'Confirmed by you', fr: 'Confirmée par vous' },
+  // Pub groups (2026-11-10). A group with no items for a type has max 0 and is left out, so restaurants are unchanged.
+  { key: 'food', en: 'Food & drink', fr: 'Nourriture et boissons' },
+  { key: 'whatson', en: 'What’s on', fr: 'À l’affiche' },
+  { key: 'yourvisit', en: 'Your visit', fr: 'Votre visite' },
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
@@ -156,6 +209,8 @@ const dayNumber = (ymd) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ym
 function doneMap(input, today) {
   const i = input || {};
   const labels = new Set((i.visitLabels || []).map((l) => String(l).trim().toLowerCase()));
+  const pub = i.pubInfo && typeof i.pubInfo === 'object' ? i.pubInfo : {};
+  const feats = new Set(Array.isArray(i.ownerFeatures) ? i.ownerFeatures : []);
   const a = dayNumber(i.hoursCheckedAt), b = dayNumber(today);
   const ownPhoto = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(i.imageUrl || '').trim());
   return {
@@ -183,8 +238,22 @@ function doneMap(input, today) {
     facebook: nonBlank(i.facebookUrl),
     arrival: !!i.hasArrival,
     owner_confirmed: !!i.claimed,
+    // Pubs (2026-11-10): owner-only answers in venue_pub_info and the owner features.
+    kitchen: PUB_KITCHEN_MODES.includes(pub.kitchen && pub.kitchen.mode),
+    sports: Array.isArray(pub.sports && pub.sports.list) && pub.sports.list.length > 0,
+    games: PUB_GAME_KEYS.some((k) => feats.has(k)),
+    minors: PUB_MINORS_POLICIES.includes(pub.minors && pub.minors.policy),
+    ...(i.type === 'pub' ? {
+      // "We don't serve food" in the kitchen question also answers the food type.
+      cuisine: nonBlank(i.cuisine) || !!(pub.kitchen && pub.kitchen.mode === 'none'),
+      // Sports on TV has its own item for pubs, so it no longer counts as an event.
+      entertainment: !!i.liveMusic || Number(i.nightsCount) > 0,
+    } : {}),
   };
 }
+const PUB_KITCHEN_MODES = ['same', 'earlier', 'none'];
+const PUB_MINORS_POLICIES = ['adults', 'minors_until', 'all_ages'];
+const PUB_GAME_KEYS = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
 
 // -> { pct, got, max, complete, groups: [{ key, got, max, full }], missing: [item + {waiting}], coming: [item],
 //      declined: [item] (told us "we don't have one" and we hold nothing for it), declared: [keys as stored] }
@@ -223,7 +292,9 @@ const BADGE_CSS = `
 function scoreCompleteness(input, opts) {
   const o = opts || {};
   const done = doneMap(input, o.today);
-  const declaredAll = ((input && input.declaredNone) || []).filter((k) => NONE_KEYS.includes(k));
+  const list = itemsFor(input && input.type);
+  const noneKeys = noneKeysFor(input && input.type);
+  const declaredAll = ((input && input.declaredNone) || []).filter((k) => noneKeys.includes(k));
   const none = new Set(declaredAll);
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
@@ -234,9 +305,10 @@ function scoreCompleteness(input, opts) {
   const hhBadgeOnly = !!(input && input.happyHourBadge) && !done.happy_hour && !na.happy_hour;
   if (hhBadgeOnly) none.delete('happy_hour');
   let got = 0, max = 0;
-  const per = new Map(GROUPS.map((g) => [g.key, { key: g.key, got: 0, max: 0 }]));
+  // Groups in the order their items come (the same as GROUPS for restaurants).
+  const per = new Map([...new Set(list.map((it) => it.group))].map((k) => [k, { key: k, got: 0, max: 0 }]));
   const missing = [], coming = [];
-  for (const base of ITEMS) {
+  for (const base of list) {
     if (na[base.key]) continue;
     let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
     if (base.key === 'menu' && !done.menu && input && sameAddress(input.menuUrl, input.website)) it = { ...base, ...MENU_SAME_SITE_COPY };
@@ -270,7 +342,7 @@ function scoreCompleteness(input, opts) {
   const groups = [...per.values()].filter((g) => g.max > 0).map((g) => ({ ...g, full: g.got === g.max }));
   // Biggest first, then the order of the spec.
   missing.sort((x, y) => (x.waiting - y.waiting) || (y.w - x.w));
-  const declined = ITEMS.filter((it) => none.has(it.key) && !done[it.key] && !na[it.key]).map((it) => ({ ...it }));
+  const declined = list.filter((it) => none.has(it.key) && !done[it.key] && !na[it.key]).map((it) => ({ ...it }));
   // Capped at a minute (Dayton): the quickest ones that fit in 60 seconds; the rest wait in the second list.
   const quick = [];
   let quickSeconds = 0;
@@ -284,7 +356,7 @@ function scoreCompleteness(input, opts) {
   const later = missing.filter((it) => !it.waiting && !quick.includes(it));
   // The lighter part of the ring: what will count once we approve what was sent.
   // Hours sent while the page had none: once checked they're fresh too, so the provisional score counts both.
-  const hoursFreshW = waitingList.some((it) => it.key === 'hours') && !done.hours ? (ITEMS.find((i) => i.key === 'hours_fresh') || { w: 0 }).w : 0;
+  const hoursFreshW = waitingList.some((it) => it.key === 'hours') && !done.hours ? (list.find((i) => i.key === 'hours_fresh') || { w: 0 }).w : 0;
   const waitingW = waitingList.reduce((a, it) => a + it.w, 0) + hoursFreshW;
   const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
   return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
@@ -382,8 +454,9 @@ function renderCompleteness(result, opts) {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
     // Easy setup (2026-11-09): photos and the menu open the one-question-at-a-time setup at that step.
-    const setupStep = o.setupHref ? { photo_main: 'photos', photo_extra: 'photos', menu: 'menu' }[it.key] : null;
+    const setupStep = o.setupHref ? ({ photo_main: 'photos', photo_extra: 'photos', menu: 'menu' }[it.key] || (it.target && it.target.setup)) : null;
     if (setupStep) return `<a class="op-cb-btn" href="${esc(o.setupHref)}#${setupStep}">${label}</a>`;
+    if (it.target && it.target.setup) return '';
     if (it.target && it.target.href) return `<a class="op-cb-btn" href="${esc(o.menuHref || '#')}">${label}</a>`;
     if (it.target) return `<button type="button" class="op-cb-btn" data-cb-task="${esc(it.target.task)}" data-cb-id="${esc(it.target.id || '')}">${label}</button>`;
     return '';
@@ -814,4 +887,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

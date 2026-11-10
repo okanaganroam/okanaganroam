@@ -455,6 +455,9 @@ function rowToVenue(row) {
   for (const f of BOOL_FIELDS) {
     v[f] = !!row[f];
   }
+  // Pubs (Dayton, 2026-11-10): the researched Kid-friendly badge stays stored but is never shown; the business's own
+  // "Who's welcome?" answer decides it (pubKidsWelcome).
+  if (row.type === 'pub') v.kid_friendly = pubKidsWelcome(row.id);
   // Seasonal hours and special closures (2026-10-18), only on the few venues that have them (keeps API pages
   // small): the lists themselves, and hours_live -- the hours JSON hours.js reads with both applied.
   if (row.hours) {
@@ -530,7 +533,7 @@ function listVenues(query) {
   }
   for (const f of BOOL_FIELDS) {
     if (query[f] === '1' || query[f] === 'true') {
-      clauses.push(`${f} = 1`);
+      clauses.push(badgeTrueSql(f));
     }
   }
 
@@ -1436,6 +1439,69 @@ function guardedAmenityCorrectUpdate(id, fieldValues, meta) {
   }
 }
 
+// ---------- Removing a wrong researched badge (2026-11-10) ----------
+// guardedAmenityCorrectUpdate() never turns a true into false, so a researched badge we found to be wrong had no logged
+// way off. This is that way, and only that: a researched boolean badge (RESEARCHED_BOOL_FIELDS) goes from true to false,
+// compare-and-set against what the caller read (expected_current must be true), logged before/after in
+// venue_enrichment_log (source 'manual_removal', with the source URL), and undone by batch (undoAmenityRemoval).
+// Never touches a value the business set itself: a field whose latest log entry is the owner's own (venue_owner, not
+// an owner Undo) is refused, claimed or not.
+function amenityOwnerSet(venueId, field) {
+  try {
+    const r = db.prepare("SELECT source, batch_id FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ? ORDER BY id DESC LIMIT 1").get(venueId, field);
+    return !!r && r.source === 'venue_owner' && !/^owner-undo-/.test(String(r.batch_id || ''));
+  } catch (e) { return false; }
+}
+// -> { found: false } | { found: true, results: { field: 'written' | 'rejected_expected_mismatch' | 'rejected_owner_value' }, venue }
+function guardedAmenityRemoveUpdate(id, fields, meta) {
+  const existing = db.prepare('SELECT id FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false };
+  const results = {};
+  db.exec('BEGIN');
+  try {
+    for (const field of RESEARCHED_BOOL_FIELDS) {
+      if (!fields.includes(field)) continue;
+      if (amenityOwnerSet(id, field)) { results[field] = 'rejected_owner_value'; continue; }
+      const info = db.prepare(`UPDATE venues SET ${field} = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${field} = 1`).run(id);
+      if (info.changes !== 1) { results[field] = 'rejected_expected_mismatch'; continue; }
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, ?, '1', '0', 'manual_removal', ?, 'high', ?, 0, ?)`).run(id, field, `${meta.reason} | ${meta.source_url}`, meta.batch_id, meta.reviewed_by || null);
+      results[field] = 'written';
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    throw err;
+  }
+  return { found: true, results, venue: getVenue(id) };
+}
+// Undo one removal batch on one venue: each field it turned off goes back on, but only while it is still off and nothing
+// else has written that field since (the removal is still its latest log entry). Logged as 'manual_removal_undo'.
+function undoAmenityRemoval(id, batchId, reason) {
+  const rows = db.prepare("SELECT id, field_name FROM venue_enrichment_log WHERE venue_id = ? AND batch_id = ? AND source = 'manual_removal' ORDER BY id").all(id, batchId);
+  if (!rows.length) return { found: false };
+  const results = {};
+  db.exec('BEGIN');
+  try {
+    for (const r of rows) {
+      const field = r.field_name;
+      if (!RESEARCHED_BOOL_FIELDS.includes(field)) continue;
+      const latest = db.prepare('SELECT id FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ? ORDER BY id DESC LIMIT 1').get(id, field);
+      if (!latest || latest.id !== r.id) { results[field] = 'skipped_changed_since'; continue; }
+      const info = db.prepare(`UPDATE venues SET ${field} = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${field} = 0`).run(id);
+      if (info.changes !== 1) { results[field] = 'skipped_changed_since'; continue; }
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, ?, '0', '1', 'manual_removal_undo', ?, 'high', ?, 0, NULL)`).run(id, field, reason, `undo-${batchId}`);
+      results[field] = 'restored';
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    throw err;
+  }
+  return { found: true, results, venue: getVenue(id) };
+}
+
 // Deleting a listing (2026-10-19): foreign keys are enforced, so a venue with owner links, photos, menus, seasons,
 // claims or visitor tips failed with "FOREIGN KEY constraint failed" (Misato's Kitchen). The rows that only exist
 // for this venue go with it; events and venue submissions are kept with their venue link cleared, and any listing
@@ -1662,7 +1728,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'))`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -4388,7 +4454,7 @@ function buildDiscoverySearchVenues() {
   for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all()) {
     if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
     const features = {};
-    for (const f of BOOL_FIELDS) if (Number(row[f]) === 1) features[f] = true;
+    for (const f of BOOL_FIELDS) if (f === 'kid_friendly' ? kidFriendlyPublic(row) : Number(row[f]) === 1) features[f] = true;
     const m = member.get(row.id) || { collections: [], activities: [], fdTypes: [] };
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
@@ -5267,7 +5333,7 @@ const SMART_FAMILY_GUIDE = '/guides/family-friendly-okanagan';
 const SMART_FAMILY_OUTSIDE = new Set(['beach', 'outdoor', 'sport']);
 const SMART_FAMILY_PARK_RE = /\b(?:park|parks|playground|spray park|splash pad|water park|petting|farm|zoo|mini golf|beach)\b/i;
 function smartFamilyWhy(v) {
-  if (Number(v.row.kid_friendly) === 1 || (v.features && v.features.kid_friendly)) return 'Kid-friendly';
+  if (kidFriendlyPublic(v.row) || (v.features && v.features.kid_friendly)) return 'Kid-friendly';
   if (v.type === 'beach') return 'Beach';
   if (SMART_FAMILY_OUTSIDE.has(v.type) && SMART_FAMILY_PARK_RE.test(String(v.row.name || ''))) return 'Park or playground';
   return false;
@@ -6139,7 +6205,7 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
           heading: `Things to do with kids in ${town}`,
           headingFr: `Activités pour enfants à ${town}`,
           guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
-          list: () => smartPickVenues((v) => v.region === region && smartFamilyWhy(v), (v) => (SMART_FAMILY_OUTSIDE.has(v.type) ? 2 : 0) + (Number(v.row.kid_friendly) === 1 ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+          list: () => smartPickVenues((v) => v.region === region && smartFamilyWhy(v), (v) => (SMART_FAMILY_OUTSIDE.has(v.type) ? 2 : 0) + (kidFriendlyPublic(v.row) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
           events: () => searchEventsFor({ regions: R, test: (e) => (e.categories || []).includes('family-kids'), now }),
         };
       }
@@ -6701,7 +6767,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
     const plannerType = v.type === 'sport' ? tripSportPlannerType(v) : v.type === 'shop' ? 'indoor' : v.type;
     if (!plannerType || TRIP_PLANNER_DROPPED_TYPES.has(plannerType)) continue;
     const features = {};
-    for (const f of BOOL_FIELDS) if (Number(v[f]) === 1) features[f] = true;
+    for (const f of BOOL_FIELDS) if (f === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f]) === 1) features[f] = true;
     const m = memberships.get(v.id) || { collections: [], activities: [], fdTypes: [] };
     facts.push({
       id: v.id, name: v.name, region: v.region, type: plannerType, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -12102,7 +12168,7 @@ function listGuideCombos(minCount) {
   // count (it was one COUNT query per pair, ~240 per call, on every venue
   // page). Same predicate (badge = 1, not redirected), same region/badge
   // iteration order and the same { region, badge, count } output.
-  const sums = BOOL_FIELDS.map((b) => `SUM(CASE WHEN ${b} = 1 THEN 1 ELSE 0 END) AS ${b}`).join(', ');
+  const sums = BOOL_FIELDS.map((b) => `SUM(CASE WHEN ${badgeTrueSql(b)} THEN 1 ELSE 0 END) AS ${b}`).join(', ');
   const byRegion = new Map(db
     .prepare(`SELECT region, ${sums} FROM venues WHERE redirect_to IS NULL GROUP BY region`)
     .all()
@@ -12305,7 +12371,7 @@ function guideStandoutPlan(region, ctx) {
   if (!guideStandoutCache || guideStandoutCache.sig !== sig) guideStandoutCache = { sig, byRegion: new Map() };
   if (guideStandoutCache.byRegion.has(region)) return guideStandoutCache.byRegion.get(region);
   const pages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region).map((c) => {
-    const list = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${c.badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`).all(region).map(rowToVenue);
+    const list = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(c.badge)} AND redirect_to IS NULL ORDER BY reviews DESC`).all(region).map(rowToVenue);
     return { badge: c.badge, cand: guideIntros.standoutCandidates(c.badge, list, ctx) };
   });
   const plan = guideIntros.allocateStandouts(pages);
@@ -12434,7 +12500,7 @@ const GUIDE_COMBOS = [
 ];
 const GUIDE_COMBO_BY_SLUG = Object.fromEntries(GUIDE_COMBOS.map((c) => [c.slug, c]));
 function comboGuideWhere(combo) {
-  return [combo.type ? 'type = ?' : null, ...combo.badges.map((b) => `${b} = 1`), 'redirect_to IS NULL'].filter(Boolean).join(' AND ');
+  return [combo.type ? 'type = ?' : null, ...combo.badges.map((b) => badgeTrueSql(b)), 'redirect_to IS NULL'].filter(Boolean).join(' AND ');
 }
 function getComboGuideVenues(region, combo) {
   return db.prepare(`SELECT * FROM venues WHERE region = ? AND ${comboGuideWhere(combo)} ORDER BY reviews DESC`)
@@ -19287,7 +19353,25 @@ const OWNER_EXTRA_BADGE_LABELS = {
   locally_owned: { en: 'Locally owned', fr: 'Propriété locale', icon: null, group: 'place' },
   takes_reservations: { en: 'Takes reservations', fr: 'Prend les réservations', icon: null, group: 'people' },
   takeout: { en: 'Takeout', fr: 'Pour emporter', icon: null, group: 'people' },
+  // Pubs (Dayton, 2026-11-10): local beer on tap and five games, owner-only like the six above.
+  local_beer_taps: { en: 'Local beer on tap', fr: 'Bière locale en fût', icon: null, group: 'food' },
+  pool: { en: 'Pool', fr: 'Billard', icon: null, group: 'place' },
+  darts: { en: 'Darts', fr: 'Fléchettes', icon: null, group: 'place' },
+  shuffleboard: { en: 'Shuffleboard', fr: 'Jeu de palets', icon: null, group: 'place' },
+  arcade: { en: 'Arcade games', fr: 'Jeux d’arcade', icon: null, group: 'place' },
+  board_games: { en: 'Board games', fr: 'Jeux de société', icon: null, group: 'place' },
 };
+// Pubs (Dayton, 2026-11-10) get six more owner-only answers: "Local beer on tap" and the games. Restaurants keep their six.
+const PUB_OWNER_BADGES = ['local_beer_taps', 'pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
+const PUB_GAME_BADGES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
+// Every owner feature that can be stored (the table holds them all); ownerExtraBadgesFor(type) is what a type is offered.
+const ALL_OWNER_FEATURES = OWNER_EXTRA_BADGES.concat(PUB_OWNER_BADGES);
+function ownerExtraBadgesFor(type) {
+  if (type === 'pub') return ['local_drinks', 'local_beer_taps', 'heated_patio', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', ...PUB_GAME_BADGES];
+  return OWNER_FEATURE_TYPES.has(type) ? OWNER_EXTRA_BADGES : [];
+}
+// The types with owner-only features: the completeness types (restaurants, and pubs since 2026-11-10).
+const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub']);
 let venueOwnerFeaturesCache = null;
 function clearVenueOwnerFeaturesCache() { venueOwnerFeaturesCache = null; }
 function venueOwnerFeatures(venueId) {
@@ -19296,24 +19380,162 @@ function venueOwnerFeatures(venueId) {
     try {
       for (const r of db.prepare('SELECT venue_id, features FROM venue_owner_features').all()) {
         let o = {}; try { o = JSON.parse(r.features) || {}; } catch (e) { o = {}; }
-        venueOwnerFeaturesCache.set(r.venue_id, Object.fromEntries(OWNER_EXTRA_BADGES.map((k) => [k, !!o[k]])));
+        venueOwnerFeaturesCache.set(r.venue_id, Object.fromEntries(ALL_OWNER_FEATURES.map((k) => [k, !!o[k]])));
       }
     } catch (e) { /* no table yet */ }
   }
-  return venueOwnerFeaturesCache.get(Number(venueId)) || Object.fromEntries(OWNER_EXTRA_BADGES.map((k) => [k, false]));
+  return venueOwnerFeaturesCache.get(Number(venueId)) || Object.fromEntries(ALL_OWNER_FEATURES.map((k) => [k, false]));
+}
+// One type's owner features only ({ key: bool }), in that type's order.
+function venueOwnerFeaturesFor(venue) {
+  const all = venueOwnerFeatures(venue.id);
+  return Object.fromEntries(ownerExtraBadgesFor(venue.type).map((k) => [k, !!all[k]]));
 }
 function writeVenueOwnerFeatures(venueId, update) {
   const next = { ...venueOwnerFeatures(venueId) };
-  for (const [k, on] of Object.entries(update)) if (OWNER_EXTRA_BADGES.includes(k)) next[k] = !!on;
+  for (const [k, on] of Object.entries(update)) if (ALL_OWNER_FEATURES.includes(k)) next[k] = !!on;
   const json = JSON.stringify(Object.fromEntries(Object.entries(next).filter(([, on]) => on)));
   db.prepare('INSERT INTO venue_owner_features (venue_id, features) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET features = excluded.features, updated_at = CURRENT_TIMESTAMP').run(venueId, json);
   clearVenueOwnerFeaturesCache();
 }
-// The chips for a venue's owner features (restaurants only; '' when none).
+// The chips for a venue's owner features (restaurants and pubs; '' when none).
 function ownerFeatureChipsHtml(venue, fr, cls) {
-  if (!venue || !COMPLETENESS_TYPES.has(venue.type)) return '';
+  if (!venue || !OWNER_FEATURE_TYPES.has(venue.type)) return '';
   const f = venueOwnerFeatures(venue.id);
-  return OWNER_EXTRA_BADGES.filter((k) => f[k]).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[k].fr : OWNER_EXTRA_BADGE_LABELS[k].en)}</span>`).join(' ');
+  return ownerExtraBadgesFor(venue.type).filter((k) => f[k]).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[k].fr : OWNER_EXTRA_BADGE_LABELS[k].en)}</span>`).join(' ');
+}
+
+// ---------- Pub answers (Dayton, 2026-11-10) ----------
+// Owner-only, never researched (memory badge-rules): when the kitchen closes, who's welcome, and which sports show on how
+// many TVs. Stored in venue_pub_info as one JSON object { kitchen, minors, sports }; each part is optional.
+//   kitchen { mode: 'same' | 'earlier' | 'none', closes: 'HH:MM' (earlier only), note }
+//   minors  { policy: 'adults' | 'minors_until' | 'all_ages', until: 'HH:MM' (minors_until only), note }
+//   sports  { list: PUB_SPORTS keys, tvs: PUB_TVS key or '' }
+// Shown on the pub's own page (kitchen and minors lines with the hours, the sports with the Sports on TV chip). No pages,
+// URLs or sitemap entries are made from them.
+const PUB_KITCHEN_MODES = ['same', 'earlier', 'none'];
+const PUB_MINORS_POLICIES = ['adults', 'minors_until', 'all_ages'];
+const PUB_SPORTS = ['hockey', 'football', 'soccer', 'basketball', 'baseball', 'ufc', 'golf', 'racing'];
+const PUB_SPORT_LABELS = {
+  hockey: { en: 'Hockey', fr: 'Hockey' }, football: { en: 'Football (NFL and CFL)', fr: 'Football (NFL et LCF)' }, soccer: { en: 'Soccer', fr: 'Soccer' },
+  basketball: { en: 'Basketball', fr: 'Basketball' }, baseball: { en: 'Baseball', fr: 'Baseball' }, ufc: { en: 'UFC and boxing', fr: 'UFC et boxe' },
+  golf: { en: 'Golf', fr: 'Golf' }, racing: { en: 'F1 and racing', fr: 'F1 et course automobile' },
+};
+// The short words on the public chip ("Sports on TV: hockey, football · 6 to 10 TVs").
+const PUB_SPORT_SHORT = {
+  hockey: { en: 'hockey', fr: 'hockey' }, football: { en: 'football', fr: 'football' }, soccer: { en: 'soccer', fr: 'soccer' }, basketball: { en: 'basketball', fr: 'basketball' },
+  baseball: { en: 'baseball', fr: 'baseball' }, ufc: { en: 'UFC and boxing', fr: 'UFC et boxe' }, golf: { en: 'golf', fr: 'golf' }, racing: { en: 'F1 and racing', fr: 'F1 et course automobile' },
+};
+const PUB_TVS = ['1-2', '3-5', '6-10', '10+'];
+const PUB_TV_LABELS = {
+  '1-2': { en: '1 or 2', fr: '1 ou 2', page: ['1 or 2 TVs', '1 ou 2 téléviseurs'] }, '3-5': { en: '3 to 5', fr: '3 à 5', page: ['3 to 5 TVs', '3 à 5 téléviseurs'] },
+  '6-10': { en: '6 to 10', fr: '6 à 10', page: ['6 to 10 TVs', '6 à 10 téléviseurs'] }, '10+': { en: 'More than 10', fr: 'Plus de 10', page: ['More than 10 TVs', 'Plus de 10 téléviseurs'] },
+};
+const PUB_NOTE_MAX = 120;
+const PUB_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
+let venuePubInfoCache = null;
+function clearVenuePubInfoCache() { venuePubInfoCache = null; }
+// The stored answers ({} when none).
+function venuePubInfo(venueId) {
+  if (!venuePubInfoCache) {
+    venuePubInfoCache = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, info FROM venue_pub_info').all()) {
+        let o = {}; try { o = JSON.parse(r.info) || {}; } catch (e) { o = {}; }
+        venuePubInfoCache.set(r.venue_id, o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+      }
+    } catch (e) { /* an older database */ }
+  }
+  return venuePubInfoCache.get(Number(venueId)) || {};
+}
+function writeVenuePubInfo(venueId, info) {
+  const clean = Object.fromEntries(['kitchen', 'minors', 'sports'].filter((k) => info && info[k]).map((k) => [k, info[k]]));
+  if (!Object.keys(clean).length) db.prepare('DELETE FROM venue_pub_info WHERE venue_id = ?').run(venueId);
+  else db.prepare('INSERT INTO venue_pub_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, JSON.stringify(clean));
+  clearVenuePubInfoCache();
+}
+// Kid-friendly on pubs (Dayton, 2026-11-10): the researched badge is never shown for a pub (it stays stored). A pub
+// counts as welcoming kids only when the business itself says minors are welcome (all ages, or with an adult until a
+// time). Read by every public reader of the field: venue objects (rowToVenue), filters and guides (kidFriendlySql), the map.
+function pubKidsWelcome(venueId) {
+  const p = (venuePubInfo(venueId).minors || {}).policy;
+  return p === 'all_ages' || p === 'minors_until';
+}
+function kidFriendlyPublic(row) {
+  if (!row) return false;
+  return row.type === 'pub' ? pubKidsWelcome(row.id) : !!Number(row.kid_friendly);
+}
+const KID_FRIENDLY_SQL = "((kid_friendly = 1 AND type <> 'pub') OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN ('all_ages', 'minors_until'))))";
+// "<field> = 1" for a badge in a WHERE clause; kid_friendly follows the pub rule above.
+function badgeTrueSql(f) { return f === 'kid_friendly' ? KID_FRIENDLY_SQL : `${f} = 1`; }
+const pubClock = (t, fr) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+  if (!m) return '';
+  const h = Number(m[1]), mi = m[2];
+  if (fr) return mi === '00' ? `${h} h` : `${h} h ${mi}`;
+  return `${h % 12 === 0 ? 12 : h % 12}${mi === '00' ? '' : `:${mi}`} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
+};
+// One validated part, or { error }. `x === null` clears that part.
+function cleanPubInfoPart(key, x) {
+  if (x === null) return { value: null };
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return { error: PUB_INFO_ERROR };
+  const time = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+  const note = (n) => {
+    if (n == null || n === '') return { text: '' };
+    const t = ownerVisitText(n);
+    if (t.error) return t;
+    return t.text.length > PUB_NOTE_MAX ? { error: OWNER_VISIT_ERRORS.long } : t;
+  };
+  if (key === 'kitchen') {
+    if (Object.keys(x).some((k) => !['mode', 'closes', 'note'].includes(k)) || !PUB_KITCHEN_MODES.includes(x.mode)) return { error: PUB_INFO_ERROR };
+    if (x.mode === 'earlier' && !time(x.closes)) return { error: 'Please pick the time your kitchen closes.' };
+    const n = note(x.note); if (n.error) return n;
+    return { value: { mode: x.mode, ...(x.mode === 'earlier' ? { closes: x.closes } : {}), ...(n.text && x.mode !== 'none' ? { note: n.text } : {}) } };
+  }
+  if (key === 'minors') {
+    if (Object.keys(x).some((k) => !['policy', 'until', 'note'].includes(k)) || !PUB_MINORS_POLICIES.includes(x.policy)) return { error: PUB_INFO_ERROR };
+    if (x.policy === 'minors_until' && !time(x.until)) return { error: 'Please pick the time minors are welcome until.' };
+    const n = note(x.note); if (n.error) return n;
+    return { value: { policy: x.policy, ...(x.policy === 'minors_until' ? { until: x.until } : {}), ...(n.text ? { note: n.text } : {}) } };
+  }
+  if (key === 'sports') {
+    if (Object.keys(x).some((k) => !['list', 'tvs'].includes(k)) || !Array.isArray(x.list) || x.list.some((s) => !PUB_SPORTS.includes(s)) || new Set(x.list).size !== x.list.length) return { error: PUB_INFO_ERROR };
+    if (x.tvs != null && x.tvs !== '' && !PUB_TVS.includes(x.tvs)) return { error: PUB_INFO_ERROR };
+    return { value: x.list.length || x.tvs ? { list: PUB_SPORTS.filter((s) => x.list.includes(s)), tvs: x.tvs || '' } : null };
+  }
+  return { error: PUB_INFO_ERROR };
+}
+// The kitchen and who's-welcome lines under a pub's hours ('' when the business hasn't said).
+function pubInfoLinesHtml(venue, fr) {
+  if (!venue || venue.type !== 'pub' || venue.redirect_to) return '';
+  const info = venuePubInfo(venue.id);
+  const L = (en, f) => (fr ? f : en);
+  const lines = [];
+  const k = info.kitchen;
+  if (k && k.mode === 'earlier' && k.closes) lines.push(['kitchen', L(`Kitchen closes at ${pubClock(k.closes)}`, `La cuisine ferme à ${pubClock(k.closes, true)}`), k.note]);
+  else if (k && k.mode === 'same') lines.push(['kitchen', L('Food served until close', 'Nourriture servie jusqu’à la fermeture'), k.note]);
+  else if (k && k.mode === 'none') lines.push(['kitchen', L('No food served', 'Pas de nourriture servie'), '']);
+  const m = info.minors;
+  if (m && m.policy) lines.push(['minors', minorsLineText(m, fr), m.note]);
+  if (!lines.length) return '';
+  // The business's own notes are in their words (usually English): the French page shows only the line.
+  return `<div class="venue-pub-lines" style="margin:10px 0 0">${lines.map(([cls, text, note]) => `<p class="venue-pub-line venue-pub-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${cls === 'kitchen' ? '🍳' : '👪'}</span> <strong>${escapeHtml(text)}</strong>${note && !fr ? `<span class="venue-pub-note" style="display:block;margin-left:1.6em;opacity:.85">${escapeHtml(note)}</span>` : ''}</p>`).join('')}</div>`;
+}
+// "Adults only (19+)" / "Minors welcome with an adult until 8 PM" / "All ages welcome" (the business's own rule).
+function minorsLineText(m, fr) {
+  if (!m) return '';
+  if (m.policy === 'adults') return fr ? 'Adultes seulement (19 ans et plus)' : 'Adults only (19+)';
+  if (m.policy === 'all_ages') return fr ? 'Tous les âges sont bienvenus' : 'All ages welcome';
+  if (m.policy === 'minors_until') return fr ? `Mineurs bienvenus avec un adulte jusqu’à ${pubClock(m.until, true)}` : `Minors welcome with an adult until ${pubClock(m.until)}`;
+  return '';
+}
+// "hockey, football · 6 to 10 TVs" ('' when the business hasn't said).
+function pubSportsText(venue, fr) {
+  const s = venue && venue.type === 'pub' ? venuePubInfo(venue.id).sports : null;
+  if (!s) return '';
+  const names = (s.list || []).map((k) => (PUB_SPORT_SHORT[k] || {})[fr ? 'fr' : 'en']).filter(Boolean);
+  const tv = s.tvs && PUB_TV_LABELS[s.tvs] ? PUB_TV_LABELS[s.tvs].page[fr ? 1 : 0] : '';
+  return [names.join(', '), tv].filter(Boolean).join(' · ');
 }
 
 // Venue-page badges (2026-11-01, Dayton: "more beautiful while staying noticeable"): each badge leads with its line icon
@@ -19328,11 +19550,15 @@ const VENUE_BADGE_GROUP = {
 };
 function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipHappyHour = false } = {}) {
   const order = ['food', 'people', 'place', 'time'];
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !(skipHappyHour && f === 'happy_hour') && f !== 'open_early' && f !== 'open_late')
+  // A pub's page says who's welcome in its own line by the hours (pubInfoLinesHtml), so no Kid-friendly chip there; its
+  // Sports on TV chip names the sports and TVs when the business has said (2026-11-10).
+  const pub = venue.type === 'pub';
+  const sports = pub ? pubSportsText(venue, fr) : '';
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !(skipHappyHour && f === 'happy_hour') && f !== 'open_early' && f !== 'open_late' && !(pub && f === 'kid_friendly'))
     .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place'))
     .map((f) => {
       const icon = (CARD_BADGE_SHORT[f] || [])[0];
-      const label = fr ? frBadgeLabel(f) : BADGE_LABELS[f].title;
+      const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
       return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, fr, (g) => `chip chip-vb chip-vb-${g}`) || [])
@@ -21000,7 +21226,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale en fût' }, spToday: 'Aujourd’hui :',
     wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
@@ -21041,7 +21267,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local beer on tap' }, spToday: 'Today:',
     wnMore: function(n){ return '+' + n + ' more'; }, hhLaterNote: 'No happy hour on right now. These places have one later today.', openMicWords: 'open mic',
     wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
@@ -21328,7 +21554,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + (st.season ? '${uiIcon('leaf', 15, true)} ' : '') + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
-  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal'];
+  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer'];
   function featHtml(p){
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
@@ -22210,6 +22436,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     free: 'free gratuit gratuits gratuite gratuites gratis',
     access: 'wheelchair accessible accessibility accessibilité', booking: 'reservation reservations réservation réservations',
     takeout: 'takeout pickup emporter', heated: 'heated', localdrinks: 'localdrinks', ownlocal: 'ownlocal',
+    games: 'billiards darts shuffleboard billard fléchettes', localbeer: 'localbeer',
     open: 'open ouvert ouverts', nearme: 'nearme'
   };
   // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
@@ -22217,7 +22444,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '], [/ happy\\s+(?:specials?|spéciaux|speciaux|spécial|deals?)(?=\\s)/g, ' happy '], [/(?:daily|weekly|nightly|today'?s|tonight'?s|dinner|lunch|food|drink) specials?|specials? (?:today|tonight)|spéciaux du jour|speciaux du jour|plats? du jour/g, ' specials '],
     [/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
-    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
+    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:beers? on tap|taps?)|bi[èe]res? locales? en f[ûu]ts?/g, ' localbeer '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
+    [/board ?games?|pool tables?|tables? de billard|jeux de soci[ée]t[ée]/g, ' games '],
     [/locally[ -]?owned|independently owned|propri[ée]t[ée] locale/g, ' ownlocal '], [/take[ -]?out|pour emporter/g, ' takeout '], [/wheel ?chair/g, ' wheelchair '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
     // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
@@ -22780,7 +23008,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 21; // 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 22; // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -22798,6 +23026,8 @@ function mapDataVersion(now = new Date()) {
   // Owner-only features (2026-11-10): their own table, so a business ticking one shows on the map without another change.
   let of = { u: null, n: 0 };
   try { of = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_owner_features').get(); } catch (err) { /* an older database */ }
+  // Pub answers (2026-11-10): who's welcome sets a pub's Kids bit.
+  try { const pi = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_pub_info').get(); of = { u: `${of.u}|${pi.u}`, n: `${of.n}|${pi.n}` }; } catch (err) { /* an older database */ }
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
   return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
 }
@@ -22822,6 +23052,8 @@ const MAP_OWNER_FEATURES = [
   { key: 'localdrinks', owner: 'local_drinks', bit: 1 << 17 }, { key: 'heated', owner: 'heated_patio', bit: 1 << 18 },
   { key: 'access', owner: 'wheelchair_accessible', bit: 1 << 19 }, { key: 'ownlocal', owner: 'locally_owned', bit: 1 << 20 },
   { key: 'booking', owner: 'takes_reservations', bit: 1 << 21 }, { key: 'takeout', owner: 'takeout', bit: 1 << 22 },
+  // Pubs (2026-11-10): "Games" is any of the five games; "Local beer on tap" its own answer. Same rules as above.
+  { key: 'games', owners: ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'], bit: 1 << 23 }, { key: 'localbeer', owner: 'local_beer_taps', bit: 1 << 24 },
 ];
 // "Specials today" (2026-10-27): a filter key like the features (?f=specials, the words "specials" / « spéciaux »), but read
 // from today's specials ([17]), never from a stored bit, so no place carries it in [7].
@@ -22855,6 +23087,9 @@ const MAP_MUST_HAVES = [
   { key: 'booking', label: 'Takes reservations', icon: uiIcon('calendar') },
   { key: 'takeout', label: 'Takeout', icon: uiIcon('bag') },
   { key: 'ownlocal', label: 'Locally owned', icon: uiIcon('home') },
+  // Owner-only pub features (2026-11-10).
+  { key: 'games', label: 'Pool, darts & games', icon: uiIcon('target') },
+  { key: 'localbeer', label: 'Local beer on tap', icon: uiIcon('cocktail') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -22970,8 +23205,8 @@ function mapPlacesData(now = new Date()) {
     const blocked = !!((st && st.reason === 'advisory') || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current))));
     v.hikeList = hikeIds.has(v.id);
     v.viewpointList = viewpointIds.has(v.id);
-    let bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
-    if (COMPLETENESS_TYPES.has(v.type)) { const of = venueOwnerFeatures(v.id); bits = MAP_OWNER_FEATURES.reduce((b, f) => (of[f.owner] ? b | f.bit : b), bits); }
+    let bits = MAP_FEATURES.reduce((b, f) => ((f.field === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.field]) === 1) ? b | f.bit : b), 0);
+    if (OWNER_FEATURE_TYPES.has(v.type)) { const of = venueOwnerFeatures(v.id); const mine = ownerExtraBadgesFor(v.type); bits = MAP_OWNER_FEATURES.reduce((b, f) => ((f.owners || [f.owner]).some((k) => mine.includes(k) && of[k]) ? b | f.bit : b), bits); }
     const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
@@ -26255,7 +26490,7 @@ function foodDrinkCategoriesByVenue(venues) {
 // venue id -> the feature keys that venue actually has set.
 function foodDrinkFeaturesByVenue(venues) {
   const map = new Map();
-  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => (f.key === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.key]) === 1)).map((f) => f.key));
   return map;
 }
 
@@ -32858,7 +33093,7 @@ function buildSitemapXml() {
     ...combo,
     lastmod: toLastmod(
       db
-        .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${combo.badge} = 1 AND redirect_to IS NULL`)
+        .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${badgeTrueSql(combo.badge)} AND redirect_to IS NULL`)
         .get(combo.region).m
     ),
   }));
@@ -34587,6 +34822,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (/^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? '' : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
+  // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
+  const pubLines = pubInfoLinesHtml(venue, fr);
+  if (pubLines) hoursHtml = hoursHtml ? hoursHtml + pubLines : `<h2>${L('Hours', 'Heures')}</h2>${pubLines}`;
 
   // Outbound links carry a data-track kind so the venue-page engagement
   // script can report them (golf 2026-09-19; every venue type since
@@ -35105,7 +35343,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
       weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
-      highlights: fdLib.highlightsFor(venue, dogFriendlyNote, profile),
+      // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
+      // Its Sports TV highlight names the sports and TVs when the business has said.
+      highlights: fdLib.highlightsFor(venue.type === 'pub' ? { ...venue, kid_friendly: false } : venue, dogFriendlyNote,
+        venue.type === 'pub' && pubSportsText(venue, false) ? { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${pubSportsText(venue, false)}` } } : profile),
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
@@ -38578,7 +38819,7 @@ function browseCategoriesByVenue(venues, also = new Map()) {
 }
 function browseFeaturesByVenue(venues) {
   const map = new Map();
-  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => (f.key === 'kid_friendly' ? kidFriendlyPublic(v) : Number(v[f.key]) === 1)).map((f) => f.key));
   return map;
 }
 function browseCuisines(venues) {
@@ -43987,7 +44228,9 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
+  // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
+  'pub_info'];
 // Cuisine picker (2026-11-08, reworked 2026-11-09): restaurants only (the types with a completeness list). Dayton
 // (Nov 9 2026): up to 3 food labels from this list of 45, plus one "kind of place". The food list is only food (place
 // styles such as "Casual dining" moved to RESTAURANT_PLACE_TYPES; dietary words are badges), every label has a French
@@ -44001,17 +44244,27 @@ const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch',
 // Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
 const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food'];
 const OWNER_CUISINES_MAX = 3;
+// Pubs (2026-11-10, SPEC-pubs.md): pub-friendly labels first; Pub Fare is picked for them in the easy setup.
+const PUB_CUISINES_POPULAR = ['Pub Fare', 'Burgers', 'Chicken & Wings', 'Pizza', 'Fish & Chips', 'Comfort food', 'Canadian', 'Contemporary & Global', 'Mexican', 'Steakhouse'];
 const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pub or sports bar', 'Diner', 'Quick bite', 'Winery or brewery restaurant'];
+// Pubs (Dayton, 2026-11-10): their own short list of kinds, stored and shown the same way (venue_cuisines.place_type).
+const PUB_PLACE_TYPES = ['Neighbourhood pub', 'Sports bar', 'Gastropub', 'Irish or British pub', 'Brewpub', 'Clubhouse'];
+function placeTypesFor(type) { return type === 'pub' ? PUB_PLACE_TYPES : RESTAURANT_PLACE_TYPES; }
+// The types whose cuisines and kind of place come from venue_cuisines (restaurants; pubs since 2026-11-10).
+const CUISINE_LIST_TYPES = new Set(['restaurant', 'pub']);
 const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
-  'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie' };
+  'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Clubhouse': 'Club-house (golf ou ski)' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
 // Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
 // read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
 // no matching property, so nothing is added to the JSON-LD.
 const PLACE_TYPE_DISPLAY = { 'Casual': 'Casual dining', 'Family': 'Family restaurant', 'Fine dining': 'Fine dining', 'Bistro': 'Bistro',
-  'Pub or sports bar': 'Pub or sports bar', 'Diner': 'Diner', 'Quick bite': 'Quick bite', 'Winery or brewery restaurant': 'Winery or brewery restaurant' };
+  'Pub or sports bar': 'Pub or sports bar', 'Diner': 'Diner', 'Quick bite': 'Quick bite', 'Winery or brewery restaurant': 'Winery or brewery restaurant',
+  'Neighbourhood pub': 'Neighbourhood pub', 'Sports bar': 'Sports bar', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Irish or British pub', 'Brewpub': 'Brewpub', 'Clubhouse': 'Golf or ski clubhouse' };
 const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family': 'Restaurant familial', 'Fine dining': 'Restaurant gastronomique', 'Bistro': 'Bistro',
-  'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie' };
+  'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Clubhouse': 'Club-house de golf ou de ski' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -44046,7 +44299,7 @@ function servesCuisineFor(venue) {
 function venueCuisineList(venue) {
   if (!venue) return [];
   const first = venue.cuisine ? String(venue.cuisine) : '';
-  if (venue.type !== 'restaurant') return first ? [first] : [];
+  if (!CUISINE_LIST_TYPES.has(venue.type)) return first ? [first] : [];
   const row = venueCuisinesRow(venue.id);
   const list = row && row.cuisines.length ? row.cuisines : [];
   if (!list.length) return first ? [first] : [];
@@ -44054,9 +44307,10 @@ function venueCuisineList(venue) {
   return list.slice(0, OWNER_CUISINES_MAX);
 }
 function venuePlaceType(venue) {
-  if (!venue || venue.type !== 'restaurant') return '';
+  if (!venue || !CUISINE_LIST_TYPES.has(venue.type)) return '';
   const row = venueCuisinesRow(venue.id);
-  return row && row.place_type ? row.place_type : '';
+  // Only a kind from the venue's own type's list (a pub never shows a restaurant kind, or the other way round).
+  return row && row.place_type && placeTypesFor(venue.type).includes(row.place_type) ? row.place_type : '';
 }
 // Writes a restaurant's cuisines and/or place type (no checks; callers validate and log). `next` holds `cuisines`
 // (array, [] clears) and/or `place_type` ('' clears). venues.cuisine follows the first cuisine. -> { before, after }.
@@ -44740,7 +44994,9 @@ function recordOwnerLinkOpen(req, venueId) {
 function ownerVenueSnapshot(venue, happyHourTimes) {
   const badges = {};
   for (const f of RESEARCHED_BOOL_FIELDS) badges[f] = !!venue[f];
-  if (COMPLETENESS_TYPES.has(venue.type)) Object.assign(badges, venueOwnerFeatures(venue.id));
+  // Pubs (2026-11-10): no Kid-friendly tick ("Who's welcome?" replaces it), so an owner's save never touches the stored one.
+  if (venue.type === 'pub') delete badges.kid_friendly;
+  if (COMPLETENESS_TYPES.has(venue.type)) Object.assign(badges, venueOwnerFeaturesFor(venue));
   return {
     hours: venue.hours || null,
     phone: venue.phone || '',
@@ -44769,6 +45025,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     ...(COMPLETENESS_TYPES.has(venue.type) ? { not_offered: venueNotOffered(venue.id) } : {}),
     // Cuisine and the date the hours were last checked (2026-11-08): only for the types with a completeness list.
     ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
+    // Pubs (2026-11-10): { kitchen, minors, sports } as stored ({} when none).
+    ...(venue.type === 'pub' ? { pub_info: venuePubInfo(venue.id) } : {}),
   };
 }
 // The stored hours_checked_at ('YYYY-MM-DD') or ''.
@@ -44997,7 +45255,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   }
   if ('badges' in input) {
     const b = input.badges;
-    const allowed = COMPLETENESS_TYPES.has(venue.type) ? RESEARCHED_BOOL_FIELDS.concat(OWNER_EXTRA_BADGES) : RESEARCHED_BOOL_FIELDS;
+    const allowed = (venue.type === 'pub' ? RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'kid_friendly') : RESEARCHED_BOOL_FIELDS).concat(ownerExtraBadgesFor(venue.type));
     if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).some((k) => !allowed.includes(k) || typeof b[k] !== 'boolean')) {
       errors.badges = 'The badges could not be read. Please reload the page and try again.';
     } else {
@@ -45097,7 +45355,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('not_offered' in input) {
     const x = input.not_offered;
     if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
-    else if (!Array.isArray(x) || x.length > portalCompleteness.NONE_MAX || x.some((k) => typeof k !== 'string' || !portalCompleteness.NONE_KEYS.includes(k)) || new Set(x).size !== x.length) {
+    else if (!Array.isArray(x) || x.length > portalCompleteness.noneKeysFor(venue.type).length || x.some((k) => typeof k !== 'string' || !portalCompleteness.noneKeysFor(venue.type).includes(k)) || new Set(x).size !== x.length) {
       errors.not_offered = OWNER_NOT_OFFERED_ERRORS.unreadable;
     } else {
       const next = [...x].sort();
@@ -45131,7 +45389,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('place_type' in input) {
     const pt = typeof input.place_type === 'string' ? input.place_type.trim() : '';
     if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
-    else if (pt && !RESTAURANT_PLACE_TYPES.includes(pt)) errors.place_type = OWNER_PLACE_TYPE_ERROR;
+    else if (pt && !placeTypesFor(venue.type).includes(pt)) errors.place_type = OWNER_PLACE_TYPE_ERROR;
     else if (pt !== (current.place_type || '')) changes.place_type = pt;
   }
   // "These hours are right" (2026-11-08): only `true`, only with hours on the page, and not while new hours wait for
@@ -45207,6 +45465,22 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (!errors.closures && JSON.stringify(out) !== JSON.stringify(current.closures || [])) changes.closures = out;
     }
   }
+  // Pub answers (2026-11-10): an object with any of kitchen, minors, sports; each part replaces that part (null clears it).
+  if ('pub_info' in input) {
+    const x = input.pub_info;
+    if (venue.type !== 'pub') errors.form = PUB_INFO_ERROR;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !['kitchen', 'minors', 'sports'].includes(k))) errors.pub_info = PUB_INFO_ERROR;
+    else {
+      const cur = current.pub_info || {};
+      const next = { ...cur };
+      for (const k of Object.keys(x)) {
+        const c = cleanPubInfoPart(k, x[k]);
+        if (c.error) { errors.pub_info = c.error; break; }
+        if (c.value) next[k] = c.value; else delete next[k];
+      }
+      if (!errors.pub_info && JSON.stringify(next) !== JSON.stringify(cur)) changes.pub_info = next;
+    }
+  }
   // Takes reservations / Takeout (2026-11-09) never contradict a "we don't have one" answer: say it plainly instead.
   if (COMPLETENESS_TYPES.has(venue.type)) {
     const nextBadges = { ...current.badges, ...(changes.badges || {}) };
@@ -45263,15 +45537,16 @@ function listOwnerChanges(status = 'pending') {
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
-  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit' };
+  avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
+  pub_info: 'Kitchen, who’s welcome and sports' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -45297,8 +45572,17 @@ function ownerValueText(field, value) {
   }
   if (field === 'cuisines') return Array.isArray(value) && value.length ? value.join(', ') : '(none)';
   if (field === 'place_type') return value || '(none)';
+  if (field === 'pub_info') {
+    const o = value && typeof value === 'object' ? value : {};
+    const parts = [];
+    if (o.kitchen) parts.push(o.kitchen.mode === 'earlier' ? `Kitchen closes at ${pubClock(o.kitchen.closes)}` : o.kitchen.mode === 'same' ? 'Food until close' : 'No food');
+    if (o.minors) parts.push(minorsLineText(o.minors, false));
+    if (o.sports) parts.push(`Sports: ${(o.sports.list || []).map((k) => (PUB_SPORT_SHORT[k] || {}).en || k).join(', ') || '(none)'}${o.sports.tvs ? ` · ${PUB_TV_LABELS[o.sports.tvs].page[0]}` : ''}`);
+    for (const k of ['kitchen', 'minors']) if (o[k] && o[k].note) parts.push(`Note: ${o[k].note}`);
+    return parts.length ? parts.join(' · ') : '(none)';
+  }
   if (field === 'not_offered') {
-    const names = Object.fromEntries(portalCompleteness.ITEMS.map((i) => [i.key, i.en]));
+    const names = Object.fromEntries([...portalCompleteness.ITEMS, ...portalCompleteness.PUB_ITEMS].map((i) => [i.key, i.en]));
     return Array.isArray(value) && value.length ? `Doesn't offer: ${value.map((k) => names[k] || k).join(', ')}` : '(none)';
   }
   if (field === 'avg_spend') return value && Number.isInteger(value.amount) ? `$${value.amount} per person${value.source ? ` (${value.source === 'owner' ? 'owner' : 'our research'}${value.checked_at ? `, ${value.checked_at}` : ''})` : ''}` : '(none)';
@@ -49729,6 +50013,13 @@ const OWNER_SETUP_STRINGS = require('./owner-setup-text');
 const SETUP_PART1 = ['basics', 'hours', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer'];
 const SETUP_PART2 = ['happy', 'specials', 'music', 'story', 'book', 'takeout', 'known', 'groups', 'instagram', 'facebook', 'door'];
 const SETUP_STEPS = SETUP_PART1.concat(SETUP_PART2);
+// Pubs (Dayton, 2026-11-10; drafts/pub-portal-2026-11-10/SETUP-pubs.md): the same 19 steps, happy hour in Part 1 (it's
+// the most-asked pub question) and average spend among "A few more". Part 2 leads with events, specials, story, groups.
+const PUB_SETUP_PART1 = ['basics', 'hours', 'closures', 'happy', 'cuisine', 'photos', 'menu', 'offer'];
+const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door'];
+const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story'], pub: ['music', 'specials', 'story', 'groups'] };
+function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
+if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no'];
 const SETUP_RATE_LIMIT = 80;
 const ownerSetupAttempts = new Map();
@@ -49804,7 +50095,9 @@ function setupFinished(venueId) {
 function setupState(venueId) {
   const { done } = setupProgress(venueId);
   if (SETUP_STEPS.every((k) => done[k])) return 'done';
-  if (SETUP_PART1.every((k) => done[k])) return 'essentials';
+  let type = 'restaurant';
+  try { type = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || type; } catch (e) { /* restaurant */ }
+  if (setupParts(type).part1.every((k) => done[k])) return 'essentials';
   return SETUP_STEPS.some((k) => done[k]) ? 'partial' : 'none';
 }
 // The same score the portal shows: % now, % once we check what was sent, and the badge state.
@@ -49888,7 +50181,9 @@ function renderOwnerSetupPage(found, opts) {
   const { venue, happyHourTimes } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const fr = lang === 'fr';
-  const t = OWNER_SETUP_STRINGS[lang];
+  // Pubs (2026-11-10): the same words with pub examples and the pub-only screens on top.
+  const pub = venue.type === 'pub';
+  const t = pub ? { ...OWNER_SETUP_STRINGS[lang], ...OWNER_SETUP_STRINGS[lang].pub, labels: { ...OWNER_SETUP_STRINGS[lang].labels, ...(OWNER_SETUP_STRINGS[lang].pub.labels || {}) }, offers: { ...OWNER_SETUP_STRINGS[lang].offers, ...(OWNER_SETUP_STRINGS[lang].pub.offers || {}) }, noLabels: { ...OWNER_SETUP_STRINGS[lang].noLabels, ...(OWNER_SETUP_STRINGS[lang].pub.noLabels || {}) } } : OWNER_SETUP_STRINGS[lang];
   const ownImage = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(venue.image_url || '').trim()) ? String(venue.image_url).trim() : '';
   const typeLabel = (CATEGORY_LABELS[venue.type] || { singular: 'Restaurant' }).singular;
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
@@ -49907,34 +50202,42 @@ function renderOwnerSetupPage(found, opts) {
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
+    ...(pub ? { pub_info: snap.pub_info || {} } : {}),
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
     Greek: '🥙', Indian: '🍛', Italian: '🍝', Japanese: '🍱', Korean: '🍜', Mexican: '🌮', 'Noodles & Ramen': '🍜', Pizza: '🍕', 'Poke & Hawaiian': '🍣', Poutine: '🍟', 'Pub Fare': '🍺', Sandwiches: '🥪',
     Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
-  const offerGroups = [
+  const offerGroups = pub ? [
+    // Pubs (2026-11-10, 22 tiles): no Kids tile ("Who's welcome?" asks it) and no Happy hour tile (Part 1 asks it).
+    { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['local_beer_taps', 'local_drinks', 'nonalcoholic', 'vegan', 'vegetarian', 'gluten_free'] },
+    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'sports_tv', 'live_music', 'lake_view', 'wheelchair_accessible', 'locally_owned'] },
+    { title: fr ? 'Jeux' : 'Games', keys: PUB_GAME_BADGES.slice() },
+    { title: fr ? 'Idéal pour' : 'Good for', keys: ['dog_friendly', 'great_groups', 'takes_reservations', 'takeout'] },
+  ] : [
     // Happy hour and Takeout are not tiles (asked twice, fresh-eyes 2026-11-09): their own questions in Part 2 set them.
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'local_drinks'] },
     { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'sports_tv', 'live_music', 'wheelchair_accessible', 'locally_owned'] },
     { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'great_groups', 'takes_reservations'] },
   ];
   const offerLabels = { ...t.offers };
-  for (const k of OWNER_EXTRA_BADGES) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
+  for (const k of ownerExtraBadgesFor(venue.type)) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
   const cfg = {
-    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: SETUP_PART1, part2: SETUP_PART2, progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
+    pub, top2: SETUP_TOP2[pub ? 'pub' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
+    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2, progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     image: pendingMain || ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
-    cur, cuisines: OWNER_CUISINES, popular: OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
+    cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
-    placeTypes: RESTAURANT_PLACE_TYPES, placeNames: Object.fromEntries(RESTAURANT_PLACE_TYPES.map((p) => [p, fr ? frPlaceType(p) : p])),
-    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡' },
+    placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
+    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' },
     nightKinds: ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: !!portalFields(venue.type).happyHour, servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -49978,11 +50281,22 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: [statusTopic] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, ...PUB_SETUP_HELP_TOPICS] : [statusTopic] })}
 </body>
 </html>`;
 }
 
+// Pubs (2026-11-10): what pub owners ask about the pub-only questions.
+const PUB_SETUP_HELP_TOPICS = [
+  { id: 'pub-kids', pages: ['setup'], q: 'Where is “Kids welcome”?', qFr: 'Où est « Enfants bienvenus »?',
+    keys: ['kids welcome', 'kid friendly', 'where is kids', 'family friendly', 'minors', 'kids'], keysFr: ['enfants bienvenus', 'enfants', 'mineurs', 'familles'],
+    a: '<p>For pubs, “Who’s welcome?” replaces it. It comes after “What you offer”. Tap adults only, minors with an adult until a set time, or all ages. Your page then shows that line by your hours, in your own words.</p>',
+    aFr: '<p>Pour les pubs, « Qui est le bienvenu? » le remplace. La question suit « Ce que vous offrez ». Touchez adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Votre page affiche ensuite cette ligne près de vos heures, dans vos mots.</p>' },
+  { id: 'pub-kitchen', pages: ['setup'], q: 'How do I change when the kitchen closes?', qFr: 'Comment changer l’heure de fermeture de la cuisine?',
+    keys: ['kitchen', 'kitchen hours', 'food until', 'last call food', 'kitchen closes'], keysFr: ['cuisine ferme', 'heures de la cuisine', 'nourriture jusqu'],
+    a: '<p>Open “Hours” and tap “Yes, that’s right” (or change your hours). The kitchen question comes next. It goes on your page right away.</p>',
+    aFr: '<p>Ouvrez « Heures » et touchez « Oui, c’est exact » (ou modifiez vos heures). La question sur la cuisine vient ensuite. Elle s’affiche sur votre page tout de suite.</p>' },
+];
 const OWNER_SETUP_CSS = `
   body.owner-setup { --su-ink: #1B2B3A; --su-soft: #5E544C; --su-line: #DDD5C7; --su-card: #FFFDF8; --su-teal: #1E4F4C; --su-gold: #A07A1B; --su-good: #1E6B3A; --su-good-bg: #E3F1E8; --su-warn: #8A2A1B; --su-warn-bg: #FBE9E5; }
   body.owner-setup .su-wrap { max-width: 480px; margin: 0 auto; padding: 8px 0 48px; color: var(--su-ink); font-size: 19px; line-height: 1.45; }
@@ -53158,7 +53472,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       // "We don't have one" (2026-11-08): the stored list becomes exactly this one (an Undo puts the old list back).
       if (field === 'not_offered') {
         const before = venueNotOffered(venue.id);
-        const next = Array.isArray(value) ? [...new Set(value.filter((k) => portalCompleteness.NONE_KEYS.includes(k)))].sort() : [];
+        const next = Array.isArray(value) ? [...new Set(value.filter((k) => portalCompleteness.ALL_NONE_KEYS.includes(k)))].sort() : [];
         db.prepare('DELETE FROM venue_not_offered WHERE venue_id = ?').run(venue.id);
         const ins = db.prepare('INSERT INTO venue_not_offered (venue_id, item) VALUES (?, ?)');
         for (const k of next) ins.run(venue.id, k);
@@ -53179,6 +53493,15 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
           if (field === 'cuisines' && JSON.stringify(w.before.cuisines) !== JSON.stringify(w.after.cuisines)) log.run(venue.id, 'cuisines', w.before.cuisines.length ? JSON.stringify(w.before.cuisines) : null, w.after.cuisines.length ? JSON.stringify(w.after.cuisines) : null, meta.reason, meta.batch_id, reviewer);
         } else if (w.before.place_type !== w.after.place_type) log.run(venue.id, 'place_type', w.before.place_type || null, w.after.place_type || null, meta.reason, meta.batch_id, reviewer);
         venue.cuisine = w.after.cuisines[0] || null;
+        applied.push(field);
+        continue;
+      }
+      // Pub answers (2026-11-10): the stored object becomes exactly this one (an Undo writes the old one back).
+      if (field === 'pub_info') {
+        const before = venuePubInfo(venue.id);
+        writeVenuePubInfo(venue.id, value && typeof value === 'object' ? value : {});
+        const after = venuePubInfo(venue.id);
+        if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, 'pub_info', Object.keys(before).length ? JSON.stringify(before) : null, Object.keys(after).length ? JSON.stringify(after) : null, meta.reason, meta.batch_id, reviewer);
         applied.push(field);
         continue;
       }
@@ -53239,7 +53562,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         const update = {}, extra = {};
         const was = venueOwnerFeatures(venue.id);
         for (const [k, on] of Object.entries(value)) {
-          if (OWNER_EXTRA_BADGES.includes(k)) { extra[k] = on; log.run(venue.id, `feature_${k}`, was[k] ? '1' : '0', on ? '1' : '0', meta.reason, meta.batch_id, reviewer); continue; }
+          if (ALL_OWNER_FEATURES.includes(k)) { extra[k] = on; log.run(venue.id, `feature_${k}`, was[k] ? '1' : '0', on ? '1' : '0', meta.reason, meta.batch_id, reviewer); continue; }
           update[k] = on;
           log.run(venue.id, k, String(venue[k] ? 1 : 0), on ? '1' : '0', meta.reason, meta.batch_id, reviewer);
         }
@@ -53352,7 +53675,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info']);
 // Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
 // address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
 // "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
@@ -53363,13 +53686,15 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Instagram and Facebook links (Dayton, 2026-11-09) too, for every type, from a login or the edit link: only a real
 // profile/page passes ownerSocialLink(), they're logged, in "Your updates", with Undo, and research can't replace them.
 // Website, menu and booking links still wait for review.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url']);
+// Pub answers (2026-11-10) too: choices from fixed lists plus short notes checked like Plan your visit lines (no links
+// or < >); logged, in "Your updates", with Undo.
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'pub_info']);
 // Full easy setup (Dayton, 2026-11-09): sent from the setup flow (from_setup: true) by a restaurant, these also go live
 // from the edit link: the business's hours, season, seasonal hours, closures, the badge tiles, happy hour (times and
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
 // with Undo, under the same OWNER_INSTANT_DAILY_LIMIT. Address, phone, description, website, menu and booking links
 // still wait for review. The classic edit page doesn't send from_setup, so its rules don't change.
-const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights']);
+const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -53386,6 +53711,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
+  if (field === 'pub_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -54421,11 +54747,13 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
+  pub_info: 'Cuisine, âge des clients et sports' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
-  pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'] };
+  pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
+  cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'] };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -54928,7 +55256,8 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 
 // "Your page is X% complete" (2026-11-08): restaurants only for now; other types add their own item tables later.
 // Owner portal only, never public, never read by ranking, sorting or indexing.
-const COMPLETENESS_TYPES = new Set(['restaurant']);
+// Pubs since 2026-11-10 (their own item list, portal-completeness.js PUB_ITEMS).
+const COMPLETENESS_TYPES = new Set(['restaurant', 'pub']);
 // The menu page's "Just add a link to your menu" (final fresh-eyes 2026-11-09): the same types as the completeness bar.
 const MENU_LINK_TYPES = COMPLETENESS_TYPES;
 // Cuisine picker and "These hours are right" (2026-11-08): their styles and page script (restaurants only).
@@ -55139,6 +55468,9 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
+    // Pubs (2026-11-10): their own item list, the pub answers and the owner features (games).
+    type: venue.type, pubInfo: venue.type === 'pub' ? (live.pub_info || venuePubInfo(venue.id)) : null,
+    ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };
 }
 
@@ -55447,7 +55779,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const label = (c) => (fr ? frCuisine(c) : c);
     const placeLabel = (p) => (fr ? frPlaceType(p) : p);
     const legacy = picked.filter((c) => !OWNER_CUISINES.includes(c));
-    const popular = OWNER_CUISINES_POPULAR.slice();
+    const popular = (venue.type === 'pub' ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR).slice();
     const rest = OWNER_CUISINES.filter((c) => !popular.includes(c)).sort((a, b) => label(a).localeCompare(label(b), fr ? 'fr' : 'en'));
     const tile = (c, more) => `<button type="button" class="op-cu-tile" data-cu="${escapeHtml(c)}" data-cu-label="${escapeHtml(label(c))}" aria-pressed="${picked.includes(c) ? 'true' : 'false'}"${more && !picked.includes(c) ? ' data-more="1" hidden' : ''}>${escapeHtml(label(c))}</button>`;
     const hint = picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
@@ -55466,7 +55798,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         <p class="op-cu-search" id="opCuSearchRow" hidden><label for="opCuSearch">${L('Or type to find it', 'Ou tapez pour la trouver')}</label><input type="search" id="opCuSearch" autocomplete="off" placeholder="${escapeHtml(L('For example: Thai', 'Par exemple : thaïlandais'))}"><span class="op-hint" id="opCuNone" hidden>${L('Not on the list? Pick the closest one, or tell us in &ldquo;Anything else?&rdquo; below.', 'Pas dans la liste? Choisissez la plus proche, ou dites-le-nous dans « Autre chose? » plus bas.')}</span></p>
         <p class="lyv-error" id="opCuLimit" role="alert" hidden></p>
         <p class="op-cu-q" id="opPlaceQ">${L('What kind of place?', 'Quel genre d’endroit?')} <span class="op-hint">${L('Pick one.', 'Choisissez-en un.')}</span></p>
-        <div class="op-cu-tiles" id="opPlaceTiles" role="group" aria-labelledby="opPlaceQ">${RESTAURANT_PLACE_TYPES.map((p) => `<button type="button" class="op-cu-tile" data-place="${escapeHtml(p)}" data-place-label="${escapeHtml(placeLabel(p))}" aria-pressed="${p === place ? 'true' : 'false'}">${escapeHtml(placeLabel(p))}</button>`).join('')}</div>
+        <div class="op-cu-tiles" id="opPlaceTiles" role="group" aria-labelledby="opPlaceQ">${placeTypesFor(venue.type).map((p) => `<button type="button" class="op-cu-tile" data-place="${escapeHtml(p)}" data-place-label="${escapeHtml(placeLabel(p))}" aria-pressed="${p === place ? 'true' : 'false'}">${escapeHtml(placeLabel(p))}</button>`).join('')}</div>
         <span class="op-cuisine-line"><button type="button" class="op-btn" id="opCuisineSave">${L('Save', 'Enregistrer')}</button><span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span></span>
         <p class="op-hint" id="opCuisineNote">${L('It shows on your page and helps people find you when they search by food.', 'Elle paraît sur votre page et aide les gens à vous trouver quand ils cherchent un type de cuisine.')}</p>
         <p class="lyv-error" id="opCuisineError" hidden></p>
@@ -55617,10 +55949,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
   const foodOnly = new Set([...(portalFields(venue.type).foodBadgesHidden ? ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv'] : []), ...portalFields(venue.type).hiddenBadges]);
   const activityOnly = portalFields(venue.type).activityBadges ? new Set() : ACTIVITY_ONLY_BADGES;
-  const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
+  // Pubs (2026-11-10): no Kid-friendly box; the easy setup's "Who's welcome?" answers it.
+  const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => (f !== 'happy_hour' || showHappyHour) && !(venue.type === 'pub' && f === 'kid_friendly')).map((f) => `
           <label class="amenity-check"${(foodOnly.has(f) || activityOnly.has(f)) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
   // Owner-only features (2026-11-09): restaurants get the six extra boxes too (same Save rules as the other badges).
-  const featureChecks = COMPLETENESS_TYPES.has(venue.type) ? OWNER_EXTRA_BADGES.map((f) => `
+  const featureChecks = COMPLETENESS_TYPES.has(venue.type) ? ownerExtraBadgesFor(venue.type).map((f) => `
           <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[f].fr : OWNER_EXTRA_BADGE_LABELS[f].en)}</label>`).join('') : '';
   // Signed in (2026-10-18): "Anything else you send now is added to them" isn't true any more (most fields go live on
   // Save), so the line says what Save does with what is still waiting.
@@ -58250,7 +58583,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (REGION_LABELS[region] && BOOL_FIELDS.includes(badge)) {
         const rows = db
-          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`)
+          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(badge)} AND redirect_to IS NULL ORDER BY reviews DESC`)
           .all(region);
         if (rows.length >= MIN_GUIDE_VENUES) {
           const gv = rows.map(rowToVenue);
@@ -59487,6 +59820,45 @@ const server = http.createServer(async (req, res) => {
       }
       indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id: body.id, changed: result.changed, closures: result.closures, showing: result.showing });
+    }
+
+    // POST /admin/remove-amenities (2026-11-10): turn wrong researched badges off, logged and compare-and-set.
+    // { id, expected_current: { field: true }, fields: [field], reason, batch_id, source_url } -> 200 when every field
+    // was written, 409 when any was refused (mismatch or the owner's own value; nothing else in the call is undone).
+    // POST /admin/remove-amenities/undo { id, batch_id, reason } puts that batch's badges back.
+    if ((pathname === '/admin/remove-amenities' || pathname === '/admin/remove-amenities/undo') && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Send a JSON object.' });
+      const undo = pathname.endsWith('/undo');
+      const allowedKeys = undo ? ['id', 'batch_id', 'reason'] : ['id', 'expected_current', 'fields', 'reason', 'batch_id', 'source_url'];
+      const extra = Object.keys(body).filter((k) => !allowedKeys.includes(k));
+      if (extra.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${extra.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (typeof body.reason !== 'string' || !body.reason.trim()) return sendJSON(res, 400, { error: 'reason is required.' });
+      if (typeof body.batch_id !== 'string' || !body.batch_id.trim()) return sendJSON(res, 400, { error: 'batch_id is required.' });
+      if (undo) {
+        const u = undoAmenityRemoval(body.id, body.batch_id.trim(), body.reason.trim());
+        if (!u.found) return sendJSON(res, 404, { error: 'No removal with that batch_id for this venue.' });
+        return sendJSON(res, 200, { id: body.id, results: u.results });
+      }
+      const fields = body.fields;
+      if (!Array.isArray(fields) || !fields.length || fields.some((f) => !RESEARCHED_BOOL_FIELDS.includes(f)) || new Set(fields).size !== fields.length) {
+        return sendJSON(res, 400, { error: `fields must be a list of researched badges: ${RESEARCHED_BOOL_FIELDS.join(', ')}` });
+      }
+      const ex = body.expected_current;
+      if (!ex || typeof ex !== 'object' || Array.isArray(ex) || Object.keys(ex).length !== fields.length || fields.some((f) => ex[f] !== true)) {
+        return sendJSON(res, 400, { error: 'expected_current must give true for each field (only a badge that is on can be removed).' });
+      }
+      if (typeof body.source_url !== 'string' || !/^https?:\/\/\S+$/.test(body.source_url.trim())) return sendJSON(res, 400, { error: 'source_url must be the http(s) address that shows the badge is wrong.' });
+      const v = db.prepare('SELECT redirect_to FROM venues WHERE id = ?').get(body.id);
+      if (v && v.redirect_to) return sendJSON(res, 409, { error: 'venue_redirected' });
+      const r = guardedAmenityRemoveUpdate(body.id, fields, { reason: body.reason.trim(), batch_id: body.batch_id.trim(), source_url: body.source_url.trim() });
+      if (!r.found) return sendJSON(res, 404, { error: 'Venue not found.' });
+      const refused = Object.values(r.results).some((x) => x !== 'written');
+      if (Object.values(r.results).includes('written')) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, refused ? 409 : 200, { id: body.id, results: r.results });
     }
 
     // POST /admin/correct-amenities
@@ -62184,6 +62556,8 @@ module.exports = {
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
+  PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
+  pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
   validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,

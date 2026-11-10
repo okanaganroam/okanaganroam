@@ -106,7 +106,7 @@ test('progress and the portal card: not started, carry on, essentials done, all 
   // The help fallback says it in the owner's words.
   assert.match(html, /Instagram: not on Instagram/);
   // Other types: no card, no progress.
-  const pub = mk('pub');
+  const pub = mk('brewery');
   assert.equal(card(await text(`/owner/${tokenFor(pub.id)}`)), '');
   assert.equal((await get(`/owner/${tokenFor(pub.id)}/setup/progress`)).status, 404);
 });
@@ -257,7 +257,9 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
   // Back on an answered question says which answer we have.
   assert.match(script, /fill\(T\.youSaid, \{ a: T\.noLabels\[step\] \|\| T\.no \}\)/);
   // Dogs: asked on its own small screen after the tiles are saved (no jump mid-list).
-  assert.match(script, /S\.badges\.dog_friendly \? 'offer:dogs' : null/);
+  // Pubs (2026-11-10): the follow-ups come from offerNext() (sports, dogs, who's welcome); a restaurant gets dogs only.
+  assert.match(script, /if \(S\.badges\.dog_friendly\) seq\.push\('offer:dogs'\)/);
+  assert.match(script, /return saveAll\('offer', list, null, offerNext\('offer'\)\);/);
   assert.doesNotMatch(script, /suDogBox/);
   // Welcome back: the button comes before the list.
   assert.ok(script.indexOf("big('➜', T.carryOn") < script.indexOf('+ statusRows(P1)'));
@@ -265,7 +267,7 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
 
 test('other types and public pages: nothing new; the portal has no empty box rule for restaurants only', async () => {
   // The setup page still redirects other types, and their edit pages have no setup card.
-  for (const type of ['pub', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'cafe', 'winery']) {
     const v = mk(type);
     assert.equal((await get(`/owner/${tokenFor(v.id)}/setup`)).status, 302);
     assert.doesNotMatch(await text(`/owner/${tokenFor(v.id)}`), /opSetupCard/);
