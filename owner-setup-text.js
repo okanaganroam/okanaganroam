@@ -428,4 +428,19 @@ Object.assign(en.pub, { saveKitchen: 'Save kitchen time', saveMyHours: 'Save kit
 Object.assign(fr.pub, { saveKitchen: 'Enregistrer l’heure de la cuisine', saveMyHours: 'Enregistrer l’heure de la cuisine',
   sportsEx: 'Astuce : si vous mettez le son pour les grands matchs, vous pourrez l’ajouter plus tard dans « Événements de la semaine ».' });
 
+// Step 1 with a new phone AND a new address or website (2026-11-10): the phone is live already, the rest is checked first.
+Object.assign(en, {
+  phoneLiveNow: 'Your new phone number is on your page now.',
+  phoneRestSite: 'Your website will show within a day, after we check it.',
+  phoneRestAddr: 'Your new address will show within a day, after we check it.',
+  phoneRestBoth: 'Your new address and website will show within a day, after we check them.',
+});
+Object.assign(fr, {
+  phoneLiveNow: 'Votre nouveau numéro de téléphone est déjà sur votre page.',
+  phoneRestSite: 'Votre site web s’affichera en moins d’un jour, après vérification.',
+  phoneRestAddr: 'Votre nouvelle adresse s’affichera en moins d’un jour, après vérification.',
+  phoneRestBoth: 'Votre nouvelle adresse et votre site web s’afficheront en moins d’un jour, après vérification.',
+});
+
 module.exports = { en, fr };
+

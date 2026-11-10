@@ -306,3 +306,14 @@ test('12: one rule for kid-friendly pubs: all ages or minors-until count, adults
   assert.match(src, /function buildTripPlannerFacts\([\s\S]*?f === 'kid_friendly' \? kidFriendlyPublic\(v\)/);
   assert.match(src, /const KID_FRIENDLY_SQL = `[^`]*\$\{PUB_KIDS_WELCOME_POLICIES\.map/, 'the SQL is built from the same list');
 });
+
+test('4c: step 1 with a new phone plus a new address or website says the phone is live now and the rest within a day', () => {
+  for (const k of ['phoneLiveNow', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) {
+    assert.ok(TEXT.en[k] && TEXT.fr[k], `${k} in EN and FR`);
+  }
+  assert.match(TEXT.en.phoneLiveNow, /on your page now/);
+  const s = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  const fn = s.slice(s.indexOf('function phoneSaved'), s.indexOf('function siteShown'));
+  assert.match(fn, /S\.savedLine\.basics = ''/, 'cleared each save, so an old line never sticks');
+  assert.match(fn, /T\.phoneLiveNow \+ ' ' \+ rest/, 'phone line + what is still checked');
+});
