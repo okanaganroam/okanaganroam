@@ -47,7 +47,7 @@ test('route: a restaurant gets the setup page (edit link, French, signed in); th
   const html = await r.text();
   assert.match(html, /window\.SETUP_CFG = /);
   for (const words of ['Add photos of your place', 'Take a photo', 'Choose from my photos', 'This one is too small. Try another.', 'These are my photos and Okanagan Roam can use them.',
-    'How should we add your menu?', 'Upload my menu', 'Take photos of my menu', 'My menu is on my website', 'Email it to us', 'You’re all set!', 'Skip this for now']) {
+    'How should we add your menu?', 'Upload my menu', 'Take photos of my menu', 'My menu is on my website', 'Email it to us', 'The essentials are done!', 'Skip this for now']) {
     assert.ok(html.includes(words), `has "${words}"`);
   }
   const own = html.slice(0, html.indexOf('class="ohb-btn"')); // the setup itself, without the shared help bot
@@ -89,13 +89,13 @@ test('edit page: a restaurant opens with the setup card; the checklist sends pho
   const t = tokenFor(v.id);
   const page = await get(`/owner/${t}`).then((x) => x.text());
   assert.match(page, new RegExp(`<a class="op-setup-card" id="opSetupCard" href="/owner/${t}/setup">`));
-  assert.ok(page.includes('Add your photos and menu') && page.includes('about 2 minutes'));
+  assert.ok(page.includes('Set up your page') && page.includes('about 10 minutes'));
   assert.ok(page.indexOf('opSetupCard') < page.indexOf('id="opComplete"'), 'the card comes first');
   assert.match(page, new RegExp(`href="/owner/${t}/setup#photos">`), 'Add photos opens the photo step');
   assert.match(page, new RegExp(`href="/owner/${t}/setup#menu">`), 'the menu item opens the menu step');
   const fr = await get(`/fr/owner/${t}`).then((x) => x.text());
   assert.match(fr, new RegExp(`href="/fr/owner/${t}/setup"`));
-  assert.ok(fr.includes('Ajoutez vos photos et votre menu'));
+  assert.ok(fr.includes('Configurez votre page'));
 });
 
 test('photos: same checks as the edit page; "Make main photo" is kept as a wish and applied on approval', async () => {
@@ -161,7 +161,7 @@ test('menu link: "My menu is on my website" uses the reviewed menu link path; th
   assert.equal(requests(), 0, 'opening the setup writes nothing');
   // The email step only shows the address; the page never posts anything for it.
   // Full setup (2026-11-09): "I'll email it" only records the answer in the setup's own progress.
-  assert.match(html, /if \(k === 'menuEmailDone'\) return progress\('menu', 'email'\)/);
+  assert.match(html, /if \(k === 'menuEmailDone'\) return record\('menu', 'email'\)/);
   const r = await post(`/owner/${t}/changes`, { changes: { menu_url: 'example.com/our-menu' }, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC").get(v.id);
@@ -203,8 +203,8 @@ test('help: the easy setup topic is on the setup page and a restaurant edit page
   const t = tokenFor(v.id);
   const setup = await get(`/owner/${t}/setup`).then((x) => x.text());
   assert.match(setup, /"id":"easy-setup"/);
-  assert.match(setup, /How do I add my photos and menu the easy way\?/);
-  assert.match(setup, /Comment ajouter mes photos et mon menu facilement\?/);
+  assert.match(setup, /How does “Set up your page” work\?/);
+  assert.match(setup, /Comment fonctionne « Configurez votre page »\?/);
   const w = mk('winery');
   assert.doesNotMatch(await get(`/owner/${tokenFor(w.id)}`).then((x) => x.text()), /"id":"easy-setup"/, 'not on other types');
 });

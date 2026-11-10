@@ -257,6 +257,10 @@ function scoreCompleteness(input, opts) {
       if (it.key === 'photo_extra' && photosWaiting > 0 && Number(input && input.photoCount || 0) + photosWaiting >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
       // A storefront spot the owner sent is waiting for our check (fresh-eyes 3, 2026-11-09), not "left".
       if (it.key === 'arrival' && input && input.pendingArrival) waiting = true;
+      // Sent for us to type up or find (the easy setup's menu pages, happy hour or specials sheet, a Facebook or
+      // Instagram name): waiting, not "left" (2026-11-09).
+      const ph = (input && input.pendingHelp) || {};
+      if (ph[it.key === 'menu' ? 'menu' : it.key] && ['menu', 'happy_hour', 'specials', 'facebook', 'instagram'].includes(it.key)) waiting = true;
       missing.push({ ...it, waiting, sent });
     }
   }
@@ -341,8 +345,20 @@ function renderCompleteness(result, opts) {
   const qMin = Math.ceil((r.quickSeconds || 0) / 60);
   const qTime = qMin <= 1 ? L('under a minute', 'moins d’une minute') : L(`about ${qMin} minutes`, `environ ${qMin} min`);
   // Things already sent and waiting for our check are never "left" (fresh-eyes 2026-11-08): they get their own count.
-  const waitTxt = nw ? L(` · ${nw} waiting for our check${left ? '' : ' (usually within a day)'}`, ` · ${nw} en attente de notre vérification${left ? '' : ' (habituellement en moins d’une journée)'}`) : '';
-  const sub = r.complete
+  const waitTxt = nw && !o.plainWaiting ? L(` · ${nw} waiting for our check${left ? '' : ' (usually within a day)'}`, ` · ${nw} en attente de notre vérification${left ? '' : ' (habituellement en moins d’une journée)'}`) : '';
+  // After the easy setup (o.plainWaiting): one plain sentence instead of a count ("Photos and menu sent. We'll add them
+  // within a day."), fresh-eyes 2026-11-09.
+  const sentNames = [];
+  if (o.plainWaiting && nw) {
+    const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
+      website: ['website', 'site Web'], arrival: ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
+    for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
+    if (badgeNames.length) sentNames.push(L('features', 'caractéristiques'));
+  }
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  const sentList = sentNames.length > 3 ? sentNames.slice(0, 3).join(', ') + L(' and more', ' et plus') : sentNames.length > 1 ? sentNames.slice(0, -1).join(', ') + L(' and ', ' et ') + sentNames[sentNames.length - 1] : sentNames[0] || '';
+  const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : envoyé. Nous l’ajouterons d’ici un jour.`) : '';
+  const sub0 = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
     : nq
       ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}${waitTxt}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}${waitTxt}. Touchez pour commencer.`)
@@ -354,7 +370,9 @@ function renderCompleteness(result, opts) {
         : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
   // While the card is open the "Tap to start." part would be wrong (final fresh-eyes 2026-11-09): the page script swaps in
   // this version without it.
-  const subOpen = sub.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '');
+  // The "sent" sentence comes before "Tap to start." so the line still ends on what to do next.
+  const subOpen = sub0.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '') + sentSentence;
+  const sub = sentSentence ? subOpen + sub0.slice(subOpen.length - sentSentence.length) : sub0;
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -434,7 +452,7 @@ function renderCompleteness(result, opts) {
   // where they'll land: "61% now · about 95% once we check your 8 changes", with a legend for the ring's two colours.
   // The real score (r.pct) never counts waiting items.
   const prov = !r.complete && nw > 0 && r.pctWithWaiting > r.pct ? r.pctWithWaiting : null;
-  const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${r.pct}% now</strong> · about <strong>${prov}%</strong> once we check your ${nw} ${nw === 1 ? 'change' : 'changes'}`, `<strong>${r.pct} % maintenant</strong> · environ <strong>${prov} %</strong> une fois vos ${nw} ${nw === 1 ? 'modification vérifiée' : 'modifications vérifiées'}`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
+  const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${r.pct}% now</strong> · about <strong>${prov}%</strong> ${o.plainWaiting ? 'once we add what you sent' : `once we check your ${nw} ${nw === 1 ? 'change' : 'changes'}`}`, `<strong>${r.pct} % maintenant</strong> · environ <strong>${prov} %</strong> ${o.plainWaiting ? 'une fois ce que vous avez envoyé ajouté' : `une fois vos ${nw} ${nw === 1 ? 'modification vérifiée' : 'modifications vérifiées'}`}`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
   const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
   // Complete & Verified (2026-11-09): what the business sees about the badge, under the ring.
   const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
