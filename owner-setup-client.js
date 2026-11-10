@@ -303,7 +303,12 @@
   // American number and writes it as 250-555-0123. The same digits typed another way are not a change.
   function digitsOf(v){ var d = String(v || '').replace(/\D/g, ''); return d.length === 11 && d.charAt(0) === '1' ? d.slice(1) : d; }
   function phoneChanged(v){ return digitsOf(v) !== digitsOf(CUR.phone) || (!String(v || '').trim()) !== !CUR.phone; }
-  function phoneSaved(ch){ if (!ch || !ch.phone) return; var d = digitsOf(ch.phone); CUR.phone = d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ch.phone; S.phone = null; }
+  // Pub test 3 follow-up (2026-11-10): a new phone goes live straight away, but with a new address or website on the
+  // same screen the step still says "Sent". Say which part is already on the page.
+  function phoneSaved(ch){ S.savedLine.basics = ''; if (!ch || !ch.phone) return;
+    var rest = ch.address != null && ch.website != null ? T.phoneRestBoth : ch.address != null ? T.phoneRestAddr : ch.website != null ? T.phoneRestSite : '';
+    if (rest) S.savedLine.basics = T.phoneLiveNow + ' ' + rest;
+    var d = digitsOf(ch.phone); CUR.phone = d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ch.phone; S.phone = null; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
   function field(id, label, value, opts){ opts = opts || {}; return '<label class="su-q" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
