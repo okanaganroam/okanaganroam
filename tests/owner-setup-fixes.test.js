@@ -178,7 +178,7 @@ test('the portal bar: the "sent" sentence is on its own line; the honest time on
   assert.match(head, /<span class="op-cb-sentline">Menu sent\. We’ll add it within a day\.<\/span>/);
   const sub = /id="opCbSub"[^>]*>([^<]*)</.exec(head)[1];
   assert.ok(!/sent\./.test(sub), `the bar's own line has no "sent" sentence: ${sub}`);
-  assert.match(sub, /(Tap to start|Tap to see)\.$/);
+  assert.doesNotMatch(sub, /Tap to/, 'no second call to action while the setup card is the way in (fresh-eyes 3)');
   const fresh = mk('restaurant');
   const card = (/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/owner/${tokenFor(fresh.id)}`)) || [])[1];
   assert.match(card, /The essentials take about 10 to 15 minutes/);
@@ -200,7 +200,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(s, /function skip\(step\)\{\s*if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
   assert.match(s, /if \(k === 'skip'\) \{ if \(answered\(v\)\) return after\(v\);/);
   // The menu step says what was sent.
-  assert.match(s, /S\.done\.menu === 'day' \? '<p class="su-sent">' \+ h\(T\.menuSent\)/);
+  assert.match(s, /sentM \? q\(T\.menuSentQ\)/);
   // Exit setup: "Save these first?" with Save and exit first; saving goes through the step's own save.
   assert.match(html, /<a class="su-exit" id="suExit" href="/);
   assert.match(s, /el\('suExit'\)\.onclick = function\(e\)\{ if \(S\.busy\) \{ e\.preventDefault\(\); return; \} if \(unsaved\(\)\) \{ e\.preventDefault\(\); askExit\(\); \} \};/);
@@ -218,7 +218,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   // Yes first on yes/no questions.
   assert.match(s, /big\('✓', yesText \|\| T\.yes, '', false, 'go:' \+ step \+ ':yes'\) \+ big\('✕', noText \|\| T\.no, '', true, 'no:' \+ step\)/);
   // Finish: the "once we add what you sent" figure leads; what is left comes from the setup and the portal together.
-  assert.match(s, /fill\(T\.pctWill, \{ n: sc\.soon \}\)/);
+  assert.match(s, /fill\(T\.pctAbout, \{ n: sc\.soon \}\)/);
   assert.match(s, /function leftList\(\)/);
   assert.equal(cfg.t.pctWill, 'Your page will be about {n}% complete');
   assert.ok(Array.isArray(cfg.progress.score.left));
@@ -226,7 +226,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(s, /data-off="none_diet"/);
   assert.equal(cfg.t.noneDiet, 'None of these');
   assert.match(s, /fill\(T\.added, \{ x: S\.added \}\)/);
-  assert.ok(s.indexOf("big('📷', T.snap, T.snapSub, false, 'go:menu:cam')") < s.indexOf("big('📄', T.upload, T.uploadSub, true, 'go:menu:upload')"), 'Take photos of my menu leads');
+  assert.ok(s.indexOf("big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')") > 0 && s.indexOf("big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')") < s.indexOf("big('📄', T.upload, T.uploadSub, true, 'go:menu:upload')"), 'Take photos of my menu leads');
   assert.equal(cfg.t.upload, 'Upload my menu (a file or photos)');
   assert.match(s, /<details class="su-kinds"><summary>/);
   assert.match(s, /h\(T\.fewMore\)/);

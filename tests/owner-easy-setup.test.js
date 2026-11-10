@@ -46,7 +46,7 @@ test('route: a restaurant gets the setup page (edit link, French, signed in); th
   assert.match(r.headers.get('x-robots-tag') || '', /noindex/);
   const html = await r.text();
   assert.match(html, /window\.SETUP_CFG = /);
-  for (const words of ['Add photos of your place', 'Take a photo', 'Choose from my photos', 'This one is too small. Try another.', 'These are my photos and Okanagan Roam can use them.',
+  for (const words of ['Add photos of your place', 'Take a photo', 'Choose from my photos', 'This photo is too small to look sharp. Try the original from your camera roll.', 'These are my photos and Okanagan Roam can use them.',
     'How should we add your menu?', 'Upload my menu', 'Take photos of my menu', 'My menu is on my website', 'Email it to us', 'The essentials are done!', 'Skip this for now']) {
     assert.ok(html.includes(words), `has "${words}"`);
   }

@@ -30,7 +30,7 @@
     happy: [], specials: [], nights: [], story: CUR.description || '', visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
-    dirty: '', exitAfter: false, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
+    fresh: true, dirty: '', exitAfter: false, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
   };
   // Season months from "5-10".
   (function(){ var m = /^(\d+)-(\d+)$/.exec(CUR.open_months || ''); if (!m) return; var a = +m[1], b = +m[2], i = a; for (var n = 0; n < 12; n++) { S.months[i] = true; if (i === b) break; i = i % 12 + 1; } })();
@@ -43,16 +43,48 @@
   })();
   // Closures: holidays are tiles, the rest are listed.
   var HOL = holidays();
-  (CUR.closures || []).forEach(function(c){ var hit = HOL.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from; })[0]; if (hit) S.closures.push(hit.key); else S.extra.push({ from: c.from, to: c.to || c.from, note: c.note || '' }); });
-  // Happy hours from the stored week: days with the same times are one happy hour.
+  // A stored closure is a holiday tile only when its note is that holiday's own name (or empty): a note the owner wrote
+  // ("Staff party") stays a row of its own, so saving again never rewrites it.
+  function holNote(key){ return String(T.holidays[key]).replace(/[()&<>]/g, ''); }
+  S.holNotes = {};
+  (CUR.closures || []).forEach(function(c){
+    var hit = HOL.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from; })[0], note = c.note || '';
+    if (hit && (!note || note === holNote(hit.key) || note === String((C.holidayAlt || {})[hit.key] || '').replace(/[()&<>]/g, ''))) { S.closures.push(hit.key); S.holNotes[hit.key] = note; }
+    else S.extra.push({ from: c.from, to: c.to || c.from, note: note });
+  });
+  function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.extra, monthRun(S.months)]); }
+  // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
+  // what they made); otherwise rebuilt from the page: days with the same times are one happy hour, a deal that starts
+  // with a row's days ("Tue, Wed, Thu: …") goes back into that row without the days, and any other deal on the page
+  // (ours, with prices) is kept as it is. Nothing is ever cut short or joined together.
+  S.happyKeep = [];
+  function dayPrefix(e){ return DAYS.filter(function(d){ return e.days[d]; }).map(dayName).join(', ') + ': '; }
   (function(){
+    if (CUR.happy_blocks && CUR.happy_blocks.length) {
+      CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what }); });
+      var mine = {}; S.happy.forEach(function(e){ if (e.what) mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; });
+      S.happyKeep = (CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : []).filter(function(d){ return d.price || !mine[d.text]; });
+      S.happyTyped = true; return;
+    }
     var w = parseWeek(CUR.happy_hour); if (!w) return; var groups = {};
     DAYS.forEach(function(d){ (w[d] || []).forEach(function(x){ var k = x[0] + '-' + x[1]; if (!groups[k]) { groups[k] = { days: {}, from: x[0], to: x[1], what: '' }; S.happy.push(groups[k]); } groups[k].days[d] = true; }); });
-    var deals = CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals.map(function(d){ return d.text + (d.price ? ' ' + d.price : ''); }) : [];
-    if (S.happy.length && deals.length) S.happy[0].what = deals.join('; ').slice(0, 60);
+    var deals = CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : [];
+    deals.forEach(function(d){
+      var hit = null;
+      if (!d.price) {
+        if (S.happy.length > 1) hit = S.happy.filter(function(e){ return !e.what && d.text.indexOf(dayPrefix(e)) === 0; })[0];
+        else if (S.happy.length === 1 && deals.length === 1) hit = S.happy[0];
+      }
+      if (hit) hit.what = S.happy.length > 1 ? d.text.slice(dayPrefix(hit).length) : d.text; else S.happyKeep.push(d);
+    });
   })();
-  (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? ', ' + x.deal : ''); S.specials.push({ days: days, text: text.slice(0, 80), price: x.price || '' }); });
-  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); S.nights.push({ days: days, kind: x.kind, what: x.title, start: x.start || '' }); });
+  // Specials and weekly events: each row remembers the stored line it came from. A row the owner doesn't touch is sent
+  // back exactly as stored (times, French, season and all); a changed one keeps what it can.
+  function daysKey(days){ return DAYS.filter(function(d){ return days[d]; }).join(','); }
+  (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? ', ' + x.deal : '');
+    var e = { days: days, text: text, price: x.price || '', orig: x }; e.was = daysKey(days) + '|' + e.text + '|' + e.price; S.specials.push(e); });
+  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start; S.nights.push(e); });
+  S.winterWas = JSON.stringify(S.winter); S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
 
   // ---------- Holidays (the next date of each, from today) ----------
   function ymd(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -69,6 +101,8 @@
     list.sort(function(a, b){ return a.d - b.d; });
     return list;
   }
+  // The date box opens on next month (closures are planned ahead; this month's wheel was the fiddly part).
+  function nextMonth(){ var d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 1)); }
   function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
 
   // ---------- Talking to the server ----------
@@ -94,13 +128,15 @@
     });
   }
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
-  function progress(step, status){ return post(C.base + '/setup/progress', { step: step, status: status }).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; return true; } S.error = why(j); return false; }); }
+  function happyBlocks(){ return S.happy.map(function(e){ return { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; }); }
+  function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
-  function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : T.st[d]; }
+  function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(T.labels[k]) + ': ' + h(stText(k, done[k])) + '</li>'; }).join('');
-    return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + '</p>';
+    return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
   window.ohbLive = window.ohbLive || {};
   window.ohbLive['setup-status'] = function(lang, update){
@@ -114,6 +150,7 @@
     var statuses = [];
     var next = function(i){
       if (i >= list.length) {
+        if (S.exitAfter && HALF.indexOf(step) >= 0 && !answered(step)) { S.busy = false; if (onOk) onOk(); return leave(); }
         var st = forced || (statuses.indexOf('day') >= 0 ? 'day' : 'live');
         return progress(step, st).then(function(ok){ S.busy = false; if (!ok) return render(); if (onOk) onOk(); go(to || 'saved:' + step); });
       }
@@ -142,9 +179,12 @@
   }
   // Tile and number steps keep their picks in memory, so they can still be saved from another screen ("Save and exit").
   var KEPT = ['offer', 'cuisine', 'closures', 'spend'];
+  // Steps with several things on one screen: "Save and exit" keeps the picks but the step isn't done until its own
+  // Save is tapped, so "Carry on" comes back to it (fresh-eyes 2026-11-10: a half-done closures step was skipped).
+  var HALF = ['offer', 'cuisine', 'closures'];
   function answered(step){ var d = S.done[step]; return d === 'live' || d === 'day' || d === 'email' || d === 'no'; }
   function leave(){ S.leaving = true; location.href = C.back; }
-  function go(step, replace){ step = entry(step);
+  function go(step, replace){ step = entry(step); S.fresh = false;
     if (S.exitAfter) return leave();
     if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
@@ -154,23 +194,25 @@
     return step;
   }
   function mark(){ var b = base(S.step); if (STEPS.indexOf(b) >= 0) S.dirty = b; }
-  function after(step){ if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
+  function after(step){ if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
   el('suBack').onclick = function(){ if (S.busy) return; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); };
   function bar(){
     var s = S.step, b = base(s), i = P1.indexOf(b), two = inP2(b) || s === 'more';
-    el('suProg').hidden = !(i >= 0 || two || s === 'finish' || s === 'ess');
-    el('suProgText').textContent = s === 'finish' ? T.allDone : s === 'ess' ? T.essBar : two ? fill(T.moreProg, { n: p2Count(), total: P2.length }) + (s === 'more' ? '' : ' · ' + T.labels[b]) : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
-    el('suProgBar').style.width = (s === 'finish' || s === 'ess' ? 100 : two ? Math.round((p2Count() / P2.length) * 100) : Math.round(((i + 1) / (P1.length + 1)) * 100)) + '%';
+    // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
+    el('suProg').hidden = !(i >= 0 || (two && s !== 'more') || s === 'finish' || s === 'ess');
+    el('suProgText').textContent = s === 'finish' ? T.allDone : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
+    el('suProgBar').parentNode.hidden = two;
+    el('suProgBar').style.width = (s === 'finish' || s === 'ess' ? 100 : Math.round(((i + 1) / (P1.length + 1)) * 100)) + '%';
     el('suBack').hidden = !S.hist.length || s === 'finish' || s === 'ess' || s === 'start' || S.busy;
   }
 
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
@@ -181,6 +223,12 @@
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
     var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
+  }
+  // Tap-first answers: chips that write the line for her (typing stays possible). A chip is "on" while its words are in the box.
+  function has(v, t){ return String(v || '').toLowerCase().indexOf(String(t).toLowerCase()) >= 0; }
+  function quick(key, boxId, value){
+    var l = (T.quick || {})[key]; if (!l) return '';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (has(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
   function q(title, lead){ return '<h1>' + h(title) + '</h1>' + (lead ? '<p class="su-lead">' + h(lead) + '</p>' : ''); }
@@ -198,13 +246,14 @@
   }
   var TOP2 = ['happy', 'specials', 'music', 'story'];
   var P2_ICONS = { happy: '🍻', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
-  function scoreBox(){
+  function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
-    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + sc.soon + '%</b></div><div><strong>' + h(fill(T.pctWill, { n: sc.soon })) + '</strong><span>'
-      + h(T.pctWillSub) + '</span><small>' + h(fill(T.pctRightNow, { n: sc.pct })) + '</small></div></div>';
+    // One number only (two read as a grade): where the page will be once we add what was sent.
+    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + sc.soon + '%</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
+      + h(T.pctAboutSub) + '</span>' + (raise ? '<small>' + h(T.pctRaise) + '</small>' : '') + '</div></div>';
     return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + sc.pct + '%</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
-      + h(sc.pct >= 100 ? T.pctDone : T.niceWork) + '</span></div></div>';
+      + h(sc.pct >= 100 ? T.pctDone : raise ? T.pctRaise : T.niceWork) + '</span></div></div>';
   }
   function preview(){
     return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
@@ -259,31 +308,37 @@
   function render(){
     bar();
     var s = S.step, p = s.split(':'), x = '';
-    if (s === 'start' || s === 'more' || s === 'ess') { S.toList = false; S.toFinish = false; } else if (s === 'finish') S.toList = false;
+    if (s === 'start' || s === 'more' || s === 'ess') { S.toList = false; S.toFinish = false; S.toEss = false; } else if (s === 'finish') { S.toList = false; S.toEss = false; }
     if (s === 'start') {
       var any = STEPS.some(function(k){ return S.done[k]; });
       var nxt = firstOpen();
       // Welcome back: the button first, then what's done.
-      x = any ? q(nxt === 'finish' ? T.changeQ : T.welcome, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
-          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, fill(T.moreDone, { n: p2Count(), total: P2.length }), false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
+      x = any ? q(nxt === 'finish' ? T.changeQ : S.fresh ? T.welcome : T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
+          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         : q(fill(T.hi, { name: C.name }), T.hiLead) + '<div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
     } else if (p[0] === 'saved') {
       var how = S.done[p[1]];
-      var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' ? T.gotIt : T.savedTitle;
+      var sentStep = how === 'day' && ['photos', 'menu', 'door', 'happy', 'specials', 'instagram', 'facebook'].indexOf(p[1]) >= 0;
+      var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' ? T.gotIt : sentStep ? T.sentTitle : T.savedTitle;
       var line = S.savedLine[p[1]] || (how === 'day' ? T.savedDay : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
       x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead">' + h(line) + '</p></div>'
         + '<div class="su-stack">' + big('➜', nextLabel(p[1]), '', false, 'after:' + p[1]) + '</div>';
     } else if (s === 'ess') {
       // Part 1 is done: the score, the page, and one choice.
-      x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.essQ) + '</h1></div>' + scoreBox() + preview()
-        + '<div class="su-stack">' + big('➜', T.moreOpt, T.moreOptSub, false, 'go:more') + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">✓</span><span>' + h(T.doneNow) + '</span></a></div>';
+      // "Your page is ready. 8 of 8 essentials done." first; one number lower down.
+      var open1 = P1.filter(function(k){ return !answered(k); }), nd = P1.length - open1.length;
+      x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.essReady) + '</h1><p class="su-lead" id="suEssCount">' + h(fill(T.essCount, { n: nd, total: P1.length })) + '</p></div>'
+        + (open1.length ? '<p class="su-q">' + h(T.essSkipped) + '</p><div class="su-stack" style="margin-bottom:18px">' + open1.map(function(k){ return big('➜', T.labels[k], '', true, 'jumpEss:' + k); }).join('') + '</div>' : '')
+        + preview() + scoreBox(true)
+        + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, T.moreOptSub, false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
       var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + P2_ICONS[k] + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
-      x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div><h2 class="su-h2">' + h(T.fewMore) + '</h2><div class="su-tiles">' + rest2.map(tile2).join('') + '</div>'
-        + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), 'go:finish') + '</div>';
+      var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
+      x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div><details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>'
+        + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), allDone() ? 'go:finish' : 'doneNow2') + '</div>';
     } else if (s === 'basics') {
       x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div></div>'
         + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'basicsOk') + big('✎', T.changeThem, '', true, 'go:basics:edit') + '</div>' + skip('basics');
@@ -307,17 +362,18 @@
     } else if (s === 'closures') {
       var mr = monthRun(S.months), monthsOn = !mr.none && !mr.all && !mr.bad;
       var nothing = !S.closures.length && !S.extra.length && !monthsOn;
-      x = doneLine('closures') + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0; }).length + Math.max(0, S.extra.length - S.savedExtra);
+      x = (changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(dateLabel(c.from) + (c.to && c.to !== c.from ? ' – ' + dateLabel(c.to) : '') + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         + (monthsOn ? '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(fill(T.monthsRow, { a: monthName(mr.a - 1), b: monthName(mr.b - 1) })) + '</span><button type="button" data-act="monthsClear" aria-label="' + h(T.remove) + '">✕</button></div>' : '')
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         + '<button type="button" class="su-more" data-act="go:closures:months">' + h(T.wholeMonths) + '</button>'
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
-        + '<div class="su-stack su-sticky">' + (nothing ? big('✕', T.nothingComing, '', false, 'closuresNone') : big('✓', T.saveClosures, '', false, 'closuresSave')) + '</div>' + skip('closures');
+        + '<div class="su-stack su-sticky">' + (nothing ? big('✕', T.nothingComing, '', false, 'closuresNone') : big('✓', newC > 0 ? fill(newC === 1 ? T.saveClosures1 : T.saveClosuresN, { n: newC }) : T.saveClosures, '', false, 'closuresSave')) + '</div>' + skip('closures');
     } else if (s === 'closures:months') {
       x = q(T.monthsQ, T.monthsLead) + msgs() + monthChips(S.months, 'months') + '<div class="su-stack">' + big('✓', T.monthsUse, '', false, 'monthsUse') + big('✕', T.allYearBtn, '', true, 'monthsClear') + '</div>';
     } else if (s === 'closures:add') {
-      x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || '', { type: 'date' })
+      x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || nextMonth(), { type: 'date' })
         + '<p class="su-q">' + h(T.howLong) + '</p><div class="su-chips">' + [['1', T.len1], ['7', T.len7], ['14', T.len14], ['pick', T.lenPick]].map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.addLen === o[0] ? 'true' : 'false') + '" data-len="' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>'
         + (S.addLen === 'pick' ? field('suCt', T.lastDay, S.addTo || '', { type: 'date' }) : '') + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
         + '<div class="su-stack">' + big('✓', T.addDates, '', false, 'closureAdd') + '</div>';
@@ -352,8 +408,11 @@
         + msgs() + '<label class="su-tick' + (S.nudge === T.needRights ? ' su-need' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span>' + h(T.rights) + '</span></label>'
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
     } else if (s === 'menu') {
-      x = (S.done.menu === 'day' ? '<p class="su-sent">' + h(T.menuSent) + '</p>' : S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs() + '<div class="su-stack">'
-        + big('📷', T.snap, T.snapSub, false, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + big('🌐', T.web, '', true, 'go:menu:web') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + skip('menu');
+      var sentM = S.done.menu === 'day';
+      // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
+      x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
+          : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
+        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + big('🌐', T.web, '', true, 'go:menu:web') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
     } else if (s === 'menu:upload' || s === 'happy:sheet' || s === 'specials:sheet') {
       var isMenu = s === 'menu:upload', files = isMenu ? S.menuFiles : S.sheetFiles;
       var title = isMenu ? (files.length ? T.upQSome : T.upQ) : p[0] === 'happy' ? T.sheetHappyQ : T.sheetSpecialsQ;
@@ -380,9 +439,9 @@
     } else if (s === 'offer') {
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '') + '</div>'; }).join('')
-        + '<div class="su-stack su-sticky">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
+        + '<div class="su-stack su-sticky su-sticky-clear">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:dogs') {
-      x = q(T.dogQ, T.dogLead) + msgs() + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
+      x = q(T.dogQ, T.dogLead) + msgs() + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';
     } else if (s === 'happy:yes' || s === 'specials:yes') {
@@ -421,7 +480,7 @@
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'lineSave:' + base(s) + ':' + cfg[0]) + '</div>'
         + (s === 'known' ? skip('known') : '<div class="su-skip"><button type="button" class="su-link" data-act="no:' + base(s) + '">' + h({ book: T.bookNoLink, takeout: T.takeoutNoLink, groups: T.groupsNoLink }[base(s)]) + '</button></div>');
     } else if (s === 'takeout') { x = yesNo('takeout', T.takeoutQ);
@@ -574,12 +633,13 @@
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
     var week = {}; DAYS.forEach(function(d){ week[d] = S.week[d] || []; });
     var ch = { hours: week, hours_checked: true };
-    if (S.winter.on) {
+    if (JSON.stringify(S.winter) === S.winterWas) { /* seasonal hours not touched: left exactly as stored */ }
+    else if (S.winter.on) {
       var r = monthRun(S.winter.months); if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
       var sw = {}; DAYS.forEach(function(d){ sw[d] = S.week[d] ? [[S.winter.from, S.winter.to]] : []; });
       var pad = function(n){ return ('0' + n).slice(-2); };
-      ch.hours_seasons = [{ from: pad(r.a) + '-01', to: pad(r.b) + '-' + LAST[r.b - 1], label: '', hours: sw }];
-    } else if ((CUR.hours_seasons || []).length) ch.hours_seasons = [];
+      ch.hours_seasons = [{ from: pad(r.a) + '-01', to: pad(r.b) + '-' + LAST[r.b - 1], label: ((CUR.hours_seasons || [])[0] || {}).label || '', hours: sw }].concat((CUR.hours_seasons || []).slice(1));
+    } else if ((CUR.hours_seasons || []).length) ch.hours_seasons = (CUR.hours_seasons || []).slice(1);
     saveAll('hours', [ch]);
   }
   function readTimes(){ Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (S.week[q2[0]] && S.week[q2[0]][+q2[1]]) S.week[q2[0]][+q2[1]][+q2[2]] = inp.value; }); var wf = el('wf'), wt = el('wt'); if (wf) S.winter.from = wf.value; if (wt) S.winter.to = wt.value; }
@@ -591,12 +651,18 @@
       var e = S.happy[i], ds = DAYS.filter(function(d){ return e.days[d]; });
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       for (var k = 0; k < ds.length; k++) { if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); } week[ds[k]].push([e.from, e.to]); }
-      if (e.what.trim()) deals.push({ text: ((many ? ds.map(dayName).join(', ') + ': ' : '') + e.what.trim()).slice(0, 60) });
+      var pre = many ? ds.map(dayName).join(', ') + ': ' : '', what = e.what.trim();
+      // Never cut short: a deal that doesn't fit says so, with how much room there is.
+      if (what && (pre + what).length > 60) { S.nudge = fill(T.dealLong, { n: i + 1, max: 60 - pre.length }); return render(); }
+      if (what) deals.push({ text: pre + what });
     }
+    deals = deals.concat(S.happyKeep);
+    if (deals.length > 6) { S.nudge = T.dealsMany; return render(); }
+    S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
     // The Happy hour feature goes on with the times: the page only shows the deals (and the chip) while it is on.
-    list.push({ happy_hour: week, happy_hour_deals: deals.length ? { deals: deals.slice(0, 6), deals_fr: [] } : null, badges: { happy_hour: true } });
+    list.push({ happy_hour: week, happy_hour_deals: deals.length ? { deals: deals, deals_fr: [] } : null, badges: { happy_hour: true } });
     saveAll('happy', list);
   }
   function readEntries(){
@@ -613,7 +679,11 @@
       var e = S.specials[i], ds = DAYS.filter(function(d){ return e.days[d]; }), text = e.text.trim();
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!text) { S.nudge = T.needText; return render(); }
-      out.push({ days: ds, title: text.split(',')[0].trim().slice(0, 40), deal: text.slice(0, 80), price: money(e.price) || null, kind: C.servesAlcohol ? 'both' : 'food' });
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price) { out.push(e.orig); continue; }
+      if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
+      var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
+      out.push({ days: ds, title: sameText ? o0.title : text.split(',')[0].trim().slice(0, 40), deal: sameText ? o0.deal : text, price: money(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
+        start: o0.start || null, end: o0.end || null, title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: o0.season_from || null, season_to: o0.season_to || null });
     }
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
     list.push({ specials: out }); saveAll('specials', list);
@@ -624,7 +694,11 @@
       var e = S.nights[i], ds = DAYS.filter(function(d){ return e.days[d]; }), title = (e.what || '').trim() || (e.kind ? T.kinds[e.kind] : '');
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!title) { S.nudge = T.needText; return render(); }
-      out.push({ days: ds, kind: e.kind || 'other', title: title.slice(0, 40), start: e.start || null, frequency: 'weekly' });
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.kind + '|' + e.what + '|' + e.start) { out.push(e.orig); continue; }
+      if (title.length > 40) { S.nudge = fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
+      var n0 = e.orig || {}, sameTitle = e.orig && n0.title === title;
+      out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: n0.frequency || 'weekly',
+        title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null });
     }
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
     list.push({ weekly_nights: out }); saveAll('music', list);
@@ -692,6 +766,9 @@
     if (k === 'after') return after(v);
     if (k === 'resume') { S.toList = false; var f = firstOpen(); return go(f); }
     if (k === 'jump') { S.toFinish = true; S.toList = false; return go(filled(v)); }
+    if (k === 'jumpEss') { S.hist = ['ess']; S.step = 'ess'; go(filled(v)); S.toEss = true; return render(); }
+    // "I'm done for now": the portal's own checklist may speak up again from here on.
+    if (k === 'doneNow' || k === 'doneNow2') { if (S.busy) return; S.busy = true; return post(C.base + '/setup/progress', { done_for_now: true }).then(function(){ S.busy = false; if (k === 'doneNow') return leave(); go('finish'); }); }
     if (k === 'no') return sayNo(v);
     if (k === 'basicsOk') return record('basics', 'live');
     if (k === 'basicsSave') { S.addr = el('suAddr').value; S.phone = el('suPhone').value; var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (S.phone.trim() !== (CUR.phone || '')) ch.phone = S.phone; if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); } return saveAll('basics', [ch]); }
@@ -701,11 +778,11 @@
     if (k === 'monthsUse') { var r = monthRun(S.months); if (r.none) { S.nudge = T.monthsNeed; return render(); } if (r.bad) { S.nudge = T.monthsInRow; return render(); } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'monthsClear') { S.months = {}; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: T.holidays[o.key].replace(/[()&<>]/g, '') }; }).concat(S.extra);
+      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; }).concat(S.extra);
       var mr2 = monthRun(S.months); if (mr2.bad) { S.nudge = T.monthsInRow; return render(); }
       var om = k === 'closuresNone' || mr2.none || mr2.all ? '' : mr2.a + '-' + mr2.b;
       var cl = [{ closures: out }]; if (om !== (CUR.open_months || '')) cl.push({ open_months: om });
-      return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ CUR.open_months = om; S.added = ''; });
+      return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ CUR.open_months = om; S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
     }
     if (k === 'closureAdd') {
       var cf = el('suCf').value, ctEl = el('suCt'), cn = el('suCn').value.trim(); S.addFrom = cf; S.addNote = cn; if (ctEl) S.addTo = ctEl.value;
@@ -720,7 +797,7 @@
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
-    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } return saveAll('cuisine', [{ cuisines: S.cuis, place_type: S.place }]); }
+    if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', [{ cuisines: S.cuis, place_type: S.place }]); }
     if (k === 'take') return el('suTake').click();
     if (k === 'pick') return el('suPick').click();
     if (k === 'sendPhotos') return sendPhotos();
@@ -810,6 +887,14 @@
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
+      var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim();
+      if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
+      box.value = v.slice(0, 180); mark();
+      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', has(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
+    }; });
+    var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-zoom]'), function(im){ im.onclick = function(){ var bx = im.parentNode; bx.className = bx.className === 'su-zoomed' ? '' : 'su-zoomed'; }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-kind]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-kind').split(':'), e = S.nights[+q2[0]]; e.kind = q2[1]; if (!e.what) e.what = T.kinds[q2[1]]; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-rm]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-rm').split(':'); S[q2[0]].splice(+q2[1], 1); render(); }; });

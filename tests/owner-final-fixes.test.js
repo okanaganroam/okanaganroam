@@ -137,7 +137,11 @@ test('small fixes: card subtitle while open, See your page, "more quick ones" no
   const html = await bar(tokenFor(v.id));
   const sub = /<span id="opCbSub" data-closed="([^"]*)" data-opened="([^"]*)">/.exec(html);
   assert.ok(sub, 'the subtitle has an open and a closed version');
-  assert.match(sub[1], /Tap to start\.$/);
+  // Fresh-eyes 3 (2026-11-10): until the setup is finished (or "I'm done for now"), the green card is the one call to
+  // action, so this line doesn't say "Tap to start" as well.
+  assert.doesNotMatch(sub[1], /Tap to/);
+  await fetch(`${base}/owner/${tokenFor(v.id)}/setup/progress`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.9.200.1' }, body: JSON.stringify({ done_for_now: true }) });
+  assert.match(/<span id="opCbSub" data-closed="([^"]*)"/.exec(await bar(tokenFor(v.id)))[1], /Tap to start\.$/, 'after "I’m done for now" it asks again');
   assert.doesNotMatch(sub[2], /Tap to/);
   assert.match(html, /<p class="op-cb-see"><a href="https:\/\/okanaganroam\.com\/penticton\/restaurants\/final-fixes-restaurant-\d+" target="_blank" rel="noopener">See your page/);
   assert.match(html, /data-cb-quick="[a-z_ ]+" data-cb-more1="1 more quick one just came up\."/);

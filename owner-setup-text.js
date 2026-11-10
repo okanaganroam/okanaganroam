@@ -263,4 +263,42 @@ Object.assign(fr, {
   helpTail: 'Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.',
 });
 
+// Fresh-eyes 3 (2026-11-10): typed answers always come back as typed; one number on the finish screens; tap-first answers.
+Object.assign(en, {
+  dealLong: 'Happy hour {n}: that’s a bit long. Please keep “What’s on special?” to {max} letters.', dealsMany: 'That’s more deals than fit on your page (6 at most). Please remove one.',
+  textLong: 'Number {n} is a bit long. Please keep it to {max} letters.',
+  soFarQ: 'Your answers so far', optional: 'Optional', sentTitle: 'Sent',
+  essReady: 'Your page is ready', essCount: '{n} of {total} essentials done.', essSkipped: 'Skipped for now. Tap one to do it:',
+  pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.',
+  saveClosures1: 'Save these closures ({n} new)', saveClosuresN: 'Save these closures ({n} new)',
+  menuSentQ: 'Your menu is sent ✓', menuNewer: 'Want to send a newer menu?',
+  quickLead: 'Tap what fits:', quickOr: 'Or type it in your own words:',
+  quick: { reservations: ['Call us', 'Book on our website', 'Walk-ins welcome too'], takeout: ['Call to order', 'Order at the counter', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
+    dogs: ['Patio only', 'Inside and patio', 'Water bowls at the door'], groups: ['Call ahead for 10 or more', 'Private room available'] },
+  savedCuisine: 'Your food types are on your page now.', stSoon: 'on your page soon',
+  helpSpend: 'Your average spend will show on your page soon.',
+  tooSmall: 'This photo is too small to look sharp. Try the original from your camera roll.',
+  savedLater: 'We’ll remind you next time. You can do it any time from your edit page.', backSettings: 'Back to my edit page',
+  helpTail: 'Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.',
+});
+en.offers.dog_friendly = 'Dogs welcome (even just the patio)';
+Object.assign(fr, {
+  dealLong: 'Happy hour {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
+  textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
+  soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé',
+  essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
+  pctAbout: 'Complète à environ {n} %', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
+  saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
+  menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
+  quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
+  quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'Sans réservation aussi'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
+    dogs: ['Terrasse seulement', 'Intérieur et terrasse', 'Bols d’eau à l’entrée'], groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible'] },
+  savedCuisine: 'Vos types de cuisine sont sur votre page maintenant.', stSoon: 'bientôt sur votre page',
+  helpSpend: 'Votre dépense moyenne s’affichera bientôt sur votre page.',
+  tooSmall: 'Cette photo est trop petite pour être nette. Essayez l’originale de votre pellicule.',
+  savedLater: 'Nous vous le rappellerons la prochaine fois. Vous pouvez le faire à tout moment depuis votre page de modification.', backSettings: 'Retour à ma page de modification',
+  helpTail: 'Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.',
+});
+fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
+
 module.exports = { en, fr };

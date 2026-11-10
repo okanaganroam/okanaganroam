@@ -85,7 +85,7 @@ test('waiting is field-precise: a vegetarian badge flags Dietary options, never 
   assert.ok(waiting.includes('Dietary options'), 'dietary is waiting');
   assert.ok(!waiting.includes('Live music or events'), 'live music is not waiting');
   // Final fresh-eyes (2026-11-09): the ticked badges get their own waiting row, so 2 are waiting (Dietary + the badges).
-  assert.match(html, / · 2 waiting for our check\. Tap to start\./);
+  assert.match(html, / · 2 waiting for our check\./);
   assert.match(waiting, /Badges you ticked<\/strong><span class="op-cb-sent">Vegetarian[^<]*Kid/);
   // Pure: badge keys map to their own items.
   const score = (pending) => pc.scoreCompleteness({ address: 'x', latitude: 1, longitude: 1, phone: 'x', hasHours: true }, { today, pending: new Set(pending) });
