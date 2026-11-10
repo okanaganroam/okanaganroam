@@ -55,7 +55,7 @@ test('two parts: 8 essentials then 11 optional; seasons are part of closures; an
   assert.equal(cfg.part1.length, 8);
   assert.equal(cfg.part2.length, 11);
   assert.ok(!cfg.steps.includes('season'), 'no separate Seasons step');
-  assert.match(cfg.t.hiLead, /The essentials take about 10 minutes\. You can stop any time/);
+  assert.match(cfg.t.hiLead, /The essentials take about 10 to 15 minutes\. You can stop any time/);
   assert.equal(cfg.t.essQ, 'The essentials are done!');
   assert.equal(cfg.t.moreOpt, 'Add more about your place');
   assert.equal(cfg.t.doneNow, 'I’m done for now');
@@ -87,7 +87,7 @@ test('two parts: 8 essentials then 11 optional; seasons are part of closures; an
 test('progress and the portal card: not started, carry on, essentials done, all set up; "no" is an answer', async () => {
   const v = mk('restaurant');
   const t = tokenFor(v.id);
-  assert.match(card(await text(`/owner/${t}`)), /Set up your page[\s\S]*The essentials take about 10 minutes/);
+  assert.match(card(await text(`/owner/${t}`)), /Set up your page[\s\S]*The essentials take about 10 to 15 minutes/);
   assert.equal(app.setupState(v.id), 'none');
   assert.equal((await prog(t, 'hours', 'live')).status, 200);
   assert.equal(app.setupState(v.id), 'partial');
@@ -245,7 +245,7 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
   const script = scriptOf(html);
   assert.doesNotThrow(() => new (require('node:vm').Script)(script));
   // progress() only marks a step done when the server said ok, and every caller checks it.
-  assert.match(script, /if \(j && j\.ok\) \{ S\.done\[step\] = status; if \(j\.score\) S\.score = j\.score; return true; \} S\.error = why\(j\); return false;/);
+  assert.match(script, /if \(j && j\.ok\) \{ S\.done\[step\] = [^;]+; if \(j\.score\) S\.score = j\.score; [^}]*return true; \} S\.error = why\(j\); return false;/);
   assert.equal((script.match(/progress\([^)]*\)\.then\(function\(\)\{/g) || []).length, 0, 'no caller ignores the answer');
   assert.match(script, /if \(S\.error && x\.indexOf\('su-error'\) < 0\) x = msgs\(\) \+ x;/, 'an error shows on every screen');
   // "nothing new to send" for an unchanged answer counts as saved (it is already true on the server).

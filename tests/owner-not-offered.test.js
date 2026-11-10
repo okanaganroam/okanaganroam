@@ -43,7 +43,7 @@ const lastInstantId = (id) => db.prepare("SELECT id FROM owner_change_requests W
 const panel = (html) => { const a = html.indexOf('id="opComplete"'); return a < 0 ? '' : html.slice(a, html.indexOf('</section>', a)); };
 
 test('items: the nine optional ones get the button; the core of a page never does', () => {
-  assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
+  assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
   for (const core of ['address_pin', 'phone', 'hours', 'hours_fresh', 'photo_main', 'photo_extra', 'avg_spend', 'menu', 'description', 'arrival', 'cuisine', 'owner_confirmed']) {
     assert.ok(!pc.NONE_KEYS.includes(core), `${core} never offers "we don't have one"`);
   }
@@ -110,8 +110,8 @@ test('saving from the edit link: live at once, logged, in "Your updates"; the pa
   assert.deepEqual({ ...log }, { old_value: null, new_value: '["happy_hour","instagram"]', source: 'venue_owner', reviewed_by: 'owner:edit-link' });
   const req = db.prepare('SELECT status, instant FROM owner_change_requests WHERE venue_id = ? ORDER BY id DESC').get(v.id);
   assert.deepEqual({ ...req }, { status: 'approved', instant: 1 });
-  assert.ok(app.ownerVenueActivity(v.id, 12, 'en').some((a) => a.status === 'approved' && /things you don’t offer/i.test(a.title)));
-  assert.ok(app.ownerVenueActivity(v.id, 12, 'fr').some((a) => /ce que vous n’offrez pas/i.test(a.title)));
+  assert.ok(app.ownerVenueActivity(v.id, 12, 'en').some((a) => a.status === 'approved' && /^You told us you don’t have: (a happy hour, Instagram|Instagram, a happy hour)$/.test(a.title)));
+  assert.ok(app.ownerVenueActivity(v.id, 12, 'fr').some((a) => /^Vous nous avez dit que vous n’avez pas : /.test(a.title)));
   const html = await get(`/owner/${token}`);
   const p = panel(html);
   assert.ok(pctOf(html) > before, `${before} -> ${pctOf(html)}`);

@@ -53,7 +53,7 @@ const ITEMS = [
     en: 'Takeout and delivery', fr: 'À emporter et livraison', whyEn: 'Order to go? Which delivery apps?', whyFr: 'Pour emporter? Quelles applis de livraison?', btnEn: 'Add it', btnFr: 'Ajouter', icon: '🥡' },
   // The "Dietary" line of Plan your visit is no longer its own item (live check 2026-11-08: owners were asked about
   // dietary twice). It still counts toward "Dietary options" above, and its box stays optional in Plan your visit.
-  { key: 'pyv_groups', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
+  { key: 'pyv_groups', noneEn: 'We can’t take big groups', noneFr: 'Nous n’accueillons pas de grands groupes', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
     en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids, anything that helps.', whyFr: 'Grands groupes, stationnement, enfants, tout ce qui aide.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '👥' },
   { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescription' }, fields: ['description'],
     en: 'A description (120+ characters)', fr: 'Une description (120 caractères ou plus)', whyEn: 'A few sentences about your place, in your words.', whyFr: 'Quelques phrases sur votre établissement, dans vos mots.', btnEn: 'Write it', btnFr: 'Écrire', icon: '✍️' },
@@ -80,6 +80,7 @@ const GOT_TEXT = {
   entertainment: { en: 'Got it: no music or events', fr: 'C’est noté : ni musique ni événements' },
   pyv_reservations: { en: 'Got it: no reservations', fr: 'C’est noté : pas de réservations' },
   pyv_takeout: { en: 'Got it: no takeout or delivery', fr: 'C’est noté : ni emporter ni livraison' },
+  pyv_groups: { en: 'Got it: no big groups', fr: 'C’est noté : pas de grands groupes' },
   instagram: { en: 'Got it: not on Instagram', fr: 'C’est noté : pas sur Instagram' },
   facebook: { en: 'Got it: not on Facebook', fr: 'C’est noté : pas sur Facebook' },
 };
@@ -371,8 +372,11 @@ function renderCompleteness(result, opts) {
   // While the card is open the "Tap to start." part would be wrong (final fresh-eyes 2026-11-09): the page script swaps in
   // this version without it.
   // The "sent" sentence comes before "Tap to start." so the line still ends on what to do next.
-  const subOpen = sub0.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '') + sentSentence;
-  const sub = sentSentence ? subOpen + sub0.slice(subOpen.length - sentSentence.length) : sub0;
+  // The "sent" sentence sits on its own line under the bar's line (fresh-eyes 2026-11-10: "2 quick ones, under a
+  // minute. Menu and photos sent. … Tap to start." ran three thoughts together).
+  const subOpen = sub0.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '');
+  const sub = sub0;
+  const sentLineHtml = sentSentence ? `<span class="op-cb-sentline">${esc(sentSentence.trim())}</span>` : '';
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
     if (it.waiting) return `<span class="op-cb-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
@@ -466,7 +470,7 @@ function renderCompleteness(result, opts) {
     : '';
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span></span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
       ${badgeBlock}${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}

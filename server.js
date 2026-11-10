@@ -9025,8 +9025,10 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     }
     const changedFields = Object.keys(next).filter((f) => existing[f] !== next[f]);
     const logStmt = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
-      VALUES (?, ?, ?, ?, 'happy_hour_research', ?, 'high', ?, 0, ?)`);
-    for (const f of changedFields) logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+      VALUES (?, ?, ?, ?, ?, ?, 'high', ?, 0, ?)`);
+    // Times the business gave itself are logged as theirs (2026-11-10: they were logged as our research).
+    const logSource = m.log_source === 'venue_owner' ? 'venue_owner' : 'happy_hour_research';
+    for (const f of changedFields) logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], logSource, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
     db.exec('COMMIT');
     txOpen = false;
     return { ok: true, changedFields, ...next };
@@ -43940,6 +43942,7 @@ const OWNER_CHANGE_RATE_WINDOW_MS = 60 * 60 * 1000;
 const OWNER_FEATURE_CONTRADICTION = {
   takes_reservations: 'You told us you don’t take reservations. Undo that answer first, or untick “Takes reservations”.',
   takeout: 'You told us you don’t do takeout. Undo that answer first, or untick “Takeout”.',
+  great_groups: 'You told us you can’t take big groups. Undo that answer first, or untick “Great for groups”.',
 };
 const OWNER_CHANGE_KEYS = new Set(['changes', 'note', 'contact_name', 'contact_email', 'company_website', 'started_at', 'from_setup']);
 
@@ -45164,7 +45167,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if (COMPLETENESS_TYPES.has(venue.type)) {
     const nextBadges = { ...current.badges, ...(changes.badges || {}) };
     const nextNone = changes.not_offered || current.not_offered || [];
-    for (const [badge, none] of [['takes_reservations', 'pyv_reservations'], ['takeout', 'pyv_takeout']]) {
+    for (const [badge, none] of [['takes_reservations', 'pyv_reservations'], ['takeout', 'pyv_takeout'], ['great_groups', 'pyv_groups']]) {
       if (nextBadges[badge] && nextNone.includes(none) && (('badges' in changes && changes.badges[badge]) || 'not_offered' in changes)) errors.badges = OWNER_FEATURE_CONTRADICTION[badge];
     }
   }
@@ -49701,8 +49704,14 @@ function setupProgress(venueId) {
   } catch (e) { /* no progress yet */ }
   return { done };
 }
+// A step that was saved or sent is never downgraded (fresh-eyes 2026-11-10: "Skip this for now" on a menu already sent
+// turned it into "skipped"): 'skip' and 'later' never replace an answer, and "I'll email it" never replaces something sent.
+const SETUP_ANSWERED = ['live', 'day', 'email', 'no'];
 function saveSetupProgress(venueId, step, status) {
   const p = setupProgress(venueId);
+  const had = p.done[step];
+  if ((status === 'skip' || status === 'later') && SETUP_ANSWERED.includes(had)) return p;
+  if (status === 'email' && (had === 'live' || had === 'day')) return p;
   p.done[step] = status;
   db.prepare('INSERT INTO owner_setup_progress (venue_id, state) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP')
     .run(venueId, JSON.stringify(p));
@@ -49728,7 +49737,10 @@ function setupScore(found) {
   const waitingReq = pend ? getOwnerChange(pend.id) : null;
   const pending = ownerCompletenessPendingKeys(live, waitingReq);
   const r = portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, happyHourTimes), { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(!!found.account) });
-  return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)) };
+  // `left`: what the portal's own checklist still asks for (not counting what's waiting for our check), so the setup's
+  // finish screen and the portal always agree on what is left (fresh-eyes 2026-11-10).
+  return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)),
+    left: r.missing.filter((it) => !it.waiting).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
 }
 // GET/POST <base>/setup/progress. GET -> { progress, score }. POST { step, status } records one answer.
 async function handleOwnerSetupProgress(req, res, method, found) {
@@ -49752,7 +49764,7 @@ function ownerSetupCardHtml(href, lang, state = 'none') {
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
   const [cardTitle, cardSub] = {
-    none: fr ? ['Configurez votre page', 'Une question à la fois. L’essentiel prend environ 10 minutes'] : ['Set up your page', 'One question at a time. The essentials take about 10 minutes'],
+    none: fr ? ['Configurez votre page', 'Une question à la fois. L’essentiel prend de 10 à 15 minutes'] : ['Set up your page', 'One question at a time. The essentials take about 10 to 15 minutes'],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
@@ -49827,7 +49839,7 @@ function renderOwnerSetupPage(found, opts) {
     placeTypes: RESTAURANT_PLACE_TYPES, placeNames: Object.fromEntries(RESTAURANT_PLACE_TYPES.map((p) => [p, fr ? frPlaceType(p) : p])),
     offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡' },
     nightKinds: ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
-    happyHour: !!portalFields(venue.type).happyHour, servesAlcohol: !!venueServesAlcohol(venue),
+    happyHour: !!portalFields(venue.type).happyHour, servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
@@ -49841,8 +49853,8 @@ function renderOwnerSetupPage(found, opts) {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
-    a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu, your address, phone and description show on your page within a day. Everything else is on your page right away.</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(progress.done[k] === 'no' ? (OWNER_SETUP_STRINGS.fr.noLabels[k] || OWNER_SETUP_STRINGS.fr.st.no) : OWNER_SETUP_STRINGS.fr.st[progress.done[k]])}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.</p>`,
+    a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(progress.done[k] === 'no' ? (OWNER_SETUP_STRINGS.fr.noLabels[k] || OWNER_SETUP_STRINGS.fr.st.no) : OWNER_SETUP_STRINGS.fr.st[progress.done[k]])}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -49852,7 +49864,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <style>${OWNER_SETUP_CSS}${portalCompleteness.BADGE_CSS}</style>
 </head>
 <body class="golf-page owner-page owner-setup">
-  <header class="su-head"><span class="su-logo">Okanagan <b>Roam</b></span><a class="su-exit" href="${escapeHtml(opts.back)}">${escapeHtml(t.exit)}</a></header>
+  <header class="su-head"><span class="su-logo">Okanagan <b>Roam</b></span><a class="su-exit" id="suExit" href="${escapeHtml(opts.back)}">${escapeHtml(t.exit)}</a></header>
   <main class="su-main" id="main"><div class="su-wrap">
     <div class="su-top"><button type="button" class="su-link" id="suBack" hidden>${escapeHtml(t.back)}</button></div>
     <div class="su-progress" id="suProg" hidden><small id="suProgText"></small><div class="su-bar"><i id="suProgBar"></i></div></div>
@@ -49997,6 +50009,23 @@ const OWNER_SETUP_CSS = `
     body.owner-setup .ohb-btn { position: absolute; top: 64px; bottom: auto; right: 12px; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; z-index: 59; }
     body.owner-setup .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
   }
+  /* Fresh-eyes fixes (2026-11-10) */
+  body.owner-setup .su-exitbox { background: var(--su-card); border: 3px solid var(--su-gold); border-radius: 18px; padding: 16px; margin: 0 0 20px; }
+  body.owner-setup .su-exitbox h2 { font-size: 24px; margin: 0 0 6px; }
+  body.owner-setup .su-exitbox p { margin: 0 0 14px; color: var(--su-soft); }
+  body.owner-setup .su-rowbtn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 0; background: none; border: 0; font: inherit; font-weight: 700; color: var(--su-ink); text-align: left; cursor: pointer; }
+  body.owner-setup .su-rowbtn > span:nth-child(2) { flex: 1; min-width: 0; }
+  body.owner-setup .su-rowbtn .su-chev { flex: none; color: var(--su-teal); font-size: 24px; font-weight: 800; }
+  body.owner-setup .su-done-list li.su-li-btn { padding: 0 16px; }
+  body.owner-setup .su-pages.su-pages-big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.owner-setup .su-pages img { cursor: zoom-in; }
+  body.owner-setup .su-pages div.su-zoomed { grid-column: 1 / -1; }
+  body.owner-setup .su-pages div.su-zoomed img { aspect-ratio: auto; object-fit: contain; cursor: zoom-out; }
+  body.owner-setup .su-kinds { margin: 0 0 12px; }
+  body.owner-setup .su-kinds summary { display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; border: 2px solid var(--su-line); border-radius: 14px; background: var(--su-card); color: var(--su-teal); font-weight: 800; cursor: pointer; }
+  body.owner-setup .su-kinds[open] summary { margin-bottom: 10px; }
+  body.owner-setup .su-score small { display: block; margin-top: 4px; color: var(--su-soft); font-weight: 700; font-size: 15px; }
+  body.owner-setup .su-tile.su-tile-wide { grid-column: 1 / -1; }
 `;
 
 // The page script (owner-setup-client.js), read once and served inline. It never contains "</script".
@@ -51090,8 +51119,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
     keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
     keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
-    a: '<p>Tap <strong>Set up your page</strong> at the top of your page settings. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
-    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut des réglages de votre page. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (environ 10 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your page settings. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut des réglages de votre page. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],
@@ -53157,7 +53186,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
       if (!Object.keys(times).length) times = null;
     }
-    const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
+    const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
     applied.push('happy_hour');
   }
@@ -54285,15 +54314,37 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite' };
+// "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
+const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
+  specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
+  pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'] };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
+  let plain = false;
+  try { const vt = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId); plain = !!vt && COMPLETENESS_TYPES.has(vt.type); } catch (e) { plain = false; }
   for (const r of db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
     let fields = [];
-    try { fields = Object.keys(JSON.parse(r.changes)).map((f) => (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f); } catch (e) { /* unreadable */ }
+    let none = null;
+    try {
+      const ch = JSON.parse(r.changes);
+      // Restaurants (2026-11-10): the owner's words, not ours: "What you offer" (not "Badges"), and a "we don't have
+      // one" answer reads "You told us you don't have: …" (not "Things you don't offer").
+      const keys = Object.keys(ch).filter((f) => !(plain && f === 'not_offered'));
+      fields = keys.map((f) => (plain && f === 'badges' ? (fr ? 'Ce que vous offrez' : 'What you offer') : (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f));
+      if (plain && Array.isArray(ch.not_offered)) {
+        let before = [];
+        try { before = (JSON.parse(r.previous || '{}').not_offered) || []; } catch (e) { before = []; }
+        const added = ch.not_offered.filter((k) => !before.includes(k));
+        const names = (added.length ? added : ch.not_offered).map((k) => (OWNER_NONE_WORDS[k] || [k, k])[fr ? 1 : 0]);
+        none = names.length ? (fr ? `Vous nous avez dit que vous n’avez pas : ${names.join(', ')}` : `You told us you don’t have: ${names.join(', ')}`)
+          : (fr ? 'Vous avez retiré une réponse « nous n’en avons pas »' : 'You took back a “we don’t have one” answer');
+      }
+    } catch (e) { /* unreadable */ }
     const what = fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+    const base = fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update';
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.undone_at ? r.undo_reason || null : r.rejection_reason,
-      title: fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update' });
+      title: none ? (fields.length ? `${base}. ${none}` : none) : base });
   }
   const today = todayLocal();
   for (const e of db.prepare('SELECT id, name, start_date, end_date, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, event_id FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
