@@ -49701,8 +49701,43 @@ function setupProgress(venueId) {
     const r = db.prepare('SELECT state FROM owner_setup_progress WHERE venue_id = ?').get(venueId);
     const o = r ? JSON.parse(r.state) : {};
     for (const [k, v] of Object.entries((o && o.done) || {})) if (SETUP_STEPS.includes(k) && SETUP_STATUSES.includes(v)) done[k] = v;
+    const out = { done };
+    if (o && o.blocks && typeof o.blocks === 'object') out.blocks = o.blocks;
+    if (o && o.done_for_now) out.done_for_now = true;
+    return out;
   } catch (e) { /* no progress yet */ }
   return { done };
+}
+function writeSetupProgress(venueId, p) {
+  db.prepare('INSERT INTO owner_setup_progress (venue_id, state) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP')
+    .run(venueId, JSON.stringify(p));
+}
+// Happy hours as the owner typed them in the setup (fresh-eyes 2026-11-10: reopening a saved happy hour rebuilt the
+// form from the page's combined deal text, cut at 60 letters, and saving it again wrecked the deals). The setup keeps
+// its own rows (days, from, to, what's on) beside a signature of what the page stored from them; the rows are only
+// offered back while the page still shows exactly that (research or the classic edit page may have changed it since).
+const SETUP_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+function setupHappySig(found) {
+  let week = null;
+  try { const w = typeof found.happyHourTimes === 'string' ? JSON.parse(found.happyHourTimes) : found.happyHourTimes; if (w) week = SETUP_WEEK.map((d) => (w[d] || []).map((x) => [x[0], x[1]])); } catch (e) { week = null; }
+  const d = ownerHappyHourDealsSnapshot(found.venue.id);
+  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []]);
+}
+function cleanSetupHappyBlocks(list) {
+  if (!Array.isArray(list) || !list.length || list.length > 6) return null;
+  const out = [];
+  for (const b of list) {
+    if (!b || typeof b !== 'object' || !Array.isArray(b.days) || !b.days.length || b.days.some((d) => !SETUP_WEEK.includes(d))) return null;
+    if (!/^\d{2}:\d{2}$/.test(String(b.from)) || !/^\d{2}:\d{2}$/.test(String(b.to))) return null;
+    if (typeof b.what !== 'string' || b.what.length > 200 || /[<>]/.test(b.what)) return null;
+    out.push({ days: SETUP_WEEK.filter((d) => b.days.includes(d)), from: b.from, to: b.to, what: b.what });
+  }
+  return out;
+}
+// The rows to show again, or null when the page no longer matches them.
+function setupHappyBlocks(found) {
+  const b = (setupProgress(found.venue.id).blocks || {}).happy;
+  return b && Array.isArray(b.entries) && b.sig === setupHappySig(found) ? b.entries : null;
 }
 // A step that was saved or sent is never downgraded (fresh-eyes 2026-11-10: "Skip this for now" on a menu already sent
 // turned it into "skipped"): 'skip' and 'later' never replace an answer, and "I'll email it" never replaces something sent.
@@ -49713,8 +49748,7 @@ function saveSetupProgress(venueId, step, status) {
   if ((status === 'skip' || status === 'later') && SETUP_ANSWERED.includes(had)) return p;
   if (status === 'email' && (had === 'live' || had === 'day')) return p;
   p.done[step] = status;
-  db.prepare('INSERT INTO owner_setup_progress (venue_id, state) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP')
-    .run(venueId, JSON.stringify(p));
+  writeSetupProgress(venueId, p);
   return p;
 }
 // Every step answered (skips and "later" count: the owner went through it all).
@@ -49747,15 +49781,32 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   const send = (status, data) => sendSubmissionResponse(res, status, data);
   if (!found) return send(404, { ok: false, error: 'This link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
   if (!COMPLETENESS_TYPES.has(found.venue.type)) return send(404, { ok: false, error: 'Not found.' });
-  if (method === 'GET') return send(200, { ok: true, progress: setupProgress(found.venue.id), score: setupScore(found) });
+  if (method === 'GET') return send(200, { ok: true, progress: { done: setupProgress(found.venue.id).done }, score: setupScore(found) });
   if (method !== 'POST') return send(405, { ok: false, error: 'Not allowed.' });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: 'Only accepted from the Okanagan Roam website.' });
   if (ownerSetupRateLimited(requestClientIp(req))) return send(429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
   let body;
-  try { body = await readLimitedJsonBody(req, 2048); } catch (e) { return send(400, { ok: false, error: 'Please try again.' }); }
+  try { body = await readLimitedJsonBody(req, 8192); } catch (e) { return send(400, { ok: false, error: 'Please try again.' }); }
+  // "I'm done for now" after the essentials: the portal's own checklist may speak up again.
+  if (body && body.done_for_now === true && !body.step) {
+    const p0 = setupProgress(found.venue.id); p0.done_for_now = true; writeSetupProgress(found.venue.id, p0);
+    return send(200, { ok: true, progress: { done: p0.done }, score: setupScore(found) });
+  }
   if (!body || !SETUP_STEPS.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
-  const progress = saveSetupProgress(found.venue.id, body.step, body.status);
-  return send(200, { ok: true, progress, score: setupScore(found) });
+  let progress = saveSetupProgress(found.venue.id, body.step, body.status);
+  if (body.step === 'happy') {
+    // Typed happy hours: keep the rows as typed (see setupHappyBlocks). Anything else (a "No", a sheet sent) drops them.
+    const entries = body.status === 'live' && body.blocks !== undefined ? cleanSetupHappyBlocks(body.blocks) : null;
+    const p1 = setupProgress(found.venue.id);
+    // A "skip" or "later" never touches them (it never replaces an answer either).
+    if (body.status === 'skip' || body.status === 'later') return send(200, { ok: true, progress: { done: p1.done }, score: setupScore(found) });
+    const blocks = { ...(p1.blocks || {}) };
+    if (entries) blocks.happy = { entries, sig: setupHappySig(found) }; else delete blocks.happy;
+    if (Object.keys(blocks).length) p1.blocks = blocks; else delete p1.blocks;
+    writeSetupProgress(found.venue.id, p1);
+    progress = p1;
+  }
+  return send(200, { ok: true, progress: { done: progress.done }, score: setupScore(found) });
 }
 
 // The big first card on a restaurant's edit page.
@@ -49807,8 +49858,10 @@ function renderOwnerSetupPage(found, opts) {
     hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
-    specials: (snap.specials || []).map((x) => ({ days: x.days, title: x.title, deal: x.deal, price: x.price })),
-    weekly_nights: (snap.weekly_nights || []).map((x) => ({ days: x.days, kind: x.kind, title: x.title, start: x.start || '' })),
+    happy_blocks: setupHappyBlocks(found),
+    // Every owner field of each special and night, so one the owner didn't touch is sent back exactly as stored.
+    specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
+    weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
@@ -49827,7 +49880,7 @@ function renderOwnerSetupPage(found, opts) {
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
   const cfg = {
-    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: SETUP_PART1, part2: SETUP_PART2, progress: { done: progress.done, score },
+    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: SETUP_PART1, part2: SETUP_PART2, progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     image: pendingMain || ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
@@ -49848,13 +49901,14 @@ function renderOwnerSetupPage(found, opts) {
   };
   // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
   // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
-  const sent = SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(progress.done[k] === 'no' ? (t.noLabels[k] || t.st.no) : t.st[progress.done[k]])}</li>`).join('');
+  const stWord = (tt, k) => (progress.done[k] === 'no' ? (tt.noLabels[k] || tt.st.no) : k === 'spend' && progress.done[k] === 'live' && !avgSpendPublic() ? tt.stSoon : tt.st[progress.done[k]]);
+  const sent = SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(stWord(t, k))}</li>`).join('');
   const statusTopic = {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
-    a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(progress.done[k] === 'no' ? (OWNER_SETUP_STRINGS.fr.noLabels[k] || OWNER_SETUP_STRINGS.fr.st.no) : OWNER_SETUP_STRINGS.fr.st[progress.done[k]])}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.</p>`,
+    a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -50021,6 +50075,16 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-pages img { cursor: zoom-in; }
   body.owner-setup .su-pages div.su-zoomed { grid-column: 1 / -1; }
   body.owner-setup .su-pages div.su-zoomed img { aspect-ratio: auto; object-fit: contain; cursor: zoom-out; }
+  /* Fresh-eyes 3 (2026-11-10): menu pages show the whole page; Help's close is a full 44px and the "?" sits clear of
+     "Exit setup"; the optional list folds; quick-answer chips; room above a sticky Save. */
+  body.owner-setup .su-pages img { object-fit: contain; background: #fff; }
+  body.owner-setup .ohb-x { width: 44px; height: 44px; }
+  @media (max-width: 699px) { body.owner-setup .ohb-btn { top: 92px; } }
+  body.owner-setup .su-fold { margin: 18px 0; }
+  body.owner-setup .su-fold summary { display: flex; align-items: center; min-height: 56px; padding: 0 16px; border: 2px dashed var(--su-line); border-radius: 16px; color: var(--su-teal); font-weight: 800; cursor: pointer; }
+  body.owner-setup .su-fold[open] summary { margin-bottom: 12px; }
+  body.owner-setup .su-chip.su-chip-wide { padding: 0 14px; min-width: 0; }
+  body.owner-setup .su-sticky-clear { margin-top: 28px; box-shadow: 0 -14px 14px -6px #F4F1EA; }
   body.owner-setup .su-kinds { margin: 0 0 12px; }
   body.owner-setup .su-kinds summary { display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; border: 2px solid var(--su-line); border-radius: 14px; background: var(--su-card); color: var(--su-teal); font-weight: 800; cursor: pointer; }
   body.owner-setup .su-kinds[open] summary { margin-bottom: 10px; }
@@ -51119,8 +51183,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
     keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
     keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
-    a: '<p>Tap <strong>Set up your page</strong> at the top of your page settings. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
-    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut des réglages de votre page. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],
@@ -55079,6 +55143,9 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     avgPublic: avgSpendPublic(),
     // Final fresh-eyes (2026-11-09): ticked badges waiting for our check get their own row, and "See your page" sits under the card.
     pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr), plainWaiting: setupState(venue.id) !== 'none',
+    // Until the setup is finished (or "I'm done for now"), the green "Set up your page" card is the one way in: this
+    // card keeps its % but not its own "Tap to start" (fresh-eyes 2026-11-10: two "start here" boxes competed).
+    quietCta: setupState(venue.id) !== 'done' && !setupProgress(venue.id).done_for_now,
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     // Complete & Verified (2026-11-09): the badge block under the ring (earned, paused, or how to earn it).
     claimed: venueIsClaimed(venue.id),

@@ -375,7 +375,8 @@ function renderCompleteness(result, opts) {
   // The "sent" sentence sits on its own line under the bar's line (fresh-eyes 2026-11-10: "2 quick ones, under a
   // minute. Menu and photos sent. … Tap to start." ran three thoughts together).
   const subOpen = sub0.replace(/ (Tap to start|Tap to see)\.$/, '').replace(/ Touchez pour (commencer|voir)\.$/, '');
-  const sub = sub0;
+  // o.quietCta: the setup card above is the way in, so this line doesn't ask to be tapped as well.
+  const sub = o.quietCta ? subOpen : sub0;
   const sentLineHtml = sentSentence ? `<span class="op-cb-sentline">${esc(sentSentence.trim())}</span>` : '';
   const btn = (it) => {
     const label = esc(fr ? it.btnFr : it.btnEn);
