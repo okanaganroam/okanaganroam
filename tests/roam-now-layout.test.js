@@ -48,7 +48,8 @@ test('map payload ships own venue photos separately without changing compact ven
 test('explicit town remains visible when GPS is also available',()=>{
  const fn=src.match(/function roamLocationLabel\(\)\{[^\n]+/)[0];
  const ctx={town:'vernon',CONF:{r:{vernon:'Vernon'}},me:{pin:false},radiusKm:5,FR:false};
- vm.createContext(ctx);vm.runInContext(fn+';result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Vernon');
+ vm.createContext(ctx);vm.runInContext(fn+';result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Browsing Vernon');
+ ctx.town='';ctx.me=null;assert.equal(vm.runInContext('roamLocationLabel()',ctx),'Across the Okanagan');ctx.me={pin:false};
  ctx.town='';vm.runInContext('result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Near your location · 5 km');
 });
 

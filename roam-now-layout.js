@@ -403,6 +403,33 @@ body.pm-app-page #rnShowResults:hover { background: #284858; }
 @media (min-width: 900px) and (max-height: 680px) {
   body.pm-app-page .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-float { max-height: 40%; }
 }
+
+/* Keep the search context visible and the active navigation map spacious. */
+body.pm-app-page .rn-location-note { font-size: 13px; color: #52665e; margin: 0 0 8px; }
+body.pm-app-page .rn-result-filters { display: none; }
+body.pm-app-page .pm-event .pm-item-main { display: flow-root; box-sizing: border-box; padding: 12px 14px 10px; }
+body.pm-app-page .pm-event .pm-when, body.pm-app-page .pm-event .pm-meta { display: block; }
+body.pm-app-page .rn-event-photo { float: right; width: 30%; max-width: 150px; height: 86px; margin: 0 0 5px 12px; border-radius: 11px; object-fit: cover; }
+body.pm-app-page .pm-event .pm-name { display: block; overflow-wrap: anywhere; }
+body.pm-app-page .pm-stage.is-nav .rn-intro,
+body.pm-app-page .pm-stage.is-nav .rn-event-filters,
+body.pm-app-page .pm-stage.is-nav .pm-sheet-head { display: none; }
+body.pm-app-page .rn-nav-actions { display: flex; align-items: center; gap: 8px; }
+body.pm-app-page .rn-nav-actions .pm-nav-voice { margin: 0; }
+body.pm-app-page .rn-nav-actions #pmNavEnd { width: auto; min-height: 44px; height: auto; padding: 8px 14px; border-radius: 999px; font: 800 13px Nunito, sans-serif; }
+body.pm-app-page .rn-all-steps summary { cursor: pointer; padding: 10px 4px; min-height: 44px; box-sizing: border-box; color: #28675e; font-weight: 800; }
+body.pm-app-page .pm-stage.is-nav .pm-route { margin: 0; padding: 0 12px; }
+@media(max-width:899px) {
+  body.pm-app-page .rn-results-compact.pm-list-view .rn-result-filters:not([hidden]) { display: block; margin: 4px 0 0; color: #52665e; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+  body.pm-app-page .rn-event-photo { height: 78px; max-width: 105px; }
+  body.pm-app-page .pm-stage.is-nav .pm-navbar { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 6px 10px; }
+  body.pm-app-page .pm-stage.is-nav .pm-nav-arrow { width: 34px; }
+  body.pm-app-page .rn-nav-actions { grid-column: 2; justify-content: flex-end; }
+  body.pm-app-page .pm-stage.is-nav .pm-sheet,
+  body.pm-app-page .pm-stage.is-nav .pm-sheet[data-state] { height: auto; max-height: min(40dvh, 340px); padding: 6px 10px; }
+  body.pm-app-page .pm-stage.is-nav .pm-sheet-body { height: auto; min-height: 0; padding: 0; }
+  body.pm-app-page .pm-stage.is-nav .pm-route { background: transparent; box-shadow: none; }
+}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 

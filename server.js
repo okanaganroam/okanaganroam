@@ -21286,7 +21286,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou déposez un repère sur la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
     loading: 'Chargement de la carte…', loadFailed: 'La carte n’a pas pu se charger. Rechargez la page pour réessayer.',
     placesNear: function(n, r){ return n + (n === 1 ? ' lieu' : ' lieux') + (r ? ' à moins de ' + r + ' km' : ' autour de vous'); },
-    placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
+    placesHere: function(n){ return n + (n === 1 ? ' lieu correspondant' : ' lieux correspondants'); },
     clusterPlaces: function(n){ return n + ' lieux ici, zoomez pour les voir'; }, clusterEvents: function(n){ return n + ' événements ici, zoomez pour les voir'; },
     // Round 13 (2026-10-20): « 0 événements cette semaine » wrapped onto 4 lines on a 320-375 px phone; none reads « Aucun événement ».
     openSuffix: ' ouverts', eventsCount: function(n){ return n ? n + (n === 1 ? ' événement' : ' événements') + ' cette semaine' : 'Aucun événement cette semaine'; },
@@ -21326,7 +21326,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or drop a pin on the map.', unsupported: 'This browser can’t share your location.',
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
-    placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
+    placesHere: function(n){ return n + (n === 1 ? ' matching place' : ' matching places'); },
     clusterPlaces: function(n){ return n + ' places here, zoom in'; }, clusterEvents: function(n){ return n + ' events here, zoom in'; },
     openSuffix: ' open', eventsCount: function(n){ return n ? n + (n === 1 ? ' event' : ' events') + ' this week' : 'No events this week'; },
     moreNear: function(n, r){ return n + ' more within ' + r + ' km'; },
@@ -21374,7 +21374,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
-  function roamLocationLabel(){return town?(CONF.r[town]):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Explorer Kelowna':'Browsing Kelowna')}
+  function roamLocationLabel(){return town?((FR?'Explorer ':'Browsing ')+CONF.r[town]):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Dans l’Okanagan':'Across the Okanagan')}
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
   document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,compact:stage.classList.contains('rn-results-compact'),y:window.scrollY,listY:$('pmSheetBody').scrollTop,cardOffset:a.closest('.pm-item')?.getBoundingClientRect().top-$('pmSheetBody').getBoundingClientRect().top}));}catch(err){}});
@@ -21442,6 +21442,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     searchEl.focus();
   });
   $('rnShowResults').addEventListener('click', function(){
+    if (timer !== null) { clearTimeout(timer); applyTypedSearch(searchEl.value); }
     setCompactResults(true);
     $('rnEditSearch').focus();
   });
@@ -21457,7 +21458,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function openTownPicker(){
     openPanel();
     choosingTown = true;
-    $('pmTown').focus();
+    $('rnLocationOptions').scrollIntoView({block:'center',behavior:'instant'});
+    $('rnLocationOptions').focus({preventScroll:true});
   }
   $('rnLocation').addEventListener('click',openTownPicker);
   $('rnClear').addEventListener('click',clearAll);
@@ -21741,6 +21743,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function render(fit){
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
+    $('rnLocationAction').textContent=town||me?(FR?'Changer de lieu':'Change location'):(FR?'Choisir un lieu':'Choose a location');
     stage.classList.toggle('rn-happy-entry', happyEntry && !!feats.happy);
     if (watching && !me && !town && !pendingRoute) {
       countEl.textContent = FR ? 'Recherche de votre position…' : 'Finding your location…';
@@ -21768,7 +21771,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       items = mapPlaceList(onMap, { me: !!me, town: town || (happyEntry && feats.happy && !me), wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
       if (hhLater && !hhNoteShown) { hhNoteShown = true; setStatus(T.hhLaterNote, 9000); }
       if (!feats.happy) hhNoteShown = false;
-      countEl.textContent = happyEntry && feats.happy ? (FR ? 'Happy hour en cours' : 'Happy Hour Now') + ' · ' + items.length : town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
+      countEl.textContent = happyEntry && feats.happy ? (FR ? 'Happy hour en cours' : 'Happy Hour Now') + ' · ' + items.length : town ? T.placesHere(items.length) + (FR ? ' à ' : ' in ') + CONF.r[town] : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = evGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
@@ -21799,6 +21802,27 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     listItems = items;
     drawList();
+    var summary = $('rnResultFilters'), labels = [];
+    if (tab === 'events') {
+      if (eventPeriod) labels.push(eventPeriod === 'today' ? (FR?'Aujourd’hui':'Today') : (FR?'Cette fin de semaine':'This weekend'));
+      if (freeEventsOnly) labels.push(FR?'Gratuit':'Free');
+    } else {
+      function addFilterLabel(chip){
+        var plain=chip.cloneNode(true);
+        plain.querySelectorAll('[aria-hidden="true"], svg').forEach(function(el){el.remove()});
+        var text=plain.textContent.trim();
+        if(text && labels.indexOf(text)===-1)labels.push(text);
+      }
+      kindChips.filter(function(c){return kinds[c.getAttribute('data-pm-kind')]}).forEach(addFilterLabel);
+      featChips.filter(function(c){return feats[c.getAttribute('data-pm-feat')]}).forEach(addFilterLabel);
+      if(openOnly)labels.push(FR?'Ouvert maintenant':'Open now');
+      if(topOnly)labels.push(FR?'Les mieux notés':'Top rated');
+      extras().forEach(function(x){if(x.id!=='town' && labels.indexOf(x.label)===-1)labels.push(x.label)});
+    }
+    var query=searchEl.value.trim();
+    if(query)labels.unshift('“'+query+'”');
+    summary.textContent=labels.slice(0,4).join(' · ')+(labels.length>4?' · +'+(labels.length-4):'');
+    summary.hidden=!labels.length;
     // Near me opens on the closest dozen places (individual pins, not bubbles); the list still covers the whole distance.
     if (fit && town && tab === 'places' && onMap.length) {
       map.stop();
@@ -21851,7 +21875,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         else if (FR && price === 'By donation') price = 'Contribution volontaire';
         else if (FR && price === 'Ticketed') price = 'Billets requis';
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
-        html += '<li class="pm-item pm-event"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span>' + (price ? '<span class="pm-event-price">' + esc(price) + '</span>' : '') + '<span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></a>'
+        var photo = x.photo ? '<img class="rn-event-photo" src="' + esc(x.photo) + '" alt="" loading="lazy" decoding="async" width="480" height="320">' : '';
+        html += '<li class="pm-item pm-event"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + photo + '<span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span>' + (price ? '<span class="pm-event-price">' + esc(price) + '</span>' : '') + '<span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></a>'
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
@@ -21981,11 +22006,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     el.innerHTML = '<button type="button" class="rn-look-x" aria-label="' + esc(FR ? 'Fermer' : 'Close') + '">&times;</button><h2>' + esc(FR ? 'Cherchez ceci' : 'Look for this') + '</h2><img src="' + esc(r.x.ar.img) + '" alt="' + esc((FR ? 'Devanture de ' : 'Storefront of ') + r.x.name) + '"><small>' + esc(r.x.name) + (r.mode === 'driving' ? ' · ' + esc(FR ? 'Conducteur : gardez les yeux sur la route.' : 'Driver: keep your eyes on the road.') : '') + '</small>';
     el.querySelector('button').addEventListener('click', function(){ if (route) route.lookClosed = true; showLook(); });
   }
+  function routeSteps(r){
+    return '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
+  }
   function drawRoute(){
     var r = route;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
     stage.classList.toggle('is-route',!!r);
     if (!r) { routeEl.innerHTML = ''; drawNav(); showLook(); return; }
+    if (r.started) {
+      routeEl.innerHTML = r.steps && r.steps.length ? '<details class="rn-all-steps"' + (r.allStepsOpen ? ' open' : '') + '><summary>' + esc(FR?'Toutes les étapes':'All steps') + '</summary>' + routeSteps(r) + '</details>' : '';
+      drawNav(); showLook(); return;
+    }
     var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2>';
     if (!r.started) html += '<button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(FR ? 'Retour aux résultats' : 'Back to results') + '</button>';
     html += '</div>';
@@ -21999,7 +22031,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         html += '<button type="button" class="pm-panel-done rn-route-start" id="rnStartRoute">' + esc(FR ? 'Démarrer le guidage' : 'Start directions') + '</button>';
       }
       if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Le guidage en direct utilise votre position.':'Live guidance uses your location.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
-      html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
+      html += routeSteps(r);
 
     }
     if (x.ar && !r.started && !r.arrived) html += '<figure class="rn-look-pre"><img src="' + esc(x.ar.img) + '" alt="" loading="lazy"><figcaption>' + esc(FR ? 'Ce que vous cherchez à l’arrivée' : 'What to look for when you get there') + '</figcaption></figure>';
@@ -22008,6 +22040,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     drawNav();
     showLook();
   }
+  routeEl.addEventListener('toggle',function(e){
+    if(route && e.target.matches('.rn-all-steps') && e.target.isConnected)route.allStepsOpen=e.target.open;
+  },true);
   routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
   routeEl.addEventListener('click', function(e){
     if (!e.target.closest('#rnStartRoute') || !route || !route.data || route.loading || !me || me.pin) return;
@@ -22075,8 +22110,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var r = route, on = !!(r && r.started && r.data && me && !me.pin);
     stage.classList.toggle('is-nav', on); navbar.hidden = !on;
     if (!on) { navbar.innerHTML = ''; return; }
-    var end = (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '${uiIcon('volume', 20, true)}' : '${uiIcon('mute', 20, true)}') + '</button>' : '')
-      + '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(T.endRoute) + '">✕</button>';
+    var end = '<div class="rn-nav-actions">' + (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '${uiIcon('volume', 20, true)}' : '${uiIcon('mute', 20, true)}') + '</button>' : '')
+      + '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(FR?'Terminer le guidage':'End directions') + '">' + esc(FR?'Terminer le guidage':'End directions') + '</button></div>';
     voiceCheck();
     if (r.arrived) { navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">⚑</span><div class="pm-nav-text"><strong>' + esc(T.arrived) + '</strong><small>' + esc(r.x.name) + '</small></div>' + end; return; }
     var cur = r.steps[r.step], next = r.steps[r.step + 1], tgt = next && next.maneuver ? next.maneuver.location : [r.x.lng, r.x.lat];
@@ -22298,6 +22333,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var n = parts.length;
     $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
+    $('rnLocationAction').textContent=town||me?(FR?'Changer de lieu':'Change location'):(FR?'Choisir un lieu':'Choose a location');
     badge.hidden = tab === 'events' || !n;
     badge.textContent = openOnly && n === 1 ? (FR ? 'Ouvert maintenant' : 'Open now') : String(n);
     badge.className = openOnly && n === 1 ? 'pm-badge rn-open-badge' : 'pm-badge';
@@ -22749,7 +22785,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ typedWords = String(v || '').trim(); if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); nameQ = ''; term = v.trim().toLowerCase(); termTyping = true; dealQuery = v; changed(); } }, 450); });
+  function applyTypedSearch(v){
+    timer = null;
+    typedWords = String(v || '').trim();
+    if (hasWords(v)) { readSearch(v, true); wantNear = false; }
+    else {
+      if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; }
+      undoLastSearch(); nameQ = ''; term = v.trim().toLowerCase(); termTyping = true; dealQuery = v;
+    }
+    changed();
+  }
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ applyTypedSearch(v); }, 450); });
   // The message above the Events tab after an events search: this week's, or (once /map/ahead.json is in) the weeks
   // after it. New Year's Eve and Christmas markets link to the full lists.
   var evSaidText = '';
@@ -22763,7 +22809,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else setStatus(T.eventsFor(evSaidText), 9000);
   }
   function addEvent(a, ah){
-    var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], price: a[13] || '', ah: !!ah, d: null };
+    var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], price: a[13] || '', photo: a[14] || '', ah: !!ah, d: null };
     if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
     events.push(e);
   }
@@ -22825,7 +22871,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
     // Round 9 (2026-10-19): each search starts from the usual 5 km and clears the last search's message, so "Not much
     // right nearby, so this shows up to 25 km away" never stays on for a search that fits close by.
-    clearTimeout(timer); wantNear = false; radiusFixed = false; typedWords = String(v || '').trim(); setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
+    clearTimeout(timer); timer = null; wantNear = false; radiusFixed = false; typedWords = String(v || '').trim(); setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
     // Round 12 (2026-10-20): Enter said "Nothing called “pizz”" while typing it showed pizza places. When the words as
     // typed match nothing, the last word is read as the search word it starts; failing that, as the start of a word in
     // a place's name (as while typing). Whole words still come first: "spa" never finds Spaghetti.
@@ -23046,7 +23092,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 22; // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 23; // 23 appends optional event photos at row index 14. // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -23309,18 +23355,18 @@ function mapPlacesData(now = new Date()) {
 function mapEventsData(now = new Date(), { ahead = false } = {}) {
   const today = todayLocal(now);
   const weekEnd = addLocalDays(today, MAP_EVENT_DAYS);
-  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, e.price_kind, e.price_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
+  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, e.price_kind, e.price_text, e.image_url, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
     FROM event_occurrences o JOIN events e ON e.id = o.event_id
     WHERE e.status = 'scheduled' AND o.status = 'scheduled' AND o.end_date >= ? AND o.start_date <= ?
     ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, ahead ? addLocalDays(today, MAP_AHEAD_DAYS) : weekEnd);
   const seen = new Set();
-  const venueQ = db.prepare('SELECT name, latitude, longitude, redirect_to FROM venues WHERE id = ?');
+  const venueQ = db.prepare('SELECT name, latitude, longitude, image_url, redirect_to FROM venues WHERE id = ?');
   const regionVenueQ = db.prepare('SELECT id, name, region, address, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
   const regionVenues = new Map();
   // An event without a venue link is pinned only when its venue text names exactly one listed place in the same
   // town ("Cannery Brewing", or "Gray Monk Estate Winery, Lake Country"); anything else is listed without a pin.
   const byName = new Map();
-  for (const v of db.prepare('SELECT name, region, latitude, longitude FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()) {
+  for (const v of db.prepare('SELECT name, region, latitude, longitude, image_url FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()) {
     const k = `${v.region}|${String(v.name).trim().toLowerCase()}`;
     byName.set(k, byName.has(k) ? null : v);
   }
@@ -23352,7 +23398,19 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
       if (ks.length) kinds.set(Number(e.id), ks);
     }
   } catch (err) { /* the map works without them */ }
-  const out = [];
+  const out = [], photoCache = new Map();
+  function eventPhoto(src) {
+    if (!src || !/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)) return 0;
+    if (photoCache.has(src)) return photoCache.get(src);
+    let small = photoSized(src, 480);
+    if (/^\/images\/events\/[a-z0-9-]+\.jpg$/i.test(src)) {
+      const stem = src.replace(/(?:-800)?\.jpg$/, '');
+      const copy = stem + '-800-w480.jpg';
+      if (fs.existsSync(path.join(__dirname, 'public', copy))) small = copy;
+    }
+    photoCache.set(src, small);
+    return small;
+  }
   for (const r of rows) {
     if (seen.has(r.id) || !REGION_LABELS[r.region] || !r.slug) continue;
     seen.add(r.id);
@@ -23386,7 +23444,7 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
     out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), point ? mapRound(point.lat) : null, point ? mapRound(point.lng) : null,
       r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0,
       // [11] 1 when the event has a French page (round 9, 2026-10-19), so /fr/map links to it.
-      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0, eventPriceLabel(r) || 0]);
+      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0, eventPriceLabel(r) || 0, eventPhoto(r.image_url) || (!privatePlace && venue ? eventPhoto(venue.image_url) : 0)]);
   }
   return out;
 }
@@ -23499,7 +23557,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','Happy hour en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les happy hours en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Browsing Kelowna','Explorer Kelowna')}</b></span></button></div>
+      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','Happy hour en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les happy hours en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span></button></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
@@ -23577,6 +23635,7 @@ ${renderGolfHeaderHtml()}
       <button type="button" class="pm-handle" id="pmHandle" aria-label="Show more of the list"><span></span></button>
       <div class="pm-sheet-head">
         <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
+        <p class="rn-result-filters" id="rnResultFilters" hidden></p>
       </div>
       <div class="pm-sheet-body" id="pmSheetBody" tabindex="0" role="region" aria-labelledby="pmCount">
         <section class="pm-route" id="pmRoute" hidden aria-live="polite"></section>
@@ -23597,7 +23656,7 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
       ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}</div>
-      <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
+      <h3 id="rnLocationOptions" tabindex="-1">${R('Choose where to search','Choisir où chercher')}</h3><p class="rn-location-note">${R('Pick a town to browse. Use your location for live directions.','Choisissez une ville à explorer. Utilisez votre position pour le guidage en direct.')}</p><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
       <div class="pm-panel-row">
         <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
           <select id="pmRadius" class="pm-select pm-radius" disabled>
