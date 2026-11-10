@@ -302,8 +302,10 @@ test('12: one rule for kid-friendly pubs: all ages or minors-until count, adults
   assert.equal(row(until.id)[7] & kidsBit, kidsBit);
   // Search and Build My Trip read the same helper (their venue lists are built with kidFriendlyPublic).
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /function buildDiscoverySearchVenues\(\) \{[\s\S]*?f === 'kid_friendly' \? kidFriendlyPublic\(row\)/);
-  assert.match(src, /function buildTripPlannerFacts\([\s\S]*?f === 'kid_friendly' \? kidFriendlyPublic\(v\)/);
+  // Pub test 5: through badgeOnPublic, which reads kid_friendly with kidFriendlyPublic (and patio with a heated patio).
+  assert.match(src, /function badgeOnPublic\(row, f\) \{\n  if \(f === 'kid_friendly'\) return kidFriendlyPublic\(row\);/);
+  assert.match(src, /function buildDiscoverySearchVenues\(\) \{[\s\S]*?if \(badgeOnPublic\(row, f\)\) features\[f\] = true;/);
+  assert.match(src, /function buildTripPlannerFacts\([\s\S]*?if \(badgeOnPublic\(v, f\)\) features\[f\] = true;/);
   assert.match(src, /const KID_FRIENDLY_SQL = `[^`]*\$\{PUB_KIDS_WELCOME_POLICIES\.map/, 'the SQL is built from the same list');
 });
 

@@ -35,6 +35,17 @@
     // "No dogs allowed" (pub test 4, 2026-11-10): the not-offered answer 'dogs'; never together with Dog friendly.
     noDogs: (CUR.not_offered || []).indexOf('dogs') >= 0 && !(CUR.badges || {}).dog_friendly,
   };
+  S.badgesAtStart = clone(CUR.badges || {});
+  // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
+  var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
+  function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
+  // A short quote around it ("…and the game on"), for the gentle prompt.
+  function sportsBit(){
+    var at = sportsAt(); if (!at) return ''; var t = String(S.story), a = Math.max(0, at[0] - 24), b = Math.min(t.length, at[1] + 24);
+    while (a > 0 && /\S/.test(t.charAt(a - 1))) a--; while (b < t.length && /\S/.test(t.charAt(b))) b++;
+    return (a > 0 ? '…' : '') + t.slice(a, b).trim().replace(/[.,;:!]+$/, '') + (b < t.length ? '…' : '');
+  }
+  function sportsNote(){ var n = el('suSportsNote'); if (n) n.hidden = !(sportsBit() && !S.badges.sports_tv); }
   // Pubs (2026-11-10): the kitchen, who's welcome and the sports, as stored (venue_pub_info); Pub Fare picked to start.
   S.pubInfo = clone(CUR.pub_info || {});
   S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '', note: (S.pubInfo.kitchen || {}).note || '' };
@@ -62,7 +73,7 @@
   // is on by default for these three. A stored next-year date of a ticked holiday is that choice, not a row of its own.
   S.everyYear = {};
   var holOk = function(key, note){ return !note || note === holNote(key) || note === String((C.holidayAlt || {})[key] || '').replace(/[()&<>]/g, ''); };
-  var nextYear = HOL.filter(function(o){ return o.yearly; }).map(function(o){ return { key: o.key, date: ymd(new Date(o.d.getFullYear() + 1, o.d.getMonth(), o.d.getDate())) }; });
+  var nextYear = HOL.filter(function(o){ return o.yearly; }).map(function(o){ return { key: o.key, date: o.next }; });
   var seenNext = {};
   (CUR.closures || []).forEach(function(c){ var n = nextYear.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from && holOk(x.key, c.note || ''); })[0]; if (n) seenNext[n.key] = true; });
   (CUR.closures || []).forEach(function(c){
@@ -119,18 +130,32 @@
   // ---------- Holidays (the next date of each, from today) ----------
   function ymd(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function easter(y){ var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451), mo = Math.floor((hh + l - 7 * m + 114) / 31), da = ((hh + l - 7 * m + 114) % 31) + 1; return new Date(y, mo - 1, da); }
-  function thirdMonday(y, mo){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === 3) return d; d.setDate(d.getDate() + 1); } }
+  function thirdMonday(y, mo){ return nthMonday(y, mo, 3); }
+  // Every day but `d` is marked Closed (no hours yet): copying may fill them all.
+  function othersClosed(d){ return !DAYS.some(function(x){ return x !== d && S.week && S.week[x]; }); }
+  function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
+  // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
+  // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the
+  // 2nd Monday of October, not the same day of the month). The eves (Dec 24, Dec 31) stay one-off.
   function holidays(){
     var today = new Date(); today.setHours(0, 0, 0, 0); var y = today.getFullYear();
-    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, yearly: key === 'xmas' || key === 'boxing' || key === 'nyd' }; };
+    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, next: ymd(fn(d.getFullYear() + 1)), yearly: key !== 'xmasEve' && key !== 'nye' }; };
     var list = [
       make('xmasEve', function(yy){ return new Date(yy, 11, 24); }), make('xmas', function(yy){ return new Date(yy, 11, 25); }), make('boxing', function(yy){ return new Date(yy, 11, 26); }),
       make('nye', function(yy){ return new Date(yy, 11, 31); }), make('nyd', function(yy){ return new Date(yy, 0, 1); }), make('family', function(yy){ return thirdMonday(yy, 1); }),
       make('goodFri', function(yy){ var e = easter(yy); return new Date(e.getFullYear(), e.getMonth(), e.getDate() - 2); }), make('easterMon', function(yy){ var e = easter(yy); return new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1); }),
+      // Victoria Day: the Monday before May 25. Canada Day: July 1 (July 2 when the 1st is a Sunday).
+      make('victoria', function(yy){ var d = new Date(yy, 4, 24); while (d.getDay() !== 1) d.setDate(d.getDate() - 1); return d; }),
+      make('canada', function(yy){ var d = new Date(yy, 6, 1); return d.getDay() === 0 ? new Date(yy, 6, 2) : d; }),
+      make('bcDay', function(yy){ return nthMonday(yy, 7, 1); }), make('labour', function(yy){ return nthMonday(yy, 8, 1); }),
+      make('truth', function(yy){ return new Date(yy, 8, 30); }), make('thanks', function(yy){ return nthMonday(yy, 9, 2); }),
+      make('remembrance', function(yy){ return new Date(yy, 10, 11); }),
     ];
     list.sort(function(a, b){ return a.d - b.d; });
     return list;
   }
+  // The holiday tiles shown before "Show all holidays": the next few, plus any already ticked.
+  var HOL_FEW = 6;
   // The date box opens on next month (closures are planned ahead; this month's wheel was the fiddly part).
   function nextMonth(){ var d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 1)); }
   function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
@@ -242,7 +267,7 @@
     return step;
   }
   function mark(){ var b = base(S.step); if (STEPS.indexOf(b) >= 0) S.dirty = b; }
-  function after(step){ if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
+  function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); } if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
@@ -260,7 +285,7 @@
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
@@ -395,7 +420,7 @@
     var st = S.step, b = base(st);
     var here = { 'hours:edit': 'hoursSave', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
       'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook',
-      'menu:web': 'menuWebSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
+      'menu:web': 'menuWebSave', 'menu:social': 'menuSocialSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
       'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave',
       'hours:kitchentime': 'kitchenSave', 'offer:sports': 'sportsSave', 'offer:minors': 'minorsSave' }[st];
     if (here) return here;
@@ -449,7 +474,11 @@
       // the same thing twice. The first Sent now says it once, in the lead.
       var explain = sentStep && S.sentExplained === p[1] && !S.savedLine[p[1]];
       if (explain) line = T.sentMeans;
+      // No sports, but the description still talks about them (pub test 5): one tap to fix it in "Your story". Never changed
+      // for them: they edit it, and it's checked first like any description.
+      var sb = p[1] === 'offer' && !S.badges.sports_tv && !S.storyFixed ? sportsBit() : '';
       x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead"' + (explain ? ' id="suSentMeans"' : '') + '>' + h(line) + '</p></div>'
+        + (sb ? '<div class="su-day su-sportsfix" id="suSportsFix"><p class="su-q" style="margin:0 0 6px">' + h(T.storySportsQ) + '</p><p class="su-hint" style="margin:0 0 12px">' + h(fill(T.storySportsLead, { bit: sb })) + '</p>' + big('✎', T.storySportsBtn, '', true, 'storyFix') + '</div>' : '')
         + '<div class="su-stack">' + big('➜', nextLabel(p[1]), '', false, 'after:' + p[1]) + '</div>';
     } else if (s === 'ess') {
       // Part 1 is done: the score, the page, and one choice.
@@ -498,7 +527,8 @@
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
-            + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(T.copyAll) + '</button><button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>' + hDone(d) + '</div>' : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
+            + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(othersClosed(d) ? T.copyAll : T.copyOpen) + '</button><button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>' + hDone(d) + '</div>'
+            + (!othersClosed(d) && DAYS.some(function(x){ return x !== d && !S.week[x]; }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
         + '<div class="su-day"><div class="su-dh"><span>' + h(T.winterQ) + '</span><button type="button" class="su-toggle" data-act="winter" aria-pressed="' + (S.winter.on ? 'true' : 'false') + '">' + h(S.winter.on ? T.yes : T.no) + '</button></div>'
         + (S.winter.on ? '<p class="su-hint">' + h(T.winterHint) + '</p><p class="su-q">' + h(T.whichMonths) + '</p>' + monthChips(S.winter.months, 'winter') + '<p class="su-q">' + h(T.hoursThen) + '</p><div class="su-times"><label class="su-sr" for="wf">' + h(T.starts) + '</label><input type="time" id="wf" value="' + S.winter.from + '"> ' + h(T.to) + ' <label class="su-sr" for="wt">' + h(T.ends) + '</label><input type="time" id="wt" value="' + S.winter.to + '"></div>' : '')
@@ -528,7 +558,8 @@
         + (monthsOn ? '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(fill(T.monthsRow, { a: monthName(mr.a - 1), b: monthName(mr.b - 1) })) + '</span><button type="button" data-act="monthsClear" aria-label="' + h(T.remove) + '">✕</button></div>' : '')
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         + '<button type="button" class="su-more" data-act="go:closures:months">' + h(T.wholeMonths) + '</button>'
-        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
+        + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(T.holidays[o.key] + ': ' + T.everyYear) + '</span></label>'; }).join('')
         + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0; }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
         + '<div class="su-stack su-sticky">' + (nothing ? big('✕', T.nothingComing, '', false, 'closuresNone') : big('✓', newC > 0 ? fill(newC === 1 ? T.saveClosures1 : T.saveClosuresN, { n: newC }) : T.saveClosures, '', false, 'closuresSave')) + '</div>' + skip('closures');
@@ -552,7 +583,8 @@
         + '<p class="su-lead" id="suCuiNone" hidden>' + h(T.notOnList) + '</p>'
         + (showAll ? '' : '<button type="button" class="su-more" data-act="cuiAll">' + h(T.showMore) + '</button>')
         + '<div class="su-stack' + (S.cuis.length ? ' su-sticky' : '') + '">' + big('➜', T.cuisineNext, '', false, 'cuisineNext') + '</div>'
-        + (C.pub && S.kitchen.mode !== 'none' ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
+        // Only before the kitchen question is answered (pub test 5: offered right after "food until we close").
+        + (C.pub && !S.kitchen.mode ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
     } else if (s === 'cuisine:place') {
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
@@ -581,7 +613,12 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
-        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + big('🌐', T.web, '', true, 'go:menu:web') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
+        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + big('🌐', T.web, '', true, 'go:menu:web') + big('📘', T.menuSocial, '', true, 'go:menu:social') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
+    } else if (s === 'menu:social') {
+      // Pub test 5 (2026-11-10): the menu is on Facebook or Instagram. A link is the menu link (checked first, like the
+      // website one); a page name goes to us to find (the Facebook "find the link" way).
+      x = q(T.menuSocialQ, T.menuSocialLead) + msgs() + field('suMsoc', T.menuSocialLabel, S.menuSoc || '', { mode: 'url', max: 300 }) + ex(T.menuSocialEx)
+        + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'menuSocialSave') + '</div>';
     } else if (s === 'menu:upload' || s === 'happy:sheet' || s === 'specials:sheet') {
       var isMenu = s === 'menu:upload', files = isMenu ? S.menuFiles : S.sheetFiles;
       var title = isMenu ? (files.length ? T.upQSome : T.upQ) : p[0] === 'happy' ? T.sheetHappyQ : T.sheetSpecialsQ;
@@ -601,9 +638,9 @@
         + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
       var site = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
-      var lead2 = s === 'menu:web' ? T.webLead : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
-      x = q(s === 'menu:web' ? T.webQ : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
-        + '<p class="su-hint"><button type="button" class="su-link" data-act="urlBack">' + h(T.putBack) + '</button></p>'
+      var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
+      x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
+        + (site ? '<p class="su-hint"><button type="button" class="su-link" data-act="urlBack">' + h(T.putBack) + '</button></p>' : '')
         + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: site || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
@@ -611,9 +648,12 @@
       x = q(T.emailQ, fill(T.emailLead, { name: C.name })) + '<div class="su-row su-mail"><span aria-hidden="true">✉️</span><span id="suEm">' + h(C.email) + '</span><button type="button" data-act="copy">' + h(T.copy) + '</button></div><p class="su-note" id="suCopied" role="status"></p>'
         + '<div class="su-stack"><a class="su-big su-alt" href="' + h(mail) + '"><span class="su-ico" aria-hidden="true">✉️</span><span>' + h(T.openMail) + '<small>' + h(T.openMailSub) + '</small></span></a>' + big('✓', T.willEmail, '', false, 'menuEmailDone') + '</div>';
     } else if (s === 'offer') {
-      x = doneLine('offer') + q(T.offerQ, T.offerLead) + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
+      // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
+      var resTicked = !S.done.offer && (C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; });
+      x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>' : '') + '</div>'; }).join('')
+        + '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>'
         + '<div class="su-stack su-offer-save">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:dogs') {
       x = q(T.dogQ, T.dogLead) + msgs() + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
@@ -657,8 +697,8 @@
           + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div></div>';
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
-      var L2 = S.story.length;
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + msgs() + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= 120 ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= 120 ? T.storyGood : T.storyCount) + '</p>' + ex(T.storyEx) + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
@@ -982,7 +1022,7 @@
     if (k === 'basicsNoSite') {
       S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = '';
       var chN = {}; if (S.addr.trim() !== (CUR.address || '')) chN.address = S.addr; if (phoneChanged(S.phone)) chN.phone = S.phone;
-      if (CUR.website) { chN.website = ''; return saveAll('basics', [chN], null, null, function(){ phoneSaved(chN); }); }
+      if (CUR.website) { chN.website = ''; return saveAll('basics', [chN], null, null, function(){ phoneSaved(chN); C.website = ''; }); }
       var listN = [{ not_offered: addNot('website') }]; if (Object.keys(chN).length) listN.push(chN);
       return saveAll('basics', listN, null, null, function(){ phoneSaved(chN); });
     }
@@ -1030,7 +1070,7 @@
     if (k === 'monthsClear') { S.months = {}; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
       var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key); }).map(function(o){ var nd = ymd(new Date(o.d.getFullYear() + 1, o.d.getMonth(), o.d.getDate())); return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
       var mr2 = monthRun(S.months); if (mr2.bad) { S.nudge = T.monthsInRow; return render(); }
       var om = k === 'closuresNone' || mr2.none || mr2.all ? '' : mr2.a + '-' + mr2.b;
       var cl = [{ closures: out }]; if (om !== (CUR.open_months || '')) cl.push({ open_months: om });
@@ -1050,6 +1090,7 @@
     if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
+    if (k === 'holAll') { S.holAll = !S.holAll; var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
     if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', foodAgain([{ cuisines: S.cuis, place_type: S.place }])); }
     if (k === 'take') return el('suTake').click();
@@ -1061,6 +1102,17 @@
     if (k === 'sendMenuPages') return sendPages(S.menuPages, null, 'menu', T.menuNote);
     if (k === 'menuWebSave') { var u = el('suUrl').value.trim(); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
     if (k === 'menuEmailDone') return record('menu', 'email');
+    if (k === 'menuSocialSave') {
+      var ms = el('suMsoc').value.trim(); S.menuSoc = ms; if (!ms) { S.nudge = T.menuSocialEmpty; return render(); }
+      var mlink = /^@[A-Za-z0-9._]{2,30}$/.test(ms) ? 'https://www.instagram.com/' + ms.slice(1) : /(?:facebook\.com|fb\.com|instagram\.com)\//i.test(ms) && !/\s/.test(ms) ? ms : '';
+      if (mlink) return saveAll('menu', [{ menu_url: mlink }], 'day');
+      if (S.busy) return; S.busy = true; S.error = ''; render();
+      return post(C.base + '/menu/help', { note: fill(T.menuSocialNote, { name: ms }), contact_email: '', contact_phone: '' }).then(function(j){
+        if (!(j && j.ok)) { S.busy = false; S.error = why(j); return render(); }
+        S.savedLine.menu = T.savedMenuSocialName;
+        return progress('menu', 'day').then(function(ok){ S.busy = false; if (ok) go('saved:menu'); else render(); });
+      });
+    }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
     if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, ''); S.webUrl = uu.value; uu.focus(); } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
@@ -1110,7 +1162,8 @@
     if (k === 'happySave') return happySave();
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
-    if (k === 'storySave') { S.story = el('suStory').value; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
+    if (k === 'storySave') { S.story = el('suStory').value; if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
       if (!line) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
@@ -1144,7 +1197,11 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hclose]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-hclose'); delete S.hoursOpen[d]; var y = window.scrollY; render(); window.scrollTo(0, y); var r = el('suRow' + d); if (r && r.getBoundingClientRect().top < 60) { r.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk]'), function(b){ b.onclick = function(){
       readTimes(); var all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : 'data-copywk'), src = S.week[d]; if (!src) return;
-      DAYS.forEach(function(x){ if (x !== d && (all || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(x) >= 0)) S.week[x] = clone(src); });
+      // Pub test 5 (2026-11-10): copying never reopens a day marked Closed ("Every day" opened a closed Monday again). It
+      // copies to the open days only ("Every open day", Mon–Fri's open days); a Tue–Sun pub is one tap. Only when every
+      // other day is closed (a new page with no hours yet) does it fill them all.
+      var fresh = othersClosed(d);
+      DAYS.forEach(function(x){ if (x !== d && (all || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(x) >= 0) && (fresh || S.week[x])) S.week[x] = clone(src); });
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d); S.week[d] = clone(S.week[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -1166,6 +1223,10 @@
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
       if (k === 'dog_friendly' && S.badges[k]) { S.noDogs = false; press('no_dogs', false); }
+      // A heated or covered patio is a patio (pub test 5): ticking it ticks Patio; unticking Patio unticks it.
+      if (k === 'heated_patio' && S.badges[k] && !S.badges.patio) { S.badges.patio = true; press('patio', true); }
+      if (k === 'patio' && !S.badges[k] && S.badges.heated_patio) { S.badges.heated_patio = false; press('heated_patio', false); }
+      if (k === 'sports_tv') sportsNote();
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
