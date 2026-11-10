@@ -206,7 +206,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'on your page soon');
   assert.equal(cfg.t.sentTitle, 'Sent');
   assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just the patio)');
-  assert.equal(cfg.t.tooSmall, 'This photo is too small to look sharp. Try the original from your camera roll.');
+  assert.equal(cfg.t.tooSmall, 'This one would look blurry. Pick a different one.');
   assert.equal(cfg.t.backSettings, 'Back to my edit page'); assert.ok(!/page settings/.test(JSON.stringify(cfg.t)), 'one name for the edit page');
   assert.ok(!/réglages/.test(JSON.stringify(strings.fr)));
   assert.match(html, /body\.owner-setup \.su-pages img \{ object-fit: contain;/);

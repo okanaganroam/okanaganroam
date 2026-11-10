@@ -62,12 +62,28 @@
     if (Date.now() < holdUntil) return;
     var line = Math.max(166, parseFloat(getComputedStyle(nav).top) + nav.offsetHeight + 48);
     var mobile = window.matchMedia('(max-width:899px)').matches;
-    var current = sections[0];
+    // The section that holds the reading line wins; else the closest one above it. The nav's order isn't the page's
+    // order on every layout, so "the last link whose section has passed the line" picked Deals while the Hours card
+    // was on screen (pub fresh-eyes 2, 2026-11-10). Near the bottom of the page, the lowest section in view wins.
+    var current = sections[0], holding = null, holdTop = -Infinity, above = null, aboveTop = -Infinity;
     sections.forEach(function (section) {
       // On desktop Hours sits alongside the main content, rather than after it.
       if (section.id === 'venueHours' && !mobile) return;
-      if (section.getBoundingClientRect().top <= line) current = section;
+      var r = section.getBoundingClientRect();
+      if (r.top <= line && r.bottom > line && r.top > holdTop) { holding = section; holdTop = r.top; }
+      if (r.top <= line && r.top > aboveTop) { above = section; aboveTop = r.top; }
     });
+    current = holding || above || current;
+    var doc = document.documentElement;
+    if (window.innerHeight + window.pageYOffset >= doc.scrollHeight - 4) {
+      var lowest = null, lowTop = -Infinity;
+      sections.forEach(function (section) {
+        if (section.id === 'venueHours' && !mobile) return;
+        var r = section.getBoundingClientRect();
+        if (r.top < window.innerHeight && r.bottom > 0 && r.top > lowTop) { lowest = section; lowTop = r.top; }
+      });
+      if (lowest) current = lowest;
+    }
     var hours = document.getElementById('venueHours');
     // Hours sits beside the content on a computer, so it stays the current tab after tapping it until the visitor
     // scrolls on to something else.

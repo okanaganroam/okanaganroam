@@ -181,7 +181,7 @@ test('Midnight on a public page: a place that closes at 12:00 AM reads "midnight
 test('hours editor, happy hour and closures: Same every day, Same as Monday, Open ✓/Closed, All day, This year and next', async () => {
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`);
   const s = scriptOf(html), cfg = cfgOf(html);
-  assert.equal(cfg.t.sameEvery, 'Same every day'); assert.equal(cfg.t.sameAsMon, 'Same as Monday');
+  assert.equal(cfg.t.sameEvery, 'Copy Monday to every day'); assert.equal(cfg.t.sameAsMon, 'Same as Monday');
   assert.equal(cfg.t.openOn, 'Open ✓'); assert.equal(cfg.t.closedOff, 'Closed');
   assert.match(s, /data-act="sameEvery"/); assert.match(s, /data-samemon/); assert.match(s, /data-dayopen/); assert.match(s, /data-dayclosed/);
   assert.match(s, /function t12[\s\S]{0,400}'Midnight'[\s\S]{0,200}'Noon'/);
