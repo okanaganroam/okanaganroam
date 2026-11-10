@@ -71,6 +71,7 @@ const FR_TEXT = {
   'Sports TV': 'Sports à la télé',
   'Sports on TV': 'Sports à la télé',
   'Patio': 'Terrasse',
+  'Heated patio': 'Terrasse chauffée',
   // Short badge labels on the listing cards (2026-10-28).
   'Dogs welcome': 'Chiens bienvenus',
   'Non-alcoholic': 'Sans alcool',

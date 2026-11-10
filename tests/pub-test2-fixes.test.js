@@ -103,8 +103,9 @@ test('2: the too-small words; the red box never covers ✕; the current main pho
 test('3: Facebook is one of the top Part 2 tiles for pubs and restaurants', async () => {
   const pub = cfgOf(await text(`/owner/${tokenFor(mk('pub').id)}/setup`));
   const rest = cfgOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
-  assert.deepEqual(pub.top2, ['music', 'specials', 'story', 'groups', 'facebook']);
-  assert.deepEqual(rest.top2, ['happy', 'specials', 'music', 'story', 'facebook']);
+  // Pub test 3 (2026-11-10): Instagram joins it, right before Facebook.
+  assert.deepEqual(pub.top2, ['music', 'specials', 'story', 'groups', 'instagram', 'facebook']);
+  assert.deepEqual(rest.top2, ['happy', 'specials', 'music', 'story', 'instagram', 'facebook']);
   assert.ok(pub.part2.includes('facebook') && rest.part2.includes('facebook'));
 });
 
@@ -154,12 +155,13 @@ test('7: the spend guess, the pub sports hint, and what "Sent" means', async () 
   const s = scriptOf(await text(`/owner/${tokenFor(mk('pub').id)}/setup`));
   assert.match(s, /CUR\.avg_spend\.source === 'research' \? ' ' \+ fill\(T\.spendGuess/, 'only when the figure is from our research');
   assert.doesNotMatch(TEXT.en.pub.sportsEx, /Big games with sound/);
-  assert.match(TEXT.en.pub.sportsEx, /sound on for big games/);
+  assert.match(TEXT.en.pub.sportsEx, /sound on for big games/); // pub test 3: now a "Tip:", not a question
   assert.doesNotMatch(TEXT.fr.pub.sportsEx, /De grands matchs avec le son/);
-  assert.equal(TEXT.en.sentMeans, 'Sent means we check it first, usually within a day.');
+  // Pub test 3 (2026-11-10): said once, in the lead (it used to repeat "It'll show within a day" under it).
+  assert.equal(TEXT.en.sentMeans, 'Sent means we check it first. It’ll show on your page within a day.');
   assert.ok(TEXT.fr.sentMeans);
   assert.match(s, /if \(sentStep && !S\.sentExplained\) S\.sentExplained = p\[1\];/);
-  assert.match(s, /id="suSentMeans">' \+ h\(T\.sentMeans\)/);
+  assert.match(s, /if \(explain\) line = T\.sentMeans;/);
 });
 
 // ---------- A: happy hour source ----------

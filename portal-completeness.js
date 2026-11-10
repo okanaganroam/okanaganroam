@@ -411,7 +411,12 @@ function renderCompleteness(result, opts) {
   const left = r.missing.length - waitingList.length;
   const nw = waitingList.length + (badgeNames.length ? 1 : 0);
   const gName = new Map(GROUPS.map((g) => [g.key, fr ? g.fr : g.en]));
-  const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
+  // One number everywhere (pub test 3, 2026-11-10: the owner saw 61%, 75%, then 63% here): the score shown counts what
+  // the owner sent and we haven't added yet, the same number the easy setup shows. The live-only score (r.pct) still
+  // decides the badge (badgeState) and the ring's dark part.
+  const shownPct = !r.complete && r.pctWithWaiting != null && r.pctWithWaiting > r.pct ? r.pctWithWaiting : r.pct;
+  const counting = shownPct > r.pct;
+  const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : counting ? L(`Your page is about ${shownPct}% complete`, `Votre fiche est complète à environ ${shownPct} %`) : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
   // Never a big total up front: lead with what takes under a minute or two (2026-11-08).
   const quick = r.quick || [], later = r.later || r.missing;
   const nq = quick.length;
@@ -422,14 +427,19 @@ function renderCompleteness(result, opts) {
   // After the easy setup (o.plainWaiting): one plain sentence instead of a count ("Photos and menu sent. We'll add them
   // within a day."), fresh-eyes 2026-11-09.
   const sentNames = [];
-  if (o.plainWaiting && nw) {
+  // Fields still waiting in the owner's change request that no checklist item names (a new phone number on a page that
+  // already had one): named too, so the line says exactly what is pending (pub test 3, 2026-11-10).
+  const fieldNames = { phone: ['phone', 'téléphone'], address: ['address', 'adresse'], website: ['website', 'site Web'], name: ['name', 'nom'], description: ['your story', 'votre histoire'] };
+  const extraFields = (Array.isArray(o.pendingFields) ? o.pendingFields : []).filter((k) => fieldNames[k]);
+  if (o.plainWaiting && (nw || extraFields.length)) {
     const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
       website: ['website', 'site Web'], arrival: ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
+    for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     if (badgeNames.length) sentNames.push(L('features', 'caractéristiques'));
   }
   const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-  const sentList = sentNames.length > 3 ? sentNames.slice(0, 3).join(', ') + L(' and more', ' et plus') : sentNames.length > 1 ? sentNames.slice(0, -1).join(', ') + L(' and ', ' et ') + sentNames[sentNames.length - 1] : sentNames[0] || '';
+  const sentList = sentNames.length > 1 ? sentNames.slice(0, -1).join(', ') + L(' and ', ' et ') + sentNames[sentNames.length - 1] : sentNames[0] || '';
   const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : envoyé. Nous l’ajouterons d’ici un jour.`) : '';
   const sub0 = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
@@ -532,9 +542,10 @@ function renderCompleteness(result, opts) {
   // Score while waiting (fresh-eyes 3, 2026-11-09): what the owner sent doesn't count until we check it, so the bar says
   // where they'll land: "61% now · about 95% once we check your 8 changes", with a legend for the ring's two colours.
   // The real score (r.pct) never counts waiting items.
-  const prov = !r.complete && nw > 0 && r.pctWithWaiting > r.pct ? r.pctWithWaiting : null;
-  const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${r.pct}% now</strong> · about <strong>${prov}%</strong> ${o.plainWaiting ? 'once we add what you sent' : `once we check your ${nw} ${nw === 1 ? 'change' : 'changes'}`}`, `<strong>${r.pct} % maintenant</strong> · environ <strong>${prov} %</strong> ${o.plainWaiting ? 'une fois ce que vous avez envoyé ajouté' : `une fois vos ${nw} ${nw === 1 ? 'modification vérifiée' : 'modifications vérifiées'}`}`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
-  const yay = ` data-cb-pct="${r.pct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
+  // One number (pub test 3, 2026-11-10): the headline already counts what was sent; this line only says so.
+  const prov = !r.complete && nw > 0 && counting ? shownPct : null;
+  const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${prov}%</strong> counts what you sent. ${o.plainWaiting ? 'We add it' : `We check your ${nw} ${nw === 1 ? 'change' : 'changes'}`}, usually within a day.`, `<strong>${prov} %</strong> compte ce que vous avez envoyé. ${o.plainWaiting ? 'Nous l’ajoutons' : `Nous vérifions vos ${nw} ${nw === 1 ? 'modification' : 'modifications'}`}, habituellement d’ici un jour.`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
+  const yay = ` data-cb-pct="${shownPct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
   // Complete & Verified (2026-11-09): what the business sees about the badge, under the ring.
   const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
   const chip = badgeChipHtml(fr);
@@ -547,7 +558,7 @@ function renderCompleteness(result, opts) {
     : '';
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${r.pct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(o.quietCta && !r.complete ? quietSub : subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${shownPct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(o.quietCta && !r.complete ? quietSub : subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
       ${badgeBlock}${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}

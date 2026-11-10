@@ -68,7 +68,10 @@ function highlightsFor(venue, dogNote, profile = {}) {
   };
   const keys = Array.isArray(profile.highlightKeys) ? profile.highlightKeys : HIGHLIGHTS.map(([k]) => k);
   const out = [];
-  for (const [key, icon] of HIGHLIGHTS) {
+  // profile.highlightFirst: keys that lead (a heated patio, pub test 3 2026-11-10: in November it's the selling point).
+  const first = Array.isArray(profile.highlightFirst) ? profile.highlightFirst : [];
+  const order = HIGHLIGHTS.filter(([k]) => first.includes(k)).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
+  for (const [key, icon] of order) {
     if (!keys.includes(key)) continue;
     let label = text[key];
     if (label && profile.highlightLabels && profile.highlightLabels[key]) label = profile.highlightLabels[key];

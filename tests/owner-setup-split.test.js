@@ -167,7 +167,7 @@ test('sent to type up (menu, happy hour, specials): waiting in the portal and in
   const cb = portal.slice(portal.indexOf('id="opComplete"'), portal.indexOf('id="opCbPanel"'));
   assert.match(cb, /Menu and happy hour sent\. We’ll add them within a day\./);
   assert.doesNotMatch(cb, /\d waiting for our check|check your \d changes/);
-  assert.match(portal, /once we add what you sent/);
+  assert.match(portal, /counts what you sent\. We add it, usually within a day\./); // pub test 3: one number
 });
 
 test('scorer: pendingHelp marks menu / happy hour / specials / Facebook / Instagram as waiting; the plain sentence is opt-in', () => {

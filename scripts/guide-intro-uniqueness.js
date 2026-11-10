@@ -118,7 +118,7 @@ if (useSnapshot) {
 const combos = app.listGuideCombos(app.MIN_INDEXABLE_GUIDE_VENUES);
 const pages = [];
 for (const c of combos) {
-  const rows = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${c.badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`).all(c.region);
+  const rows = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${app.badgeTrueSql(c.badge)} AND redirect_to IS NULL ORDER BY reviews DESC`).all(c.region); // the pub kid-friendly rule, as the site
   const venues = rows.map(app.rowToVenue);
   const facts = app.guideIntroFacts(c.badge, venues);
   const en = app.guideIntroFor(c.region, c.badge, venues, 'en', new Date(), facts);
