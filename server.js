@@ -19472,6 +19472,8 @@ const pubClock = (t, fr) => {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
   if (!m) return '';
   const h = Number(m[1]), mi = m[2];
+  if ((h === 0 || h === 24) && mi === '00') return fr ? 'minuit' : 'midnight';
+  if (h === 12 && mi === '00') return fr ? 'midi' : 'noon';
   if (fr) return mi === '00' ? `${h} h` : `${h} h ${mi}`;
   return `${h % 12 === 0 ? 12 : h % 12}${mi === '00' ? '' : `:${mi}`} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
 };
@@ -19535,6 +19537,17 @@ function pubOwnerHighlights(venue, fr = false) {
   if (!venue || venue.type !== 'pub') return [];
   const f = venueOwnerFeatures(venue.id);
   return PUB_OWNER_BADGES.filter((k) => f[k]).map((k) => [PUB_HIGHLIGHT_ICONS[k], OWNER_EXTRA_BADGE_LABELS[k][fr ? 'fr' : 'en']]);
+}
+// A pub's visible highlights (pub fresh-eyes, 2026-11-10): Sports on TV first (it was cut by the four-item cap and only
+// showed in the folded list), then the usual ones, then Local beer on tap and the games. Never Kid-friendly (a pub says
+// who's welcome in its own line).
+function pubHighlights(venue, dogNote, profile = {}) {
+  const sports = pubSportsText(venue, false);
+  const base = require('./food-drink-venue-layout').highlightsFor({ ...venue, kid_friendly: false }, dogNote, { ...profile, highlightMax: 99,
+    highlightLabels: sports ? { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${sports}` } : profile.highlightLabels });
+  const isTv = (h) => /^Sports (TV|on TV)/.test(h[1]);
+  const ordered = base.filter(isTv).concat(base.filter((h) => !isTv(h)));
+  return ordered.slice(0, profile.highlightMax || 4).concat(pubOwnerHighlights(venue));
 }
 // "hockey, football · 6 to 10 TVs" ('' when the business hasn't said).
 function pubSportsText(venue, fr) {
@@ -32954,7 +32967,13 @@ function frElideOkanagan(s) {
   return typeof s === 'string' ? s.replace(/\b([Dd])u Okanagan\b/g, '$1e l\u2019Okanagan').replace(/\bAu Okanagan\b/g, '\u00c0 l\u2019Okanagan').replace(/\bau Okanagan\b/g, '\u00e0 l\u2019Okanagan') : s;
 }
 function frTidy(s) { return typeof s === 'string' ? frElideOkanagan(frTidyDots(s).replace(FR_FIRST_OF_MONTH, '$11er $2').replace(FR_DE_VOWEL_TOWN, '$1\u2019$2')) : s; }
-function frText(plain) { return frTidy(frTextRaw(plain)); }
+// Pub fresh-eyes (2026-11-10): English clock times say "midnight" now (never "12 AM"); the French lines were built on
+// "12 AM", so a line with "midnight" that has no French of its own is read as "12 AM" (→ "minuit").
+function frText(plain) {
+  let out = frTextRaw(plain);
+  if ((out == null || /\bmidnight\b/.test(out)) && /\bmidnight\b/.test(String(plain))) { const alt = frTextRaw(String(plain).replace(/\bmidnight\b/g, '12 AM')); if (alt != null) out = alt; }
+  return frTidy(out);
+}
 function frTextRaw(plain) {
   const key = String(plain).replace(/\s+/g, ' ').trim();
   if (!key) return null;
@@ -33804,7 +33823,8 @@ function frStatusText(text) {
     : `Ferm\u00e9 du ${day1(d1)} au ${day1(d2)} ${FR_STATUS_MONTHS[m1]}`));
   // Any other closure note the French list has (an owner's "(Renovations)") in French too.
   text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { const fr = /^(holiday|temporary closure)$/.test(note) ? null : frText(note); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : m; });
-  const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; });
+  // "midnight" (pub fresh-eyes, 2026-11-10: English never says "12 AM" now) is "minuit".
+  const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; }).replace(/\bmidnight\b/g, 'minuit');
   return time(text
     .replace('Open now \u00b7 Closes ', 'Ouvert \u00b7 ferme \u00e0 ')
     .replace('Open 24 hours', 'Ouvert 24 h sur 24')
@@ -35353,9 +35373,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
       // tap and the games show in the visible highlights too, not only in the folded features list.
-      highlights: fdLib.highlightsFor(venue.type === 'pub' ? { ...venue, kid_friendly: false } : venue, dogFriendlyNote,
-        venue.type === 'pub' && pubSportsText(venue, false) ? { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), tv: `Sports on TV: ${pubSportsText(venue, false)}` } } : profile)
-        .concat(pubOwnerHighlights(venue)),
+      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : fdLib.highlightsFor(venue, dogFriendlyNote, profile),
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
@@ -48425,7 +48443,11 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     return send(200, { ok: true, live: false });
   }
   if (action === 'help') {
-    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) || (SETUP_NOTE_KINDS.includes(body.sheet) && venue.type === 'restaurant') ? body.sheet : null;
+    // A find-link note (Facebook / Instagram name) is its own request for every type with the easy setup (2026-11-10:
+    // a pub's note fell through to its menu-help row and overwrote it). A note kind from any other type is refused,
+    // never folded into the menu row.
+    if (SETUP_NOTE_KINDS.includes(body.sheet) && !COMPLETENESS_TYPES.has(venue.type)) return send(400, { ok: false, error: generic });
+    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) || SETUP_NOTE_KINDS.includes(body.sheet) ? body.sheet : null;
     const note = typeof body.note === 'string' ? body.note.replace(/[<>]/g, '').trim().slice(0, 1000) : '';
     const contact = ctx.found.account ? { email: ctx.found.account.email } : ownerOptionalEmail(body.contact_email);
     if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
@@ -50242,6 +50264,8 @@ function renderOwnerSetupPage(found, opts) {
     pub, top2: SETUP_TOP2[pub ? 'pub' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
     base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2, progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
+    // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
+    typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub' })[venue.type] || (fr ? 'établissement' : 'place'),
     image: pendingMain || ownImage, website: normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
@@ -50251,7 +50275,9 @@ function renderOwnerSetupPage(found, opts) {
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
     offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' },
-    nightKinds: ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
+    // The first 6 show open (pub fresh-eyes 2026-11-10), so pubs lead with their usual nights.
+    nightKinds: venue.type === 'pub' ? ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic', 'comedy', 'bingo', 'games', 'paint', 'run_club', 'other']
+      : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: !!portalFields(venue.type).happyHour, servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
@@ -50267,8 +50293,8 @@ function renderOwnerSetupPage(found, opts) {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
-    a: `<p>Yes. When you see <strong>Saved ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
+    a: `<p>Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -50389,6 +50415,11 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-times input { font: inherit; font-size: 18px; min-height: 52px; padding: 6px 10px; border-radius: 12px; border: 2px solid var(--su-line); background: #fff; color: var(--su-ink); }
   body.owner-setup .su-toggle { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--su-line); background: #fff; color: var(--su-ink); font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
   body.owner-setup .su-toggle[aria-pressed="true"] { background: var(--su-warn-bg); color: var(--su-warn); border-color: var(--su-warn); }
+  body.owner-setup .su-switch { display: inline-flex; border: 2px solid var(--su-line); border-radius: 12px; overflow: hidden; }
+  body.owner-setup .su-switch button { min-height: 44px; min-width: 76px; padding: 0 12px; border: 0; background: #fff; color: var(--su-ink); font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
+  body.owner-setup .su-switch button[aria-pressed="true"].su-on { background: #1E4F4C; color: #fff; }
+  body.owner-setup .su-switch button[aria-pressed="true"].su-off { background: var(--su-warn-bg); color: var(--su-warn); }
+  body.owner-setup .su-samerow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   body.owner-setup .su-same { margin-top: 8px; }
   body.owner-setup .su-sent { background: var(--su-good-bg); color: var(--su-good); font-weight: 800; padding: 12px 14px; border-radius: 14px; margin: 0 0 14px; }
   body.owner-setup .su-example { font-size: 16px; color: var(--su-soft); background: var(--su-card); border-left: 4px solid var(--su-gold); padding: 10px 12px; border-radius: 0 12px 12px 0; margin: -8px 0 18px; }
@@ -51554,8 +51585,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
     keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
     keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
-    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
-    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],

@@ -228,7 +228,8 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(s, /fill\(T\.added, \{ x: S\.added \}\)/);
   assert.ok(s.indexOf("big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')") > 0 && s.indexOf("big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')") < s.indexOf("big('📄', T.upload, T.uploadSub, true, 'go:menu:upload')"), 'Take photos of my menu leads');
   assert.equal(cfg.t.upload, 'Upload my menu (a file or photos)');
-  assert.match(s, /<details class="su-kinds"><summary>/);
+  // Pub fresh-eyes (2026-11-10): the 6 most common kinds show open; the rest sit under "More kinds".
+  assert.match(s, /<div class="su-chips su-kinds">/); assert.match(s, /h\(T\.moreKinds\)/);
   assert.match(s, /h\(T\.fewMore\)/);
   assert.match(s, /su-pages su-pages-big/);
   assert.match(s, /var n = inp\.value\.length; if \(!n\) return;/, 'the cursor is left alone in an empty box');

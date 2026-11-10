@@ -342,4 +342,31 @@ fr.pub = {
   quick: Object.assign({}, fr.quick, { groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible', 'Réservez la terrasse'] }),
 };
 
+// Pub fresh-eyes fixes (2026-11-10): a warmer greeting, an honest time, the kind of place in the front-door step, plain
+// words instead of "Roam Now map", and only two ways of saying "when" (Saved ✓ / Sent ✓).
+Object.assign(en, {
+  hi: 'Hi, welcome to your page for {name} 👋',
+  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
+  doorLead: 'So visitors can walk right to your door. It takes one photo, taken outside your {type}.',
+  doorHere: 'Are you at your {type} right now?',
+  helpYes: 'Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you right now:',
+  mapFail: 'We couldn’t load the map. Send it with your address and we’ll place the pin for you.', mapFailSend: 'Send with my address', mapFailQ: 'Send your front door photo',
+  sameEvery: 'Same every day', sameAsMon: 'Same as Monday', openOn: 'Open ✓', closedOff: 'Closed',
+  allDay: 'All day (open to close)', everyYear: 'This year and next', everyYearSub: 'Ticked: we also mark you closed on that day next year.',
+  moreKinds: 'More kinds', andMore: 'and more',
+});
+en.pub.hiLead = 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.';
+Object.assign(fr, {
+  hi: 'Bonjour, bienvenue sur votre page pour {name} 👋',
+  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
+  doorLead: 'Pour que les visiteurs marchent jusqu’à votre porte. Il suffit d’une photo, prise devant votre {type}.',
+  doorHere: 'Êtes-vous à votre {type} en ce moment?',
+  helpYes: 'Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous en ce moment :',
+  mapFail: 'Nous n’avons pas pu charger la carte. Envoyez-la avec votre adresse et nous placerons l’épingle pour vous.', mapFailSend: 'Envoyer avec mon adresse', mapFailQ: 'Envoyez la photo de votre devanture',
+  sameEvery: 'Pareil tous les jours', sameAsMon: 'Comme lundi', openOn: 'Ouvert ✓', closedOff: 'Fermé',
+  allDay: 'Toute la journée (de l’ouverture à la fermeture)', everyYear: 'Cette année et l’an prochain', everyYearSub: 'Coché : nous indiquons aussi que vous êtes fermé ce jour-là l’an prochain.',
+  moreKinds: 'Autres genres', andMore: 'et plus',
+});
+fr.pub.hiLead = 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.';
+
 module.exports = { en, fr };

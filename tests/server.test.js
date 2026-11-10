@@ -14298,7 +14298,7 @@ test('Stage 2: the venue page hours list never shows an unlisted day as "Closed"
     // 12-hour since 2026-10-14, the same reading as every status line.
     assert.deepEqual(rows, [
       ['Monday', 'Hours not listed'], ['Tuesday', '12 PM – 11 PM'], ['Wednesday', 'Closed'], ['Thursday', '12 PM – 2 AM'],
-      ['Friday', '11 AM – 12 AM'], ['Saturday', '12 AM – 11:59 PM'], ['Sunday', 'Closed'],
+      ['Friday', '11 AM – midnight'], ['Saturday', '12 AM – 11:59 PM'], ['Sunday', 'Closed'],
     ]);
     assert.doesNotMatch(list, /26:00|24:00|Open 24 hours/);
     const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.openingHoursSpecification);

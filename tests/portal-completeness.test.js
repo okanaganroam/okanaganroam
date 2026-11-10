@@ -308,6 +308,8 @@ test('no ranking, sorting or indexing code reads the score', () => {
     // and the owner-only restaurant features (which restaurants get them). None feeds ranking, sorting or indexing.
     // Fresh-eyes fixes (2026-11-10): "Your updates" reads the type only to word restaurant updates in the owner's words.
     'function ownerVenueActivity',
+    // Pub fresh-eyes (2026-11-10): the menu-help route reads it only to allow a find-link note for setup types.
+    'async function handleMenuApi',
     'function setupScore', 'function handleOwnerSetupProgress', 'function renderOwnerSetupPage', 'async function handleOwnerChangeSubmission', 'function ownerFeatureChipsHtml'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
