@@ -9,7 +9,7 @@ const en = {
   welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet' },
   labels: {
-    basics: 'Address and phone', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Average spend', cuisine: 'What you serve',
+    basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Average spend', cuisine: 'What you serve',
     photos: 'Photos', menu: 'Menu', offer: 'What you offer', happy: 'Happy hour', specials: 'Weekly specials', music: 'Weekly events', story: 'Your story',
     book: 'Booking', takeout: 'Takeout', known: 'Known for', groups: 'Groups', instagram: 'Instagram', facebook: 'Facebook', door: 'Your front door',
   },
@@ -18,8 +18,8 @@ const en = {
   nextStep: 'Next: {step}', finish: 'Finish', alreadyDone: '✓ Saved. You can change it here.',
   failed: 'That didn’t go through. Please check your connection and try again.', tryAgain: 'Try again', sending: 'Sending…',
   yes: 'Yes', no: 'No', putBack: 'Put it back', example: 'For example: {x}', remove: 'Remove',
-  basicsQ: 'Is this your address and phone number?', address: 'Address', phone: 'Phone', yesRight: 'Yes, that’s right', changeThem: 'Change them',
-  basicsEditQ: 'Change your address or phone', streetLabel: 'Street address', phoneLabel: 'Phone number', saveThese: 'Save these', noChange: 'Nothing changed. If they’re right, tap Back and then “Yes, that’s right”.',
+  basicsQ: 'Is this your address, phone and website?', address: 'Address', phone: 'Phone', website: 'Website', noWebsiteYet: 'No website yet', noWebsiteSaid: 'You don’t have a website', yesRight: 'Yes, that’s right', changeThem: 'Change them',
+  basicsEditQ: 'Change your address, phone or website', streetLabel: 'Street address', phoneLabel: 'Phone number', websiteLabel: 'Website', websiteEx: 'For example: yourbusiness.com', noWebsiteBtn: 'We don’t have a website', websiteBad: 'Please check the web address, for example yourbusiness.com', saveThese: 'Save these', noChange: 'Nothing changed. If they’re right, tap Back and then “Yes, that’s right”.',
   hoursQ: 'Are these still your hours?', closed: 'Closed', open: 'Open', hoursEditQ: 'Change your hours', hoursEditLead: 'Tap a time to change it.',
   sameAs: 'Same as {day}', opens: '{day} opens', closes: '{day} closes', to: 'to', saveHours: 'Save my hours', needOpenDay: 'Please set at least one day you’re open.',
   winterQ: 'Different hours part of the year?', winterHint: 'For example, shorter winter hours from November to April.', whichMonths: 'Which months?', hoursThen: 'Hours in those months',
@@ -96,7 +96,7 @@ const fr = {
   welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait' },
   labels: {
-    basics: 'Adresse et téléphone', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Dépense moyenne', cuisine: 'Ce que vous servez',
+    basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Dépense moyenne', cuisine: 'Ce que vous servez',
     photos: 'Photos', menu: 'Menu', offer: 'Ce que vous offrez', happy: 'Happy hour', specials: 'Spéciaux de la semaine', music: 'Événements de la semaine', story: 'Votre histoire',
     book: 'Réservations', takeout: 'À emporter', known: 'Reconnu pour', groups: 'Groupes', instagram: 'Instagram', facebook: 'Facebook', door: 'Votre porte d’entrée',
   },
@@ -105,8 +105,8 @@ const fr = {
   nextStep: 'Suivant : {step}', finish: 'Terminer', alreadyDone: '✓ Enregistré. Vous pouvez le modifier ici.',
   failed: 'Cela n’a pas fonctionné. Vérifiez votre connexion et réessayez.', tryAgain: 'Réessayer', sending: 'Envoi…',
   yes: 'Oui', no: 'Non', putBack: 'Remettre comme avant', example: 'Par exemple : {x}', remove: 'Retirer',
-  basicsQ: 'Est-ce bien votre adresse et votre numéro de téléphone?', address: 'Adresse', phone: 'Téléphone', yesRight: 'Oui, c’est exact', changeThem: 'Les modifier',
-  basicsEditQ: 'Modifier votre adresse ou votre téléphone', streetLabel: 'Adresse', phoneLabel: 'Numéro de téléphone', saveThese: 'Enregistrer', noChange: 'Rien n’a changé. S’ils sont exacts, touchez Retour puis « Oui, c’est exact ».',
+  basicsQ: 'Est-ce bien votre adresse, votre téléphone et votre site Web?', address: 'Adresse', phone: 'Téléphone', website: 'Site Web', noWebsiteYet: 'Pas encore de site Web', noWebsiteSaid: 'Vous n’avez pas de site Web', yesRight: 'Oui, c’est exact', changeThem: 'Les modifier',
+  basicsEditQ: 'Modifier votre adresse, votre téléphone ou votre site Web', streetLabel: 'Adresse', phoneLabel: 'Numéro de téléphone', websiteLabel: 'Site Web', websiteEx: 'Par exemple : votreentreprise.com', noWebsiteBtn: 'Nous n’avons pas de site Web', websiteBad: 'Vérifiez l’adresse Web, par exemple votreentreprise.com', saveThese: 'Enregistrer', noChange: 'Rien n’a changé. S’ils sont exacts, touchez Retour puis « Oui, c’est exact ».',
   hoursQ: 'Est-ce que ce sont toujours vos heures?', closed: 'Fermé', open: 'Ouvert', hoursEditQ: 'Modifier vos heures', hoursEditLead: 'Touchez une heure pour la changer.',
   sameAs: 'Comme {day}', opens: '{day} ouverture', closes: '{day} fermeture', to: 'à', saveHours: 'Enregistrer mes heures', needOpenDay: 'Indiquez au moins un jour d’ouverture.',
   winterQ: 'D’autres heures une partie de l’année?', winterHint: 'Par exemple, des heures d’hiver plus courtes de novembre à avril.', whichMonths: 'Quels mois?', hoursThen: 'Heures pendant ces mois',
@@ -234,7 +234,7 @@ fr.st.no = 'non';
 
 // Fresh-eyes fixes (2026-11-10).
 Object.assign(en, {
-  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
   nextPlain: 'Next', backToList: 'Back to the list', changeQ: 'Change something?', changeLead: 'Tap anything to change it.', welcomeLead: 'Your answers are saved. Tap any line to change it.',
   menuSentEmail: '✓ You said you’ll email your menu.',
   pctWill: 'Your page will be about {n}% complete', pctWillSub: 'once we add what you sent, usually within a day.', pctRightNow: 'It’s {n}% right now.',
@@ -249,7 +249,7 @@ Object.assign(en, {
 });
 en.noLabels = Object.assign({}, en.noLabels, { groups: 'no big groups' });
 Object.assign(fr, {
-  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
   nextPlain: 'Suivant', backToList: 'Retour à la liste', changeQ: 'Changer quelque chose?', changeLead: 'Touchez une ligne pour la modifier.', welcomeLead: 'Vos réponses sont enregistrées. Touchez une ligne pour la modifier.',
   menuSentEmail: '✓ Vous avez dit que vous enverrez votre menu par courriel.',
   pctWill: 'Votre fiche sera complète à environ {n} %', pctWillSub: 'dès que nous aurons ajouté ce que vous avez envoyé, habituellement d’ici un jour.', pctRightNow: 'Elle est à {n} % en ce moment.',
@@ -304,7 +304,7 @@ fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
 // Pubs (Dayton, 2026-11-10; mockup drafts/pub-portal-2026-11-10/pub-setup.html): pub examples and the pub-only screens,
 // laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
 en.pub = {
-  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
   cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', cuisineLeadEmpty: 'Pick up to 3. Serving food now? Pick what you serve.', noFood: 'We don’t serve food',
   placeQ: 'What kind of pub is it?', placeLead: 'Pick the one that fits best.',
   groupsLead: 'Birthdays, work parties, team nights.', knownEx: 'Wing night and the hockey on the big screen', igLead: 'Type your Instagram name, like @yourpub.',
@@ -323,7 +323,7 @@ en.pub = {
   quick: Object.assign({}, en.quick, { groups: ['Call ahead for 10 or more', 'Private room available', 'Book the patio'] }),
 };
 fr.pub = {
-  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
   cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', cuisineLeadEmpty: 'Choisissez-en jusqu’à 3. Vous servez à manger maintenant? Choisissez ce que vous servez.', noFood: 'Nous ne servons pas de nourriture',
   placeQ: 'Quel genre de pub est-ce?', placeLead: 'Choisissez celui qui convient le mieux.',
   groupsLead: 'Anniversaires, fêtes de bureau, soirées d’équipe.', knownEx: 'La soirée ailes de poulet et le hockey sur grand écran', igLead: 'Écrivez votre nom Instagram, comme @votrepub.',
