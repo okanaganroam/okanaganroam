@@ -1224,6 +1224,10 @@ CREATE INDEX IF NOT EXISTS idx_visitor_contribution_notes_contribution ON visito
   const cols = db.prepare('PRAGMA table_info(venue_owner_links)').all().map((c) => c.name);
   if (!cols.includes('prev_token_hash')) db.exec('ALTER TABLE venue_owner_links ADD COLUMN prev_token_hash TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_venue_owner_links_prev ON venue_owner_links (prev_token_hash)');
+  // Portal opens (2026-11-09): when a business first and last opened its private link, and how many times.
+  for (const [col, def] of [['first_opened_at', 'TEXT'], ['last_opened_at', 'TEXT'], ['open_count', 'INTEGER NOT NULL DEFAULT 0']]) {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE venue_owner_links ADD COLUMN ${col} ${def}`);
+  }
 }
 
 // Claim this listing (2026-10-18): a business owner with no edit link (no
