@@ -232,4 +232,35 @@ Object.assign(fr, {
 });
 fr.st.no = 'non';
 
+// Fresh-eyes fixes (2026-11-10).
+Object.assign(en, {
+  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes. You can stop any time and carry on later.',
+  nextPlain: 'Next', backToList: 'Back to the list', changeQ: 'Change something?', changeLead: 'Tap anything to change it.', welcomeLead: 'Your answers are saved. Tap any line to change it.',
+  menuSentEmail: '✓ You said you’ll email your menu.',
+  pctWill: 'Your page will be about {n}% complete', pctWillSub: 'once we add what you sent, usually within a day.', pctRightNow: 'It’s {n}% right now.',
+  leftLater: '{n} left for later, whenever suits you.', leftLater1: '1 thing left for later, whenever suits you.', finishAlmost: 'Nearly there',
+  exitQ: 'Save these first?', exitLead: 'You have answers on this screen that aren’t saved yet.', exitSave: 'Save and exit', exitDrop: 'Exit without saving', exitStay: 'Keep going',
+  added: 'Added: {x}', holidaysH: 'Holidays', closuresLead: 'Closed for a while? Add the dates. Then tap the holidays you’re closed.',
+  noneDiet: 'None of these', noneDietSub: 'No vegan, vegetarian or gluten-free options',
+  savedSoon: 'It’ll show on your page soon.',
+  upload: 'Upload my menu (a file or photos)', uploadSub: 'From your phone or computer',
+  pickKind: 'Pick a kind', kindIs: 'Kind: {k}', fewMore: 'A few more', tapBigger: 'Tap a page to see it bigger.',
+  helpTail: 'Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.',
+});
+en.noLabels = Object.assign({}, en.noLabels, { groups: 'no big groups' });
+Object.assign(fr, {
+  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  nextPlain: 'Suivant', backToList: 'Retour à la liste', changeQ: 'Changer quelque chose?', changeLead: 'Touchez une ligne pour la modifier.', welcomeLead: 'Vos réponses sont enregistrées. Touchez une ligne pour la modifier.',
+  menuSentEmail: '✓ Vous avez dit que vous enverrez votre menu par courriel.',
+  pctWill: 'Votre fiche sera complète à environ {n} %', pctWillSub: 'dès que nous aurons ajouté ce que vous avez envoyé, habituellement d’ici un jour.', pctRightNow: 'Elle est à {n} % en ce moment.',
+  leftLater: 'Il en reste {n} pour plus tard, quand vous voudrez.', leftLater1: 'Il en reste 1 pour plus tard, quand vous voudrez.', finishAlmost: 'Vous y êtes presque',
+  exitQ: 'Enregistrer d’abord?', exitLead: 'Des réponses sur cet écran ne sont pas encore enregistrées.', exitSave: 'Enregistrer et quitter', exitDrop: 'Quitter sans enregistrer', exitStay: 'Continuer',
+  added: 'Ajouté : {x}', holidaysH: 'Jours fériés', closuresLead: 'Fermé un certain temps? Ajoutez les dates. Touchez ensuite les jours fériés où vous êtes fermé.',
+  noneDiet: 'Aucune de ces options', noneDietSub: 'Pas d’options véganes, végétariennes ou sans gluten',
+  savedSoon: 'Cela s’affichera bientôt sur votre page.',
+  upload: 'Téléverser mon menu (un fichier ou des photos)', uploadSub: 'De votre téléphone ou ordinateur',
+  pickKind: 'Choisir un genre', kindIs: 'Genre : {k}', fewMore: 'Quelques autres', tapBigger: 'Touchez une page pour l’agrandir.',
+  helpTail: 'Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.',
+});
+
 module.exports = { en, fr };

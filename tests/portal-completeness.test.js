@@ -305,6 +305,8 @@ test('no ranking, sorting or indexing code reads the score', () => {
     'function venueBadgeState', 'function completeVerifiedPageHtml', 'function badgeRemindersDue', 'function renderBadgeReminderPage',
     // Full easy setup (2026-11-09): the setup's own score/progress, its page, the setup-only live rule in the owner save,
     // and the owner-only restaurant features (which restaurants get them). None feeds ranking, sorting or indexing.
+    // Fresh-eyes fixes (2026-11-10): "Your updates" reads the type only to word restaurant updates in the owner's words.
+    'function ownerVenueActivity',
     'function setupScore', 'function handleOwnerSetupProgress', 'function renderOwnerSetupPage', 'async function handleOwnerChangeSubmission', 'function ownerFeatureChipsHtml'].map((name) => {
     const a = src.indexOf(name);
     assert.ok(a > 0, `${name} exists`);
