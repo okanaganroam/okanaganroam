@@ -22217,7 +22217,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '], [/ happy\\s+(?:specials?|spéciaux|speciaux|spécial|deals?)(?=\\s)/g, ' happy '], [/(?:daily|weekly|nightly|today'?s|tonight'?s|dinner|lunch|food|drink) specials?|specials? (?:today|tonight)|spéciaux du jour|speciaux du jour|plats? du jour/g, ' specials '],
     [/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
-    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:wine|wines|beer|beers|craft beers?)|craft beers?|vins? locaux|bi[èe]res? artisanales?/g, ' localdrinks '],
+    [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
     [/locally[ -]?owned|independently owned|propri[ée]t[ée] locale/g, ' ownlocal '], [/take[ -]?out|pour emporter/g, ' takeout '], [/wheel ?chair/g, ' wheelchair '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
     // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
