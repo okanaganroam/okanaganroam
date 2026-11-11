@@ -1328,6 +1328,7 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Recurs': 'Récurrence',
   'With': 'Avec',
   'All day': 'Toute la journée',
+  'Time to be confirmed': 'Heure à confirmer',
   'Matinee': 'Matinée',
   'Mondays & Thursdays until the end of October': 'Les lundis et jeudis jusqu’à la fin d’octobre',
   'Nightly Oct 24 to Oct 30, 7 pm': 'Tous les soirs du 24 au 30 oct., 19 h',

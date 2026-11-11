@@ -26961,10 +26961,11 @@ test('French portal (2026-10-18): forms post from French pages, messages and ema
   assert.deepEqual(ok.body.live.sort(), ['phone', 'price_range']);
   assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, '250-555-0142');
   // Events, photos, settings, access and the help bot.
-  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: '', started_at: old }, cookie);
+  // An end time with no start time (owners may leave both blank since 2026-11-11, so this is the time error they can get).
+  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: '', end_time: '21:00', started_at: old }, cookie);
   assert.equal(ev.body.error, 'Corrigez les champs indiqués.');
   assert.equal(ev.body.errors.name, 'Entrez le nom de l’événement.');
-  assert.equal(ev.body.errors.start_time, 'Entrez l’heure de début ou cochez « Toute la journée ».');
+  assert.equal(ev.body.errors.start_time, 'Ajoutez aussi l’heure de début, ou effacez l’heure de fin.');
   const ph = await post(`/fr/owner/account/venue/${v.id}/photos`, { image: '', credit: 'Portail', rights: false, started_at: old }, cookie);
   assert.equal(ph.body.errors.rights, 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.');
   const pw = await post('/fr/owner/account/password', { current: 'not the password', password: 'another long password' }, cookie);
