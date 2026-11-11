@@ -526,6 +526,7 @@
     var c = y[1] === '24:00' ? '00:00' : y[1];
     return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(fill(T.lateQ, { day: dayName(d) })) + '"><span class="su-latelbl">' + h(T.lateLbl) + '</span>' + LATE.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (c === t ? 'true' : 'false') + '" data-late="' + d + ':' + j + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>';
   }
+  function allDays(days){ return DAYS.every(function(d){ return days && days[d]; }); }
   function dayChips(obj, key){ return chips(obj, key, DAYS.map(function(d){ return { k: d, t: dayName(d) }; }), T.whichDays); }
   function monthChips(obj, key){ var l = []; for (var i = 1; i <= 12; i++) l.push({ k: i, t: monthName(i - 1) }); return chips(obj, key, l, T.whichMonths); }
   // Website shown as a plain domain ("tapsidepub.ca"), or "No website yet" / "You don't have a website".
@@ -1033,7 +1034,8 @@
       if (!S.specials.length) S.specials.push({ days: {}, text: '', price: '', start: '', end: '' });
       x = q(T.specialsTypeQ, T.upTo7) + msgs() + S.specials.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.specialN, { n: i + 1 })) + '</span>' + (S.specials.length > 1 ? '<button type="button" class="su-toggle" data-rm="specials:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          + '<p class="su-q">' + h(T.whichDaysOr) + '</p>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
+          // Café test 3 (2026-11-11): "Every day" in one tap (tap again to clear), like the happy hour's.
+          + '<p class="su-q">' + h(T.whichDaysOr) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" id="suSpAll' + i + '" aria-pressed="' + (allDays(e.days) ? 'true' : 'false') + '" data-act="spDays:' + i + '">' + h(T.everyDay) + '</button></div>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
           + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '')
           + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' ' + (e.endClose ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '">') + '</div>'
           + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.endClose ? 'true' : 'false') + '" data-act="spClose:' + i + '">' + h(T.untilClose) + '</button></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
@@ -1573,6 +1575,7 @@
       mark(); var y9 = window.scrollY; render(); window.scrollTo(0, y9); return;
     }
     if (k === 'keepMain') { S.keepMain = true; S.photos.forEach(function(ph){ ph.main = false; }); return render(); }
+    if (k === 'spDays') { readEntries(); var es = S.specials[+v]; if (!es) return; var on7 = !allDays(es.days); es.days = {}; if (on7) DAYS.forEach(function(d){ es.days[d] = true; }); mark(); var ys = window.scrollY; render(); window.scrollTo(0, ys); return; }
     if (k === 'hhDays') { readEntries(); var sp = String(v).split(','), eh = S.happy[+sp[0]]; if (!eh) return; eh.days = {}; DAYS.forEach(function(d){ if (sp[1] === 'all' || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(d) >= 0) eh.days[d] = true; }); mark(); var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
     if (k === 'monthsUse') {
       // The months tapped are the closed ones; the open months are the rest (none tapped: open all year).
@@ -1818,6 +1821,7 @@
       var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;
       obj[key] = !obj[key]; b.setAttribute('aria-pressed', obj[key] ? 'true' : 'false'); S.nudge = '';
       if (path[0] === 'specials' || path[0] === 'nights') warnRefresh();
+      if (path[0] === 'specials') { var spa = el('suSpAll' + path[1]); if (spa) spa.setAttribute('aria-pressed', allDays(obj) ? 'true' : 'false'); }
     }; });
     // The usual week or the other season's week (pub test 6): the same editor, on W().
     Array.prototype.forEach.call(screen.querySelectorAll('[data-closed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-closed'), wk = W(); wk[d] = wk[d] ? null : [['11:00', '21:00']]; render(); }; });
