@@ -92,3 +92,174 @@ test('1: a café that said "No" to specials can still add some later (the setup 
   ok(await change(tokenFor(v.id), { not_offered: [] }));
   assert.deepEqual(notOffered(v.id), []);
 });
+// The setup page and its script, as a café owner gets it.
+const setupOf = async (v, lang) => { const r = await get(`${lang === 'fr' ? '/fr' : ''}/owner/${tokenFor(v.id)}/setup`); assert.equal(r.status, 200); return r.text; };
+const scriptOf = (html) => /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
+
+// ---------- 2: "No Wi-Fi" and "No laptops" show a friendly line ----------
+test('2: "No Wi-Fi" and "No laptops" show "a place to talk" on the café page, only when picked; EN + FR', async () => {
+  const both = mk('cafe'), wifi = mk('cafe'), laptops = mk('cafe'), neither = mk('cafe'), hasWifi = mk('cafe');
+  ok(await change(tokenFor(both.id), { not_offered: ['wifi'] })); ok(await change(tokenFor(both.id), { cafe_info: { stay: { laptops: 'none' } } }));
+  ok(await change(tokenFor(wifi.id), { not_offered: ['wifi'] }));
+  ok(await change(tokenFor(laptops.id), { cafe_info: { stay: { laptops: 'none', seats: 'few' } } }));
+  ok(await change(tokenFor(neither.id), { cafe_info: { stay: { laptops: 'not_busy' } } }));
+  ok(await change(tokenFor(hasWifi.id), { badges: { wifi: true } })); ok(await change(tokenFor(hasWifi.id), { cafe_info: { stay: { laptops: 'none' } } }));
+  assert.match(page(both, 'en'), /No Wi-Fi or laptops: a place to talk/);
+  assert.match(page(both, 'fr'), /Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter/);
+  assert.match(page(wifi, 'en'), /No Wi-Fi: a place to talk/); assert.match(page(wifi, 'fr'), /Pas de Wi-Fi : un endroit pour discuter/);
+  assert.match(page(laptops, 'en'), /No laptops: a place to talk/); assert.match(page(laptops, 'fr'), /Pas d’ordinateurs portables : un endroit pour discuter/);
+  assert.ok(!/a place to talk/.test(page(neither, 'en')), 'nothing when neither was picked');
+  assert.match(page(hasWifi, 'en'), /No laptops: a place to talk/); assert.ok(!/No Wi-Fi/.test(page(hasWifi, 'en')), 'never "No Wi-Fi" beside a Wi-Fi tile');
+  // Restaurants and pubs never get it.
+  const r = mk('restaurant'); ok(await change(tokenFor(r.id), { not_offered: ['instagram'] }));
+  assert.ok(!/a place to talk/.test(page(r, 'en')));
+  // The setup and checklist words say it shows.
+  for (const L of ['en', 'fr']) { assert.ok(!/Nothing about laptops|Rien sur les ordinateurs/.test(TEXT[L].cafe.laptopSub.none)); assert.match(TEXT[L].cafe.noWifiSub, /Wi-Fi/); }
+  assert.match(TEXT.en.cafe.laptopSub.none, /No laptops: a place to talk/);
+  const owner = (await get(`/owner/${tokenFor(wifi.id)}`)).text;
+  assert.match(owner, /Your page says “No Wi-Fi: a place to talk”/);
+});
+
+// ---------- 3: a dietary note, and the gluten-free chip says which kitchen ----------
+test('3: the dietary note saves (120 max), shows with the details in English, and old diet answers read the same', async () => {
+  const v = mk('cafe', { gluten_free: 1 }); const t = tokenFor(v.id);
+  const old = mk('cafe'); ok(await change(tokenFor(old.id), { cafe_info: { diet: { milks: ['oat'], milk_extra: 'yes' } } }));
+  assert.deepEqual(app.venueCafeInfo(old.id).diet, { milks: ['oat'], milk_extra: 'yes' }, 'no note: stored exactly as before');
+  ok(await change(t, { cafe_info: { diet: { milks: ['oat', 'almond'], milk_extra: 'yes', gf_kitchen: 'shared', note: '  Oat & almond milk +50¢ · Gluten-free: macarons only ' } } }));
+  assert.equal(app.venueCafeInfo(v.id).diet.note, 'Oat & almond milk +50¢ · Gluten-free: macarons only');
+  const en = page(v, 'en');
+  assert.match(en, /gluten-free baking \(made in a shared kitchen\)\. Oat &amp; almond milk \+50¢ · Gluten-free: macarons only/);
+  assert.match(en, /Gluten-free options \(shared kitchen\)/, 'the top chip carries the hint');
+  assert.ok(!/macarons only/.test(page(v, 'fr')), 'her own words stay off the French page, like the other notes');
+  const long = await change(t, { cafe_info: { diet: { note: 'x'.repeat(121) } } });
+  assert.equal(long.status, 400);
+  // A note alone is an answer too.
+  const n2 = mk('cafe'); ok(await change(tokenFor(n2.id), { cafe_info: { diet: { note: 'Ask about gluten-free bread' } } }));
+  assert.match(page(n2, 'en'), /Ask about gluten-free bread/);
+  // The setup: the box, its live count and the words in both languages.
+  const html = await setupOf(v); const s = scriptOf(html);
+  assert.match(s, /field\('suDnote', T\.dietNoteLabel, dt\.note, \{ max: 120/); assert.match(s, /noteRoom\(/);
+  for (const L of ['en', 'fr']) assert.ok(TEXT[L].cafe.dietNoteLabel && TEXT[L].cafe.dietNoteEx, `${L} note words`);
+  assert.equal(cfgOf(html).cur.cafe_info.diet.note, 'Oat & almond milk +50¢ · Gluten-free: macarons only', 'comes back to the setup as typed');
+});
+
+// ---------- 4: honest price wording while prices aren't public ----------
+test('4: while AVG_SPEND_PUBLIC is off, the price question promises nothing; with it on, the old words', async () => {
+  for (const type of ['cafe', 'pub', 'restaurant']) {
+    const v = mk(type); const html = await setupOf(v); const cfg = cfgOf(html), s = scriptOf(html);
+    assert.equal(cfg.spendPublic, false);
+    assert.ok(!/Your page will say|indiquera/.test(cfg.t.spendLeadOff), `${type}: no promise`);
+    assert.ok(!/soon|bientôt/.test(cfg.t.savedSpendOff + cfg.t.stSoon + cfg.t.helpSpend), `${type}: no "soon"`);
+    assert.match(s, /fill\(C\.spendPublic \? T\.spendLead : T\.spendLeadOff \|\| T\.spendLead/);
+    assert.match(s, /S\.done\.spend && S\.done\.spend !== 'skip' && C\.spendPublic \?/, 'the preview shows no price while prices are off');
+  }
+  assert.match(TEXT.en.cafe.spendLead, /Your page will say/, 'kept for when prices are on');
+  assert.equal(TEXT.en.savedSpendOff, 'Thanks. We’ll use this when prices go live on pages.');
+  process.env.AVG_SPEND_PUBLIC = '1';
+  try { const v = mk('cafe'); assert.equal(cfgOf(await setupOf(v)).spendPublic, true); } finally { delete process.env.AVG_SPEND_PUBLIC; }
+});
+
+// ---------- 5: "No website yet" counts ----------
+test('5: "Yes, that’s right" with no website saves the "no website" answer, and the Website item counts (all three types)', async () => {
+  for (const type of ['cafe', 'pub', 'restaurant']) {
+    const v = mk(type, { website: '' }); const t = tokenFor(v.id);
+    const s = scriptOf(await setupOf(v));
+    assert.match(s, /if \(k === 'basicsOk'\) \{ if \(!CUR\.website && !C\.website && S\.notOffered\.indexOf\('website'\) < 0\) return saveAll\('basics', \[\{ not_offered: addNot\('website'\) \}\]\)/);
+    const before = cfgOf(await setupOf(v)).progress.score.left.map((x) => x.k);
+    assert.ok(before.includes('website'), `${type}: website open before`);
+    ok(await change(t, { not_offered: ['website'] }));
+    const after = cfgOf(await setupOf(v)).progress.score.left.map((x) => x.k);
+    assert.ok(!after.includes('website'), `${type}: counted after`);
+  }
+});
+
+// ---------- 6: yearly custom closures, and the end date before Add ----------
+test('6: "Every year" on her own dates saves this year and next (plain dates, like the holidays); the end date shows before Add', async () => {
+  const v = mk('cafe'); const t = tokenFor(v.id);
+  const s = scriptOf(await setupOf(v));
+  assert.match(s, /id="suCyear"/); assert.match(s, /function plusYear\(s\)/); assert.match(s, /id="suCends"/);
+  assert.match(s, /if \(S\.addYearly\) \{ var nf = plusYear\(cf\), nt = plusYear\(to\);/);
+  // What the setup sends for Jan 5 + 2 weeks, every year: two plain closures.
+  const y = Number(today.slice(0, 4)) + 1;
+  const pair = [{ from: `${y}-01-05`, to: `${y}-01-18`, note: 'Winter break' }, { from: `${y + 1}-01-05`, to: `${y + 1}-01-18`, note: 'Winter break' }];
+  ok(await change(t, { closures: pair }));
+  const html = page(v, 'en');
+  assert.ok(html.includes(`${y + 1}`) || /Jan 5/.test(html));
+  for (const L of ['en', 'fr']) for (const k of ['closeYearly', 'closeYearlySub', 'closeEnds', 'addedYearly']) assert.ok(TEXT[L][k], `${L}.${k}`);
+  // The end date, worked out the same way Add does (first day + length − 1).
+  const closeEnds = new Function('S', 'T', 'fill', 'dateLabel', 'ymd', `${/function lenEnd\(cf\)\{[^\n]*\}/.exec(s)[0]}\n${/function closeEnds\(cf\)\{[^\n]*\}/.exec(s)[0]}\nreturn closeEnds;`)(
+    { addLen: '14' }, TEXT.en, (x, o) => x.replace(/\{(\w+)\}/g, (m, k) => o[k]), (d) => d, (d) => d.toISOString().slice(0, 10));
+  assert.equal(closeEnds(`${y}-01-05`), `Closed ${y}-01-05 to ${y}-01-18`);
+});
+
+// ---------- 7: café questions brought forward ----------
+test('7: Dietary details, Your coffee and Sells out early are above the fold for cafés; Groups and Weekly events stay folded', async () => {
+  const cfg = cfgOf(await setupOf(mk('cafe')));
+  for (const k of ['diet', 'coffee', 'sellout']) assert.ok(cfg.top2.includes(k), k);
+  for (const k of ['groups', 'music']) assert.ok(!cfg.top2.includes(k), k);
+  assert.deepEqual(cfgOf(await setupOf(mk('pub'))).top2, ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'], 'pubs unchanged');
+  assert.deepEqual(cfgOf(await setupOf(mk('restaurant'))).top2, ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], 'restaurants unchanged');
+});
+
+// ---------- 8: café wording ----------
+test('8: café specials example, "Specials" tab, menu photo hint; pubs keep "Deals"', async () => {
+  const cfg = cfgOf(await setupOf(mk('cafe')));
+  assert.ok(!/Taco|\$12/.test(cfg.t.specialEx + cfg.t.priceEx)); assert.match(cfg.t.specialEx, /Soup of the day/);
+  assert.ok(!/Taco|12 \$/.test(TEXT.fr.cafe.specialEx + TEXT.fr.cafe.priceEx));
+  assert.equal(cfg.t.snapSub, 'Snap your menu (a board or each page)'); assert.match(TEXT.fr.snapSub, /tableau/);
+  assert.match(cfgOf(await setupOf(mk('pub'))).t.specialEx, /Taco|Wing|wing/i, 'pubs keep theirs');
+  const c = mk('cafe'); ok(await change(tokenFor(c.id), { specials: [{ days: ['tue', 'fri'], title: 'Fresh baguettes', deal: 'Fresh baguettes', price: null, kind: 'food' }] }));
+  assert.match(page(c, 'en'), /<a href="#fdDeals">Specials<\/a>/);
+  const p = mk('pub'); ok(await change(tokenFor(p.id), { specials: [{ days: ['tue'], title: 'Wing night', deal: '60¢ wings', price: null, kind: 'food' }] }));
+  assert.match(page(p, 'en'), /<a href="#fdDeals">Deals<\/a>/);
+});
+
+// ---------- 9: public wording ----------
+test('9: what a café serves reads as a proper list, and the pre-order line never repeats itself', async () => {
+  const v = mk('cafe'); const t = tokenFor(v.id);
+  ok(await change(t, { cafe_info: { serves: ['espresso', 'breakfast', 'lunch', 'desserts'], order: { preorder: true, preorder_how: 'Cakes and tarts: call us 48 hours ahead' } } }));
+  const en = page(v, 'en');
+  assert.match(en, /Espresso drinks, breakfast, lunch and desserts &amp; cakes/);
+  assert.ok(!/desserts and cakes/.test(en));
+  assert.match(en, /🛍️<\/span> Cakes and tarts: call us 48 hours ahead</);
+  assert.ok(!/Custom cakes and pre-orders: Cakes/.test(en));
+  assert.match(page(v, 'fr'), /Gâteaux sur commande et précommandes/, 'French: the label alone');
+  const w = mk('cafe'); ok(await change(tokenFor(w.id), { cafe_info: { order: { preorder: true } } }));
+  assert.match(page(w, 'en'), /🛍️<\/span> Custom cakes and pre-orders</);
+});
+
+// ---------- 10: small UI ----------
+test('10: the photo order buttons sit under the photo, only ✕ stays on it; Help sits in the Back row', async () => {
+  const html = await setupOf(mk('cafe'));
+  assert.match(html, /body\.owner-setup \.su-ph \.su-order \{ position: static;/);
+  assert.match(html, /t\.appendChild\(b\);document\.body\.classList\.add\('su-help-inrow'\)/);
+});
+
+// ---------- 11: one set of success words ----------
+test('11: success words: "It’s on your page now" for live answers, "We’ll add it within a day" for checked ones, no stray "soon"', async () => {
+  for (const type of ['cafe', 'pub', 'restaurant']) {
+    const t = cfgOf(await setupOf(mk(type))).t;
+    assert.equal(t.savedLive, 'It’s on your page now.'); assert.equal(t.savedDay, 'We’ll add it within a day.');
+    for (const k of ['savedDay', 'photosSent', 'sentMeans', 'savedFbName', 'savedIgName', 'savedMenuSocialName', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) assert.match(t[k], /We’ll (add|find)/, `${type} ${k}`);
+    for (const k of Object.keys(t)) if (typeof t[k] === 'string' && k !== 'savedSoon') assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`);
+    assert.equal(t.st.day, 'we’ll add it within a day');
+  }
+  const f = cfgOf(await setupOf(mk('cafe'), 'fr')).t;
+  assert.equal(f.savedDay, 'Nous l’ajouterons d’ici un jour.');
+  for (const k of Object.keys(f)) if (typeof f[k] === 'string' && k !== 'savedSoon') assert.ok(!/bientôt/.test(f[k]), `fr: no "bientôt" in ${k}`);
+});
+
+// ---------- 12: the "refused changes … : form" log line ----------
+test('12: the ordering screen no longer re-sends "no drive-thru, no walk-up" (it came back "Nothing has changed yet")', async () => {
+  const v = mk('cafe'); const t = tokenFor(v.id);
+  // The request the tester's server logged: unchanged badges, refused as "Nothing has changed yet" (400, errors.form).
+  const r = await change(t, { badges: { drive_thru: false, walk_up: false } });
+  assert.equal(r.status, 400); assert.deepEqual(Object.keys(r.body.errors), ['form']); assert.match(r.body.errors.form, /Nothing has changed yet/);
+  // The setup now sends only what differs from what is stored.
+  const s = scriptOf(await setupOf(v));
+  assert.match(s, /if \(ob\.drive_thru !== !!S\.savedBadges\.drive_thru \|\| ob\.walk_up !== !!S\.savedBadges\.walk_up\) ol\.push\(\{ badges: ob \}\);/);
+  assert.match(s, /if \(JSON\.stringify\(oi\) !== S\.savedOrder\) ol\.push\(\{ cafe_info: \{ order: oi \} \}\);/);
+  // And a pre-order only (the tester's answer) saves cleanly with nothing refused.
+  ok(await change(t, { cafe_info: { order: { preorder: true, preorder_how: 'Call us 48 hours ahead' } } }));
+  ok(await change(t, { not_offered: [] }).then((x) => (x.status === 400 && /Nothing has changed/.test(JSON.stringify(x.body)) ? { status: 200 } : x)));
+});

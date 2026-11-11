@@ -46411,7 +46411,7 @@ function ownerValueText(field, value) {
     const parts = [];
     if (o.serves) parts.push(`Serves: ${o.serves.map((k) => (CAFE_SERVE_LABELS[k] || {}).en || k).join(', ')}`);
     if (o.stay) parts.push(`Stay: ${['laptops', 'seats'].filter((k) => o.stay[k]).map((k) => `${k} ${o.stay[k]}`).concat(o.stay.outlets ? ['outlets'] : [], o.stay.quiet ? ['quiet'] : []).join(', ')}`);
-    if (o.diet) parts.push(`Dietary: ${[(o.diet.milks || []).join('/'), o.diet.milk_extra ? `milk extra ${o.diet.milk_extra}` : '', o.diet.gf_kitchen ? `GF ${o.diet.gf_kitchen}` : '', o.diet.vegan_baking ? 'vegan baking' : '', o.diet.nut_free ? 'nut-free' : ''].filter(Boolean).join(', ')}`);
+    if (o.diet) parts.push(`Dietary: ${[(o.diet.milks || []).join('/'), o.diet.milk_extra ? `milk extra ${o.diet.milk_extra}` : '', o.diet.gf_kitchen ? `GF ${o.diet.gf_kitchen}` : '', o.diet.vegan_baking ? 'vegan baking' : '', o.diet.nut_free ? 'nut-free' : '', o.diet.note ? `note “${o.diet.note}”` : ''].filter(Boolean).join(', ')}`);
     if (o.order) parts.push(`Pre-orders${o.order.preorder_how ? `: ${o.order.preorder_how}` : ''}`);
     if (o.coffee) parts.push(`Coffee: ${[o.coffee.roast_own ? 'roasts its own' : o.coffee.source ? `beans from ${o.coffee.source}` : '', o.coffee.beans ? 'beans for sale' : ''].filter(Boolean).join(', ')}`);
     if (o.sellout) parts.push(`Sells out: ${o.sellout}`);
