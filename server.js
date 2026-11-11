@@ -9079,7 +9079,7 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
   if (v.times !== null) {
     if (!v.times || typeof v.times !== 'object' || Array.isArray(v.times)) return { ok: false, reason: 'invalid_times', detail: 'times must be an object keyed by day, or null' };
     const days = hoursModule ? hoursModule.HOURS_WEEKDAYS : FD_HOURS_DAYS;
-    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season');
+    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season' && k !== '_close');
     if (extra.length) return { ok: false, reason: 'invalid_times', detail: `unexpected key(s): ${extra.join(', ')}` };
     // Pub test 7 (2026-11-10): the happy hour's own season ({ from, to } 'MM-DD', every year) rides along.
     var hhSeason = null;
@@ -9102,7 +9102,9 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     if (!parseLocalDate(v.checked_at) || v.checked_at > todayLocal(now)) {
       return { ok: false, reason: 'invalid_checked_at', detail: 'checked_at must be a real YYYY-MM-DD date, not in the future' };
     }
-    next = { happy_hour_times: hhSeason ? JSON.stringify({ ...JSON.parse(checked.json), _season: hhSeason }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
+    // Until close (pub test 9): kept for windows that start at the times it names.
+    const hhClose = v.times._close != null ? happyHourCloseOf({ ...JSON.parse(checked.json), _close: v.times._close }) : null;
+    next = { happy_hour_times: hhSeason || hhClose ? JSON.stringify({ ...JSON.parse(checked.json), ...(hhSeason ? { _season: hhSeason } : {}), ...(hhClose ? { _close: hhClose } : {}) }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
   }
   const existing = db.prepare('SELECT id, redirect_to, happy_hour_times, happy_hour_source, happy_hour_checked_at FROM venues WHERE id = ?').get(id);
   if (!existing) return { ok: false, reason: 'venue_not_found' };
@@ -34139,10 +34141,13 @@ function happyHourWeekText(json, fr) {
   if (!parsed || !parsed.known) return '';
   const W = hoursModule.HOURS_WEEKDAYS, names = HH_DAYS_SHORT[fr ? 'fr' : 'en'];
   const groups = [];
+  // Until close (pub test 9): "9 PM until close" (« 21 h jusqu’à la fermeture »), never the end stored when it was saved.
+  const close = happyHourCloseOf(json);
   W.forEach((d, i) => {
     const day = parsed.days[d];
     if (!day || day.status !== 'open') return;
-    const text = day.ranges.map(([a, b]) => happyHourRangeText(a, b, fr)).join(', ');
+    const text = day.ranges.map(([a, b]) => (close && close[d] && close[d].includes(hoursModule.formatClock24(a))
+      ? `${happyHourTimeText(a, fr)} ${fr ? 'jusqu’à la fermeture' : 'until close'}` : happyHourRangeText(a, b, fr))).join(', ');
     let g = groups.find((x) => x.text === text);
     if (!g) groups.push(g = { text, days: [] });
     g.days.push(i);
@@ -34171,6 +34176,20 @@ function happyHourSeasonOf(json) {
   if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
   const x = o && typeof o === 'object' ? o._season : null;
   return x && /^\d{2}-\d{2}$/.test(x.from || '') && /^\d{2}-\d{2}$/.test(x.to || '') && x.from !== x.to ? { from: x.from, to: x.to } : null;
+}
+// "Until close" (pub test 9, 2026-11-10): the windows of a happy hour week that run until the place closes ride along
+// in the stored week as "_close": { sun: ['21:00'] } (each window's start). -> that object (days with starts) | null
+function happyHourCloseOf(json) {
+  let o = json;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
+  const x = o && typeof o === 'object' ? o._close : null;
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const out = {};
+  for (const d of SPECIAL_WEEK) {
+    const starts = Array.isArray(x[d]) ? x[d].filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) && Array.isArray(o[d]) && o[d].some((w) => Array.isArray(w) && w[0] === t)) : [];
+    if (starts.length) out[d] = [...new Set(starts)].sort();
+  }
+  return Object.keys(out).length ? out : null;
 }
 // A season in a few words: whole months "Jun–Aug" (« juin–août »), one month "July", exact days "May 20 – Sep 6"
 // (« 20 mai – 6 sept. »).
@@ -45527,7 +45546,7 @@ function ownerSeasonValue(x) {
 }
 function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = false }) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, detail: `${label} must list each day.` };
-  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && k === '_season'));
+  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && (k === '_season' || k === '_close')));
   if (extra.length) return { ok: false, detail: `${label}: unexpected day(s) ${extra.join(', ')}.` };
   const week = {};
   for (const d of OWNER_DAYS) {
@@ -45550,7 +45569,16 @@ function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = fal
     if (!sv.ok) return { ok: false, detail: `${label}: please pick the months again.` };
     if (sv.season) json = JSON.stringify({ ...JSON.parse(json), _season: sv.season });
   }
-  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input };
+  // Until close (pub test 9, happy hour): { mon: ['21:00'] }, each the start of one of that day's windows.
+  if (allowSeason && input._close != null) {
+    const c = input._close;
+    if (typeof c !== 'object' || Array.isArray(c) || Object.keys(c).some((k) => !OWNER_DAYS.includes(k) || !Array.isArray(c[k]) || c[k].some((t) => !(week[k] || []).some((w) => w[0] === t)))) {
+      return { ok: false, detail: `${label}: please pick the times again.` };
+    }
+    const keep = happyHourCloseOf({ ...JSON.parse(json), _close: c });
+    if (keep) json = JSON.stringify({ ...JSON.parse(json), _close: keep });
+  }
+  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input, closeGiven: allowSeason && '_close' in input };
 }
 
 function sameJsonWeek(a, b) {
@@ -45560,8 +45588,10 @@ function sameJsonWeek(a, b) {
       const o = typeof s === 'string' ? JSON.parse(s) : s;
       const out = {};
       for (const d of OWNER_DAYS) out[d] = o[d] && o[d].length ? o[d] : null;
-      // A happy hour's own season (pub test 7) is part of it.
+      // A happy hour's own season (pub test 7) is part of it, and so are its "until close" windows (pub test 9).
       if (o._season) out._season = o._season;
+      const cl = happyHourCloseOf(o);
+      if (cl) out._close = cl;
       return JSON.stringify(out);
     } catch (e) { return String(s); }
   };
@@ -45684,6 +45714,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const w = ownerWeekJson(input.happy_hour, 'Happy hour', { allowEmptyWeek: true, season: true });
       // A save that doesn't mention the season (the edit page's week) keeps the stored one (pub test 7).
       if (w.ok && !w.empty && !w.seasonGiven) { const keep = happyHourSeasonOf(current.happy_hour); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _season: keep }); }
+      // The same for "until close" (pub test 9): kept for the windows that still start at the same time.
+      if (w.ok && !w.empty && !w.closeGiven) { const was = happyHourCloseOf(current.happy_hour); const keep = was && happyHourCloseOf({ ...JSON.parse(w.json), _close: was }); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _close: keep }); }
       if (!w.ok) errors.happy_hour = w.detail;
       else if (w.empty) { if (current.happy_hour) changes.happy_hour = null; }
       else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
@@ -50494,7 +50526,9 @@ function setupHappySig(found) {
   let week = null;
   try { const w = typeof found.happyHourTimes === 'string' ? JSON.parse(found.happyHourTimes) : found.happyHourTimes; if (w) week = SETUP_WEEK.map((d) => (w[d] || []).map((x) => [x[0], x[1]])); } catch (e) { week = null; }
   const d = ownerHappyHourDealsSnapshot(found.venue.id);
-  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []]);
+  // Until close (pub test 9) is part of what the page stored; added only when there is some, so older rows still match.
+  const close = happyHourCloseOf(found.happyHourTimes);
+  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []].concat(close ? [close] : []));
 }
 function cleanSetupHappyBlocks(list) {
   if (!Array.isArray(list) || !list.length || list.length > 6) return null;
@@ -50503,7 +50537,7 @@ function cleanSetupHappyBlocks(list) {
     if (!b || typeof b !== 'object' || !Array.isArray(b.days) || !b.days.length || b.days.some((d) => !SETUP_WEEK.includes(d))) return null;
     if (!/^\d{2}:\d{2}$/.test(String(b.from)) || !/^\d{2}:\d{2}$/.test(String(b.to))) return null;
     if (typeof b.what !== 'string' || b.what.length > 200 || /[<>]/.test(b.what)) return null;
-    out.push({ days: SETUP_WEEK.filter((d) => b.days.includes(d)), from: b.from, to: b.to, what: b.what });
+    out.push({ days: SETUP_WEEK.filter((d) => b.days.includes(d)), from: b.from, to: b.to, what: b.what, ...(b.close === true ? { close: true } : {}) });
   }
   return out;
 }
@@ -50907,6 +50941,10 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-line { min-height: 64px; resize: vertical; }
   body.owner-setup .su-count { margin: -10px 0 16px; font-weight: 800; font-size: 16px; color: var(--su-soft); }
   body.owner-setup .su-count.su-ok { color: var(--su-good); }
+  /* Pub test 9 (2026-11-10): the happy hour deal's live count under its box, red when over; "until close" in a time row. */
+  body.owner-setup .su-day .su-count { margin: 4px 0 8px; font-size: 15px; }
+  body.owner-setup .su-count.su-over { color: #A3271F; }
+  body.owner-setup .su-closetxt { font-weight: 800; padding: 0 6px; }
   body.owner-setup .su-score { display: flex; align-items: center; gap: 16px; background: var(--su-card); border: 2px solid var(--su-line); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
   body.owner-setup .su-score strong { display: block; font-size: 20px; }
   body.owner-setup .su-score span { color: var(--su-soft); font-weight: 700; font-size: 16px; }
@@ -54185,7 +54223,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       times = {};
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
       if (!Object.keys(times).length) times = null;
-      else if (o._season) times._season = o._season; // its own season (pub test 7)
+      else { if (o._season) times._season = o._season; if (o._close) times._close = o._close; } // its own season (pub test 7), until close (pub test 9)
     }
     const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: times ? 'venue_owner' : listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };

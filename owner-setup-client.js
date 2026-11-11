@@ -17,6 +17,8 @@
   function monthName(i){ return C.monthNames[i]; }
   // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
+  function happyCloseOf(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; return o && o._close && typeof o._close === 'object' ? o._close : {}; } catch (e) { return {}; } }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
 
   // ---------- Seasons (pub test 7, 2026-11-10) ----------
@@ -187,13 +189,14 @@
   function prefixOf(e, text){ var a = dayPrefix(e), b = oldPrefix(e); return text.indexOf(a) === 0 ? a : text.indexOf(b) === 0 ? b : null; }
   (function(){
     if (CUR.happy_blocks && CUR.happy_blocks.length) {
-      CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what }); });
+      CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what, close: !!b.close }); });
       var mine = {}; S.happy.forEach(function(e){ if (e.what) { mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? oldPrefix(e) : '') + e.what] = true; } });
       S.happyKeep = (CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : []).filter(function(d){ return d.price || !mine[d.text]; });
       S.happyTyped = true; return;
     }
-    var w = parseWeek(CUR.happy_hour); if (!w) return; var groups = {};
-    DAYS.forEach(function(d){ (w[d] || []).forEach(function(x){ var k = x[0] + '-' + x[1]; if (!groups[k]) { groups[k] = { days: {}, from: x[0], to: x[1], what: '' }; S.happy.push(groups[k]); } groups[k].days[d] = true; }); });
+    var w = parseWeek(CUR.happy_hour); if (!w) return; var groups = {}, cl = happyCloseOf(CUR.happy_hour);
+    // Until close (pub test 9): those windows are one row by their start, whatever each day's closing time is.
+    DAYS.forEach(function(d){ (w[d] || []).forEach(function(x){ var c = !!(cl[d] && cl[d].indexOf(x[0]) >= 0), k = x[0] + '-' + (c ? 'close' : x[1]); if (!groups[k]) { groups[k] = { days: {}, from: x[0], to: x[1], what: '', close: c }; S.happy.push(groups[k]); } groups[k].days[d] = true; }); });
     var deals = CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : [];
     deals.forEach(function(d){
       var hit = null;
@@ -280,7 +283,7 @@
     });
   }
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
-  function happyBlocks(){ return S.happy.map(function(e){ return { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; }); }
+  function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
     return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
@@ -807,8 +810,12 @@
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
-          + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' <label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '"></div>'
-          + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what"' }) + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
+          + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' '
+          // Until close (pub test 9, 2026-11-10): the end is the place's closing time that day (after midnight too).
+          + (e.close ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '">') + '</div>'
+          + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.close ? 'true' : 'false') + '" data-act="hhClose:' + i + '">' + h(T.untilClose) + '</button></div>'
+          // A live count (pub test 9): the room left for the deal, its days included when there are several happy hours.
+          + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what" data-room="' + i + '" aria-describedby="hwc' + i + '"' }) + '<p class="su-count" id="hwc' + i + '" aria-live="polite">' + h(roomText(i, e.what)) + '</p>' + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
         + '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>' + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
@@ -818,7 +825,8 @@
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.specialN, { n: i + 1 })) + '</span>' + (S.specials.length > 1 ? '<button type="button" class="su-toggle" data-rm="specials:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDaysOr) + '</p>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
           + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '')
-          + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' <label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '"></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
+          + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' ' + (e.endClose ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '">') + '</div>'
+          + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.endClose ? 'true' : 'false') + '" data-act="spClose:' + i + '">' + h(T.untilClose) + '</button></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
           + seasonBox('specials.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('specials', i, e) + '</div>';
       }).join('') + (S.specials.length < 7 ? '<button type="button" class="su-more" data-act="add:specials">' + h(T.addSpecial) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveSpecials, '', false, 'specialsSave') + '</div>';
     } else if (s === 'music') { x = yesNo('music', T.musicQ, T.musicLead);
@@ -1050,14 +1058,29 @@
     });
   }
   function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
+  // The room a happy hour's deal has (60 letters, less its days when there are several happy hours).
+  function hhRoom(i){ var e = S.happy[i]; return 60 - (S.happy.length > 1 && e ? dayPrefix(e).length : 0); }
+  function roomText(i, v){ var left = hhRoom(i) - String(v || '').trim().length; return left >= 0 ? fill(left === 1 ? T.charLeft1 : T.charsLeft, { n: left }) : fill(-left === 1 ? T.charOver1 : T.charsOver, { n: -left }); }
+  function roomRefresh(){ S.happy.forEach(function(e, i){ var b = el('hw' + i), c = el('hwc' + i); if (!b || !c) return; c.textContent = roomText(i, b.value); c.className = 'su-count' + (hhRoom(i) - b.value.trim().length < 0 ? ' su-over' : ''); }); }
+  // A day's closing time for a window starting at `from` (the usual week): '23:00', '01:00' (after midnight), or null.
+  function closeFor(d, from){
+    var w = S.week && S.week[d]; if (!w) return null; var m = function(t){ var x = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : null; }, f = m(from);
+    for (var i = 0; i < w.length; i++) { var a = m(w[i][0]), b = m(w[i][1]); if (a === null || b === null || f === null) continue; if (b <= a) b += 1440; if (f >= a && f < b) return w[i][1] === '24:00' ? '00:00' : w[i][1]; }
+    return null;
+  }
   function happySave(){
     readEntries();
-    var week = {}, deals = [], many = S.happy.length > 1;
+    var week = {}, deals = [], many = S.happy.length > 1, close = {};
     DAYS.forEach(function(d){ week[d] = []; });
     for (var i = 0; i < S.happy.length; i++) {
       var e = S.happy[i], ds = DAYS.filter(function(d){ return e.days[d]; });
       if (!ds.length) { S.nudge = T.needDays; return render(); }
-      for (var k = 0; k < ds.length; k++) { if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); } week[ds[k]].push([e.from, e.to]); }
+      for (var k = 0; k < ds.length; k++) {
+        if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); }
+        // Until close: stored with that day's closing time as its end (what older pages show) and marked in "_close".
+        if (e.close) { var ce = closeFor(ds[k], e.from); if (!ce || ce === e.from) { S.nudge = fill(T.closeUnknown, { day: longDay(ds[k]) }); return render(); } week[ds[k]].push([e.from, ce]); (close[ds[k]] = close[ds[k]] || []).push(e.from); }
+        else week[ds[k]].push([e.from, e.to]);
+      }
       var pre = many ? dayPrefix(e) : '', what = e.what.trim();
       // Never cut short: a deal that doesn't fit says so, with how much room there is.
       if (what && (pre + what).length > 60) { S.nudge = fill(T.dealLong, { n: i + 1, max: 60 - pre.length }); return render(); }
@@ -1068,6 +1091,7 @@
     // Its season (pub test 7): all year, or the months (or exact days) it runs.
     var hs = seaOut(S.happySea); if (!hs.ok) { S.nudge = hs.why; return render(); }
     week._season = hs.from ? { from: hs.from, to: hs.to } : null;
+    week._close = Object.keys(close).length ? close : null;
     S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
@@ -1091,7 +1115,7 @@
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!text) { S.nudge = T.needText; return render(); }
       var ss = seaOut(e.sea); if (!ss.ok) { S.nudge = ss.why; return render(); }
-      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + (e.start || '') + '|' + (e.end || '')) { out.push(e.orig); continue; }
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + (e.start || '') + '|' + (e.end || '') && !!e.endClose === (e.orig.end === 'close')) { out.push(e.orig); continue; }
       if (e.start && e.end && e.start === e.end) { S.nudge = T.specialTimeSame; return render(); }
       if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
       var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
@@ -1260,6 +1284,10 @@
       return saveAll('offer', [{ pub_info: { minors: mv } }]);
     }
     if (k === 'hoursSave') return hoursSave();
+    // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
+    if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
+    // The same for a weekly special (its end is stored as 'close', the way it always was).
+    if (k === 'spClose') { readEntries(); var es = S.specials[+v]; if (!es) return; es.endClose = !es.endClose; if (es.endClose) es.end = ''; render(); return; }
     // "All day (open to close)" (pub fresh-eyes, 2026-11-10): the happy hour runs from the earliest opening to the latest
     // closing of the days picked (or of the whole week when no day is picked yet).
     if (k === 'allDay') {
@@ -1508,6 +1536,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-pdel]'), function(b){ b.onclick = function(){ S.menuPages.splice(+b.getAttribute('data-pdel'), 1); S.error = ''; render(); }; });
     var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked && S.nudge === T.needRights) { S.nudge = ''; render(); } };
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
+    if (S.step === 'happy:type') roomRefresh();
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= 120 ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= 120 ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.

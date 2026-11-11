@@ -604,4 +604,14 @@ Object.assign(fr, {
 en.timeLine = 'About 15 to 30 minutes. You can stop any time and carry on later.';
 fr.timeLine = 'Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.';
 
+// Ninth first-time pub test (2026-11-10; drafts/fresh-eyes-pub9-2026-11-10/REPORT.md). Shared with restaurants.
+Object.assign(en, {
+  untilClose: 'Until close', untilCloseShort: 'close', closeUnknown: 'We don’t have your closing time for {day}. Please pick an end time instead, or add your hours first.',
+  charsLeft: '{n} characters left', charLeft1: '1 character left', charsOver: '{n} characters too many', charOver1: '1 character too many',
+});
+Object.assign(fr, {
+  untilClose: 'Jusqu’à la fermeture', untilCloseShort: 'la fermeture', closeUnknown: 'Nous n’avons pas votre heure de fermeture du {day}. Choisissez plutôt une heure de fin, ou ajoutez d’abord vos heures.',
+  charsLeft: 'Il reste {n} caractères', charLeft1: 'Il reste 1 caractère', charsOver: '{n} caractères de trop', charOver1: '1 caractère de trop',
+});
+
 module.exports = { en, fr };
