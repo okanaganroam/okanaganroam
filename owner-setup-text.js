@@ -668,7 +668,7 @@ en.cafe = {
   musicQ: 'Anything on at your café?', musicLead: 'Like open mic, live music, art on the walls or a workshop.',
   knownEx: 'Cinnamon buns and the window seats', igLead: 'Type your Instagram name, like @yourcafe.',
   groupsLead: 'Book clubs, meetings, a birthday coffee.', storyEx: 'A small bakery café by the lake. Everything is baked here each morning, and the window seats catch the sun.',
-  happyQ: 'Do you have a happy hour?', styleDone: 'Done', noWifi: 'No Wi-Fi', noWifiSub: 'We don’t have Wi-Fi for guests',
+  happyQ: 'Do you have a happy hour?', styleDone: 'Done', aPersonCafe: 'about ${n} for {words}', noWifi: 'No Wi-Fi', noWifiSub: 'We don’t have Wi-Fi for guests',
 };
 fr.cafe = {
   hiLead: 'Préparons la page de votre café, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
@@ -707,7 +707,7 @@ fr.cafe = {
   musicQ: 'Il se passe quelque chose à votre café?', musicLead: 'Comme une scène ouverte, de la musique en direct, de l’art aux murs ou un atelier.',
   knownEx: 'Les brioches à la cannelle et les places près de la fenêtre', igLead: 'Écrivez votre nom Instagram, comme @votrecafe.',
   groupsLead: 'Clubs de lecture, réunions, un café d’anniversaire.', storyEx: 'Un petit café-boulangerie au bord du lac. Tout est cuit ici chaque matin, et les places près de la fenêtre ont le soleil.',
-  happyQ: 'Avez-vous un happy hour?', styleDone: 'Terminé', noWifi: 'Pas de Wi-Fi', noWifiSub: 'Nous n’avons pas de Wi-Fi pour les clients',
+  happyQ: 'Avez-vous un happy hour?', styleDone: 'Terminé', aPersonCafe: 'environ {n} $ pour {words}', noWifi: 'Pas de Wi-Fi', noWifiSub: 'Nous n’avons pas de Wi-Fi pour les clients',
 };
 
 module.exports = { en, fr };

@@ -19711,7 +19711,7 @@ function pubSportsText(venue, fr) {
 // The shared lists only (the checklist module is pure); nothing here reads a score.
 const { CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS } = require('./portal-completeness');
 const CAFE_SERVE_LABELS = {
-  espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫖' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
+  espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫗' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
   baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
   lunch: { en: 'Lunch (sandwiches, soup)', fr: 'Dîner (sandwichs, soupe)', icon: '🥪' }, ice_cream: { en: 'Ice cream / gelato', fr: 'Crème glacée / gelato', icon: '🍨' },
   desserts: { en: 'Desserts & cakes', fr: 'Desserts et gâteaux', icon: '🍰' }, bubble_tea: { en: 'Bubble tea', fr: 'Thé aux perles', icon: '🧋' },
