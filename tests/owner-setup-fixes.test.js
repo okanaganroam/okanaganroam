@@ -181,13 +181,13 @@ test('the portal bar: the "sent" sentence is on its own line; the honest time on
   assert.doesNotMatch(sub, /Tap to/, 'no second call to action while the setup card is the way in (fresh-eyes 3)');
   const fresh = mk('restaurant');
   const card = (/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/owner/${tokenFor(fresh.id)}`)) || [])[1];
-  assert.match(card, /The essentials take about 10 to 15 minutes \(a bit longer if you change your hours\)/, 'card matches the start screen');
-  assert.match((/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/fr/owner/${tokenFor(fresh.id)}`)) || [])[1], /de 10 à 15 minutes \(un peu plus si vous changez vos heures\)/);
-  assert.match(strings.en.hiLead, /about 10 to 15 minutes \(a bit longer if you change your hours\)/);
-  assert.match(strings.fr.hiLead, /de 10 à 15 minutes \(un peu plus si vous changez vos heures\)/);
+  assert.match(card, /About 15 to 30 minutes\. You can stop any time and carry on later\./, 'card matches the start screen');
+  assert.match((/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await text(`/fr/owner/${tokenFor(fresh.id)}`)) || [])[1], /Environ 15 à 30 minutes\. Vous pouvez arrêter à tout moment/);
+  assert.match(strings.en.hiLead, /About 15 to 30 minutes\. You can stop any time and carry on later\./);
+  assert.match(strings.fr.hiLead, /Environ 15 à 30 minutes\. Vous pouvez arrêter à tout moment/);
   const topic = app.OWNER_HELP_TOPICS.find((x) => x.id === 'easy-setup');
-  assert.match(topic.a, /about 10 to 15 minutes, a bit longer if you change your hours/);
-  assert.match(topic.aFr, /de 10 à 15 minutes, un peu plus si vous changez vos heures/);
+  assert.match(topic.a, /About 15 to 30 minutes\. You can stop any time and carry on later\./);
+  assert.match(topic.aFr, /Environ 15 à 30 minutes\. Vous pouvez arrêter à tout moment et continuer plus tard\./);
 });
 
 test('the page script: answered steps offer Next (never Skip), Exit asks to save, lists are tappable, Yes comes first', async () => {

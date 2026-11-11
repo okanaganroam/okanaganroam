@@ -5,7 +5,7 @@
 
 const en = {
   title: 'Set up your page', exit: 'Exit setup', back: '← Back', skip: 'Skip this for now', step: 'Step {n} of {total}', allDone: 'All done',
-  hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready. One question at a time, about 10 minutes. You can stop any time and carry on later.', start: 'Start',
+  hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.', start: 'Start',
   welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet' },
   labels: {
@@ -92,7 +92,7 @@ const en = {
 
 const fr = {
   title: 'Configurez votre page', exit: 'Quitter', back: '← Retour', skip: 'Passer pour l’instant', step: 'Étape {n} sur {total}', allDone: 'Terminé',
-  hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page. Une question à la fois, environ 10 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
+  hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
   welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait' },
   labels: {
@@ -180,7 +180,7 @@ const fr = {
 // ----- Split in two + fresh-eyes fixes (2026-11-09) -----
 // Part 1 "the essentials" (8 questions, in order), then Part 2 "more about your place" (optional, any order).
 Object.assign(en, {
-  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 minutes. You can stop any time and carry on later.',
+  hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.',
   welcomeLead: 'Your answers so far are saved.',
   essBar: 'The essentials: done', moreProg: 'More about your place · {n} of {total} done', moreDone: 'Optional · {n} of {total} done',
   essQ: 'The essentials are done!', moreOpt: 'Add more about your place', moreOptSub: 'Optional: happy hour, specials, your story and more', doneNow: 'I’m done for now',
@@ -206,7 +206,7 @@ Object.assign(en, {
 });
 en.st.no = 'no';
 Object.assign(fr, {
-  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend environ 10 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   welcomeLead: 'Vos réponses sont enregistrées.',
   essBar: 'L’essentiel : terminé', moreProg: 'Plus de détails · {n} sur {total}', moreDone: 'Facultatif · {n} sur {total}',
   essQ: 'L’essentiel est fait!', moreOpt: 'Ajouter plus de détails', moreOptSub: 'Facultatif : happy hour, spéciaux, votre histoire et plus', doneNow: 'J’ai terminé pour l’instant',
@@ -234,7 +234,7 @@ fr.st.no = 'non';
 
 // Fresh-eyes fixes (2026-11-10).
 Object.assign(en, {
-  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
+  hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.',
   nextPlain: 'Next', backToList: 'Back to the list', changeQ: 'Change something?', changeLead: 'Tap anything to change it.', welcomeLead: 'Your answers are saved. Tap any line to change it.',
   menuSentEmail: '✓ You said you’ll email your menu.',
   pctWill: 'Your page will be about {n}% complete', pctWillSub: 'once we add what you sent, usually within a day.', pctRightNow: 'It’s {n}% right now.',
@@ -249,7 +249,7 @@ Object.assign(en, {
 });
 en.noLabels = Object.assign({}, en.noLabels, { groups: 'no big groups' });
 Object.assign(fr, {
-  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   nextPlain: 'Suivant', backToList: 'Retour à la liste', changeQ: 'Changer quelque chose?', changeLead: 'Touchez une ligne pour la modifier.', welcomeLead: 'Vos réponses sont enregistrées. Touchez une ligne pour la modifier.',
   menuSentEmail: '✓ Vous avez dit que vous enverrez votre menu par courriel.',
   pctWill: 'Votre fiche sera complète à environ {n} %', pctWillSub: 'dès que nous aurons ajouté ce que vous avez envoyé, habituellement d’ici un jour.', pctRightNow: 'Elle est à {n} % en ce moment.',
@@ -304,7 +304,7 @@ fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
 // Pubs (Dayton, 2026-11-10; mockup drafts/pub-portal-2026-11-10/pub-setup.html): pub examples and the pub-only screens,
 // laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
 en.pub = {
-  hiLead: 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
+  hiLead: 'Let’s get your pub’s page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.',
   cuisineLead: 'We picked Pub Fare. Add up to 2 more, or change it.', cuisineLeadEmpty: 'Pick up to 3. Serving food now? Pick what you serve.', noFood: 'We don’t serve food',
   placeQ: 'What kind of pub is it?', placeLead: 'Pick the one that fits best.',
   groupsLead: 'Birthdays, work parties, team nights.', knownEx: 'Wing night and the hockey on the big screen', igLead: 'Type your Instagram name, like @yourpub.',
@@ -323,7 +323,7 @@ en.pub = {
   quick: Object.assign({}, en.quick, { groups: ['Call ahead for 10 or more', 'Private room available', 'Book the patio'] }),
 };
 fr.pub = {
-  hiLead: 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons la page de votre pub, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   cuisineLead: 'Nous avons choisi Cuisine de pub. Ajoutez-en jusqu’à 2 autres, ou changez-la.', cuisineLeadEmpty: 'Choisissez-en jusqu’à 3. Vous servez à manger maintenant? Choisissez ce que vous servez.', noFood: 'Nous ne servons pas de nourriture',
   placeQ: 'Quel genre de pub est-ce?', placeLead: 'Choisissez celui qui convient le mieux.',
   groupsLead: 'Anniversaires, fêtes de bureau, soirées d’équipe.', knownEx: 'La soirée ailes de poulet et le hockey sur grand écran', igLead: 'Écrivez votre nom Instagram, comme @votrepub.',
@@ -346,7 +346,7 @@ fr.pub = {
 // words instead of "Roam Now map", and only two ways of saying "when" (Saved ✓ / Sent ✓).
 Object.assign(en, {
   hi: 'Hi, welcome to your page for {name} 👋',
-  hiLead: 'Let’s get your page ready, one question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.',
+  hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.',
   doorLead: 'So visitors can walk right to your door. It takes one photo, taken outside your {type}.',
   doorHere: 'Are you at your {type} right now?',
   helpYes: 'Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you right now:',
@@ -355,10 +355,10 @@ Object.assign(en, {
   allDay: 'All day (open to close)', everyYear: 'This year and next', everyYearSub: 'Ticked: we also mark you closed on that day next year.',
   moreKinds: 'More kinds', andMore: 'and more',
 });
-en.pub.hiLead = 'Let’s get your pub’s page ready. One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours). You can stop any time and carry on later.';
+en.pub.hiLead = 'Let’s get your pub’s page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.';
 Object.assign(fr, {
   hi: 'Bonjour, bienvenue sur votre page pour {name} 👋',
-  hiLead: 'Préparons votre page, une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.',
+  hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   doorLead: 'Pour que les visiteurs marchent jusqu’à votre porte. Il suffit d’une photo, prise devant votre {type}.',
   doorHere: 'Êtes-vous à votre {type} en ce moment?',
   helpYes: 'Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous en ce moment :',
@@ -367,7 +367,7 @@ Object.assign(fr, {
   allDay: 'Toute la journée (de l’ouverture à la fermeture)', everyYear: 'Cette année et l’an prochain', everyYearSub: 'Coché : nous indiquons aussi que vous êtes fermé ce jour-là l’an prochain.',
   moreKinds: 'Autres genres', andMore: 'et plus',
 });
-fr.pub.hiLead = 'Préparons la page de votre pub. Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures). Vous pouvez arrêter à tout moment et continuer plus tard.';
+fr.pub.hiLead = 'Préparons la page de votre pub, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.';
 
 // Second first-time pub test (2026-11-10). Shared with restaurants (same setup), except the pub-only lines.
 Object.assign(en, {
@@ -495,5 +495,55 @@ Object.assign(fr, {
   storySportsQ: 'Votre description parle encore de sports', storySportsLead: 'Elle dit « {bit} ». Vous pouvez changer cela dans votre description.', storySportsBtn: 'Corriger ma description',
   storySportsHint: 'Vous avez indiqué ne pas diffuser de sports, mais votre description dit « {bit} ». Modifiez ou retirez ce passage, puis enregistrez. Nous le vérifions d’abord.',
 });
+
+// Sixth first-time pub test (2026-11-10; drafts/fresh-eyes-pub6-2026-11-10/REPORT.md). Shared with restaurants.
+Object.assign(en, {
+  // Hours: one question after the usual week; the other season has its own day-by-day list.
+  hoursNext: 'Next',
+  allYearQ: 'Are these your hours all year?', allYearLead: 'If they change for part of the year, tap the season that’s different.',
+  allYearYes: 'Yes, all year', allYearSummer: 'No, different in summer', allYearSummerSub: 'You add the summer hours next', allYearWinter: 'No, different in winter', allYearWinterSub: 'You add the winter hours next',
+  seasonNow: 'Your page has different {kind} hours now, {a} to {b}.', seasonWord: { summer: 'summer', winter: 'winter' },
+  seasonEditQ: { summer: 'Your summer hours', winter: 'Your winter hours' },
+  seasonEditLead: 'Tap the months, then Change beside any day that’s different. Any day can be open, even one that’s closed the rest of the year.',
+  seasonDaysH: 'Hours in those months', seasonNeedOpenDay: 'Please set at least one day you’re open in those months.',
+  winterNeedMonths: 'Please tap the months when your hours are different.',
+  // Weekly events: "Something else" empties the box.
+  otherPh: 'Type the name, e.g. Meat draw', otherNeed: 'Please type the name of your event.',
+  // What you offer (pubs): an explicit "no sports".
+  noSports: 'No sports / no TVs', noSportsSub: 'We don’t show sports on TV',
+  // Photos: where the photo on the page now came from.
+  curMainGoogle: 'The photo we have now (from Google Maps)', curMainOther: 'The photo we have now', keepMainOther: 'Keep this photo for now',
+  reviewLeadKeepOther: 'Tap ✕ to remove one. The photo we have now stays at the top unless you pick one of yours as the main photo.',
+  // Instagram and Facebook: "Not sure" is an answer too.
+  socialUnsure: 'Not sure / someone else runs it', socialUnsureSub: 'That’s fine. We won’t ask again.', savedUnsure: 'No problem. We won’t ask again. You can add it any time from your edit page.',
+  // "I'm done for now" is the end.
+  doneNowTitle: 'Nice work!', doneNowLead: 'Your answers are saved. That’s all for now.', addLater: 'Want to add more later?', addLaterLead: 'All optional. Each one raises your number a little.',
+});
+en.st = Object.assign({}, en.st, { unsure: 'not sure (that’s fine)' });
+// The old one-time seasonal box is gone (its hint assumed the current hours were the summer ones).
+delete en.winterQ; delete en.winterHint; delete en.hoursThen;
+Object.assign(fr, {
+  hoursNext: 'Suivant',
+  allYearQ: 'Ce sont vos heures toute l’année?', allYearLead: 'Si elles changent une partie de l’année, touchez la saison qui est différente.',
+  allYearYes: 'Oui, toute l’année', allYearSummer: 'Non, différentes l’été', allYearSummerSub: 'Vous ajoutez les heures d’été ensuite', allYearWinter: 'Non, différentes l’hiver', allYearWinterSub: 'Vous ajoutez les heures d’hiver ensuite',
+  seasonNow: 'Votre page a des heures d’{kind} différentes en ce moment, de {a} à {b}.', seasonWord: { summer: 'été', winter: 'hiver' },
+  seasonEditQ: { summer: 'Vos heures d’été', winter: 'Vos heures d’hiver' },
+  seasonEditLead: 'Touchez les mois, puis Modifier à côté d’une journée différente. Toute journée peut être ouverte, même une qui est fermée le reste de l’année.',
+  seasonDaysH: 'Heures pendant ces mois', seasonNeedOpenDay: 'Indiquez au moins un jour d’ouverture pendant ces mois.',
+  winterNeedMonths: 'Touchez les mois où vos heures sont différentes.',
+  otherPh: 'Écrivez le nom, p. ex. Tirage de viande', otherNeed: 'Écrivez le nom de votre événement.',
+  noSports: 'Pas de sports / pas de télé', noSportsSub: 'Nous ne diffusons pas de sports à la télé',
+  curMainGoogle: 'La photo que nous avons maintenant (de Google Maps)', curMainOther: 'La photo que nous avons maintenant', keepMainOther: 'Garder cette photo pour l’instant',
+  reviewLeadKeepOther: 'Touchez ✕ pour en retirer une. La photo que nous avons maintenant reste en haut, sauf si vous choisissez une des vôtres comme photo principale.',
+  socialUnsure: 'Pas certain / quelqu’un d’autre s’en occupe', socialUnsureSub: 'Aucun problème. Nous ne le redemanderons pas.', savedUnsure: 'Aucun problème. Nous ne le redemanderons pas. Vous pouvez l’ajouter à tout moment depuis votre page de modification.',
+  doneNowTitle: 'Beau travail!', doneNowLead: 'Vos réponses sont enregistrées. C’est tout pour l’instant.', addLater: 'Ajouter plus de détails plus tard?', addLaterLead: 'Tout est facultatif. Chacun augmente un peu votre pourcentage.',
+});
+fr.st = Object.assign({}, fr.st, { unsure: 'pas certain (c’est correct)' });
+delete fr.winterQ; delete fr.winterHint; delete fr.hoursThen;
+
+// The one time promise (pub test 6, 2026-11-10: the essentials took a careful owner about 30 minutes, not 10 to 15).
+// The start screen, the green card and the help topic all use these exact words.
+en.timeLine = 'About 15 to 30 minutes. You can stop any time and carry on later.';
+fr.timeLine = 'Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.';
 
 module.exports = { en, fr };

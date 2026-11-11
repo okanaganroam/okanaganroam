@@ -338,14 +338,28 @@ function hoursStatusLabel(status, clock) {
 //         | { state: 'later', from, to }               -- a window still to come today
 //         | { state: 'next', from, to, nextWeek }      -- the next window on another day, up to a week ahead
 // `to` is when that window ends ({ weekday, minutes }, or null when it can't be read).
-function happyHourState(hh, clock, placeClosedNow) {
-  const parsed = parseHours(hh);
+// Closures (pub test 6, 2026-11-10): with the venue's special closures (`closures`, [{ from, to }], and a dated clock)
+// the next happy hour walks real dates like the next opening (nextOpeningByDate): a closure day has no happy hour, and
+// a multi-day closure is stepped over ("Next happy hour: tomorrow 3 PM" was shown for a Remembrance Day closure). A day
+// the happy-hour week doesn't list is no happy hour that day. `daysAhead` (0 = today) comes with a dated answer.
+function happyHourState(hh, clock, placeClosedNow, closures) {
+  let parsed = parseHours(hh);
+  const cl = Array.isArray(closures) ? closures.filter((c) => c && /^\d{4}-\d{2}-\d{2}$/.test(c.from) && /^\d{4}-\d{2}-\d{2}$/.test(c.to || c.from)).map((c) => ({ from: c.from, to: c.to || c.from, note: '' })) : [];
+  if (cl.length && parsed && parsed.known && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) {
+    const days = {};
+    for (const d of WEEKDAYS) days[d] = parsed.days[d] && parsed.days[d].status !== 'unknown' ? parsed.days[d] : { status: 'closed' };
+    parsed = { known: true, days, closures: cl };
+  }
   const s = statusAt(parsed, clock);
   if (s.state === 'open') return placeClosedNow ? null : { state: 'now', until: s.closesAt };
   if (s.state !== 'closed' || !s.opensAt) return null;
   const from = s.opensAt;
   const probe = statusAt(parsed, { weekday: from.weekday, minutes: from.minutes });
   const to = probe.state === 'open' ? probe.closesAt : null;
+  if (from.daysAhead != null) {
+    if (from.daysAhead === 0) return { state: 'later', from, to };
+    return { state: 'next', from, to, nextWeek: from.daysAhead >= 7, daysAhead: from.daysAhead };
+  }
   // nextOpening() only returns today's weekday for a start still ahead today, or for the same day next week.
   if (from.weekday === clock.weekday && from.minutes > clock.minutes) return { state: 'later', from, to };
   return { state: 'next', from, to, nextWeek: from.weekday === clock.weekday };

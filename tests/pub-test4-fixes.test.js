@@ -49,23 +49,23 @@ test('1: hours start as a short list of the 7 days, each with a big Change butto
     assert.equal(cfg.t.hoursChange, 'Change');
     assert.equal(cfg.t.hoursEditLead, 'Tap Change beside any day that’s different. The other days stay as they are.');
     // A closed row is a summary and a Change button: no time boxes, so nothing in it is read or changed on Save.
-    const row = /if \(!S\.hoursOpen\[d\]\) return ([\s\S]*?);\n/.exec(s);
+    const row = /if \(!hop\[d\]\) return ([\s\S]*?);\n/.exec(s); // pub test 6: hop = the usual week's or the season's open days
     assert.ok(row, 'the folded row');
     assert.match(row[1], /data-hopen="' \+ d \+ '"/);
     assert.match(row[1], /h\(T\.hoursChange\)/);
     assert.doesNotMatch(row[1], /data-h=|type="time"/, 'a folded day has no time boxes');
     // With no hours yet, Monday opens so there is somewhere to start; otherwise every day starts folded.
-    assert.match(s, /if \(!S\.hoursOpenSet\) \{ S\.hoursOpenSet = true; S\.hoursOpen = \{\}; if \(!DAYS\.some\(function\(d\)\{ return S\.week\[d\]; \}\)\) S\.hoursOpen\.mon = true; \}/);
+    assert.match(s, /if \(!seas && !S\.hoursOpenSet\) \{ S\.hoursOpenSet = true; S\.hoursOpen = \{\}; if \(!DAYS\.some\(function\(d\)\{ return S\.week\[d\]; \}\)\) S\.hoursOpen\.mon = true; \}/);
     // An open day keeps everything it had: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, Same as.
     assert.match(s, /\(j === w\.length - 1 \? lateBtns\(d, j, y\) : ''\)/);
     assert.match(s, /id="suLate' \+ d \+ j \+ '"/);
-    assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/);
+    assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\)\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/);
     assert.match(s, /data-same="' \+ d \+ '"/); assert.match(s, /data-samemon="' \+ d \+ '"/);
     // Copy shortcuts: every day, or Mon–Fri.
     // Pub test 5: "Every open day" unless no other day is open; a day marked Closed is never reopened by a copy.
     assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
     assert.match(s, /data-copywk="' \+ d \+ '">' \+ h\(T\.copyWeek\)/);
-    assert.match(s, /DAYS\.forEach\(function\(x\)\{ if \(x !== d && \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\) && \(fresh \|\| S\.week\[x\]\)\) S\.week\[x\] = clone\(src\); \}\);/);
+    assert.match(s, /DAYS\.forEach\(function\(x\)\{ if \(x !== d && \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\) && \(fresh \|\| wk\[x\]\)\) wk\[x\] = clone\(src\); \}\);/);
     // Saving sends the whole week as before (every day, opened or not).
     assert.match(s, /var week = \{\}; DAYS\.forEach\(function\(d\)\{ week\[d\] = S\.week\[d\] \|\| \[\]; \}\);/);
     assert.match(html, /\.su-hchg \{[^}]*min-height: 56px;/, 'the Change button is big enough to tap');
@@ -200,8 +200,8 @@ test('5a: "Local or craft beer on tap" for owners and the public, EN and FR; the
   // The map's "Must have" chip, and its EN/FR chip words.
   assert.equal(app.MAP_MUST_HAVES.find((f) => f.key === 'localbeer').label, 'Local or craft beer on tap');
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /localbeer: 'Local or craft beer on tap' \}/);
-  assert.match(src, /localbeer: 'Bière locale ou artisanale en fût' \}/);
+  assert.match(src, /localbeer: 'Local or craft beer on tap'[,} ]/);
+  assert.match(src, /localbeer: 'Bière locale ou artisanale en fût'[,} ]/);
   assert.doesNotMatch(src, /'Local beer on tap'|'Bière locale en fût'/);
 });
 

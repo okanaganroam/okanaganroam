@@ -50,11 +50,11 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   assert.deepEqual(cfg.steps, cfg.part1.concat(cfg.part2));
   assert.equal(cfg.t.spendLead, 'One main and a soft drink, before tax and tip.');
   assert.equal(cfg.t.spendQ, 'About how much does one person spend?');
-  assert.match(cfg.t.hiLead, /The essentials take about 10 to 15 minutes/);
+  assert.match(cfg.t.hiLead, /About 15 to 30 minutes/);
   assert.equal(cfg.t.savedEmail, 'Great. Once you’ve emailed it, we’ll add it within a day.');
   assert.equal(cfg.offerGroups.length, 3);
   // Happy hour and Takeout aren't tiles any more (asked twice): their own questions in Part 2 set them.
-  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 16);
+  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 17); // + Fireplace (pub test 6)
   assert.ok(!cfg.offerGroups.some((g) => g.keys.includes('happy_hour') || g.keys.includes('takeout')));
   assert.equal(cfg.offerLabels.wheelchair_accessible, 'Wheelchair accessible');
   assert.equal(cfg.cuisines.length, 45);

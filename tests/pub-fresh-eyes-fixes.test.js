@@ -78,7 +78,8 @@ test('B–E: Save and exit records no implicit "not offered"; the spend icon; th
   // B: only a full Save (not Save and exit) adds games / sports to "not offered".
   assert.match(s, /partial = !!S\.exitAfter/);
   assert.match(s, /if \(gameOn\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/);
-  assert.match(s, /if \(badges\.sports_tv\) rem\.push\('sports'\); else if \(!partial\)/);
+  // Pub test 6: only an explicit "no sports" is recorded, and never from "Save and exit".
+  assert.match(s, /if \(badges\.sports_tv \|\| !noSportsSaid\) rem\.push\('sports'\); else if \(!partial\) add\.push\('sports'\);/);
   // C: the average spend tile has its own icon, and a missing one is never "undefined".
   assert.match(s, /spend: '💵'/); assert.match(s, /\(P2_ICONS\[k\] \|\| '•'\)/);
   // D: "pub", and no "Roam Now map" on the front-door step, in English and French.
@@ -213,7 +214,7 @@ test('two ways of saying "when", the honest time, the greeting, event kinds open
   const pub = mk('pub'); const html = await text(`/owner/${tokenFor(pub.id)}/setup`);
   const cfg = cfgOf(html), s = scriptOf(html);
   assert.equal(cfg.t.hi, 'Hi, welcome to your page for {name} 👋');
-  assert.match(cfg.t.hiLead, /about 10 to 15 minutes \(a bit longer if you change your hours\)/);
+  assert.match(cfg.t.hiLead, /About 15 to 30 minutes\. You can stop any time and carry on later\./ /* pub test 6 */);
   assert.match(cfg.t.helpYes, /<strong>Saved ✓<\/strong> or <strong>Sent ✓<\/strong>/);
   // Event kinds: the 6 most common show open (pubs lead with sports), the rest under "More kinds".
   assert.deepEqual(cfg.nightKinds.slice(0, 6), ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic']);
@@ -221,7 +222,7 @@ test('two ways of saying "when", the honest time, the greeting, event kinds open
   assert.match(s, /C\.nightKinds\.slice\(0, 6\)/);
   const restCfg = cfgOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
   assert.equal(restCfg.nightKinds.length, 12);
-  assert.match(restCfg.t.hiLead, /a bit longer if you change your hours/);
+  assert.match(restCfg.t.hiLead, /About 15 to 30 minutes\. You can stop any time and carry on later\./); // pub test 6
 });
 
 test('the quick-ones line waits until the setup is finished or "I\'m done for now"', async () => {

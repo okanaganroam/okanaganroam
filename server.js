@@ -19350,10 +19350,12 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 // badge guide pages, sitemap entries or feature filters are made from them). Restaurants only (the completeness types).
 // Stored in venue_owner_features; they ride along in the owner's "badges" changes and show as chips on the venue
 // page and on cards.
-const OWNER_EXTRA_BADGES = ['local_drinks', 'heated_patio', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout'];
+// Fireplace (pub test 6, 2026-11-10): one more owner-only answer for restaurants and pubs; never part of the score.
+const OWNER_EXTRA_BADGES = ['local_drinks', 'heated_patio', 'fireplace', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout'];
 const OWNER_EXTRA_BADGE_LABELS = {
   local_drinks: { en: 'Local wine & craft beer', fr: 'Vins locaux et bières artisanales', icon: null, group: 'food' },
   heated_patio: { en: 'Heated or covered patio', fr: 'Terrasse chauffée ou couverte', icon: null, group: 'place' },
+  fireplace: { en: 'Fireplace', fr: 'Foyer', icon: null, group: 'place' },
   wheelchair_accessible: { en: 'Wheelchair accessible', fr: 'Accessible en fauteuil roulant', icon: null, group: 'place' },
   locally_owned: { en: 'Locally owned', fr: 'Propriété locale', icon: null, group: 'place' },
   takes_reservations: { en: 'Takes reservations', fr: 'Prend les réservations', icon: null, group: 'people' },
@@ -19373,7 +19375,7 @@ const PUB_GAME_BADGES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games
 // Every owner feature that can be stored (the table holds them all); ownerExtraBadgesFor(type) is what a type is offered.
 const ALL_OWNER_FEATURES = OWNER_EXTRA_BADGES.concat(PUB_OWNER_BADGES);
 function ownerExtraBadgesFor(type) {
-  if (type === 'pub') return ['local_drinks', 'local_beer_taps', 'heated_patio', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', ...PUB_GAME_BADGES];
+  if (type === 'pub') return ['local_drinks', 'local_beer_taps', 'heated_patio', 'fireplace', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', ...PUB_GAME_BADGES];
   return OWNER_FEATURE_TYPES.has(type) ? OWNER_EXTRA_BADGES : [];
 }
 // The types with owner-only features: the completeness types (restaurants, and pubs since 2026-11-10).
@@ -21283,7 +21285,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût', fireplace: 'Foyer' }, spToday: 'Aujourd’hui :',
     wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
@@ -21324,7 +21326,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local or craft beer on tap' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local or craft beer on tap', fireplace: 'Fireplace' }, spToday: 'Today:',
     wnMore: function(n){ return '+' + n + ' more'; }, hhLaterNote: 'No happy hour on right now. These places have one later today.', openMicWords: 'open mic',
     wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
@@ -21566,7 +21568,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!p.hh || p.sc) return null;
     try {
       var clock = okanaganClock(new Date());
-      var h = happyHourState(expandFoodDrinkHours(p.hh), clock, !!(p.st && p.st.state === 'closed'));
+      // Special closures ride along in the hours (_closures, pub test 6): no happy hour on a closure day.
+      var h = happyHourState(expandFoodDrinkHours(p.hh), clock, !!(p.st && p.st.state === 'closed'), p.h && typeof p.h === 'object' && p.h._closures ? p.h._closures : null);
       // 2026-10-26: while it is on, the countdown ("Happy hour on now · ends in 1 hr 20 min"), updated every minute.
       var left = h && h.state === 'now' ? happyHourMinutesLeft(h.until, clock) : null;
       if (h && h.state === 'now' && left != null) return { now: true, text: T.hhOnNow(happyHourLeftText(left, FR)) };
@@ -21613,7 +21616,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + (st.season ? '${uiIcon('leaf', 15, true)} ' : '') + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
-  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer'];
+  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer', 'fireplace'];
   function featHtml(p){
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
@@ -22529,7 +22532,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     free: 'free gratuit gratuits gratuite gratuites gratis',
     access: 'wheelchair accessible accessibility accessibilité', booking: 'reservation reservations réservation réservations',
     takeout: 'takeout pickup emporter', heated: 'heated', localdrinks: 'localdrinks', ownlocal: 'ownlocal',
-    games: 'billiards darts shuffleboard billard fléchettes', localbeer: 'localbeer',
+    games: 'billiards darts shuffleboard billard fléchettes', localbeer: 'localbeer', fireplace: 'fireplace fireplaces fireside foyer foyers',
     open: 'open ouvert ouverts', nearme: 'nearme'
   };
   // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
@@ -23157,6 +23160,8 @@ const MAP_OWNER_FEATURES = [
   { key: 'booking', owner: 'takes_reservations', bit: 1 << 21 }, { key: 'takeout', owner: 'takeout', bit: 1 << 22 },
   // Pubs (2026-11-10): "Games" is any of the five games; "Local beer on tap" its own answer. Same rules as above.
   { key: 'games', owners: ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'], bit: 1 << 23 }, { key: 'localbeer', owner: 'local_beer_taps', bit: 1 << 24 },
+  // Pub test 6 (2026-11-10): a fireplace, restaurants and pubs.
+  { key: 'fireplace', owner: 'fireplace', bit: 1 << 25 },
 ];
 // "Specials today" (2026-10-27): a filter key like the features (?f=specials, the words "specials" / « spéciaux »), but read
 // from today's specials ([17]), never from a stored bit, so no place carries it in [7].
@@ -23193,6 +23198,7 @@ const MAP_MUST_HAVES = [
   // Owner-only pub features (2026-11-10).
   { key: 'games', label: 'Pool, darts & games', icon: uiIcon('target') },
   { key: 'localbeer', label: 'Local or craft beer on tap', icon: uiIcon('cocktail') },
+  { key: 'fireplace', label: 'Fireplace', icon: uiIcon('home') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -34079,8 +34085,11 @@ function happyHourLiveText(h, fr, clock) {
     return fr ? `Happy hour aujourd’hui ${when}` : `Happy hour today ${when}`;
   }
   const day = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
-  const tomorrow = !!(clock && !h.nextWeek && h.from.weekday === SPECIAL_WEEK[(SPECIAL_WEEK.indexOf(clock.weekday) + 1) % 7]);
-  const dayText = tomorrow ? (fr ? 'demain' : 'tomorrow') : h.nextWeek ? (fr ? `${day} prochain` : `next ${day}`) : day;
+  // Pub test 6 (2026-11-10): a dated answer (closures stepped over) knows how many days ahead it is; more than a week
+  // ahead (after a long closure) it names the date too ("Monday, Jan 21" / « lundi 21 janv. »).
+  const tomorrow = h.daysAhead != null ? h.daysAhead === 1 : !!(clock && !h.nextWeek && h.from.weekday === SPECIAL_WEEK[(SPECIAL_WEEK.indexOf(clock.weekday) + 1) % 7]);
+  const dayText = tomorrow ? (fr ? 'demain' : 'tomorrow') : h.daysAhead > 7 && h.from.date ? (fr ? `${day} ${hoursExtraDayText(h.from.date, true)}` : `${day}, ${hoursExtraDayText(h.from.date)}`)
+    : h.nextWeek ? (fr ? `${day} prochain` : `next ${day}`) : day;
   return fr ? `Prochain happy hour : ${dayText} ${happyHourTimeText(h.from.minutes, true)}` : `Next happy hour: ${dayText} ${happyHourTimeText(h.from.minutes, false)}`;
 }
 // What a venue page shows: { week, checked, live: { state, text } | null }, or null when the place has no stored times,
@@ -34106,7 +34115,8 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
   const clock = okanaganClock(now);
   let h = null;
-  try { h = hoursModule.happyHourState(row.happy_hour_times, clock, !!(place && place.state === 'closed')); } catch (e) { h = null; }
+  // Special closures (pub test 6): no happy hour on a closure day, and "next" skips them.
+  try { h = hoursModule.happyHourState(row.happy_hour_times, clock, !!(place && place.state === 'closed'), upcomingClosures(venueHoursExtras(venue.id).closures, now)); } catch (e) { h = null; }
   if (h && h.state === 'later' && place && place.closedToday) h = null;
   // Countdown (2026-10-26): "Happy hour on now · ends in 1 hr 20 min" while it is on (worked out when the page is made).
   const text = h ? (happyHourOnNowText(h, clock, fr) || happyHourLiveText(h, fr, clock)) : '';
@@ -34312,7 +34322,7 @@ function happyHourStatesFor(venues, now = new Date()) {
     let place = null;
     try { place = v.hours ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), clock) : null; } catch (e) { place = null; }
     let h = null;
-    try { h = hoursModule.happyHourState(v.happy_hour_times, clock, !!(place && place.state === 'closed')); } catch (e) { h = null; }
+    try { h = hoursModule.happyHourState(v.happy_hour_times, clock, !!(place && place.state === 'closed'), upcomingClosures(venueHoursExtras(v.id).closures, now)); } catch (e) { h = null; }
     const closedToday = !!(place && place.closedToday);
     if (h && h.state === 'later' && closedToday) h = null;
     byId.set(v.id, { h, blocked: false, closedToday });
@@ -34337,7 +34347,7 @@ function happyHourNowSummary(now = new Date()) {
     if (!h) continue;
     if (h.state === 'now') on++;
     else if (h.state === 'later') { later++; laterFrom = laterFrom == null ? h.from.minutes : Math.min(laterFrom, h.from.minutes); }
-    else if (h.state === 'next' && !h.nextWeek && h.from.weekday === tomorrow) { next++; nextFrom = nextFrom == null ? h.from.minutes : Math.min(nextFrom, h.from.minutes); }
+    else if (h.state === 'next' && !h.nextWeek && h.from.weekday === tomorrow && (h.daysAhead == null || h.daysAhead === 1)) { next++; nextFrom = nextFrom == null ? h.from.minutes : Math.min(nextFrom, h.from.minutes); }
   }
   const s = on ? { state: 'now', count: on, startsAt: null } : later ? { state: 'later', count: later, startsAt: laterFrom } : next ? { state: 'tomorrow', count: next, startsAt: nextFrom } : { state: 'none', count: 0, startsAt: null };
   s.label = { en: happyHourNowLabel(s, false), fr: happyHourNowLabel(s, true) };
@@ -50226,7 +50236,10 @@ const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known
 const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'] };
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
-const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no'];
+// 'unsure' (pub test 6, 2026-11-10): "Not sure / someone else runs it" for Instagram and Facebook. It answers the step
+// (no nagging) without saying they have no account, so it is never stored as a "we don't have one" (not_offered).
+const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no', 'unsure'];
+const SETUP_UNSURE_STEPS = ['instagram', 'facebook'];
 const SETUP_RATE_LIMIT = 80;
 const ownerSetupAttempts = new Map();
 function ownerSetupRateLimited(ip, now = Date.now()) {
@@ -50282,7 +50295,7 @@ function setupHappyBlocks(found) {
 }
 // A step that was saved or sent is never downgraded (fresh-eyes 2026-11-10: "Skip this for now" on a menu already sent
 // turned it into "skipped"): 'skip' and 'later' never replace an answer, and "I'll email it" never replaces something sent.
-const SETUP_ANSWERED = ['live', 'day', 'email', 'no'];
+const SETUP_ANSWERED = ['live', 'day', 'email', 'no', 'unsure'];
 function saveSetupProgress(venueId, step, status) {
   const p = setupProgress(venueId);
   const had = p.done[step];
@@ -50353,6 +50366,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
     return send(200, { ok: true, progress: { done: p0.done }, score: setupScore(found) });
   }
   if (!body || !SETUP_STEPS.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
+  if (body.status === 'unsure' && !SETUP_UNSURE_STEPS.includes(body.step)) return send(400, { ok: false, error: 'Please try again.' });
   let progress = saveSetupProgress(found.venue.id, body.step, body.status);
   if (body.step === 'menu') setupMenuEmailRecord(found.venue, progress.done.menu);
   if (body.step === 'happy') {
@@ -50370,13 +50384,24 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   return send(200, { ok: true, progress: { done: progress.done }, score: setupScore(found) });
 }
 
+// Where the photo now on the page came from (pub test 6, 2026-11-10: the Google Maps stand-in was labelled "Your main
+// photo now"): 'own' (the business's own upload), 'google' (credited to Google Maps) or 'other' (anything else we found).
+function setupImageSource(venue, pendingMain) {
+  if (pendingMain) return 'own';
+  const url = String(venue.image_url || '').split('?')[0];
+  if (!url) return 'other';
+  try { if (ownerPhotoCreditFor(venue.image_url) || /^\/images\/owner\//.test(url)) return 'own'; } catch (e) { /* no owner photos table */ }
+  let credit = '';
+  try { credit = String(require('./data/venue-photo-credits.json')[url] || ''); } catch (e) { credit = ''; }
+  return /google/i.test(credit) || /googleusercontent|maps\.googleapis|ggpht/i.test(url) ? 'google' : 'other';
+}
 // The big first card on a restaurant's edit page.
 function ownerSetupCardHtml(href, lang, state = 'none') {
   const fr = lang === 'fr';
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
   const [cardTitle, cardSub] = {
-    none: fr ? ['Configurez votre page', 'Une question à la fois. L’essentiel prend de 10 à 15 minutes (un peu plus si vous changez vos heures)'] : ['Set up your page', 'One question at a time. The essentials take about 10 to 15 minutes (a bit longer if you change your hours)'],
+    none: fr ? ['Configurez votre page', `Une question à la fois. ${OWNER_SETUP_STRINGS.fr.timeLine}`] : ['Set up your page', `One question at a time. ${OWNER_SETUP_STRINGS.en.timeLine}`],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
@@ -50444,13 +50469,13 @@ function renderOwnerSetupPage(found, opts) {
   const offerGroups = pub ? [
     // Pubs (2026-11-10, 22 tiles): no Kids tile ("Who's welcome?" asks it) and no Happy hour tile (Part 1 asks it).
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['local_beer_taps', 'local_drinks', 'nonalcoholic', 'vegan', 'vegetarian', 'gluten_free'] },
-    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'sports_tv', 'live_music', 'lake_view', 'wheelchair_accessible', 'locally_owned'] },
+    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'fireplace', 'sports_tv', 'live_music', 'lake_view', 'wheelchair_accessible', 'locally_owned'] },
     { title: fr ? 'Jeux' : 'Games', keys: PUB_GAME_BADGES.slice() },
     { title: fr ? 'Idéal pour' : 'Good for', keys: ['dog_friendly', 'great_groups', 'takes_reservations', 'takeout'] },
   ] : [
     // Happy hour and Takeout are not tiles (asked twice, fresh-eyes 2026-11-09): their own questions in Part 2 set them.
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'local_drinks'] },
-    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'sports_tv', 'live_music', 'wheelchair_accessible', 'locally_owned'] },
+    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'fireplace', 'lake_view', 'sports_tv', 'live_music', 'wheelchair_accessible', 'locally_owned'] },
     { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'great_groups', 'takes_reservations'] },
   ];
   const offerLabels = { ...t.offers };
@@ -50467,7 +50492,7 @@ function renderOwnerSetupPage(found, opts) {
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
     typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub' })[venue.type] || (fr ? 'établissement' : 'place'),
     // Never a website the owner just asked to remove (still waiting for review) or said they don't have (pub test 5).
-    image: pendingMain || ownImage, website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
+    image: pendingMain || ownImage, imageSource: setupImageSource(venue, pendingMain), website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
     researchTicks: setupResearchTicks(venue, offerGroups.flatMap((g) => g.keys)),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
@@ -50477,7 +50502,7 @@ function renderOwnerSetupPage(found, opts) {
     cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
-    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' },
+    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', fireplace: '🪵', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' },
     // The first 6 show open (pub fresh-eyes 2026-11-10), so pubs lead with their usual nights.
     nightKinds: venue.type === 'pub' ? ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic', 'comedy', 'bingo', 'games', 'paint', 'run_club', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
@@ -50710,6 +50735,12 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-fold[open] summary { margin-bottom: 12px; }
   body.owner-setup .su-chip.su-chip-wide { padding: 0 14px; min-width: 0; }
   body.owner-setup .su-sticky-clear { margin-top: 28px; box-shadow: 0 -14px 14px -6px #F4F1EA; }
+  /* Pub test 6 (2026-11-10): a rejected website is outlined in red; the seasonal hours box; "Want to add more later?". */
+  body.owner-setup .su-field[aria-invalid="true"] { border-color: var(--su-warn); box-shadow: 0 0 0 3px var(--su-warn-bg); }
+  body.owner-setup .su-seasonnow { margin: 0 0 14px; }
+  body.owner-setup .su-later { margin: 18px 0; }
+  body.owner-setup .su-later summary { display: inline-flex; align-items: center; min-height: 48px; color: var(--su-teal); font-weight: 800; text-decoration: underline; cursor: pointer; }
+  body.owner-setup .su-later[open] summary { margin-bottom: 10px; }
   body.owner-setup .su-kinds { margin: 0 0 12px; }
   body.owner-setup .su-kinds summary { display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; border: 2px solid var(--su-line); border-radius: 14px; background: var(--su-card); color: var(--su-teal); font-weight: 800; cursor: pointer; }
   body.owner-setup .su-kinds[open] summary { margin-bottom: 10px; }
@@ -51817,8 +51848,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
     keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
     keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
-    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts:</p><ul><li><strong>The essentials</strong> (about 10 to 15 minutes, a bit longer if you change your hours): address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
-    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties :</p><ul><li><strong>L’essentiel</strong> (de 10 à 15 minutes, un peu plus si vous changez vos heures) : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts. About 15 to 30 minutes. You can stop any time and carry on later.</p><ul><li><strong>The essentials</strong>: address and phone, hours, holidays and closures, average spend, what you serve, photos, your menu and what you offer.</li><li><strong>More about your place</strong> (optional, any order): happy hour, specials, weekly events, your story, booking, takeout, what you’re known for, groups, Instagram, Facebook and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.</p><ul><li><strong>L’essentiel</strong> : adresse et téléphone, heures, jours fériés et fermetures, dépense moyenne, ce que vous servez, photos, votre menu et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : happy hour, spéciaux, événements de la semaine, votre histoire, réservations, commandes à emporter, ce pour quoi vous êtes reconnu, groupes, Instagram, Facebook et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
   { id: 'cuisine-pick', completenessOnly: true, over: ['page-complete'], q: 'How do I change my cuisine?', qFr: 'Comment changer ma cuisine?', pages: ['edit'],
     keys: ['cuisine', 'change cuisine', 'change my cuisine', 'wrong cuisine', 'what we serve', 'what you serve', 'type of food', 'kind of food', 'food type', 'italian', 'sushi', 'steakhouse', 'not on the list', 'cuisine not listed', 'more than one cuisine', 'two cuisines', 'kind of place', 'type of restaurant', 'fine dining', 'casual'],
     keysFr: ['cuisine', 'changer ma cuisine', 'mauvaise cuisine', 'ce que vous servez', 'type de cuisine', 'genre de cuisine', 'pas dans la liste', 'plusieurs cuisines', 'genre d’endroit', 'type de restaurant'],
@@ -55039,6 +55070,45 @@ const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['veg
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
   pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
   cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'] };
+// What one save changed, in the owner's words (pub test 6, 2026-11-10): only what actually changed. A kitchen-only save
+// is "Kitchen" (not "Kitchen, who's welcome and sports"); a happy hour save is "Happy hour" (the Happy hour badge and the
+// deals that come with it are part of it, not "What you offer, happy hour, happy hour deals"). Restaurants and pubs.
+const OWNER_PUB_INFO_LABELS = { kitchen: ['Kitchen', 'Heures de la cuisine'], minors: ['Who’s welcome', 'Qui est le bienvenu'], sports: ['Sports on TV', 'Sports à la télé'] };
+// A badge that only follows another field of the same save (the Happy hour badge with the happy hour times).
+const OWNER_BADGE_FOLLOWS = { happy_hour: ['happy_hour', 'happy_hour_deals'], live_music: ['weekly_nights'] };
+function ownerChangeLabels(ch, prev, fr) {
+  const names = fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS;
+  const out = [];
+  const add = (x) => { if (x && !out.includes(x)) out.push(x); };
+  for (const f of Object.keys(ch || {})) {
+    if (f === 'not_offered') continue;
+    if (f === 'badges') {
+      const own = Object.keys(ch.badges || {}).filter((b) => !(OWNER_BADGE_FOLLOWS[b] || []).some((x) => x in ch));
+      if (own.length || !ch.badges || typeof ch.badges !== 'object') add(fr ? 'Ce que vous offrez' : 'What you offer');
+      continue;
+    }
+    if (f === 'happy_hour_deals' && 'happy_hour' in ch) continue;
+    if (f === 'pub_info') {
+      const a = (ch.pub_info && typeof ch.pub_info === 'object') ? ch.pub_info : {}, b = (prev && prev.pub_info && typeof prev.pub_info === 'object') ? prev.pub_info : {};
+      const parts = Object.keys(OWNER_PUB_INFO_LABELS).filter((k) => JSON.stringify(a[k] === undefined ? null : a[k]) !== JSON.stringify(b[k] === undefined ? null : b[k]));
+      if (parts.length) parts.forEach((k) => add(OWNER_PUB_INFO_LABELS[k][fr ? 1 : 0])); else add(names.pub_info);
+      continue;
+    }
+    add(names[f] || f);
+  }
+  return out;
+}
+// The same line twice on the same day shows once (the newest), wherever it is in the list (pub test 6: a happy hour
+// saved, Back, saved again showed twice).
+function ownerActivityDedup(itemsIn, fr) {
+  const seenLine = new Set();
+  return itemsIn.filter((it) => {
+    if (it.kind === 'event') return true;
+    const k = `${it.title}|${it.status}|${ownerLocalDate(it.sent, fr)}`;
+    if (seenLine.has(k)) return false;
+    seenLine.add(k); return true;
+  });
+}
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -55051,8 +55121,9 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       const ch = JSON.parse(r.changes);
       // Restaurants (2026-11-10): the owner's words, not ours: "What you offer" (not "Badges"), and a "we don't have
       // one" answer reads "You told us you don't have: …" (not "Things you don't offer").
-      const keys = Object.keys(ch).filter((f) => !(plain && f === 'not_offered'));
-      fields = keys.map((f) => (plain && f === 'badges' ? (fr ? 'Ce que vous offrez' : 'What you offer') : (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f));
+      let prev = {};
+      try { prev = JSON.parse(r.previous || '{}') || {}; } catch (e) { prev = {}; }
+      fields = plain ? ownerChangeLabels(ch, prev, fr) : Object.keys(ch).map((f) => (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f);
       if (plain && Array.isArray(ch.not_offered)) {
         let before = [];
         try { before = (JSON.parse(r.previous || '{}').not_offered) || []; } catch (e) { before = []; }
@@ -55128,13 +55199,7 @@ function ownerActivityHtml(itemsIn, lang = 'en', now = new Date()) {
   const L = (en, f) => (fr ? f : en);
   // The same line twice on the same day (e.g. "Kitchen, who's welcome and sports" saved twice in the setup) shows once;
   // the list is no longer cut at 12 -- the rest folds behind "Show all (N)" (pub fresh-eyes 2, 2026-11-10).
-  const seenLine = new Set();
-  const items = itemsIn.filter((it) => {
-    if (it.kind === 'event') return true;
-    const k = `${it.title}|${it.status}|${ownerLocalDate(it.sent, fr)}`;
-    if (seenLine.has(k)) return false;
-    seenLine.add(k); return true;
-  });
+  const items = ownerActivityDedup(itemsIn, fr);
   const OWNER_ACTIVITY_SHOWN = 12;
   const old = items.map((it, i) => ownerActivityIsOld(it, now) || (i >= OWNER_ACTIVITY_SHOWN && it.status !== 'pending' && it.status !== 'changewait'));
   if (old.every(Boolean)) old[0] = false;
@@ -55763,6 +55828,8 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
+    // "Not sure / someone else runs it" in the setup (pub test 6): answered, kept apart from "we don't have one".
+    unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
     // Pubs (2026-11-10): their own item list, the pub answers and the owner features (games).
     type: venue.type, pubInfo: venue.type === 'pub' ? (live.pub_info || venuePubInfo(venue.id)) : null,
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
@@ -55816,6 +55883,8 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     pendingBadges: ownerPendingBadgeNames(live, waitingReq, fr), plainWaiting: setupState(venue.id) !== 'none',
     // Every field still waiting for our check (pub test 3, 2026-11-10), so the "… sent" line names exactly what is pending.
     pendingFields: [...pending].filter((k) => !k.includes(':')),
+    // Photos sent and waiting (pub test 6): named in the "… sent" line even when the page already has a main photo.
+    pendingPhotos: input.pendingPhotos || 0,
     // Until the setup is finished (or "I'm done for now"), the green "Set up your page" card is the one way in: this
     // card keeps its % but not its own "Tap to start" (fresh-eyes 2026-11-10: two "start here" boxes competed).
     quietCta: setupState(venue.id) !== 'done' && !setupProgress(venue.id).done_for_now,
@@ -56258,7 +56327,23 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     ? Object.keys((ownerPendingInstantSplit(waitingReq, live) || { live: {} }).live) : [];
   // "le 15 oct." already ends in a period, so the French sentences drop their own after it (2026-10-18).
   const sentOn = pending ? escapeHtml(ownerLocalDate(pending.submitted_at, fr)) : '';
+  // Restaurants and pubs (pub test 6, 2026-11-10): "They're waiting for review" read as if everything was, when 13 of
+  // 15 updates were already live. The note says how many are waiting, and that the rest are on the page.
+  let waitingNote = '';
+  if (pending && !instantOn && COMPLETENESS_TYPES.has(venue.type)) {
+    const acts = ownerActivityDedup(ownerVenueActivity(venue.id, 60, lang), fr);
+    const nWait = acts.filter((it) => it.status === 'pending' || it.status === 'changewait').length;
+    const nLive = acts.filter((it) => it.status === 'approved').length;
+    // Only when some are live already: with everything waiting, the old line ("They're waiting for review … added to
+    // them") is still exactly right.
+    if (nWait && nLive) {
+      const head = nWait === 1 ? L('1 update is waiting for us to check.', '1 mise à jour attend notre vérification.') : L(`${nWait} updates are waiting for us to check.`, `${nWait} mises à jour attendent notre vérification.`);
+      const tail = L(' The rest are on your page now.', ' Les autres sont déjà sur votre page.');
+      waitingNote = `<p class="op-pending" id="opPendingCount">${head}${tail} ${nWait === 1 ? L('It’s marked “Waiting for review” below.', 'Elle est marquée « En attente de vérification » ci-dessous.') : L('They’re marked “Waiting for review” below.', 'Elles sont marquées « En attente de vérification » ci-dessous.')}</p>`;
+    }
+  }
   const pendingNote = !pending ? ''
+    : waitingNote ? waitingNote
     : !instantOn
       ? `<p class="op-pending">${L(`You sent changes on ${sentOn}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${sentOn.replace(/\.$/, '')}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
       : carryOnSave.length
@@ -62688,7 +62773,7 @@ module.exports = {
   CHIP_TEXT_EM,
   // Portal polish (2026-10-18)
   ownerActivityHtml,
-  ownerVenueActivity,
+  ownerChangeLabels, ownerActivityDedup, setupImageSource, SETUP_STATUSES, ownerVenueActivity,
   ownerActivityIsOld,
   adminReviewAction,
   ownerUndoEmail,
