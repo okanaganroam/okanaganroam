@@ -171,8 +171,9 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /fill\(T\.dealLong, \{ n: i \+ 1, max: 60 - pre\.length \}\)/, 'a deal that is too long says so; it is never cut');
   assert.match(s, /body\.blocks = happyBlocks\(\)/);
   // Specials and events: an untouched row goes back as stored.
-  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.text \+ '\|' \+ e\.price\) \{ out\.push\(e\.orig\); continue; \}/);
-  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start\) \{ out\.push\(e\.orig\); continue; \}/);
+  // Pub test 7: the season is part of what "untouched" means.
+  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.text \+ '\|' \+ e\.price \+ '\|' \+ seaKey\(e\.sea\)\) \{ out\.push\(e\.orig\); continue; \}/);
+  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start \+ '\|' \+ seaKey\(e\.sea\)\) \{ out\.push\(e\.orig\); continue; \}/);
   assert.doesNotMatch(s, /text\.slice\(0, 80\)/);
   // Seasonal hours not touched are not sent; a holiday keeps the note it was stored with.
   // Pub test 6: seasonal hours are only sent once the all-year question was answered on this visit (S.seaTouched).
