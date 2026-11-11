@@ -17,6 +17,8 @@
   function monthName(i){ return C.monthNames[i]; }
   // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
+  function happyCloseOf(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; return o && o._close && typeof o._close === 'object' ? o._close : {}; } catch (e) { return {}; } }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
 
   // ---------- Seasons (pub test 7, 2026-11-10) ----------
@@ -88,6 +90,7 @@
   }
 
   // ---------- State ----------
+  var GAMES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
   var S = {
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
@@ -98,12 +101,16 @@
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
     happy: [], specials: [], nights: [], story: CUR.description || '', visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
+    // TikTok (pub test 9): "@handle" from the stored https://www.tiktok.com/@handle.
+    tt: (CUR.tiktok_url || '').replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/\/$/, ''), ttSaved: (CUR.tiktok_url || '').replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/\/$/, ''),
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
     // "No dogs allowed" (pub test 4, 2026-11-10): the not-offered answer 'dogs'; never together with Dog friendly.
     noDogs: (CUR.not_offered || []).indexOf('dogs') >= 0 && !(CUR.badges || {}).dog_friendly,
     // "No sports / no TVs" (pub test 6): the explicit answer; an unticked Sports on TV tile alone says nothing.
     noSports: (CUR.not_offered || []).indexOf('sports') >= 0 && !(CUR.badges || {}).sports_tv,
+    // "No games" (pub test 9, 2026-11-10): the explicit answer, like No sports. Leaving the game tiles unticked says nothing.
+    noGames: (CUR.not_offered || []).indexOf('games') >= 0 && !GAMES.some(function(g){ return (CUR.badges || {})[g]; }),
   };
   S.badgesAtStart = clone(CUR.badges || {});
   // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
@@ -187,13 +194,14 @@
   function prefixOf(e, text){ var a = dayPrefix(e), b = oldPrefix(e); return text.indexOf(a) === 0 ? a : text.indexOf(b) === 0 ? b : null; }
   (function(){
     if (CUR.happy_blocks && CUR.happy_blocks.length) {
-      CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what }); });
+      CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what, close: !!b.close }); });
       var mine = {}; S.happy.forEach(function(e){ if (e.what) { mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? oldPrefix(e) : '') + e.what] = true; } });
       S.happyKeep = (CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : []).filter(function(d){ return d.price || !mine[d.text]; });
       S.happyTyped = true; return;
     }
-    var w = parseWeek(CUR.happy_hour); if (!w) return; var groups = {};
-    DAYS.forEach(function(d){ (w[d] || []).forEach(function(x){ var k = x[0] + '-' + x[1]; if (!groups[k]) { groups[k] = { days: {}, from: x[0], to: x[1], what: '' }; S.happy.push(groups[k]); } groups[k].days[d] = true; }); });
+    var w = parseWeek(CUR.happy_hour); if (!w) return; var groups = {}, cl = happyCloseOf(CUR.happy_hour);
+    // Until close (pub test 9): those windows are one row by their start, whatever each day's closing time is.
+    DAYS.forEach(function(d){ (w[d] || []).forEach(function(x){ var c = !!(cl[d] && cl[d].indexOf(x[0]) >= 0), k = x[0] + '-' + (c ? 'close' : x[1]); if (!groups[k]) { groups[k] = { days: {}, from: x[0], to: x[1], what: '', close: c }; S.happy.push(groups[k]); } groups[k].days[d] = true; }); });
     var deals = CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : [];
     deals.forEach(function(d){
       var hit = null;
@@ -280,7 +288,7 @@
     });
   }
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
-  function happyBlocks(){ return S.happy.map(function(e){ return { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; }); }
+  function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
     return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
@@ -334,7 +342,7 @@
   function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!S.done[P1[i]]) return P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
   function entry(step){
-    if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations)) return 'book:yes';
+    if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations || CUR.booking_url)) return 'book:yes';
     if (step === 'takeout' && (S.badges.takeout || S.visit.takeout)) return 'takeout:yes';
     if (step === 'groups' && (S.badges.great_groups || S.visit.groups)) return 'groups:yes';
     if (step === 'season') return 'closures';
@@ -422,6 +430,16 @@
   function monthChips(obj, key){ var l = []; for (var i = 1; i <= 12; i++) l.push({ k: i, t: monthName(i - 1) }); return chips(obj, key, l, T.whichMonths); }
   // Website shown as a plain domain ("tapsidepub.ca"), or "No website yet" / "You don't have a website".
   function siteDomain(u){ return String(u || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, ''); }
+  // "https://tapandbarrelkitchen.ca/" from "https://tapandbarrelkitchen.ca/?utm_source=okanaganroam#top" (pub test 9).
+  function siteOrigin(u){ var t = String(u || '').trim(); if (!t) return ''; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^([a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+)/i.exec(t); return m ? m[1] + '/' : ''; }
+  function siteHostOf(u){ return siteOrigin(u).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
+  // A web address inside a line of text (pub test 9: "Book on OpenTable: opentable.ca/r/tap-and-barrel"): -> { url, rest } | null.
+  function linkIn(t){
+    var m = /(?:https?:\/\/|www\.)[^\s<>]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|ca|net|org|io|co|app|me|bar|pub|restaurant|menu|link|ly)\/[^\s<>]*/i.exec(String(t || ''));
+    if (!m) return null; var url = m[0].replace(/[.,;:!)]+$/, '');
+    var rest = (String(t).slice(0, m.index) + String(t).slice(m.index + url.length)).replace(/\s*[:\-–]\s*$/, '').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').replace(/^[\s,.:;\-–]+|[\s,:;\-–]+$/g, '').trim();
+    return { url: url, rest: rest };
+  }
   function siteOk(u){ var d = siteDomain(u); return /^[^\s\/]+\.[^\s\/]{2,}(\/\S*)?$/.test(d) && d.length <= 290; }
   // Phone (pub test 3, 2026-11-10): a new number goes on the page straight away; the server checks it is a real North
   // American number and writes it as 250-555-0123. The same digits typed another way are not a change.
@@ -556,7 +574,9 @@
           + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
-        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
+        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>'
+          // Staff access (pub test 9, 2026-11-10): a manager or staff member can do this too, each with their own login.
+          + '<p class="su-hint su-staff" id="suStaff">' + h(C.mode === 'account' ? T.staffLineIn : T.staffLine) + '</p>';
     } else if (p[0] === 'saved') {
       var how = S.done[p[1]];
       // Two phrases only (pub fresh-eyes, 2026-11-10): "Saved ✓ It's on your page now." or "Sent ✓ It'll show on your page
@@ -733,8 +753,10 @@
         var m = ph.bad === 'small' ? T.tooSmall : T.cantOpen;
         return '<div class="su-ph' + (ph.main ? ' su-main' : '') + (ph.bad ? ' su-bad' : '') + '">' + (ph.thumb ? '<img src="' + ph.thumb + '" alt="">' : '<img alt="">')
           + '<button type="button" class="su-x" data-del="' + i + '" aria-label="' + h(fill(T.removePhoto, { n: i + 1 })) + '"' + (S.busy ? ' disabled' : '') + '>✕</button>'
+          // Photo order (pub test 9, 2026-11-10): earlier / later; your page shows them in this order after the main photo.
+          + (S.photos.length > 1 && !S.busy ? '<span class="su-order"><button type="button" class="su-ord" data-pmove="' + i + ':-1" aria-label="' + h(fill(T.photoEarlier, { n: i + 1 })) + '"' + (i === 0 ? ' disabled' : '') + '>◀</button><button type="button" class="su-ord" data-pmove="' + i + ':1" aria-label="' + h(fill(T.photoLater, { n: i + 1 })) + '"' + (i === S.photos.length - 1 ? ' disabled' : '') + '>▶</button></span>' : '')
           + (ph.bad ? '<div class="su-badmsg">' + h(m) + '</div><span class="su-tag">' + h(T.wontAdd) + '</span>' : '<button type="button" class="su-tag" data-main="' + i + '" aria-pressed="' + (ph.main ? 'true' : 'false') + '">' + h(ph.main ? T.isMain : T.makeMain) + '</button>') + '</div>';
-      }).join('') + '</div>' + (S.busy ? '' : '<button type="button" class="su-more" data-act="pick">' + h(T.addAnother) + '</button>')
+      }).join('') + '</div>' + (S.photos.length > 1 ? '<p class="su-hint">' + h(T.photoOrderHint) + '</p>' : '') + (S.busy ? '' : '<button type="button" class="su-more" data-act="pick">' + h(T.addAnother) + '</button>')
         + msgs() + '<label class="su-tick su-rights' + (S.rights ? ' su-ticked' : '') + (S.nudge === T.needRights ? ' su-need' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span><small>' + h(T.rightsStep) + '</small>' + h(T.rights) + '</span></label>'
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
     } else if (s === 'menu') {
@@ -766,12 +788,14 @@
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n && (S.error || S.busy) ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '')
         + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
-      var site = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // Pub test 9 (2026-11-10): only the website's origin ("https://tapandbarrelkitchen.ca/"), never its path, query or
+      // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
+      var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
-        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: site.replace(/^www\./i, '') })) + '</button></p>' : '')
-        + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: site || 'yourplace.com' })))
+        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
+        + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: siteHost || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
       var mail = 'mailto:' + C.email + '?subject=' + encodeURIComponent(fill(T.mailSubject, { name: C.name }));
@@ -782,6 +806,7 @@
       var resTicked = !S.done.offer && (C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; });
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
+          + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
           + (C.pub && g.keys.indexOf('sports_tv') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noSports ? 'true' : 'false') + '" data-off="no_sports"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noSports) + '<span class="su-tile-sub">' + h(T.noSportsSub) + '</span></button>' : '')
           + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>'
             // Pub test 8 (2026-11-10): "Service dogs welcome", the follow-up to No dogs (shown only while No dogs is on).
@@ -802,8 +827,12 @@
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
-          + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' <label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '"></div>'
-          + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what"' }) + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
+          + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' '
+          // Until close (pub test 9, 2026-11-10): the end is the place's closing time that day (after midnight too).
+          + (e.close ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '">') + '</div>'
+          + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.close ? 'true' : 'false') + '" data-act="hhClose:' + i + '">' + h(T.untilClose) + '</button></div>'
+          // A live count (pub test 9): the room left for the deal, its days included when there are several happy hours.
+          + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what" data-room="' + i + '" aria-describedby="hwc' + i + '"' }) + '<p class="su-count" id="hwc' + i + '" aria-live="polite">' + h(roomText(i, e.what)) + '</p>' + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
         + '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>' + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
@@ -813,7 +842,8 @@
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.specialN, { n: i + 1 })) + '</span>' + (S.specials.length > 1 ? '<button type="button" class="su-toggle" data-rm="specials:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDaysOr) + '</p>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
           + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '')
-          + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' <label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '"></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
+          + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' ' + (e.endClose ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '">') + '</div>'
+          + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.endClose ? 'true' : 'false') + '" data-act="spClose:' + i + '">' + h(T.untilClose) + '</button></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
           + seasonBox('specials.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('specials', i, e) + '</div>';
       }).join('') + (S.specials.length < 7 ? '<button type="button" class="su-more" data-act="add:specials">' + h(T.addSpecial) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveSpecials, '', false, 'specialsSave') + '</div>';
     } else if (s === 'music') { x = yesNo('music', T.musicQ, T.musicLead);
@@ -842,6 +872,10 @@
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
       x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+        // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
+        // links"), and a link typed into the line above is offered a move into it instead of being refused.
+        + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
+          + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'lineSave:' + base(s) + ':' + cfg[0]) + '</div>'
         + (s === 'known' ? skip('known') : '<div class="su-skip"><button type="button" class="su-link" data-act="no:' + base(s) + '">' + h({ book: T.bookNoLink, takeout: T.takeoutNoLink, groups: T.groupsNoLink }[base(s)]) + '</button></div>');
     } else if (s === 'takeout') { x = yesNo('takeout', T.takeoutQ);
@@ -849,6 +883,8 @@
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
       x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+        // TikTok (pub test 9, 2026-11-10): optional, on the Instagram screen; live straight away like Instagram.
+        + (ig ? field('suTt', T.ttLabel, S.tt, { max: 200, data: 'autocapitalize="none" spellcheck="false"' }) + ex(T.ttEx) : '')
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
         + big('🤷', T.socialUnsure, T.socialUnsureSub, true, 'socialUnsure:' + s) + '</div>' + skip(s);
@@ -867,7 +903,7 @@
       // "I'm done for now" is the end (pub test 6, 2026-11-10): "Nice work" and the number, the page, and the rest folded
       // under a small, optional "Want to add more later?" (it was a "To reach 100%" list that looked like more homework).
       if (S.doneNowSaid && left.length) {
-        x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview()
+        x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview() + (C.statsHtml || '')
           + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
           + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>'
           + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>';
@@ -878,6 +914,8 @@
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
         + (left.length ? '<h2 class="su-h2">' + h(T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
         + preview()
+        // Owner stats (pub test 9, 2026-11-10): the page's own numbers for the last 30 days (made on the server, owner-only).
+        + (C.statsHtml || '')
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
         + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>';
     }
@@ -1045,14 +1083,29 @@
     });
   }
   function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
+  // The room a happy hour's deal has (60 letters, less its days when there are several happy hours).
+  function hhRoom(i){ var e = S.happy[i]; return 60 - (S.happy.length > 1 && e ? dayPrefix(e).length : 0); }
+  function roomText(i, v){ var left = hhRoom(i) - String(v || '').trim().length; return left >= 0 ? fill(left === 1 ? T.charLeft1 : T.charsLeft, { n: left }) : fill(-left === 1 ? T.charOver1 : T.charsOver, { n: -left }); }
+  function roomRefresh(){ S.happy.forEach(function(e, i){ var b = el('hw' + i), c = el('hwc' + i); if (!b || !c) return; c.textContent = roomText(i, b.value); c.className = 'su-count' + (hhRoom(i) - b.value.trim().length < 0 ? ' su-over' : ''); }); }
+  // A day's closing time for a window starting at `from` (the usual week): '23:00', '01:00' (after midnight), or null.
+  function closeFor(d, from){
+    var w = S.week && S.week[d]; if (!w) return null; var m = function(t){ var x = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : null; }, f = m(from);
+    for (var i = 0; i < w.length; i++) { var a = m(w[i][0]), b = m(w[i][1]); if (a === null || b === null || f === null) continue; if (b <= a) b += 1440; if (f >= a && f < b) return w[i][1] === '24:00' ? '00:00' : w[i][1]; }
+    return null;
+  }
   function happySave(){
     readEntries();
-    var week = {}, deals = [], many = S.happy.length > 1;
+    var week = {}, deals = [], many = S.happy.length > 1, close = {};
     DAYS.forEach(function(d){ week[d] = []; });
     for (var i = 0; i < S.happy.length; i++) {
       var e = S.happy[i], ds = DAYS.filter(function(d){ return e.days[d]; });
       if (!ds.length) { S.nudge = T.needDays; return render(); }
-      for (var k = 0; k < ds.length; k++) { if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); } week[ds[k]].push([e.from, e.to]); }
+      for (var k = 0; k < ds.length; k++) {
+        if (week[ds[k]].length >= 2) { S.nudge = fill(T.twoPerDay, { day: dayName(ds[k]) }); return render(); }
+        // Until close: stored with that day's closing time as its end (what older pages show) and marked in "_close".
+        if (e.close) { var ce = closeFor(ds[k], e.from); if (!ce || ce === e.from) { S.nudge = fill(T.closeUnknown, { day: longDay(ds[k]) }); return render(); } week[ds[k]].push([e.from, ce]); (close[ds[k]] = close[ds[k]] || []).push(e.from); }
+        else week[ds[k]].push([e.from, e.to]);
+      }
       var pre = many ? dayPrefix(e) : '', what = e.what.trim();
       // Never cut short: a deal that doesn't fit says so, with how much room there is.
       if (what && (pre + what).length > 60) { S.nudge = fill(T.dealLong, { n: i + 1, max: 60 - pre.length }); return render(); }
@@ -1063,6 +1116,7 @@
     // Its season (pub test 7): all year, or the months (or exact days) it runs.
     var hs = seaOut(S.happySea); if (!hs.ok) { S.nudge = hs.why; return render(); }
     week._season = hs.from ? { from: hs.from, to: hs.to } : null;
+    week._close = Object.keys(close).length ? close : null;
     S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
@@ -1086,7 +1140,7 @@
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!text) { S.nudge = T.needText; return render(); }
       var ss = seaOut(e.sea); if (!ss.ok) { S.nudge = ss.why; return render(); }
-      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + (e.start || '') + '|' + (e.end || '')) { out.push(e.orig); continue; }
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + (e.start || '') + '|' + (e.end || '') && !!e.endClose === (e.orig.end === 'close')) { out.push(e.orig); continue; }
       if (e.start && e.end && e.start === e.end) { S.nudge = T.specialTimeSame; return render(); }
       if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
       var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
@@ -1255,6 +1309,10 @@
       return saveAll('offer', [{ pub_info: { minors: mv } }]);
     }
     if (k === 'hoursSave') return hoursSave();
+    // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
+    if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
+    // The same for a weekly special (its end is stored as 'close', the way it always was).
+    if (k === 'spClose') { readEntries(); var es = S.specials[+v]; if (!es) return; es.endClose = !es.endClose; if (es.endClose) es.end = ''; render(); return; }
     // "All day (open to close)" (pub fresh-eyes, 2026-11-10): the happy hour runs from the earliest opening to the latest
     // closing of the days picked (or of the whole week when no day is picked yet).
     if (k === 'allDay') {
@@ -1327,7 +1385,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, ''); S.webUrl = uu.value; uu.focus(); } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
@@ -1361,8 +1419,10 @@
       // sports" (and its sports go). Only from the screen's own Save: "Save and exit" with picks half done never records
       // a "we don't" answer the owner didn't give (fresh-eyes pub test) — it only takes back ones a tick contradicts.
       if (C.pub) {
-        var gameOn = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'].some(function(g){ return badges[g]; }), add = [], rem = [], partial = !!S.exitAfter;
-        if (gameOn) rem.push('games'); else if (!partial) add.push('games');
+        var gameOn = GAMES.some(function(g){ return badges[g]; }), add = [], rem = [], partial = !!S.exitAfter;
+        // Pub test 9 (2026-11-10): only the "No games" tile is a "we don't have games" answer. Games left unticked used
+        // to record one ("You told us you don't have: games"); now they leave the question open.
+        if (gameOn || !S.noGames) rem.push('games'); else if (!partial) add.push('games');
         // Pub test 6 (2026-11-10): Sports on TV left unticked is not an answer. Only an explicit one is "You told us you
         // don't have": the "No sports / no TVs" tile, or unticking a Sports on TV we had ticked from research.
         var noSportsSaid = S.noSports || (!!S.badgesAtStart.sports_tv && !badges.sports_tv);
@@ -1383,18 +1443,37 @@
     if (k === 'musicSave') return musicSave();
     if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
     if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
-      if (!line) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
+      // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
+      var bkUrl = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bkUrl !== null) S.bookUrl = bkUrl;
+      if (bkUrl !== null) { var inl = linkIn(line); if (inl) { S.visit[key] = el('suLine').value; S.linkOffer = inl.url; S.nudge = ''; render(); var mv0 = el('suMoveLink'); if (mv0) mv0.scrollIntoView({ block: 'center' }); return; } S.linkOffer = ''; }
+      var linkChanged = bkUrl !== null && bkUrl !== (CUR.booking_url || '');
+      if (!line && !(bkUrl && step === 'book')) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
+      if (!line) { return saveAll(step, (S.badges.takes_reservations ? [] : [{ badges: { takes_reservations: true } }]).concat(linkChanged ? [{ booking_url: bkUrl }] : []), null, null, function(){ S.badges.takes_reservations = true; CUR.booking_url = bkUrl; }); }
+      var sameLine = (S.visit[key] || '') === line && ((S.visitSaved || CUR.visit_rows || {})[key] || '') === line;
       S.visit[key] = line; var vr = {}; vr[key] = line;
       var list2 = []; var nk = { reservations: 'pyv_reservations', takeout: 'pyv_takeout', groups: 'pyv_groups' }[key];
       if (nk && S.notOffered.indexOf(nk) >= 0) list2.push({ not_offered: S.notOffered.filter(function(z){ return z !== nk; }) });
       // Saying how to book (or order, or that groups are welcome) ticks the matching feature too.
+      // Pub test 9 (2026-11-10): only when it isn't ticked already (re-sending it came back "Nothing has changed yet").
       var bk = { reservations: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' }[key];
-      if (bk) { var bb = {}; bb[bk] = true; list2.push({ badges: bb }); S.badges[bk] = true; }
-      list2.push({ visit_rows: vr }); return saveAll(step, list2);
+      if (bk && !S.badges[bk]) { var bb = {}; bb[bk] = true; list2.push({ badges: bb }); S.badges[bk] = true; }
+      if (!sameLine) list2.push({ visit_rows: vr });
+      if (linkChanged) list2.push({ booking_url: bkUrl });
+      return saveAll(step, list2, null, null, function(){ S.visitSaved = clone(S.visitSaved || CUR.visit_rows || {}); S.visitSaved[key] = line; if (linkChanged) CUR.booking_url = bkUrl; });
     }
-    if (k === 'socialSave') { var val = el('suSoc').value.trim(); if (!val) { S.nudge = fill(T.needValue, { no: v === 'instagram' ? T.igNo : T.fbNo }); return render(); } if (v === 'instagram') S.ig = val; else S.fb = val; return socialSave(v, val); }
+    if (k === 'socialSave') {
+      var val = el('suSoc').value.trim(), ttb = el('suTt'), tt = ttb ? ttb.value.trim() : null;
+      if (tt !== null) S.tt = tt;
+      // TikTok on its own (no Instagram typed): saved, and the Instagram question stays open.
+      if (!val && tt !== null && tt !== S.ttSaved) { if (S.busy) return; S.busy = true; S.error = ''; S.nudge = ''; render(); return change({ tiktok_url: tt }).then(function(r){ S.busy = false; if (r) { S.ttSaved = tt; S.nudge = tt ? T.ttSavedOnly : ''; } render(); }); }
+      if (!val) { S.nudge = fill(T.needValue, { no: v === 'instagram' ? T.igNo : T.fbNo }); return render(); }
+      if (v === 'instagram') S.ig = val; else S.fb = val;
+      if (tt !== null && tt !== S.ttSaved) { if (S.busy) return; S.busy = true; S.error = ''; render(); return change({ tiktok_url: tt }).then(function(r){ S.busy = false; if (!r) return render(); S.ttSaved = tt; socialSave(v, val); }); }
+      return socialSave(v, val);
+    }
     if (k === 'socialNo') return sayNo(v);
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }
@@ -1465,6 +1544,7 @@
       var press = function(key, on){ var n = screen.querySelector('[data-off="' + key + '"]'); if (n) n.setAttribute('aria-pressed', on ? 'true' : 'false'); };
       if (k === 'none_diet') { S.noDiet = !S.noDiet; press('none_diet', S.noDiet); if (S.noDiet) ['vegan', 'vegetarian', 'gluten_free'].forEach(function(d){ S.badges[d] = false; press(d, false); }); return; }
       // "No dogs allowed" and "Dog friendly": picking one turns the other off.
+      if (k === 'no_games') { S.noGames = !S.noGames; press('no_games', S.noGames); if (S.noGames) GAMES.forEach(function(gk){ S.badges[gk] = false; press(gk, false); }); return; }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
       var sdog = function(){ var n = el('suServiceDogs'); if (n) n.hidden = !S.noDogs; };
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
@@ -1474,6 +1554,7 @@
       if (k === 'heated_patio' && S.badges[k] && !S.badges.patio) { S.badges.patio = true; press('patio', true); }
       if (k === 'patio' && !S.badges[k] && S.badges.heated_patio) { S.badges.heated_patio = false; press('heated_patio', false); }
       if (k === 'sports_tv') { if (S.badges[k]) { S.noSports = false; press('no_sports', false); } sportsNote(); }
+      if (S.badges[k] && GAMES.indexOf(k) >= 0) { S.noGames = false; press('no_games', false); }
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
@@ -1498,11 +1579,14 @@
       if (!e.what || kindName) e.what = T.kinds[q2[1]]; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-rm]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-rm').split(':'); S[q2[0]].splice(+q2[1], 1); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-del]'), function(b){ b.onclick = function(){ S.photos.splice(+b.getAttribute('data-del'), 1); S.error = ''; if (!S.photos.length) { S.step = 'photos'; } render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-pmove]'), function(b){ b.onclick = function(){ var q2 = b.getAttribute('data-pmove').split(':'), i = +q2[0], j = i + +q2[1]; if (j < 0 || j >= S.photos.length) return; var t = S.photos[i]; S.photos[i] = S.photos[j]; S.photos[j] = t; render(); var nb = screen.querySelector('[data-pmove="' + j + ':' + q2[1] + '"]'); if (nb && !nb.disabled) nb.focus(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-main]'), function(b){ b.onclick = function(){ var k = +b.getAttribute('data-main'); S.photos.forEach(function(ph, i){ ph.main = i === k; }); S.keepMain = false; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-fdel]'), function(b){ b.onclick = function(){ var l = S.step === 'menu:upload' ? S.menuFiles : S.sheetFiles; l.splice(+b.getAttribute('data-fdel'), 1); S.error = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-pdel]'), function(b){ b.onclick = function(){ S.menuPages.splice(+b.getAttribute('data-pdel'), 1); S.error = ''; render(); }; });
     var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked && S.nudge === T.needRights) { S.nudge = ''; render(); } };
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
+    if (S.step === 'happy:type') roomRefresh();
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= 120 ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= 120 ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
@@ -1517,7 +1601,13 @@
       inp.addEventListener('input', function(){ b.hidden = !inp.value; });
     });
     // Text never gets wiped: the cursor goes to the end of what's there.
-    Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){ inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; setTimeout(function(){ try { if (inp.value.length === n) inp.setSelectionRange(n, n); } catch (e) {} }, 0); }); });
+    // Pub test 9 (2026-11-10): a one-line box we filled in (her old phone, website, a deal) is selected on its first tap,
+    // so pasting replaces it; typing or a second tap places the cursor as usual, and the ✕ still clears it. Story boxes
+    // and the menu address (made to be added to after its last /) keep the cursor at the end.
+    Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
+      var pre = inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value, first = true;
+      inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+    });
   }
   el('suPick').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
   el('suTake').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };

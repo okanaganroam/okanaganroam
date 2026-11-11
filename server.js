@@ -18,6 +18,7 @@ const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
 const portalCompleteness = require('./portal-completeness');
+const ownerStatsModule = require('./owner-stats');
 const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
@@ -9079,7 +9080,7 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
   if (v.times !== null) {
     if (!v.times || typeof v.times !== 'object' || Array.isArray(v.times)) return { ok: false, reason: 'invalid_times', detail: 'times must be an object keyed by day, or null' };
     const days = hoursModule ? hoursModule.HOURS_WEEKDAYS : FD_HOURS_DAYS;
-    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season');
+    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season' && k !== '_close');
     if (extra.length) return { ok: false, reason: 'invalid_times', detail: `unexpected key(s): ${extra.join(', ')}` };
     // Pub test 7 (2026-11-10): the happy hour's own season ({ from, to } 'MM-DD', every year) rides along.
     var hhSeason = null;
@@ -9102,7 +9103,9 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     if (!parseLocalDate(v.checked_at) || v.checked_at > todayLocal(now)) {
       return { ok: false, reason: 'invalid_checked_at', detail: 'checked_at must be a real YYYY-MM-DD date, not in the future' };
     }
-    next = { happy_hour_times: hhSeason ? JSON.stringify({ ...JSON.parse(checked.json), _season: hhSeason }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
+    // Until close (pub test 9): kept for windows that start at the times it names.
+    const hhClose = v.times._close != null ? happyHourCloseOf({ ...JSON.parse(checked.json), _close: v.times._close }) : null;
+    next = { happy_hour_times: hhSeason || hhClose ? JSON.stringify({ ...JSON.parse(checked.json), ...(hhSeason ? { _season: hhSeason } : {}), ...(hhClose ? { _close: hhClose } : {}) }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
   }
   const existing = db.prepare('SELECT id, redirect_to, happy_hour_times, happy_hour_source, happy_hour_checked_at FROM venues WHERE id = ?').get(id);
   if (!existing) return { ok: false, reason: 'venue_not_found' };
@@ -34139,10 +34142,13 @@ function happyHourWeekText(json, fr) {
   if (!parsed || !parsed.known) return '';
   const W = hoursModule.HOURS_WEEKDAYS, names = HH_DAYS_SHORT[fr ? 'fr' : 'en'];
   const groups = [];
+  // Until close (pub test 9): "9 PM until close" (« 21 h jusqu’à la fermeture »), never the end stored when it was saved.
+  const close = happyHourCloseOf(json);
   W.forEach((d, i) => {
     const day = parsed.days[d];
     if (!day || day.status !== 'open') return;
-    const text = day.ranges.map(([a, b]) => happyHourRangeText(a, b, fr)).join(', ');
+    const text = day.ranges.map(([a, b]) => (close && close[d] && close[d].includes(hoursModule.formatClock24(a))
+      ? `${happyHourTimeText(a, fr)} ${fr ? 'jusqu’à la fermeture' : 'until close'}` : happyHourRangeText(a, b, fr))).join(', ');
     let g = groups.find((x) => x.text === text);
     if (!g) groups.push(g = { text, days: [] });
     g.days.push(i);
@@ -34171,6 +34177,20 @@ function happyHourSeasonOf(json) {
   if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
   const x = o && typeof o === 'object' ? o._season : null;
   return x && /^\d{2}-\d{2}$/.test(x.from || '') && /^\d{2}-\d{2}$/.test(x.to || '') && x.from !== x.to ? { from: x.from, to: x.to } : null;
+}
+// "Until close" (pub test 9, 2026-11-10): the windows of a happy hour week that run until the place closes ride along
+// in the stored week as "_close": { sun: ['21:00'] } (each window's start). -> that object (days with starts) | null
+function happyHourCloseOf(json) {
+  let o = json;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
+  const x = o && typeof o === 'object' ? o._close : null;
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const out = {};
+  for (const d of SPECIAL_WEEK) {
+    const starts = Array.isArray(x[d]) ? x[d].filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) && Array.isArray(o[d]) && o[d].some((w) => Array.isArray(w) && w[0] === t)) : [];
+    if (starts.length) out[d] = [...new Set(starts)].sort();
+  }
+  return Object.keys(out).length ? out : null;
 }
 // A season in a few words: whole months "Jun–Aug" (« juin–août »), one month "July", exact days "May 20 – Sep 6"
 // (« 20 mai – 6 sept. »).
@@ -35215,8 +35235,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
     venueLinkRow.menu_url && !menuInVisitBox ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
-    (venueLinkRow.instagram_url || venueLinkRow.facebook_url) ? [L('Social', 'R\u00e9seaux'), [
+    (venueLinkRow.instagram_url || venueLinkRow.facebook_url || venueLinkRow.tiktok_url) ? [L('Social', 'R\u00e9seaux'), [
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
+      // TikTok (pub test 9, 2026-11-10): the owner's profile, beside Instagram and Facebook.
+      venueLinkRow.tiktok_url ? `<a href="${escapeHtml(venueLinkRow.tiktok_url)}" rel="nofollow noopener" target="_blank">TikTok</a>` : '',
       venueLinkRow.facebook_url ? `<a href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank">Facebook</a>` : '',
     ].filter(Boolean).join(' &middot; ')] : null,
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
@@ -44058,6 +44080,8 @@ function buildEventSubmissionEmail(sub) {
   if (sub.schedule_notes) payload['Other dates / schedule notes (not published)'] = sub.schedule_notes;
   if (sub.price_text) payload['Price (as given)'] = sub.price_text;
   if (sub.image_link) payload['Poster / photo link (not published automatically)'] = sub.image_link;
+  // Pub test 9: the owner's uploaded picture, private until the event is approved (then it is the event's image).
+  if (sub.image_key) payload['Picture (uploaded; used as the event image when approved)'] = ownerPhotoPreviewUrl(sub.image_key);
   const existing = findExistingEventsForSubmission(sub);
   if (existing.length) payload['Possible existing event'] = existing.map((e) => `${e.name} (event #${e.event_id}, ${e.rule})`).join('; ');
   payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject event submission #${sub.id}.`;
@@ -44232,6 +44256,8 @@ function approveEventSubmission(id, body, now = new Date()) {
   if (venueId !== undefined) data.venue_id = venueId;
   else data.venue_name_text = sub.venue_name;
   if (body.type !== undefined) data.type = body.type;
+  // The owner's uploaded picture (pub test 9): reviewed with the event, so approving the event publishes it as its image.
+  if (sub.image_file && ownerPhotoPath(sub.image_file)) data.image_url = `/images/owner/${sub.image_file}`;
   // The price as the organizer gave it (2026-10-29): "Free", "By donation", "$25 in advance".
   const price = eventPriceFromText(sub.price_text, { priceField: true });
   if (price) Object.assign(data, price);
@@ -44562,7 +44588,7 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
   // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
   'pub_info'];
@@ -44788,10 +44814,11 @@ function ownerMonthDay(value) {
   return len && d >= 1 && d <= len ? `${m[1]}-${m[2]}` : null;
 }
 // Name, address and links (2026-10-15). Links live in venue_links.
-const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+// TikTok (pub test 9, 2026-11-10): an owner link like Instagram (live straight away, strictly a profile).
+const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 function venueLinks(venueId) {
-  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
-    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, open_months: null };
+  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, tiktok_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
+    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, tiktok_url: null, open_months: null };
 }
 // ---------- Seasonal hours and special closures (2026-10-18) ----------
 // An owner can add one second week of hours for part of every year (winter hours Nov 1 - Apr 30) and dated special
@@ -44998,6 +45025,13 @@ function ownerSocialLink(field, raw) {
     const m = /^@([A-Za-z0-9._]{1,30})$/.exec(v) || /^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([A-Za-z0-9._]{1,30})\/?(?:[?#].*)?$/i.exec(v);
     if (!m || INSTAGRAM_NON_PROFILE.has(m[1].toLowerCase())) return null;
     return `https://www.instagram.com/${m[1]}/`;
+  }
+  // TikTok (pub test 9): "@handle" or (https://)(www.|m.)tiktok.com/@handle, never a video, tag or the For You page
+  // -> https://www.tiktok.com/@handle.
+  if (field === 'tiktok_url') {
+    const m = /^@([A-Za-z0-9._]{2,24})$/.exec(v) || /^(?:https?:\/\/)?(?:www\.|m\.)?tiktok\.com\/@([A-Za-z0-9._]{2,24})\/?(?:[?#].*)?$/i.exec(v);
+    if (!m || /^\.|\.$/.test(m[1])) return null;
+    return `https://www.tiktok.com/@${m[1]}`;
   }
   if (field !== 'facebook_url') return null;
   const m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?facebook\.com(\/[^?#]*)?(\?[^#]*)?(?:#.*)?$/i.exec(v);
@@ -45397,6 +45431,17 @@ function ownerWebsitePending(venueId) {
     return c && typeof c.website === 'string' && c.website.trim() ? normalizeWebsiteUrl(c.website.trim()) || '' : '';
   } catch (e) { return ''; }
 }
+// A link the owner sent that is still waiting for review (pub test 9, 2026-11-10: the setup's booking link box shows
+// it): the newest pending request that names `field` ('booking_url'), or ''.
+function ownerLinkPending(venueId, field) {
+  try {
+    for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
+      const c = JSON.parse(w.changes);
+      if (c && field in c) return typeof c[field] === 'string' ? c[field] : '';
+    }
+  } catch (e) { /* none */ }
+  return null;
+}
 // The researched badges among `keys` that are on and that the owner never set themselves (no venue_owner log row).
 function setupResearchTicks(venue, keys) {
   let row = null;
@@ -45527,7 +45572,7 @@ function ownerSeasonValue(x) {
 }
 function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = false }) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, detail: `${label} must list each day.` };
-  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && k === '_season'));
+  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && (k === '_season' || k === '_close')));
   if (extra.length) return { ok: false, detail: `${label}: unexpected day(s) ${extra.join(', ')}.` };
   const week = {};
   for (const d of OWNER_DAYS) {
@@ -45550,7 +45595,16 @@ function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = fal
     if (!sv.ok) return { ok: false, detail: `${label}: please pick the months again.` };
     if (sv.season) json = JSON.stringify({ ...JSON.parse(json), _season: sv.season });
   }
-  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input };
+  // Until close (pub test 9, happy hour): { mon: ['21:00'] }, each the start of one of that day's windows.
+  if (allowSeason && input._close != null) {
+    const c = input._close;
+    if (typeof c !== 'object' || Array.isArray(c) || Object.keys(c).some((k) => !OWNER_DAYS.includes(k) || !Array.isArray(c[k]) || c[k].some((t) => !(week[k] || []).some((w) => w[0] === t)))) {
+      return { ok: false, detail: `${label}: please pick the times again.` };
+    }
+    const keep = happyHourCloseOf({ ...JSON.parse(json), _close: c });
+    if (keep) json = JSON.stringify({ ...JSON.parse(json), _close: keep });
+  }
+  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input, closeGiven: allowSeason && '_close' in input };
 }
 
 function sameJsonWeek(a, b) {
@@ -45560,8 +45614,10 @@ function sameJsonWeek(a, b) {
       const o = typeof s === 'string' ? JSON.parse(s) : s;
       const out = {};
       for (const d of OWNER_DAYS) out[d] = o[d] && o[d].length ? o[d] : null;
-      // A happy hour's own season (pub test 7) is part of it.
+      // A happy hour's own season (pub test 7) is part of it, and so are its "until close" windows (pub test 9).
       if (o._season) out._season = o._season;
+      const cl = happyHourCloseOf(o);
+      if (cl) out._close = cl;
       return JSON.stringify(out);
     } catch (e) { return String(s); }
   };
@@ -45650,9 +45706,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     let url = '';
     if (raw) {
       // Instagram and Facebook go live straight away (Dayton, 2026-11-09), so only a real profile or page is accepted.
-      url = (f === 'instagram_url' || f === 'facebook_url') ? ownerSocialLink(f, raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
+      url = (f === 'instagram_url' || f === 'facebook_url' || f === 'tiktok_url') ? ownerSocialLink(f, raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
       if (!url) {
-        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name with @, like @yourbusiness, or your profile link.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.' : 'Please check the link, for example yourbusiness.com/menu.';
+        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name with @, like @yourbusiness, or your profile link.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.'
+          : f === 'tiktok_url' ? 'Please enter your TikTok name with @, like @yourbusiness, or your profile link.' : 'Please check the link, for example yourbusiness.com/menu.';
         continue;
       }
     }
@@ -45684,6 +45741,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const w = ownerWeekJson(input.happy_hour, 'Happy hour', { allowEmptyWeek: true, season: true });
       // A save that doesn't mention the season (the edit page's week) keeps the stored one (pub test 7).
       if (w.ok && !w.empty && !w.seasonGiven) { const keep = happyHourSeasonOf(current.happy_hour); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _season: keep }); }
+      // The same for "until close" (pub test 9): kept for the windows that still start at the same time.
+      if (w.ok && !w.empty && !w.closeGiven) { const was = happyHourCloseOf(current.happy_hour); const keep = was && happyHourCloseOf({ ...JSON.parse(w.json), _close: was }); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _close: keep }); }
       if (!w.ok) errors.happy_hour = w.detail;
       else if (w.empty) { if (current.happy_hour) changes.happy_hour = null; }
       else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
@@ -45962,17 +46021,17 @@ function listOwnerChanges(status = 'pending') {
 }
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
-  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
+  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
   pub_info: 'Kitchen, who’s welcome and sports' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
-    name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
     price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
-    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
     price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
@@ -46440,7 +46499,7 @@ function setEventPartners(eventId, ids) {
 }
 
 const OWNER_EVENT_KEYS = new Set(['change_of', 'name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
-  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'partner_venue_ids', 'company_website', 'started_at']);
+  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'partner_venue_ids', 'company_website', 'started_at', 'image', 'image_rights']);
 async function handleOwnerEventSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Events are only accepted from the Okanagan Roam website.' });
@@ -46451,13 +46510,18 @@ async function handleOwnerEventSubmission(req, res, token) {
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
-    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES);
+    // An optional picture (pub test 9) rides along, so the owner's event can be as large as one owner photo plus the event.
+    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES + OWNER_PHOTO_MAX_BODY);
   } catch (err) {
     return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'Your event is too long. Please shorten it and try again.' : generic }, err.status === 413);
   }
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_EVENT_KEYS.has(k))) {
     return sendSubmissionResponse(res, 400, { ok: false, error: generic });
   }
+  // Only the picture may be large: the event itself keeps its own limit.
+  if (Buffer.byteLength(JSON.stringify({ ...body, image: '' })) > EVENT_SUBMISSION_MAX_BODY_BYTES) return sendSubmissionResponse(res, 413, { ok: false, error: 'Your event is too long. Please shorten it and try again.' }, true);
+  const picture = body.image == null || body.image === '' ? null : ownerEventPicture(body.image, body.image_rights);
+  if (picture && picture.error) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors: { image: picture.error } });
   if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
   // No fill-time check here (2026-10-18): the edit link or the login already proves who this is, and a quick Save
   // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
@@ -46467,6 +46531,8 @@ async function handleOwnerEventSubmission(req, res, token) {
   delete full.started_at;
   delete full.change_of;
   delete full.partner_venue_ids;
+  delete full.image;
+  delete full.image_rights;
   const { data, errors } = validateEventSubmission(full);
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
@@ -46481,9 +46547,32 @@ async function handleOwnerEventSubmission(req, res, token) {
   ).get(venue.id, data.start_date, data.name);
   if (duplicate) return sendSubmissionResponse(res, 409, { ok: false, error: 'You already sent this event. It is waiting for review.' });
   const id = insertEventSubmission(data, ip, req.headers['user-agent'], venue.id);
+  // The picture (pub test 9): written like an owner photo and kept with the submission, private until it is approved.
+  if (picture) {
+    const file = `${crypto.randomBytes(12).toString('hex')}.jpg`, key = crypto.randomBytes(18).toString('base64url');
+    try {
+      fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true });
+      fs.writeFileSync(ownerPhotoPath(file), picture.buf, { flag: 'wx' });
+      db.prepare('UPDATE event_submissions SET image_file = ?, image_key = ? WHERE id = ?').run(file, key, id);
+    } catch (err) { console.error(`[owner-portal] event #${id} picture not saved: ${err.message}`); }
+  }
   ownerMarkFrench(res, 'event_submissions', id);
   notifyInBackground(`owner event #${id}`, () => notifyEventSubmission(id));
   return sendSubmissionResponse(res, 201, { ok: true, id });
+}
+
+// An owner event's picture (pub test 9, 2026-11-10): the same checks as an owner photo (a JPEG the browser made, at least
+// OWNER_PHOTO_MIN_EDGE on its long edge, under OWNER_PHOTO_MAX_BYTES) and the same rights tick. -> { buf } | { error }
+function ownerEventPicture(image, rights) {
+  if (rights !== true) return { error: 'Please confirm you took this picture or have permission to share it.' };
+  const m = typeof image === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(image) : null;
+  const buf = m ? Buffer.from(m[1], 'base64') : null;
+  const dims = buf ? jpegDimensions(buf) : null;
+  if (!buf || !dims || buf.length > OWNER_PHOTO_MAX_BYTES) return { error: 'That file could not be read as a photo. Please try a JPG or PNG.' };
+  const longEdge = Math.max(dims.width, dims.height);
+  if (longEdge < OWNER_PHOTO_MIN_EDGE) return { error: `That picture is too small. Please use one at least ${OWNER_PHOTO_MIN_EDGE} pixels wide.` };
+  if (longEdge > OWNER_PHOTO_MAX_EDGE) return { error: 'That picture is too large. Please try again.' };
+  return { buf, dims };
 }
 
 // ---------- Owner photo uploads (2026-10-15) ----------
@@ -46651,7 +46740,7 @@ function ownerPhotoRateLimited(ip, now = Date.now()) {
 // photo): photos the owner moved first, by sort_order, then the rest oldest first.
 const OWNER_PHOTO_ORDER_SQL = 'sort_order IS NULL, sort_order, id';
 function ownerPhotosForVenue(venueId) {
-  return db.prepare(`SELECT id, file, preview_key, status, credit, submitted_at FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY ${OWNER_PHOTO_ORDER_SQL} LIMIT 60`).all(venueId);
+  return db.prepare(`SELECT id, file, preview_key, status, credit, submitted_at, main_requested FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY ${OWNER_PHOTO_ORDER_SQL} LIMIT 60`).all(venueId);
 }
 // Moves one photo a place earlier (-1) or later (+1) among the venue's photos other
 // than the main one, then numbers them all 1..n so the order is fixed from now on.
@@ -50494,7 +50583,9 @@ function setupHappySig(found) {
   let week = null;
   try { const w = typeof found.happyHourTimes === 'string' ? JSON.parse(found.happyHourTimes) : found.happyHourTimes; if (w) week = SETUP_WEEK.map((d) => (w[d] || []).map((x) => [x[0], x[1]])); } catch (e) { week = null; }
   const d = ownerHappyHourDealsSnapshot(found.venue.id);
-  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []]);
+  // Until close (pub test 9) is part of what the page stored; added only when there is some, so older rows still match.
+  const close = happyHourCloseOf(found.happyHourTimes);
+  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []].concat(close ? [close] : []));
 }
 function cleanSetupHappyBlocks(list) {
   if (!Array.isArray(list) || !list.length || list.length > 6) return null;
@@ -50503,7 +50594,7 @@ function cleanSetupHappyBlocks(list) {
     if (!b || typeof b !== 'object' || !Array.isArray(b.days) || !b.days.length || b.days.some((d) => !SETUP_WEEK.includes(d))) return null;
     if (!/^\d{2}:\d{2}$/.test(String(b.from)) || !/^\d{2}:\d{2}$/.test(String(b.to))) return null;
     if (typeof b.what !== 'string' || b.what.length > 200 || /[<>]/.test(b.what)) return null;
-    out.push({ days: SETUP_WEEK.filter((d) => b.days.includes(d)), from: b.from, to: b.to, what: b.what });
+    out.push({ days: SETUP_WEEK.filter((d) => b.days.includes(d)), from: b.from, to: b.to, what: b.what, ...(b.close === true ? { close: true } : {}) });
   }
   return out;
 }
@@ -50680,6 +50771,8 @@ function renderOwnerSetupPage(found, opts) {
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
+    // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first) and TikTok.
+    booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(), tiktok_url: snap.tiktok_url || '',
     ...(pub ? { pub_info: snap.pub_info || {} } : {}),
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
@@ -50733,6 +50826,8 @@ function renderOwnerSetupPage(found, opts) {
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
     badgeChip: portalCompleteness.badgeChipHtml(fr), t,
+    // Owner stats (pub test 9, 2026-11-10): the short "your page in the last 30 days" box on the finish screen.
+    statsHtml: (() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { short: true, id: 'suStats' }); } catch (e) { return ''; } })(),
   };
   // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
   // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
@@ -50810,6 +50905,10 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-ph img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
   body.owner-setup .su-ph.su-main { border-color: var(--su-gold); }
   body.owner-setup .su-x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 22px; font-weight: 800; cursor: pointer; }
+  /* Photo order (pub test 9): earlier / later at the photo's top left, clear of the ✕. */
+  body.owner-setup .su-order { position: absolute; top: 6px; left: 6px; display: flex; gap: 6px; }
+  body.owner-setup .su-ord { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.6); color: #fff; font-size: 18px; cursor: pointer; }
+  body.owner-setup .su-ord:disabled { opacity: .35; cursor: default; }
   body.owner-setup .su-tag { display: block; width: 100%; min-height: 44px; border: 0; background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 15px; font-weight: 800; padding: 8px; cursor: pointer; }
   body.owner-setup .su-main .su-tag { color: var(--su-gold); }
   body.owner-setup .su-ph.su-bad img { filter: grayscale(1) opacity(.45); }
@@ -50907,6 +51006,11 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-line { min-height: 64px; resize: vertical; }
   body.owner-setup .su-count { margin: -10px 0 16px; font-weight: 800; font-size: 16px; color: var(--su-soft); }
   body.owner-setup .su-count.su-ok { color: var(--su-good); }
+  ${ownerStatsModule.OWNER_STATS_CSS.replace(/\n\s*\./g, '\n  body.owner-setup .')}
+  /* Pub test 9 (2026-11-10): the happy hour deal's live count under its box, red when over; "until close" in a time row. */
+  body.owner-setup .su-day .su-count { margin: 4px 0 8px; font-size: 15px; }
+  body.owner-setup .su-count.su-over { color: #A3271F; }
+  body.owner-setup .su-closetxt { font-weight: 800; padding: 0 6px; }
   body.owner-setup .su-score { display: flex; align-items: center; gap: 16px; background: var(--su-card); border: 2px solid var(--su-line); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
   body.owner-setup .su-score strong { display: block; font-size: 20px; }
   body.owner-setup .su-score span { color: var(--su-soft); font-weight: 700; font-size: 16px; }
@@ -51804,7 +51908,7 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Ça dépend de la façon dont vous avez ouvert votre fiche :</p><ul><li><strong>Avec le lien de modification reçu par courriel :</strong> les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour.</li><li><strong>Avec votre compte, depuis Mes fiches :</strong> les photos et les menus sont en ligne tout de suite.</li></ul><p>C\u2019est en ligne, mais vous voyez encore l\u2019ancienne version? Actualisez la page. L\u2019affichage peut prendre une minute.</p>',
     } },
   { id: 'photo-main', over: ['photo-add'], q: 'Change my main photo or remove one', qFr: 'Changer ma photo principale ou en retirer une', pages: ['edit'],
-    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'reorder photos', 'photo order', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo',
+    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo',
       // French pass 6 (2026-10-19): "ma photo est laide" got the add-photos answer.
       'ugly photo', 'photo is ugly', 'ugly picture', 'picture is ugly', 'hate the photo', 'hate my photo', 'dont like the photo', 'dont like my photo', 'photo looks bad', 'better photo', 'blurry photo', 'photo is blurry', 'old photo', 'replace my photo', 'change my photo'],
     keysFr: ['photo principale', 'photo de couverture', 'banniere', 'retirer une photo', 'supprimer une photo', 'enlever une photo', 'changer la photo', 'mauvaise photo', 'remplacer la photo', 'premiere photo',
@@ -51909,10 +52013,10 @@ const OWNER_HELP_TOPICS = [
     a: '<p>{ON}, write 30 to 1,200 characters in <strong>Description</strong>. Say what you serve or offer, what makes you special, and who you suit. Leave out &lt; and &gt; characters. Then tap {SEND}. {LIVE}</p>',
     aFr: '<p>{ON}, écrivez de 30 à 1 200 caractères dans <strong>Description</strong>. Dites ce que vous servez ou offrez, ce qui vous distingue et à qui vous convenez. La description s\u2019affiche en anglais et en français; écrivez-la dans la langue de votre choix. Évitez les caractères &lt; et &gt;. Touchez ensuite {SEND}. {LIVE}</p>' },
   { id: 'links', q: 'Add a booking, menu or social link', qFr: 'Ajouter un lien de réservation, de menu ou de réseau social', pages: ['edit'],
-    keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'change website', 'change our website', 'new website', 'tiktok'],
+    keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'change website', 'change our website', 'new website'],
     keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'nouveau site'],
-    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
-    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
+    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong>, <strong>Facebook</strong> and <strong>TikTok</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
+    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong>, votre <strong>Facebook</strong> et votre <strong>TikTok</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
   // French pass 6 (2026-10-19): a phone number of its own ("changer mon numéro de téléphone" got the links answer).
   { id: 'phone', over: ['links'], q: 'Change our phone number', qFr: 'Changer notre numéro de téléphone', pages: ['edit'],
     keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number',
@@ -52120,8 +52224,36 @@ const OWNER_HELP_TOPICS = [
   { id: 'stats', q: 'How many people see my listing?', qFr: 'Combien de personnes voient ma fiche?', pages: ['account', 'edit'],
     keys: ['how many people', 'how many visitors', 'how many views', 'views', 'page views', 'visitors to my page', 'stats', 'statistics', 'analytics', 'traffic', 'clicks', 'insights', 'how many clicks'],
     keysFr: ['combien de personnes', 'combien de visiteurs', 'combien de vues', 'vues', 'statistiques', 'stats', 'clics', 'achalandage', 'trafic'],
-    a: '<p>Visit numbers aren\u2019t in the business portal yet. <strong>Message us</strong> and Dayton can tell you roughly how many people have looked at your listing and tapped through to your website or phone.</p>',
-    aFr: '<p>Le nombre de visites n\u2019est pas encore dans l\u2019espace entreprises. <strong>Écrivez-nous</strong> et Dayton pourra vous dire à peu près combien de personnes ont consulté votre fiche et touché votre site Web ou votre numéro.</p>' },
+    // Pub test 9 (2026-11-10): the numbers are on the edit page now ("Your page in the last 30 days").
+    a: '<p>{ON}, near the top, tap <strong>Your page in the last 30 days</strong>. It shows how many times your page was viewed and how many people tapped <strong>Website</strong>, <strong>Call</strong>, <strong>Directions</strong>, <strong>Book</strong> and <strong>Menu</strong>, with the 30 days before beside each one. The easy setup shows the same numbers when you finish.</p><ul><li>Only you (and anyone with your link or a login) can see them.</li><li>They count Okanagan Roam only. Search robots and our own team aren\u2019t counted.</li><li>Small numbers are normal at first. They grow as more people find your page.</li></ul>',
+    aFr: '<p>{ON}, en haut, touchez <strong>Votre page ces 30 derniers jours</strong>. Vous y voyez combien de fois votre page a été vue et combien de personnes ont touché <strong>Site Web</strong>, <strong>Appeler</strong>, <strong>Itinéraire</strong>, <strong>Réserver</strong> et <strong>Menu</strong>, avec les 30 jours précédents à côté de chacun. La configuration facile montre les mêmes chiffres à la fin.</p><ul><li>Seuls vous (et toute personne qui a votre lien ou un compte) pouvez les voir.</li><li>Ils ne comptent qu\u2019Okanagan Roam. Les robots de recherche et notre équipe ne sont pas comptés.</li><li>De petits chiffres sont normaux au début. Ils grandissent à mesure que plus de gens trouvent votre page.</li></ul>' },
+  // Pub test 9 (2026-11-10): a marketing or social media manager's questions -- may I edit if I'm not the owner, TikTok,
+  // photo order, a picture on an event, and where the booking link goes.
+  { id: 'not-owner', over: ['staff', 'claim', 'login-create', 'changes-review'], q: 'I’m not the owner. Can I still edit our page?', qFr: 'Je ne suis pas le propriétaire. Puis-je quand même modifier notre page?', pages: ['edit', 'setup', 'account'],
+    keys: ['not the owner', 'im not the owner', 'i am not the owner', 'not an owner', 'not owner', 'i work here', 'i work there', 'i work for', 'im staff', 'i am staff', 'im an employee', 'im the manager', 'i am the manager', 'im a manager', 'general manager', 'marketing manager', 'social media manager', 'marketing', 'social media', 'on behalf', 'for my boss', 'for the owner', 'can i edit', 'can staff edit', 'allowed to edit', 'am i allowed', 'can a manager edit', 'manager edit'],
+    keysFr: ['pas le proprietaire', 'pas la proprietaire', 'pas proprietaire', 'je travaille', 'je suis employe', 'je suis employee', 'je suis le gerant', 'je suis la gerante', 'responsable marketing', 'responsable des reseaux sociaux', 'marketing', 'au nom de', 'pour mon patron', 'puis je modifier', 'ai je le droit', 'le droit de modifier'],
+    a: '<p><strong>Yes.</strong> Managers, marketing and staff can update the page too. Anyone the business trusts with this private link can use it.</p><ul><li>Best: each person makes their <strong>own login</strong>. {ON}, they tap <strong>Create a login</strong> and use their own email. Please don’t share one password.</li><li>Signed in, <strong>People with access</strong> shows everyone who can update the page, and you can remove people added after you.</li><li>The same rules apply to everyone: quick answers go live straight away, and a new website, description or link is checked first, usually within a day.</li></ul>',
+    aFr: '<p><strong>Oui.</strong> Les gérants, le marketing et le personnel peuvent aussi mettre la page à jour. Toute personne à qui l’entreprise confie ce lien privé peut l’utiliser.</p><ul><li>Le mieux : chaque personne crée <strong>son propre compte</strong>. {ON}, elle touche <strong>Créer un compte</strong> et utilise son propre courriel. Évitez de partager un mot de passe.</li><li>Une fois connecté, <strong>Personnes ayant accès</strong> montre toutes les personnes qui peuvent modifier la page, et vous pouvez retirer celles ajoutées après vous.</li><li>Les mêmes règles s’appliquent à tous : les réponses rapides sont en ligne tout de suite, et un nouveau site Web, une description ou un lien sont vérifiés d’abord, en général d’ici un jour.</li></ul>' },
+  { id: 'tiktok', over: ['links', 'social-post'], q: 'Can I add our TikTok?', qFr: 'Puis-je ajouter notre TikTok?', pages: ['edit', 'setup'],
+    keys: ['tiktok', 'tik tok', 'our tiktok', 'add tiktok', 'add our tiktok', 'tiktok link', 'tiktok account'],
+    keysFr: ['tiktok', 'tik tok', 'notre tiktok', 'ajouter tiktok', 'ajouter notre tiktok', 'compte tiktok'],
+    a: '<p><strong>Yes.</strong> Type your TikTok name with @ (like <strong>@yourplace</strong>) or paste your tiktok.com/@ link:</p><ul><li>in the easy setup, on the <strong>Instagram</strong> question (the TikTok box is under it), or</li><li>{ON}, in <strong>Name, address &amp; links</strong>, then tap {SEND}.</li></ul><p>It goes on your page straight away, beside Instagram and Facebook.</p>',
+    aFr: '<p><strong>Oui.</strong> Tapez votre nom TikTok avec @ (comme <strong>@votreendroit</strong>) ou collez votre lien tiktok.com/@ :</p><ul><li>dans la configuration facile, à la question <strong>Instagram</strong> (la case TikTok est dessous), ou</li><li>{ON}, dans <strong>Nom, adresse et liens</strong>, puis touchez {SEND}.</li></ul><p>Il s’affiche tout de suite sur votre page, à côté d’Instagram et de Facebook.</p>' },
+  { id: 'photo-order', over: ['photo-main', 'photo-add'], q: 'How do I change the order of my photos?', qFr: 'Comment changer l’ordre de mes photos?', pages: ['edit', 'setup'],
+    keys: ['photo order', 'order of my photos', 'order of the photos', 'order of photos', 'reorder', 'reorder photos', 'rearrange', 'rearrange photos', 'change the order', 'move a photo', 'move photo', 'move my photo', 'sort photos', 'which photo comes first', 'photo first', 'swap photos'],
+    keysFr: ['ordre des photos', 'ordre de mes photos', 'changer l ordre', 'reorganiser', 'deplacer une photo', 'deplacer la photo', 'trier les photos', 'quelle photo en premier'],
+    a: '<ul><li>{ON}, in <strong>Photos</strong>, each photo after your main one has <strong>↑ ↓</strong> arrows. Tap them to move it earlier or later. This works from your edit link too.</li><li>In the easy setup’s photo screen, use <strong>◀ ▶</strong> on each photo before you send them.</li></ul><p>A new order shows on your page straight away. Photos still waiting for our check keep their place and appear there once they’re checked. Your <strong>main photo</strong> always comes first: pick it in the setup, or with <strong>Make main photo</strong> when you’re signed in.</p>',
+    aFr: '<ul><li>{ON}, dans <strong>Photos</strong>, chaque photo après la principale a des flèches <strong>↑ ↓</strong>. Touchez-les pour l’avancer ou la reculer. Ça fonctionne aussi avec votre lien de modification.</li><li>Dans l’écran des photos de la configuration facile, utilisez <strong>◀ ▶</strong> sur chaque photo avant de les envoyer.</li></ul><p>Le nouvel ordre s’affiche tout de suite sur votre page. Les photos en attente de vérification gardent leur place et y apparaissent une fois vérifiées. Votre <strong>photo principale</strong> vient toujours en premier : choisissez-la dans la configuration, ou avec <strong>Choisir comme photo principale</strong> quand vous êtes connecté.</p>' },
+  { id: 'event-picture', over: ['event-add', 'photo-add'], q: 'Can I add a picture or poster to an event?', qFr: 'Puis-je ajouter une image ou une affiche à un événement?', pages: ['edit'],
+    keys: ['event picture', 'event photo', 'event image', 'event poster', 'poster', 'flyer', 'picture for the event', 'picture for my event', 'photo for the event', 'photo for my event', 'image for the event', 'add a poster', 'add a picture to', 'picture with the event', 'another event', 'add another event', 'more than one event', 'second event'],
+    keysFr: ['image de l evenement', 'photo de l evenement', 'affiche', 'affiche de l evenement', 'image pour l evenement', 'photo pour l evenement', 'ajouter une affiche', 'autre evenement', 'un autre evenement', 'deuxieme evenement'],
+    a: '<p><strong>Yes.</strong> {ON}, in <strong>Add an event</strong>, use <strong>Picture (optional)</strong> to add a photo or poster, and tick the box to say you can share it. We check it with the event, usually within a day, and it shows on What’s On once the event is approved.</p><p>After you send one event, tap <strong>Add another event</strong>. Your name and email come with it, so you don’t type them again.</p>',
+    aFr: '<p><strong>Oui.</strong> {ON}, dans <strong>Ajouter un événement</strong>, utilisez <strong>Image (facultatif)</strong> pour ajouter une photo ou une affiche, et cochez la case pour confirmer que vous pouvez la partager. Nous la vérifions avec l’événement, en général d’ici un jour, et elle s’affiche dans À l’affiche une fois l’événement approuvé.</p><p>Après l’envoi d’un événement, touchez <strong>Ajouter un autre événement</strong>. Votre nom et votre courriel suivent, pour ne pas les retaper.</p>' },
+  { id: 'booking-link', over: ['links'], q: 'Where do I put our booking link?', qFr: 'Où mettre notre lien de réservation?', pages: ['edit', 'setup'],
+    keys: ['booking link', 'book button', 'opentable', 'open table', 'resy', 'tock', 'sevenrooms', 'reservation link', 'reservations link', 'link to book', 'booking url', 'online booking', 'book online', 'put our booking link', 'add our booking link'],
+    keysFr: ['lien de reservation', 'bouton reserver', 'opentable', 'reserver en ligne', 'reservation en ligne', 'lien pour reserver'],
+    a: '<ul><li>In the easy setup, the <strong>Booking</strong> question has a <strong>Booking link</strong> box right under “How do people book?”.</li><li>{ON}, it’s <strong>Booking or tickets link</strong> in <strong>Name, address &amp; links</strong>.</li></ul><p>Both are the same link. A new one is checked first, usually within a day; then your page shows a <strong>Book</strong> button. Typed the link into the “How do people book?” line? The setup offers to move it into the box for you.</p>',
+    aFr: '<ul><li>Dans la configuration facile, la question <strong>Réservations</strong> a une case <strong>Lien de réservation</strong> juste sous « Comment réserver? ».</li><li>{ON}, c’est <strong>Lien de réservation ou de billets</strong> dans <strong>Nom, adresse et liens</strong>.</li></ul><p>C’est le même lien aux deux endroits. Un nouveau lien est vérifié d’abord, en général d’ici un jour; ensuite, votre page affiche un bouton <strong>Réserver</strong>. Vous avez tapé le lien dans la ligne « Comment réserver? »? La configuration vous propose de le déplacer dans la case.</p>' },
   // Portal polish (2026-10-18): the second portal review's missed questions -- posting on social media for them, who
   // can see a login, a wrong phone number on Google, and a broken website link.
   { id: 'social-post', over: ['links', 'cost'], q: 'Can you post about us on Instagram or Facebook?', qFr: 'Pouvez-vous publier sur nous sur Instagram ou Facebook?', pages: ['edit', 'account'],
@@ -52747,6 +52879,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'Please enter your Instagram name, like @yourbusiness.': 'Entrez votre nom Instagram, comme @votreentreprise.',
   'Please enter your Instagram name with @, like @yourbusiness, or your profile link.': 'Entrez votre nom Instagram avec @, comme @votreentreprise, ou le lien de votre profil.',
   'Please enter your Facebook page link, like facebook.com/yourbusiness.': 'Entrez le lien de votre page Facebook, comme facebook.com/votreentreprise.',
+  'Please enter your TikTok name with @, like @yourbusiness, or your profile link.': 'Entrez votre nom TikTok avec @, comme @votreentreprise, ou le lien de votre profil.',
   'Please check the link, for example yourbusiness.com/menu.': 'Vérifiez le lien, par exemple votreentreprise.com/menu.',
   'Please pick the first and last month you’re open.': 'Choisissez le premier et le dernier mois où vous êtes ouverts.',
   'The badges could not be read. Please reload the page and try again.': 'Les caractéristiques sont illisibles. Rechargez la page et réessayez.',
@@ -54185,7 +54318,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       times = {};
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
       if (!Object.keys(times).length) times = null;
-      else if (o._season) times._season = o._season; // its own season (pub test 7)
+      else { if (o._season) times._season = o._season; if (o._close) times._close = o._close; } // its own season (pub test 7), until close (pub test 9)
     }
     const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: times ? 'venue_owner' : listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
@@ -54258,7 +54391,7 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Website, menu and booking links still wait for review.
 // Pub answers (2026-11-10) too: choices from fixed lists plus short notes checked like Plan your visit lines (no links
 // or < >); logged, in "Your updates", with Undo.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'pub_info']);
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info']);
 // Full easy setup (Dayton, 2026-11-09): sent from the setup flow (from_setup: true) by a restaurant, these also go live
 // from the edit link: the business's hours, season, seasonal hours, closures, the badge tiles, happy hour (times and
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
@@ -54672,7 +54805,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
 
 // --- review actions ---------------------------------------------------------
 
-const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 
 // Applies the reviewer's edits to a pending update's text fields, checked
 // exactly like the owner's own input. The owner's original is kept in
@@ -55319,7 +55452,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   gluten_free: 'Options sans gluten', lake_view: 'Vue sur le lac ou le vignoble', nonalcoholic: 'Options sans alcool', sports_tv: 'Sports à la télé', live_music: 'Musique en direct',
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
-  name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
+  name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
@@ -55558,6 +55691,19 @@ function ownerVenueSummary(venueId, lang = 'en') {
   const last = ownerLastUpdatedAt(venueId);
   const lastHtml = last ? `<br><span class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</span>` : '';
   return (parts.length ? parts.join(' ') : `<span class="op-status op-status-live">${L('Up to date', 'À jour')}</span>`) + lastHtml;
+}
+
+// POST /owner/<link>/photos/<photoId>/(up|down) (pub test 9, 2026-11-10): the edit link can change the photo order too.
+// Only the order: it never makes a photo live (a waiting photo keeps its review) and the main photo always comes first.
+async function handleOwnerLinkPhotoMove(req, res, token, photoId, action) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  const found = venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more.' });
+  const photo = db.prepare('SELECT id, status FROM owner_photos WHERE id = ? AND venue_id = ?').get(photoId, found.venue.id);
+  if (!photo || photo.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'That photo isn’t available any more.' });
+  const r = moveOwnerPhoto(found.venue.id, photo.id, action === 'up' ? -1 : 1);
+  if (!r.ok) return sendSubmissionResponse(res, 409, { ok: false, error: 'The main photo always comes first. Make another photo main to change it.' });
+  return sendSubmissionResponse(res, 200, { ok: true, order: r.order, moved: r.moved, position: r.position || null, total: r.total || r.order.length });
 }
 
 // POST /owner/account/venue/<id>/photos/<photoId>/(remove|main|up|down), signed-in owners only.
@@ -55817,19 +55963,45 @@ function ownerPhotoGridHtml(venueId, signedIn, lang = 'en') {
   if (!ph.length) return '';
   const main = ownerVenueMainImage(venueId);
   const isMain = (p) => main === `/images/owner/${p.file}`;
-  const ordered = ph.filter(isMain).concat(ph.filter((p) => !isMain(p)));
-  const movable = ordered.filter((p) => !isMain(p));
+  // Pub test 9 (2026-11-10): the main photo the owner picked in the setup (still waiting for our check) says so, and comes
+  // first like the main photo it will be ("Your main photo · on your page within a day").
+  const pick = ph.find((p) => p.status === 'pending' && Number(p.main_requested) === 1 && !isMain(p)) || null;
+  const isMainish = (p) => isMain(p) || p === pick;
+  const ordered = ph.filter(isMain).concat(pick ? [pick] : [], ph.filter((p) => !isMainish(p)));
+  const movable = ordered.filter((p) => !isMainish(p));
   return `<div class="op-photos" id="opPhotoGrid">${ordered.map((p) => {
     const m = isMain(p);
-    const st = p.status === 'approved' ? (m ? `<span class="op-status op-status-live">${L('Main photo', 'Photo principale')}</span>` : `<span class="op-status op-status-live">${L('Live', 'En ligne')}</span>`) : `<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
+    const st = p === pick ? `<span class="op-status op-status-wait">${L('Your main photo · on your page within a day', 'Votre photo principale · sur votre page d’ici un jour')}</span>`
+      : p.status === 'approved' ? (m ? `<span class="op-status op-status-live">${L('Main photo', 'Photo principale')}</span>` : `<span class="op-status op-status-live">${L('Live', 'En ligne')}</span>`) : `<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
     const k = movable.indexOf(p);
     const pos = k >= 0 ? L(`photo ${k + 1} of ${movable.length}`, `la photo ${k + 1} sur ${movable.length}`) : L('main photo', 'la photo principale');
     const arrows = k >= 0 && movable.length > 1 ? `<span class="op-photo-move"><button type="button" class="op-btn op-up" data-photo="${p.id}" data-move="up" aria-label="${L(`Move ${pos} earlier`, `Avancer ${pos}`)}"${k === 0 ? ' disabled' : ''}>&uarr;</button><button type="button" class="op-btn op-down" data-photo="${p.id}" data-move="down" aria-label="${L(`Move ${pos} later`, `Reculer ${pos}`)}"${k === movable.length - 1 ? ' disabled' : ''}>&darr;</button></span>` : '';
-    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">${L('Make main photo', 'Choisir comme photo principale')}</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="${L(`Remove ${pos}`, `Retirer ${pos}`)}">${L('Remove', 'Retirer')}</button>${arrows}</span>` : '';
+    // Pub test 9 (2026-11-10): the edit link gets the order arrows too (not Make main or Remove, which need a login).
+    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">${L('Make main photo', 'Choisir comme photo principale')}</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="${L(`Remove ${pos}`, `Retirer ${pos}`)}">${L('Remove', 'Retirer')}</button>${arrows}</span>`
+      : arrows ? `<span class="op-photo-btns">${arrows}</span>` : '';
     return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
   }).join('')}</div>`;
 }
 
+// "Your pick: on your page within a day" (pub test 9, 2026-11-10): the main photo the owner chose (setup or edit page),
+// still waiting for our check, as a small preview above the banner previews. '' when there is none or theirs is live.
+function ownerPickedMainHtml(venueId, ownLive, lang = 'en') {
+  if (ownLive) return '';
+  const L = (en, f) => (lang === 'fr' ? f : en);
+  let p = null;
+  try { p = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venueId); } catch (e) { p = null; }
+  if (!p) return '';
+  return `<div class="op-pick" id="opMainPick"><img src="/owner-photos/preview/${escapeHtml(p.preview_key)}.jpg" alt="" loading="lazy"><p><strong>${L('Your pick: on your page within a day', 'Votre choix : sur votre page d’ici un jour')}</strong><br>${L('This is your main photo. Once we’ve checked it, it replaces the one below.', 'C’est votre photo principale. Une fois vérifiée, elle remplace celle ci-dessous.')}</p></div>`;
+}
+// Staff access (pub test 9, 2026-11-10): one plain line on the edit page and the setup welcome.
+function ownerStaffLineHtml(lang = 'en', linkMode = true) {
+  const fr = lang === 'fr';
+  return linkMode
+    ? (fr ? 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci (<a href="#opLogin" data-open-login>Créer un compte</a>); vous vous verrez ensuite tous sous « Personnes ayant accès ».'
+      : 'Managers and staff can use this link too. Each person can make their own login from it (<a href="#opLogin" data-open-login>Create a login</a>); you’ll then all see each other under “People with access”.')
+    : (fr ? 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».'
+      : 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.');
+}
 // Main photo position (2026-10-19, JoieFarm asked): the venue banner crops the main photo to a wide strip, and the
 // photo was always centred, so a vineyard or a sign near the top could be cut off. This shows the main photo (ours
 // or the owner's) cropped the way the page crops it, on a computer and on a phone, with a slider to move it up or
@@ -55844,6 +56016,9 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
   let wide = false;
   try { wide = venueGalleryPhotos({ ...venue, image_url: main }, L).length < 2; } catch (e) { wide = false; }
   const own = /^\/images\/owner\//.test(main);
+  // Pub test 9 (2026-11-10): with a main photo picked in the setup and still waiting for our check, the page says so
+  // ("Your pick: on your page within a day") and never "We chose this photo for you … create a login".
+  const picked = !own && ownerPhotosForVenue(venue.id).some((p) => p.status === 'pending' && Number(p.main_requested) === 1);
   // Restaurant polish (2026-11-08): no "Slide it" on the edit link (sliding needs a login), and say what the previews are.
   const polish = COMPLETENESS_TYPES.has(venue.type);
   const img = (cls) => `<img src="${escapeHtml(main)}" alt="" loading="lazy" class="op-pos-img ${cls}" style="object-position: 50% ${y}%">`;
@@ -55856,10 +56031,10 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
     : `<p class="op-hint">${L('To move the photo up or down in the banner, <a href="#opLogin">create a login</a> (it takes 30 seconds) and open your listing from <strong>My listings</strong>.', 'Pour monter ou descendre la photo dans la bannière, <a href="#opLogin">créez un compte</a> (ça prend 30 secondes) et ouvrez votre fiche depuis <strong>Mes fiches</strong>.')}</p>`;
   return `<div class="op-pos" id="opPos">
       <h3 class="op-pos-title">${L('Main photo on your page', 'Photo principale de votre page')}</h3>
-      <p class="op-hint">${polish && !signedIn
+      ${ownerPickedMainHtml(venue.id, own, lang)}<p class="op-hint">${polish && !signedIn
         ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone.')
         : polish ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone. Faites-la glisser pour montrer la meilleure partie.')
-        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (!(polish && !signedIn) && ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
+        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own || picked ? '' : ' ' + (!(polish && !signedIn) && ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
         ? L('We chose this photo for you. To use one of yours instead, tap <strong>Make main photo</strong> on it below.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, touchez <strong>Choisir comme photo principale</strong> sous celle-ci.')
         : polish && !signedIn ? L('We chose this photo for you. To use one of yours instead, upload it below; once we’ve checked it, <a href="#opLogin">create a login</a> to make it your main photo, or email us and we’ll do it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous; une fois vérifiée, <a href="#opLogin">créez un compte</a> pour en faire votre photo principale, ou écrivez-nous et nous le ferons.')
         : L('We chose this photo for you. To use one of yours instead, upload it below, then tap <strong>Make main photo</strong> on it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous, puis touchez <strong>Choisir comme photo principale</strong>.'))}</p>
@@ -56774,6 +56949,15 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
   body.owner-page .op-photo-move { display: contents; }
   body.owner-page .op-pos { background: var(--paper); border-radius: 14px; padding: 14px 16px; margin: 12px 0 18px; }
+  /* Pub test 9 (2026-11-10): the event picture's rights tick and "Sending as" line stay hidden until wanted. */
+  body.owner-page #oePhotoRightsRow[hidden], body.owner-page #oeSendingAs[hidden] { display: none; }
+  /* Pub test 9 (2026-11-10): the staff line and the owner's own numbers. */
+  body.owner-page .op-staff { margin: 8px 0 4px; color: #3E3A34; }
+  ${ownerStatsModule.OWNER_STATS_CSS.replace(/\n\s*\./g, '\n  body.owner-page .')}
+  /* Pub test 9 (2026-11-10): the main photo the owner picked, still waiting for our check. */
+  body.owner-page .op-pick { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: #EEF5F3; }
+  body.owner-page .op-pick img { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
+  body.owner-page .op-pick p { margin: 0; }
   body.owner-page .op-pos-title { font-size: 1rem; margin: 0 0 4px; }
   body.owner-page .op-pos-previews { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 10px 0; }
   body.owner-page .op-pos-previews figure { margin: 0; }
@@ -56857,6 +57041,8 @@ ${renderGolfHeaderHtml()}
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
       <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Aucuns frais, jamais.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
+      <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
+      ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
@@ -56968,6 +57154,9 @@ ${renderGolfHeaderHtml()}
       <div class="form-row">
         <div class="form-field"><label for="opInstagram">${L('Instagram (optional)', 'Instagram (facultatif)')}</label><input type="text" id="opInstagram" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
         <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label for="opTiktok">${L('TikTok (optional)', 'TikTok (facultatif)')}</label><input type="text" id="opTiktok" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" spellcheck="false" value="${escapeHtml(snap.tiktok_url || '')}"><p class="lyv-error" id="opTiktokError" hidden></p></div>
       </div>
       </details>
 
@@ -57151,7 +57340,15 @@ ${priceFieldHtml}      </details>` : ''}
         </div>
         <p class="lyv-error" id="oePartnersError" hidden></p>
       </div></div>
-      <div class="form-row">
+      <div class="form-row full"><div class="form-field oe-photo">
+        <label for="oePhoto">${L('Picture (optional)', 'Image (facultatif)')}</label>
+        <input type="file" id="oePhoto" accept="image/*" aria-describedby="oePhotoHint">
+        <p class="op-hint" id="oePhotoHint" style="margin:4px 0 0">${L('A photo or poster for a new event. We check it with the event, and it shows on What&rsquo;s On once the event is approved.', 'Une photo ou une affiche pour un nouvel événement. Nous la vérifions avec l’événement, et elle s’affiche dans À l’affiche une fois l’événement approuvé.')}</p>
+        <label class="op-closed" id="oePhotoRightsRow" style="width:auto;margin-top:8px" hidden><input type="checkbox" id="oePhotoRights"> ${L('I took this picture or have permission to share it.', 'J’ai pris cette image ou j’ai la permission de la partager.')}</label>
+        <p class="lyv-error" id="oeImageError" hidden></p>
+      </div></div>
+      <p class="op-hint" id="oeSendingAs" hidden></p>
+      <div class="form-row" id="oeContactRow">
         <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')} *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
         <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
@@ -57159,7 +57356,7 @@ ${priceFieldHtml}      </details>` : ''}
       <p class="lyv-error" id="oeFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="oeSubmit">${L('Send event', 'Envoyer l’événement')}</button>
     </form>
-    <div class="op-done" id="oeDone"><span id="oeDoneText">${L('Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.')}</span> <a href="#events" id="oeAnother">${L('Add another event', 'Ajouter un autre événement')}</a></div>
+    <div class="op-done" id="oeDone"><span id="oeDoneText">${L('Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.')}</span> <a href="#events" id="oeAnother" class="op-btn" style="display:inline-block;margin-top:10px">${L('Add another event', 'Ajouter un autre événement')}</a></div>
     </details>
     ${found.account ? ownerAccessPanelHtml(venue, found.account, lang) : ''}
 
@@ -57422,7 +57619,7 @@ ${ownerFooterHtml(fr)}
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opTiktokError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -57433,6 +57630,7 @@ ${ownerFooterHtml(fr)}
       name: document.getElementById('opBizName').value, address: document.getElementById('opAddress').value,
       menu_url: document.getElementById('opMenu').value, booking_url: document.getElementById('opBooking').value,
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
+      tiktok_url: document.getElementById('opTiktok') ? document.getElementById('opTiktok').value : (initial.tiktok_url || ''),
       description: document.getElementById('opDescription').value,
       open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
       badges: {}
@@ -57484,7 +57682,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
     if (changes.website === initial.website) delete changes.website;
-    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
+    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
     if (changes.description === initial.description) delete changes.description;
     var btn = document.getElementById('opSubmit');
     btn.disabled = true;
@@ -57525,13 +57723,15 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
               p.className = 'op-save-line op-save-sent';
             }
           });
-          var tt = document.getElementById('opToast');
-          if (tt) { tt.textContent = document.getElementById('opDoneText').textContent; tt.hidden = false; clearTimeout(window.opToastT); window.opToastT = setTimeout(function(){ tt.hidden = true; }, 8000); }` : ''}
-          form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
+          // Pub test 9 (2026-11-10): the thanks shows once. The top toast repeated the panel's own "Thanks!" just below it,
+          // so the panel itself is brought into view instead.
+          var tt = document.getElementById('opToast'); if (tt) tt.hidden = true;` : ''}
+          form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0);${completeOn ? `
+          try { document.getElementById('opDone').scrollIntoView({ block: 'center' }); } catch (e) {}` : ''} return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
-        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
+        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url); show('opTiktokError', errs.tiktok_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}${completeOn ? " show('opCuisineError', errs.cuisine); show('opVisitError', errs.visit_rows);" : ''}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
@@ -57642,7 +57842,25 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       .then(function(j){ if (j && j.ok) { location.hash = 'opActivityHead'; location.reload(); return; } x.disabled = false; x.textContent = (j && j.error) || T.again; })
       .catch(function(){ x.disabled = false; x.textContent = T.connect; });
   });
-  document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
+  // "Add another event" (pub test 9, 2026-11-10): the name and email of the event just sent come back, folded into one
+  // "Sending as …" line with a Change button, so a second event needs neither typed again.
+  var sentAs = null;
+  function sendingAs(on){
+    var row = document.getElementById('oeContactRow'), line = document.getElementById('oeSendingAs');
+    if (!row || !line) return;
+    if (!on || !sentAs) { row.style.display = ''; line.hidden = true; return; }
+    line.textContent = '';
+    line.appendChild(document.createTextNode(${JSON.stringify(L('Sending as', 'Envoyé par'))} + ' ' + sentAs.name + ' (' + sentAs.email + '). '));
+    var ch = document.createElement('button'); ch.type = 'button'; ch.className = 'op-linkbtn'; ch.textContent = ${JSON.stringify(L('Change', 'Modifier'))};
+    ch.onclick = function(){ sendingAs(false); document.getElementById('oeContactName').focus(); };
+    line.appendChild(ch); line.hidden = false; row.style.display = 'none';
+  }
+  document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now();
+    document.getElementById('oeContactName').value = sentAs ? sentAs.name : savedName(); var em = sentAs ? sentAs.email : lastEmail; if (em) document.getElementById('oeContactEmail').value = em;
+    var pr = document.getElementById('oePhotoRightsRow'); if (pr) pr.hidden = true; sendingAs(!!sentAs);
+    setTimeout(function(){ var n = document.getElementById('oeName'); if (n) { n.scrollIntoView({ block: 'center' }); n.focus(); } }, 0); });
+  // The event's picture (pub test 9): the rights tick shows once a picture is chosen.
+  (function(){ var f = document.getElementById('oePhoto'), r = document.getElementById('oePhotoRightsRow'); if (f && r) f.addEventListener('change', function(){ r.hidden = !(f.files && f.files.length); show('oeImageError', ''); }); })();
   // Photos (2026-10-18): after an upload or a change, fetch this page again and swap in the new
   // grid (no reload, so nothing typed elsewhere on the page is lost).
   var photoBox = document.getElementById('opPhotoBox'), photoStatus = document.getElementById('opPhotoStatus');
@@ -57782,7 +58000,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   ev.addEventListener('submit', function(e){
     e.preventDefault();
     var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',
-      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError', partner_venue_ids:'oePartnersError' };
+      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError', partner_venue_ids:'oePartnersError', image:'oeImageError' };
     Object.keys(ids).forEach(function(k){ show(ids[k], ''); }); show('oeFormError', '');
     var cats = Array.prototype.map.call(document.querySelectorAll('#oeCategories input:checked'), function(c){ return c.value; });
     var v = function(id){ return document.getElementById(id).value; };
@@ -57792,11 +58010,18 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       company_website: v('oeHp'), started_at: evStarted, partner_venue_ids: partners.map(function(p){ return p.id; }) };
     if (changeOf) payload.change_of = changeOf;
     var b = document.getElementById('oeSubmit'); b.disabled = true;
-    fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
-      .then(function(r){ return r.json(); })
+    // The picture (pub test 9): made smaller in the browser like an owner photo, then sent with the event.
+    var pf0 = document.getElementById('oePhoto'), pfile = !changeOf && pf0 && pf0.files && pf0.files[0];
+    if (pfile && !document.getElementById('oePhotoRights').checked) { b.disabled = false; show('oeImageError', ${JSON.stringify(L('Please tick the box to confirm you can share this picture.', 'Cochez la case pour confirmer que vous pouvez partager cette image.'))}); jumpToError(ev); return; }
+    (pfile ? resize(pfile).then(function(r){ payload.image = r.image; payload.image_rights = true; }, function(err){ throw err; }) : Promise.resolve())
+      .then(function(){ return fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) }); }, function(err){
+        b.disabled = false; show('oeImageError', err && err.message === 'small' ? ${JSON.stringify(L('That picture is too small. Please use one at least 800 pixels wide.', 'Cette image est trop petite. Utilisez-en une d’au moins 800 pixels de large.'))} : ${JSON.stringify(L('That file could not be read as a picture. Please try a JPG or PNG.', 'Ce fichier n’a pas pu être lu comme une image. Essayez un JPG ou un PNG.'))}); jumpToError(ev); return null; })
+      .then(function(r){ if (!r) return null; return r.json(); })
       .then(function(j){
+        if (j === null) return;
         b.disabled = false;
         if (j && j.ok) {
+          sentAs = { name: v('oeContactName').trim(), email: v('oeContactEmail').trim() };
           rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
           if (j.updated) document.getElementById('oeDoneText').textContent = T.evUpdated;
           if (j.change) document.getElementById('oeDoneText').textContent = T.evChange;
@@ -59054,7 +59279,9 @@ const server = http.createServer(async (req, res) => {
     {
       const pm = /^\/owner-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
       if (pm && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1]);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1])
+          // An owner event's picture (pub test 9) has the same private preview.
+          || db.prepare("SELECT image_file AS file FROM event_submissions WHERE image_key = ? AND status != 'rejected' AND image_file IS NOT NULL").get(pm[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' });
       }
@@ -59074,7 +59301,9 @@ const server = http.createServer(async (req, res) => {
       // file's own ?v= hash (what withVersionedImages writes) is kept for a year like every other image.
       const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(160|240|480|960|1200))?\.jpg$/.exec(pathname);
       if (im && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`)
+          // An owner event's picture once the event is approved (pub test 9).
+          || (im[2] ? null : db.prepare("SELECT image_file AS file FROM event_submissions WHERE image_file = ? AND status = 'approved'").get(`${im[1]}.jpg`));
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         const cache = { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' };
         if (!im[2]) return sendOwnerPhotoFile(res, row.file, cache);
@@ -61718,6 +61947,8 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const photoMove = /^([A-Za-z0-9_-]+)\/photos\/(\d+)\/(up|down)$/.exec(rest);
+      if (photoMove && method === 'POST') return await handleOwnerLinkPhotoMove(req, res, photoMove[1], Number(photoMove[2]), photoMove[3]);
       const arrivalMatch = /^([A-Za-z0-9_-]+)\/arrival$/.exec(rest);
       if (arrivalMatch && method === 'POST') return await arrivalPoints.submit(req, res, arrivalMatch[1], res.ownerLang);
       const videoMatch = /^([A-Za-z0-9_-]+)\/video\/(start|done)$/.exec(rest);

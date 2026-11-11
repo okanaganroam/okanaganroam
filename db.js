@@ -721,7 +721,9 @@ CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(sta
 // notification email and the admin list); none is published automatically.
 for (const [table, cols] of [
   ['venue_submissions', ['hours_text TEXT', 'happy_hour_text TEXT', 'social_url TEXT', 'submitter_role TEXT']],
-  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER', 'partner_venue_ids TEXT']],
+  // Pub test 9 (2026-11-10): an owner's event picture, uploaded like an owner photo (image_file on the photo volume,
+  // image_key its private preview id), reviewed with the event and used as the event's image once it is approved.
+  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER', 'partner_venue_ids TEXT', 'image_file TEXT', 'image_key TEXT']],
 ]) {
   const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
   for (const col of cols) if (!have.has(col.split(' ')[0])) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
@@ -1158,6 +1160,11 @@ CREATE TABLE IF NOT EXISTS venue_links (
 // Set by the owner (2026-10-17); server.js turns it into the same season notes as venue_seasons.
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'open_months')) {
   db.exec('ALTER TABLE venue_links ADD COLUMN open_months TEXT');
+}
+// TikTok (pub test 9, 2026-11-10): the owner's TikTok profile, https://www.tiktok.com/@handle. Live straight away like
+// Instagram; NULL = none. Additive: older rows read as no TikTok.
+if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'tiktok_url')) {
+  db.exec('ALTER TABLE venue_links ADD COLUMN tiktok_url TEXT');
 }
 
 // Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a

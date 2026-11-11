@@ -214,7 +214,7 @@ test('reservations, takeout and groups: saying how sets the feature; only an exp
   // The page script does exactly this, in this order.
   const script = scriptOf(await text(`/owner/${t}/setup`));
   assert.match(script, /var bk = \{ reservations: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' \}\[key\];/);
-  assert.match(script, /if \(step === 'book' && \(S\.badges\.takes_reservations \|\| S\.visit\.reservations\)\) return 'book:yes';/);
+  assert.match(script, /if \(step === 'book' && \(S\.badges\.takes_reservations \|\| S\.visit\.reservations \|\| CUR\.booking_url\)\) return 'book:yes';/ /* pub test 9: a booking link too */);
   assert.match(script, /if \(step === 'takeout' && \(S\.badges\.takeout \|\| S\.visit\.takeout\)\) return 'takeout:yes';/);
   // The classic edit page's rule for badges is unchanged: without the setup flag they wait for review.
   const w = mk('restaurant');

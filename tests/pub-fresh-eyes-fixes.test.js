@@ -77,7 +77,7 @@ test('B–E: Save and exit records no implicit "not offered"; the spend icon; th
   const s = scriptOf(html), cfg = cfgOf(html);
   // B: only a full Save (not Save and exit) adds games / sports to "not offered".
   assert.match(s, /partial = !!S\.exitAfter/);
-  assert.match(s, /if \(gameOn\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/);
+  assert.match(s, /if \(gameOn \|\| !S\.noGames\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/ /* pub test 9: only the "No games" tile */);
   // Pub test 6: only an explicit "no sports" is recorded, and never from "Save and exit".
   assert.match(s, /if \(badges\.sports_tv \|\| !noSportsSaid\) rem\.push\('sports'\); else if \(!partial\) add\.push\('sports'\);/);
   // C: the average spend tile has its own icon, and a missing one is never "undefined".

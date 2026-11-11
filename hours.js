@@ -372,9 +372,42 @@ function hoursStatusLabel(status, clock) {
 // month it is closed for the season, and a day outside the happy hour's own season ('MM-DD' from/to). A happy hour on a
 // day the place is closed is never "on now", "later today" or "next" ("Next happy hour: tomorrow 3 PM" was shown for a
 // pub closed Wednesdays). placeHours: the place's hours JSON (with _seasons/_closures) or parseHours() output.
+// "Until close" (pub test 9, 2026-11-10): a happy hour week may carry `_close`: { sun: ['21:00'], ... }, the start times
+// of the windows that run until the place closes. The stored end is the closing time when it was saved (what older
+// readers show). With the place's days (parseHours() days, or hoursForClock() for the dates ahead, so a seasonal week
+// counts) each of those windows ends when the place's open stretch it starts in ends, after midnight included. A day
+// whose hours aren't known keeps the stored end. -> the week object (or `hh` unchanged).
+function happyHourUntilClose(hh, placeDays) {
+  let raw = hh;
+  if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { return hh; } }
+  if (!raw || typeof raw !== 'object' || !raw._close || typeof raw._close !== 'object' || !placeDays) return hh;
+  const out = Object.assign({}, raw);
+  WEEKDAYS.forEach((d) => {
+    const starts = Array.isArray(raw._close[d]) ? raw._close[d] : null;
+    const day = placeDays[d];
+    if (!starts || !Array.isArray(raw[d]) || !day || day.status !== 'open') return;
+    out[d] = raw[d].map((w) => {
+      if (!Array.isArray(w) || starts.indexOf(w[0]) < 0) return w;
+      const a = hoursTimeToMinutes(w[0]);
+      const r = a === null ? null : day.ranges.find((x) => a >= x[0] && a < x[1]);
+      if (!r) return w;
+      const e = r[1] % DAY_MINUTES;
+      return [w[0], String(Math.floor(e / 60)).padStart(2, '0') + ':' + String(e % 60).padStart(2, '0')];
+    });
+  });
+  return out;
+}
 function happyHourState(hh, clock, placeClosedNow, closures, opts) {
-  let parsed = parseHours(hh);
   const o = Object.assign({}, opts || {});
+  // Until close (pub test 9): those windows end at the place's own closing time for that day.
+  if (o.placeHours) {
+    try {
+      const ph0 = typeof o.placeHours === 'object' && o.placeHours.days && typeof o.placeHours.known === 'boolean' ? o.placeHours : parseHours(o.placeHours);
+      const pd = ph0 && ph0.known ? (clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || '') ? hoursForClock(ph0, clock) : ph0) : null;
+      if (pd) hh = happyHourUntilClose(hh, pd.days);
+    } catch (e) { /* the stored ends stand */ }
+  }
+  let parsed = parseHours(hh);
   // The happy hour's own season rides along in its stored week ("_season": { from, to }, 'MM-DD', pub test 7).
   if (!o.season) {
     let raw = hh;
@@ -469,7 +502,7 @@ function openingPeriods(parsed) {
 const HOURS_CLIENT_SRC = [
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
   ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
-    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
+    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose].map((fn) => fn.toString()),
 ].join('\n');
 
 module.exports = {
@@ -489,6 +522,7 @@ module.exports = {
   formatClockMinutes,
   hoursStatusLabel,
   happyHourState,
+  happyHourUntilClose,
   formatClock24,
   formatRange,
   dayHoursText,

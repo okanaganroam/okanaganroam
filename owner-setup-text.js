@@ -47,7 +47,7 @@ const en = {
   upPick: 'Choose my menu file', upMore: 'Add another file', removeFile: 'Remove {name}', sendMenu: 'Send my menu ✓',
   camQ: 'Snap your first page', camLead: 'Hold your phone over the menu so the whole page fits.', camGot1: 'Got page 1', camGotN: 'Got {n} pages', camLeadSome: 'Got another page? Add it. Tap ✕ to retake one.',
   camTake: 'Take a photo', camMore: 'Add another page', page: 'Menu page {n}', removePage: 'Remove page {n}',
-  webQ: 'Is this where your menu is?', webLead: 'We filled in your website. If your menu is on another page, add to the end.', webLabel: 'Menu web address', useAddress: 'Use this address', webEmpty: 'Please type the address of your menu, like www.yourplace.com/menu.',
+  webQ: 'Is this where your menu is?', webLead: 'We filled in your website’s address. If your menu has its own page, type its name after the last /, like /menu.', webLabel: 'Menu web address', useAddress: 'Use this address', webEmpty: 'Please type the address of your menu, like www.yourplace.com/menu.',
   emailQ: 'Email your menu to us', emailLead: 'Send a photo or a PDF of your menu. Put “{name}” in the subject.', openMail: 'Open my email', openMailSub: 'Starts an email to us', copy: 'Copy', copied: 'Copied ✓', selected: 'Selected. Press and hold to copy.', willEmail: 'I’ll email it',
   mailSubject: 'Menu for {name}',
   fileTooBig: '{name} is too big. Try photos instead.', pageSmall: 'This page is a bit small to read. Try taking it a little closer.', tooManyPages: 'That’s {n} pages, the most we can take at once.',
@@ -134,7 +134,7 @@ const fr = {
   upPick: 'Choisir le fichier de mon menu', upMore: 'Ajouter un autre fichier', removeFile: 'Retirer {name}', sendMenu: 'Envoyer mon menu ✓',
   camQ: 'Photographiez la première page', camLead: 'Tenez votre téléphone au-dessus du menu pour que toute la page soit visible.', camGot1: 'Page 1 reçue', camGotN: '{n} pages reçues', camLeadSome: 'Une autre page? Ajoutez-la. Touchez ✕ pour en reprendre une.',
   camTake: 'Prendre une photo', camMore: 'Ajouter une autre page', page: 'Page de menu {n}', removePage: 'Retirer la page {n}',
-  webQ: 'Votre menu est-il à cette adresse?', webLead: 'Nous avons inscrit votre site Web. Si votre menu est sur une autre page, ajoutez la fin de l’adresse.', webLabel: 'Adresse Web du menu', useAddress: 'Utiliser cette adresse', webEmpty: 'Écrivez l’adresse de votre menu, comme www.votreendroit.com/menu.',
+  webQ: 'Votre menu est-il à cette adresse?', webLead: 'Nous avons inscrit l’adresse de votre site Web. Si votre menu a sa propre page, tapez son nom après le dernier /, comme /menu.', webLabel: 'Adresse Web du menu', useAddress: 'Utiliser cette adresse', webEmpty: 'Écrivez l’adresse de votre menu, comme www.votreendroit.com/menu.',
   emailQ: 'Envoyez-nous votre menu', emailLead: 'Envoyez une photo ou un PDF de votre menu. Indiquez « {name} » dans l’objet.', openMail: 'Ouvrir mon courriel', openMailSub: 'Commence un courriel à notre adresse', copy: 'Copier', copied: 'Copié ✓', selected: 'Sélectionné. Appuyez longuement pour copier.', willEmail: 'Je vais l’envoyer',
   mailSubject: 'Menu de {name}',
   fileTooBig: '{name} est trop gros. Essayez plutôt des photos.', pageSmall: 'Cette page est un peu petite pour être lue. Essayez de la prendre de plus près.', tooManyPages: 'Cela fait {n} pages, le maximum à la fois.',
@@ -603,5 +603,29 @@ Object.assign(fr, {
 // The start screen, the green card and the help topic all use these exact words.
 en.timeLine = 'About 15 to 30 minutes. You can stop any time and carry on later.';
 fr.timeLine = 'Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.';
+
+// Ninth first-time pub test (2026-11-10; drafts/fresh-eyes-pub9-2026-11-10/REPORT.md). Shared with restaurants.
+Object.assign(en, {
+  untilClose: 'Until close', untilCloseShort: 'close', closeUnknown: 'We don’t have your closing time for {day}. Please pick an end time instead, or add your hours first.',
+  noGames: 'No games', noGamesSub: 'No pool, darts or other games',
+  staffLine: 'Managers and staff can use this link too. Each person can make their own login from it, and you’ll all see each other under “People with access”.',
+  staffLineIn: 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.',
+  photoEarlier: 'Move photo {n} earlier', photoLater: 'Move photo {n} later', photoOrderHint: 'Your page shows your photos in this order, after your main photo. Use ◀ ▶ to change it. You can change it later on your edit page too.',
+  ttLabel: 'TikTok (optional)', ttEx: '@yourplace, or your tiktok.com/@ link', ttSavedOnly: 'TikTok saved ✓ It’s on your page now. Add your Instagram too, or tap “We’re not on Instagram”.',
+  bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'Like opentable.ca/r/yourplace or your website’s booking page', bookLinkHint: 'This is the link behind the Book button on your page. We check a new link first, usually within a day.',
+  linkInLine: 'That looks like your booking link. It works best in its own box, so your page shows a Book button.', moveLink: 'Move it to the booking link box',
+  charsLeft: '{n} characters left', charLeft1: '1 character left', charsOver: '{n} characters too many', charOver1: '1 character too many',
+});
+Object.assign(fr, {
+  untilClose: 'Jusqu’à la fermeture', untilCloseShort: 'la fermeture', closeUnknown: 'Nous n’avons pas votre heure de fermeture du {day}. Choisissez plutôt une heure de fin, ou ajoutez d’abord vos heures.',
+  noGames: 'Pas de jeux', noGamesSub: 'Pas de billard, de fléchettes ni d’autres jeux',
+  staffLine: 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci, et vous vous verrez tous sous « Personnes ayant accès ».',
+  staffLineIn: 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».',
+  photoEarlier: 'Avancer la photo {n}', photoLater: 'Reculer la photo {n}', photoOrderHint: 'Votre page montre vos photos dans cet ordre, après votre photo principale. Utilisez ◀ ▶ pour le changer. Vous pourrez aussi le changer plus tard sur votre page de modification.',
+  ttLabel: 'TikTok (facultatif)', ttEx: '@votreendroit, ou votre lien tiktok.com/@', ttSavedOnly: 'TikTok enregistré ✓ Il est sur votre page. Ajoutez aussi votre Instagram, ou touchez « Nous ne sommes pas sur Instagram ».',
+  bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'Par exemple opentable.ca/r/votreendroit ou la page de réservation de votre site', bookLinkHint: 'C’est le lien du bouton Réserver de votre page. Nous vérifions d’abord un nouveau lien, en général d’ici un jour.',
+  linkInLine: 'On dirait votre lien de réservation. Il fonctionne mieux dans sa propre case, pour que votre page affiche un bouton Réserver.', moveLink: 'Le déplacer dans la case du lien de réservation',
+  charsLeft: 'Il reste {n} caractères', charLeft1: 'Il reste 1 caractère', charsOver: '{n} caractères de trop', charOver1: '1 caractère de trop',
+});
 
 module.exports = { en, fr };
