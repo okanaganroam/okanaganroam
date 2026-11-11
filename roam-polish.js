@@ -125,7 +125,7 @@ const css = TOKENS + GUIDE;
 // The block exactly as it is added to a page; server.js swaps it for a <link> to /styles/shared/roam-polish.css.
 const block = `<style>${css}</style>`;
 // Pages the guide template covers: list pages and town pages.
-const COVERED = /<body[^>]*class="[^"]*\b(?:fd-page|town-page|kelowna-page)\b/;
+const COVERED = /<body[^>]*class="(?:[^"]*\s)?(?:fd-page|town-page|kelowna-page)(?:\s[^"]*)?"/;
 function apply(html) {
   if (typeof html !== 'string' || !COVERED.test(html) || html.indexOf(block) !== -1) return html;
   const at = html.indexOf('</head>');
