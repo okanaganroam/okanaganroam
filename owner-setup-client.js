@@ -157,16 +157,34 @@
     coffee: { roast_own: !!CIc.roast_own, source: CIc.source || '', beans: !!CIc.beans }, sellout: CI.sellout || ''
   };
   (CI.serves || []).forEach(function(k){ S.cafe.serves[k] = true; });
+  // Café test 2 (2026-11-11): ice cream and gelato answers, "No washroom" and the seats answer on "What you offer".
+  S.cafe.diet.df_sorbet = !!CId.df_sorbet; S.cafe.diet.vegan_ice = !!CId.vegan_ice; S.cafe.diet.gf_cones = CId.gf_cones || '';
+  S.noWash = (CUR.not_offered || []).indexOf('washroom') >= 0 && !(CUR.badges || {}).washroom;
+  S.seatsWas = S.cafe.stay.seats;
   (CId.milks || []).forEach(function(k){ S.cafe.diet.milks[k] = true; });
   // "Laptop friendly" is a tile on "What you offer" but stored as the three-way laptops answer.
   if (C.cafe) { S.badges.laptop = S.cafe.stay.laptops === 'all_day' || S.cafe.stay.laptops === 'not_busy'; S.badgesAtStart.laptop = S.badges.laptop; }
   S.noWifi = (CUR.not_offered || []).indexOf('wifi') >= 0 && !(CUR.badges || {}).wifi;
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
+  // Café test 2: no "Your coffee" tile for a gelato window (unless it ticked espresso or drip coffee). Only the saved kind
+  // counts here, never a guess from the name.
+  if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   if (C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount)) S.spend = 9;
   S.cuiTouched = false;
   // A café's happy hour is a step only while it serves Beer & wine (outreach rule).
   function cafeHappy(on){ if (!C.cafe) return; C.happyHour = on; var i = STEPS.indexOf('happy'), j = P2.indexOf('happy'); if (on && i < 0) { STEPS.push('happy'); P2.push('happy'); } if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } }
+  // Café test 2 (2026-11-11): words for the café's kind (photos, story example) and what fits it. Kinds that don't serve
+  // coffee (gelato, bubble tea, juice, tea, dessert) don't get the "Your coffee" tile unless espresso or drip is ticked.
+  var KIND_SERVE = { 'Coffee shop': 'espresso', Bakery: 'baked_here', 'Bakery café': 'baked_here', Roastery: 'espresso', 'Tea house': 'tea', 'Bubble tea': 'bubble_tea', 'Ice cream & gelato': 'ice_cream', 'Dessert & sweets': 'desserts', 'Brunch café': 'breakfast', 'Juice & smoothie bar': 'smoothies', 'Deli & sandwiches': 'lunch' };
+  var NO_COFFEE = ['Ice cream & gelato', 'Bubble tea', 'Juice & smoothie bar', 'Tea house', 'Dessert & sweets'];
+  var BAKES = ['Bakery', 'Bakery café', 'Coffee shop', 'Roastery', 'Brunch café', 'Deli & sandwiches'];
+  function kindText(key){ var k = (T.kinds || {})[S.place]; return k && k[key] ? k[key] : ''; }
+  function iceKind(){ return S.place === 'Ice cream & gelato'; }
+  function coffeeOn(){ return !S.place || NO_COFFEE.indexOf(S.place) < 0 || !!(S.cafe.serves.espresso || S.cafe.serves.drip); }
+  function syncCoffee(){ if (!C.cafe) return; var on = coffeeOn(), i = STEPS.indexOf('coffee'), j = P2.indexOf('coffee'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('coffee') >= 0) { STEPS.push('coffee'); P2.push('coffee'); } }
+  // The serve chips for the kind: "Baked fresh here" for bakeries, "Made here" for the rest (a ticked one always shows).
+  function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; return true; }); }
   function cafeWords(){ return (C.priceWords || {})[S.place] || (C.priceWords || {}).default || ''; }
   function cafeStay(){ var st = S.cafe.stay, o = {}; if (st.laptops) o.laptops = st.laptops; if (st.seats) o.seats = st.seats; if (st.outlets) o.outlets = true; if (st.quiet) o.quiet = true; return o; }
   // Reads the café screens' text boxes into S.cafe (before a redraw or a save).
@@ -816,7 +834,11 @@
         + '<div class="su-tiles" id="suKindTiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack' + (S.place ? ' su-sticky' : '') + '">' + big('➜', T.kindNext, '', false, 'kindNext') + '</div>' + skip('cuisine');
     } else if (s === 'cuisine:serve') {
-      x = q(T.serveQ, T.serveLead) + msgs() + '<div class="su-tiles" id="suServeTiles">' + C.serves.map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cafe.serves[o.k] ? 'true' : 'false') + '" data-ctog="serves:' + o.k + '"><span class="su-e" aria-hidden="true">' + o.i + '</span>' + h(o.t) + '</button>'; }).join('') + '</div>'
+      // Café test 2 (2026-11-11): the chip that matches the kind is ticked as a suggestion, only while nothing is saved yet.
+      var pre = KIND_SERVE[S.place];
+      if (pre && !S.serveSuggested && !(CI.serves || []).length && !Object.keys(S.cafe.serves).some(function(z){ return S.cafe.serves[z]; })) { S.cafe.serves[pre] = true; S.serveSuggested = pre; }
+      var preName = S.serveSuggested && S.cafe.serves[S.serveSuggested] ? (C.serves.filter(function(o){ return o.k === S.serveSuggested; })[0] || {}).t : '';
+      x = q(T.serveQ, T.serveLead) + (preName ? '<p class="su-sent su-research" id="suServePre">' + h(fill(T.servePre, { x: preName })) + '</p>' : '') + msgs() + '<div class="su-tiles" id="suServeTiles">' + servesShown().map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cafe.serves[o.k] ? 'true' : 'false') + '" data-ctog="serves:' + o.k + '"><span class="su-e" aria-hidden="true">' + o.i + '</span>' + h(o.t) + '</button>'; }).join('') + '</div>'
         + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '')
         + '<button type="button" class="su-more" data-act="go:cuisine:style">' + h(T.styleMore) + '</button>'
         + '<div class="su-stack su-sticky">' + big('✓', T.saveServe, '', false, 'serveSave') + '</div>';
@@ -841,7 +863,7 @@
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
     } else if (s === 'photos') {
-      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ')) + '</p>' + q(T.photosMore) : q(T.photosQ, T.photosLead)) + msgs()
+      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ')) + '</p>' + q(T.photosMore) : q(T.photosQ, kindText('photos') || T.photosLead)) + msgs()
         + '<div class="su-stack">' + big('📷', T.take, T.takeSub, false, 'take') + big('🖼️', T.choose, '', true, 'pick') + (S.photosSent || S.done.photos === 'day' ? big('➜', T.photosNoMore, '', true, 'after:photos') : '') + '</div>' + (S.photosSent || S.done.photos ? '' : skip('photos'));
     } else if (s === 'photos:review') {
       var g = goodPhotos();
@@ -913,7 +935,10 @@
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
-          + (C.cafe && g.keys.indexOf('wifi') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWifi ? 'true' : 'false') + '" data-off="no_wifi"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWifi) + '<span class="su-tile-sub">' + h(T.noWifiSub) + '</span></button>' : '')
+          + (C.cafe && g.keys.indexOf('wifi') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWifi ? 'true' : 'false') + '" data-off="no_wifi"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWifi) + '<span class="su-tile-sub">' + h(S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub) + '</span></button>' : '')
+          // Café test 2 (2026-11-11): "No seats inside (takeout only)" up front, and an explicit "No washroom" (never shown).
+          + (C.cafe && g.keys.indexOf('washroom') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWash ? 'true' : 'false') + '" data-off="no_washroom"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWashroom) + '<span class="su-tile-sub">' + h(T.noWashroomSub) + '</span></button>'
+            + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.cafe.stay.seats === 'takeout' ? 'true' : 'false') + '" data-off="takeout_only"><span class="su-e" aria-hidden="true">🥡</span>' + h(T.takeoutOnly) + '<span class="su-tile-sub">' + h(T.takeoutOnlySub) + '</span></button>' : '')
           + (C.pub && g.keys.indexOf('sports_tv') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noSports ? 'true' : 'false') + '" data-off="no_sports"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noSports) + '<span class="su-tile-sub">' + h(T.noSportsSub) + '</span></button>' : '')
           + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>'
             // Pub test 8 (2026-11-10): "Service dogs welcome", the follow-up to No dogs (shown only while No dogs is on).
@@ -937,6 +962,15 @@
         + (od.preorder ? field('suOhow', T.preorderHowLabel, od.how, { max: 120 }) + ex(T.preorderHowEx) + field('suOpurl', T.preorderUrlLabel, od.purl, { mode: 'url', max: 300 }) : '')
         + (od.online || od.preorder ? '<p class="su-hint">' + h(T.linkHint) + '</p>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'orderSave') + '</div>' + skip('order');
+    } else if (s === 'diet' && iceKind()) {
+      // Café test 2 (2026-11-11): gelato and ice cream get their own questions (dairy-free sorbet, vegan, gluten-free cups
+      // or cones), not milks and baking.
+      var di = S.cafe.diet;
+      x = doneLine('diet') + q(T.dietQ, T.dietLead) + msgs() + '<h2 class="su-h2">' + h(T.iceDfQ) + '</h2><div class="su-tiles">' + ctile('diet.df_sorbet', '🍧', T.dfSorbet) + ctile('diet.vegan_ice', '🌱', T.veganIce) + '</div>'
+        + '<h2 class="su-h2">' + h(T.gfConesQ) + '</h2>' + radios('diet.gf_cones', ['cups', 'cones'], T.gfCones)
+        + '<h2 class="su-h2">' + h(T.dietMore) + '</h2><div class="su-tiles">' + ctile('diet.nut_free', '🥜', T.nutFreeIce) + '</div>'
+        + field('suDnote', T.dietNoteLabel, di.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(di.note)) + '</p>' + ex(T.dietNoteExIce)
+        + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'dietSave') + '</div>' + skip('diet');
     } else if (s === 'diet') {
       var dt = S.cafe.diet, anyMilk = Object.keys(dt.milks).some(function(m){ return dt.milks[m]; });
       x = doneLine('diet') + q(T.dietQ, T.dietLead) + msgs() + '<h2 class="su-h2">' + h(T.milksQ) + '</h2><div class="su-chips" role="group" aria-label="' + h(T.milksQ) + '">' + C.milks.map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (dt.milks[o.k] ? 'true' : 'false') + '" data-ctog="milks:' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
@@ -1008,7 +1042,7 @@
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
       x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
-        + '<p class="su-count' + (L2 >= 120 ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= 120 ? T.storyGood : T.storyCount) + '</p>' + ex(T.storyEx) + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
+        + '<p class="su-count' + (L2 >= 120 ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= 120 ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx) + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
@@ -1640,7 +1674,10 @@
         var wadd = [], wrem = [];
         if (badges.wifi || !S.noWifi) wrem.push('wifi'); else if (!S.exitAfter) wadd.push('wifi');
         if (badges.drive_thru || badges.walk_up) { wrem.push('ordering'); S.cafe.order.counter = false; }
+        if (badges.washroom || !S.noWash) wrem.push('washroom'); else if (!S.exitAfter) wadd.push('washroom');
         list.push({ not_offered: { add: wadd, remove: wrem } });
+        // The seats answer from this screen (café test 2): takeout only, or taken back.
+        if (S.cafe.stay.seats !== S.seatsWas && (S.cafe.stay.seats === 'takeout' || S.seatsWas === 'takeout')) { var cs2 = cafeStay(); list.push({ cafe_info: { stay: Object.keys(cs2).length ? cs2 : null } }); S.seatsWas = S.cafe.stay.seats; }
       }
       return saveAll('offer', list, null, offerNext('offer'));
     }
@@ -1649,12 +1686,13 @@
     if (k === 'styleDone') { S.nudge = ''; return go('cuisine:serve'); }
     if (k === 'serveSave') {
       var sv = C.serves.map(function(o){ return o.k; }).filter(function(z){ return S.cafe.serves[z]; });
+      if (S.serveSuggested && !S.cafe.serves[S.serveSuggested]) S.serveSuggested = '';
       if (!S.place) { S.nudge = T.kindNeed; return go('cuisine'); }
       if (!sv.length) { S.nudge = T.serveNeed; return render(); }
       // The kind is saved only now, when the owner confirms it (a suggestion from the name is never saved by itself).
       var kc = { place_type: S.place }; if (S.cuiTouched) kc.cuisines = S.cuis;
       S.savedLine.cuisine = T.savedCuisine;
-      return saveAll('cuisine', [kc, { cafe_info: { serves: sv } }], null, null, function(){ CUR.place_type = S.place; S.kindGuessed = ''; S.cuiTouched = false; cafeHappy(sv.indexOf('beer_wine') >= 0); });
+      return saveAll('cuisine', [kc, { cafe_info: { serves: sv } }], null, null, function(){ CUR.place_type = S.place; S.kindGuessed = ''; S.cuiTouched = false; S.serveSuggested = ''; CI.serves = sv; cafeHappy(sv.indexOf('beer_wine') >= 0); syncCoffee(); });
     }
     if (k === 'laptopSave') {
       if (!S.cafe.stay.laptops) { S.nudge = T.laptopNeed; return render(); }
@@ -1682,8 +1720,10 @@
       var dnote = String(dt2.note || '').trim().replace(/\s+/g, ' ');
       if (dnote.length > 120) { S.nudge = fill(T.textLong, { n: 1, max: 120 }); return render(); }
       var dv = { milks: mk, milk_extra: mk.length ? dt2.milk_extra : '', gf_kitchen: dt2.gf_kitchen, vegan_baking: !!dt2.vegan_baking, nut_free: !!dt2.nut_free };
+      // Café test 2 (2026-11-11): the gelato answers ride along (kept as they are for other kinds).
+      if (dt2.df_sorbet) dv.df_sorbet = true; if (dt2.vegan_ice) dv.vegan_ice = true; if (dt2.gf_cones) dv.gf_cones = dt2.gf_cones;
       if (dnote) dv.note = dnote;
-      if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dnote) { S.nudge = T.dietNeed; return render(); }
+      if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dv.df_sorbet && !dv.vegan_ice && !dv.gf_cones && !dnote) { S.nudge = T.dietNeed; return render(); }
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
       if (mk.length && !S.badges.dairy_free_milk) { dl.push({ badges: { dairy_free_milk: true } }); S.badges.dairy_free_milk = true; }
@@ -1828,6 +1868,9 @@
       if (k === 'none_diet') { S.noDiet = !S.noDiet; press('none_diet', S.noDiet); if (S.noDiet) ['vegan', 'vegetarian', 'gluten_free'].forEach(function(d){ S.badges[d] = false; press(d, false); }); return; }
       // "No dogs allowed" and "Dog friendly": picking one turns the other off.
       if (k === 'no_games') { S.noGames = !S.noGames; press('no_games', S.noGames); if (S.noGames) GAMES.forEach(function(gk){ S.badges[gk] = false; press(gk, false); }); return; }
+      if (k === 'no_washroom') { S.noWash = !S.noWash; press('no_washroom', S.noWash); if (S.noWash) { S.badges.washroom = false; press('washroom', false); } return; }
+      if (k === 'washroom' && !S.badges.washroom) { S.noWash = false; press('no_washroom', false); }
+      if (k === 'takeout_only') { S.cafe.stay.seats = S.cafe.stay.seats === 'takeout' ? '' : 'takeout'; press('takeout_only', S.cafe.stay.seats === 'takeout'); return; }
       if (k === 'no_wifi') { S.noWifi = !S.noWifi; press('no_wifi', S.noWifi); if (S.noWifi) { S.badges.wifi = false; press('wifi', false); } return; }
       if (k === 'wifi' && !S.badges.wifi) { S.noWifi = false; press('no_wifi', false); }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }

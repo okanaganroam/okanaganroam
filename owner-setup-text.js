@@ -784,4 +784,51 @@ Object.assign(fr, {
   closeYearlySub: 'Coché : enregistré une seule fois comme fermeture annuelle, aux mêmes dates chaque année.', addedYearly: '{x} (chaque année)',
 });
 
+// Café words by kind (café test 2, 2026-11-11): the photos prompt and the story example for each of the 11 kinds in
+// SPEC-cafes.md, gelato's own dietary questions, "No seats inside" and "No washroom" on "What you offer".
+Object.assign(en.cafe, {
+  kinds: {
+    'Coffee shop': { photos: 'Your counter, your coffee, your seats. Three photos is perfect.', story: 'A small coffee shop on the main street. Beans from a local roaster, and the window seats catch the morning sun.' },
+    Bakery: { photos: 'Your shop front, your bread and pastries, your counter. Three photos is perfect.', story: 'A family bakery on Main Street. The bread comes out of the oven at 7, and the croissants sell out by noon.' },
+    'Bakery café': { photos: 'Your counter, your coffee, your baking. Three photos is perfect.', story: 'A small bakery café by the lake. Everything is baked here each morning, and the window seats catch the sun.' },
+    Roastery: { photos: 'Your roaster, your coffee bar, a cup being poured. Three photos is perfect.', story: 'We roast our beans right here in small batches. Come in for a pour-over, and take a bag home.' },
+    'Tea house': { photos: 'Your tea room, your teapots and cups, your tea wall. Three photos is perfect.', story: 'A quiet tea room with over 40 loose-leaf teas. Sit by the window with a pot, or take a tin home.' },
+    'Bubble tea': { photos: 'Your shop front, a few drinks, your menu board. Three photos is perfect.', story: 'Bubble tea made to order, with fresh tapioca pearls through the day. Try the brown sugar milk tea.' },
+    'Ice cream & gelato': { photos: 'Your shop front, your gelato case, a cone. Three photos is perfect.', story: 'Gelato made here every morning, with 24 flavours in the case and dairy-free sorbets too. Right on the lake walk.' },
+    'Dessert & sweets': { photos: 'Your shop front, your display case, a favourite treat. Three photos is perfect.', story: 'Cakes, macarons and chocolates, made here by hand. Order a custom cake, or pick a box of treats to take home.' },
+    'Brunch café': { photos: 'Your room, a brunch plate, your coffee. Three photos is perfect.', story: 'Brunch all day: eggs Benedict, big pancakes and good coffee. Grab a patio table on a sunny morning.' },
+    'Juice & smoothie bar': { photos: 'Your counter, a few drinks, your fruit. Three photos is perfect.', story: 'Fresh juices and smoothies made to order, plus acai bowls. Grab one on your way to the beach.' },
+    'Deli & sandwiches': { photos: 'Your counter, a sandwich, your deli case. Three photos is perfect.', story: 'Sandwiches made to order on bread from down the street, and soup every day. Call ahead and it’s ready.' },
+  },
+  servePre: 'We ticked “{x}” for your kind of café. Untick it if it’s not right.',
+  iceDfQ: 'Dairy-free or vegan?', dfSorbet: 'Dairy-free sorbet', veganIce: 'Vegan gelato or ice cream',
+  gfConesQ: 'Gluten-free?', gfCones: { cups: 'Gluten-free in a cup (our cones have gluten)', cones: 'Gluten-free cones too' },
+  nutFreeIce: 'Nut-free flavours', dietNoteExIce: 'Sorbets are vegan · Ask for a clean scoop',
+  noWifiSubTakeout: 'We don’t have Wi-Fi for guests',
+  noWashroom: 'No customer washroom', noWashroomSub: 'Only for our records. It isn’t shown on your page.',
+  takeoutOnly: 'No seats inside (takeout only)', takeoutOnlySub: 'Your page says “Takeout only”',
+});
+Object.assign(fr.cafe, {
+  kinds: {
+    'Coffee shop': { photos: 'Votre comptoir, votre café, vos places assises. Trois photos, c’est parfait.', story: 'Un petit café sur la rue principale. Des grains d’un torréfacteur local, et les places près de la fenêtre ont le soleil du matin.' },
+    Bakery: { photos: 'Votre devanture, vos pains et pâtisseries, votre comptoir. Trois photos, c’est parfait.', story: 'Une boulangerie familiale sur la rue Main. Le pain sort du four à 7 h, et les croissants sont épuisés avant midi.' },
+    'Bakery café': { photos: 'Votre comptoir, votre café, vos pâtisseries. Trois photos, c’est parfait.', story: 'Un petit café-boulangerie au bord du lac. Tout est cuit ici chaque matin, et les places près de la fenêtre ont le soleil.' },
+    Roastery: { photos: 'Votre torréfacteur, votre bar à café, une tasse qu’on verse. Trois photos, c’est parfait.', story: 'Nous torréfions nos grains ici, en petits lots. Venez prendre un café filtre, et repartez avec un sac.' },
+    'Tea house': { photos: 'Votre salon de thé, vos théières et tasses, votre mur de thés. Trois photos, c’est parfait.', story: 'Un salon de thé tranquille avec plus de 40 thés en vrac. Asseyez-vous près de la fenêtre avec une théière, ou rapportez une boîte.' },
+    'Bubble tea': { photos: 'Votre devanture, quelques boissons, votre menu. Trois photos, c’est parfait.', story: 'Du thé aux perles fait sur commande, avec des perles de tapioca fraîches toute la journée. Essayez le thé au lait à la cassonade.' },
+    'Ice cream & gelato': { photos: 'Votre devanture, votre comptoir à gelato, un cornet. Trois photos, c’est parfait.', story: 'Du gelato fait ici chaque matin, 24 saveurs au comptoir et des sorbets sans produits laitiers. Juste sur la promenade du lac.' },
+    'Dessert & sweets': { photos: 'Votre devanture, votre vitrine, une gâterie préférée. Trois photos, c’est parfait.', story: 'Gâteaux, macarons et chocolats faits ici à la main. Commandez un gâteau, ou choisissez une boîte de gâteries à emporter.' },
+    'Brunch café': { photos: 'Votre salle, une assiette de brunch, votre café. Trois photos, c’est parfait.', story: 'Brunch toute la journée : œufs bénédictine, grosses crêpes et bon café. Prenez une table sur la terrasse un matin ensoleillé.' },
+    'Juice & smoothie bar': { photos: 'Votre comptoir, quelques boissons, vos fruits. Trois photos, c’est parfait.', story: 'Jus et smoothies frais faits sur commande, et des bols açaï. Prenez-en un en allant à la plage.' },
+    'Deli & sandwiches': { photos: 'Votre comptoir, un sandwich, votre comptoir de charcuterie. Trois photos, c’est parfait.', story: 'Des sandwichs faits sur commande avec le pain de la boulangerie voisine, et une soupe chaque jour. Appelez d’avance et c’est prêt.' },
+  },
+  servePre: 'Nous avons coché « {x} » pour votre genre de café. Décochez-le s’il ne convient pas.',
+  iceDfQ: 'Sans produits laitiers ou végane?', dfSorbet: 'Sorbet sans produits laitiers', veganIce: 'Gelato ou crème glacée véganes',
+  gfConesQ: 'Sans gluten?', gfCones: { cups: 'Sans gluten dans une coupe (nos cornets contiennent du gluten)', cones: 'Cornets sans gluten aussi' },
+  nutFreeIce: 'Saveurs sans noix', dietNoteExIce: 'Les sorbets sont véganes · Demandez une cuillère propre',
+  noWifiSubTakeout: 'Nous n’avons pas de Wi-Fi pour les clients',
+  noWashroom: 'Pas de toilettes pour les clients', noWashroomSub: 'Seulement pour nos dossiers. Ce n’est pas affiché sur votre page.',
+  takeoutOnly: 'Pas de places à l’intérieur (pour emporter seulement)', takeoutOnlySub: 'Votre page indique « Pour emporter seulement »',
+});
+
 module.exports = { en, fr };
