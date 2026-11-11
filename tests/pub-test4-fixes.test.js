@@ -112,8 +112,9 @@ test('3: "No dogs allowed" is a tile on What you offer (pubs and restaurants), s
     assert.ok(cfg.offerGroups.some((g) => g.keys.includes('dog_friendly')), `${type} has the Dog friendly tile`);
     assert.match(s, /\(g\.keys\.indexOf\('dog_friendly'\) >= 0 \? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' \+ \(S\.noDogs \? 'true' : 'false'\) \+ '" data-off="no_dogs">/);
     // Picking one turns the other off.
-    assert.match(s, /if \(k === 'no_dogs'\) \{ S\.noDogs = !S\.noDogs; press\('no_dogs', S\.noDogs\); if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); \} return; \}/);
-    assert.match(s, /if \(k === 'dog_friendly' && S\.badges\[k\]\) \{ S\.noDogs = false; press\('no_dogs', false\); \}/);
+    // Pub test 8: un-ticking No dogs also un-ticks its "Service dogs welcome" follow-up.
+    assert.match(s, /if \(k === 'no_dogs'\) \{ S\.noDogs = !S\.noDogs; press\('no_dogs', S\.noDogs\); if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); \} else \{ S\.badges\.service_dogs = false; press\('service_dogs', false\); \} sdog\(\); return; \}/);
+    assert.match(s, /if \(k === 'dog_friendly' && S\.badges\[k\]\) \{ S\.noDogs = false; press\('no_dogs', false\); S\.badges\.service_dogs = false; press\('service_dogs', false\); sdog\(\); \}/);
     // Saved in order: "no dogs" taken back before Dog friendly goes on; given after it goes off.
     assert.ok(s.indexOf("list.push({ not_offered: { remove: ['dogs'] } })") < s.indexOf("list.push({ badges: badges });"));
     assert.ok(s.indexOf("list.push({ not_offered: { add: ['dogs'] } })") > s.indexOf("list.push({ badges: badges });"));
@@ -144,9 +145,10 @@ test('3b: No dogs and Dog friendly are never both; the answer counts as given, s
     assert.equal(!!cfg.cur.badges.dog_friendly, false);
     const after = (await progress(t, 'offer', 'live')).body.score.pct;
     assert.ok(after >= before, 'no penalty');
-    // Nothing new on the public page.
+    // Pub test 8 (approved): the answer now shows publicly as one short line, and nothing else.
     const html = page(v, 'en');
-    assert.doesNotMatch(html, /No dogs|Dogs not allowed|no dogs allowed/i);
+    assert.match(html, /<strong>No dogs<\/strong>/);
+    assert.doesNotMatch(html, /Dogs not allowed|no dogs allowed/i);
     assert.doesNotMatch(html, /Dogs OK|Dog-friendly|Dog friendly/);
     // Research never turns Dog friendly back on.
     const am = app.guardedAmenityCorrectUpdate(v.id, { dog_friendly: { expectedCurrent: false, corrected: true } }, { reason: 'pt4', batch_id: 'pt4', source_url: 'https://example.com/' });
