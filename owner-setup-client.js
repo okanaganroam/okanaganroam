@@ -1601,7 +1601,13 @@
       inp.addEventListener('input', function(){ b.hidden = !inp.value; });
     });
     // Text never gets wiped: the cursor goes to the end of what's there.
-    Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){ inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; setTimeout(function(){ try { if (inp.value.length === n) inp.setSelectionRange(n, n); } catch (e) {} }, 0); }); });
+    // Pub test 9 (2026-11-10): a one-line box we filled in (her old phone, website, a deal) is selected on its first tap,
+    // so pasting replaces it; typing or a second tap places the cursor as usual, and the ✕ still clears it. Story boxes
+    // and the menu address (made to be added to after its last /) keep the cursor at the end.
+    Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
+      var pre = inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value, first = true;
+      inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+    });
   }
   el('suPick').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
   el('suTake').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
