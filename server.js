@@ -22355,7 +22355,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function located(){
     $('rnLocationHelp').hidden=true;
-    radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
+    radiusSel.value = String(radiusKm); radiusSel.disabled = false; $('rnDistanceField').hidden = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
     nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(town || pendingRoute || route ? '' : T.near);
   }
   function onErr(err){
@@ -22377,7 +22377,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
     if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); }
     if (quiet) return;
-    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; radiusSel.disabled = true; stopLoc.hidden = true;
+    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; radiusSel.disabled = true; $('rnDistanceField').hidden = true; stopLoc.hidden = true;
     places.forEach(function(p){ p.d = null; }); render(false);
   }
   nearBtn.addEventListener('click', function(){
@@ -22408,7 +22408,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     setPinMode(false);
     if (route) { if (route.line) map.removeLayer(route.line); route = null; drawRoute(); }
     radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8);
-    radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.pinRemove;
+    radiusSel.value = String(radiusKm); radiusSel.disabled = false; $('rnDistanceField').hidden = false; stopLoc.hidden = false; stopLoc.textContent = T.pinRemove;
     setStatus(pendingRoute?(FR?'Point de départ choisi. Calcul de l’itinéraire…':'Starting point selected. Calculating your route…'):T.pinned); limit = 25;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
     track('map_pin', { radius_km: radiusKm });
@@ -23776,7 +23776,7 @@ ${renderGolfHeaderHtml()}
       <div class="pm-panel-row">
         <label><span>${R('Choose a town','Choisir une ville')}</span>
           <select id="pmTown" class="pm-select pm-town"><option value="">${R('Town…','Ville…')}</option>${townOptions}</select></label>
-        <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
+        <label id="rnDistanceField" hidden><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
           <select id="pmRadius" class="pm-select pm-radius" disabled>
             <option value="1">1 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="0">Any</option>
           </select></label>

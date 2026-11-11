@@ -11,18 +11,18 @@ function roamRouteLocationMessage(reason,destination,lang='en'){
   return (fr?'Vers ':'To ')+destination+'. '+(causes[reason]?causes[reason]+' ':'')+(fr?'Utilisez votre position pour le guidage en direct, ou choisissez le départ sur la carte pour un aperçu.':'Use your location for live guidance, or choose a start on the map for a route preview.');
 }
 function renderRoamFilterGroups({must,diet,lang='en'}) {
-  const translations={'Dietary':'Régimes alimentaires','Patios, music, views & sports':'Terrasses, musique, vues et sports','Dogs, kids & groups':'Chiens, enfants et groupes','Right now':'En ce moment','More options':'Autres options'};
+  const translations={'Dietary':'Régimes alimentaires','Patios, music, views & sports':'Terrasses, musique, vues et sports','Dogs, kids & groups':'Chiens, enfants et groupes','Open now, deals & events':'Ouvert, offres et événements','Hours, access & amenities':'Horaires, accès et équipements'};
   const titleLabel=t=>lang==='fr'?(translations[t]||t):t;
   const chips=items=>items.map(f=>`<button type="button" class="pm-chip" data-pm-feat="${esc(f.key)}" aria-pressed="false">${f.icon?'<span aria-hidden="true">'+f.icon+'</span> ':''}${esc(f.label)}</button>`).join('');
   const groupEmoji = {
     Dietary: '🥗',
     'Patios, music, views & sports': '🎶',
     'Dogs, kids & groups': '🐾',
-    'Right now': '⏰',
-    'More options': '✨',
+    'Open now, deals & events': '⏰',
+    'Hours, access & amenities': '✨',
   };
   const group=(title,content)=>`<details class="rn-filter-group"><summary><span class="rn-filter-emoji" aria-hidden="true">${groupEmoji[title]}</span> ${titleLabel(title)}<span data-rn-count></span></summary><div class="pm-chips" role="group" aria-label="${titleLabel(title)}">${content}</div></details>`;
-  return group('Dietary',chips(diet))+group('Patios, music, views & sports',chips(must.filter(f=>['patio','heated','music','lake','sports'].includes(f.key))))+group('Dogs, kids & groups',chips(must.filter(f=>['dogs','kids','groups'].includes(f.key))))+group('Right now','<button type="button" class="pm-chip" data-pm-open aria-pressed="false">'+(lang==='fr'?'Ouvert maintenant':'Open now')+'</button>'+chips(must.filter(f=>['happy','specials','nights'].includes(f.key))))+group('More options',chips(must.filter(f=>['late','early','nonalc','free','access','booking','takeout','localdrinks','ownlocal','games','localbeer','fireplace','beachaccess','parking','rv','offsales'].includes(f.key))))+'<button type="button" class="pm-chip" data-pm-top aria-pressed="false">'+(lang==='fr'?'Les mieux notés':'Top rated')+'</button>';
+  return group('Dietary',chips(diet))+group('Patios, music, views & sports',chips(must.filter(f=>['patio','heated','music','lake','sports'].includes(f.key))))+group('Dogs, kids & groups',chips(must.filter(f=>['dogs','kids','groups'].includes(f.key))))+group('Open now, deals & events','<button type="button" class="pm-chip" data-pm-open aria-pressed="false">'+(lang==='fr'?'Ouvert maintenant':'Open now')+'</button>'+chips(must.filter(f=>['happy','specials','nights'].includes(f.key))))+group('Hours, access & amenities',chips(must.filter(f=>['late','early','nonalc','free','access','booking','takeout','localdrinks','ownlocal','games','localbeer','fireplace','beachaccess','parking','rv','offsales'].includes(f.key))))+'<button type="button" class="pm-chip" data-pm-top aria-pressed="false">'+(lang==='fr'?'Les mieux notés':'Top rated')+'</button>';
 }
 const ROAM_LAYOUT_STYLE=`<style id="roam-now-layout">
 body.map-page{background:#f6f3eb}body.map-page .pm-stage{height:auto;min-height:900px;overflow:visible;max-width:1500px;margin:auto;padding:24px;--pm-sheet-h:0px}
@@ -405,6 +405,7 @@ body.pm-app-page #rnShowResults:hover { background: #284858; }
 }
 
 /* Keep the search context visible and the active navigation map spacious. */
+body.pm-app-page #rnDistanceField[hidden] { display: none; }
 body.pm-app-page .rn-location-note { font-size: 13px; color: #52665e; margin: 0 0 8px; }
 body.pm-app-page .rn-result-filters { display: none; }
 body.pm-app-page .pm-event .pm-item-main { display: flow-root; box-sizing: border-box; padding: 12px 14px 10px; }
@@ -422,6 +423,15 @@ body.pm-app-page .pm-stage.is-nav .pm-route { margin: 0; padding: 0 12px; }
 @media(max-width:899px) {
   body.pm-app-page .rn-results-compact.pm-list-view .rn-result-filters:not([hidden]) { display: block; margin: 4px 0 0; color: #52665e; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
   body.pm-app-page .rn-event-photo { height: 78px; max-width: 105px; }
+  body.pm-app-page .pm-map-view.is-route:not(.is-nav) .pm-sheet,
+  body.pm-app-page .pm-map-view.is-route:not(.is-nav) .pm-sheet[data-state] {
+    height: auto;
+    max-height: min(56dvh, 500px, calc(100% - 160px));
+  }
+  body.pm-app-page .pm-map-view.is-route:not(.is-nav) .pm-sheet-body {
+    flex: 0 1 auto;
+    height: auto;
+  }
   body.pm-app-page .pm-stage.is-nav .pm-navbar { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 6px 10px; }
   body.pm-app-page .pm-stage.is-nav .pm-nav-arrow { width: 34px; }
   body.pm-app-page .rn-nav-actions { grid-column: 2; justify-content: flex-end; }
