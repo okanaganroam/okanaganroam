@@ -61,7 +61,8 @@ test('checklist: café weights sum to 100 in the spec groups; restaurants and pu
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
   // Café test 1 (2026-11-11): the unscored optional questions (specials, events, groups, happy hour) may be answered "No" too.
-  assert.deepEqual(pc.noneKeysFor('cafe').sort(), ['dietary', 'dogs', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'ordering', 'pyv_groups', 'specials', 'website', 'wifi']);
+  // Café test 2 (2026-11-11): "No washroom" too (unscored, never shown).
+  assert.deepEqual(pc.noneKeysFor('cafe').sort(), ['dietary', 'dogs', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'ordering', 'pyv_groups', 'specials', 'washroom', 'website', 'wifi']);
   for (const it of pc.CAFE_ITEMS) assert.ok(it.en && it.fr && it.whyEn && it.whyFr && (it.fix === false || (it.btnEn && it.btnFr)), `${it.key} has its words in both languages`);
   for (const k of pc.noneKeysFor('cafe')) assert.ok(pc.GOT_TEXT[k] && pc.GOT_TEXT[k].fr, `${k} has its Got it text`);
 });
@@ -274,7 +275,8 @@ test('setup: the café parts, screens and tiles; restaurants and pubs keep their
   assert.deepEqual(cfg.part1, ['basics', 'hours', 'closures', 'cuisine', 'photos', 'menu', 'spend', 'offer']);
   assert.deepEqual(cfg.part2, ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'music', 'story', 'known', 'groups', 'instagram', 'facebook', 'door']);
   assert.deepEqual(cfg.placeTypes, ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches']);
-  assert.deepEqual(cfg.serves.map((x) => x.k), ['espresso', 'drip', 'tea', 'baked_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine']);
+  // Café test 2 (2026-11-11): Made here, Sorbet, Milkshakes, Cones & cups and Affogato added.
+  assert.deepEqual(cfg.serves.map((x) => x.k), ['espresso', 'drip', 'tea', 'baked_here', 'made_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'sorbet', 'milkshakes', 'cones', 'affogato', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine']);
   const keys = cfg.offerGroups.flatMap((g) => g.keys);
   for (const k of ['patio', 'dog_friendly', 'kid_friendly', 'wheelchair_accessible', 'free_parking', 'lake_view', 'vegan', 'vegetarian', 'gluten_free', 'wifi', 'laptop', 'dairy_free_milk', 'drive_thru', 'walk_up', 'washroom', 'stroller', 'dog_treats']) assert.ok(keys.includes(k), k);
   for (const k of ['sports_tv', 'pool', 'darts', 'off_sales', 'happy_hour', 'local_beer_taps']) assert.ok(!keys.includes(k), `${k} is hidden for cafés`);

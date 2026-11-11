@@ -7383,6 +7383,18 @@ function seasonClosedOnTrip(v, season) {
   // An owner's yearly season ("open May to October") is judged on the trip's own date (2026-10-19, round 7), not on
   // whether it is in season today.
   if (d && v.openMonths) {
+    // Exact days (café test 2, 2026-11-11): "04-25:10-12", open Apr 25 to Oct 12 every year (may wrap New Year).
+    const ex = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(String(v.openMonths));
+    if (ex) {
+      const md = d.slice(5, 10), a = ex[1], b = ex[2];
+      const from = v.seasonClosed && v.seasonReopens === null && /^\d{4}-\d{2}-\d{2}/.test(String(v.seasonClosed.from || '')) ? String(v.seasonClosed.from).slice(0, 10) : null;
+      if (from && d >= from) {
+        let next = `${from.slice(0, 4)}-${a}`;
+        if (next <= from) next = `${Number(from.slice(0, 4)) + 1}-${a}`;
+        if (d < next) return true;
+      }
+      return a <= b ? md < a || md > b : md < a && md > b;
+    }
     const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(v.openMonths));
     if (m) {
       const mon = Number(d.slice(5, 7)), a = Number(m[1]), b = Number(m[2]);

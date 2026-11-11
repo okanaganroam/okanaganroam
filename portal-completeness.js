@@ -111,7 +111,9 @@ if (PUB_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-comp
 // laptops), Wi-Fi, dogs and kids, and ordering. Wi-Fi, laptops and ordering are owner-only (never researched). Happy
 // hour, events and specials are optional and unscored, so a café that has none can still reach 100%.
 const CAFE_KINDS = ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches'];
-const CAFE_SERVES = ['espresso', 'drip', 'tea', 'baked_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine'];
+// Café test 2 (2026-11-11): sorbet, milkshakes, cones & cups, affogato and a general "Made here" (beside "Baked fresh
+// here", kept for bakeries). Additive: stored lists read as before.
+const CAFE_SERVES = ['espresso', 'drip', 'tea', 'baked_here', 'made_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'sorbet', 'milkshakes', 'cones', 'affogato', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine'];
 const CAFE_LAPTOPS = ['all_day', 'not_busy', 'none'];
 const CAFE_SEATS = ['takeout', 'few', 'lots'];
 const CAFE_ORDER_FEATURES = ['drive_thru', 'walk_up'];
@@ -130,7 +132,7 @@ const CAFE_ITEMS = [
   { key: 'serves', group: 'serve', w: 6, fix: true, target: { setup: 'cuisine:serve' }, fields: ['cafe_info'],
     en: 'What you serve', fr: 'Ce que vous servez', whyEn: 'Espresso, pastries baked here, lunch, gelato, bubble tea: tick all that apply.', whyFr: 'Espresso, pâtisseries maison, dîner, gelato, thé aux perles : cochez tout ce qui s’applique.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥐' },
   R('menu', { group: 'serve', w: 6 }),
-  R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Whole dollars.', whyFr: 'Combien coûtent environ un café et une pâtisserie? En dollars entiers.' }),
+  R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Cents are fine, like $5.50.', whyFr: 'Combien coûtent environ un café et une pâtisserie? Les cents sont acceptés, par exemple 5,50 $.' }),
   R('dietary', { group: 'serve', w: 4, noneEn: 'None of these', noneFr: 'Aucune de ces options', whyEn: 'Vegan, vegetarian, gluten-free or dairy-free milks. Tick what you offer.', whyFr: 'Options véganes, végétariennes, sans gluten ou laits végétaux. Cochez ce que vous offrez.' }),
   { key: 'stay', group: 'yourvisit', w: 5, fix: true, target: { setup: 'stay' }, fields: ['cafe_info'],
     en: 'Seats and laptops', fr: 'Places et ordinateurs portables', whyEn: 'Takeout only, a few seats or lots, and whether laptops are welcome.', whyFr: 'Pour emporter seulement, quelques places ou beaucoup, et si les ordinateurs portables sont bienvenus.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💻' },
@@ -160,10 +162,12 @@ const EXTRA_NONE_KEYS = ['dogs'];
 // or Weekly specials came back "could not be read", because only scored items were allowed). Their "No" is stored like
 // any other (remembered, research doesn't add them back), never scored and never in that type's checklist. Pubs are
 // asked about booking and takeout in the setup without scoring them.
-const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups'], pub: ['pyv_reservations', 'pyv_takeout'] };
+// Café test 2 (2026-11-11): "No washroom" is an explicit answer too (never shown on the page).
+const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom'], pub: ['pyv_reservations', 'pyv_takeout'] };
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
+// Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -183,6 +187,7 @@ const GOT_TEXT = {
   dogs: { en: 'Got it: no dogs allowed', fr: 'C’est noté : chiens non admis' },
   wifi: { en: 'Got it: no Wi-Fi', fr: 'C’est noté : pas de Wi-Fi' },
   ordering: { en: 'Got it: order at the counter only', fr: 'C’est noté : commande au comptoir seulement' },
+  washroom: { en: 'Got it: no customer washroom', fr: 'C’est noté : pas de toilettes pour les clients' },
 };
 if (ALL_NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;
@@ -308,6 +313,8 @@ function doneMap(input, today) {
         cafe_kind: CAFE_KINDS.includes(i.placeType),
         season: nonBlank(i.openMonths) || !!i.hasSeasons || c.year === 'all' || c.year === 'seasonal',
         serves: Array.isArray(c.serves) && c.serves.length > 0,
+        // Café test 2 (2026-11-11): "Our menu changes daily (see Instagram / Facebook / the board)" answers the menu.
+        menu: (nonBlank(i.menuUrl) && !sameAddress(i.menuUrl, i.website)) || !!i.hasPublishedMenu || ['instagram', 'facebook', 'board'].includes(c.menu_daily),
         // Dairy-free milks count as a dietary option for a café (the tile, or the milks named in Dietary details).
         dietary: !!(i.vegan || i.vegetarian || i.glutenFree) || labels.has('dietary') || feats.has('dairy_free_milk') || (Array.isArray((c.diet || {}).milks) && c.diet.milks.length > 0),
         stay: CAFE_LAPTOPS.includes(stay.laptops) || CAFE_SEATS.includes(stay.seats),
@@ -383,7 +390,7 @@ function scoreCompleteness(input, opts) {
   let got = 0, max = 0;
   // Groups in the order their items come (the same as GROUPS for restaurants).
   const per = new Map([...new Set(list.map((it) => it.group))].map((k) => [k, { key: k, got: 0, max: 0 }]));
-  const missing = [], coming = [];
+  const missing = [], coming = [], afterReopen = [];
   for (const base of list) {
     if (na[base.key]) continue;
     let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
@@ -396,6 +403,9 @@ function scoreCompleteness(input, opts) {
       continue;
     }
     if (!ok && !it.fix) { coming.push({ ...it }); continue; }
+    // Café test 2 (2026-11-11): the storefront photo is taken standing at the open door. A seasonal place closed for the
+    // season can't, so the item waits under "When you reopen" and doesn't count until then (it can still reach 100%).
+    if (!ok && it.key === 'arrival' && input && input.closedForSeason && !input.pendingArrival) { afterReopen.push({ ...it }); continue; }
     max += it.w; per.get(it.group).max += it.w;
     if (ok) { got += it.w; per.get(it.group).got += it.w; } else {
       // Waiting = something the owner already sent for this item is in our review queue (field-precise: a badge only
@@ -435,7 +445,7 @@ function scoreCompleteness(input, opts) {
   const hoursFreshW = waitingList.some((it) => it.key === 'hours') && !done.hours ? (list.find((i) => i.key === 'hours_fresh') || { w: 0 }).w : 0;
   const waitingW = waitingList.reduce((a, it) => a + it.w, 0) + hoursFreshW;
   const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
-  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
+  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, afterReopen, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
 }
 
 // The weekly hours as one short line for "Are your hours still right?" (fresh-eyes 2026-11-08):
@@ -608,7 +618,9 @@ function renderCompleteness(result, opts) {
   const comingAsk = r.coming.filter((it) => noneBtn(it));
   const comingPlain = r.coming.filter((it) => !noneBtn(it));
   const askHtml = comingAsk.length ? `<h3 class="op-cb-h3">${L('Don’t offer these?', 'Vous n’offrez pas ceci?')}</h3><p class="op-cb-note">${L('If you don’t, tap to tell us. It counts as done.', 'Si c’est le cas, touchez pour nous le dire. Cela compte comme fait.')}</p><ul class="op-cb-soon">${comingAsk.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong><div>${noneBtn(it)}</div></li>`).join('')}</ul>` : '';
-  const comingHtml = askHtml + (comingPlain.length ? `<h3 class="op-cb-h3">${L('We’re adding these', 'Nous ajoutons ceci')}</h3><p class="op-cb-note">${L('You can’t fill these in yet. They’ll count once you can.', 'Vous ne pouvez pas encore les remplir. Ils compteront dès que ce sera possible.')}</p><ul class="op-cb-soon">${comingPlain.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${esc(fr ? it.whyFr : it.whyEn)}</span></li>`).join('')}</ul>` : '');
+  // Café test 2 (2026-11-11): the storefront photo of a place closed for the season waits until it reopens.
+  const reopenHtml = (r.afterReopen || []).length ? `<h3 class="op-cb-h3">${L('When you reopen', 'À votre réouverture')}</h3><p class="op-cb-note">${L('You’re closed for the season, so this waits. It doesn’t count against you until you reopen.', 'Vous êtes fermé pour la saison, alors ceci attend. Cela ne compte pas contre vous avant la réouverture.')}</p><ul class="op-cb-soon">${r.afterReopen.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${L('Stand at your front door and take one photo when you’re open again.', 'Placez-vous devant votre porte et prenez une photo quand vous serez rouvert.')}</span></li>`).join('')}</ul>` : '';
+  const comingHtml = reopenHtml + askHtml + (comingPlain.length ? `<h3 class="op-cb-h3">${L('We’re adding these', 'Nous ajoutons ceci')}</h3><p class="op-cb-note">${L('You can’t fill these in yet. They’ll count once you can.', 'Vous ne pouvez pas encore les remplir. Ils compteront dès que ce sera possible.')}</p><ul class="op-cb-soon">${comingPlain.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${esc(fr ? it.whyFr : it.whyEn)}</span></li>`).join('')}</ul>` : '');
   const groups = r.groups.map((g) => `<div class="op-cb-g${g.full ? ' full' : ''}"><b>${esc(gName.get(g.key))}${g.full ? ' ✓' : ''}</b><em>${L(`${g.got} of ${g.max}`, `${g.got} sur ${g.max}`)}</em><div class="op-cb-bar"><i style="width:${Math.round((g.got / g.max) * 100)}%"></i></div></div>`).join('');
   const declined = r.declined || [];
   const declinedHtml = o.canDecline && declined.length ? `<h3 class="op-cb-h3">${L('You told us you don’t have these', 'Vous nous avez dit ne pas avoir ceci')}</h3><ul class="op-cb-declined">${declined.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${L('Not offered', 'Non offert')} ✓</span></span><button type="button" class="op-cb-undo" data-cb-undo="${esc(it.key)}">${L('Undo', 'Annuler')}</button></li>`).join('')}</ul><p class="op-cb-note">${declined.some((it) => it.key === 'wifi')

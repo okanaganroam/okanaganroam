@@ -334,7 +334,8 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   // Cafés get Price per person in café words (2026-11-10, SPEC-cafes.md Decided 2); happy hour only with Beer & wine.
   // Sports on TV is kept if set but not offered to a café (SPEC-cafes.md: hidden for cafés).
-  cafe: portalRow({ specials: true, nights: true, menu: true, avgSpend: true, hiddenBadges: Object.freeze(['sports_tv']) }),
+  // Café test 2 (2026-11-11): no Live music, Non-alcoholic options or Great for groups box either (kept if already set).
+  cafe: portalRow({ specials: true, nights: true, menu: true, avgSpend: true, hiddenBadges: Object.freeze(['sports_tv', 'live_music', 'nonalcoholic', 'great_groups']) }),
   pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
@@ -6759,7 +6760,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   try { specialsByVenue = allVenueSpecials(); } catch (e) { specialsByVenue = new Map(); }
   const specialsFact = (v) => {
     if (!specialsByVenue.has(v.id)) return undefined;
-    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at, new Date(), x)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
     return list.length ? list : undefined;
   };
   const golfWindows = getGolfRateWindows();
@@ -8738,6 +8739,13 @@ const MONTH_NAMES = { en: ['January', 'February', 'March', 'April', 'May', 'June
   fr: ['janvier', 'f\u00e9vrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'ao\u00fbt', 'septembre', 'octobre', 'novembre', 'd\u00e9cembre'] };
 function openMonthsText(value, lang = 'en') {
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(value || ''));
+  // Exact days (café test 2, 2026-11-11): "April 25 – October 12" (fr: "25 avril au 12 octobre").
+  const ex = !m && hoursModule ? hoursModule.parseOpenSeason(value) : null;
+  if (ex && ex.exact) {
+    const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
+    const day = (md) => (lang === 'fr' ? `${Number(md.slice(3)) === 1 ? '1er' : Number(md.slice(3))} ${names[Number(md.slice(0, 2)) - 1]}` : `${names[Number(md.slice(0, 2)) - 1]} ${Number(md.slice(3))}`);
+    return lang === 'fr' ? `${day(ex.from)} au ${day(ex.to)}` : `${day(ex.from)} \u2013 ${day(ex.to)}`;
+  }
   if (!m) return '';
   const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
   return lang === 'fr' ? `${names[Number(m[1]) - 1]} \u00e0 ${names[Number(m[2]) - 1]}` : `${names[Number(m[1]) - 1]} \u2013 ${names[Number(m[2]) - 1]}`;
@@ -8746,23 +8754,37 @@ function openMonthsText(value, lang = 'en') {
 // out of season -> closed until the first day of the opening month; the last 30 days of the season -> open until the
 // last day; otherwise null (open as usual). Months can wrap the new year ("11-4", a winter business).
 function recurringSeasonRow(venueId, openMonths, today) {
-  const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(openMonths || ''));
-  if (!m || !parseLocalDate(today)) return null;
-  const from = Number(m[1]), to = Number(m[2]);
-  const y = Number(today.slice(0, 4)), mon = Number(today.slice(5, 7));
-  const iso = (yy, mm, dd) => { const d = new Date(Date.UTC(yy, mm - 1, dd)); return d.toISOString().slice(0, 10); };
-  const inSeason = from <= to ? mon >= from && mon <= to : mon >= from || mon <= to;
+  // Café test 2 (2026-11-11): exact days too ("04-25:10-12", hours.js parseOpenSeason). A month-only value ("4-10") is
+  // read as the 1st of its first month to the last day of its last month, which gives exactly the rows it always gave
+  // (tests/cafe-test2-fixes.test.js compares every day of a year against the month-only rule).
+  const os = hoursModule ? hoursModule.parseOpenSeason(openMonths) : null;
+  if (!os || !parseLocalDate(today)) return null;
+  const y = Number(today.slice(0, 4)), md = today.slice(5);
+  const leap = (yy) => (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0;
+  const on = (yy, d) => (d === '02-29' && !leap(yy) ? `${yy}-02-28` : `${yy}-${d}`);
+  const inSeason = hoursModule.mdInRange(md, os.from, os.to);
   if (inSeason) {
-    const endYear = from <= to || mon <= to ? y : y + 1;
-    const until = iso(endYear, to + 1, 0); // last day of the closing month
+    const endYear = os.from <= os.to || md <= os.to ? y : y + 1;
+    const until = on(endYear, os.to); // the last open day
     return addLocalDays(today, 30) >= until ? { venue_id: venueId, status: 'open_until', until_date: until, reopens_date: null, source_url: null, checked_at: today } : null;
   }
-  const openYear = mon < from ? y : y + 1;
-  const reopens = iso(openYear, from, 1);
-  const closedFrom = mon > to ? iso(y, to + 1, 1) : iso(y - 1, to + 1, 1);
+  const reopens = on(md < os.from ? y : y + 1, os.from);
+  const closedFrom = addLocalDays(on(md > os.to ? y : y - 1, os.to), 1);
   return { venue_id: venueId, status: 'closed', until_date: null, reopens_date: reopens, source_url: null, checked_at: closedFrom };
 }
-
+// Café test 2 (2026-11-11): a reopening date that falls inside a special closure running straight on from the closed
+// season (closed Nov - Mar, then Apr 1 - 24 as well) is the day after that closure, and the next one after it, and so
+// on: "Reopens April 25", not "April 1". `closures`: dated rows (a yearly rule already expanded).
+function chainReopening(reopens, closures) {
+  if (!reopens || !parseLocalDate(reopens)) return reopens;
+  let date = reopens;
+  for (let hop = 0; hop < 30; hop++) {
+    const c = (closures || []).find((x) => x && parseLocalDate(x.from) && x.from <= date && (x.to || x.from) >= date);
+    if (!c) break;
+    date = addLocalDays(c.to || c.from, 1);
+  }
+  return date;
+}
 // today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
 function getSeasonRows(today = todayLocal()) {
   const map = new Map();
@@ -8778,6 +8800,16 @@ function getSeasonRows(today = todayLocal()) {
     const row = recurringSeasonRow(r.venue_id, r.open_months, today);
     if (row) map.set(r.venue_id, row);
   }
+  // Café test 2: a closed season's reopening date steps over a special closure that runs straight on from it.
+  let extras = null;
+  try { extras = hoursExtrasMap(); } catch (e) { extras = null; }
+  if (extras) {
+    for (const [id, row] of map) {
+      if (!row.reopens_date || !extras.has(id)) continue;
+      const next = chainReopening(row.reopens_date, extras.get(id).closures);
+      if (next !== row.reopens_date) map.set(id, { ...row, reopens_date: next });
+    }
+  }
   return map;
 }
 
@@ -8786,7 +8818,7 @@ function getSeasonStates(now = new Date()) {
   const today = todayLocal(now);
   const map = new Map();
   const ending = [];
-  for (const [id, s] of getSeasonRows()) {
+  for (const [id, s] of getSeasonRows(today)) {
     const st = seasonStateOn(s, today);
     if (st) map.set(id, st);
     if (st && st.kind === 'open_until') ending.push([id, s]);
@@ -9258,9 +9290,34 @@ function parseHappyHourDealsJson(json) {
     return ok.length ? ok : null;
   } catch (e) { return null; }
 }
-// Is a deals check too old to show? (more than HH_DEALS_STALE_DAYS days before today, or no real date)
-function happyHourDealsStale(checkedAt, now = new Date()) {
+// Seasonal items don't go stale between seasons (café test 2, 2026-11-11). A summer-only special (Jul - Aug) the owner
+// confirmed in November vanished on Jul 15 next year: 246 days had passed, over the 120-day window, although the
+// special had not run once since the check. For an item with its own season ('MM-DD' from/to), the days out of season
+// since the check don't count, up to one whole off-season: so the owner never has to re-confirm in winter something
+// that runs every summer, but a check is still only good for about one season (a Jul - Aug special confirmed in
+// November 2026 shows all summer 2027 and is hidden again in summer 2028 until re-confirmed). Items without a season
+// keep the plain rule (more than `windowDays` days since the check).
+// -> true when the check is too old to show.
+function seasonalCheckStale(checkedAt, now, windowDays, from, to) {
   if (!parseLocalDate(checkedAt)) return true;
+  const today = todayLocal(now);
+  const age = localDaysBetween(checkedAt, today);
+  if (age <= windowDays) return false;
+  if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '') || from === to || !hoursModule) return true;
+  // Days out of season after the check, through today, and the length of one off-season.
+  let off = 0, offYear = 0;
+  for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) if (!hoursModule.mdInRange(new Date(t).toISOString().slice(5, 10), from, to)) offYear++;
+  for (let d = addLocalDays(checkedAt, 1), n = 0; d <= today && n < 1200; d = addLocalDays(d, 1), n++) if (!hoursModule.mdInRange(d.slice(5), from, to)) off++;
+  return age - Math.min(off, offYear) > windowDays;
+}
+function seasonOfHappyHour(times) {
+  try { const o = typeof times === 'string' ? JSON.parse(times) : times; return o && o._season ? o._season : null; } catch (e) { return null; }
+}
+// Is a deals check too old to show? (more than HH_DEALS_STALE_DAYS days before today, or no real date). `season`: the
+// happy hour's own season ({ from, to } 'MM-DD', from its stored week's _season), see seasonalCheckStale.
+function happyHourDealsStale(checkedAt, now = new Date(), season = null) {
+  if (!parseLocalDate(checkedAt)) return true;
+  if (season) return seasonalCheckStale(checkedAt, now, HH_DEALS_STALE_DAYS, season.from, season.to);
   return localDaysBetween(checkedAt, todayLocal(now)) > HH_DEALS_STALE_DAYS;
 }
 // The deals a page may show for a venue row (needs happy_hour, happy_hour_deals, happy_hour_deals_fr,
@@ -9268,7 +9325,7 @@ function happyHourDealsStale(checkedAt, now = new Date()) {
 // place has no happy_hour badge, or the check is stale.
 function happyHourDealsShown(row, now = new Date()) {
   if (!row || !Number(row.happy_hour) || !row.happy_hour_deals) return null;
-  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now)) return null;
+  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now, row.happy_hour_times !== undefined ? seasonOfHappyHour(row.happy_hour_times) : null)) return null;
   const en = parseHappyHourDealsJson(row.happy_hour_deals);
   if (!en) return null;
   return { en, fr: parseHappyHourDealsJson(row.happy_hour_deals_fr), checked: row.happy_hour_deals_checked_at };
@@ -9388,8 +9445,8 @@ function withTripListHappyHour(plan, now = new Date()) {
 // /admin/review (2026-10-26): places whose deals are on file but no longer shown (checked more than
 // HH_DEALS_STALE_DAYS days ago), oldest first, so they get re-checked.
 function staleHappyHourDeals(now = new Date()) {
-  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
-  return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now));
+  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at, happy_hour_times FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
+  return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now, seasonOfHappyHour(r.happy_hour_times))).map(({ happy_hour_times, ...r }) => r);
 }
 
 // ---- Weekly specials (2026-10-27) ----
@@ -9692,11 +9749,25 @@ function avgSpendPublic() { return process.env.AVG_SPEND_PUBLIC === '1'; }
 // The words shown with the number once it's public (Dayton, 2026-11-09: always "before tax and tip").
 const AVG_SPEND_PUBLIC_TEXT = { en: 'About ${n} a person, before tax and tip', fr: 'Environ {n} $ par personne, avant taxes et pourboire' };
 function avgSpendPublicText(amount, fr) { return (fr ? AVG_SPEND_PUBLIC_TEXT.fr : AVG_SPEND_PUBLIC_TEXT.en).replace('{n}', String(amount)); }
+// Cents (café test 2, 2026-11-11): a café's price can be "$5.50" (a single scoop). Stored additively: `amount` stays the
+// whole-dollar number every reader already uses (rounded), and `exact` carries the price in steps of 25 cents, from
+// AVG_SPEND_EXACT_MIN. A row without `exact` reads exactly as before. cafePriceText() shows `exact` when there is one.
+const AVG_SPEND_EXACT_MIN = 2;
+function avgSpendExactOk(x) { return typeof x === 'number' && Number.isFinite(x) && Number.isInteger(x * 4) && x >= AVG_SPEND_EXACT_MIN && x <= AVG_SPEND_MAX; }
+// "$5.50" / "5,50 $" ("$9" for a whole number).
+function avgSpendMoney(spend, fr) {
+  const n = spend && avgSpendExactOk(spend.exact) ? spend.exact : spend ? spend.amount : null;
+  if (n == null) return '';
+  const t = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return fr ? `${t.replace('.', ',')} $` : `$${t}`;
+}
 function validateAvgSpend(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, detail: 'avg_spend must be an object or null' };
-  const extra = Object.keys(v).filter((k) => !['amount', 'source', 'source_url', 'basis', 'checked_at'].includes(k));
+  const extra = Object.keys(v).filter((k) => !['amount', 'source', 'source_url', 'basis', 'checked_at', 'exact'].includes(k));
   if (extra.length) return { ok: false, detail: `Unexpected field(s): ${extra.join(', ')}` };
-  if (!Number.isInteger(v.amount) || v.amount < AVG_SPEND_MIN || v.amount > AVG_SPEND_MAX) {
+  if (v.exact !== undefined && v.exact !== null) {
+    if (!avgSpendExactOk(v.exact) || v.amount !== Math.round(v.exact)) return { ok: false, detail: `exact must be in steps of $0.25 from ${AVG_SPEND_EXACT_MIN} to ${AVG_SPEND_MAX}, with amount its whole-dollar rounding` };
+  } else if (!Number.isInteger(v.amount) || v.amount < AVG_SPEND_MIN || v.amount > AVG_SPEND_MAX) {
     return { ok: false, detail: `amount must be a whole number of dollars from ${AVG_SPEND_MIN} to ${AVG_SPEND_MAX}` };
   }
   if (v.source !== 'research' && v.source !== 'owner') return { ok: false, detail: "source must be 'research' or 'owner'" };
@@ -9712,7 +9783,7 @@ function validateAvgSpend(v) {
     basis = v.basis.trim().replace(/\s+/g, ' ');
   }
   if (typeof v.checked_at !== 'string' || !parseLocalDate(v.checked_at)) return { ok: false, detail: 'checked_at must be YYYY-MM-DD' };
-  return { ok: true, info: { amount: v.amount, source: v.source, source_url: sourceUrl, basis, checked_at: v.checked_at } };
+  return { ok: true, info: { amount: v.amount, source: v.source, source_url: sourceUrl, basis, checked_at: v.checked_at, ...(v.exact != null ? { exact: v.exact } : {}) } };
 }
 function currentAvgSpendJson(venueId) {
   try { const r = db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
@@ -9921,8 +9992,10 @@ function visitInfoHtml(info, fr = false) {
 function venueServesAlcohol(v) {
   return !!v && (portalFields(v.type).happyHour || Number(v.happy_hour) === 1 || (v.type === 'cafe' && v.id != null && cafeServesBeerWine(v.id)));
 }
-function specialsStale(checkedAt, now = new Date()) {
+// `item` (café test 2): the special itself; one with a season (season_from/season_to) uses seasonalCheckStale.
+function specialsStale(checkedAt, now = new Date(), item = null) {
   if (!parseLocalDate(checkedAt)) return true;
+  if (item && item.season_from && item.season_to) return seasonalCheckStale(checkedAt, now, SPECIALS_STALE_DAYS, item.season_from, item.season_to);
   return localDaysBetween(checkedAt, todayLocal(now)) > SPECIALS_STALE_DAYS;
 }
 // Inside its season on a date ('YYYY-MM-DD')? A season may wrap the new year (11-15 to 03-31).
@@ -9935,7 +10008,7 @@ function specialInSeason(s, date) {
 // `date` (today by default).
 function specialsShown(venue, list, now = new Date(), date = todayLocal(now)) {
   const alcohol = venueServesAlcohol(venue);
-  return (list || []).filter((s) => !specialsStale(s.checked_at, now) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
+  return (list || []).filter((s) => !specialsStale(s.checked_at, now, s) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
 }
 // Where a special's time stands at `minutes` on its day: 'allday' (no time given), 'later', 'now' or 'over'.
 function specialTimeState(s, minutes) {
@@ -10183,7 +10256,7 @@ function withTripSpecials(plan, now = new Date()) {
 function staleVenueSpecials(now = new Date()) {
   const out = [];
   for (const [venueId, list] of allVenueSpecials()) {
-    const stale = list.filter((s) => specialsStale(s.checked_at, now));
+    const stale = list.filter((s) => specialsStale(s.checked_at, now, s));
     if (!stale.length) continue;
     const v = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId);
     if (!v || v.redirect_to) continue;
@@ -10367,15 +10440,17 @@ function guardedWeeklyNightsUpdate(id, expectedCurrent, input, meta, now = new D
     throw err;
   }
 }
-function nightsStale(checkedAt, now = new Date()) {
+// `item` (café test 2): the night itself; one with a season uses seasonalCheckStale.
+function nightsStale(checkedAt, now = new Date(), item = null) {
   if (!parseLocalDate(checkedAt)) return true;
+  if (item && item.season_from && item.season_to) return seasonalCheckStale(checkedAt, now, NIGHTS_STALE_DAYS, item.season_from, item.season_to);
   return localDaysBetween(checkedAt, todayLocal(now)) > NIGHTS_STALE_DAYS;
 }
 // The nights a visitor may see: not stale, and in season today (pub test 7: a summer-only night is hidden in winter,
 // like an out-of-season special).
 function nightsShown(list, now = new Date()) {
   const today = todayLocal(now);
-  return (list || []).filter((s) => !nightsStale(s.checked_at, now) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
+  return (list || []).filter((s) => !nightsStale(s.checked_at, now, s) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
 }
 // Is a night on this date ('YYYY-MM-DD')? Its day of the week, then its frequency: weekly and every other week always
 // (we don't know which week, so "every other week" may be tonight and says so), monthly-1st the first such day of the
@@ -10621,7 +10696,7 @@ function withTripListNights(plan, now = new Date()) {
 function staleVenueWeeklyNights(now = new Date()) {
   const out = [];
   for (const [venueId, list] of allVenueWeeklyNights()) {
-    const stale = list.filter((s) => nightsStale(s.checked_at, now));
+    const stale = list.filter((s) => nightsStale(s.checked_at, now, s));
     if (!stale.length) continue;
     const v = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId);
     if (!v || v.redirect_to) continue;
@@ -12378,11 +12453,11 @@ function guideIntroContext(badge, venues, now = new Date()) {
       if (d) ctx.deals.set(r.id, d.en);
     }
   } catch (e) { /* older schema: no happy hour facts */ }
-  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
+  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now, x)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
   try {
     for (const [id, list] of allVenueWeeklyNights()) {
       if (!idSet.has(id) || !NIGHT_TYPES.has(types.get(id))) continue;
-      const kinds = list.filter((x) => !nightsStale(x.checked_at, now)).map((x) => x.kind);
+      const kinds = list.filter((x) => !nightsStale(x.checked_at, now, x)).map((x) => x.kind);
       if (kinds.length) ctx.nights.set(id, kinds);
     }
   } catch (e) { /* no weekly nights */ }
@@ -15386,6 +15461,10 @@ const SEO_PAGE_CSS = `
   .venue-hours-season { margin: 4px 0 6px; font-weight: 800; }
   .venue-hours-usual summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; opacity: 0.8; }
   .venue-hours-usual .hours-list { opacity: 0.75; }
+  .venue-hours-year { margin: 10px 0 8px; }
+  .venue-hours-year-h { margin: 0 0 4px; font-size: 0.95rem; }
+  .venue-hours-year-list li { gap: 12px; }
+  .venue-hours-year-list li span:first-child { font-weight: 700; }
   .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-muted, #6B5D54); }
   .venue-hours-stale { margin: 4px 0 0; font-size: 0.84rem; font-weight: 700; color: #8A4B1F; }
 
@@ -19714,7 +19793,9 @@ function pubSportsText(venue, fr) {
 const { CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS } = require('./portal-completeness');
 const CAFE_SERVE_LABELS = {
   espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫗' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
-  baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
+  baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, made_here: { en: 'Made here', fr: 'Fait sur place', icon: '🧑‍🍳' },
+  sorbet: { en: 'Sorbet', fr: 'Sorbet', icon: '🍧' }, milkshakes: { en: 'Milkshakes', fr: 'Laits frappés', icon: '🥛' }, cones: { en: 'Cones & cups', fr: 'Cornets et coupes', icon: '🍦' },
+  affogato: { en: 'Affogato', fr: 'Affogato', icon: '☕' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
   lunch: { en: 'Lunch (sandwiches, soup)', fr: 'Dîner (sandwichs, soupe)', icon: '🥪' }, ice_cream: { en: 'Ice cream / gelato', fr: 'Crème glacée / gelato', icon: '🍨' },
   desserts: { en: 'Desserts & cakes', fr: 'Desserts et gâteaux', icon: '🍰' }, bubble_tea: { en: 'Bubble tea', fr: 'Thé aux perles', icon: '🧋' },
   smoothies: { en: 'Smoothies & juice', fr: 'Smoothies et jus', icon: '🥤' }, beer_wine: { en: 'Beer & wine', fr: 'Bière et vin', icon: '🍷' },
@@ -19722,6 +19803,7 @@ const CAFE_SERVE_LABELS = {
 // The short words on the page ("Espresso drinks, pastries, lunch").
 const CAFE_SERVE_SHORT = {
   espresso: ['espresso drinks', 'boissons espresso'], drip: ['drip coffee', 'café filtre'], tea: ['tea', 'thé'], baked_here: ['baked fresh here', 'cuit sur place'], pastries: ['pastries', 'pâtisseries'],
+  made_here: ['made here', 'fait sur place'], sorbet: ['sorbet', 'sorbet'], milkshakes: ['milkshakes', 'laits frappés'], cones: ['cones & cups', 'cornets & coupes'], affogato: ['affogato', 'affogato'],
   // Two-part items use "&" (café test 1, 2026-11-11: "…lunch and desserts and cakes" read as a stumble inside the list).
   breakfast: ['breakfast', 'déjeuner'], lunch: ['lunch', 'dîner'], ice_cream: ['ice cream & gelato', 'crème glacée & gelato'], desserts: ['desserts & cakes', 'desserts & gâteaux'],
   bubble_tea: ['bubble tea', 'thé aux perles'], smoothies: ['smoothies & juice', 'smoothies & jus'], beer_wine: ['beer & wine', 'bière & vin'],
@@ -19730,7 +19812,10 @@ const CAFE_MILKS = ['oat', 'almond', 'soy', 'coconut'];
 const CAFE_MILK_LABELS = { oat: ['Oat', 'Avoine'], almond: ['Almond', 'Amande'], soy: ['Soy', 'Soya'], coconut: ['Coconut', 'Noix de coco'] };
 const CAFE_TEXT_MAX = 120;
 const CAFE_SOURCE_MAX = 80;
-const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year'];
+// menu_daily (café test 2, 2026-11-11): "Our menu changes daily": where people see today's ('instagram' | 'facebook' |
+// 'board'). Shown as one line ("Flavours change daily: see Instagram"); it answers the menu question.
+const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year', 'menu_daily'];
+const CAFE_MENU_DAILY = ['instagram', 'facebook', 'board'];
 const CAFE_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Price per person by kind (Decided 2): never compared with restaurant meal prices.
 const CAFE_PRICE_WORDS = {
@@ -19741,7 +19826,8 @@ const CAFE_PRICE_WORDS = {
 };
 function cafePriceWords(kind, fr) { return (CAFE_PRICE_WORDS[kind] || CAFE_PRICE_WORDS.default)[fr ? 'fr' : 'en']; }
 // "About $9 for a coffee and a pastry" / « Environ 9 $ pour un café et une pâtisserie ».
-function cafePriceText(amount, kind, fr) { return fr ? `Environ ${amount} $ pour ${cafePriceWords(kind, true)}` : `About $${amount} for ${cafePriceWords(kind, false)}`; }
+// Cents (café test 2): "About $5.50 for a single scoop" / « Environ 5,50 $ pour une boule ».
+function cafePriceText(amount, kind, fr) { const t = Number.isInteger(amount) ? String(amount) : Number(amount).toFixed(2); return fr ? `Environ ${t.replace('.', ',')} $ pour ${cafePriceWords(kind, true)}` : `About $${t} for ${cafePriceWords(kind, false)}`; }
 let venueCafeInfoCache = null;
 function clearVenueCafeInfoCache() { venueCafeInfoCache = null; }
 // The stored answers ({} when none).
@@ -19809,13 +19895,16 @@ function cleanCafeInfoPart(key, x) {
     return { value: x.length ? CAFE_SERVES.filter((s) => x.includes(s)) : null };
   }
   if (key === 'diet') {
-    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note'])) return { error: CAFE_INFO_ERROR };
+    // Café test 2 (2026-11-11): ice cream and gelato answers too: dairy-free sorbet, vegan gelato, gluten-free cups or cones.
+    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note', 'df_sorbet', 'vegan_ice', 'gf_cones'])) return { error: CAFE_INFO_ERROR };
+    if (!bool(x.df_sorbet) || !bool(x.vegan_ice) || !pick(x.gf_cones, ['cups', 'cones'])) return { error: CAFE_INFO_ERROR };
     const dn = text(x.note, CAFE_TEXT_MAX); if (dn.error) return dn;
     const milks = x.milks === undefined ? [] : x.milks;
     if (!Array.isArray(milks) || milks.some((m) => !CAFE_MILKS.includes(m)) || new Set(milks).size !== milks.length) return { error: CAFE_INFO_ERROR };
     if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
     const v = { ...(milks.length ? { milks: CAFE_MILKS.filter((m) => milks.includes(m)) } : {}), ...(milks.length && x.milk_extra ? { milk_extra: x.milk_extra } : {}),
-      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}), ...(dn.text ? { note: dn.text } : {}) };
+      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}),
+      ...(x.df_sorbet ? { df_sorbet: true } : {}), ...(x.vegan_ice ? { vegan_ice: true } : {}), ...(x.gf_cones ? { gf_cones: x.gf_cones } : {}), ...(dn.text ? { note: dn.text } : {}) };
     return { value: Object.keys(v).length ? v : null };
   }
   if (key === 'stay') {
@@ -19840,6 +19929,7 @@ function cleanCafeInfoPart(key, x) {
     return { value: t.text || null };
   }
   if (key === 'year') return x === 'all' || x === 'seasonal' ? { value: x } : { error: CAFE_INFO_ERROR };
+  if (key === 'menu_daily') return x === null || x === '' ? { value: null } : CAFE_MENU_DAILY.includes(x) ? { value: x } : { error: CAFE_INFO_ERROR };
   return { error: CAFE_INFO_ERROR };
 }
 const cafeList = (arr, fr) => (arr.length < 2 ? arr.join('') : `${arr.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${arr[arr.length - 1]}`);
@@ -19852,12 +19942,13 @@ function cafeInfoLinesHtml(venue, fr) {
   const L = (en, f) => (fr ? f : en);
   const lines = [];
   const kind = venuePlaceType(venue);
-  const serves = (info.serves || []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
+  // Café test 2: "made here" reads last ("Ice cream & gelato, sorbet and made here").
+  const serves = (info.serves || []).filter((k) => k !== 'made_here').concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
   // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
   const spend = avgSpendPublic() ? venueAvgSpend(venue.id) : null;
-  if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(spend.amount, kind, fr)]);
+  if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(avgSpendExactOk(spend.exact) ? spend.exact : spend.amount, kind, fr)]);
   const stay = info.stay || {};
   const stayBits = [];
   if (stay.laptops === 'all_day') stayBits.push(L('Laptops welcome all day', 'Ordinateurs portables bienvenus toute la journée'));
@@ -19878,6 +19969,10 @@ function cafeInfoLinesHtml(venue, fr) {
   if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'pâtisseries sans gluten d’une cuisine réservée'));
   else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
+  if (d.df_sorbet) dBits.push(L('dairy-free sorbet', 'sorbet sans produits laitiers'));
+  if (d.vegan_ice) dBits.push(L('vegan gelato or ice cream', 'gelato ou crème glacée véganes'));
+  if (d.gf_cones === 'cups') dBits.push(L('gluten-free in a cup (cones have gluten)', 'sans gluten dans une coupe (les cornets contiennent du gluten)'));
+  else if (d.gf_cones === 'cones') dBits.push(L('gluten-free cones', 'cornets sans gluten'));
   if (d.nut_free) dBits.push(L('nut-free options', 'options sans noix'));
   // The owner's own note (her words, usually English) follows the details; the French page shows the details only.
   const dNote = d.note && !fr ? d.note : '';
@@ -19900,10 +19995,30 @@ function cafeInfoLinesHtml(venue, fr) {
     oBits.push(links.preorder_url ? `<a href="${escapeHtml(links.preorder_url)}" rel="nofollow noopener" target="_blank" data-track="preorder">${escapeHtml(words)}</a>` : escapeHtml(words));
   }
   if (oBits.length) lines.push(['order', '🛍️', oBits.join(' · '), true]);
+  // Café test 2 (2026-11-11): "Flavours change daily: see Instagram" (linked when the page has its Instagram or Facebook).
+  const md = cafeMenuDailyHtml(venue, info, fr);
+  if (md) lines.push(['menu', '📋', md, true]);
   // The tip is in the business's own words (usually English): the French page leaves it out.
   if (info.sellout && !fr) lines.push(['sellout', '⏰', `Tip: ${info.sellout}`]);
   if (!lines.length) return '';
   return `<div class="venue-cafe-lines" style="margin:10px 0 0">${lines.map(([cls, icon, text, raw]) => `<p class="venue-cafe-line venue-cafe-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${icon}</span> ${cls === 'serves' || cls === 'price' ? `<strong>${escapeHtml(text)}</strong>` : raw ? text : escapeHtml(text)}</p>`).join('')}</div>`;
+}
+// "Flavours change daily: see Instagram" (café test 2): the words by kind (flavours for ice cream and gelato, the menu
+// for the rest), and where. '' when the café hasn't said.
+function cafeMenuDailyText(venue, where, fr) {
+  if (!CAFE_MENU_DAILY.includes(where)) return '';
+  const ice = venuePlaceType(venue) === 'Ice cream & gelato';
+  const lead = ice ? (fr ? 'Les saveurs changent chaque jour' : 'Flavours change daily') : (fr ? 'Le menu change chaque jour' : 'Our menu changes daily');
+  const see = { instagram: fr ? 'voir Instagram' : 'see Instagram', facebook: fr ? 'voir Facebook' : 'see Facebook', board: fr ? 'voir le tableau en boutique' : 'see the board in the shop' }[where];
+  return `${lead}${fr ? ' : ' : ': '}${see}`;
+}
+function cafeMenuDailyHtml(venue, info, fr) {
+  const where = (info || {}).menu_daily;
+  const t = cafeMenuDailyText(venue, where, fr);
+  if (!t) return '';
+  const links = venue && venue.id != null ? venueLinks(venue.id) : {};
+  const url = where === 'instagram' ? links.instagram_url : where === 'facebook' ? links.facebook_url : null;
+  return url ? `<a href="${escapeHtml(url)}" rel="nofollow noopener" target="_blank" data-track="${where}">${escapeHtml(t)}</a>` : escapeHtml(t);
 }
 // "No Wi-Fi or laptops: a place to talk" (café test 1, 2026-11-11), or the single version: the owner's own "No Wi-Fi"
 // (venue_not_offered 'wifi', with no Wi-Fi tile) and "No laptops" (stay.laptops 'none'). '' when neither was picked.
@@ -19911,6 +20026,8 @@ function cafeTalkLine(venue, fr) {
   if (!venue || venue.type !== 'cafe') return '';
   const noWifi = !venueOwnerFeatures(venue.id).wifi && venueNotOffered(venue.id).includes('wifi');
   const noLaptops = (venueCafeInfo(venue.id).stay || {}).laptops === 'none';
+  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. A takeout window says nothing about it.
+  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return '';
   if (noWifi && noLaptops) return fr ? 'Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter' : 'No Wi-Fi or laptops: a place to talk';
   if (noWifi) return fr ? 'Pas de Wi-Fi : un endroit pour discuter' : 'No Wi-Fi: a place to talk';
   if (noLaptops) return fr ? 'Pas d’ordinateurs portables : un endroit pour discuter' : 'No laptops: a place to talk';
@@ -34386,6 +34503,54 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
   }
   return out.join('');
 }
+// Hours through the year (café test 2, 2026-11-11): a seasonal place's hours for each part of its year in one short
+// list, always shown, closed for the season included (in November a visitor planning July saw only "Usual hours when
+// open 12–8", never the summer 11–10):
+//   Apr 25 – Jun 20 and Sep 2 – Oct 12: Daily 12 PM – 8 PM
+//   Jun 21 – Sep 1: Daily 11 AM – 10 PM
+// From the owner's open season (open_months, exact days or whole months) and seasonal sets (venue_hours_extra.seasons).
+// '' when the place has no seasonal set and isn't closed for the season (nothing to add to the usual list).
+function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
+  if (!hoursModule || !parsed || !parsed.known) return '';
+  const x = hoursExtrasMap().get(venueId);
+  const seasons = ((x && x.seasons) || []).filter((z) => z && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to) && z.hours)
+    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days }));
+  if (!seasons.length && !shut) return '';
+  const os = openMonths ? hoursModule.parseOpenSeason(openMonths) : null;
+  // Closed for the season with neither a seasonal set nor an open season of its own (a dated closure set by us): the
+  // usual hours fold away as before; a list of "Jan 1 – Dec 31" would add nothing.
+  if (!seasons.length && !os) return '';
+  // Every day of a leap year as 'MM-DD', from the first open day (or the day after the first set ends) round the year.
+  const all = [];
+  for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) all.push(new Date(t).toISOString().slice(5, 10));
+  const startMd = os ? os.from : seasons.length ? all[(all.indexOf(seasons[0].to) + 1) % all.length] : '01-01';
+  const start = Math.max(0, all.indexOf(startMd));
+  const runs = [];
+  for (let i = 0; i < all.length; i++) {
+    const md = all[(start + i) % all.length];
+    if (os && !hoursModule.mdInRange(md, os.from, os.to)) break;
+    const k = seasons.findIndex((z) => hoursModule.mdInRange(md, z.from, z.to));
+    const last = runs[runs.length - 1];
+    if (last && last.k === k) last.to = md; else runs.push({ k, from: md, to: md });
+  }
+  if (!runs.length) return '';
+  const SHORT = { en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, fr: { mon: 'lun.', tue: 'mar.', wed: 'mer.', thu: 'jeu.', fri: 'ven.', sat: 'sam.', sun: 'dim.' } }[fr ? 'fr' : 'en'];
+  const weekText = (days) => {
+    const W = hoursModule.HOURS_WEEKDAYS, texts = W.map((d) => venueDayHoursText(days[d], fr));
+    if (texts.every((t) => t === texts[0])) return `${fr ? 'Tous les jours' : 'Daily'} ${texts[0]}`;
+    const parts = [];
+    for (let i = 0; i < 7;) { let j = i; while (j + 1 < 7 && texts[j + 1] === texts[i]) j++; parts.push(`${SHORT[W[i]]}${j > i ? `${j - i > 1 ? '\u2013' : ', '}${SHORT[W[j]]}` : ''} ${texts[i]}`); i = j + 1; }
+    return parts.join(' \u00b7 ');
+  };
+  const order = [];
+  for (const r of runs) if (!order.includes(r.k)) order.push(r.k);
+  const and = fr ? ' et ' : ' and ';
+  const lines = order.map((k) => {
+    const when = runs.filter((r) => r.k === k).map((r) => (r.from === r.to ? hoursExtraDayText(r.from, fr) : hoursExtraRangeText(r.from, r.to, fr))).join(and);
+    return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days))}</span></li>`;
+  });
+  return `<div class="venue-hours-year"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list">${lines.join('')}</ul></div>`;
+}
 function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   if (!hoursModule || !pageHours || hasAdvisory) return null;
   const clock = okanaganClock(now);
@@ -34518,7 +34683,9 @@ function happyHourOffOn(v, date, now = new Date(), openMonthsById = null) {
   if (!inMonthDaySeason(happyHourSeasonOf(v.happy_hour_times), date)) return true;
   const g = happyHourGateOpts(v, now, openMonthsById);
   const om = /^(\d{1,2})-(\d{1,2})$/.exec(String(g.openMonths || ''));
-  return hoursModule.gateClosedOn({ place: g.placeHours ? hoursModule.parseHours(g.placeHours) : null, openMonths: om && om[1] !== om[2] ? [Number(om[1]), Number(om[2])] : null }, date);
+  // Exact days (café test 2): "04-25:10-12".
+  const os = !om ? hoursModule.parseOpenSeason(g.openMonths) : null;
+  return hoursModule.gateClosedOn({ place: g.placeHours ? hoursModule.parseHours(g.placeHours) : null, openMonths: om && om[1] !== om[2] ? [Number(om[1]), Number(om[2])] : null, openSeason: os && os.exact ? { from: os.from, to: os.to } : null }, date);
 }
 // Every owner's yearly open months at once (venue id -> '5-10').
 function openMonthsMap() {
@@ -35424,6 +35591,13 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
         return `<h2>${L('Hours', 'Heures')}</h2>${tempClosureLine}${list}`;
       })();
     if (datedWeek) hoursHtml += venueHoursExtrasHtml(parsedHours, clockNow, fr, (d) => escapeHtml(venueDayHoursText(d, fr)), dayNames, tempClosure);
+    // Café test 2 (2026-11-11): every part of a seasonal place's year with its hours, in and out of season.
+    if (pageHours === venue.hours && !venue.redirect_to) {
+      let om = null;
+      try { om = venueLinks(venue.id).open_months; } catch (e) { om = null; }
+      const yearHtml = venueSeasonHoursHtml(venue.id, hoursModule.parseHours(venue.hours), om, fr, seasonShut);
+      if (yearHtml) hoursHtml = seasonShut ? hoursHtml.replace('<details class="venue-hours-usual">', `${yearHtml}<details class="venue-hours-usual">`) : hoursHtml + yearHtml;
+    }
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -35433,7 +35607,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   if (openMonths) {
     // Round 13 (2026-10-21): French elides before avril, août and octobre (« Ouvert d’avril à octobre »).
     const monthsText = openMonthsText(openMonths, fr ? 'fr' : 'en');
-    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (/^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? '' : ' each year'}</p>`;
+    const exactSeason = !/^\d{1,2}-\d{1,2}$/.test(String(openMonths));
+    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (exactSeason ? 'Ouvert du ' : /^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? (exactSeason ? ' chaque année' : '') : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
@@ -35618,7 +35793,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // page by adding this; it's a second, higher-visibility presentation of
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
-    venue.type === 'golf' ? golfKindLabel : label.singular,
+    // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
+    venue.type === 'golf' ? golfKindLabel : venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -35930,7 +36106,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
     const atAGlance = [
-      label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
+      venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
       venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
@@ -45102,10 +45279,21 @@ const OWNER_NOT_OFFERED_ERRORS = {
   has: 'Your page already shows this. To say you don’t have it, remove it from your page first, then try again.',
 };
 const OWNER_AVG_SPEND_ERROR = 'Please enter a whole number of dollars from $' + AVG_SPEND_MIN + ' to $' + AVG_SPEND_MAX + ', like 25.';
+const OWNER_AVG_SPEND_CENTS_ERROR = 'Please enter a price from $2 to $300, like 5.50 (in steps of 25 cents).';
 const OWNER_AVG_SPEND_ERROR_FR = 'Entrez un nombre entier de dollars, de ' + AVG_SPEND_MIN + ' $ à ' + AVG_SPEND_MAX + ' $, par exemple 25.';
 // -> { blank: true } | { amount } | { error }. Accepts 25, "25", "$25", " 25 $ ". Not 25.50, 2,5, 1e2 or 0x19.
-function ownerAvgSpendAmount(raw) {
+function ownerAvgSpendAmount(raw, opts = {}) {
   if (raw == null) return { blank: true };
+  // Cafés (café test 2): cents in steps of 25 ("5.50", "$4.75"), and a price from $2. Whole dollars from $5 as always.
+  if (opts.cents && (typeof raw === 'number' || typeof raw === 'string')) {
+    const c = String(raw).trim().replace(/^[$]\s*/, '').replace(/\s*[$]$/, '').replace(',', '.');
+    if (/^\d{1,3}(?:\.\d{1,2})?$/.test(c)) {
+      const x = Number(c);
+      if (Number.isInteger(x) && x >= AVG_SPEND_MIN && x <= AVG_SPEND_MAX) return { amount: x };
+      if (!avgSpendExactOk(x)) return { error: OWNER_AVG_SPEND_CENTS_ERROR };
+      return { amount: Math.round(x), exact: x };
+    }
+  }
   if (typeof raw !== 'number' && typeof raw !== 'string') return { error: OWNER_AVG_SPEND_ERROR };
   const t = String(raw).trim().replace(/^[$]\s*/, '').replace(/\s*[$]$/, '');
   if (t === '') return { blank: true };
@@ -45148,7 +45336,16 @@ function hoursExtrasMap() {
         try { closures = JSON.parse(r.closures || '[]') || []; } catch (e) { closures = []; }
         if (!Array.isArray(seasons)) seasons = [];
         if (!Array.isArray(closures)) closures = [];
-        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures });
+        // Yearly closures (café test 2, 2026-11-11): a row stored as { from: 'MM-DD', to: 'MM-DD', yearly: true } is
+        // one rule ("Every year: Apr 1 – Apr 24"); every reader of closures gets it as dated rows for last year through
+        // two years on (hours.js expandYearlyClosures), so Open Now, the notices and the reopening date work on it
+        // unchanged. `raw` is the list as stored, for the owner's own screens. Dated rows read exactly as before.
+        const raw = closures;
+        if (raw.some((c) => hoursModule && hoursModule.isYearlyClosure(c))) {
+          const y = Number(todayLocal().slice(0, 4));
+          closures = hoursModule.expandYearlyClosures(raw, y - 1, y + 2);
+        }
+        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures, raw });
       }
     } catch (e) { /* table missing in an old copy: no extras */ }
     hoursExtraCache = { at: Date.now(), map };
@@ -45159,7 +45356,11 @@ function clearHoursExtraCache() { hoursExtraCache = null; }
 // -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
 function venueHoursExtras(venueId) {
   const x = hoursExtrasMap().get(venueId);
-  return x ? { seasons: x.seasons, closures: x.closures } : { seasons: [], closures: [] };
+  return x ? { seasons: x.seasons, closures: x.closures, raw: x.raw || x.closures } : { seasons: [], closures: [], raw: [] };
+}
+// The closures an owner keeps (café test 2): as stored (a yearly rule stays one row), without dated ones already over.
+function ownerClosuresKept(venueId, today = todayLocal()) {
+  return venueHoursExtras(venueId).raw.filter((c) => c && ((hoursModule && hoursModule.isYearlyClosure(c)) || (c.to || c.from) >= today));
 }
 // Closures that haven't ended yet (yesterday's is kept for a night that ran past midnight).
 function upcomingClosures(list, now = new Date()) {
@@ -45694,7 +45895,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // Price range, seasonal hours and special closures (2026-10-18). Closures already over are left out.
     price_range: venue.price ? String(venue.price) : '',
     hours_seasons: venueHoursExtras(venue.id).seasons,
-    closures: venueHoursExtras(venue.id).closures.filter((c) => (c.to || c.from) >= todayLocal()),
+    closures: ownerClosuresKept(venue.id),
     // Happy hour deals (2026-10-26): { deals, deals_fr, source, checked_at } or null. The owner sends { deals,
     // deals_fr }; the source and date are kept here so an Undo can put the old ones back.
     happy_hour_deals: ownerHappyHourDealsSnapshot(venue.id),
@@ -46028,7 +46229,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('open_months' in input) {
     const raw = typeof input.open_months === 'string' ? input.open_months.trim() : '';
     const m = /^(1[0-2]|[1-9])-(1[0-2]|[1-9])$/.exec(raw);
-    if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
+    // Café test 2 (2026-11-11): or exact days every year, "04-25:10-12" (open Apr 25 to Oct 12; may wrap New Year).
+    const exact = !m && hoursModule ? hoursModule.parseOpenSeason(raw) : null;
+    if (raw && exact && exact.exact) { if (raw !== (current.open_months || '')) changes.open_months = raw; }
+    else if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
     else if (raw !== (current.open_months || '')) changes.open_months = raw || null;
   }
   if ('badges' in input) {
@@ -46126,9 +46330,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('avg_spend' in input) {
     if (!portalFields(venue.type).avgSpend) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
     else {
-      const a = ownerAvgSpendAmount(input.avg_spend);
+      const a = ownerAvgSpendAmount(input.avg_spend, { cents: venue.type === 'cafe' });
+      const curExact = current.avg_spend && current.avg_spend.exact != null ? current.avg_spend.exact : null;
       if (a.error) errors.avg_spend = a.error;
-      else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount)) changes.avg_spend = { amount: a.amount };
+      else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount && curExact === (a.exact != null ? a.exact : null))) changes.avg_spend = { amount: a.amount, ...(a.exact != null ? { exact: a.exact } : {}) };
     }
   }
   // "We don't have one" (2026-11-08): the whole list of items the owner says their place doesn't offer. A new one is
@@ -46232,6 +46437,16 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     else {
       const out = [];
       for (const x of list) {
+        // Every year (café test 2, 2026-11-11): one yearly rule, { from: 'MM-DD', to: 'MM-DD', note, yearly: true }
+        // ("Every year: Apr 1 – Apr 24"; may run over New Year), instead of a dated copy for this year and next.
+        if (x && x.yearly === true) {
+          const yf = ownerMonthDay(x.from), yt = x.to ? ownerMonthDay(x.to) : yf;
+          if (!yf || !yt) { errors.closures = 'Please pick a date for each closure.'; break; }
+          const ynote = typeof x.note === 'string' ? x.note.trim().replace(/\s+/g, ' ') : '';
+          if (ynote.length > HOURS_EXTRA_NOTE_MAX || /[<>&()]/.test(ynote)) { errors.closures = `Please keep each note short (up to ${HOURS_EXTRA_NOTE_MAX} characters), without < > & or brackets.`; break; }
+          out.push({ from: yf, to: yt, note: ynote, yearly: true });
+          continue;
+        }
         const from = x && typeof x.from === 'string' && parseLocalDate(x.from) ? x.from : null;
         const to = x && typeof x.to === 'string' && x.to ? (parseLocalDate(x.to) ? x.to : null) : from;
         if (!from || !to) { errors.closures = 'Please pick a date for each closure.'; break; }
@@ -48778,10 +48993,12 @@ function menuFiles(menuId) {
 }
 // Full easy setup (2026-11-09): happy hour and weekly specials sent as a file, photo or website to type up.
 const SETUP_SHEET_KINDS = ['happy_hour', 'specials'];
-const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials', facebook: 'Facebook page', instagram: 'Instagram name' };
+const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials', facebook: 'Facebook page', instagram: 'Instagram name', menu_social: 'menu on Facebook or Instagram' };
 // A page name instead of a link (2026-11-09): "What's your Facebook page called?" answered with plain words is a note
 // for us to find the link (never published as typed). Same queue, no pages.
-const SETUP_NOTE_KINDS = ['facebook', 'instagram'];
+// Café test 2 (2026-11-11): 'menu_social', a menu on their Facebook or Instagram given as a page name: "[FIND LINK] …
+// told us their menu on Facebook or Instagram", never "asked us to type up their menu".
+const SETUP_NOTE_KINDS = ['facebook', 'instagram', 'menu_social'];
 // -> { facebook: true, instagram: true } for names sent and still waiting for us.
 function setupSocialNotes(venueId) {
   const out = {};
@@ -51154,7 +51371,7 @@ function renderOwnerSetupPage(found, opts) {
   try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
     address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
-    hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source } : null,
+    hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
     happy_blocks: setupHappyBlocks(found),
@@ -51195,7 +51412,7 @@ function renderOwnerSetupPage(found, opts) {
   for (const k of ownerExtraBadgesFor(venue.type)) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
   // A pub has its own "Local beer on tap" tile, so this one is just the wine (pub fresh-eyes 2, 2026-11-10).
   if (pub && offerLabels.local_beer_taps) offerLabels.local_drinks = fr ? 'Vins locaux' : 'Local wine';
-  if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (« puppuccino »)' : 'Dog treats (“puppuccino”)'; }
+  if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (p. ex. un puppuccino ou une coupe pour chien)' : 'Dog treats (e.g. a puppuccino or pup cup)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
@@ -51229,7 +51446,7 @@ function renderOwnerSetupPage(found, opts) {
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
-    dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
@@ -51272,7 +51489,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, ...CAFE_SETUP_HELP_TOPICS] : [statusTopic] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -51294,13 +51511,18 @@ const CAFE_SETUP_HELP_TOPICS = [
     aFr: '<p>Le happy hour est seulement pour les cafés qui servent de l’alcool. Cochez « Bière et vin » sous « Que servez-vous? » et la question sur le happy hour s’affiche sous « Plus sur votre établissement ».</p>' },
   { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
     keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
-    a: '<p>About how much one person pays for a coffee and a pastry, in whole dollars. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
-    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie, en dollars entiers. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
+    a: '<p>About how much one person pays for a coffee and a pastry. Cents are fine (like $5.50): use the 25¢ buttons. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
+    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
   { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
     keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
     a: '<p>Like every link, we check a new order or pre-order link first, usually within a day. The drive-thru, walk-up window and “we take pre-orders” answers are on your page right away.</p>',
     aFr: '<p>Comme tout lien, nous vérifions d’abord un nouveau lien pour commander ou précommander, en général d’ici un jour. Le service au volant, le comptoir extérieur et « nous prenons les précommandes » sont sur votre page tout de suite.</p>' },
 ];
+// Café test 2 (2026-11-11): the easy setup's "We're closed part of the year" (every type).
+const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We close for part of the year', qFr: 'Nous fermons une partie de l’année',
+  keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year'], keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année'],
+  a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p>',
+  aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture (par exemple du 25 avril au 12 octobre). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture. D’autres heures l’été aussi? Touchez <strong>Enregistrer et ajouter des heures d’été différentes</strong>.</p><p>Fermé une semaine ou deux aussi, chaque année? Ajoutez-le sous Jours fériés et fermetures et cochez <strong>Chaque année</strong>.</p>' };
 // Food styles a café may add under "Show more" (optional; what they serve is its own screen).
 const CAFE_CUISINES_POPULAR = ['Breakfast & Brunch', 'Sandwiches', 'Dessert', 'French', 'Italian', 'Japanese', 'Korean', 'Ukrainian', 'Polish', 'Mediterranean'];
 // Pubs (2026-11-10): what pub owners ask about the pub-only questions.
@@ -51509,6 +51731,11 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-day > .su-season:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   body.owner-setup .su-seadates { display: grid; gap: 6px; }
   body.owner-setup .su-seadates .su-field { margin-bottom: 8px; }
+  body.owner-setup .su-md { display: flex; gap: 8px; }
+  body.owner-setup .su-md select.su-field { flex: 1 1 0; min-width: 0; min-height: 48px; margin-bottom: 4px; }
+  body.owner-setup .su-md select.su-mdm { flex: 2 1 0; }
+  body.owner-setup .su-repeats { font-weight: 700; }
+  body.owner-setup .su-openrow .su-link { margin-left: auto; padding: 8px 4px; }
   body.owner-setup .su-closedwarn { margin: 10px 0 0; padding: 8px 12px; border-radius: 12px; background: var(--su-warn-bg); color: var(--su-warn); font-weight: 700; }
   body.owner-setup .su-closedwarn[hidden] { display: none; }
   body.owner-setup .su-fwrap-area > .su-field { padding-right: 64px; }
@@ -52412,8 +52639,8 @@ const OWNER_HELP_TOPICS = [
 ],
     keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois',
 ],
-    a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p><p>Open all year now? Choose <strong>Open all year</strong> in the same list and tap {SEND}.</p>',
-    aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p><p>Maintenant ouvert toute l\u2019année? Choisissez <strong>Ouvert toute l\u2019année</strong> dans la même liste et touchez {SEND}.</p>' },
+    a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Open or close mid-month? Pick the day too (for example April 25 to October 12). It repeats every year. Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p><p>Open all year now? Choose <strong>Open all year</strong> in the same list and tap {SEND}.</p>',
+    aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Vous ouvrez ou fermez en milieu de mois? Choisissez aussi le jour (par exemple du 25 avril au 12 octobre). Cela revient chaque année. Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p><p>Maintenant ouvert toute l\u2019année? Choisissez <strong>Ouvert toute l\u2019année</strong> dans la même liste et touchez {SEND}.</p>' },
   // Round 11 (2026-10-20): "we are open year round now" got the seasonal answer, with the year-round step last. Its own
   // topic, so the answer starts with it. (Round 10's « ouvert à l'année maintenant » keys moved here.)
   { id: 'year-round', over: ['season', 'hours', 'shows-closed'], q: 'We\u2019re open all year now', qFr: 'Nous sommes maintenant ouverts toute l\u2019année', pages: ['edit'],
@@ -54820,7 +55047,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     const value = values.avg_spend;
     const next = opts.undo
       ? (value && Number.isInteger(value.amount) ? value : null)
-      : { amount: value.amount, source: 'owner', source_url: null, basis: 'Entered by the owner', checked_at: todayLocal(now) };
+      : { amount: value.amount, source: 'owner', source_url: null, basis: 'Entered by the owner', checked_at: todayLocal(now), ...(value.exact != null ? { exact: value.exact } : {}) };
     const r = guardedAvgSpendUpdate(venue.id, currentAvgSpendJson(venue.id), next, { reason: meta.reason, batch_id: meta.batch_id, log_source: 'venue_owner', reviewed_by: reviewer, undo: !!opts.undo });
     if (!r.ok) return { ok: false, reason: 'avg_spend_failed', detail: r.reason, applied };
     applied.push('avg_spend');
@@ -55598,7 +55825,7 @@ function renderAdminMenuCard(m) {
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -56005,7 +56232,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
     for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: t });
     }
   } catch (e) { /* no menus table */ }
@@ -56357,7 +56584,11 @@ function ownerSeasonSummary(season, lang = 'en') {
     : `${label} ${hoursExtraDayText(season.from)}–${hoursExtraDayText(season.to)}`;
 }
 function ownerClosuresSummary(closures, lang = 'en', today = todayLocal()) {
-  const list = (closures || []).filter((c) => c && (c.to || c.from) >= today).sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  // Café test 2: a yearly closure counts once, at its next run.
+  const y = Number(today.slice(0, 4));
+  const dated = (closures || []).map((c) => (c && hoursModule && hoursModule.isYearlyClosure(c)
+    ? hoursModule.expandYearlyClosures([c], y - 1, y + 1).find((x) => x.to >= today) || null : c));
+  const list = dated.filter((c) => c && (c.to || c.from) >= today).sort((a, b) => String(a.from).localeCompare(String(b.from)));
   if (!list.length) return '';
   const fr = lang === 'fr', n = list.length, next = list[0].from >= today ? list[0].from : today;
   const when = hoursExtraDayText(next, fr);
@@ -56391,6 +56622,14 @@ function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
 // Special closures on the owner page (2026-10-18): one row per date or date range, with an optional note.
 function ownerClosureRowHtml(c, today, lang = 'en') {
   const L = (en, f) => (lang === 'fr' ? f : en);
+  // Café test 2 (2026-11-11): a yearly closure is one row, "Every year: Apr 1 – Apr 24 (note)", with Remove.
+  if (c && hoursModule && hoursModule.isYearlyClosure(c)) {
+    const range = lang === 'fr' ? `du ${hoursExtraDayText(c.from, true)} au ${hoursExtraDayText(c.to || c.from, true)}` : `${hoursExtraDayText(c.from)} \u2013 ${hoursExtraDayText(c.to || c.from)}`;
+    return `<div class="op-closure op-closure-yearly" data-yfrom="${escapeHtml(c.from)}" data-yto="${escapeHtml(c.to || c.from)}" data-ynote="${escapeHtml(c.note || '')}">
+          <p style="margin:0"><strong>${L('Every year', 'Chaque année')}:</strong> ${escapeHtml(range)}${c.note ? ` (${escapeHtml(c.note)})` : ''}</p>
+          <button type="button" class="op-cl-remove">${L('Remove', 'Retirer')}</button>
+        </div>`;
+  }
   return `<div class="op-closure">
           <label>${L('First day', 'Premier jour')} <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
           <label>${L('Last day (optional)', 'Dernier jour (facultatif)')} <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
@@ -56705,7 +56944,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   // Sent through "do it for me" (the easy setup's menu photos or files, happy hour or specials sheets, a Facebook or
   // Instagram name): waiting for us, not "left" (fresh-eyes on the full setup, 2026-11-09).
   const pendingHelp = {};
-  try { for (const r of db.prepare("SELECT help_kind, status FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) { if (r.status === 'help' || !r.help_kind) pendingHelp[r.help_kind || 'menu'] = true; } } catch (e) { /* none */ }
+  try { for (const r of db.prepare("SELECT help_kind, status FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) { if (r.status === 'help' || !r.help_kind) pendingHelp[r.help_kind === 'menu_social' ? 'menu' : r.help_kind || 'menu'] = true; } } catch (e) { /* none */ }
   return {
     pendingHelp,
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
@@ -56718,6 +56957,8 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
+    // Café test 2 (2026-11-11): closed for the season today (the storefront photo waits until it reopens).
+    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ?').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
     // "Not sure / someone else runs it" in the setup (pub test 6): answered, kept apart from "we don't have one".
     unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
@@ -56982,7 +57223,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const avgSpendOn = !!portalFields(venue.type).avgSpend;
   const avgNow = avgSpendOn && snap.avg_spend && Number.isInteger(snap.avg_spend.amount) ? snap.avg_spend : null;
   const avgByOwner = !!avgNow && avgNow.source === 'owner';
-  const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
+  const avgMoney = (n) => (avgNow && n === avgNow.amount && avgSpendExactOk(avgNow.exact) ? avgSpendMoney(avgNow, fr) : fr ? `${n} $` : `$${n}`);
   // Completeness bar (2026-11-08): restaurants only; everything it adds is inside this flag.
   const completeOn = COMPLETENESS_TYPES.has(venue.type);
   // Every block says whether it goes live now or is checked first (final fresh-eyes 2026-11-09), like cuisine and Plan
@@ -57039,19 +57280,24 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const label = (c) => (fr ? frCuisine(c) : c);
     const placeLabel = (p) => (fr ? frPlaceType(p) : p);
     const legacy = picked.filter((c) => !OWNER_CUISINES.includes(c));
-    const popular = (venue.type === 'pub' ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR).slice();
+    // Café test 2 (2026-11-11): a café's food styles start with café ones (never Pub Fare, Burgers, Pizza first).
+    const popular = (venue.type === 'pub' ? PUB_CUISINES_POPULAR : venue.type === 'cafe' ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR).slice();
     const rest = OWNER_CUISINES.filter((c) => !popular.includes(c)).sort((a, b) => label(a).localeCompare(label(b), fr ? 'fr' : 'en'));
     const tile = (c, more) => `<button type="button" class="op-cu-tile" data-cu="${escapeHtml(c)}" data-cu-label="${escapeHtml(label(c))}" aria-pressed="${picked.includes(c) ? 'true' : 'false'}"${more && !picked.includes(c) ? ' data-more="1" hidden' : ''}>${escapeHtml(label(c))}</button>`;
-    const hint = picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
+    // Café test 2: a café's line is its kind and what it serves ("Ice cream & gelato · Espresso drinks, ice cream & gelato").
+    const cafeServes = venue.type === 'cafe' ? ((snap.cafe_info || {}).serves || []).map((k) => (CAFE_SERVE_LABELS[k] || {})[fr ? 'fr' : 'en']).filter(Boolean) : [];
+    const hint = venue.type === 'cafe' && (place || cafeServes.length)
+      ? [place ? placeLabel(place) : '', cafeServes.join(', '), picked.map(label).join(', ')].filter(Boolean).join(' · ')
+      : picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
     return `
-      <details class="op-fold op-sec" id="cuisine" data-task="more"${picked.length ? '' : ' open'} data-max="${OWNER_CUISINES_MAX}"
+      <details class="op-fold op-sec" id="cuisine" data-task="more"${picked.length || (venue.type === 'cafe' && place) ? '' : ' open'} data-max="${OWNER_CUISINES_MAX}"
         data-empty="${escapeHtml(L('Please tap at least one kind of food first.', 'Touchez d’abord au moins un type de cuisine.'))}"
         data-limit="${escapeHtml(L('You can pick up to 3. Tap one you picked to remove it.', 'Vous pouvez en choisir 3 au plus. Touchez-en un choisi pour le retirer.'))}"
         data-picked="${escapeHtml(L('Picked: {c}', 'Choisi : {c}'))}"
         data-done="${escapeHtml(L('Saved. Your page now says {c}.', 'Enregistré. Votre page indique maintenant {c}.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
       <summary><span class="lyv-section-label" id="opCuisineLabel">${L('What you serve', 'Ce que vous servez')}${waitChip('cuisine', 'cuisines', 'place_type')}</span> <span class="op-fold-hint" id="opCuisineHint">${escapeHtml(hint)}</span></summary>
       <div class="form-row full"><div class="form-field">
-        <p class="op-cu-q" id="opCuisineQ">${L('What kind of food do you serve?', 'Quel type de cuisine servez-vous?')} <span class="op-hint">${L('Pick up to 3.', 'Choisissez-en jusqu’à 3.')}</span></p>
+        <p class="op-cu-q" id="opCuisineQ">${venue.type === 'cafe' ? L('A food style (optional)', 'Un style de cuisine (facultatif)') : L('What kind of food do you serve?', 'Quel type de cuisine servez-vous?')} <span class="op-hint">${L('Pick up to 3.', 'Choisissez-en jusqu’à 3.')}</span></p>
         <p class="op-cu-picked" id="opCuPicked" role="status"${picked.length ? '' : ' hidden'}>${escapeHtml(L('Picked: {c}', 'Choisi : {c}').replace('{c}', picked.map(label).join(', ')))}</p>
         <div class="op-cu-tiles" id="opCuTiles" role="group" aria-labelledby="opCuisineQ">${legacy.map((c) => tile(c, false)).join('')}${popular.map((c) => tile(c, false)).join('')}${rest.map((c) => tile(c, true)).join('')}</div>
         <button type="button" class="op-more op-cu-more" id="opCuMore">${L('Don’t see yours? Show more kinds of food', 'Vous ne la voyez pas? Afficher plus de cuisines')}</button>
@@ -57072,7 +57318,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const visitRowsHtml = () => {
     if (!completeOn) return '';
     const cur = snap.visit_rows || {};
-    const filled = OWNER_VISIT_EDIT_KEYS.filter((k) => cur[k]).length;
+    // Café test 2 (2026-11-11): cafés answer reservations and takeout under Ordering, so those boxes aren't here; and the
+    // count includes the Dogs line set from "What you offer" ("1 of 5 lines filled in" said so with Dogs and Known for set).
+    const editKeys = venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : OWNER_VISIT_EDIT_KEYS;
+    const countKeys = cur.dogs ? editKeys.concat(['dogs']) : editKeys;
+    const filled = countKeys.filter((k) => cur[k]).length;
     const fieldsEn = {
       known_for: ['Known for', 'What people come back for, in one line.', 'Wood-fired pizza and the lakeside patio'],
       reservations: ['Reservations', 'How to book, or say walk-ins only.', 'Book online or call; walk-ins welcome at the bar'],
@@ -57089,13 +57339,13 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     };
     const words = fr ? fieldsFr : fieldsEn;
     const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups' };
-    const boxes = OWNER_VISIT_EDIT_KEYS.map((k) => `
+    const boxes = editKeys.map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
           <textarea id="${ids[k]}" class="op-visit-ta" rows="1" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}">${escapeHtml(cur[k] || '')}</textarea></div>`).join('');
     return `
-      <details class="op-fold op-sec" id="visit" data-task="more"${filled < OWNER_VISIT_EDIT_KEYS.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
-      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${OWNER_VISIT_EDIT_KEYS.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${OWNER_VISIT_EDIT_KEYS.length} remplie${filled === 1 ? '' : 's'}`) : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
+      <details class="op-fold op-sec" id="visit" data-task="more"${filled < countKeys.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${countKeys.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${countKeys.length} remplie${filled === 1 ? '' : 's'}`) : venue.type === 'cafe' ? L('Known for, dietary note and more', 'Connu pour, note alimentaire et plus') : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
       <p class="op-hint">${L('These short lines show in the &ldquo;Plan your visit&rdquo; box on your page. One line each, plain words, no links. Leave a box empty to leave that line off.', 'Ces courtes lignes paraissent dans la case « Planifiez votre visite » de votre page. Une ligne chacune, des mots simples, sans liens. Laissez une case vide pour ne pas afficher cette ligne.')}</p>
       <div class="form-row full op-visit-rows">${boxes}
       </div>
@@ -57582,13 +57832,18 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}
       ${(() => {
         // Seasonal businesses (tours, golf, patios): the months they open every year.
-        const om = /^(\d{1,2})-(\d{1,2})$/.exec(snap.open_months || '');
+        // Café test 2 (2026-11-11): with the first and last day too ("04-25:10-12"); whole months stay "4-10".
+        const os = hoursModule ? hoursModule.parseOpenSeason(snap.open_months || '') : null;
+        const om = os ? [null, String(os.months[0]), String(os.months[1])] : null;
         const opts = (sel) => MONTH_NAMES[fr ? 'fr' : 'en'].map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
+        const dopts = (sel) => Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${i + 1}</option>`).join('');
+        const fromD = os ? Number(os.from.slice(3)) : 1, toD = os ? Number(os.to.slice(3)) : 31;
         return `<div class="op-season">
         <label for="opSeasonMode"><strong>${L('Season', 'Saison')}</strong>${waitChip('open_months')}</label>
         <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">${L('Open all year', 'Ouvert toute l’année')}</option><option value="season"${om ? ' selected' : ''}>${L('Open some months only', 'Ouvert certains mois seulement')}</option></select>
-        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'de')} <select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>
-        ${L('to', 'à')} <select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select></span>
+        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'du')} ${fr ? `<select id="opSeasonFromD" aria-label="Premier jour d’ouverture">${dopts(fromD)}</select> ` : ''}<select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>${fr ? '' : ` <select id="opSeasonFromD" aria-label="First day open">${dopts(fromD)}</select>`}
+        ${L('to', 'au')} ${fr ? `<select id="opSeasonToD" aria-label="Dernier jour d’ouverture">${dopts(toD)}</select> ` : ''}<select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select>${fr ? '' : ` <select id="opSeasonToD" aria-label="Last day open">${dopts(toD)}</select>`}
+        <small class="op-hint" style="display:block">${L('Every year. Leave the days at the 1st and the last day of the month for whole months.', 'Chaque année. Laissez le 1er et le dernier jour du mois pour des mois entiers.')}</small></span>
         <p class="lyv-error" id="opSeasonError" hidden></p>
         <p class="op-hint">${L('Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.', 'Hors saison, votre page indique « Fermé pour la saison » et la date de réouverture, au lieu de « Ouvert maintenant ».')}</p>
       </div>`;
@@ -57646,8 +57901,11 @@ ${priceFieldHtml}      </details>`}${!avgSpendOn ? '' : `
       <details class="op-fold op-sec" id="avgspend" data-task="more"${avgNow && !avgByOwner ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opAvgLabel">${L('Average spend per person', 'Dépense moyenne par personne')}</span> <span class="op-fold-hint" id="opAvgHint">${avgByOwner ? L(`${avgMoney(avgNow.amount)}, set by you`, `${avgMoney(avgNow.amount)}, indiqué par vous`) : avgNow ? L(`About ${avgMoney(avgNow.amount)}, our estimate: please check it`, `Environ ${avgMoney(avgNow.amount)}, notre estimation : veuillez la vérifier`) : L('Not set', 'Non indiqué')}</span></summary>
       <div class="form-row full"><div class="form-field">
-        <label for="opAvg">${L('About how much does one person spend? (one main and a soft drink, before tax and tip)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool, avant taxes et pourboire)')}</label>
-        <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="numeric" min="${AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="1" autocomplete="off" value="${avgNow ? avgNow.amount : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
+        <label for="opAvg">${venue.type === 'cafe'
+          // Café test 2 (2026-11-11): the café words for its kind ("a single scoop"), never "one main and a soft drink".
+          ? L(`About how much is ${escapeHtml(cafePriceWords(venuePlaceType(venue), false))}? (for one person, before tax and tip)`, `Combien coûte environ ${escapeHtml(cafePriceWords(venuePlaceType(venue), true))}? (pour une personne, avant taxes et pourboire)`)
+          : L('About how much does one person spend? (one main and a soft drink, before tax and tip)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool, avant taxes et pourboire)')}</label>
+        <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="${venue.type === 'cafe' ? 'decimal' : 'numeric'}" min="${venue.type === 'cafe' ? AVG_SPEND_EXACT_MIN : AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="${venue.type === 'cafe' ? '0.25' : '1'}" autocomplete="off" value="${avgNow ? (avgSpendExactOk(avgNow.exact) ? avgNow.exact.toFixed(2) : avgNow.amount) : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
         <p class="op-hint" id="opAvgNote">${avgSpendPublic() ? L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`) : L(`A whole number of dollars, like 25. Leave it blank to keep what we have now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous avons.`)}${completeOn ? ` <span class="op-live-note">${avgSpendPublic() ? L('Goes live as soon as you save it.', 'En ligne dès que vous l’enregistrez.') : L('Saved as soon as you tap Save. It’ll show on your page soon.', 'Enregistré dès que vous touchez Enregistrer. Cela s’affichera bientôt sur votre fiche.')}</span>` : ''}</p>
         <p class="lyv-error" id="opAvgError" hidden></p>
         ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
@@ -57981,6 +58239,8 @@ ${ownerFooterHtml(fr)}
     if (!clBox) return { list: undefined };
     var out = [], err = '';
     Array.prototype.forEach.call(clBox.querySelectorAll('.op-closure'), function(row){
+      // Café test 2 (2026-11-11): a yearly closure ("Every year: Apr 1 – Apr 24") is kept as it is (Remove takes it off).
+      if (row.getAttribute('data-yfrom')) { out.push({ from: row.getAttribute('data-yfrom'), to: row.getAttribute('data-yto'), note: row.getAttribute('data-ynote') || '', yearly: true }); return; }
       var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, n = row.querySelector('.op-cl-note').value.trim();
       if (!f && !t && !n) return;
       if (!f) { err = T.clFirst; return; }
@@ -58096,7 +58356,14 @@ ${ownerFooterHtml(fr)}
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
       tiktok_url: document.getElementById('opTiktok') ? document.getElementById('opTiktok').value : (initial.tiktok_url || ''),
       description: document.getElementById('opDescription').value,
-      open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
+      open_months: document.getElementById('opSeasonMode').value ? (function(){
+        // Café test 2 (2026-11-11): exact days ("04-25:10-12") unless they are whole months ("4-10", as always).
+        var fm = +document.getElementById('opSeasonFrom').value, tm = +document.getElementById('opSeasonTo').value, last = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        var fdEl = document.getElementById('opSeasonFromD'), tdEl = document.getElementById('opSeasonToD');
+        var fd = fdEl ? Math.min(+fdEl.value, last[fm - 1]) : 1, td = tdEl ? Math.min(+tdEl.value, last[tm - 1]) : last[tm - 1];
+        var p2 = function(n){ return ('0' + n).slice(-2); };
+        return fd === 1 && (td === last[tm - 1] || (tm === 2 && td === 28)) ? fm + '-' + tm : p2(fm) + '-' + p2(fd) + ':' + p2(tm) + '-' + p2(td);
+      })() : '',
       badges: {}
     };
     if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', T.seasonMonths); jumpToError(form); return; }
@@ -63790,6 +64057,7 @@ module.exports = {
   EVENT_PHOTO_SPECIAL,
   HOME_EVENT_IMAGES,
   recurringSeasonRow,
+  chainReopening, getSeasonRows, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
   stripJpegMetadata,
