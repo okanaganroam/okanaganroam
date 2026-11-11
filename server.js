@@ -19700,7 +19700,8 @@ function pubSportsText(venue, fr) {
 // ---------- Café answers (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md, "Decided") ----------
 // Owner-only, never researched (memory badge-rules). Stored in venue_cafe_info as one JSON object; each part optional:
 //   serves  [CAFE_SERVES keys]                      what you serve (Espresso drinks, Baked fresh here, Beer & wine...)
-//   diet    { milks: [oat|almond|soy|coconut], milk_extra: 'yes'|'no', gf_kitchen: 'shared'|'dedicated', vegan_baking, nut_free }
+//   diet    { milks: [oat|almond|soy|coconut], milk_extra: 'yes'|'no', gf_kitchen: 'shared'|'dedicated', vegan_baking, nut_free,
+//             note: 'one line' (café test 1, 2026-11-11: "Oat & almond milk +50¢ · Gluten-free: macarons only"; optional) }
 //   stay    { laptops: 'all_day'|'not_busy'|'none', seats: 'takeout'|'few'|'lots', outlets, quiet }
 //   order   { preorder: bool, preorder_how: 'one line' }
 //   coffee  { roast_own: bool, source: 'a name', beans: bool }
@@ -19721,8 +19722,9 @@ const CAFE_SERVE_LABELS = {
 // The short words on the page ("Espresso drinks, pastries, lunch").
 const CAFE_SERVE_SHORT = {
   espresso: ['espresso drinks', 'boissons espresso'], drip: ['drip coffee', 'café filtre'], tea: ['tea', 'thé'], baked_here: ['baked fresh here', 'cuit sur place'], pastries: ['pastries', 'pâtisseries'],
-  breakfast: ['breakfast', 'déjeuner'], lunch: ['lunch', 'dîner'], ice_cream: ['ice cream and gelato', 'crème glacée et gelato'], desserts: ['desserts and cakes', 'desserts et gâteaux'],
-  bubble_tea: ['bubble tea', 'thé aux perles'], smoothies: ['smoothies and juice', 'smoothies et jus'], beer_wine: ['beer and wine', 'bière et vin'],
+  // Two-part items use "&" (café test 1, 2026-11-11: "…lunch and desserts and cakes" read as a stumble inside the list).
+  breakfast: ['breakfast', 'déjeuner'], lunch: ['lunch', 'dîner'], ice_cream: ['ice cream & gelato', 'crème glacée & gelato'], desserts: ['desserts & cakes', 'desserts & gâteaux'],
+  bubble_tea: ['bubble tea', 'thé aux perles'], smoothies: ['smoothies & juice', 'smoothies & jus'], beer_wine: ['beer & wine', 'bière & vin'],
 };
 const CAFE_MILKS = ['oat', 'almond', 'soy', 'coconut'];
 const CAFE_MILK_LABELS = { oat: ['Oat', 'Avoine'], almond: ['Almond', 'Amande'], soy: ['Soy', 'Soya'], coconut: ['Coconut', 'Noix de coco'] };
@@ -19807,12 +19809,13 @@ function cleanCafeInfoPart(key, x) {
     return { value: x.length ? CAFE_SERVES.filter((s) => x.includes(s)) : null };
   }
   if (key === 'diet') {
-    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free'])) return { error: CAFE_INFO_ERROR };
+    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note'])) return { error: CAFE_INFO_ERROR };
+    const dn = text(x.note, CAFE_TEXT_MAX); if (dn.error) return dn;
     const milks = x.milks === undefined ? [] : x.milks;
     if (!Array.isArray(milks) || milks.some((m) => !CAFE_MILKS.includes(m)) || new Set(milks).size !== milks.length) return { error: CAFE_INFO_ERROR };
     if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
     const v = { ...(milks.length ? { milks: CAFE_MILKS.filter((m) => milks.includes(m)) } : {}), ...(milks.length && x.milk_extra ? { milk_extra: x.milk_extra } : {}),
-      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}) };
+      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}), ...(dn.text ? { note: dn.text } : {}) };
     return { value: Object.keys(v).length ? v : null };
   }
   if (key === 'stay') {
@@ -19865,6 +19868,10 @@ function cafeInfoLinesHtml(venue, fr) {
   if (stay.outlets) stayBits.push(L('power outlets', 'prises électriques'));
   if (stay.quiet) stayBits.push(L('a quiet spot', 'un coin tranquille'));
   if (stayBits.length) lines.push(['stay', '💻', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
+  // Café test 1 (2026-11-11): "No Wi-Fi" and "No laptops" were deliberate ("we want people to talk"), so they show as one
+  // friendly line, only when the owner picked them (and never beside a Wi-Fi tile).
+  const talk = cafeTalkLine(venue, fr);
+  if (talk) lines.push(['talk', '💬', talk]);
   const d = info.diet || {};
   const dBits = [];
   if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
@@ -19872,7 +19879,9 @@ function cafeInfoLinesHtml(venue, fr) {
   else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
   if (d.nut_free) dBits.push(L('nut-free options', 'options sans noix'));
-  if (dBits.length) lines.push(['diet', '🌱', cafeCap(dBits.join(' · '))]);
+  // The owner's own note (her words, usually English) follows the details; the French page shows the details only.
+  const dNote = d.note && !fr ? d.note : '';
+  if (dBits.length || dNote) lines.push(['diet', '🌱', [dBits.length ? cafeCap(dBits.join(' · ')) : '', dNote].filter(Boolean).join(dBits.length ? '. ' : '')]);
   const c = info.coffee || {};
   const cBits = [];
   if (c.roast_own) cBits.push(L('We roast our own beans', 'Nous torréfions nos propres grains'));
@@ -19884,14 +19893,38 @@ function cafeInfoLinesHtml(venue, fr) {
   const oBits = [];
   if (links.order_url) oBits.push(`<a href="${escapeHtml(links.order_url)}" rel="nofollow noopener" target="_blank" data-track="order">${escapeHtml(L('Order online', 'Commander en ligne'))}</a>`);
   if (o.preorder || links.preorder_url) {
-    const how = o.preorder_how && !fr ? `: ${escapeHtml(o.preorder_how)}` : '';
-    oBits.push(links.preorder_url ? `<a href="${escapeHtml(links.preorder_url)}" rel="nofollow noopener" target="_blank" data-track="preorder">${escapeHtml(L('Custom cakes and pre-orders', 'Gâteaux sur commande et précommandes'))}</a>${how}` : `${escapeHtml(L('Custom cakes and pre-orders', 'Gâteaux sur commande et précommandes'))}${how}`);
+    // Café test 1 (2026-11-11): "Custom cakes and pre-orders: Cakes and tarts: call us 48 hours ahead" said it twice. The
+    // owner's own line alone when there is one (it is what they pre-order and how), the label alone when there isn't.
+    const own = o.preorder_how && !fr ? o.preorder_how : '';
+    const words = own || L('Custom cakes and pre-orders', 'Gâteaux sur commande et précommandes');
+    oBits.push(links.preorder_url ? `<a href="${escapeHtml(links.preorder_url)}" rel="nofollow noopener" target="_blank" data-track="preorder">${escapeHtml(words)}</a>` : escapeHtml(words));
   }
   if (oBits.length) lines.push(['order', '🛍️', oBits.join(' · '), true]);
   // The tip is in the business's own words (usually English): the French page leaves it out.
   if (info.sellout && !fr) lines.push(['sellout', '⏰', `Tip: ${info.sellout}`]);
   if (!lines.length) return '';
   return `<div class="venue-cafe-lines" style="margin:10px 0 0">${lines.map(([cls, icon, text, raw]) => `<p class="venue-cafe-line venue-cafe-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${icon}</span> ${cls === 'serves' || cls === 'price' ? `<strong>${escapeHtml(text)}</strong>` : raw ? text : escapeHtml(text)}</p>`).join('')}</div>`;
+}
+// "No Wi-Fi or laptops: a place to talk" (café test 1, 2026-11-11), or the single version: the owner's own "No Wi-Fi"
+// (venue_not_offered 'wifi', with no Wi-Fi tile) and "No laptops" (stay.laptops 'none'). '' when neither was picked.
+function cafeTalkLine(venue, fr) {
+  if (!venue || venue.type !== 'cafe') return '';
+  const noWifi = !venueOwnerFeatures(venue.id).wifi && venueNotOffered(venue.id).includes('wifi');
+  const noLaptops = (venueCafeInfo(venue.id).stay || {}).laptops === 'none';
+  if (noWifi && noLaptops) return fr ? 'Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter' : 'No Wi-Fi or laptops: a place to talk';
+  if (noWifi) return fr ? 'Pas de Wi-Fi : un endroit pour discuter' : 'No Wi-Fi: a place to talk';
+  if (noLaptops) return fr ? 'Pas d’ordinateurs portables : un endroit pour discuter' : 'No laptops: a place to talk';
+  return '';
+}
+// The café's page profile (café test 1, 2026-11-11): its specials tab says "Specials" (not the pubs' "Deals"), and the
+// Gluten-free chip says which kitchen when the café told us ("Gluten-free options (shared kitchen)").
+function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = false, hasNights = false } = {}) {
+  if (!venue || venue.type !== 'cafe') return profile;
+  const out = { ...profile };
+  if (hasSpecials && !hasHappyDeals) out.dealsLabel = hasNights ? 'Specials & events' : 'Specials';
+  const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
+  if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
+  return out;
 }
 // A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
 const CAFE_HIGHLIGHT_ICONS = { wifi: '📶', laptop: '💻', drive_thru: '🚗', walk_up: '🪟', dairy_free_milk: '🥛', washroom: '🚻', stroller: '👶', dog_treats: '🦴' };
@@ -35892,7 +35925,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const fdBody = fdLayout ? (() => {
     const fdLib = require('./food-drink-venue-layout');
     const winery = wineryPage;
-    const profile = copperProfile || (nichePrices ? { shortName: 'Niche' } : {});
+    const profile = cafePageProfile(venue, copperProfile || (nichePrices ? { shortName: 'Niche' } : {}), { hasHappyDeals: !!(happyHour && happyHour.deals), hasSpecials: !!weeklySpecials, hasNights: !!weeklyNights });
     const picks = venueMenu ? fdLib.pickMenuExamples(venueMenu.data.sections, profile.menuPickNames) : [];
     const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
@@ -50885,7 +50918,9 @@ const CAFE_SETUP_PART2 = ['stay', 'order', 'diet', 'coffee', 'sellout', 'special
 const CAFE_ONLY_STEPS = ['stay', 'order', 'diet', 'coffee', 'sellout'];
 // Every step any type has (what a stored progress may hold).
 const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS);
-SETUP_TOP2.cafe = ['stay', 'order', 'specials', 'story', 'instagram', 'facebook'];
+// Café test 1 (2026-11-11): Dietary details, Your coffee and Sells out early lead too (the useful café questions were in the
+// folded "A few more" box). Groups and Weekly events stay folded for cafés.
+SETUP_TOP2.cafe = ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'story', 'instagram', 'facebook'];
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 // The steps one venue answers, in order (a café's happy hour only with Beer & wine). Restaurants and pubs: SETUP_STEPS.
 function setupStepsFor(type, venueId) {
@@ -51247,8 +51282,8 @@ ${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, comple
 const CAFE_SETUP_HELP_TOPICS = [
   { id: 'cafe-laptops', pages: ['setup', 'edit'], q: 'What does “Laptop friendly” say on my page?', qFr: 'Que dit « Ordinateurs portables bienvenus » sur ma page?',
     keys: ['laptop', 'laptops', 'laptop friendly', 'work from', 'remote work', 'no laptops'], keysFr: ['ordinateur', 'ordinateurs portables', 'portable', 'télétravail'],
-    a: '<p>You pick one of three answers under “Staying a while”: all day, not at busy times, or no laptops. Only “all day” shows the Laptop friendly chip. “Not at busy times” shows as a line, “Laptops welcome, except at busy times”. “No laptops” shows nothing. You can change it any time.</p>',
-    aFr: '<p>Vous choisissez une de trois réponses sous « Rester un moment » : toute la journée, pas aux heures de pointe, ou pas d’ordinateurs portables. Seul « toute la journée » affiche la mention Ordinateurs portables bienvenus. « Pas aux heures de pointe » s’affiche en une ligne. « Pas d’ordinateurs » n’affiche rien. Vous pouvez changer d’avis en tout temps.</p>' },
+    a: '<p>You pick one of three answers under “Staying a while”: all day, not at busy times, or no laptops. Only “all day” shows the Laptop friendly chip. “Not at busy times” shows as a line, “Laptops welcome, except at busy times”. “No laptops” shows as “No laptops: a place to talk” (with “No Wi-Fi” too, it says “No Wi-Fi or laptops: a place to talk”). You can change it any time.</p>',
+    aFr: '<p>Vous choisissez une de trois réponses sous « Rester un moment » : toute la journée, pas aux heures de pointe, ou pas d’ordinateurs portables. Seul « toute la journée » affiche la mention Ordinateurs portables bienvenus. « Pas aux heures de pointe » s’affiche en une ligne. « Pas d’ordinateurs » s’affiche comme « Pas d’ordinateurs portables : un endroit pour discuter » (avec « Pas de Wi-Fi », la ligne dit « Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter »). Vous pouvez changer d’avis en tout temps.</p>' },
   { id: 'cafe-kind', pages: ['setup', 'edit'], q: 'Why is a kind of café already picked?', qFr: 'Pourquoi un genre de café est-il déjà choisi?',
     keys: ['kind of cafe', 'kind of café', 'already picked', 'bakery', 'coffee shop', 'wrong kind', 'gelato'], keysFr: ['genre de café', 'déjà choisi', 'boulangerie'],
     a: '<p>We guessed it from your business name, to save you a tap. Nothing is saved until you tap Save. Pick another one if it’s not right. Chocolatiers and donut shops pick “Dessert & sweets”.</p>',
@@ -51259,8 +51294,8 @@ const CAFE_SETUP_HELP_TOPICS = [
     aFr: '<p>Le happy hour est seulement pour les cafés qui servent de l’alcool. Cochez « Bière et vin » sous « Que servez-vous? » et la question sur le happy hour s’affiche sous « Plus sur votre établissement ».</p>' },
   { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
     keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
-    a: '<p>About how much one person pays for a coffee and a pastry, in whole dollars. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. Your page says it in those words, so it is never compared with restaurant meals.</p>',
-    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie, en dollars entiers. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
+    a: '<p>About how much one person pays for a coffee and a pastry, in whole dollars. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
+    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie, en dollars entiers. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
   { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
     keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
     a: '<p>Like every link, we check a new order or pre-order link first, usually within a day. The drive-thru, walk-up window and “we take pre-orders” answers are on your page right away.</p>',
@@ -51312,6 +51347,10 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-ph.su-bad img { filter: grayscale(1) opacity(.45); }
   body.owner-setup .su-badmsg { position: static; background: var(--su-warn-bg); color: var(--su-warn); font-size: 15px; font-weight: 800; padding: 8px; }
   body.owner-setup .su-ph .su-x { z-index: 2; }
+  /* Café test 1 (2026-11-11): three round buttons covered most of the first photo. Only ✕ stays on the photo (top
+     right); ◀ ▶ sit in their own row under it, still 44px to tap. */
+  body.owner-setup .su-ph .su-order { position: static; justify-content: center; gap: 12px; padding: 8px 0 0; }
+  body.owner-setup .su-ph .su-ord { border-color: var(--su-line); background: var(--su-card); color: var(--su-ink); }
   body.owner-setup .su-curmain { display: flex; gap: 12px; align-items: center; background: var(--su-card); border: 3px solid var(--su-gold); border-radius: 16px; padding: 10px; margin: 0 0 16px; }
   body.owner-setup .su-curmain .su-toggle[aria-pressed="true"] { background: #fff; color: var(--su-ink); border-color: var(--su-gold); }
   body.owner-setup .su-curmain img { width: 112px; aspect-ratio: 4/3; object-fit: cover; border-radius: 10px; flex: none; }
@@ -52588,8 +52627,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
     keysFr: ['nous n en avons pas', 'n en avons pas', 'on n en a pas', 'non offert', 'nous n offrons pas', 'ne s applique pas', 'pas applicable', 'pas de site web', 'pas sur instagram', 'pas sur facebook', 'pas de livraison', 'pas de reservations'],
-    a: '<p>Some items in <strong>Still to add</strong> have a second button, like <strong>We don’t have a happy hour</strong> or <strong>We’re not on Instagram</strong>. Tap it and that item counts as done.</p><ul><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Changed your mind? Open the bar, find <strong>You told us you don’t have these</strong> and tap <strong>Undo</strong>.</li><li>Only you see these answers. Nothing about them shows on your public page.</li><li>If your page already shows something (say, happy hour times), remove it from your page first.</li></ul>',
-    aFr: '<p>Certains éléments sous <strong>Reste à ajouter</strong> ont un deuxième bouton, comme <strong>Nous n’avons pas de happy hour</strong> ou <strong>Nous ne sommes pas sur Instagram</strong>. Touchez-le et l’élément compte comme fait.</p><ul><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vous changez d’idée? Ouvrez la barre, trouvez <strong>Vous nous avez dit ne pas avoir ceci</strong> et touchez <strong>Annuler</strong>.</li><li>Vous seul voyez ces réponses. Rien n’en paraît sur votre fiche publique.</li><li>Si votre fiche montre déjà quelque chose (par exemple des heures de happy hour), retirez-le d’abord de votre fiche.</li></ul>' },
+    a: '<p>Some items in <strong>Still to add</strong> have a second button, like <strong>We don’t have a happy hour</strong> or <strong>We’re not on Instagram</strong>. Tap it and that item counts as done.</p><ul><li>It’s saved straight away and shows in <strong>Your updates</strong>.</li><li>Changed your mind? Open the bar, find <strong>You told us you don’t have these</strong> and tap <strong>Undo</strong>.</li><li>Only you see most of these answers. Two show as a short line on your page: “No dogs”, and a café’s “No Wi-Fi: a place to talk”.</li><li>If your page already shows something (say, happy hour times), remove it from your page first.</li></ul>',
+    aFr: '<p>Certains éléments sous <strong>Reste à ajouter</strong> ont un deuxième bouton, comme <strong>Nous n’avons pas de happy hour</strong> ou <strong>Nous ne sommes pas sur Instagram</strong>. Touchez-le et l’élément compte comme fait.</p><ul><li>C’est enregistré tout de suite et cela paraît dans <strong>Vos mises à jour</strong>.</li><li>Vous changez d’idée? Ouvrez la barre, trouvez <strong>Vous nous avez dit ne pas avoir ceci</strong> et touchez <strong>Annuler</strong>.</li><li>Vous seul voyez la plupart de ces réponses. Deux s’affichent en une courte ligne sur votre fiche : « Pas de chiens », et le « Pas de Wi-Fi : un endroit pour discuter » d’un café.</li><li>Si votre fiche montre déjà quelque chose (par exemple des heures de happy hour), retirez-le d’abord de votre fiche.</li></ul>' },
   // "These hours are right" and the cuisine picker (2026-11-08): only on a restaurant's edit page (completenessOnly).
   { id: 'hours-right', completenessOnly: true, over: ['hours', 'page-complete'], q: 'My hours haven’t changed. How do I confirm them?', qFr: 'Mes heures n’ont pas changé. Comment les confirmer?', pages: ['edit'],
     keys: ['hours are right', 'hours are correct', 'confirm hours', 'confirm my hours', 'hours havent changed', 'hours have not changed', 'hours still right', 'same hours', 'hours checked', 'checked in the last 90 days', '90 days', 'last checked', 'hours fresh', 'verify hours', 'verify my hours'],

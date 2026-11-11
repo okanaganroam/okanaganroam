@@ -60,7 +60,7 @@ test('checklist: pub weights sum to 100 in the spec groups; restaurants keep the
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.deepEqual(pc.ITEMS.map((i) => i.key), ['address_pin', 'phone', 'website', 'cuisine', 'hours', 'hours_fresh', 'photo_main', 'photo_extra', 'avg_spend', 'menu', 'dietary', 'happy_hour', 'specials', 'entertainment', 'pyv_known', 'pyv_reservations', 'pyv_takeout', 'pyv_groups', 'description', 'instagram', 'facebook', 'arrival', 'owner_confirmed']);
   assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
-  assert.deepEqual(pc.noneKeysFor('pub').sort(), ['cuisine', 'dietary', 'dogs', 'entertainment', 'facebook', 'games', 'happy_hour', 'instagram', 'pyv_groups', 'specials', 'sports', 'website']); // dogs: pub test 4, never scored
+  assert.deepEqual(pc.noneKeysFor('pub').sort(), ['cuisine', 'dietary', 'dogs', 'entertainment', 'facebook', 'games', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'sports', 'website']); // dogs: pub test 4; booking and takeout: café test 1 (asked in the setup); never scored
   for (const it of pc.PUB_ITEMS) assert.ok(it.en && it.fr && it.whyEn && it.whyFr && (it.fix === false || (it.btnEn && it.btnFr)), `${it.key} has its words in both languages`);
 });
 
@@ -78,7 +78,8 @@ test('checklist: the pub-only items score from the owner answers; sports on TV i
   // "We don't show sports" / "No games" count as done.
   const r = pc.scoreCompleteness({ ...base0, declaredNone: ['sports', 'games', 'pyv_takeout'] }, { today });
   assert.ok(!r.missing.some((it) => it.key === 'sports' || it.key === 'games'));
-  assert.ok(!r.declared.includes('pyv_takeout'), 'a restaurant-only answer is ignored for a pub');
+  // Café test 1 (2026-11-11): a pub's setup asks about takeout and booking, so its "No" is kept (and never scored).
+  assert.ok(r.declared.includes('pyv_takeout') && !r.missing.concat(r.declined).some((it) => it.key === 'pyv_takeout'), 'a pub\u2019s unscored takeout answer is kept, never scored');
   assert.deepEqual(r.groups.map((g) => g.key), ['basics', 'hours', 'photos', 'food', 'whatson', 'yourvisit', 'about', 'social', 'finding'], 'pub groups in spec order');
   // The new rows open the setup at their own question.
   const html = pc.renderCompleteness(pc.scoreCompleteness(base0, { today }), { setupHref: '/owner/x/setup', canDecline: true });

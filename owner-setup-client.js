@@ -113,6 +113,10 @@
     noGames: (CUR.not_offered || []).indexOf('games') >= 0 && !GAMES.some(function(g){ return (CUR.badges || {})[g]; }),
   };
   S.badgesAtStart = clone(CUR.badges || {});
+  // What the page holds now (café test 1, 2026-11-11): kept up to date by each save, so a screen never re-sends a value
+  // that is already stored (the ordering screen sent "no drive-thru, no walk-up" again, which came back "Nothing has
+  // changed yet": harmless, but a refused save in the server log every time).
+  S.savedBadges = clone(CUR.badges || {}); S.savedOrder = JSON.stringify((CUR.cafe_info || {}).order || null);
   // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
   var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
   function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
@@ -136,7 +140,7 @@
   var CI = clone(CUR.cafe_info || {}), CL = CUR.cafe_links || {}, CIs = CI.stay || {}, CId = CI.diet || {}, CIc = CI.coffee || {}, CIo = CI.order || {};
   S.cafe = {
     serves: {}, stay: { laptops: CIs.laptops || '', seats: CIs.seats || '', outlets: !!CIs.outlets, quiet: !!CIs.quiet },
-    diet: { milks: {}, milk_extra: CId.milk_extra || '', gf_kitchen: CId.gf_kitchen || '', vegan_baking: !!CId.vegan_baking, nut_free: !!CId.nut_free },
+    diet: { milks: {}, milk_extra: CId.milk_extra || '', gf_kitchen: CId.gf_kitchen || '', vegan_baking: !!CId.vegan_baking, nut_free: !!CId.nut_free, note: CId.note || '' },
     order: { online: !!CL.order_url, url: CL.order_url || '', preorder: !!(CIo.preorder || CL.preorder_url), how: CIo.preorder_how || '', purl: CL.preorder_url || '', counter: (CUR.not_offered || []).indexOf('ordering') >= 0 },
     coffee: { roast_own: !!CIc.roast_own, source: CIc.source || '', beans: !!CIc.beans }, sellout: CI.sellout || ''
   };
@@ -158,6 +162,7 @@
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suOurl')) !== null) S.cafe.order.url = x.trim(); if ((x = v('suOhow')) !== null) S.cafe.order.how = x.trim(); if ((x = v('suOpurl')) !== null) S.cafe.order.purl = x.trim();
     if ((x = v('suCsrc')) !== null) S.cafe.coffee.source = x.trim(); if ((x = v('suSell')) !== null) S.cafe.sellout = x.trim();
+    if ((x = v('suDnote')) !== null) S.cafe.diet.note = x;
   }
   // Season months from "5-10".
   (function(){ var m = /^(\d+)-(\d+)$/.exec(CUR.open_months || ''); if (!m) return; var a = +m[1], b = +m[2], i = a; for (var n = 0; n < 12; n++) { S.months[i] = true; if (i === b) break; i = i % 12 + 1; } })();
@@ -283,6 +288,10 @@
   var HOL_FEW = 6;
   // The date box opens on next month (closures are planned ahead; this month's wheel was the fiddly part).
   function nextMonth(){ var d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 1)); }
+  // Café test 1 (2026-11-11): the end date shown before Add ("Closed Tue, Jan 5 to Mon, Jan 18"), and the same date a year on.
+  function lenEnd(cf){ if (!cf || S.addLen === 'pick') return ''; var d0 = new Date(cf + 'T12:00:00'); if (isNaN(d0)) return ''; d0.setDate(d0.getDate() + (+S.addLen - 1)); return ymd(d0); }
+  function closeEnds(cf){ var e = lenEnd(cf); return !e ? '' : e === cf ? dateLabel(cf) : fill(T.closeEnds, { a: dateLabel(cf), b: dateLabel(e) }); }
+  function plusYear(s){ var d = new Date(s + 'T12:00:00'); d.setFullYear(d.getFullYear() + 1); return ymd(d); }
   function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
 
   // ---------- Talking to the server ----------
@@ -309,7 +318,8 @@
       changes = { not_offered: nl };
     }
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
-      if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); return j.review && j.review.length ? 'day' : 'live'; }
+      if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
+        if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); return j.review && j.review.length ? 'day' : 'live'; }
       if (nothingChanged(j)) return 'live';
       S.error = why(j); return null;
     });
@@ -509,7 +519,7 @@
   }
   function preview(){
     return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' ? (C.cafe ? fill(T.aPersonCafe, { n: S.spend, words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: S.spend, words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
   }
   function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
 
@@ -747,13 +757,16 @@
     } else if (s === 'closures:add') {
       x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || nextMonth(), { type: 'date' })
         + '<p class="su-q">' + h(T.howLong) + '</p><div class="su-chips">' + [['1', T.len1], ['7', T.len7], ['14', T.len14], ['pick', T.lenPick]].map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.addLen === o[0] ? 'true' : 'false') + '" data-len="' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>'
-        + (S.addLen === 'pick' ? field('suCt', T.lastDay, S.addTo || '', { type: 'date' }) : '') + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
+        + (S.addLen === 'pick' ? field('suCt', T.lastDay, S.addTo || '', { type: 'date' }) : '<p class="su-sent su-cends" id="suCends" aria-live="polite">' + h(closeEnds(S.addFrom || nextMonth())) + '</p>')
+        + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
+        // Café test 1 (2026-11-11): "Every year" for her own dates, like the holidays' "This year and next".
+        + '<label class="su-tick" style="margin:12px 0 0"><input type="checkbox" id="suCyear"' + (S.addYearly ? ' checked' : '') + '><span>' + h(T.closeYearly) + '</span></label><p class="su-example">' + h(T.closeYearlySub) + '</p>'
         + '<div class="su-stack">' + big('✓', T.addDates, '', false, 'closureAdd') + '</div>';
     } else if (s === 'spend') {
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';
       // Cafés (Decided 2): "About how much is a coffee and a pastry?" in the words for their kind.
       var sw = C.cafe ? cafeWords() : '';
-      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(T.spendLead, { n: S.spend, words: sw }) + guess) + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? S.spend + ' $' : '$' + S.spend) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
+      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: S.spend, words: sw }) + guess) + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? S.spend + ' $' : '$' + S.spend) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
         + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: S.spend }), '', false, 'spendSave') + '</div>' + skip('spend');
     } else if (s === 'cuisine' && C.cafe) {
       // Cafés (2026-11-10): "What kind of café?" first (one of 11), then "What do you serve?".
@@ -888,6 +901,8 @@
         + (anyMilk ? '<p class="su-q">' + h(T.milkExtraQ) + '</p>' + radios('diet.milk_extra', ['no', 'yes'], T.milkExtra) : '')
         + '<h2 class="su-h2">' + h(T.gfQ) + '</h2>' + radios('diet.gf_kitchen', ['dedicated', 'shared'], T.gf)
         + '<h2 class="su-h2">' + h(T.dietMore) + '</h2><div class="su-tiles">' + ctile('diet.vegan_baking', '🌱', T.veganBaking) + ctile('diet.nut_free', '🥜', T.nutFree) + '</div>'
+        // Café test 1 (2026-11-11): a short note in her words ("Oat & almond milk +50¢ · Gluten-free: macarons only"), with a live count.
+        + field('suDnote', T.dietNoteLabel, dt.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(dt.note)) + '</p>' + ex(T.dietNoteEx)
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'dietSave') + '</div>' + skip('diet');
     } else if (s === 'coffee') {
       var cf = S.cafe.coffee;
@@ -1169,6 +1184,7 @@
   function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
   // The room a happy hour's deal has (60 letters, less its days when there are several happy hours).
   function hhRoom(i){ var e = S.happy[i]; return 60 - (S.happy.length > 1 && e ? dayPrefix(e).length : 0); }
+  function noteRoom(v){ var left = 120 - String(v || '').length; return left >= 0 ? fill(left === 1 ? T.charLeft1 : T.charsLeft, { n: left }) : fill(-left === 1 ? T.charOver1 : T.charsOver, { n: -left }); }
   function roomText(i, v){ var left = hhRoom(i) - String(v || '').trim().length; return left >= 0 ? fill(left === 1 ? T.charLeft1 : T.charsLeft, { n: left }) : fill(-left === 1 ? T.charOver1 : T.charsOver, { n: -left }); }
   function roomRefresh(){ S.happy.forEach(function(e, i){ var b = el('hw' + i), c = el('hwc' + i); if (!b || !c) return; c.textContent = roomText(i, b.value); c.className = 'su-count' + (hhRoom(i) - b.value.trim().length < 0 ? ' su-over' : ''); }); }
   // A day's closing time for a window starting at `from` (the usual week): '23:00', '01:00' (after midnight), or null.
@@ -1345,7 +1361,9 @@
     // "I'm done for now": the portal's own checklist may speak up again from here on.
     if (k === 'doneNow' || k === 'doneNow2') { if (S.busy) return; S.busy = true; return post(C.base + '/setup/progress', { done_for_now: true }).then(function(){ S.busy = false; if (k === 'doneNow') return leave(); S.doneNowSaid = true; go('finish'); }); }
     if (k === 'no') return sayNo(v);
-    if (k === 'basicsOk') return record('basics', 'live');
+    // Café test 1 (2026-11-11): "Yes, that's right" with no website on file is the "We don't have a website" answer too,
+    // so the checklist's Website item counts it (it stopped at 97%). Never while a website is on file or waiting.
+    if (k === 'basicsOk') { if (!CUR.website && !C.website && S.notOffered.indexOf('website') < 0) return saveAll('basics', [{ not_offered: addNot('website') }]); return record('basics', 'live'); }
     if (k === 'basicsSave') {
       S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = el('suSite').value;
       var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (phoneChanged(S.phone)) ch.phone = S.phone;
@@ -1448,13 +1466,17 @@
       var to = cf;
       if (S.addLen === 'pick') to = S.addTo && S.addTo >= cf ? S.addTo : cf;
       else { var d0 = new Date(cf + 'T12:00:00'); d0.setDate(d0.getDate() + (+S.addLen - 1)); to = ymd(d0); }
-      S.extra.push({ from: cf, to: to, note: cn.replace(/[()&<>]/g, '').slice(0, 60) }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : ''); S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1';
+      var cnote = cn.replace(/[()&<>]/g, '').slice(0, 60), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
+      S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : '');
+      // Every year: the same dates next year too (stored as plain dates, like the holidays), while that is within the two years we take.
+      if (S.addYearly) { var nf = plusYear(cf), nt = plusYear(to); if (nf <= ymd(new Date(Date.now() + 729 * 864e5)) && !S.extra.some(function(c){ return c.from === nf && c.to === nt; })) { S.extra.push({ from: nf, to: nt, note: cnote }); S.added = fill(T.addedYearly, { x: S.added }); } }
+      S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1'; S.addYearly = false;
       S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }
     if (k === 'spend') { S.spend = Math.max(5, Math.min(300, S.spend + (+v))); return render(); }
-    if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
+    if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
     if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
-    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSoon; return saveAll('spend', [{ avg_spend: S.spend }]); }
+    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }]); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'holAll') { S.holAll = !S.holAll; var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
@@ -1564,16 +1586,21 @@
       readCafe(); var od2 = S.cafe.order;
       if (od2.online && !od2.url) { S.nudge = T.orderUrlNeed; S.badField = 'suOurl'; return render(); }
       if (!od2.counter && !od2.online && !od2.preorder && !S.badges.drive_thru && !S.badges.walk_up) { S.nudge = T.orderNeed; return render(); }
-      var ol = [{ badges: { drive_thru: !!S.badges.drive_thru, walk_up: !!S.badges.walk_up } }, { cafe_info: { order: od2.preorder ? { preorder: true, preorder_how: od2.how } : null } }];
+      var ol = [], ob = { drive_thru: !!S.badges.drive_thru, walk_up: !!S.badges.walk_up }, oi = od2.preorder ? (od2.how ? { preorder: true, preorder_how: od2.how } : { preorder: true }) : null;
+      if (ob.drive_thru !== !!S.savedBadges.drive_thru || ob.walk_up !== !!S.savedBadges.walk_up) ol.push({ badges: ob });
+      if (JSON.stringify(oi) !== S.savedOrder) ol.push({ cafe_info: { order: oi } });
       var links = { order_url: od2.online ? od2.url : '', preorder_url: od2.preorder ? od2.purl : '' };
       if (links.order_url !== (CL.order_url || '') || links.preorder_url !== (CL.preorder_url || '')) ol.push({ cafe_links: links });
       ol.push({ not_offered: od2.counter ? { add: ['ordering'] } : { remove: ['ordering'] } });
       return saveAll('order', ol, od2.counter ? 'no' : null, null, function(){ CL = { order_url: links.order_url, preorder_url: links.preorder_url }; });
     }
     if (k === 'dietSave') {
-      var dt2 = S.cafe.diet, mk = C.milks.map(function(o){ return o.k; }).filter(function(z){ return dt2.milks[z]; });
+      readCafe(); var dt2 = S.cafe.diet, mk = C.milks.map(function(o){ return o.k; }).filter(function(z){ return dt2.milks[z]; });
+      var dnote = String(dt2.note || '').trim().replace(/\s+/g, ' ');
+      if (dnote.length > 120) { S.nudge = fill(T.textLong, { n: 1, max: 120 }); return render(); }
       var dv = { milks: mk, milk_extra: mk.length ? dt2.milk_extra : '', gf_kitchen: dt2.gf_kitchen, vegan_baking: !!dt2.vegan_baking, nut_free: !!dt2.nut_free };
-      if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free) { S.nudge = T.dietNeed; return render(); }
+      if (dnote) dv.note = dnote;
+      if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dnote) { S.nudge = T.dietNeed; return render(); }
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
       if (mk.length && !S.badges.dairy_free_milk) { dl.push({ badges: { dairy_free_milk: true } }); S.badges.dairy_free_milk = true; }
@@ -1686,6 +1713,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hol]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-hol'), i = S.closures.indexOf(k); if (i >= 0) S.closures.splice(i, 1); else S.closures.push(k); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    var cfIn = el('suCf'); if (cfIn) cfIn.oninput = cfIn.onchange = function(){ S.addFrom = cfIn.value; var ce = el('suCends'); if (ce) ce.textContent = closeEnds(cfIn.value); };
+    var cyIn = el('suCyear'); if (cyIn) cyIn.onchange = function(){ S.addYearly = cyIn.checked; };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-len]'), function(b){ b.onclick = function(){ S.addFrom = el('suCf').value; S.addNote = el('suCn').value; var ct = el('suCt'); if (ct) S.addTo = ct.value; S.addLen = b.getAttribute('data-len'); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-xdel]'), function(b){ b.onclick = function(){ S.extra.splice(+b.getAttribute('data-xdel'), 1); S.added = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ b.onclick = function(){
@@ -1760,6 +1789,7 @@
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
+    var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= 120 ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= 120 ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.

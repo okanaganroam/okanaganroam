@@ -201,7 +201,7 @@ test('8: the front door waits for a visit; a researched spend asks "About $24 a 
   assert.equal(TEXT.fr.spendAsk.replace('{n}', 24), 'Environ 24 $ par personne?');
   assert.match(s, /big\('✓', fill\(T\.spendAskYes, \{ n: n \}\), '', false, 'spendConfirm'\) \+ big\('✎', T\.spendAskNo, '', true, 'jump:spend'\)/);
   // Yes saves her number through the usual avg_spend save (shown publicly only when AVG_SPEND_PUBLIC is on).
-  assert.match(s, /if \(k === 'spendConfirm'\) \{ S\.spend = spendGuess\(\) \|\| S\.spend; S\.toFinish = true; if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSoon; return saveAll\('spend', \[\{ avg_spend: S\.spend \}\]/);
+  assert.match(s, /if \(k === 'spendConfirm'\) \{ S\.spend = spendGuess\(\) \|\| S\.spend; S\.toFinish = true; if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSpendOff; return saveAll\('spend', \[\{ avg_spend: S\.spend \}\]/);
   assert.equal(cfg.spendPublic, false);
   const r = await change(t, { avg_spend: 24 });
   assert.equal(r.status, 201, JSON.stringify(r.body));

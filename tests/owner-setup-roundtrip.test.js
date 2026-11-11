@@ -206,7 +206,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Menu after sending; honest words; names.
   assert.equal(cfg.t.menuSentQ, 'Your menu is sent ✓'); assert.equal(cfg.t.menuNewer, 'Want to send a newer menu?');
   assert.match(s, /S\.savedLine\.cuisine = T\.savedCuisine/); assert.equal(cfg.t.savedCuisine, 'Your food types and kind of place are on your page now.');
-  assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'on your page soon');
+  assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'saved (prices aren’t on pages yet)'); // café test 1: no "soon" while prices aren't public
   assert.equal(cfg.t.sentTitle, 'Sent');
   assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just the patio)');
   assert.equal(cfg.t.tooSmall, 'This one would look blurry. Pick a different one.');
@@ -225,8 +225,8 @@ test('help: average spend says "soon" while it isn’t shown publicly; other typ
   assert.equal((await change(t, { avg_spend: 30 })).status, 201);
   await prog(t, { step: 'spend', status: 'live' });
   const html = await text(`/owner/${t}/setup`);
-  assert.match(html, /Price per person: on your page soon/); // pub test 8: the label says what it asks
-  assert.match(html, /Your average spend will show on your page soon\./);
+  assert.match(html, /Price per person: saved \(prices aren’t on pages yet\)/); // pub test 8: the label says what it asks
+  assert.match(html, /Prices aren’t shown on pages yet\. We’ll use yours when they are\./);
   for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup since 2026-11-10
     const o = mk(type);
     const r = await fetch(`${base}/owner/${tokenFor(o.id)}/setup`, { redirect: 'manual' });

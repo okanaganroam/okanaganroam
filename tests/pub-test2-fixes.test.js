@@ -160,7 +160,7 @@ test('7: the spend guess, the pub sports hint, and what "Sent" means', async () 
   assert.match(TEXT.en.pub.sportsEx, /sound on for big games/); // pub test 3: now a "Tip:", not a question
   assert.doesNotMatch(TEXT.fr.pub.sportsEx, /De grands matchs avec le son/);
   // Pub test 3 (2026-11-10): said once, in the lead (it used to repeat "It'll show within a day" under it).
-  assert.equal(TEXT.en.sentMeans, 'Sent means we check it first. It’ll show on your page within a day.');
+  assert.equal(TEXT.en.sentMeans, 'Sent means we check it first. We’ll add it within a day.'); // café test 1 (2026-11-11): one set of success words
   assert.ok(TEXT.fr.sentMeans);
   assert.match(s, /if \(sentStep && !S\.sentExplained\) S\.sentExplained = p\[1\];/);
   assert.match(s, /if \(explain\) line = T\.sentMeans;/);
