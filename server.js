@@ -332,7 +332,9 @@ const portalRow = (flags) => Object.freeze({ ...PORTAL_FIELDS_DEFAULT, ...flags 
 const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   // Food & drink (key order is the old NIGHT_TYPES order)
   restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
-  cafe: portalRow({ specials: true, nights: true, menu: true }),
+  // Cafés get Price per person in café words (2026-11-10, SPEC-cafes.md Decided 2); happy hour only with Beer & wine.
+  // Sports on TV is kept if set but not offered to a café (SPEC-cafes.md: hidden for cafés).
+  cafe: portalRow({ specials: true, nights: true, menu: true, avgSpend: true, hiddenBadges: Object.freeze(['sports_tv']) }),
   pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
@@ -1733,7 +1735,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info'))`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info', 'cafe_info'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -9917,7 +9919,7 @@ function visitInfoHtml(info, fr = false) {
 // brewery, winery, distillery or golf course (OWNER_HAPPY_HOUR_TYPES), or carries the happy_hour badge. Drink and
 // food-and-drink specials show only there; food specials anywhere (cafés, family restaurants).
 function venueServesAlcohol(v) {
-  return !!v && (portalFields(v.type).happyHour || Number(v.happy_hour) === 1);
+  return !!v && (portalFields(v.type).happyHour || Number(v.happy_hour) === 1 || (v.type === 'cafe' && v.id != null && cafeServesBeerWine(v.id)));
 }
 function specialsStale(checkedAt, now = new Date()) {
   if (!parseLocalDate(checkedAt)) return true;
@@ -19423,10 +19425,25 @@ const PUB_GAME_BADGES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games
 const ALL_OWNER_FEATURES = OWNER_EXTRA_BADGES.concat(PUB_OWNER_BADGES);
 function ownerExtraBadgesFor(type) {
   if (type === 'pub') return ['local_drinks', 'local_beer_taps', 'off_sales', 'heated_patio', 'fireplace', 'beach_access', 'free_parking', 'rv_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', 'service_dogs', ...PUB_GAME_BADGES];
+  // Cafés (2026-11-10): their seven tiles, then the shared ones that fit a café. No games, off-sales or reservations.
+  if (type === 'cafe') return [...CAFE_OWNER_BADGES, 'free_parking', 'wheelchair_accessible', 'locally_owned', 'takeout', 'service_dogs'];
   return OWNER_FEATURE_TYPES.has(type) ? OWNER_EXTRA_BADGES : [];
 }
 // The types with owner-only features: the completeness types (restaurants, and pubs since 2026-11-10).
-const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub']);
+const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub', 'cafe']);
+// Cafés (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md): seven owner-only tiles, never researched.
+// "Laptop friendly" is not one of them: it comes from the café's own three-way laptops answer (venue_cafe_info).
+const CAFE_OWNER_BADGES = ['wifi', 'dairy_free_milk', 'drive_thru', 'walk_up', 'washroom', 'stroller', 'dog_treats'];
+Object.assign(OWNER_EXTRA_BADGE_LABELS, {
+  wifi: { en: 'Wi-Fi', fr: 'Wi-Fi', icon: null, group: 'place' },
+  dairy_free_milk: { en: 'Dairy-free milks', fr: 'Laits sans produits laitiers', icon: null, group: 'food' },
+  drive_thru: { en: 'Drive-thru', fr: 'Service au volant', icon: null, group: 'people' },
+  walk_up: { en: 'Walk-up window', fr: 'Comptoir extérieur', icon: null, group: 'people' },
+  washroom: { en: 'Customer washroom', fr: 'Toilettes pour les clients', icon: null, group: 'place' },
+  stroller: { en: 'Stroller space', fr: 'Place pour les poussettes', icon: null, group: 'people' },
+  dog_treats: { en: 'Dog treats', fr: 'Gâteries pour chiens', icon: null, group: 'people' },
+});
+ALL_OWNER_FEATURES.push(...CAFE_OWNER_BADGES);
 let venueOwnerFeaturesCache = null;
 function clearVenueOwnerFeaturesCache() { venueOwnerFeaturesCache = null; }
 function venueOwnerFeatures(venueId) {
@@ -19459,7 +19476,11 @@ function ownerFeatureChipsHtml(venue, fr, cls) {
   if (!venue || !OWNER_FEATURE_TYPES.has(venue.type)) return '';
   const f = venueOwnerFeatures(venue.id);
   // "Service dogs welcome" (pub test 8) is never a chip: it rides on the "No dogs" line (noDogsLineHtml).
-  return ownerExtraBadgesFor(venue.type).filter((k) => f[k] && !OWNER_FEATURE_NOT_CHIPS.has(k)).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[k].fr : OWNER_EXTRA_BADGE_LABELS[k].en)}</span>`).join(' ');
+  // Cafés (2026-11-10): "Laptop friendly" from their laptops answer (all day only), after Wi-Fi.
+  const laptop = venue.type === 'cafe' && cafeLaptopFriendly(venue) ? [`<span class="${cls('place')}">${escapeHtml(fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly')}</span>`] : [];
+  const chips = ownerExtraBadgesFor(venue.type).filter((k) => f[k] && !OWNER_FEATURE_NOT_CHIPS.has(k)).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[k].fr : OWNER_EXTRA_BADGE_LABELS[k].en)}</span>`);
+  if (laptop.length) chips.splice(f.wifi ? 1 : 0, 0, ...laptop);
+  return chips.join(' ');
 }
 
 // ---------- Pub answers (Dayton, 2026-11-10) ----------
@@ -19674,6 +19695,214 @@ function pubSportsText(venue, fr) {
   const names = (s.list || []).map((k) => (PUB_SPORT_SHORT[k] || {})[fr ? 'fr' : 'en']).filter(Boolean);
   const tv = s.tvs && PUB_TV_LABELS[s.tvs] ? PUB_TV_LABELS[s.tvs].page[fr ? 1 : 0] : '';
   return [names.join(', '), tv].filter(Boolean).join(' · ');
+}
+
+// ---------- Café answers (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md, "Decided") ----------
+// Owner-only, never researched (memory badge-rules). Stored in venue_cafe_info as one JSON object; each part optional:
+//   serves  [CAFE_SERVES keys]                      what you serve (Espresso drinks, Baked fresh here, Beer & wine...)
+//   diet    { milks: [oat|almond|soy|coconut], milk_extra: 'yes'|'no', gf_kitchen: 'shared'|'dedicated', vegan_baking, nut_free }
+//   stay    { laptops: 'all_day'|'not_busy'|'none', seats: 'takeout'|'few'|'lots', outlets, quiet }
+//   order   { preorder: bool, preorder_how: 'one line' }
+//   coffee  { roast_own: bool, source: 'a name', beans: bool }
+//   sellout 'Cinnamon buns usually gone by 11'
+//   year    'all' | 'seasonal' (the answer to "Do you close for part of the year?")
+//   links   { order_url, preorder_url } (only through 'cafe_links', which waits for our check like any link)
+// A café with no row reads and shows exactly as before. Shown on the café's own page only: no pages, URLs or sitemap
+// entries are made from them.
+// The shared lists only (the checklist module is pure); nothing here reads a score.
+const { CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS } = require('./portal-completeness');
+const CAFE_SERVE_LABELS = {
+  espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫗' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
+  baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
+  lunch: { en: 'Lunch (sandwiches, soup)', fr: 'Dîner (sandwichs, soupe)', icon: '🥪' }, ice_cream: { en: 'Ice cream / gelato', fr: 'Crème glacée / gelato', icon: '🍨' },
+  desserts: { en: 'Desserts & cakes', fr: 'Desserts et gâteaux', icon: '🍰' }, bubble_tea: { en: 'Bubble tea', fr: 'Thé aux perles', icon: '🧋' },
+  smoothies: { en: 'Smoothies & juice', fr: 'Smoothies et jus', icon: '🥤' }, beer_wine: { en: 'Beer & wine', fr: 'Bière et vin', icon: '🍷' },
+};
+// The short words on the page ("Espresso drinks, pastries, lunch").
+const CAFE_SERVE_SHORT = {
+  espresso: ['espresso drinks', 'boissons espresso'], drip: ['drip coffee', 'café filtre'], tea: ['tea', 'thé'], baked_here: ['baked fresh here', 'cuit sur place'], pastries: ['pastries', 'pâtisseries'],
+  breakfast: ['breakfast', 'déjeuner'], lunch: ['lunch', 'dîner'], ice_cream: ['ice cream and gelato', 'crème glacée et gelato'], desserts: ['desserts and cakes', 'desserts et gâteaux'],
+  bubble_tea: ['bubble tea', 'thé aux perles'], smoothies: ['smoothies and juice', 'smoothies et jus'], beer_wine: ['beer and wine', 'bière et vin'],
+};
+const CAFE_MILKS = ['oat', 'almond', 'soy', 'coconut'];
+const CAFE_MILK_LABELS = { oat: ['Oat', 'Avoine'], almond: ['Almond', 'Amande'], soy: ['Soy', 'Soya'], coconut: ['Coconut', 'Noix de coco'] };
+const CAFE_TEXT_MAX = 120;
+const CAFE_SOURCE_MAX = 80;
+const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year'];
+const CAFE_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
+// Price per person by kind (Decided 2): never compared with restaurant meal prices.
+const CAFE_PRICE_WORDS = {
+  default: { en: 'a coffee and a pastry', fr: 'un café et une pâtisserie' },
+  'Ice cream & gelato': { en: 'a single scoop', fr: 'une boule' },
+  'Bubble tea': { en: 'one drink', fr: 'une boisson' }, 'Juice & smoothie bar': { en: 'one drink', fr: 'une boisson' },
+  'Brunch café': { en: 'a breakfast or lunch and a coffee', fr: 'un déjeuner ou un dîner et un café' }, 'Deli & sandwiches': { en: 'a breakfast or lunch and a coffee', fr: 'un déjeuner ou un dîner et un café' },
+};
+function cafePriceWords(kind, fr) { return (CAFE_PRICE_WORDS[kind] || CAFE_PRICE_WORDS.default)[fr ? 'fr' : 'en']; }
+// "About $9 for a coffee and a pastry" / « Environ 9 $ pour un café et une pâtisserie ».
+function cafePriceText(amount, kind, fr) { return fr ? `Environ ${amount} $ pour ${cafePriceWords(kind, true)}` : `About $${amount} for ${cafePriceWords(kind, false)}`; }
+let venueCafeInfoCache = null;
+function clearVenueCafeInfoCache() { venueCafeInfoCache = null; }
+// The stored answers ({} when none).
+function venueCafeInfo(venueId) {
+  if (!venueCafeInfoCache) {
+    venueCafeInfoCache = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, info FROM venue_cafe_info').all()) {
+        let o = {}; try { o = JSON.parse(r.info) || {}; } catch (e) { o = {}; }
+        venueCafeInfoCache.set(r.venue_id, o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+      }
+    } catch (e) { /* an older database */ }
+  }
+  return venueCafeInfoCache.get(Number(venueId)) || {};
+}
+function writeVenueCafeInfo(venueId, info) {
+  const clean = Object.fromEntries([...CAFE_INFO_PARTS, 'links'].filter((k) => info && info[k] != null && info[k] !== '').map((k) => [k, info[k]]));
+  if (!Object.keys(clean).length) db.prepare('DELETE FROM venue_cafe_info WHERE venue_id = ?').run(venueId);
+  else db.prepare('INSERT INTO venue_cafe_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, JSON.stringify(clean));
+  clearVenueCafeInfoCache();
+}
+// The café's answers without the links part (what the instant 'cafe_info' field holds).
+function cafeInfoAnswers(venueId) { const o = { ...venueCafeInfo(venueId) }; delete o.links; return o; }
+function cafeInfoLinks(venueId) { const l = venueCafeInfo(venueId).links || {}; return { order_url: l.order_url || '', preorder_url: l.preorder_url || '' }; }
+function cafeServesBeerWine(venueId) { const s = venueCafeInfo(venueId).serves; return Array.isArray(s) && s.includes('beer_wine'); }
+// Happy hour is asked of a café only when it ticked Beer & wine (outreach rule); every other type as before.
+function happyHourAllowed(venue) { return !!venue && (!!portalFields(venue.type).happyHour || (venue.type === 'cafe' && cafeServesBeerWine(venue.id))); }
+// Laptops "all day" is the public Laptop friendly chip (Decided 3); "not at busy times" is a line; "no laptops" shows nothing.
+function cafeLaptopFriendly(venue) { return !!venue && venue.type === 'cafe' && (venueCafeInfo(venue.id).stay || {}).laptops === 'all_day'; }
+// The kind of café a name suggests (Decided 6), for the setup only: pre-selected, saved only when the owner confirms it.
+// Never written by itself, never for a café that already has a kind.
+const CAFE_KIND_HINTS = [
+  [/\b(?:gelato|gelateria|ice ?cream|creamery|frozen yogh?urt|froyo|scoops?)\b/i, 'Ice cream & gelato'],
+  [/\b(?:bubble tea|boba|taro)\b/i, 'Bubble tea'],
+  [/\b(?:juice|smoothies?|juicery)\b/i, 'Juice & smoothie bar'],
+  [/\b(?:roasters?|roastery|roasting)\b/i, 'Roastery'],
+  [/\b(?:tea ?house|tea room|teahouse|tea co)\b/i, 'Tea house'],
+  [/\b(?:deli|delicatessen|sandwich(?:es)?|subs)\b/i, 'Deli & sandwiches'],
+  [/\b(?:brunch|breakfast)\b/i, 'Brunch café'],
+  [/\b(?:chocolat(?:e|ier|es)|donuts?|doughnuts?|sweets|candy|cupcakes?|desserts?|patisserie|pâtisserie|macarons?)\b/i, 'Dessert & sweets'],
+  [/\b(?:bakery|bakeshop|bake ?shop|bakehouse|boulangerie|breads?)\b.*\b(?:caf[eé]|coffee)(?![a-z])|\b(?:caf[eé]|coffee)(?![a-z]).*\b(?:bakery|bakeshop|bakehouse|boulangerie)\b/i, 'Bakery café'],
+  [/\b(?:bakery|bakeshop|bake ?shop|bakehouse|boulangerie)\b/i, 'Bakery'],
+  [/\b(?:coffee|espresso|caf[eé]|coffeehouse|coffee house|java|brew bar)(?![a-z])/i, 'Coffee shop'],
+];
+function cafeKindSuggestion(venue) {
+  if (!venue || venue.type !== 'cafe' || venuePlaceType(venue)) return '';
+  const name = String(venue.name || '');
+  for (const [re, kind] of CAFE_KIND_HINTS) if (re.test(name)) return kind;
+  return '';
+}
+// One validated part, or { error }. `x === null` clears that part.
+function cleanCafeInfoPart(key, x) {
+  if (x === null) return { value: null };
+  const text = (n, max) => {
+    if (n == null || n === '') return { text: '' };
+    const t = ownerVisitText(n);
+    if (t.error) return t;
+    return t.text.length > max ? { error: OWNER_VISIT_ERRORS.long } : t;
+  };
+  const obj = (o, keys) => !!o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every((k) => keys.includes(k));
+  const bool = (b) => b === undefined || typeof b === 'boolean';
+  const pick = (v, list) => v === undefined || v === '' || list.includes(v);
+  if (key === 'serves') {
+    if (!Array.isArray(x) || x.some((s) => !CAFE_SERVES.includes(s)) || new Set(x).size !== x.length) return { error: CAFE_INFO_ERROR };
+    return { value: x.length ? CAFE_SERVES.filter((s) => x.includes(s)) : null };
+  }
+  if (key === 'diet') {
+    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free'])) return { error: CAFE_INFO_ERROR };
+    const milks = x.milks === undefined ? [] : x.milks;
+    if (!Array.isArray(milks) || milks.some((m) => !CAFE_MILKS.includes(m)) || new Set(milks).size !== milks.length) return { error: CAFE_INFO_ERROR };
+    if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
+    const v = { ...(milks.length ? { milks: CAFE_MILKS.filter((m) => milks.includes(m)) } : {}), ...(milks.length && x.milk_extra ? { milk_extra: x.milk_extra } : {}),
+      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}) };
+    return { value: Object.keys(v).length ? v : null };
+  }
+  if (key === 'stay') {
+    if (!obj(x, ['laptops', 'seats', 'outlets', 'quiet']) || !pick(x.laptops, CAFE_LAPTOPS) || !pick(x.seats, CAFE_SEATS) || !bool(x.outlets) || !bool(x.quiet)) return { error: CAFE_INFO_ERROR };
+    const v = { ...(x.laptops ? { laptops: x.laptops } : {}), ...(x.seats ? { seats: x.seats } : {}), ...(x.outlets ? { outlets: true } : {}), ...(x.quiet ? { quiet: true } : {}) };
+    return { value: Object.keys(v).length ? v : null };
+  }
+  if (key === 'order') {
+    if (!obj(x, ['preorder', 'preorder_how']) || !bool(x.preorder)) return { error: CAFE_INFO_ERROR };
+    const how = text(x.preorder_how, CAFE_TEXT_MAX); if (how.error) return how;
+    const v = { ...(x.preorder ? { preorder: true } : {}), ...(x.preorder && how.text ? { preorder_how: how.text } : {}) };
+    return { value: Object.keys(v).length ? v : null };
+  }
+  if (key === 'coffee') {
+    if (!obj(x, ['roast_own', 'source', 'beans']) || !bool(x.roast_own) || !bool(x.beans)) return { error: CAFE_INFO_ERROR };
+    const src = text(x.source, CAFE_SOURCE_MAX); if (src.error) return src;
+    const v = { ...(x.roast_own ? { roast_own: true } : {}), ...(!x.roast_own && src.text ? { source: src.text } : {}), ...(x.beans ? { beans: true } : {}) };
+    return { value: Object.keys(v).length ? v : null };
+  }
+  if (key === 'sellout') {
+    const t = text(x, CAFE_TEXT_MAX); if (t.error) return t;
+    return { value: t.text || null };
+  }
+  if (key === 'year') return x === 'all' || x === 'seasonal' ? { value: x } : { error: CAFE_INFO_ERROR };
+  return { error: CAFE_INFO_ERROR };
+}
+const cafeList = (arr, fr) => (arr.length < 2 ? arr.join('') : `${arr.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${arr[arr.length - 1]}`);
+const cafeCap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+// The café's own lines under its hours ('' when it hasn't said anything): kind and what it serves, the price per person
+// in café words, staying a while, dietary details, coffee, ordering and the "sells out early" tip.
+function cafeInfoLinesHtml(venue, fr) {
+  if (!venue || venue.type !== 'cafe' || venue.redirect_to) return '';
+  const info = venueCafeInfo(venue.id);
+  const L = (en, f) => (fr ? f : en);
+  const lines = [];
+  const kind = venuePlaceType(venue);
+  const serves = (info.serves || []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
+  if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
+  // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
+  // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
+  const spend = avgSpendPublic() ? venueAvgSpend(venue.id) : null;
+  if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(spend.amount, kind, fr)]);
+  const stay = info.stay || {};
+  const stayBits = [];
+  if (stay.laptops === 'all_day') stayBits.push(L('Laptops welcome all day', 'Ordinateurs portables bienvenus toute la journée'));
+  else if (stay.laptops === 'not_busy') stayBits.push(L('Laptops welcome, except at busy times', 'Ordinateurs portables bienvenus, sauf aux heures de pointe'));
+  if (stay.seats === 'takeout') stayBits.push(L('Takeout only', 'Pour emporter seulement'));
+  else if (stay.seats === 'few') stayBits.push(L('A few seats inside', 'Quelques places à l’intérieur'));
+  else if (stay.seats === 'lots') stayBits.push(L('Lots of seats inside', 'Beaucoup de places à l’intérieur'));
+  if (stay.outlets) stayBits.push(L('power outlets', 'prises électriques'));
+  if (stay.quiet) stayBits.push(L('a quiet spot', 'un coin tranquille'));
+  if (stayBits.length) lines.push(['stay', '💻', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
+  const d = info.diet || {};
+  const dBits = [];
+  if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
+  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'pâtisseries sans gluten d’une cuisine réservée'));
+  else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
+  if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
+  if (d.nut_free) dBits.push(L('nut-free options', 'options sans noix'));
+  if (dBits.length) lines.push(['diet', '🌱', cafeCap(dBits.join(' · '))]);
+  const c = info.coffee || {};
+  const cBits = [];
+  if (c.roast_own) cBits.push(L('We roast our own beans', 'Nous torréfions nos propres grains'));
+  else if (c.source && !fr) cBits.push(`Beans from ${c.source}`);
+  else if (c.source) cBits.push(`Grains de ${c.source}`);
+  if (c.beans) cBits.push(cBits.length ? L('beans for sale', 'grains en vente') : L('Beans for sale', 'Grains en vente'));
+  if (cBits.length) lines.push(['coffee', '🫘', cBits.join(' · ')]);
+  const o = info.order || {}, links = info.links || {};
+  const oBits = [];
+  if (links.order_url) oBits.push(`<a href="${escapeHtml(links.order_url)}" rel="nofollow noopener" target="_blank" data-track="order">${escapeHtml(L('Order online', 'Commander en ligne'))}</a>`);
+  if (o.preorder || links.preorder_url) {
+    const how = o.preorder_how && !fr ? `: ${escapeHtml(o.preorder_how)}` : '';
+    oBits.push(links.preorder_url ? `<a href="${escapeHtml(links.preorder_url)}" rel="nofollow noopener" target="_blank" data-track="preorder">${escapeHtml(L('Custom cakes and pre-orders', 'Gâteaux sur commande et précommandes'))}</a>${how}` : `${escapeHtml(L('Custom cakes and pre-orders', 'Gâteaux sur commande et précommandes'))}${how}`);
+  }
+  if (oBits.length) lines.push(['order', '🛍️', oBits.join(' · '), true]);
+  // The tip is in the business's own words (usually English): the French page leaves it out.
+  if (info.sellout && !fr) lines.push(['sellout', '⏰', `Tip: ${info.sellout}`]);
+  if (!lines.length) return '';
+  return `<div class="venue-cafe-lines" style="margin:10px 0 0">${lines.map(([cls, icon, text, raw]) => `<p class="venue-cafe-line venue-cafe-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${icon}</span> ${cls === 'serves' || cls === 'price' ? `<strong>${escapeHtml(text)}</strong>` : raw ? text : escapeHtml(text)}</p>`).join('')}</div>`;
+}
+// A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
+const CAFE_HIGHLIGHT_ICONS = { wifi: '📶', laptop: '💻', drive_thru: '🚗', walk_up: '🪟', dairy_free_milk: '🥛', washroom: '🚻', stroller: '👶', dog_treats: '🦴' };
+function cafeOwnerHighlights(venue, fr = false) {
+  if (!venue || venue.type !== 'cafe') return [];
+  const f = venueOwnerFeatures(venue.id);
+  const out = [];
+  if (f.wifi) out.push([CAFE_HIGHLIGHT_ICONS.wifi, OWNER_EXTRA_BADGE_LABELS.wifi[fr ? 'fr' : 'en']]);
+  if (cafeLaptopFriendly(venue)) out.push([CAFE_HIGHLIGHT_ICONS.laptop, fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly']);
+  for (const k of ['drive_thru', 'walk_up', 'dairy_free_milk', 'washroom', 'stroller', 'dog_treats']) if (f[k]) out.push([CAFE_HIGHLIGHT_ICONS[k], OWNER_EXTRA_BADGE_LABELS[k][fr ? 'fr' : 'en']]);
+  return out;
 }
 
 // Venue-page badges (2026-11-01, Dayton: "more beautiful while staying noticeable"): each badge leads with its line icon
@@ -21364,7 +21593,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût', fireplace: 'Foyer', beachaccess: 'Accès à la plage', parking: 'Stationnement gratuit', rv: 'Place pour VR et remorques', offsales: 'Magasin d’alcool sur place' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût', fireplace: 'Foyer', beachaccess: 'Accès à la plage', parking: 'Stationnement gratuit', rv: 'Place pour VR et remorques', offsales: 'Magasin d’alcool sur place' , wifi: 'Wi-Fi', laptop: 'Ordinateurs portables bienvenus', drivethru: 'Service au volant' }, spToday: 'Aujourd’hui :',
     wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
@@ -21405,7 +21634,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local or craft beer on tap', fireplace: 'Fireplace', beachaccess: 'Beach access', parking: 'Free parking', rv: 'Room for RVs & trailers', offsales: 'Liquor store / off-sales' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight', heated: 'Heated patio', localdrinks: 'Local wine & beer', access: 'Wheelchair accessible', booking: 'Reservations', takeout: 'Takeout', ownlocal: 'Locally owned', games: 'Pool, darts & games', localbeer: 'Local or craft beer on tap', fireplace: 'Fireplace', beachaccess: 'Beach access', parking: 'Free parking', rv: 'Room for RVs & trailers', offsales: 'Liquor store / off-sales' , wifi: 'Wi-Fi', laptop: 'Laptop friendly', drivethru: 'Drive-thru' }, spToday: 'Today:',
     wnMore: function(n){ return '+' + n + ' more'; }, hhLaterNote: 'No happy hour on right now. These places have one later today.', openMicWords: 'open mic',
     wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
@@ -21699,9 +21928,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + (st.season ? '${uiIcon('leaf', 15, true)} ' : '') + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
-  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer', 'fireplace', 'beachaccess', 'parking', 'rv', 'offsales'];
+  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer', 'fireplace', 'beachaccess', 'parking', 'rv', 'offsales', 'wifi', 'laptop', 'drivethru'];
+  // Cafés (2026-11-10): Laptop friendly and Drive-thru sit above bit 31, so they are read with arithmetic, not '&'.
+  function fHas(f, b){ return b > 1073741824 ? Math.floor(f / b) % 2 === 1 : !!(f & b); }
   function featHtml(p){
-    var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
+    var on = FEAT_ORDER.filter(function(k){ return fHas(p.f, CONF.f[k]); });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog) out += '<span class="pm-visit-note"><strong>' + esc(T.dogRule) + '</strong> ' + esc(p.dog) + '</span>';
@@ -21804,10 +22035,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (notTypes[p.type]) return false;
     for (var nk in notTags) if (notTags[nk] && p.tg.indexOf(TAGIX[nk]) !== -1) return false;
     for (var nn in notKinds) if (notKinds[nn] && CONF.k[nn].indexOf(p.type) !== -1) return false;
-    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : (p.f & CONF.f[nf]))) return false;
+    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : (CONF.f[nf] > 1073741824 ? Math.floor(p.f / CONF.f[nf]) % 2 === 1 : (p.f & CONF.f[nf])))) return false;
     // Specials today (2026-10-27): from today's specials ([17]), not a stored feature bit.
     // Weekly nights tonight (2026-10-27): from tonight's nights ([19]).
-    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
+    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !(CONF.f[k] > 1073741824 ? Math.floor(p.f / CONF.f[k]) % 2 === 1 : (p.f & CONF.f[k])))) return false;
     if (openOnly && !(p.st && p.st.state === 'open') && !(!p.st && (includeUnlistedHours || allowUnlisted === true))) return false;
     return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
@@ -22624,6 +22855,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     takeout: 'takeout pickup emporter', heated: 'heated', localdrinks: 'localdrinks', ownlocal: 'ownlocal',
     games: 'billiards darts shuffleboard billard fléchettes', localbeer: 'localbeer', fireplace: 'fireplace fireplaces fireside foyer foyers', beachaccess: 'beach access beachfront plage',
     parking: 'parking stationnement', rv: 'rv rvs trailer trailers camper campers motorhome motorhomes vr roulotte roulottes', offsales: 'offsales',
+    wifi: 'wifi', laptop: 'laptop laptops', drivethru: 'drivethru',
     open: 'open ouvert ouverts', nearme: 'nearme'
   };
   // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
@@ -22633,6 +22865,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
     [/heated patios?|covered patios?|terrasses? chauff[ée]es?|terrasses? couvertes?/g, ' heated '], [/local (?:or craft )?(?:beers? on tap|taps?)|craft beers? on tap|bi[èe]res? locales?(?: ou artisanales?)? en f[ûu]ts?/g, ' localbeer '], [/local (?:wines?|beers?|craft beers?|drinks?)|vins? locaux|bi[èe]res? locales?/g, ' localdrinks '],
     [/board ?games?|pool tables?|tables? de billard|jeux de soci[ée]t[ée]/g, ' games '],
+    [/drive[ -]?thr(?:u|ough)s?|service au volant/g, ' drivethru '], [/wi[ -]?fi/g, ' wifi '], [/laptop[ -]?friendly|work(?:ing)? (?:on (?:a|my) )?laptops?|ordinateurs? portables?/g, ' laptop '],
     [/off[ -]?sales?|liquor stores?|beer (?:and wine )?stores?|cold beer (?:and wine )?stores?|magasins? d.alcool/g, ' offsales '], [/semi[ -]?trucks?|big rigs?/g, ' rv '],
     [/locally[ -]?owned|independently owned|propri[ée]t[ée] locale/g, ' ownlocal '], [/take[ -]?out|pour emporter/g, ' takeout '], [/wheel ?chair/g, ' wheelchair '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
@@ -23206,7 +23439,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 23; // 23 appends optional event photos at row index 14. // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 24; // 24: café Wi-Fi 2^30, Laptop friendly 2^32 and Drive-thru 2^33 (2026-11-10). // 23 appends optional event photos at row index 14. // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -23226,6 +23459,8 @@ function mapDataVersion(now = new Date()) {
   try { of = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_owner_features').get(); } catch (err) { /* an older database */ }
   // Pub answers (2026-11-10): who's welcome sets a pub's Kids bit.
   try { const pi = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_pub_info').get(); of = { u: `${of.u}|${pi.u}`, n: `${of.n}|${pi.n}` }; } catch (err) { /* an older database */ }
+  // Café answers (2026-11-10): the laptops answer sets a café's Laptop friendly bit.
+  try { const ci = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_cafe_info').get(); of = { u: `${of.u}|${ci.u}`, n: `${of.n}|${ci.n}` }; } catch (err) { /* an older database */ }
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
   return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
 }
@@ -23258,6 +23493,9 @@ const MAP_OWNER_FEATURES = [
   { key: 'beachaccess', owner: 'beach_access', bit: 1 << 26 },
   // Pub test 8 (2026-11-10): free parking, room for RVs / trailers (restaurants and pubs) and off-sales (pubs).
   { key: 'parking', owner: 'free_parking', bit: 1 << 27 }, { key: 'rv', owner: 'rv_parking', bit: 1 << 28 }, { key: 'offsales', owner: 'off_sales', bit: 1 << 29 },
+  // Cafés (Dayton, 2026-11-10, Decided 4): Wi-Fi, Laptop friendly (the laptops answer "all day") and Drive-thru. Bits 2^32
+  // and 2^33 are past 32-bit '|' and '&', so they are added (mapPlacesData) and read with arithmetic (fHas).
+  { key: 'wifi', owner: 'wifi', bit: 2 ** 30 }, { key: 'laptop', cafeLaptop: true, bit: 2 ** 32 }, { key: 'drivethru', owner: 'drive_thru', bit: 2 ** 33 },
 ];
 // "Specials today" (2026-10-27): a filter key like the features (?f=specials, the words "specials" / « spéciaux »), but read
 // from today's specials ([17]), never from a stored bit, so no place carries it in [7].
@@ -23299,6 +23537,10 @@ const MAP_MUST_HAVES = [
   { key: 'parking', label: 'Free parking', icon: uiIcon('pin') },
   { key: 'rv', label: 'Room for RVs & trailers', icon: uiIcon('pin') },
   { key: 'offsales', label: 'Liquor store / off-sales', icon: uiIcon('beer') },
+  // Owner-only café answers (2026-11-10).
+  { key: 'wifi', label: 'Wi-Fi', icon: uiIcon('coffee') },
+  { key: 'laptop', label: 'Laptop friendly', icon: uiIcon('coffee') },
+  { key: 'drivethru', label: 'Drive-thru', icon: uiIcon('bag') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -23416,7 +23658,13 @@ function mapPlacesData(now = new Date()) {
     v.hikeList = hikeIds.has(v.id);
     v.viewpointList = viewpointIds.has(v.id);
     let bits = MAP_FEATURES.reduce((b, f) => (badgeOnPublic(v, f.field) ? b | f.bit : b), 0);
-    if (OWNER_FEATURE_TYPES.has(v.type)) { const of = venueOwnerFeatures(v.id); const mine = ownerExtraBadgesFor(v.type); bits = MAP_OWNER_FEATURES.reduce((b, f) => ((f.owners || [f.owner]).some((k) => mine.includes(k) && of[k]) ? b | f.bit : b), bits); }
+    if (OWNER_FEATURE_TYPES.has(v.type)) {
+      const of = venueOwnerFeatures(v.id); const mine = ownerExtraBadgesFor(v.type);
+      const on = (f) => (f.cafeLaptop ? cafeLaptopFriendly(v) : (f.owners || [f.owner]).some((k) => mine.includes(k) && of[k]));
+      bits = MAP_OWNER_FEATURES.filter((f) => f.bit < 2 ** 31).reduce((b, f) => (on(f) ? b | f.bit : b), bits);
+      // Bits past 2^31 (cafés, 2026-11-10): added, never '|' (which would cut them to 32 bits).
+      bits += MAP_OWNER_FEATURES.filter((f) => f.bit >= 2 ** 31 && on(f)).reduce((a, f) => a + f.bit, 0);
+    }
     const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
@@ -35158,6 +35406,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
   const pubLines = pubInfoLinesHtml(venue, fr, opts.now || new Date());
   if (pubLines) hoursHtml = hoursHtml ? hoursHtml + pubLines : `<h2>${L('Hours', 'Heures')}</h2>${pubLines}`;
+  // Cafés (2026-11-10): the café's own answers under the hours (kind and what it serves, price per person in café words,
+  // staying a while, dietary details, coffee, ordering links and the "sells out early" tip). '' when it hasn't said.
+  const cafeLines = cafeInfoLinesHtml(venue, fr);
+  if (cafeLines) hoursHtml = hoursHtml ? hoursHtml + cafeLines : `<h2>${L('Hours', 'Heures')}</h2>${cafeLines}`;
 
   // Outbound links carry a data-track kind so the venue-page engagement
   // script can report them (golf 2026-09-19; every venue type since
@@ -35690,7 +35942,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
       // tap and the games show in the visible highlights too, not only in the folded features list.
-      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : foodDrinkHighlights(venue, dogFriendlyNote, profile),
+      // A café's own tiles (Wi-Fi, Laptop friendly, Drive-thru...) follow its usual highlights (2026-11-10).
+      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : venue.type === 'cafe' ? foodDrinkHighlights(venue, dogFriendlyNote, profile).concat(cafeOwnerHighlights(venue)) : foodDrinkHighlights(venue, dogFriendlyNote, profile),
       intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
@@ -44602,7 +44855,9 @@ function rememberOwnerContact(venueId, email) {
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
   // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
-  'pub_info'];
+  'pub_info',
+  // Cafés (2026-11-10): their answers (venue_cafe_info) and their two links (online ordering, pre-orders), checked first.
+  'cafe_info', 'cafe_links'];
 // Cuisine picker (2026-11-08, reworked 2026-11-09): restaurants only (the types with a completeness list). Dayton
 // (Nov 9 2026): up to 3 food labels from this list of 45, plus one "kind of place". The food list is only food (place
 // styles such as "Casual dining" moved to RESTAURANT_PLACE_TYPES; dietary words are badges), every label has a French
@@ -44625,22 +44880,31 @@ const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pu
 // "Beach or patio bar" (pub test 7, 2026-11-10: a beach bar picked Neighbourhood pub as the nearest fit).
 // "Country pub" (pub test 8, 2026-11-10: a highway pub with truck parking and off-sales picked Neighbourhood pub).
 const PUB_PLACE_TYPES = ['Neighbourhood pub', 'Sports bar', 'Gastropub', 'Irish or British pub', 'Brewpub', 'Taphouse', 'Beach or patio bar', 'Country pub', 'Clubhouse'];
-function placeTypesFor(type) { return type === 'pub' ? PUB_PLACE_TYPES : RESTAURANT_PLACE_TYPES; }
-// The types whose cuisines and kind of place come from venue_cuisines (restaurants; pubs since 2026-11-10).
-const CUISINE_LIST_TYPES = new Set(['restaurant', 'pub']);
+// Cafés (Dayton, 2026-11-10, Decided 1): the 11 kinds of café (chocolatiers and donut shops pick "Dessert & sweets").
+const CAFE_PLACE_TYPES = CAFE_KINDS;
+function placeTypesFor(type) { return type === 'pub' ? PUB_PLACE_TYPES : type === 'cafe' ? CAFE_PLACE_TYPES : RESTAURANT_PLACE_TYPES; }
+// The types whose cuisines and kind of place come from venue_cuisines (restaurants; pubs and cafés since 2026-11-10).
+// A café with no venue_cuisines row reads exactly as before (its one stored cuisine label).
+const CUISINE_LIST_TYPES = new Set(['restaurant', 'pub', 'cafe']);
 const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine dining': 'Gastronomique', 'Bistro': 'Bistro', 'Pub or sports bar': 'Pub ou bar sportif',
   'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
-  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house (golf ou ski)' };
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house (golf ou ski)',
+  'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur', 'Tea house': 'Salon de thé', 'Bubble tea': 'Thé aux perles',
+  'Ice cream & gelato': 'Crème glacée et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
 // Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
 // read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
 // no matching property, so nothing is added to the JSON-LD.
 const PLACE_TYPE_DISPLAY = { 'Casual': 'Casual dining', 'Family': 'Family restaurant', 'Fine dining': 'Fine dining', 'Bistro': 'Bistro',
   'Pub or sports bar': 'Pub or sports bar', 'Diner': 'Diner', 'Quick bite': 'Quick bite', 'Winery or brewery restaurant': 'Winery or brewery restaurant',
-  'Neighbourhood pub': 'Neighbourhood pub', 'Sports bar': 'Sports bar', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Irish or British pub', 'Brewpub': 'Brewpub', 'Taphouse': 'Taphouse / craft beer bar', 'Beach or patio bar': 'Beach or patio bar', 'Country pub': 'Country pub', 'Clubhouse': 'Golf or ski clubhouse' };
+  'Neighbourhood pub': 'Neighbourhood pub', 'Sports bar': 'Sports bar', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Irish or British pub', 'Brewpub': 'Brewpub', 'Taphouse': 'Taphouse / craft beer bar', 'Beach or patio bar': 'Beach or patio bar', 'Country pub': 'Country pub', 'Clubhouse': 'Golf or ski clubhouse',
+  'Coffee shop': 'Coffee shop', 'Bakery': 'Bakery', 'Bakery café': 'Bakery café', 'Roastery': 'Coffee roastery', 'Tea house': 'Tea house', 'Bubble tea': 'Bubble tea shop',
+  'Ice cream & gelato': 'Ice cream & gelato shop', 'Dessert & sweets': 'Dessert & sweets shop', 'Brunch café': 'Brunch café', 'Juice & smoothie bar': 'Juice & smoothie bar', 'Deli & sandwiches': 'Deli & sandwich shop' };
 const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family': 'Restaurant familial', 'Fine dining': 'Restaurant gastronomique', 'Bistro': 'Bistro',
   'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
-  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house de golf ou de ski' };
+  'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house de golf ou de ski',
+  'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur de café', 'Tea house': 'Salon de thé', 'Bubble tea': 'Comptoir de thé aux perles',
+  'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -45414,6 +45678,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
     // Pubs (2026-11-10): { kitchen, minors, sports } as stored ({} when none).
     ...(venue.type === 'pub' ? { pub_info: venuePubInfo(venue.id) } : {}),
+    // Cafés (2026-11-10): { serves, diet, stay, order, coffee, sellout, year } and { order_url, preorder_url } as stored.
+    ...(venue.type === 'cafe' ? { cafe_info: cafeInfoAnswers(venue.id), cafe_links: cafeInfoLinks(venue.id) } : {}),
   };
 }
 // The stored hours_checked_at ('YYYY-MM-DD') or ''.
@@ -45744,7 +46010,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     }
   }
   if ('happy_hour' in input) {
-    if (!portalFields(venue.type).happyHour) {
+    if (!happyHourAllowed(venue)) {
       errors.happy_hour = 'Happy hour is only listed for places that serve alcohol.';
     } else if (input.happy_hour === null) {
       if (current.happy_hour) changes.happy_hour = null;
@@ -45762,7 +46028,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // Happy hour deals (2026-10-26): { deals: [{ text, price }], deals_fr: [...] } (up to 6 each), or null to remove them.
   if ('happy_hour_deals' in input) {
     const x = input.happy_hour_deals;
-    if (!portalFields(venue.type).happyHour) {
+    if (!happyHourAllowed(venue)) {
       errors.happy_hour_deals = 'Happy hour is only listed for places that serve alcohol.';
     } else if (x === null) {
       if (current.happy_hour_deals) changes.happy_hour_deals = null;
@@ -45968,6 +46234,39 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (changes.pub_info && noFood(next) && !noFood(cur) && !('cuisines' in input) && !('cuisine' in input) && (current.cuisines || []).length) changes.cuisines = [];
     }
   }
+  // Café answers (2026-11-10): an object with any of CAFE_INFO_PARTS; each part replaces that part (null clears it).
+  if ('cafe_info' in input) {
+    const x = input.cafe_info;
+    if (venue.type !== 'cafe') errors.form = CAFE_INFO_ERROR;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !CAFE_INFO_PARTS.includes(k))) errors.cafe_info = CAFE_INFO_ERROR;
+    else {
+      const cur = current.cafe_info || {};
+      const next = { ...cur };
+      for (const k of Object.keys(x)) {
+        const c = cleanCafeInfoPart(k, x[k]);
+        if (c.error) { errors.cafe_info = c.error; break; }
+        if (c.value) next[k] = c.value; else delete next[k];
+      }
+      if (!errors.cafe_info && JSON.stringify(next) !== JSON.stringify(cur)) changes.cafe_info = next;
+    }
+  }
+  // The café's two links (2026-11-10): online ordering and custom cakes / pre-orders. Like every link, checked first.
+  if ('cafe_links' in input) {
+    const x = input.cafe_links;
+    if (venue.type !== 'cafe') errors.form = CAFE_INFO_ERROR;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !['order_url', 'preorder_url'].includes(k))) errors.cafe_links = CAFE_INFO_ERROR;
+    else {
+      const cur = current.cafe_links || { order_url: '', preorder_url: '' };
+      const next = { ...cur };
+      for (const k of Object.keys(x)) {
+        const raw = typeof x[k] === 'string' ? x[k].trim() : '';
+        const url = raw ? (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null) : '';
+        if (url === null || url === undefined) { errors.cafe_links = 'Please check the link, for example yourcafe.com/order.'; break; }
+        next[k] = url;
+      }
+      if (!errors.cafe_links && JSON.stringify(next) !== JSON.stringify(cur)) changes.cafe_links = next;
+    }
+  }
   // Takes reservations / Takeout (2026-11-09) never contradict a "we don't have one" answer: say it plainly instead.
   if (COMPLETENESS_TYPES.has(venue.type)) {
     const nextBadges = { ...current.badges, ...(changes.badges || {}) };
@@ -46035,15 +46334,15 @@ const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
-  pub_info: 'Kitchen, who’s welcome and sports' };
+  pub_info: 'Kitchen, who’s welcome and sports', cafe_info: 'Your café answers', cafe_links: 'Ordering links' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -46069,6 +46368,23 @@ function ownerValueText(field, value) {
   }
   if (field === 'cuisines') return Array.isArray(value) && value.length ? value.join(', ') : '(none)';
   if (field === 'place_type') return value || '(none)';
+  if (field === 'cafe_links') {
+    const o = value && typeof value === 'object' ? value : {};
+    const parts = [o.order_url ? `Order online: ${o.order_url}` : '', o.preorder_url ? `Pre-orders: ${o.preorder_url}` : ''].filter(Boolean);
+    return parts.length ? parts.join(' · ') : '(none)';
+  }
+  if (field === 'cafe_info') {
+    const o = value && typeof value === 'object' ? value : {};
+    const parts = [];
+    if (o.serves) parts.push(`Serves: ${o.serves.map((k) => (CAFE_SERVE_LABELS[k] || {}).en || k).join(', ')}`);
+    if (o.stay) parts.push(`Stay: ${['laptops', 'seats'].filter((k) => o.stay[k]).map((k) => `${k} ${o.stay[k]}`).concat(o.stay.outlets ? ['outlets'] : [], o.stay.quiet ? ['quiet'] : []).join(', ')}`);
+    if (o.diet) parts.push(`Dietary: ${[(o.diet.milks || []).join('/'), o.diet.milk_extra ? `milk extra ${o.diet.milk_extra}` : '', o.diet.gf_kitchen ? `GF ${o.diet.gf_kitchen}` : '', o.diet.vegan_baking ? 'vegan baking' : '', o.diet.nut_free ? 'nut-free' : ''].filter(Boolean).join(', ')}`);
+    if (o.order) parts.push(`Pre-orders${o.order.preorder_how ? `: ${o.order.preorder_how}` : ''}`);
+    if (o.coffee) parts.push(`Coffee: ${[o.coffee.roast_own ? 'roasts its own' : o.coffee.source ? `beans from ${o.coffee.source}` : '', o.coffee.beans ? 'beans for sale' : ''].filter(Boolean).join(', ')}`);
+    if (o.sellout) parts.push(`Sells out: ${o.sellout}`);
+    if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
+    return parts.length ? parts.join(' · ') : '(none)';
+  }
   if (field === 'pub_info') {
     const o = value && typeof value === 'object' ? value : {};
     const parts = [];
@@ -50560,7 +50876,24 @@ const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known
 // and events there, and the tester hunted for it under "A few more"). Shown in Part 2's order, so it comes last of the five.
 // Instagram sits next to Facebook in the top tiles (pub test 3, 2026-11-10: the tester hunted for it under "A few more").
 const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'] };
-function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
+// Cafés (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md): Part 1 is the spec's 8 screens (basics, hours
+// with closures, what kind of café + what you serve, photos, menu, price per person, what you offer). Part 2 has five
+// café-only steps (staying a while, ordering, dietary details, coffee, "sells out early?") and no booking or takeout
+// question (ordering covers it). Happy hour is a step only once the café ticked Beer & wine (outreach rule).
+const CAFE_SETUP_PART1 = ['basics', 'hours', 'closures', 'cuisine', 'photos', 'menu', 'spend', 'offer'];
+const CAFE_SETUP_PART2 = ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'music', 'story', 'known', 'groups', 'instagram', 'facebook', 'door', 'happy'];
+const CAFE_ONLY_STEPS = ['stay', 'order', 'diet', 'coffee', 'sellout'];
+// Every step any type has (what a stored progress may hold).
+const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS);
+SETUP_TOP2.cafe = ['stay', 'order', 'specials', 'story', 'instagram', 'facebook'];
+function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
+// The steps one venue answers, in order (a café's happy hour only with Beer & wine). Restaurants and pubs: SETUP_STEPS.
+function setupStepsFor(type, venueId) {
+  if (type !== 'cafe') return SETUP_STEPS;
+  const all = CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
+  return venueId != null && cafeServesBeerWine(venueId) ? all : all.filter((k) => k !== 'happy');
+}
+function setupTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || 'restaurant'; } catch (e) { return 'restaurant'; } }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
 // 'unsure' (pub test 6, 2026-11-10): "Not sure / someone else runs it" for Instagram and Facebook. It answers the step
 // (no nagging) without saying they have no account, so it is never stored as a "we don't have one" (not_offered).
@@ -50580,7 +50913,7 @@ function setupProgress(venueId) {
   try {
     const r = db.prepare('SELECT state FROM owner_setup_progress WHERE venue_id = ?').get(venueId);
     const o = r ? JSON.parse(r.state) : {};
-    for (const [k, v] of Object.entries((o && o.done) || {})) if (SETUP_STEPS.includes(k) && SETUP_STATUSES.includes(v)) done[k] = v;
+    for (const [k, v] of Object.entries((o && o.done) || {})) if (ALL_SETUP_STEPS.includes(k) && SETUP_STATUSES.includes(v)) done[k] = v;
     const out = { done };
     if (o && o.blocks && typeof o.blocks === 'object') out.blocks = o.blocks;
     if (o && o.done_for_now) out.done_for_now = true;
@@ -50636,16 +50969,15 @@ function saveSetupProgress(venueId, step, status) {
 // Every step answered (skips and "later" count: the owner went through it all).
 function setupFinished(venueId) {
   const { done } = setupProgress(venueId);
-  return SETUP_STEPS.every((k) => done[k]);
+  return setupStepsFor(setupTypeOf(venueId), venueId).every((k) => done[k]);
 }
 // Where the owner is: 'none' (not started), 'partial' (some answered), 'essentials' (Part 1 answered), 'done' (all).
 function setupState(venueId) {
   const { done } = setupProgress(venueId);
-  if (SETUP_STEPS.every((k) => done[k])) return 'done';
-  let type = 'restaurant';
-  try { type = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || type; } catch (e) { /* restaurant */ }
+  const type = setupTypeOf(venueId), steps = setupStepsFor(type, venueId);
+  if (steps.every((k) => done[k])) return 'done';
   if (setupParts(type).part1.every((k) => done[k])) return 'essentials';
-  return SETUP_STEPS.some((k) => done[k]) ? 'partial' : 'none';
+  return steps.some((k) => done[k]) ? 'partial' : 'none';
 }
 // The same score the portal shows: % now, % once we check what was sent, and the badge state.
 function setupScore(found) {
@@ -50693,7 +51025,8 @@ async function handleOwnerSetupProgress(req, res, method, found) {
     const p0 = setupProgress(found.venue.id); p0.done_for_now = true; writeSetupProgress(found.venue.id, p0);
     return send(200, { ok: true, progress: { done: p0.done }, score: setupScore(found) });
   }
-  if (!body || !SETUP_STEPS.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
+  const typeSteps = found.venue.type === 'cafe' ? CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2) : SETUP_STEPS;
+  if (!body || !typeSteps.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
   if (body.status === 'unsure' && !SETUP_UNSURE_STEPS.includes(body.step)) return send(400, { ok: false, error: 'Please try again.' });
   let progress = saveSetupProgress(found.venue.id, body.step, body.status);
   if (body.step === 'menu') setupMenuEmailRecord(found.venue, progress.done.menu);
@@ -50770,7 +51103,12 @@ function renderOwnerSetupPage(found, opts) {
   const fr = lang === 'fr';
   // Pubs (2026-11-10): the same words with pub examples and the pub-only screens on top.
   const pub = venue.type === 'pub';
-  const t = pub ? { ...OWNER_SETUP_STRINGS[lang], ...OWNER_SETUP_STRINGS[lang].pub, labels: { ...OWNER_SETUP_STRINGS[lang].labels, ...(OWNER_SETUP_STRINGS[lang].pub.labels || {}) }, offers: { ...OWNER_SETUP_STRINGS[lang].offers, ...(OWNER_SETUP_STRINGS[lang].pub.offers || {}) }, noLabels: { ...OWNER_SETUP_STRINGS[lang].noLabels, ...(OWNER_SETUP_STRINGS[lang].pub.noLabels || {}) } } : OWNER_SETUP_STRINGS[lang];
+  // Cafés (2026-11-10): the same engine with café words and the café-only screens on top (owner-setup-text.js .cafe).
+  const cafe = venue.type === 'cafe';
+  const over = pub ? 'pub' : cafe ? 'cafe' : '';
+  const S0 = OWNER_SETUP_STRINGS[lang];
+  const t = over ? { ...S0, ...S0[over], labels: { ...S0.labels, ...(S0[over].labels || {}) }, offers: { ...S0.offers, ...(S0[over].offers || {}) }, noLabels: { ...S0.noLabels, ...(S0[over].noLabels || {}) } } : S0;
+  const steps = setupStepsFor(venue.type, venue.id);
   const ownImage = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(venue.image_url || '').trim()) ? String(venue.image_url).trim() : '';
   const typeLabel = (CATEGORY_LABELS[venue.type] || { singular: 'Restaurant' }).singular;
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
@@ -50792,12 +51130,20 @@ function renderOwnerSetupPage(found, opts) {
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first) and TikTok.
     booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(), tiktok_url: snap.tiktok_url || '',
     ...(pub ? { pub_info: snap.pub_info || {} } : {}),
+    ...(cafe ? { cafe_info: snap.cafe_info || {}, cafe_links: snap.cafe_links || { order_url: '', preorder_url: '' } } : {}),
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
     Greek: '🥙', Indian: '🍛', Italian: '🍝', Japanese: '🍱', Korean: '🍜', Mexican: '🌮', 'Noodles & Ramen': '🍜', Pizza: '🍕', 'Poke & Hawaiian': '🍣', Poutine: '🍟', 'Pub Fare': '🍺', Sandwiches: '🥪',
     Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
-  const offerGroups = pub ? [
+  const offerGroups = cafe ? [
+    // Cafés (2026-11-10, SPEC-cafes.md "What you offer"): the reused tiles and the eight new ones. "Laptop friendly" is the
+    // three-way laptops answer (venue_cafe_info), not a stored badge. No sports, games, off-sales or happy hour tiles.
+    { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free_milk'] },
+    { title: fr ? 'L’endroit' : 'The place', keys: ['wifi', 'laptop', 'patio', 'lake_view', 'washroom', 'free_parking', 'wheelchair_accessible'] },
+    { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'stroller', 'dog_friendly', 'dog_treats'] },
+    { title: fr ? 'Commander' : 'Ordering', keys: ['drive_thru', 'walk_up'] },
+  ] : pub ? [
     // Pubs (2026-11-10, 22 tiles): no Kids tile ("Who's welcome?" asks it) and no Happy hour tile (Part 1 asks it).
     // Pub test 8 (2026-11-10): off-sales, free parking and room for RVs / trailers (she had nowhere to say them).
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['local_beer_taps', 'local_drinks', 'off_sales', 'nonalcoholic', 'vegan', 'vegetarian', 'gluten_free'] },
@@ -50814,15 +51160,22 @@ function renderOwnerSetupPage(found, opts) {
   for (const k of ownerExtraBadgesFor(venue.type)) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
   // A pub has its own "Local beer on tap" tile, so this one is just the wine (pub fresh-eyes 2, 2026-11-10).
   if (pub && offerLabels.local_beer_taps) offerLabels.local_drinks = fr ? 'Vins locaux' : 'Local wine';
+  if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (« puppuccino »)' : 'Dog treats (“puppuccino”)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
   const cfg = {
-    pub, top2: SETUP_TOP2[pub ? 'pub' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
-    base: opts.base, back: opts.back, lang, mode: opts.mode, steps: SETUP_STEPS, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2, progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
+    // Cafés (2026-11-10): the café screens' lists, the kind a name suggests (pre-selected only; saved when confirmed) and
+    // the price words by kind.
+    ...(cafe ? {
+      serves: CAFE_SERVES.map((k) => ({ k, t: CAFE_SERVE_LABELS[k][lang], i: CAFE_SERVE_LABELS[k].icon })), milks: CAFE_MILKS.map((k) => ({ k, t: CAFE_MILK_LABELS[k][fr ? 1 : 0] })),
+      suggestKind: cafeKindSuggestion(venue), priceWords: Object.fromEntries(Object.entries(CAFE_PRICE_WORDS).map(([k, v]) => [k, v[lang]])), allSteps: CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2),
+    } : {}),
+    cafe, pub, top2: SETUP_TOP2[pub ? 'pub' : cafe ? 'cafe' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
+    base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
-    typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub' })[venue.type] || (fr ? 'établissement' : 'place'),
+    typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub', cafe: fr ? 'café' : 'café' })[venue.type] || (fr ? 'établissement' : 'place'),
     // Never a website the owner just asked to remove (still waiting for review) or said they don't have (pub test 5).
     image: pendingMain || ownImage, imageSource: setupImageSource(venue, pendingMain), website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : ownerWebsitePending(venue.id) || normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
@@ -50831,14 +51184,16 @@ function renderOwnerSetupPage(found, opts) {
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
-    cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
+    cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
-    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', fireplace: '🪵', beach_access: '🏖️', free_parking: '🅿️', rv_parking: '🚚', off_sales: '🛒', service_dogs: '🦮', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' },
+    offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', fireplace: '🪵', beach_access: '🏖️', free_parking: '🅿️', rv_parking: '🚚', off_sales: '🛒', service_dogs: '🦮', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' , wifi: '📶', laptop: '💻', dairy_free_milk: '🥛', drive_thru: '🚗', walk_up: '🪟', washroom: '🚻', stroller: '👶', dog_treats: '🦴' },
     // The first 6 show open (pub fresh-eyes 2026-11-10), so pubs lead with their usual nights.
     nightKinds: venue.type === 'pub' ? ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic', 'comedy', 'bingo', 'games', 'paint', 'run_club', 'other']
+      // Cafés (2026-11-10): open mic, live music, art and workshops first.
+      : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
-    happyHour: !!portalFields(venue.type).happyHour, servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
+    happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
@@ -50850,13 +51205,13 @@ function renderOwnerSetupPage(found, opts) {
   // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
   // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
   const stWord = (tt, k) => (progress.done[k] === 'no' ? (tt.noLabels[k] || tt.st.no) : k === 'spend' && progress.done[k] === 'live' && !avgSpendPublic() ? tt.stSoon : tt.st[progress.done[k]]);
-  const sent = SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(stWord(t, k))}</li>`).join('');
+  const sent = steps.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(stWord(t, k))}</li>`).join('');
   const statusTopic = {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
     a: `<p>Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${SETUP_STEPS.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(OWNER_SETUP_STRINGS.fr.labels[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${steps.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml((cafe ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.cafe.labels } : OWNER_SETUP_STRINGS.fr.labels)[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -50882,12 +51237,37 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, ...PUB_SETUP_HELP_TOPICS] : [statusTopic] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, ...CAFE_SETUP_HELP_TOPICS] : [statusTopic] })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
 }
 
+// Cafés (2026-11-10): what café owners ask about the café-only questions.
+const CAFE_SETUP_HELP_TOPICS = [
+  { id: 'cafe-laptops', pages: ['setup', 'edit'], q: 'What does “Laptop friendly” say on my page?', qFr: 'Que dit « Ordinateurs portables bienvenus » sur ma page?',
+    keys: ['laptop', 'laptops', 'laptop friendly', 'work from', 'remote work', 'no laptops'], keysFr: ['ordinateur', 'ordinateurs portables', 'portable', 'télétravail'],
+    a: '<p>You pick one of three answers under “Staying a while”: all day, not at busy times, or no laptops. Only “all day” shows the Laptop friendly chip. “Not at busy times” shows as a line, “Laptops welcome, except at busy times”. “No laptops” shows nothing. You can change it any time.</p>',
+    aFr: '<p>Vous choisissez une de trois réponses sous « Rester un moment » : toute la journée, pas aux heures de pointe, ou pas d’ordinateurs portables. Seul « toute la journée » affiche la mention Ordinateurs portables bienvenus. « Pas aux heures de pointe » s’affiche en une ligne. « Pas d’ordinateurs » n’affiche rien. Vous pouvez changer d’avis en tout temps.</p>' },
+  { id: 'cafe-kind', pages: ['setup', 'edit'], q: 'Why is a kind of café already picked?', qFr: 'Pourquoi un genre de café est-il déjà choisi?',
+    keys: ['kind of cafe', 'kind of café', 'already picked', 'bakery', 'coffee shop', 'wrong kind', 'gelato'], keysFr: ['genre de café', 'déjà choisi', 'boulangerie'],
+    a: '<p>We guessed it from your business name, to save you a tap. Nothing is saved until you tap Save. Pick another one if it’s not right. Chocolatiers and donut shops pick “Dessert & sweets”.</p>',
+    aFr: '<p>Nous l’avons deviné à partir du nom de votre entreprise, pour vous faire gagner du temps. Rien n’est enregistré avant que vous touchiez Enregistrer. Choisissez-en un autre s’il ne convient pas. Les chocolatiers et les beigneries choisissent « Desserts et sucreries ».</p>' },
+  { id: 'cafe-happy', pages: ['setup'], q: 'Where is happy hour?', qFr: 'Où est le happy hour?',
+    keys: ['happy hour', 'happy', 'drink specials', 'beer', 'wine'], keysFr: ['happy hour', 'bière', 'vin'],
+    a: '<p>Happy hour is only for cafés that serve alcohol. Tick “Beer & wine” under “What do you serve?” and the happy hour question appears under “More about your place”.</p>',
+    aFr: '<p>Le happy hour est seulement pour les cafés qui servent de l’alcool. Cochez « Bière et vin » sous « Que servez-vous? » et la question sur le happy hour s’affiche sous « Plus sur votre établissement ».</p>' },
+  { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
+    keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
+    a: '<p>About how much one person pays for a coffee and a pastry, in whole dollars. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. Your page says it in those words, so it is never compared with restaurant meals.</p>',
+    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie, en dollars entiers. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
+  { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
+    keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
+    a: '<p>Like every link, we check a new order or pre-order link first, usually within a day. The drive-thru, walk-up window and “we take pre-orders” answers are on your page right away.</p>',
+    aFr: '<p>Comme tout lien, nous vérifions d’abord un nouveau lien pour commander ou précommander, en général d’ici un jour. Le service au volant, le comptoir extérieur et « nous prenons les précommandes » sont sur votre page tout de suite.</p>' },
+];
+// Food styles a café may add under "Show more" (optional; what they serve is its own screen).
+const CAFE_CUISINES_POPULAR = ['Breakfast & Brunch', 'Sandwiches', 'Dessert', 'French', 'Italian', 'Japanese', 'Korean', 'Ukrainian', 'Polish', 'Mediterranean'];
 // Pubs (2026-11-10): what pub owners ask about the pub-only questions.
 const PUB_SETUP_HELP_TOPICS = [
   { id: 'pub-kids', pages: ['setup'], q: 'Where is “Kids welcome”?', qFr: 'Où est « Enfants bienvenus »?',
@@ -54212,6 +54592,22 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         applied.push(field);
         continue;
       }
+      // Café answers (2026-11-10): the stored answers become exactly these (an Undo writes the old ones back); the links
+      // part is kept. The links: approved from the review queue like any link, the answers kept.
+      if (field === 'cafe_info' || field === 'cafe_links') {
+        const all = venueCafeInfo(venue.id);
+        const before = field === 'cafe_info' ? cafeInfoAnswers(venue.id) : cafeInfoLinks(venue.id);
+        const v = value && typeof value === 'object' ? value : {};
+        if (field === 'cafe_info') writeVenueCafeInfo(venue.id, { ...Object.fromEntries(CAFE_INFO_PARTS.filter((k) => v[k] != null).map((k) => [k, v[k]])), ...(all.links ? { links: all.links } : {}) });
+        else {
+          const links = Object.fromEntries(['order_url', 'preorder_url'].filter((k) => v[k]).map((k) => [k, v[k]]));
+          writeVenueCafeInfo(venue.id, { ...cafeInfoAnswers(venue.id), ...(Object.keys(links).length ? { links } : {}) });
+        }
+        const after = field === 'cafe_info' ? cafeInfoAnswers(venue.id) : cafeInfoLinks(venue.id);
+        if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, field, JSON.stringify(before), JSON.stringify(after), meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       // Pub answers (2026-11-10): the stored object becomes exactly this one (an Undo writes the old one back).
       if (field === 'pub_info') {
         const before = venuePubInfo(venue.id);
@@ -54397,7 +54793,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info']);
 // Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
 // address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
 // "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
@@ -54410,7 +54806,9 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Website, menu and booking links still wait for review.
 // Pub answers (2026-11-10) too: choices from fixed lists plus short notes checked like Plan your visit lines (no links
 // or < >); logged, in "Your updates", with Undo.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info']);
+// Café answers (2026-11-10) the same way: fixed choices plus short lines checked like Plan your visit (no links, no < >).
+// Their two links ('cafe_links') still wait for our check.
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info', 'cafe_info']);
 // Full easy setup (Dayton, 2026-11-09): sent from the setup flow (from_setup: true) by a restaurant, these also go live
 // from the edit link: the business's hours, season, seasonal hours, closures, the badge tiles, happy hour (times and
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
@@ -54419,7 +54817,7 @@ const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine'
 // Phone (pub test 3, 2026-11-10) too: the old number stayed on the public "Call" button until someone reviewed the change.
 // Only a real North American number passes from the setup (ownerNanpPhone), and like every instant save it is logged with
 // the number it replaced, in "Your updates", with Undo.
-const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'phone']);
+const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'phone']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -54436,7 +54834,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
-  if (field === 'pub_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links') return JSON.stringify(a || {}) === JSON.stringify(b || {});
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -55473,12 +55871,13 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
-  pub_info: 'Cuisine, âge des clients et sports' };
+  pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
   pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
-  cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'] };
+  cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'],
+  wifi: ['Wi-Fi', 'de Wi-Fi'], ordering: ['online ordering, a drive-thru or pre-orders (order at the counter only)', 'de commande en ligne, de service au volant ni de précommandes (commande au comptoir seulement)'] };
 // What one save changed, in the owner's words (pub test 6, 2026-11-10): only what actually changed. A kitchen-only save
 // is "Kitchen" (not "Kitchen, who's welcome and sports"); a happy hour save is "Happy hour" (the Happy hour badge and the
 // deals that come with it are part of it, not "What you offer, happy hour, happy hour deals"). Restaurants and pubs.
@@ -56068,7 +56467,7 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 // "Your page is X% complete" (2026-11-08): restaurants only for now; other types add their own item tables later.
 // Owner portal only, never public, never read by ranking, sorting or indexing.
 // Pubs since 2026-11-10 (their own item list, portal-completeness.js PUB_ITEMS).
-const COMPLETENESS_TYPES = new Set(['restaurant', 'pub']);
+const COMPLETENESS_TYPES = new Set(['restaurant', 'pub', 'cafe']);
 // The menu page's "Just add a link to your menu" (final fresh-eyes 2026-11-09): the same types as the completeness bar.
 const MENU_LINK_TYPES = COMPLETENESS_TYPES;
 // Cuisine picker and "These hours are right" (2026-11-08): their styles and page script (restaurants only).
@@ -56283,6 +56682,9 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
     // Pubs (2026-11-10): their own item list, the pub answers and the owner features (games).
     type: venue.type, pubInfo: venue.type === 'pub' ? (live.pub_info || venuePubInfo(venue.id)) : null,
+    // Cafés (2026-11-10): the kind of café, the season answer and the café's own answers.
+    ...(venue.type === 'cafe' ? { placeType: venuePlaceType(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
+      cafeInfo: live.cafe_info || cafeInfoAnswers(venue.id), dogFriendly: !!venue.dog_friendly, kidFriendly: !!venue.kid_friendly } : {}),
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };
 }
@@ -56533,7 +56935,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const listing = fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
   const dayLabel = (d) => (fr ? OWNER_DAY_LABELS_FR[d].charAt(0).toUpperCase() + OWNER_DAY_LABELS_FR[d].slice(1) : OWNER_DAY_LABELS[d]);
   const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
-  const showHappyHour = portalFields(venue.type).happyHour;
+  const showHappyHour = happyHourAllowed(venue);
   // Average spend per person (2026-11-08): restaurants and pubs only. Everything it adds to the page is inside this flag,
   // so the edit page of every other type is byte for byte what it was.
   const avgSpendOn = !!portalFields(venue.type).avgSpend;
@@ -58281,7 +58683,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, ...(venue.type === 'cafe' ? { extraTopics: CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }
@@ -63469,6 +63871,9 @@ module.exports = {
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
+  // Cafés (2026-11-10).
+  CAFE_SETUP_PART1, CAFE_SETUP_PART2, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
+  cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,

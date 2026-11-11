@@ -227,7 +227,7 @@ test('help: average spend says "soon" while it isn’t shown publicly; other typ
   const html = await text(`/owner/${t}/setup`);
   assert.match(html, /Price per person: on your page soon/); // pub test 8: the label says what it asks
   assert.match(html, /Your average spend will show on your page soon\./);
-  for (const type of ['brewery', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup since 2026-11-10
     const o = mk(type);
     const r = await fetch(`${base}/owner/${tokenFor(o.id)}/setup`, { redirect: 'manual' });
     assert.equal(r.status, 302, `${type} goes back to its edit page`);

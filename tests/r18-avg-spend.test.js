@@ -152,6 +152,9 @@ test('only three code paths read average spend: the admin read, the flagged API 
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const uses = src.split('\n').filter((l) => /venueAvgSpend\(/.test(l) && !/^\s*(\/\/|function )/.test(l)).length;
   // 2026-11-08: the third is the owner's own edit page (ownerVenueSnapshot, restaurants and pubs only). No public page reads it.
-  assert.equal(uses, 3, 'only the admin read, the flagged API read and the owner portal snapshot call venueAvgSpend');
+  // 2026-11-10: the fourth is a café's own page line ("About $9 for a coffee and a pastry"), owner amounts only and behind
+  // the same AVG_SPEND_PUBLIC flag (cafeInfoLinesHtml).
+  assert.equal(uses, 4, 'only the admin read, the flagged API read, the owner portal snapshot and the flagged café line call venueAvgSpend');
+  assert.ok(src.split('\n').some((l) => /const spend = avgSpendPublic\(\) \? venueAvgSpend\(venue\.id\) : null;/.test(l)), 'the café line is behind the flag');
   assert.ok(src.split('\n').some((l) => /portalFields\(venue\.type\)\.avgSpend \? \{ avg_spend: venueAvgSpend\(/.test(l)), 'the owner portal snapshot (restaurants and pubs only) is one of them');
 });

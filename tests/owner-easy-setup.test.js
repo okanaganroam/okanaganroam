@@ -73,7 +73,7 @@ test('route: a restaurant gets the setup page (edit link, French, signed in); th
 });
 
 test('route: other types go back to their edit page; their edit pages have no setup card', async () => {
-  for (const type of ['winery', 'brewery', 'cafe']) {
+  for (const type of ['winery', 'brewery', 'distillery']) { // cafés have the setup since 2026-11-10
     const v = mk(type);
     const t = tokenFor(v.id);
     const r = await get(`/owner/${t}/setup`);

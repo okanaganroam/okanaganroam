@@ -201,7 +201,7 @@ test('no new pages: sitemap and robots are the same with and without cuisine lis
     const r = await fetch(base + p, { redirect: 'manual' });
     assert.ok(r.status !== 200 || !/servesCuisine/.test(await r.text()) || p.includes('?'), `${p} is not a new page`);
   }
-  for (const type of ['winery', 'cafe', 'pub', 'brewery']) {
+  for (const type of ['winery', 'pub', 'brewery']) { // cafés have the kind-of-café picker since 2026-11-10
     const o = mk(type, { cuisine: type === 'cafe' ? 'Coffee' : null });
     const html = await get(`/owner/${tokenFor(o.id)}`);
     assert.ok(!/data-cu="/.test(html) && !/What kind of place\?/.test(html), `${type} has no cuisine tiles`);

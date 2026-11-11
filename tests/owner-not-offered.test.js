@@ -158,7 +158,7 @@ test('refused: an item the page already shows, an unknown or core item, a repeat
     assert.equal(r.status, 400, JSON.stringify(bad));
   }
   assert.deepEqual(app.venueNotOffered(v.id), []);
-  for (const t of ['cafe', 'winery', 'brewery']) {
+  for (const t of ['distillery', 'winery', 'brewery']) { // cafés have the setup and checklist since 2026-11-10
     const w = mk(t);
     const r = await post(tokenFor(w.id), { not_offered: ['instagram'] });
     assert.equal(r.status, 400, t);
@@ -224,7 +224,7 @@ test('nothing public changes: the venue page, the API and the Verified tick stay
 });
 
 test('other types: no buttons, no data, no field word, no help topic (EN + FR)', async () => {
-  for (const t of ['cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
+  for (const t of ['winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
     const v = mk(t);
     for (const lang of ['', '/fr']) {
       const html = await get(`${lang}/owner/${tokenFor(v.id)}`);
