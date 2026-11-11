@@ -203,7 +203,11 @@ test('public page: kind, what they serve, price per person by kind, laptops, til
     diet: { milks: ['oat', 'soy'], milk_extra: 'no' } } });
   await change(t, { badges: { wifi: true, drive_thru: true, dog_treats: true } });
   await change(t, { avg_spend: 9 });
-  const en = page(v, 'en'), fr = page(v, 'fr');
+  // Average spend stays off public pages until AVG_SPEND_PUBLIC=1, like every type.
+  assert.ok(!/About \$9 for/.test(page(v, 'en')), 'hidden while the flag is off');
+  process.env.AVG_SPEND_PUBLIC = '1';
+  let en, fr;
+  try { en = page(v, 'en'); fr = page(v, 'fr'); } finally { delete process.env.AVG_SPEND_PUBLIC; }
   assert.match(en, /Coffee shop · Espresso drinks, baked fresh here and pastries/);
   assert.match(en, /About \$9 for a coffee and a pastry/);
   assert.match(en, /Laptops welcome all day · lots of seats inside/);
@@ -233,7 +237,8 @@ test('public page: kind, what they serve, price per person by kind, laptops, til
   // A research estimate is never shown; nothing until the business says.
   const r = mk('cafe');
   db.prepare("INSERT INTO venue_avg_spend (venue_id, amount, source, info) VALUES (?, 12, 'research', ?)").run(r.id, JSON.stringify({ amount: 12, source: 'research' }));
-  assert.ok(!/About \$12 for/.test(page(r, 'en')));
+  process.env.AVG_SPEND_PUBLIC = '1';
+  try { assert.ok(!/About \$12 for/.test(page(r, 'en'))); } finally { delete process.env.AVG_SPEND_PUBLIC; }
   assert.equal(app.cafeInfoLinesHtml(app.getVenue(mk('cafe').id), false), '');
 });
 

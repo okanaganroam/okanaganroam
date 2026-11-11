@@ -19850,8 +19850,9 @@ function cafeInfoLinesHtml(venue, fr) {
   const kind = venuePlaceType(venue);
   const serves = (info.serves || []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
-  // The owner's own number only (never a research estimate), in café words (Decided 2).
-  const spend = venueAvgSpend(venue.id);
+  // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
+  // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
+  const spend = avgSpendPublic() ? venueAvgSpend(venue.id) : null;
   if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(spend.amount, kind, fr)]);
   const stay = info.stay || {};
   const stayBits = [];

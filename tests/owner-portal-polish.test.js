@@ -80,7 +80,7 @@ test('photo section on the edit link: no "Slide it", the previews are explained;
   }
   assert.match(html, /progress\.classList\.toggle\('op-ok', !!sent\);/);
   assert.match(html, /#ofProgress\.op-ok \{ color: #1E6B3A;/);
-  const cafe = await get(`/owner/${tokenFor(mk('cafe').id)}`);
+  const cafe = await get(`/owner/${tokenFor(mk('distillery').id)}`); // cafés have the setup and checklist since 2026-11-10
   assert.doesNotMatch(cafe, /op-ok/);
 });
 

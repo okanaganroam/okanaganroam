@@ -142,7 +142,7 @@ test('5. the ceiling: photos and the storefront spot are named as the last steps
 });
 
 test('other types: no bar, and their edit pages carry none of the new words', async () => {
-  for (const type of ['brewery', 'cafe', 'winery']) {
+  for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup and checklist since 2026-11-10
     const html = await get(`/owner/${tokenFor(mk(type, { hours: week, happy_hour: 1 }).id)}`);
     assert.ok(!html.includes('id="opComplete"'), type);
     for (const w of ['Add your happy hour times', 'last steps to 100%', 'Link to your menu, or snap a photo of it']) assert.ok(!html.includes(w), `${type}: ${w}`);

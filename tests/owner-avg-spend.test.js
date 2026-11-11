@@ -45,8 +45,9 @@ const stored = (id) => app.venueAvgSpend(id);
 
 test('field map: only restaurants and pubs are offered average spend; an unknown type is not', () => {
   const on = Object.keys(app.PORTAL_FIELDS_BY_TYPE).filter((t) => app.portalFields(t).avgSpend).sort();
-  assert.deepEqual(on, ['pub', 'restaurant']);
-  for (const t of ['cafe', 'brewery', 'winery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) assert.equal(app.portalFields(t).avgSpend, false, t);
+  // Cafés too since 2026-11-10, as "Price per person" in café words (SPEC-cafes.md Decided 2; tests/owner-cafes.test.js).
+  assert.deepEqual(on, ['cafe', 'pub', 'restaurant']);
+  for (const t of ['brewery', 'winery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) assert.equal(app.portalFields(t).avgSpend, false, t);
   assert.equal(app.portalFields('a-type-added-later').avgSpend, false);
 });
 
@@ -81,7 +82,7 @@ test('edit page: the box shows for a restaurant (with our estimate) and a pub, i
 });
 
 test('edit page: cafes, breweries, wineries, beaches and shops do not get the box (or any of its code)', async () => {
-  for (const t of ['cafe', 'brewery', 'winery', 'distillery', 'beach', 'shop', 'golf', 'tour']) {
+  for (const t of ['brewery', 'winery', 'distillery', 'beach', 'shop', 'golf', 'tour']) { // cafés have Price per person since 2026-11-10
     const v = mk(t);
     const html = await get(`/owner/${tokenFor(v.id)}`);
     for (const word of ['opAvg', 'avg_spend', 'avgspend', 'Average spend', 'op-money', 'That\'s right', 'avgThanks', 'dépense moyenne']) {
@@ -91,8 +92,9 @@ test('edit page: cafes, breweries, wineries, beaches and shops do not get the bo
     const frHtml = await get(`/fr/owner/${tokenFor(v.id)}`);
     assert.ok(!/opAvg|Dépense moyenne/.test(frHtml), `${t}: French page has none either`);
   }
-  // An average spend row for a cafe (research could have written one) still does not show on its edit page.
-  const cafe = mk('cafe');
+  // An average spend row for a distillery (research could have written one) still does not show on its edit page.
+  // (Cafés have Price per person since 2026-11-10.)
+  const cafe = mk('distillery');
   setResearch(cafe.id, 14);
   assert.ok(!(await get(`/owner/${tokenFor(cafe.id)}`)).includes('opAvg'));
 });
@@ -219,7 +221,7 @@ test('validation: whole dollars 5 to 300, a friendly error, nothing written', as
 });
 
 test('only restaurants and pubs can send it: a cafe or a beach is refused and nothing is written', async () => {
-  for (const t of ['cafe', 'winery', 'brewery', 'beach', 'shop']) {
+  for (const t of ['distillery', 'winery', 'brewery', 'beach', 'shop']) { // cafés can since 2026-11-10
     const v = mk(t);
     const r = await post(tokenFor(v.id), { avg_spend: '25' });
     assert.equal(r.status, 400, t);

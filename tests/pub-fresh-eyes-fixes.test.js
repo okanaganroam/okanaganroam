@@ -63,7 +63,7 @@ test('A: a pub\'s find-link note is its own request and never overwrites the men
   const rest = mk('restaurant');
   assert.equal((await post(`/owner/${tokenFor(rest.id)}/menu/help`, { note: 'Our Facebook page is X', sheet: 'facebook', contact_email: '', contact_phone: '' })).status, 200);
   // A type without the easy setup can't send a note kind, and nothing is folded into a menu row.
-  const cafe = mk('cafe'); const ct = tokenFor(cafe.id);
+  const cafe = mk('winery'); const ct = tokenFor(cafe.id); // cafés have the setup and checklist since 2026-11-10
   assert.equal((await post(`/owner/${ct}/menu/help`, { note: 'Our menu is at example.com', contact_email: '', contact_phone: '' })).status, 200);
   const cafeRow = db.prepare('SELECT * FROM venue_menus WHERE venue_id = ?').get(cafe.id);
   assert.equal((await post(`/owner/${ct}/menu/help`, { note: 'Our Facebook page is X', sheet: 'facebook', contact_email: '', contact_phone: '' })).status, 400);
