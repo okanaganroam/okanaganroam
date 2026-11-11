@@ -106,7 +106,49 @@ const PUB_ITEMS = [
   R('owner_confirmed', { w: 3 }),
 ];
 if (PUB_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: pub weights must sum to 100');
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS };
+// Cafés (Dayton, Nov 10 2026; drafts/cafe-portal-2026-11-10/SPEC-cafes.md, "Decided"): the same engine with their own
+// 100 points. Seven items are new: what kind of café, all year or seasonal, what you serve, staying a while (seats and
+// laptops), Wi-Fi, dogs and kids, and ordering. Wi-Fi, laptops and ordering are owner-only (never researched). Happy
+// hour, events and specials are optional and unscored, so a café that has none can still reach 100%.
+const CAFE_KINDS = ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches'];
+const CAFE_SERVES = ['espresso', 'drip', 'tea', 'baked_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine'];
+const CAFE_LAPTOPS = ['all_day', 'not_busy', 'none'];
+const CAFE_SEATS = ['takeout', 'few', 'lots'];
+const CAFE_ORDER_FEATURES = ['drive_thru', 'walk_up'];
+const CAFE_ITEMS = [
+  R('address_pin', { w: 4 }),
+  R('phone', { w: 4, whyEn: 'The number guests call with a question or a cake order.', whyFr: 'Le numéro que les clients appellent pour une question ou une commande de gâteau.' }),
+  R('website', { w: 3 }),
+  { key: 'cafe_kind', group: 'basics', w: 3, fix: true, target: { setup: 'cuisine' }, fields: ['place_type'],
+    en: 'What kind of café', fr: 'Quel genre de café', whyEn: 'Coffee shop, bakery, gelato, bubble tea and so on. Pick one.', whyFr: 'Café, boulangerie, gelato, thé aux perles, etc. Choisissez-en un.', btnEn: 'Pick one', btnFr: 'Choisir', icon: '☕' },
+  R('hours', { w: 8 }),
+  R('hours_fresh', { w: 4 }),
+  { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'closures' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
+    en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Ice cream and patio cafés often close for winter. Say so, so nobody drives out to a closed door.', whyFr: 'Les bars laitiers et les cafés-terrasses ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
+  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your counter, your coffee, your baking.', whyFr: 'De vraies photos seulement, prises par vous. Votre comptoir, votre café, vos pâtisseries.' }),
+  R('photo_extra', { w: 7, whyEn: 'Your counter, your coffee, your baking, your seats.', whyFr: 'Votre comptoir, votre café, vos pâtisseries, vos places assises.' }),
+  { key: 'serves', group: 'serve', w: 6, fix: true, target: { setup: 'cuisine:serve' }, fields: ['cafe_info'],
+    en: 'What you serve', fr: 'Ce que vous servez', whyEn: 'Espresso, pastries baked here, lunch, gelato, bubble tea: tick all that apply.', whyFr: 'Espresso, pâtisseries maison, dîner, gelato, thé aux perles : cochez tout ce qui s’applique.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥐' },
+  R('menu', { group: 'serve', w: 6 }),
+  R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Whole dollars.', whyFr: 'Combien coûtent environ un café et une pâtisserie? En dollars entiers.' }),
+  R('dietary', { group: 'serve', w: 4, noneEn: 'None of these', noneFr: 'Aucune de ces options', whyEn: 'Vegan, vegetarian, gluten-free or dairy-free milks. Tick what you offer.', whyFr: 'Options véganes, végétariennes, sans gluten ou laits végétaux. Cochez ce que vous offrez.' }),
+  { key: 'stay', group: 'yourvisit', w: 5, fix: true, target: { setup: 'stay' }, fields: ['cafe_info'],
+    en: 'Seats and laptops', fr: 'Places et ordinateurs portables', whyEn: 'Takeout only, a few seats or lots, and whether laptops are welcome.', whyFr: 'Pour emporter seulement, quelques places ou beaucoup, et si les ordinateurs portables sont bienvenus.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💻' },
+  { key: 'wifi', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'], noneEn: 'We don’t have Wi-Fi', noneFr: 'Nous n’avons pas de Wi-Fi',
+    en: 'Wi-Fi', fr: 'Wi-Fi', whyEn: 'Visitors look for it on the map.', whyFr: 'Les visiteurs le cherchent sur la carte.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📶' },
+  { key: 'dogs_kids', group: 'yourvisit', w: 4, fix: true, target: { setup: 'offer' }, fields: ['badges', 'owner_features'],
+    en: 'Dogs and kids', fr: 'Chiens et enfants', whyEn: 'Dogs welcome, dog treats, kids welcome, stroller space, or no dogs allowed.', whyFr: 'Chiens bienvenus, gâteries pour chiens, enfants bienvenus, place pour poussettes, ou chiens non admis.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🐕' },
+  { key: 'ordering', group: 'yourvisit', w: 5, fix: true, target: { setup: 'order' }, fields: ['cafe_info', 'owner_features'], noneEn: 'Order at the counter only', noneFr: 'Commande au comptoir seulement',
+    en: 'Ordering', fr: 'Commander', whyEn: 'Order online, a drive-thru or walk-up window, or custom cakes and pre-orders.', whyFr: 'Commande en ligne, service au volant ou comptoir extérieur, ou gâteaux sur commande.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🛍️' },
+  R('description', { w: 5 }),
+  R('pyv_known', { group: 'about', w: 3, whyEn: 'One line, like “Cinnamon buns and the window seats”.', whyFr: 'Une ligne, comme « Les brioches à la cannelle et les places près de la fenêtre ».' }),
+  R('instagram', { w: 3 }),
+  R('facebook', { w: 3 }),
+  R('arrival', { w: 2 }),
+  R('owner_confirmed', { w: 2 }),
+];
+if (CAFE_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: café weights must sum to 100');
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -116,7 +158,7 @@ const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 const EXTRA_NONE_KEYS = ['dogs'];
 const noneKeysFor = (type) => itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS);
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -134,6 +176,8 @@ const GOT_TEXT = {
   sports: { en: 'Got it: no sports on TV', fr: 'C’est noté : pas de sports à la télé' },
   games: { en: 'Got it: no games', fr: 'C’est noté : pas de jeux' },
   dogs: { en: 'Got it: no dogs allowed', fr: 'C’est noté : chiens non admis' },
+  wifi: { en: 'Got it: no Wi-Fi', fr: 'C’est noté : pas de Wi-Fi' },
+  ordering: { en: 'Got it: order at the counter only', fr: 'C’est noté : commande au comptoir seulement' },
 };
 if (ALL_NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;
@@ -156,8 +200,9 @@ const SECONDS = {
   pyv_known: 45, pyv_reservations: 45, pyv_takeout: 30, pyv_groups: 45,
   description: 180, instagram: 30, facebook: 30, arrival: 90, owner_confirmed: 0,
   kitchen: 20, sports: 30, games: 15, minors: 20,
+  cafe_kind: 10, season: 15, serves: 20, stay: 20, wifi: 5, dogs_kids: 15, ordering: 40,
 };
-if ([...ITEMS, ...PUB_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -170,7 +215,8 @@ const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
 // from an edit link, so there they sit under "When you have a few minutes".
 const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', hours_fresh: 'hours_checked', avg_spend: 'avg_spend', dietary: 'badges',
   instagram: 'instagram_url', facebook: 'facebook_url', pyv_known: 'visit_rows', pyv_reservations: 'visit_rows', pyv_takeout: 'visit_rows', pyv_groups: 'visit_rows',
-  kitchen: 'pub_info', sports: 'pub_info', minors: 'pub_info', games: 'owner_features' };
+  kitchen: 'pub_info', sports: 'pub_info', minors: 'pub_info', games: 'owner_features',
+  cafe_kind: 'place_type', season: 'cafe_info', serves: 'cafe_info', stay: 'cafe_info', wifi: 'owner_features', dogs_kids: 'badges' };
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
   if (!keys.size) return 0;
@@ -194,6 +240,8 @@ const GROUPS = [
   { key: 'food', en: 'Food & drink', fr: 'Nourriture et boissons' },
   { key: 'whatson', en: 'What’s on', fr: 'À l’affiche' },
   { key: 'yourvisit', en: 'Your visit', fr: 'Votre visite' },
+  // Cafés (2026-11-10).
+  { key: 'serve', en: 'What you serve', fr: 'Ce que vous servez' },
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
@@ -247,6 +295,22 @@ function doneMap(input, today) {
     sports: Array.isArray(pub.sports && pub.sports.list) && pub.sports.list.length > 0,
     games: PUB_GAME_KEYS.some((k) => feats.has(k)),
     minors: PUB_MINORS_POLICIES.includes(pub.minors && pub.minors.policy),
+    // Cafés (2026-11-10): the kind of café, venue_cafe_info and the owner features (Wi-Fi, drive-thru, walk-up, dogs and kids).
+    ...(i.type === 'cafe' ? (() => {
+      const c = i.cafeInfo && typeof i.cafeInfo === 'object' ? i.cafeInfo : {};
+      const stay = c.stay || {}, order = c.order || {};
+      return {
+        cafe_kind: CAFE_KINDS.includes(i.placeType),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || c.year === 'all' || c.year === 'seasonal',
+        serves: Array.isArray(c.serves) && c.serves.length > 0,
+        // Dairy-free milks count as a dietary option for a café (the tile, or the milks named in Dietary details).
+        dietary: !!(i.vegan || i.vegetarian || i.glutenFree) || labels.has('dietary') || feats.has('dairy_free_milk') || (Array.isArray((c.diet || {}).milks) && c.diet.milks.length > 0),
+        stay: CAFE_LAPTOPS.includes(stay.laptops) || CAFE_SEATS.includes(stay.seats),
+        wifi: feats.has('wifi'),
+        dogs_kids: !!(i.dogFriendly || i.kidFriendly) || feats.has('stroller') || feats.has('dog_treats') || (i.declaredNone || []).includes('dogs'),
+        ordering: nonBlank(order.online_url) || !!(order.preorder && (nonBlank(order.preorder.url) || nonBlank(order.preorder.phone) || order.preorder.on)) || CAFE_ORDER_FEATURES.some((k) => feats.has(k)),
+      };
+    })() : {}),
     ...(i.type === 'pub' ? {
       // "We don't serve food" in the kitchen question also answers the food type.
       cuisine: nonBlank(i.cuisine) || !!(pub.kitchen && pub.kitchen.mode === 'none'),
@@ -911,4 +975,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

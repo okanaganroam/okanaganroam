@@ -1568,4 +1568,16 @@ CREATE TABLE IF NOT EXISTS venue_pub_info (
 );
 `);
 
+// Café answers only the business gives (Dayton, 2026-11-10; never researched): what they serve, dietary details,
+// staying a while (seats, laptops, outlets, quiet), ordering (online link, pre-orders), coffee, and the "sells out
+// early" tip. info: JSON { serves, diet, stay, order, coffee, sellout, year } (keys optional). Additive: a café with no
+// row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_cafe_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 module.exports = db;
