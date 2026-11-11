@@ -422,6 +422,9 @@
   function monthChips(obj, key){ var l = []; for (var i = 1; i <= 12; i++) l.push({ k: i, t: monthName(i - 1) }); return chips(obj, key, l, T.whichMonths); }
   // Website shown as a plain domain ("tapsidepub.ca"), or "No website yet" / "You don't have a website".
   function siteDomain(u){ return String(u || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, ''); }
+  // "https://tapandbarrelkitchen.ca/" from "https://tapandbarrelkitchen.ca/?utm_source=okanaganroam#top" (pub test 9).
+  function siteOrigin(u){ var t = String(u || '').trim(); if (!t) return ''; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^([a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+)/i.exec(t); return m ? m[1] + '/' : ''; }
+  function siteHostOf(u){ return siteOrigin(u).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
   function siteOk(u){ var d = siteDomain(u); return /^[^\s\/]+\.[^\s\/]{2,}(\/\S*)?$/.test(d) && d.length <= 290; }
   // Phone (pub test 3, 2026-11-10): a new number goes on the page straight away; the server checks it is a real North
   // American number and writes it as 250-555-0123. The same digits typed another way are not a change.
@@ -766,12 +769,14 @@
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n && (S.error || S.busy) ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '')
         + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
-      var site = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // Pub test 9 (2026-11-10): only the website's origin ("https://tapandbarrelkitchen.ca/"), never its path, query or
+      // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
+      var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
-        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: site.replace(/^www\./i, '') })) + '</button></p>' : '')
-        + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: site || 'yourplace.com' })))
+        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
+        + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: siteHost || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
       var mail = 'mailto:' + C.email + '?subject=' + encodeURIComponent(fill(T.mailSubject, { name: C.name }));
@@ -1327,7 +1332,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, ''); S.webUrl = uu.value; uu.focus(); } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
