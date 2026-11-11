@@ -62,3 +62,19 @@ test('venue map card: the pin comes from the coordinates; no card without them o
   assert.equal(polish.mapCard({ ...base, lat: NaN, lng: -119.5 }), '');
   assert.equal(polish.mapCard({ ...base, lat: 49.8888, lng: -119.5035, map: null }), '');
 });
+
+test('older filter layout: the search box and the filter pills are wrapped in one sticky bar, nothing else changes', () => {
+  const search = '<div class="fd-search"><label class="visually-hidden" for="fdSearch">Search</label><input type="search" id="fdSearch" class="fd-search-input"></div>';
+  const controls = '<div class="fd-controls js"><div class="fd-pop"><button class="fd-pop-btn" id="fdFeaturesBtn">Filters</button><div class="fd-pop-panel" id="fdFeaturesPanel" hidden><div>Patio</div></div></div><button class="fd-pop-btn" id="fdOpenNow">Open now</button></div>';
+  const wrap = (inner) => `<!DOCTYPE html><html><head></head><body class="golf-page outdoor-page fd-page fd-scoped-page"><main>${inner}<section><ul class="card-grid"></ul></section></main></body></html>`;
+  const together = polish.apply(wrap(search + '\n' + controls));
+  assert.ok(together.includes('<div class="rp-filterbar rp-filterbar-search">' + search + '\n' + controls + '</div><section>'), 'both in one bar');
+  assert.equal(together.replace('<div class="rp-filterbar rp-filterbar-search">', '').replace(controls + '</div><section>', controls + '<section>').replace(polish.block + '\n', ''), wrap(search + '\n' + controls), 'only the wrapper is added');
+  const apart = polish.apply(wrap(search + '<nav class="fd-type-tabs">All</nav>' + controls));
+  assert.ok(apart.includes('<nav class="fd-type-tabs">All</nav><div class="rp-filterbar">' + controls + '</div><section>'), 'something between them: only the pills are wrapped');
+  assert.equal(polish.apply(together), together, 'applying twice adds nothing');
+  const newer = wrap('<div class="fd-toolbar">' + search + controls + '</div>');
+  assert.doesNotMatch(polish.apply(newer), /<div class="rp-filterbar/, 'a page that already has the toolbar is left alone');
+  assert.doesNotMatch(polish.apply(wrap('<p>No filters here</p>')), /<div class="rp-filterbar/);
+  assert.match(polish.css, /\.rp-filterbar\{position:sticky;top:calc\(var\(--rp-header-h\) \+ 10px\)/);
+});

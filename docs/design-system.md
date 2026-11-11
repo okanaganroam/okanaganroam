@@ -72,6 +72,9 @@ List pages keep their existing markup; the stylesheet restyles these parts:
 </body>
 ```
 
+- Pages on the older filter layout (no `.fd-toolbar`) get the same bar: `roamPolish.apply` wraps their search box and
+  filter pills in `<div class="rp-filterbar">` (the pills alone when something sits between the two). Ids and order
+  are unchanged, so the page's filter script needs no change.
 - The filter bar sticks under the site header. On phones only the row of filter pills stays; the search box scrolls away.
 - Cards lift and their photo zooms slowly on hover (devices with a pointer only).
 - `data-fd-open="open"` gets a pulsing dot. Closed, unknown and by-appointment do not.

@@ -76,6 +76,14 @@ html body.fd-page .fd-toolbar .fd-search-input:focus-visible{outline:0;border-co
 html body.fd-page .fd-pop-btn,html body.fd-page .fd-sort select{transition:background-color .2s,color .2s,border-color .2s,transform .25s var(--rp-ease)}
 html body.fd-page .fd-pop-btn:hover{border-color:var(--rp-ink);transform:translateY(-1px)}
 
+/* Pages on the older filter layout have no .fd-toolbar: apply() wraps their search box and filter pills in
+   .rp-filterbar (or the pills alone, when something sits between the two), which sticks the same way. */
+html body.fd-page .rp-filterbar{position:sticky;top:calc(var(--rp-header-h) + 10px);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin:0 0 16px;padding:12px 14px;border:1px solid #e6dfcecc;border-radius:var(--rp-radius-lg);background:#fffaf0e6;-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);box-shadow:var(--rp-shadow-2)}
+html body.fd-page .rp-filterbar > .fd-search{flex:1 1 300px;max-width:520px;margin:0}
+html body.fd-page .rp-filterbar > .fd-search .fd-search-input{width:100%;transition:border-color .2s,box-shadow .25s var(--rp-ease)}
+html body.fd-page .rp-filterbar > .fd-search .fd-search-input:focus-visible{outline:0;border-color:var(--rp-ink);box-shadow:0 0 0 3px #f1dda1cc}
+html body.fd-page .rp-filterbar > .fd-controls{flex:0 1 auto;width:auto;margin:0}
+
 /* Venue cards: softer depth, a lift and a slow photo zoom on hover. */
 html body.golf-page.fd-page .card-grid > li.venue-card.venue-card:not(.rp-off){border-radius:var(--rp-radius);box-shadow:var(--rp-shadow-1);transition:transform .45s var(--rp-ease),box-shadow .45s var(--rp-ease)}
 html body.golf-page.fd-page .card-grid > li.venue-card.venue-card:not(.rp-off)::before{transition:transform .9s var(--rp-ease);transform-origin:50% 60%;will-change:transform}
@@ -93,6 +101,9 @@ html body.fd-page .fd-open-status[data-fd-open="open"]::after{content:'';positio
 /* Phones: only the row of filter pills stays; the search box scrolls away under the header. */
 @media(max-width:560px){
 html body.fd-page .fd-toolbar{top:calc(var(--rp-header-h) - 60px);border-radius:var(--rp-radius)}
+html body.fd-page .rp-filterbar{padding:10px;border-radius:var(--rp-radius)}
+html body.fd-page .rp-filterbar.rp-filterbar-search{top:calc(var(--rp-header-h) - 60px)}
+html body.fd-page .rp-filterbar > .fd-search{flex-basis:100%;max-width:none}
 }
 @media(max-width:700px){
 html body.fd-page .category-hero h1{font-size:2rem}
@@ -117,7 +128,7 @@ body.town-page .bw-essentials,body.kelowna-page .bw-essentials{border-radius:var
 /* People who ask for less motion get none. */
 @media(prefers-reduced-motion:reduce){
 .rp-lift,.rp-zoom img,.rp-pill,.rp-live-dot::after,
-html body.fd-page .fd-toolbar,html body.fd-page .category-banner img,html body.fd-page .card-grid > li.venue-card,html body.fd-page .card-grid > li.venue-card::before,html body.fd-page .fd-open-status::after,html body.fd-page .venue-card .venue-card-cue,
+html body.fd-page .fd-toolbar,html body.fd-page .rp-filterbar,html body.fd-page .category-banner img,html body.fd-page .card-grid > li.venue-card,html body.fd-page .card-grid > li.venue-card::before,html body.fd-page .fd-open-status::after,html body.fd-page .venue-card .venue-card-cue,
 body.town-page .bw-tile,body.town-page .bw-pick,body.town-page .bw-tile img,body.town-page .bw-pick img,body.kelowna-page .bw-tile,body.kelowna-page .bw-pick,body.kelowna-page .bw-tile img,body.kelowna-page .bw-pick img{animation:none!important;transition:none!important;transform:none!important}
 }
 `;
@@ -240,13 +251,42 @@ const css = TOKENS + GUIDE + VENUE;
 const block = `<style>${css}</style>`;
 // Pages the guide template covers: list pages and town pages.
 const COVERED = /<body[^>]*class="(?:[^"]*\s)?(?:fd-page|town-page|kelowna-page|fd-venue-page)(?:\s[^"]*)?"/;
+const LIST_PAGE = /<body[^>]*class="(?:[^"]*\s)?fd-page(?:\s[^"]*)?"/;
 const VENUE_PAGE = /<body[^>]*class="(?:[^"]*\s)?fd-venue-page(?:\s[^"]*)?"/;
+// The end (index after the closing tag) of the <div> that starts at \`from\`, or -1.
+function divEnd(html, from) {
+  const re = /<(\/?)div\b[^>]*>/g;
+  re.lastIndex = from;
+  let depth = 0, m;
+  while ((m = re.exec(html))) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return re.lastIndex;
+    if (depth < 0) return -1;
+  }
+  return -1;
+}
+// A list page on the older filter layout (no .fd-toolbar): its search box and filter pills go into one .rp-filterbar so
+// they can stick together. When something sits between them (a guide's type tabs), only the pills are wrapped. The
+// elements themselves, their ids and their order are unchanged, so the page's filter script works as before.
+function filterBar(html) {
+  if (html.indexOf('class="fd-toolbar"') !== -1 || html.indexOf('<div class="rp-filterbar') !== -1) return html;
+  const cAt = html.search(/<div class="fd-controls(?: js)?">/);
+  if (cAt === -1) return html;
+  const cEnd = divEnd(html, cAt);
+  if (cEnd === -1) return html;
+  const sAt = html.lastIndexOf('<div class="fd-search">', cAt);
+  const sEnd = sAt === -1 ? -1 : divEnd(html, sAt);
+  const together = sEnd !== -1 && sEnd <= cAt && html.slice(sEnd, cAt).trim() === '';
+  const start = together ? sAt : cAt;
+  return html.slice(0, start) + '<div class="rp-filterbar' + (together ? ' rp-filterbar-search' : '') + '">' + html.slice(start, cEnd) + '</div>' + html.slice(cEnd);
+}
 function apply(html) {
   if (typeof html !== 'string' || !COVERED.test(html) || html.indexOf(block) !== -1) return html;
   const at = html.indexOf('</head>');
   if (at === -1) return html;
   const out = html.slice(0, at) + block + '\n' + html.slice(at);
-  return VENUE_PAGE.test(out) ? venueIcons(out) : out;
+  if (VENUE_PAGE.test(out)) return venueIcons(out);
+  return LIST_PAGE.test(out) ? filterBar(out) : out;
 }
 
-module.exports = { css, block, apply, TOKENS, GUIDE, VENUE, icon, venueIcons, mapCard };
+module.exports = { filterBar, css, block, apply, TOKENS, GUIDE, VENUE, icon, venueIcons, mapCard };
