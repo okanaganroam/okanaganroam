@@ -57563,9 +57563,11 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
               p.className = 'op-save-line op-save-sent';
             }
           });
-          var tt = document.getElementById('opToast');
-          if (tt) { tt.textContent = document.getElementById('opDoneText').textContent; tt.hidden = false; clearTimeout(window.opToastT); window.opToastT = setTimeout(function(){ tt.hidden = true; }, 8000); }` : ''}
-          form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
+          // Pub test 9 (2026-11-10): the thanks shows once. The top toast repeated the panel's own "Thanks!" just below it,
+          // so the panel itself is brought into view instead.
+          var tt = document.getElementById('opToast'); if (tt) tt.hidden = true;` : ''}
+          form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0);${completeOn ? `
+          try { document.getElementById('opDone').scrollIntoView({ block: 'center' }); } catch (e) {}` : ''} return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
