@@ -179,7 +179,15 @@
   function coffeeOn(){ return !S.place || NO_COFFEE.indexOf(S.place) < 0 || !!(S.cafe.serves.espresso || S.cafe.serves.drip); }
   function syncCoffee(){ if (!C.cafe) return; var on = coffeeOn(), i = STEPS.indexOf('coffee'), j = P2.indexOf('coffee'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('coffee') >= 0) { STEPS.push('coffee'); P2.push('coffee'); } }
   // The serve chips for the kind: "Baked fresh here" for bakeries, "Made here" for the rest (a ticked one always shows).
-  function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; return true; }); }
+  // Café test 3 (2026-11-11): the gelato-shop chips (sorbet, milkshakes, cones & cups, affogato) only for an ice cream &
+  // gelato kind; a bubble tea shop saw them.
+  var ICE_ONLY = ['sorbet', 'milkshakes', 'cones', 'affogato'];
+  // "Custom cakes and pre-orders" on the ordering screen: bakeries and dessert shops only (or already ticked).
+  var CAKE_KINDS = ['Bakery', 'Bakery café', 'Dessert & sweets'];
+  function cakesShown(){ return !S.place || CAKE_KINDS.indexOf(S.place) >= 0 || !!S.cafe.order.preorder; }
+  // "No dogs allowed": no patio named when the place has none (café test 3).
+  function dogSubText(){ return S.badges.patio ? T.noDogsSub : T.noDogsSubInside || T.noDogsSub; }
+  function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; if (ICE_ONLY.indexOf(o.k) >= 0) return iceKind(); return true; }); }
   // "5.50" for cents (French "5,50"), "9" for whole dollars.
   function money(n){ var t = Math.round(n * 4) / 4 === Math.round(n) ? String(Math.round(n)) : (Math.round(n * 100) / 100).toFixed(2); return C.lang === 'fr' ? t.replace('.', ',') : t; }
   function cafeWords(){ return (C.priceWords || {})[S.place] || (C.priceWords || {}).default || ''; }
@@ -559,6 +567,8 @@
     return seq[(from === 'offer' ? -1 : seq.indexOf(from)) + 1] || null;
   }
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
+  // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
+  if (C.cafe) P2_ICONS.music = '🗓️';
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
@@ -948,7 +958,7 @@
           + (C.cafe && g.keys.indexOf('washroom') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWash ? 'true' : 'false') + '" data-off="no_washroom"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWashroom) + '<span class="su-tile-sub">' + h(T.noWashroomSub) + '</span></button>'
             + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.cafe.stay.seats === 'takeout' ? 'true' : 'false') + '" data-off="takeout_only"><span class="su-e" aria-hidden="true">🥡</span>' + h(T.takeoutOnly) + '<span class="su-tile-sub">' + h(T.takeoutOnlySub) + '</span></button>' : '')
           + (C.pub && g.keys.indexOf('sports_tv') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noSports ? 'true' : 'false') + '" data-off="no_sports"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noSports) + '<span class="su-tile-sub">' + h(T.noSportsSub) + '</span></button>' : '')
-          + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>'
+          + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub" id="suNoDogsSub">' + h(dogSubText()) + '</span></button>'
             // Pub test 8 (2026-11-10): "Service dogs welcome", the follow-up to No dogs (shown only while No dogs is on).
             + (C.offerLabels.service_dogs ? '<button type="button" class="su-tile su-tile-wide su-subtile" id="suServiceDogs" aria-pressed="' + (S.badges.service_dogs ? 'true' : 'false') + '" data-off="service_dogs"' + (S.noDogs ? '' : ' hidden') + '><span class="su-e" aria-hidden="true">' + C.offerIcons.service_dogs + '</span>' + h(C.offerLabels.service_dogs) + '<span class="su-tile-sub">' + h(T.serviceDogsSub) + '</span></button>' : '') : '') + '</div>'; }).join('')
         + '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>'
@@ -964,8 +974,8 @@
     } else if (s === 'order') {
       var od = S.cafe.order;
       x = doneLine('order') + q(T.orderQ, T.orderLead) + msgs() + '<div class="su-tiles">' + ctile('order.online', '🌐', T.orderOnline) + '<button type="button" class="su-tile" aria-pressed="' + (S.badges.drive_thru ? 'true' : 'false') + '" data-cbadge="drive_thru"><span class="su-e" aria-hidden="true">🚗</span>' + h(C.offerLabels.drive_thru) + '</button>'
-        + '<button type="button" class="su-tile" aria-pressed="' + (S.badges.walk_up ? 'true' : 'false') + '" data-cbadge="walk_up"><span class="su-e" aria-hidden="true">🪟</span>' + h(C.offerLabels.walk_up) + '</button>' + ctile('order.preorder', '🎂', T.preorder)
-        + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (od.counter ? 'true' : 'false') + '" data-ctog="order.counter"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.counterOnly) + '<span class="su-tile-sub">' + h(T.counterOnlySub) + '</span></button></div>'
+        + '<button type="button" class="su-tile" aria-pressed="' + (S.badges.walk_up ? 'true' : 'false') + '" data-cbadge="walk_up"><span class="su-e" aria-hidden="true">🪟</span>' + h(C.offerLabels.walk_up) + '</button>' + (cakesShown() ? ctile('order.preorder', '🎂', T.preorder) : '')
+        + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (od.counter ? 'true' : 'false') + '" data-ctog="order.counter"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.counterOnly) + '<span class="su-tile-sub">' + h(cakesShown() ? T.counterOnlySub : T.counterOnlySubNoCakes || T.counterOnlySub) + '</span></button></div>'
         + (od.online ? field('suOurl', T.orderUrlLabel, od.url, { mode: 'url', max: 300 }) + ex(T.orderUrlEx) : '')
         + (od.preorder ? field('suOhow', T.preorderHowLabel, od.how, { max: 120 }) + ex(T.preorderHowEx) + field('suOpurl', T.preorderUrlLabel, od.purl, { mode: 'url', max: 300 }) : '')
         + (od.online || od.preorder ? '<p class="su-hint">' + h(T.linkHint) + '</p>' : '')
@@ -1893,6 +1903,7 @@
       var sdog = function(){ var n = el('suServiceDogs'); if (n) n.hidden = !S.noDogs; };
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
+      if (k === 'patio') { var dsub = el('suNoDogsSub'); if (dsub) dsub.textContent = dogSubText(); }
       if (k === 'dog_friendly' && S.badges[k]) { S.noDogs = false; press('no_dogs', false); S.badges.service_dogs = false; press('service_dogs', false); sdog(); }
       // A heated or covered patio is a patio (pub test 5): ticking it ticks Patio; unticking Patio unticks it.
       if (k === 'heated_patio' && S.badges[k] && !S.badges.patio) { S.badges.patio = true; press('patio', true); }

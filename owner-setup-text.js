@@ -450,7 +450,7 @@ Object.assign(en, {
   // Menu photos: "Add another page" comes first.
   camLeadSome: 'Got another page? Add it first. When every page is here, tap Send. Tap ✕ to retake one.',
   // No dogs: its own answer on "What you offer".
-  noDogs: 'No dogs allowed', noDogsSub: 'Not inside or on the patio',
+  noDogs: 'No dogs allowed', noDogsSub: 'Not inside or on the patio', noDogsSubInside: 'Not inside',
   // "About $24 a person?": Not sure? Skip.
   spendSkip: 'Not sure? Skip',
   fbWhy: 'We find your Facebook link for you, so it shows within a day.',
@@ -460,7 +460,7 @@ Object.assign(fr, {
   hoursEditLead: 'Touchez Modifier à côté d’une journée différente. Les autres journées restent telles quelles.',
   hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven',
   camLeadSome: 'Une autre page? Ajoutez-la d’abord. Quand toutes les pages sont là, touchez Envoyer. Touchez ✕ pour en reprendre une.',
-  noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse',
+  noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse', noDogsSubInside: 'Pas à l’intérieur',
   spendSkip: 'Pas certain? Passer',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
   kitchenNeed: 'Choisissez l’heure à laquelle votre cuisine ferme.',
@@ -651,7 +651,7 @@ en.cafe = {
   orderUrlEx: 'yourcafe.com/order, or your Square or DoorDash page', preorder: 'Custom cakes and pre-orders',
   preorderHowLabel: 'How do people pre-order? (optional)', preorderHowEx: 'Call us 48 hours ahead', preorderUrlLabel: 'Pre-order link (optional)',
   linkHint: 'We check a new link first, usually within a day. Everything else is on your page right away.',
-  counterOnly: 'Order at the counter only', counterOnlySub: 'No online ordering, drive-thru or pre-orders', orderNeed: 'Please tap at least one, or tap “Order at the counter only”.',
+  counterOnly: 'Order at the counter only', counterOnlySub: 'No online ordering, drive-thru or pre-orders', counterOnlySubNoCakes: 'No online ordering or drive-thru', orderNeed: 'Please tap at least one, or tap “Order at the counter only”.',
   orderUrlNeed: 'Please type your ordering link, or untick “Order online”.', badLink: 'Please check the link, for example yourcafe.com/order.',
   dietQ: 'Dietary details', dietLead: 'Visitors with allergies or diets check this before they come.',
   milksQ: 'Dairy-free milks?', milkExtraQ: 'Do they cost extra?', milkExtra: { no: 'No extra charge', yes: 'Yes, extra' },
@@ -690,7 +690,7 @@ fr.cafe = {
   orderUrlEx: 'votrecafe.com/commande, ou votre page Square ou DoorDash', preorder: 'Gâteaux sur commande et précommandes',
   preorderHowLabel: 'Comment précommander? (facultatif)', preorderHowEx: 'Appelez-nous 48 heures à l’avance', preorderUrlLabel: 'Lien de précommande (facultatif)',
   linkHint: 'Nous vérifions d’abord un nouveau lien, en général d’ici un jour. Tout le reste est sur votre page tout de suite.',
-  counterOnly: 'Commande au comptoir seulement', counterOnlySub: 'Ni commande en ligne, ni service au volant, ni précommandes', orderNeed: 'Touchez au moins une réponse, ou touchez « Commande au comptoir seulement ».',
+  counterOnly: 'Commande au comptoir seulement', counterOnlySub: 'Ni commande en ligne, ni service au volant, ni précommandes', counterOnlySubNoCakes: 'Ni commande en ligne, ni service au volant', orderNeed: 'Touchez au moins une réponse, ou touchez « Commande au comptoir seulement ».',
   orderUrlNeed: 'Écrivez votre lien de commande, ou décochez « Commande en ligne ».', badLink: 'Vérifiez le lien, par exemple votrecafe.com/commande.',
   dietQ: 'Détails alimentaires', dietLead: 'Les visiteurs qui ont des allergies ou un régime vérifient ceci avant de venir.',
   milksQ: 'Laits sans produits laitiers?', milkExtraQ: 'Coûtent-ils plus cher?', milkExtra: { no: 'Sans frais', yes: 'Oui, en supplément' },

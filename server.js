@@ -34905,7 +34905,8 @@ const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volu
 // and a "Tonight" tag on tonight's row (words, not only colour; "Today" for a night before 4 PM), then a line with the
 // kind, the detail, the host, the cost and "every other week". French without a French title or detail shows the
 // English, marked lang="en".
-function venueWeeklyNightsHtml(wn, fr) {
+// Café test 3 (2026-11-11): a café's card says "Weekly events" (« Événements de la semaine »); "nights" is a pub word.
+function venueWeeklyNightsHtml(wn, fr, opts = {}) {
   if (!wn || !wn.rows.length) return '';
   const row = ({ s, days, today, onNow, time, freq }) => {
     const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
@@ -34926,7 +34927,7 @@ function venueWeeklyNightsHtml(wn, fr) {
     const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
     return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${seasonTagSpan(s, fr)}${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
-  const label = fr ? 'Soirées de la semaine' : 'Weekly nights';
+  const label = opts.events ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
   return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
 }
 // ---------- Happy hour access (2026-10-26) ----------
@@ -36147,7 +36148,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe' }), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
@@ -36249,7 +36250,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
        in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
   <div class="venue-extra">
   ${venueDealsCardHtml}
-  ${venueWeeklyNightsHtml(weeklyNights, fr)}
+  ${venueWeeklyNightsHtml(weeklyNights, fr, { events: venue.type === 'cafe' })}
   ${fr ? '' : outdoorGoodToKnowHtml(venue)}${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
@@ -57936,7 +57937,7 @@ ${priceFieldHtml}      </details>` : ''}
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      <summary><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
       ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
