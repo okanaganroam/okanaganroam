@@ -90,6 +90,7 @@
   }
 
   // ---------- State ----------
+  var GAMES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
   var S = {
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
@@ -106,6 +107,8 @@
     noDogs: (CUR.not_offered || []).indexOf('dogs') >= 0 && !(CUR.badges || {}).dog_friendly,
     // "No sports / no TVs" (pub test 6): the explicit answer; an unticked Sports on TV tile alone says nothing.
     noSports: (CUR.not_offered || []).indexOf('sports') >= 0 && !(CUR.badges || {}).sports_tv,
+    // "No games" (pub test 9, 2026-11-10): the explicit answer, like No sports. Leaving the game tiles unticked says nothing.
+    noGames: (CUR.not_offered || []).indexOf('games') >= 0 && !GAMES.some(function(g){ return (CUR.badges || {})[g]; }),
   };
   S.badgesAtStart = clone(CUR.badges || {});
   // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
@@ -790,6 +793,7 @@
       var resTicked = !S.done.offer && (C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; });
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
+          + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
           + (C.pub && g.keys.indexOf('sports_tv') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noSports ? 'true' : 'false') + '" data-off="no_sports"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noSports) + '<span class="su-tile-sub">' + h(T.noSportsSub) + '</span></button>' : '')
           + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub">' + h(T.noDogsSub) + '</span></button>'
             // Pub test 8 (2026-11-10): "Service dogs welcome", the follow-up to No dogs (shown only while No dogs is on).
@@ -1394,8 +1398,10 @@
       // sports" (and its sports go). Only from the screen's own Save: "Save and exit" with picks half done never records
       // a "we don't" answer the owner didn't give (fresh-eyes pub test) — it only takes back ones a tick contradicts.
       if (C.pub) {
-        var gameOn = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'].some(function(g){ return badges[g]; }), add = [], rem = [], partial = !!S.exitAfter;
-        if (gameOn) rem.push('games'); else if (!partial) add.push('games');
+        var gameOn = GAMES.some(function(g){ return badges[g]; }), add = [], rem = [], partial = !!S.exitAfter;
+        // Pub test 9 (2026-11-10): only the "No games" tile is a "we don't have games" answer. Games left unticked used
+        // to record one ("You told us you don't have: games"); now they leave the question open.
+        if (gameOn || !S.noGames) rem.push('games'); else if (!partial) add.push('games');
         // Pub test 6 (2026-11-10): Sports on TV left unticked is not an answer. Only an explicit one is "You told us you
         // don't have": the "No sports / no TVs" tile, or unticking a Sports on TV we had ticked from research.
         var noSportsSaid = S.noSports || (!!S.badgesAtStart.sports_tv && !badges.sports_tv);
@@ -1498,6 +1504,7 @@
       var press = function(key, on){ var n = screen.querySelector('[data-off="' + key + '"]'); if (n) n.setAttribute('aria-pressed', on ? 'true' : 'false'); };
       if (k === 'none_diet') { S.noDiet = !S.noDiet; press('none_diet', S.noDiet); if (S.noDiet) ['vegan', 'vegetarian', 'gluten_free'].forEach(function(d){ S.badges[d] = false; press(d, false); }); return; }
       // "No dogs allowed" and "Dog friendly": picking one turns the other off.
+      if (k === 'no_games') { S.noGames = !S.noGames; press('no_games', S.noGames); if (S.noGames) GAMES.forEach(function(gk){ S.badges[gk] = false; press(gk, false); }); return; }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
       var sdog = function(){ var n = el('suServiceDogs'); if (n) n.hidden = !S.noDogs; };
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
@@ -1507,6 +1514,7 @@
       if (k === 'heated_patio' && S.badges[k] && !S.badges.patio) { S.badges.patio = true; press('patio', true); }
       if (k === 'patio' && !S.badges[k] && S.badges.heated_patio) { S.badges.heated_patio = false; press('heated_patio', false); }
       if (k === 'sports_tv') { if (S.badges[k]) { S.noSports = false; press('no_sports', false); } sportsNote(); }
+      if (S.badges[k] && GAMES.indexOf(k) >= 0) { S.noGames = false; press('no_games', false); }
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
