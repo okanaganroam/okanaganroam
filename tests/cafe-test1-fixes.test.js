@@ -205,7 +205,7 @@ test('7: Dietary details, Your coffee and Sells out early are above the fold for
 // ---------- 8: café wording ----------
 test('8: café specials example, "Specials" tab, menu photo hint; pubs keep "Deals"', async () => {
   const cfg = cfgOf(await setupOf(mk('cafe')));
-  assert.ok(!/Taco|\$12/.test(cfg.t.specialEx + cfg.t.priceEx)); assert.match(cfg.t.specialEx, /Soup of the day/);
+  assert.ok(!/Taco|\$12/.test(cfg.t.specialEx + cfg.t.priceEx)); assert.match(cfg.t.specialEx, /Buy 9/); // café test 3: café examples, not soup
   assert.ok(!/Taco|12 \$/.test(TEXT.fr.cafe.specialEx + TEXT.fr.cafe.priceEx));
   assert.equal(cfg.t.snapSub, 'Snap your menu (a board or each page)'); assert.match(TEXT.fr.snapSub, /tableau/);
   assert.match(cfgOf(await setupOf(mk('pub'))).t.specialEx, /Taco|Wing|wing/i, 'pubs keep theirs');
@@ -241,7 +241,7 @@ test('11: success words: "It’s on your page now" for live answers, "We’ll ad
   for (const type of ['cafe', 'pub', 'restaurant']) {
     const t = cfgOf(await setupOf(mk(type))).t;
     assert.equal(t.savedLive, 'It’s on your page now.'); assert.equal(t.savedDay, 'We’ll add it within a day.');
-    for (const k of ['savedDay', 'photosSent', 'sentMeans', 'savedFbName', 'savedIgName', 'savedMenuSocialName', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) assert.match(t[k], /We’ll (add|find)/, `${type} ${k}`);
+    for (const k of ['savedDay', 'photosSent', 'sentMeans', 'savedFbName', 'savedIgName', 'savedMenuSocialName', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) assert.match(t[k], k === 'sentMeans' ? /add it to your page within a day/ : /We’ll (add|find)/, `${type} ${k}`); // café test 3: plainer Sent line
     for (const k of Object.keys(t)) if (typeof t[k] === 'string' && k !== 'savedSoon') assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`);
     assert.equal(t.st.day, 'we’ll add it within a day');
   }

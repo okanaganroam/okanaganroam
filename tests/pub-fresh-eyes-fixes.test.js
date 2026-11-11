@@ -141,9 +141,10 @@ test('G: deal prefixes are compact ("Mon–Fri: ") and old stored deals ("Mon, T
   }
   assert.equal(lib.prefixOf(row, 'Sat, Sun: wings'), null, 'another row\'s deal is not taken');
   assert.match(s, /mine\[\(S\.happy\.length > 1 \? oldPrefix\(e\) : ''\) \+ e\.what\] = true/, 'an old-form deal of a row is not kept twice');
-  // Specials: "Wing Wednesday, 50¢ wings" is title + deal, never the same words twice.
+  // Specials: café test 3 (2026-11-11): one typed line stays one line (no comma split); the page hides a deal that only
+  // repeats the title, so the words never show twice.
   assert.match(s, /function specialsSave|specialsSave/);
-  assert.match(s, /indexOf\(','\)/);
+  assert.doesNotMatch(s, /var cut = text\.indexOf\(','\)/);
   // "To reach 100%" skips ticked/answered steps, and the Optional line lists only open Part 2 steps.
   assert.match(s, /tickedBy = \{ book: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' \}/);
   assert.match(s, /function moreSub\(\)/);
