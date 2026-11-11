@@ -83,6 +83,18 @@ Town pages (`bw-hero`, `bw-tile`, `bw-pick`) get the same fonts, shadows and hov
 Nothing here contains words. Text stays in the page as it is today (`home-en` / `home-fr` spans on the homepage,
 the `/fr` twins elsewhere), so a French page needs no extra work to get the design.
 
+## 4. Venue profile template (Food & Drink venue pages, `body.fd-venue-page`)
+
+- **Photo:** the main photo is larger (up to 520px tall) with a slow zoom on hover.
+- **Icons:** `roamPolish.venueIcons(html)` swaps the emoji in the highlights, the fact labels (Address, Phone, Menu,
+  Social, Price, Cuisine, Happy hour and their French labels) and the Hours button for line icons
+  (`roamPolish.icon('pin')`). An emoji with no matching icon is left alone, and no words change.
+- **Map card:** `roamPolish.mapCard({ lat, lng, map, href, label, credit, esc })` draws the town's pre-rendered map
+  (`public/images/regions/maps`) with the place pinned from its own coordinates. It returns nothing when the place has
+  no coordinates or would fall outside the picture, so a wrong pin is never shown. The whole card opens directions.
+- **Sidebar:** serif headings, the shared shadows, today's row in bold in the hours list.
+
 ## Still to do
 
-The venue profile template (large photos, metadata icons, map and hours sidebar).
+- Venue pages with other layouts (indoor, outdoor, golf) and the French venue pages, which use the older layout.
+- Wider town maps: the current pictures cover about 55% of Food & Drink places; the rest show no map card.

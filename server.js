@@ -35511,7 +35511,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;
       // every other venue keeps its rows (the price row, the happy hour row with its jump to the deals).
       detailRows: copperProfile ? detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, '') : detailRows,
-      locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, 'en'), guideLinks, ownerCtaHtml,
+      // Roam design system (2026-11-11): the town map with this place pinned, above the Location link.
+      locationHtml: venueMapCardHtml(venue, mapsUrl, fr) + locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, 'en'), guideLinks, ownerCtaHtml,
       eventsHtml: venueEventsHtml, nearbyCards: fdNearbyCards, relatedHtml, nearbyHtml,
     });
   })() : '';
@@ -37964,6 +37965,21 @@ function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
   }
   if (dir === TRIP_V3_MAPS_DIR) tripV3MapHeadersCache = out;
   return out;
+}
+// Venue page map card (2026-11-11): the same pre-rendered town maps, with the venue pinned from its own coordinates
+// (roam-polish.js mapCard). No tile, script or API request. '' when the town has no map, the place has no coordinates
+// or the pin would fall outside the picture.
+function venueMapCardHtml(venue, mapsUrl, fr) {
+  try {
+    const header = tripV3MapHeaders()[venue.region];
+    const map = header && header.assets && header.assets.desktop;
+    if (!map || !mapsUrl || typeof roamPolish.mapCard !== 'function') return '';
+    return roamPolish.mapCard({
+      lat: Number(venue.latitude), lng: Number(venue.longitude), map, href: mapsUrl, esc: escapeHtml,
+      label: fr ? 'Ouvrir dans Google Maps' : 'Open in Google Maps',
+      credit: '\u00a9 OpenStreetMap \u00b7 Geoapify',
+    });
+  } catch (e) { return ''; }
 }
 // Day-header photos: each town's one photo (REGION_PHOTOS, 2026-10-15), the 800px copy for phones.
 const TRIP_V3_REGION_IMAGES = (() => {
