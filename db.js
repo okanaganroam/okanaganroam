@@ -1568,4 +1568,10 @@ CREATE TABLE IF NOT EXISTS venue_pub_info (
 );
 `);
 
+// Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
+// set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.
+if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name === 'time_tbc')) {
+  db.exec('ALTER TABLE event_occurrences ADD COLUMN time_tbc INTEGER NOT NULL DEFAULT 0');
+}
+
 module.exports = db;
