@@ -19708,8 +19708,8 @@ function pubSportsText(venue, fr) {
 //   links   { order_url, preorder_url } (only through 'cafe_links', which waits for our check like any link)
 // A café with no row reads and shows exactly as before. Shown on the café's own page only: no pages, URLs or sitemap
 // entries are made from them.
-const CAFE_KINDS = portalCompleteness.CAFE_KINDS;
-const CAFE_SERVES = portalCompleteness.CAFE_SERVES;
+// The shared lists only (the checklist module is pure); nothing here reads a score.
+const { CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS } = require('./portal-completeness');
 const CAFE_SERVE_LABELS = {
   espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫖' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
   baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
@@ -19725,8 +19725,6 @@ const CAFE_SERVE_SHORT = {
 };
 const CAFE_MILKS = ['oat', 'almond', 'soy', 'coconut'];
 const CAFE_MILK_LABELS = { oat: ['Oat', 'Avoine'], almond: ['Almond', 'Amande'], soy: ['Soy', 'Soya'], coconut: ['Coconut', 'Noix de coco'] };
-const CAFE_LAPTOPS = portalCompleteness.CAFE_LAPTOPS;
-const CAFE_SEATS = portalCompleteness.CAFE_SEATS;
 const CAFE_TEXT_MAX = 120;
 const CAFE_SOURCE_MAX = 80;
 const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year'];
@@ -22035,10 +22033,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (notTypes[p.type]) return false;
     for (var nk in notTags) if (notTags[nk] && p.tg.indexOf(TAGIX[nk]) !== -1) return false;
     for (var nn in notKinds) if (notKinds[nn] && CONF.k[nn].indexOf(p.type) !== -1) return false;
-    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : fHas(p.f, CONF.f[nf]))) return false;
+    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : (CONF.f[nf] > 1073741824 ? Math.floor(p.f / CONF.f[nf]) % 2 === 1 : (p.f & CONF.f[nf])))) return false;
     // Specials today (2026-10-27): from today's specials ([17]), not a stored feature bit.
     // Weekly nights tonight (2026-10-27): from tonight's nights ([19]).
-    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !fHas(p.f, CONF.f[k]))) return false;
+    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !(CONF.f[k] > 1073741824 ? Math.floor(p.f / CONF.f[k]) % 2 === 1 : (p.f & CONF.f[k])))) return false;
     if (openOnly && !(p.st && p.st.state === 'open') && !(!p.st && (includeUnlistedHours || allowUnlisted === true))) return false;
     return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
@@ -44871,7 +44869,7 @@ const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pu
 // "Country pub" (pub test 8, 2026-11-10: a highway pub with truck parking and off-sales picked Neighbourhood pub).
 const PUB_PLACE_TYPES = ['Neighbourhood pub', 'Sports bar', 'Gastropub', 'Irish or British pub', 'Brewpub', 'Taphouse', 'Beach or patio bar', 'Country pub', 'Clubhouse'];
 // Cafés (Dayton, 2026-11-10, Decided 1): the 11 kinds of café (chocolatiers and donut shops pick "Dessert & sweets").
-const CAFE_PLACE_TYPES = portalCompleteness.CAFE_KINDS;
+const CAFE_PLACE_TYPES = CAFE_KINDS;
 function placeTypesFor(type) { return type === 'pub' ? PUB_PLACE_TYPES : type === 'cafe' ? CAFE_PLACE_TYPES : RESTAURANT_PLACE_TYPES; }
 // The types whose cuisines and kind of place come from venue_cuisines (restaurants; pubs and cafés since 2026-11-10).
 // A café with no venue_cuisines row reads exactly as before (its one stored cuisine label).
