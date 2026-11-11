@@ -258,7 +258,7 @@ test('setup: the pub parts and screens; restaurants keep theirs', async () => {
   assert.equal(cfg.popular[0], 'Pub Fare');
   assert.deepEqual(cfg.placeTypes, app.PUB_PLACE_TYPES);
   const keys = cfg.offerGroups.flatMap((g) => g.keys);
-  assert.equal(keys.length, 23, '23 tiles (Fireplace added in pub test 6)');
+  assert.equal(keys.length, 24, '24 tiles (Fireplace added in pub test 6, Beach access in pub test 7)');
   assert.ok(!keys.includes('kid_friendly') && !keys.includes('happy_hour'));
   for (const k of ['local_beer_taps', 'pool', 'darts', 'shuffleboard', 'arcade', 'board_games', 'takeout']) assert.ok(keys.includes(k), k);
   assert.equal(cfg.t.kitchenQ, 'Does your kitchen close before the bar?');

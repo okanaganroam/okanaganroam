@@ -824,6 +824,11 @@ CREATE TABLE IF NOT EXISTS venue_weekly_nights (
 );
 CREATE INDEX IF NOT EXISTS idx_venue_weekly_nights_venue ON venue_weekly_nights(venue_id);
 `);
+// Pub test 7 (2026-11-10): a weekly night may run only part of the year, like a special: season_from / season_to
+// 'MM-DD' (every year, may run over New Year), both NULL for all year. Additive.
+for (const col of ['season_from', 'season_to']) {
+  if (!db.prepare('PRAGMA table_info(venue_weekly_nights)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE venue_weekly_nights ADD COLUMN ${col} TEXT`);
+}
 
 // Full easy setup (2026-11-09): which steps a restaurant's owner has answered, sent, skipped or left for later, so the
 // setup can say "Welcome back" and start at the first open step. One row per venue; state is a small JSON object

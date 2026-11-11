@@ -19,6 +19,74 @@
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
 
+  // ---------- Seasons (pub test 7, 2026-11-10) ----------
+  // A season as the screens hold it: { on, months: { 6: true, ... }, exact: { from: 'MM-DD', to: 'MM-DD' } | null }.
+  var MLAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function pad2(n){ return ('0' + n).slice(-2); }
+  function seaFrom(from, to){
+    var o = { on: false, months: {}, exact: null };
+    if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '')) return o;
+    o.on = true; var a = +from.slice(0, 2), b = +to.slice(0, 2), da = +from.slice(3), db = +to.slice(3);
+    if (!(da === 1 && (db === MLAST[b - 1] || (b === 2 && db === 28)))) o.exact = { from: from, to: to };
+    var i = a; for (var n = 0; n < 12; n++) { o.months[i] = true; if (i === b) break; i = i % 12 + 1; }
+    return o;
+  }
+  // -> { ok, from, to } (from/to null for all year) | { ok: false, why }
+  function seaOut(o){
+    if (!o || !o.on) return { ok: true, from: null, to: null };
+    if (o.exact) return o.exact.from && o.exact.to && o.exact.from !== o.exact.to ? { ok: true, from: o.exact.from, to: o.exact.to } : { ok: false, why: T.seasonNeedDates };
+    var r = monthRun(o.months);
+    if (r.none) return { ok: false, why: T.seasonNeedMonths };
+    if (r.bad) return { ok: false, why: T.monthsInRow };
+    if (r.all) return { ok: true, from: null, to: null };
+    return { ok: true, from: pad2(r.a) + '-01', to: pad2(r.b) + '-' + MLAST[r.b - 1] };
+  }
+  function seaKey(o){ var r = seaOut(o); return r.ok ? (r.from || '') + '>' + (r.to || '') : 'x'; }
+  // The months a season touches (all 12 for all year).
+  function seaMonths(o){
+    var r = o && o.on ? seaOut(o) : null, out = {};
+    if (!r || !r.ok || !r.from) { for (var i = 1; i <= 12; i++) out[i] = true; return out; }
+    var a = +r.from.slice(0, 2), b = +r.to.slice(0, 2), j = a; for (var n = 0; n < 12; n++) { out[j] = true; if (j === b) break; j = j % 12 + 1; }
+    return out;
+  }
+  // The season box on a screen: "All year" / "Only some months", the month chips, and "Starts or ends mid-month? Pick the
+  // exact dates" (two date boxes; the year is only there for the date picker).
+  function seaObj(id){ var q2 = String(id).split('.'); if (q2[0] === 'happy') return S.happySea; if (q2[0] === 'hours') return S.sea; var e = S[q2[0]] && S[q2[0]][+q2[1]]; if (!e) return null; return e.sea || (e.sea = seaFrom()); }
+  function seaDateVal(md){ return md ? new Date().getFullYear() + '-' + md : ''; }
+  function seaExactHtml(id, o){
+    return '<p class="su-hint" style="margin:10px 0 6px">' + h(T.seasonExactLead) + '</p><div class="su-seadates"><label class="su-q" for="sxf' + id + '">' + h(T.seasonFrom) + '</label><input class="su-field" type="date" id="sxf' + id + '" data-sexact="' + id + ':from" value="' + h(seaDateVal(o.exact.from)) + '">'
+      + '<label class="su-q" for="sxt' + id + '">' + h(T.seasonTo) + '</label><input class="su-field" type="date" id="sxt' + id + '" data-sexact="' + id + ':to" value="' + h(seaDateVal(o.exact.to)) + '"></div>'
+      + '<p class="su-hint"><button type="button" class="su-link" data-sea="' + id + ':months">' + h(T.seasonExactMonths) + '</button></p>';
+  }
+  function seasonBox(id, o, title){
+    var l = []; for (var i = 1; i <= 12; i++) l.push({ k: i, t: monthName(i - 1) });
+    return '<div class="su-season" id="suSea' + id.replace('.', '_') + '"><p class="su-q">' + h(title || T.seasonQ2) + '</p><div class="su-samerow" role="group" aria-label="' + h(title || T.seasonQ2) + '">'
+      + '<button type="button" class="su-toggle su-seabtn" aria-pressed="' + (o.on ? 'false' : 'true') + '" data-sea="' + id + ':all">' + h(T.seasonAll) + '</button>'
+      + '<button type="button" class="su-toggle su-seabtn" aria-pressed="' + (o.on ? 'true' : 'false') + '" data-sea="' + id + ':some">' + h(T.seasonSome) + '</button></div>'
+      + (o.on ? (o.exact ? seaExactHtml(id, o) : '<p class="su-hint" style="margin:10px 0 6px">' + h(T.seasonHint) + '</p><div class="su-chips" role="group" aria-label="' + h(T.whichMonths) + '">' + l.map(function(m){ return '<button type="button" class="su-chip" aria-pressed="' + (o.months[m.k] ? 'true' : 'false') + '" data-smon="' + id + ':' + m.k + '">' + h(m.t) + '</button>'; }).join('') + '</div>'
+        + '<p class="su-hint"><button type="button" class="su-link" data-sea="' + id + ':exact">' + h(T.seasonExactLink) + '</button></p>') : '') + '</div>';
+  }
+  function readSeasons(){
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ var q2 = inp.getAttribute('data-sexact').split(':'), o = seaObj(q2[0]); if (!o || !o.exact) return; var m = /^\d{4}-(\d{2}-\d{2})$/.exec(inp.value || ''); o.exact[q2[1]] = m ? m[1] : ''; });
+  }
+  // "Heads up: you're closed on Tue (in your usual hours)." under a special or event on a weekday the place is closed in
+  // the months it runs (pub test 7). Only with hours on file.
+  function closedWarn(days, sea){
+    if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
+    var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
+    for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
+    var u = [], z = [];
+    DAYS.forEach(function(d){ if (!days[d]) return; if (usual && !S.week[d]) u.push(d); if (seas && !S.sea.week[d]) z.push(d); });
+    var all = DAYS.filter(function(d){ return u.indexOf(d) >= 0 || z.indexOf(d) >= 0; });
+    if (!all.length) return '';
+    var when = hasSea ? (z.length && !u.length ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : u.length && !z.length ? T.closedWarnUsual : '') : '';
+    return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
+  }
+  function warnHtml(key, i, e){ var t = closedWarn(e.days, e.sea); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  function warnRefresh(){
+    ['specials', 'nights'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = closedWarn(e.days, e.sea); n.textContent = t; n.hidden = !t; }); });
+  }
+
   // ---------- State ----------
   var S = {
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
@@ -51,6 +119,8 @@
   // Pubs (2026-11-10): the kitchen, who's welcome and the sports, as stored (venue_pub_info); Pub Fare picked to start.
   S.pubInfo = clone(CUR.pub_info || {});
   S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '', note: (S.pubInfo.kitchen || {}).note || '' };
+  // Seasonal kitchen time (pub test 7): 'same' (as the rest of the year), 'close' (food until close) or 'time'.
+  (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
@@ -66,6 +136,8 @@
     var a = +s.from.slice(0, 2), b = +s.to.slice(0, 2), i = a; S.sea.on = true;
     for (var n = 0; n < 12; n++) { S.sea.months[i] = true; if (i === b) break; i = i % 12 + 1; }
     S.sea.week = parseWeek(s.hours);
+    // Exact days (pub test 7): a season that doesn't start on the 1st or end on a month's last day keeps its dates.
+    var sf = seaFrom(s.from, s.to); if (sf.exact) S.sea.exact = sf.exact;
     var lab = String(s.label || '').toLowerCase();
     S.sea.kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : S.sea.months[7] ? 'summer' : S.sea.months[1] ? 'winter' : 'summer';
     S.sea.storedKind = S.sea.kind;
@@ -135,9 +207,13 @@
   // Specials and weekly events: each row remembers the stored line it came from. A row the owner doesn't touch is sent
   // back exactly as stored (times, French, season and all); a changed one keeps what it can.
   function daysKey(days){ return DAYS.filter(function(d){ return days[d]; }).join(','); }
+  // Seasons (pub test 7, 2026-11-10): each special and event, and the happy hour, can run all year or only some months
+  // (or exact days, "May 20 to Sep 6"). Stored as 'MM-DD' from/to like the specials' season_from/season_to.
   (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? ', ' + x.deal : '');
-    var e = { days: days, text: text, price: x.price || '', orig: x }; e.was = daysKey(days) + '|' + e.text + '|' + e.price; S.specials.push(e); });
-  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start; S.nights.push(e); });
+    var e = { days: days, text: text, price: x.price || '', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea); S.specials.push(e); });
+  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea); S.nights.push(e); });
+  S.happySea = (function(){ try { var o = typeof CUR.happy_hour === 'string' ? JSON.parse(CUR.happy_hour) : CUR.happy_hour; var z = o && o._season; return seaFrom(z && z.from, z && z.to); } catch (e) { return seaFrom(); } })();
+  S.happySeaWas = seaKey(S.happySea);
   S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
 
   // ---------- Holidays (the next date of each, from today) ----------
@@ -330,7 +406,8 @@
     return fill(T.earlyNote, { t: t12(c), day: C.lang === 'fr' ? dn.toLowerCase() : dn });
   }
   // Folds an open day back into its one-line row (pub test 4).
-  function hDone(d){ return '<button type="button" class="su-toggle su-hdone" data-hclose="' + d + '">' + h(T.hoursDoneDay) + '</button>'; }
+  // Each day's Done says which day it is (pub test 7: with two days open, two identical "Done ✓" buttons were easy to mix up).
+  function hDone(d){ return '<button type="button" class="su-toggle su-hdone" data-hclose="' + d + '" aria-label="' + h(fill(T.hoursDoneDayAria, { day: (C.longDays || {})[d] || dayName(d) })) + '">' + h(T.hoursDoneDay) + '</button>'; }
   // "Closes at midnight or later?" Midnight · 1 AM · 2 AM: one tap sets that day's closing time.
   var LATE = ['00:00', '01:00', '02:00'];
   function lateBtns(d, j, y){
@@ -542,12 +619,16 @@
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
       if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
       var wk = W(), hop = HO();
-      x = (seas ? q(T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer, T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>' + monthChips(S.sea.months, 'sea') + '<h2 class="su-h2">' + h(T.seasonDaysH) + '</h2>'
+      // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
+      x = (seas ? q(T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer, T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
+          + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2">' + h(T.seasonDaysH) + '</h2>'
           : q(T.hoursEditQ, T.hoursEditLead)) + '<p class="su-hint" id="suLateHint">' + h(T.lateHint) + '</p>' + msgs() + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
-          + '<button type="button" class="su-hchg" data-hopen="' + d + '" aria-label="' + h(fill(T.hoursChangeDay, { day: (C.longDays || {})[d] || dayName(d) })) + '"><span aria-hidden="true">✎</span> ' + h(T.hoursChange) + '</button></div>';
+          // Pub test 7 (2026-11-10): one tap marks a day Closed (or opens it again) right from the list; Change is for times.
+          + '<span class="su-hbtns"><button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="' + (w ? 'false' : 'true') + '" aria-label="' + h(fill(w ? T.closeDayAria : T.openDayAria, { day: (C.longDays || {})[d] || dayName(d) })) + '">' + h(T.closeDay) + '</button>'
+          + '<button type="button" class="su-hchg" data-hopen="' + d + '" aria-label="' + h(fill(T.hoursChangeDay, { day: (C.longDays || {})[d] || dayName(d) })) + '"><span aria-hidden="true">✎</span> ' + h(T.hoursChange) + '</button></span></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: dayName(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
@@ -562,7 +643,12 @@
       x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big('🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:hours">' + h(T.skip) + '</button></div>';
     } else if (s === 'hours:kitchentime') {
+      // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
+      var ks0 = kitchenSeason(), kz = S.kitchen.sea;
       x = q(T.kitchenTimeQ, T.kitchenTimeLead) + msgs() + '<div class="su-day"><div class="su-times"><label class="su-q" for="suKto" style="margin:0">' + h(T.kitchenAt) + '</label> <input type="time" id="suKto" value="' + h(S.kitchen.closes) + '"></div></div>'
+        + (ks0 ? '<div class="su-day su-kseason" id="suKitchenSeason"><p class="su-q" style="margin-top:0">' + h(fill(T.kitchenSeasonQ, { kind: T.seasonWord[ks0.kind] || T.seasonWord.summer, range: mdText(ks0.from) + ' – ' + mdText(ks0.to) })) + '</p>'
+          + '<div class="su-stack" role="group">' + ['same', 'close', 'time'].map(function(m){ var on = kz.mode === m; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-ksea="' + m + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(m === 'same' ? T.kitchenSeasonSame : m === 'close' ? T.kitchenSeasonClose : T.kitchenSeasonAt + '…') + '</span></button>'; }).join('') + '</div>'
+          + (kz.mode === 'time' ? '<div class="su-times" style="margin-top:12px"><label class="su-q" for="suKsto" style="margin:0">' + h(T.kitchenSeasonAt) + '</label> <input type="time" id="suKsto" value="' + h(kz.closes) + '"></div>' : '') + '</div>' : '')
         + field('suKnote', T.kitchenNoteLabel, S.kitchen.note, { max: 120 }) + ex(T.kitchenNoteEx) + '<div class="su-stack">' + big('✓', T.saveKitchen, '', false, 'kitchenSave') + '</div>';
     } else if (s === 'offer:sports') {
       x = q(T.sportsQ, T.sportsLead) + msgs() + '<div class="su-chips" role="group" aria-label="' + h(T.sportsQ) + '">' + C.sports.map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.sports.list[o.k] ? 'true' : 'false') + '" data-sport="' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
@@ -579,7 +665,7 @@
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0; }).length + Math.max(0, S.extra.length - S.savedExtra);
       x = (changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(dateLabel(c.from) + (c.to && c.to !== c.from ? ' – ' + dateLabel(c.to) : '') + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
-        + (monthsOn ? '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(fill(T.monthsRow, { a: monthName(mr.a - 1), b: monthName(mr.b - 1) })) + '</span><button type="button" data-act="monthsClear" aria-label="' + h(T.remove) + '">✕</button></div>' : '')
+        + (monthsOn ? '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(closedMonthsText(mr)) + '</span><button type="button" data-act="monthsClear" aria-label="' + h(T.remove) + '">✕</button></div>' : '')
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         + '<button type="button" class="su-more" data-act="go:closures:months">' + h(T.wholeMonths) + '</button>'
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
@@ -590,7 +676,11 @@
         // after them.
         + '<div class="su-stack su-closures-save">' + (nothing ? big('✕', T.nothingComing, '', false, 'closuresNone') : big('✓', newC > 0 ? fill(newC === 1 ? T.saveClosures1 : T.saveClosuresN, { n: newC }) : T.saveClosures, '', false, 'closuresSave')) + '</div>' + skip('closures');
     } else if (s === 'closures:months') {
-      x = q(T.monthsQ, T.monthsLead) + msgs() + monthChips(S.months, 'months') + '<div class="su-stack">' + big('✓', T.monthsUse, '', false, 'monthsUse') + big('✕', T.allYearBtn, '', true, 'monthsClear') + '</div>';
+      // Pub test 7 (2026-11-10): "Which months are you CLOSED?" (it asked which months you're open: 11 taps, and easy to tap
+      // the month you're closed). Stored exactly as before: the open months ("2-12").
+      if (!S.closedM) { S.closedM = {}; var mr0 = monthRun(S.months); if (!mr0.none && !mr0.all) for (var mi = 1; mi <= 12; mi++) if (!S.months[mi]) S.closedM[mi] = true; }
+      x = q(T.monthsClosedQ, T.monthsClosedLead) + msgs() + chips(S.closedM, 'closedm', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function(i){ return { k: i, t: monthName(i - 1) }; }), T.monthsClosedQ)
+        + '<div class="su-stack">' + big('✓', T.monthsUse, '', false, 'monthsUse') + big('✕', T.allYearBtn, '', true, 'monthsClear') + '</div>';
     } else if (s === 'closures:add') {
       x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || nextMonth(), { type: 'date' })
         + '<p class="su-q">' + h(T.howLong) + '</p><div class="su-chips">' + [['1', T.len1], ['7', T.len7], ['14', T.len14], ['pick', T.lenPick]].map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.addLen === o[0] ? 'true' : 'false') + '" data-len="' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>'
@@ -624,8 +714,11 @@
       if (C.image && S.keepMain !== false) S.photos.forEach(function(ph){ ph.main = false; });
       else if (g.length && !g.some(function(ph){ return ph.main; })) { S.photos.forEach(function(ph){ ph.main = false; }); g[0].main = true; }
       var keeping = !!C.image && !S.photos.some(function(ph){ return ph.main; });
-      x = q(T.reviewQ, C.image ? (C.imageSource === 'own' ? T.reviewLeadKeep : T.reviewLeadKeepOther) : T.reviewLead)
-        + (C.image ? '<div class="su-curmain"><img src="' + h(C.image) + '" alt=""><div><p class="su-q" style="margin:0 0 8px" id="suCurMain">' + h(C.imageSource === 'own' ? T.curMain : C.imageSource === 'google' ? T.curMainGoogle : T.curMainOther) + '</p><button type="button" class="su-toggle" data-act="keepMain" aria-pressed="' + (keeping ? 'true' : 'false') + '">' + h((keeping ? '✓ ' : '') + (C.imageSource === 'own' ? T.keepMain : T.keepMainOther)) + '</button></div></div>' : '')
+      // Pub test 7 (2026-11-10): after she picks a new main photo it is the one shown here ("Your new main photo (on your
+      // page within a day)"), not the old Google Maps one.
+      var ownish = C.imageSource === 'own' || C.imageSource === 'pending';
+      x = q(T.reviewQ, C.image ? (ownish ? T.reviewLeadKeep : T.reviewLeadKeepOther) : T.reviewLead)
+        + (C.image ? '<div class="su-curmain"><img src="' + h(C.image) + '" alt=""><div><p class="su-q" style="margin:0 0 8px" id="suCurMain">' + h(C.imageSource === 'pending' ? T.curMainPending : C.imageSource === 'own' ? T.curMain : C.imageSource === 'google' ? T.curMainGoogle : T.curMainOther) + '</p><button type="button" class="su-toggle" data-act="keepMain" aria-pressed="' + (keeping ? 'true' : 'false') + '">' + h((keeping ? '✓ ' : '') + (C.imageSource === 'pending' ? T.keepMainPending : C.imageSource === 'own' ? T.keepMain : T.keepMainOther)) + '</button></div></div>' : '')
         + '<div class="su-grid">' + S.photos.map(function(ph, i){
         var m = ph.bad === 'small' ? T.tooSmall : T.cantOpen;
         return '<div class="su-ph' + (ph.main ? ' su-main' : '') + (ph.bad ? ' su-bad' : '') + '">' + (ph.thumb ? '<img src="' + ph.thumb + '" alt="">' : '<img alt="">')
@@ -666,7 +759,8 @@
       var site = (C.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
-        + (site ? '<p class="su-hint"><button type="button" class="su-link" data-act="urlBack">' + h(T.putBack) + '</button></p>' : '')
+        // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
+        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: site.replace(/^www\./i, '') })) + '</button></p>' : '')
         + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: site || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
@@ -697,14 +791,15 @@
           + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
           + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' <label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '"></div>'
           + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what"' }) + (i === 0 ? ex(T.whatsOnEx) : '') + '</div>';
-      }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
+      }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
+        + '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>' + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
     } else if (s === 'specials:type') {
       if (!S.specials.length) S.specials.push({ days: {}, text: '', price: '' });
       x = q(T.specialsTypeQ, T.upTo7) + msgs() + S.specials.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.specialN, { n: i + 1 })) + '</span>' + (S.specials.length > 1 ? '<button type="button" class="su-toggle" data-rm="specials:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDaysOr) + '</p>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
-          + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '') + '</div>';
+          + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '') + seasonBox('specials.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('specials', i, e) + '</div>';
       }).join('') + (S.specials.length < 7 ? '<button type="button" class="su-more" data-act="add:specials">' + h(T.addSpecial) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveSpecials, '', false, 'specialsSave') + '</div>';
     } else if (s === 'music') { x = yesNo('music', T.musicQ, T.musicLead);
     } else if (s === 'music:yes') {
@@ -721,11 +816,12 @@
           })()
           + '<input class="su-field" id="nt' + i + '" data-nt="' + i + '" type="text" maxlength="40" aria-labelledby="ntq' + i + '" value="' + h(e.what) + '"' + (e.kind === 'other' ? ' placeholder="' + h(T.otherPh) + '"' : '') + '>' + (i === 0 ? ex(T.eventEx) : '')
           + '<p class="su-q">' + h(T.whichNights) + '</p>' + dayChips(e.days, 'nights.' + i)
-          + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div></div>';
+          + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div>'
+          + seasonBox('nights.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('nights', i, e) + '</div>';
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= 120 ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= 120 ? T.storyGood : T.storyCount) + '</p>' + ex(T.storyEx) + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
@@ -810,7 +906,7 @@
     var next = function(){
       var ph = list[i];
       if (!ph) {
-        if (mainP) { try { S.mainSrc = jpeg(mainP.img, 1200).toDataURL('image/jpeg', 0.8); } catch (e) {} }
+        if (mainP) { try { S.mainSrc = jpeg(mainP.img, 1200).toDataURL('image/jpeg', 0.8); C.image = S.mainSrc; C.imageSource = 'pending'; S.keepMain = true; } catch (e) {} }
         S.photosSent += total; S.photos = []; S.rights = false;
         return progress('photos', 'day').then(function(ok){ S.busy = false; if (ok) go('saved:photos'); else render(); });
       }
@@ -892,6 +988,11 @@
   }
 
   // ---------- Saving each step ----------
+  // "Closed Jan to Mar each year" / "Closed in January each year": the closed months of an open run.
+  function closedMonthsText(mr){
+    var ca = mr.b % 12 + 1, cb = mr.a === 1 ? 12 : mr.a - 1;
+    return ca === cb ? fill(T.monthsClosedOne, { a: monthName(ca - 1) }) : fill(T.monthsClosedRow, { a: monthName(ca - 1), b: monthName(cb - 1) });
+  }
   function windowsOk(w){ return DAYS.some(function(d){ return w[d] && w[d].length; }); }
   function monthRun(obj){
     var on = []; for (var i = 1; i <= 12; i++) if (obj[i]) on.push(i);
@@ -910,14 +1011,16 @@
     if (S.seaTouched) {
       var stored = CUR.hours_seasons || [], s0 = stored[0], rest = stored.slice(1), list = rest;
       if (S.sea.on) {
-        var r = monthRun(S.sea.months); if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
+        var r = monthRun(S.sea.months);
+        if (S.sea.exact) { var xo = seaOut({ on: true, exact: S.sea.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
+        else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
         if (!S.sea.week || !windowsOk(S.sea.week)) { S.nudge = T.seasonNeedOpenDay; return render(); }
         var sw = {}; DAYS.forEach(function(d){ sw[d] = S.sea.week[d] || []; });
         var pad = function(n){ return ('0' + n).slice(-2); };
         var same = s0 && S.sea.kind === S.sea.storedKind;
         // The same months as stored keep their exact dates (a set from Jun 15 stays Jun 15).
         var keepDates = same && JSON.stringify(S.sea.months) === S.sea.monthsWas;
-        list = [{ from: keepDates ? s0.from : pad(r.a) + '-01', to: keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : (S.sea.kind === 'winter' ? 'Winter hours' : 'Summer hours'), hours: sw }].concat(rest);
+        list = [{ from: S.sea.exact ? S.sea.exact.from : keepDates ? s0.from : pad(r.a) + '-01', to: S.sea.exact ? S.sea.exact.to : keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : (S.sea.kind === 'winter' ? 'Winter hours' : 'Summer hours'), hours: sw }].concat(rest);
       }
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
@@ -926,7 +1029,7 @@
       S.seaTouched = false;
     });
   }
-  function readTimes(){ var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
+  function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
   function happySave(){
     readEntries();
     var week = {}, deals = [], many = S.happy.length > 1;
@@ -942,6 +1045,9 @@
     }
     deals = deals.concat(S.happyKeep);
     if (deals.length > 6) { S.nudge = T.dealsMany; return render(); }
+    // Its season (pub test 7): all year, or the months (or exact days) it runs.
+    var hs = seaOut(S.happySea); if (!hs.ok) { S.nudge = hs.why; return render(); }
+    week._season = hs.from ? { from: hs.from, to: hs.to } : null;
     S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
@@ -950,6 +1056,7 @@
     saveAll('happy', list);
   }
   function readEntries(){
+    readSeasons();
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hh]'), function(inp){ var q2 = inp.getAttribute('data-hh').split(':'); S.happy[+q2[0]][q2[1]] = inp.value; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sp]'), function(inp){ var q2 = inp.getAttribute('data-sp').split(':'); S.specials[+q2[0]][q2[1]] = inp.value; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-nt]'), function(inp){ S.nights[+inp.getAttribute('data-nt')].what = inp.value; });
@@ -963,14 +1070,15 @@
       var e = S.specials[i], ds = DAYS.filter(function(d){ return e.days[d]; }), text = e.text.trim();
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!text) { S.nudge = T.needText; return render(); }
-      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price) { out.push(e.orig); continue; }
+      var ss = seaOut(e.sea); if (!ss.ok) { S.nudge = ss.why; return render(); }
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea)) { out.push(e.orig); continue; }
       if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
       var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
       // "Wing night, 60¢ a wing" → title "Wing night", deal "60¢ a wing" (pub fresh-eyes, 2026-11-10: the deal used to
       // repeat the title). With no comma the deal is the whole line (it's required; the page never shows a repeat).
       var cut = text.indexOf(','), t1 = (cut > 0 ? text.slice(0, cut) : text).trim().slice(0, 40), rest = cut > 0 ? text.slice(cut + 1).trim() : '';
       out.push({ days: ds, title: sameText ? o0.title : t1, deal: sameText ? o0.deal : (rest || text), price: money(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
-        start: o0.start || null, end: o0.end || null, title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: o0.season_from || null, season_to: o0.season_to || null });
+        start: o0.start || null, end: o0.end || null, title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: ss.from, season_to: ss.to });
     }
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
     list.push({ specials: out }); saveAll('specials', list);
@@ -982,11 +1090,12 @@
       if (!title && e.kind === 'other') { S.nudge = T.otherNeed; return render(); }
       if (!ds.length) { S.nudge = T.needDays; return render(); }
       if (!title) { S.nudge = T.needText; return render(); }
-      if (e.orig && e.was === daysKey(e.days) + '|' + e.kind + '|' + e.what + '|' + e.start) { out.push(e.orig); continue; }
+      var ns = seaOut(e.sea); if (!ns.ok) { S.nudge = ns.why; return render(); }
+      if (e.orig && e.was === daysKey(e.days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea)) { out.push(e.orig); continue; }
       if (title.length > 40) { S.nudge = fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
       var n0 = e.orig || {}, sameTitle = e.orig && n0.title === title;
       out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: n0.frequency || 'weekly',
-        title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null });
+        title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null, season_from: ns.from, season_to: ns.to });
     }
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
     list.push({ weekly_nights: out }); saveAll('music', list);
@@ -1038,6 +1147,21 @@
     });
   }
 
+  // Pub test 7 (2026-11-10): new words typed straight after the old description ("…pub food.A beach bar…") get the
+  // space they were missing. Only that one join is touched; the rest is exactly as she typed it.
+  function storyJoinFix(v){
+    var old = String(CUR.description || '').replace(/\s+$/, ''); v = String(v || '');
+    if (old && v.length > old.length && v.indexOf(old) === 0 && /[.!?,;:)]$/.test(old) && /^[^\s.,;:!?)]/.test(v.slice(old.length))) return old + ' ' + v.slice(old.length);
+    return v;
+  }
+  // The stored seasonal hours the kitchen's seasonal time goes with: { from, to, kind } or null.
+  function kitchenSeason(){
+    var s0 = (CUR.hours_seasons || [])[0]; if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '')) return null;
+    var lab = String(s0.label || '').toLowerCase(), m = +s0.from.slice(0, 2);
+    return { from: s0.from, to: s0.to, kind: /winter|hiver/.test(lab) ? 'winter' : /summer|été/.test(lab) ? 'summer' : (m >= 4 && m <= 9 ? 'summer' : 'winter') };
+  }
+  function mdText(md){ return monthName(+md.slice(0, 2) - 1) + ' ' + (+md.slice(3)); }
+  function readKsea(){ var e = el('suKsto'); if (e) S.kitchen.sea.closes = e.value; }
   // ---------- Wiring ----------
   function act(a){
     var p = a.split(':'), k = p[0], v = p.slice(1).join(':');
@@ -1067,7 +1191,8 @@
       if (siteDomain(site) !== siteDomain(CUR.website)) ch.website = site;
       if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); }
       var listB = [ch]; if (site && S.notOffered.indexOf('website') >= 0) listB.unshift({ not_offered: S.notOffered.filter(function(z){ return z !== 'website'; }) });
-      return saveAll('basics', listB, null, null, function(){ phoneSaved(ch); });
+      // The new website (still being checked) is what the menu link offers next (pub test 7).
+      return saveAll('basics', listB, null, null, function(){ phoneSaved(ch); if (ch.website) C.website = /^https?:\/\//i.test(ch.website) ? ch.website : 'https://' + ch.website; });
     }
     // "We don't have a website": with none on file it's the existing not-offered answer (live); with one on file the
     // removal is a website change, checked first like any other (Sent ✓ within a day).
@@ -1091,10 +1216,15 @@
     // Pubs (2026-11-10): the kitchen, the sports and who's welcome.
     if (k === 'kitchenSame' || k === 'kitchenNone') { var km = k === 'kitchenSame' ? 'same' : 'none'; return saveAll('hours', [{ pub_info: { kitchen: { mode: km } } }], null, null, function(){ kitchenSaid(km); S.kitchen.note = ''; }); }
     if (k === 'kitchenSave') {
-      var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value.trim();
+      var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value.trim(); readKsea();
       // Never pre-filled (pub test 4): a blank time asks gently, and nothing is saved.
       if (!/^\d{2}:\d{2}$/.test(S.kitchen.closes)) { S.nudge = T.kitchenNeed; return render(); }
-      return saveAll('hours', [{ pub_info: { kitchen: { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note } } }], null, null, function(){ kitchenSaid('earlier'); });
+      var kseason = kitchenSeason(), kv = { mode: 'earlier', closes: S.kitchen.closes, note: S.kitchen.note };
+      if (kseason && S.kitchen.sea.mode !== 'same') {
+        if (S.kitchen.sea.mode === 'time' && !/^\d{2}:\d{2}$/.test(S.kitchen.sea.closes)) { S.nudge = T.kitchenSeasonNeed; return render(); }
+        kv.season = { from: kseason.from, to: kseason.to, closes: S.kitchen.sea.mode === 'close' ? 'close' : S.kitchen.sea.closes };
+      }
+      return saveAll('hours', [{ pub_info: { kitchen: kv } }], null, null, function(){ kitchenSaid('earlier'); S.pubInfo.kitchen = kv; });
     }
     if (k === 'noFood') return saveAll('cuisine', [{ pub_info: { kitchen: { mode: 'none' } } }], 'no', null, function(){ kitchenSaid('none'); });
     if (k === 'sportsSave') {
@@ -1126,8 +1256,15 @@
     }
     if (k === 'keepMain') { S.keepMain = true; S.photos.forEach(function(ph){ ph.main = false; }); return render(); }
     if (k === 'hhDays') { readEntries(); var sp = String(v).split(','), eh = S.happy[+sp[0]]; if (!eh) return; eh.days = {}; DAYS.forEach(function(d){ if (sp[1] === 'all' || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(d) >= 0) eh.days[d] = true; }); mark(); var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
-    if (k === 'monthsUse') { var r = monthRun(S.months); if (r.none) { S.nudge = T.monthsNeed; return render(); } if (r.bad) { S.nudge = T.monthsInRow; return render(); } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
-    if (k === 'monthsClear') { S.months = {}; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
+    if (k === 'monthsUse') {
+      // The months tapped are the closed ones; the open months are the rest (none tapped: open all year).
+      var cm = S.closedM || {}, nClosed = 0, openM = {}; for (var mj = 1; mj <= 12; mj++) { if (cm[mj]) nClosed++; else openM[mj] = true; }
+      if (!nClosed) { S.months = {}; S.closedM = null; S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
+      if (nClosed === 12) { S.nudge = T.monthsAllClosed; return render(); }
+      var r = monthRun(openM); if (r.bad) { S.nudge = T.monthsClosedInRow; return render(); }
+      S.months = openM; S.closedM = null; S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
+    }
+    if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
       var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
       out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
@@ -1222,12 +1359,12 @@
       if (S.dogNote === ((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
       return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
     }
-    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '' } : { days: {}, kind: '', what: '' }); return render(); }
+    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
     if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
-    if (k === 'storySave') { S.story = el('suStory').value; if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
       if (!line) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
@@ -1249,12 +1386,33 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(){ if (!S.busy) act(b.getAttribute('data-act')); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-chip]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];
-      var obj = path[0] === 'months' ? S.months : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;
+      var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;
       obj[key] = !obj[key]; b.setAttribute('aria-pressed', obj[key] ? 'true' : 'false'); S.nudge = '';
+      if (path[0] === 'specials' || path[0] === 'nights') warnRefresh();
     }; });
     // The usual week or the other season's week (pub test 6): the same editor, on W().
     Array.prototype.forEach.call(screen.querySelectorAll('[data-closed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-closed'), wk = W(); wk[d] = wk[d] ? null : [['11:00', '21:00']]; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-dayopen]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayopen'), wk = W(); if (!wk[d]) { var tpl = wk.mon || wk[DAYS.filter(function(x){ return wk[x]; })[0]] || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [['11:00', '21:00']]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-ksea]'), function(b){ b.onclick = function(){ var kt = el('suKto'), kn = el('suKnote'); if (kt) S.kitchen.closes = kt.value; if (kn) S.kitchen.note = kn.value; readKsea(); S.kitchen.sea.mode = b.getAttribute('data-ksea'); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    // Seasons (pub test 7): All year / Only some months / exact dates / back to months, and the month chips.
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sea]'), function(b){ b.onclick = function(){
+      readEntries(); readTimes(); var q2 = b.getAttribute('data-sea').split(':'), o = seaObj(q2[0]); if (!o) return;
+      if (q2[1] === 'all') o.on = false; else if (q2[1] === 'some') o.on = true;
+      else if (q2[1] === 'exact') { var r0 = monthRun(o.months); o.exact = r0.a ? { from: pad2(r0.a) + '-01', to: pad2(r0.b) + '-' + MLAST[r0.b - 1] } : { from: '', to: '' }; }
+      else if (q2[1] === 'months') { var sm = seaMonths({ on: true, months: o.months, exact: o.exact }); o.exact = null; o.months = sm; }
+      if (q2[0] === 'hours') S.seaTouched = true;
+      S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-smon]'), function(b){ b.onclick = function(){
+      var q2 = b.getAttribute('data-smon').split(':'), o = seaObj(q2[0]); if (!o) return; o.months[q2[1]] = !o.months[q2[1]];
+      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); warnRefresh(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ inp.addEventListener('change', function(){ readSeasons(); if (inp.getAttribute('data-sexact').indexOf('hours') === 0) S.seaTouched = true; warnRefresh(); }); });
+    // One-tap Closed on the short list (pub test 7): closes the day, or opens it again with the hours it had (or the
+    // first open day's), without opening its card.
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-hoff]'), function(b){ b.onclick = function(){
+      readTimes(); var d = b.getAttribute('data-hoff'), wk = W(); S.hoffWas = S.hoffWas || {};
+      if (wk[d]) { S.hoffWas[S.step + d] = wk[d]; wk[d] = null; }
+      else { var tpl = S.hoffWas[S.step + d] || wk[DAYS.filter(function(x){ return wk[x]; })[0]] || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [['11:00', '21:00']]; }
+      mark(); var y = window.scrollY; render(); window.scrollTo(0, y); var nb = screen.querySelector('[data-hoff="' + d + '"]'); if (nb) try { nb.focus({ preventScroll: true }); } catch (e) {} }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'), wk = W(); if (wk[d]) { wk[d] = null; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-samemon]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-samemon'), wk = W(); if (wk.mon) { wk[d] = clone(wk.mon); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-late]'), function(b){ b.onclick = function(){ readTimes(); var q4 = b.getAttribute('data-late').split(':'), d4 = q4[0], wk = W(), w4 = wk[d4] && wk[d4][+q4[1]]; if (!w4) return; w4[1] = q4[2] + ':' + q4[3]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -1329,10 +1487,12 @@
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= 120 ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= 120 ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
-    Array.prototype.forEach.call(screen.querySelectorAll('input.su-field[type=text], input.su-field[type=tel], input.su-field[type=search]'), function(inp){
-      if (inp.parentNode && inp.parentNode.className === 'su-fwrap') return;
-      var w = document.createElement('div'); w.className = 'su-fwrap'; inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'su-clear'; b.setAttribute('aria-label', T.clearField); b.setAttribute('data-clear', inp.id); b.textContent = '✕'; b.hidden = !inp.value; w.appendChild(b);
+    // Pub test 7 (2026-11-10): the story box too (its old text could only be removed with a long backspace).
+    Array.prototype.forEach.call(screen.querySelectorAll('input.su-field[type=text], input.su-field[type=tel], input.su-field[type=search], textarea.su-area'), function(inp){
+      if (inp.parentNode && /\bsu-fwrap\b/.test(inp.parentNode.className)) return;
+      var area = inp.tagName === 'TEXTAREA';
+      var w = document.createElement('div'); w.className = 'su-fwrap' + (area ? ' su-fwrap-area' : ''); inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'su-clear'; b.setAttribute('aria-label', area ? T.storyClear : T.clearField); b.setAttribute('data-clear', inp.id); b.textContent = '✕'; b.hidden = !inp.value; w.appendChild(b);
       var keep = function(e){ e.preventDefault(); }; b.addEventListener('mousedown', keep); b.addEventListener('pointerdown', keep);
       b.onclick = function(){ inp.value = ''; b.hidden = true; try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} };
       inp.addEventListener('input', function(){ b.hidden = !inp.value; });
@@ -1368,7 +1528,7 @@
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-copyevery],[data-sport],[data-tv],[data-minors]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors]') : null; if (t) mark(); }, true);
   render();
   window.addEventListener('beforeunload', function(e){ if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

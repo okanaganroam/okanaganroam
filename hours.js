@@ -146,21 +146,46 @@ function closureOn(parsed, date) {
 // The seasonal set covering a date: Nov 1 - Apr 30 runs over New Year.
 function seasonOn(parsed, date) {
   const md = date.slice(5);
-  return (parsed && parsed.seasons || []).find((s) => (s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to)) || null;
+  return (parsed && parsed.seasons || []).find((s) => mdInRange(md, s.from, s.to)) || null;
 }
-// One calendar day: a closure wins, then a seasonal set, then the usual week.
+// 'MM-DD' inside a from/to range of 'MM-DD' days (both ends included; Nov 1 - Apr 30 runs over New Year).
+function mdInRange(md, from, to) {
+  return from <= to ? md >= from && md <= to : md >= from || md <= to;
+}
+// Pub test 7 (2026-11-10): a day the PLACE itself is closed, for a happy hour (or anything else that only runs while the
+// place is open). `gate`: { place: parseHours() output of the place's own hours (with its seasons and closures),
+// openMonths: [first, last] month it is open (an owner's yearly season, may wrap New Year), season: { from, to } 'MM-DD'
+// the happy hour itself runs }. A weekday the place's hours for that date (seasonal set included) list as closed, a month
+// outside its open months or a day outside the happy hour's own season is closed. An unknown day never closes anything.
+function gateClosedOn(gate, date) {
+  if (!gate) return false;
+  var md = date.slice(5), mon = Number(date.slice(5, 7));
+  if (gate.season && !mdInRange(md, gate.season.from, gate.season.to)) return true;
+  if (gate.openMonths) {
+    var a = gate.openMonths[0], b = gate.openMonths[1];
+    if (!(a <= b ? mon >= a && mon <= b : mon >= a || mon <= b)) return true;
+  }
+  if (gate.place && gate.place.days) {
+    var d = dayOnDate(gate.place, date);
+    if (d && d.status === 'closed') return true;
+  }
+  return false;
+}
+// One calendar day: a closure wins, then a seasonal set, then the usual week. A happy-hour week built by happyHourState()
+// also carries the place's own closed days (`gate`): those are closed like a closure (stepped over, not counted).
 function dayOnDate(parsed, date) {
   if (!parsed || !parsed.days) return { status: 'unknown' };
   const wd = dateWeekday(date);
   const c = closureOn(parsed, date);
   if (c) return { status: 'closed', closure: c };
+  if (parsed.gate && gateClosedOn(parsed.gate, date)) return { status: 'closed', closure: { from: date, to: date, note: '' }, placeClosed: true };
   const s = seasonOn(parsed, date);
   return s ? s.days[wd] : parsed.days[wd];
 }
 // The week as it really runs from `clock.date`: today and the next five days by date, and yesterday (for a night
 // that runs past midnight) in the seventh weekday slot. Without a date, or with nothing extra, it is `parsed`.
 function hoursForClock(parsed, clock) {
-  if (!parsed || !(parsed.seasons || parsed.closures) || !clock || !/^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) return parsed;
+  if (!parsed || !(parsed.seasons || parsed.closures || parsed.gate) || !clock || !/^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) return parsed;
   const days = {};
   for (let off = -1; off <= 5; off++) {
     const d = shiftDate(clock.date, off);
@@ -250,7 +275,7 @@ function nextOpeningByDate(parsed, date, now) {
 function statusAt(parsed, clock) {
   const base = { state: 'unknown', closesAt: null, opensAt: null, closedToday: false, allDay: false };
   if (!parsed || !parsed.days || !validClock(clock)) return base;
-  const byDate = !!(parsed.closures && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || ''));
+  const byDate = !!((parsed.closures || parsed.gate) && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || ''));
   const undated = parsed;
   parsed = hoursForClock(parsed, clock);
   const today = clock.weekday;
@@ -342,13 +367,35 @@ function hoursStatusLabel(status, clock) {
 // the next happy hour walks real dates like the next opening (nextOpeningByDate): a closure day has no happy hour, and
 // a multi-day closure is stepped over ("Next happy hour: tomorrow 3 PM" was shown for a Remembrance Day closure). A day
 // the happy-hour week doesn't list is no happy hour that day. `daysAhead` (0 = today) comes with a dated answer.
-function happyHourState(hh, clock, placeClosedNow, closures) {
+// Closed days (pub test 7, 2026-11-10): `opts` { placeHours, openMonths, season } also steps over every day the place
+// itself is closed (gateClosedOn): a weekday its hours list as closed (the seasonal week that applies on that date), a
+// month it is closed for the season, and a day outside the happy hour's own season ('MM-DD' from/to). A happy hour on a
+// day the place is closed is never "on now", "later today" or "next" ("Next happy hour: tomorrow 3 PM" was shown for a
+// pub closed Wednesdays). placeHours: the place's hours JSON (with _seasons/_closures) or parseHours() output.
+function happyHourState(hh, clock, placeClosedNow, closures, opts) {
   let parsed = parseHours(hh);
+  const o = Object.assign({}, opts || {});
+  // The happy hour's own season rides along in its stored week ("_season": { from, to }, 'MM-DD', pub test 7).
+  if (!o.season) {
+    let raw = hh;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = null; } }
+    if (raw && typeof raw === 'object' && raw._season) o.season = raw._season;
+  }
   const cl = Array.isArray(closures) ? closures.filter((c) => c && /^\d{4}-\d{2}-\d{2}$/.test(c.from) && /^\d{4}-\d{2}-\d{2}$/.test(c.to || c.from)).map((c) => ({ from: c.from, to: c.to || c.from, note: '' })) : [];
-  if (cl.length && parsed && parsed.known && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) {
+  let gate = null;
+  if (o.placeHours) {
+    const ph = typeof o.placeHours === 'object' && o.placeHours.days && typeof o.placeHours.known === 'boolean' ? o.placeHours : parseHours(o.placeHours);
+    if (ph && ph.known) gate = { place: ph };
+  }
+  const om = /^(\d{1,2})-(\d{1,2})$/.exec(String(o.openMonths || ''));
+  if (om && Number(om[1]) !== Number(om[2])) (gate = gate || {}).openMonths = [Number(om[1]), Number(om[2])];
+  if (o.season && /^\d{2}-\d{2}$/.test(o.season.from || '') && /^\d{2}-\d{2}$/.test(o.season.to || '') && o.season.from !== o.season.to) (gate = gate || {}).season = { from: o.season.from, to: o.season.to };
+  if ((cl.length || gate) && parsed && parsed.known && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) {
     const days = {};
     for (const d of WEEKDAYS) days[d] = parsed.days[d] && parsed.days[d].status !== 'unknown' ? parsed.days[d] : { status: 'closed' };
-    parsed = { known: true, days, closures: cl };
+    parsed = { known: true, days };
+    if (cl.length) parsed.closures = cl;
+    if (gate) parsed.gate = gate;
   }
   const s = statusAt(parsed, clock);
   if (s.state === 'open') return placeClosedNow ? null : { state: 'now', until: s.closesAt };
@@ -357,6 +404,9 @@ function happyHourState(hh, clock, placeClosedNow, closures) {
   const probe = statusAt(parsed, { weekday: from.weekday, minutes: from.minutes });
   const to = probe.state === 'open' ? probe.closesAt : null;
   if (from.daysAhead != null) {
+    // Past a closed season (pub test 7): nothing is claimed more than a month ahead ("Next happy hour: Tuesday, Jun 1"
+    // in November); the page shows the week with its months instead.
+    if (parsed.gate && from.daysAhead > 31) return null;
     if (from.daysAhead === 0) return { state: 'later', from, to };
     return { state: 'next', from, to, nextWeek: from.daysAhead >= 7, daysAhead: from.daysAhead };
   }
@@ -418,7 +468,7 @@ function openingPeriods(parsed) {
 // server and the browser can never read hours differently.
 const HOURS_CLIENT_SRC = [
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
-  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, seasonOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
+  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
     validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
 ].join('\n');
 
@@ -430,6 +480,8 @@ module.exports = {
   dateWeekday,
   shiftDate,
   dayOnDate,
+  mdInRange,
+  gateClosedOn,
   isTemporaryClosure,
   hoursForClock,
   nextOpeningByDate,

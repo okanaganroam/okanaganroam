@@ -160,7 +160,8 @@ test('2: hours.js happyHourState takes the closures (the map runs the same funct
   assert.notEqual(hours.happyHourState(hh, wedClock, false, [{ from: '2026-11-11', to: '2026-11-11' }]).state, 'later');
   // The map's copy passes the closures from the hours it ships.
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /happyHourState\(expandFoodDrinkHours\(p\.hh\), clock, !!\(p\.st && p\.st\.state === 'closed'\), p\.h && typeof p\.h === 'object' && p\.h\._closures \? p\.h\._closures : null\)/);
+  // Pub test 7: and the place's own hours, so a closed weekday has no happy hour either.
+  assert.match(src, /happyHourState\(expandFoodDrinkHours\(p\.hh\), clock, !!\(p\.st && p\.st\.state === 'closed'\), p\.h && typeof p\.h === 'object' && p\.h\._closures \? p\.h\._closures : null, p\.h \? \{ placeHours: expandFoodDrinkHours\(p\.h\) \} : null\)/);
   assert.match(hours.HOURS_CLIENT_SRC, /function nextOpeningByDate\(/);
 });
 
@@ -262,12 +263,14 @@ test('8: the photo now on the page is labelled honestly: Google Maps stand-in, o
   assert.equal(app.setupImageSource(app.getVenue(g.id), ''), 'google');
   assert.equal(app.setupImageSource(app.getVenue(mk('pub', { image_url: '/images/venues/priest-creek-winery-exterior.jpg' }).id), ''), 'other');
   assert.equal(app.setupImageSource(app.getVenue(mk('pub', { image_url: '/images/owner/abc.jpg' }).id), ''), 'own');
-  assert.equal(app.setupImageSource(app.getVenue(g.id), '/owner-photos/preview/x.jpg'), 'own');
+  // Pub test 7: the owner's own pick still being checked is 'pending' ("Your new main photo (on your page within a day)").
+  assert.equal(app.setupImageSource(app.getVenue(g.id), '/owner-photos/preview/x.jpg'), 'pending');
   const html = await text(`/owner/${tokenFor(g.id)}/setup`), cfg = cfgOf(html), s = scriptOf(html);
   assert.equal(cfg.imageSource, 'google');
   assert.equal(cfg.t.curMainGoogle, 'The photo we have now (from Google Maps)');
   assert.equal(cfg.t.curMain, 'Your main photo now');
-  assert.match(s, /C\.imageSource === 'own' \? T\.curMain : C\.imageSource === 'google' \? T\.curMainGoogle : T\.curMainOther/);
+  // Pub test 7: a new main photo still being checked has its own label.
+  assert.match(s, /C\.imageSource === 'pending' \? T\.curMainPending : C\.imageSource === 'own' \? T\.curMain : C\.imageSource === 'google' \? T\.curMainGoogle : T\.curMainOther/);
   assert.equal(cfgOf(await text(`/fr/owner/${tokenFor(g.id)}/setup`)).t.curMainGoogle, 'La photo que nous avons maintenant (de Google Maps)');
 });
 

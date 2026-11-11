@@ -541,6 +541,45 @@ Object.assign(fr, {
 fr.st = Object.assign({}, fr.st, { unsure: 'pas certain (c’est correct)' });
 delete fr.winterQ; delete fr.winterHint; delete fr.hoursThen;
 
+// Pub test 7 (2026-11-10): seasons for happy hour, specials and events (and exact season dates), one-tap Closed, months
+// closed, the seasonal kitchen time, the story box, the menu link and the new main photo.
+Object.assign(en, {
+  seasonQ2: 'When does it run?', seasonAll: 'All year', seasonSome: 'Only some months', seasonHint: 'Tap the months it runs.',
+  seasonExactLink: 'Starts or ends mid-month? Pick the exact dates', seasonExactMonths: 'Use whole months instead', seasonFrom: 'Starts on', seasonTo: 'Ends on',
+  seasonNeedMonths: 'Please tap the months it runs, or tap “All year”.', seasonNeedDates: 'Please pick the first and last day, or use whole months.',
+  happySeasonH: 'Is your happy hour all year?',
+  closedWarn: 'Heads up: you’re closed on {days}{when}. It won’t show as on that day.', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (in your usual hours)',
+  seasonExactLead: 'Or pick the exact first and last day:',
+  monthsClosedQ: 'Which months are you closed?', monthsClosedLead: 'Tap each month you’re closed. Your page says “Closed for the season” then, and when you reopen.',
+  monthsClosedNeed: 'Please tap the months you’re closed.', monthsClosedInRow: 'Please pick closed months in a row, like November to March.', monthsAllClosed: 'That’s every month. Please leave the months you’re open untapped.',
+  monthsClosedRow: 'Closed {a} to {b} each year', monthsClosedOne: 'Closed in {a} each year',
+  closeDay: 'Closed', closeDayAria: 'Mark {day} closed', openDayAria: 'Open {day} again',
+  kitchenSeasonQ: 'In your {kind} hours ({range}), when does the kitchen close?', kitchenSeasonSame: 'Same time as the rest of the year', kitchenSeasonClose: 'Food until we close',
+  kitchenSeasonAt: 'Kitchen closes at', kitchenSeasonNeed: 'Please pick the time, or tap “Same time as the rest of the year”.',
+  storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyClear: 'Clear the text',
+  useSite: 'Use {site}', useSiteSub: 'Your website',
+  curMainPending: 'Your new main photo (on your page within a day)', keepMainPending: 'Keep this one',
+  hoursDoneDayAria: 'Done with {day}',
+});
+Object.assign(fr, {
+  seasonQ2: 'Quand est-ce offert?', seasonAll: 'Toute l’année', seasonSome: 'Seulement certains mois', seasonHint: 'Touchez les mois où c’est offert.',
+  seasonExactLink: 'Ça commence ou finit en milieu de mois? Choisissez les dates exactes', seasonExactMonths: 'Utiliser des mois entiers', seasonFrom: 'Commence le', seasonTo: 'Finit le',
+  seasonNeedMonths: 'Touchez les mois où c’est offert, ou touchez « Toute l’année ».', seasonNeedDates: 'Choisissez le premier et le dernier jour, ou utilisez des mois entiers.',
+  happySeasonH: 'Votre happy hour est-il offert toute l’année?',
+  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
+  seasonExactLead: 'Ou choisissez le premier et le dernier jour exacts :',
+  monthsClosedQ: 'Quels mois êtes-vous fermé?', monthsClosedLead: 'Touchez chaque mois où vous êtes fermé. Votre page indique alors « Fermé pour la saison » et la date de réouverture.',
+  monthsClosedNeed: 'Touchez les mois où vous êtes fermé.', monthsClosedInRow: 'Choisissez des mois de fermeture qui se suivent, comme de novembre à mars.', monthsAllClosed: 'Ce sont tous les mois. Ne touchez pas les mois où vous êtes ouvert.',
+  monthsClosedRow: 'Fermé de {a} à {b} chaque année', monthsClosedOne: 'Fermé en {a} chaque année',
+  closeDay: 'Fermé', closeDayAria: 'Indiquer {day} fermé', openDayAria: 'Rouvrir {day}',
+  kitchenSeasonQ: 'Pendant vos heures d’{kind} ({range}), à quelle heure la cuisine ferme-t-elle?', kitchenSeasonSame: 'Même heure que le reste de l’année', kitchenSeasonClose: 'Nourriture jusqu’à la fermeture',
+  kitchenSeasonAt: 'La cuisine ferme à', kitchenSeasonNeed: 'Choisissez l’heure, ou touchez « Même heure que le reste de l’année ».',
+  storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.', storyClear: 'Effacer le texte',
+  useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
+  curMainPending: 'Votre nouvelle photo principale (sur votre page d’ici un jour)', keepMainPending: 'Garder celle-ci',
+  hoursDoneDayAria: 'Terminé pour {day}',
+});
+
 // The one time promise (pub test 6, 2026-11-10: the essentials took a careful owner about 30 minutes, not 10 to 15).
 // The start screen, the green card and the help topic all use these exact words.
 en.timeLine = 'About 15 to 30 minutes. You can stop any time and carry on later.';

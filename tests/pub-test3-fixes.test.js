@@ -47,7 +47,8 @@ const page = (v, lang) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { 
 // ---------- 1: the ✕ clear button ----------
 test('1: a ✕ inside every filled text box empties it and keeps the cursor there (EN+FR label, tap-sized)', async () => {
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`), s = scriptOf(html);
-  assert.match(s, /querySelectorAll\('input\.su-field\[type=text\], input\.su-field\[type=tel\], input\.su-field\[type=search\]'\)/);
+  // Pub test 7: the story box gets one too.
+  assert.match(s, /querySelectorAll\('input\.su-field\[type=text\], input\.su-field\[type=tel\], input\.su-field\[type=search\], textarea\.su-area'\)/);
   assert.match(s, /b\.onclick = function\(\)\{ inp\.value = ''; b\.hidden = true; try \{ inp\.focus\(/);
   assert.match(s, /b\.addEventListener\('mousedown', keep\)/, 'tapping it never takes the cursor out of the box');
   assert.match(s, /b\.hidden = !inp\.value/, 'only on a filled box');
