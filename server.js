@@ -56921,6 +56921,8 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
   body.owner-page .op-photo-move { display: contents; }
   body.owner-page .op-pos { background: var(--paper); border-radius: 14px; padding: 14px 16px; margin: 12px 0 18px; }
+  /* Pub test 9 (2026-11-10): the event picture's rights tick and "Sending as" line stay hidden until wanted. */
+  body.owner-page #oePhotoRightsRow[hidden], body.owner-page #oeSendingAs[hidden] { display: none; }
   /* Pub test 9 (2026-11-10): the staff line and the owner's own numbers. */
   body.owner-page .op-staff { margin: 8px 0 4px; color: #3E3A34; }
   ${ownerStatsModule.OWNER_STATS_CSS.replace(/\n\s*\./g, '\n  body.owner-page .')}
