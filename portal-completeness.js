@@ -156,7 +156,12 @@ const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // Answers with no checklist item of their own (pub test 4, 2026-11-10): "No dogs allowed" on "What you offer". Stored
 // with the others (an explicit answer, kept apart from "not ticked") but never scored and never in the checklist.
 const EXTRA_NONE_KEYS = ['dogs'];
-const noneKeysFor = (type) => itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS);
+// Optional questions a type is asked but doesn't score (café test 1, 2026-11-11: "No" on a café's Weekly events, Groups
+// or Weekly specials came back "could not be read", because only scored items were allowed). Their "No" is stored like
+// any other (remembered, research doesn't add them back), never scored and never in that type's checklist. Pubs are
+// asked about booking and takeout in the setup without scoring them.
+const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups'], pub: ['pyv_reservations', 'pyv_takeout'] };
+const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
@@ -606,7 +611,11 @@ function renderCompleteness(result, opts) {
   const comingHtml = askHtml + (comingPlain.length ? `<h3 class="op-cb-h3">${L('We’re adding these', 'Nous ajoutons ceci')}</h3><p class="op-cb-note">${L('You can’t fill these in yet. They’ll count once you can.', 'Vous ne pouvez pas encore les remplir. Ils compteront dès que ce sera possible.')}</p><ul class="op-cb-soon">${comingPlain.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${esc(fr ? it.whyFr : it.whyEn)}</span></li>`).join('')}</ul>` : '');
   const groups = r.groups.map((g) => `<div class="op-cb-g${g.full ? ' full' : ''}"><b>${esc(gName.get(g.key))}${g.full ? ' ✓' : ''}</b><em>${L(`${g.got} of ${g.max}`, `${g.got} sur ${g.max}`)}</em><div class="op-cb-bar"><i style="width:${Math.round((g.got / g.max) * 100)}%"></i></div></div>`).join('');
   const declined = r.declined || [];
-  const declinedHtml = o.canDecline && declined.length ? `<h3 class="op-cb-h3">${L('You told us you don’t have these', 'Vous nous avez dit ne pas avoir ceci')}</h3><ul class="op-cb-declined">${declined.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${L('Not offered', 'Non offert')} ✓</span></span><button type="button" class="op-cb-undo" data-cb-undo="${esc(it.key)}">${L('Undo', 'Annuler')}</button></li>`).join('')}</ul><p class="op-cb-note">${L('These count as done. Only you see them: nothing about them shows on your public page.', 'Ils comptent comme faits. Vous seul les voyez : rien n’en paraît sur votre fiche publique.')}</p>` : '';
+  const declinedHtml = o.canDecline && declined.length ? `<h3 class="op-cb-h3">${L('You told us you don’t have these', 'Vous nous avez dit ne pas avoir ceci')}</h3><ul class="op-cb-declined">${declined.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${L('Not offered', 'Non offert')} ✓</span></span><button type="button" class="op-cb-undo" data-cb-undo="${esc(it.key)}">${L('Undo', 'Annuler')}</button></li>`).join('')}</ul><p class="op-cb-note">${declined.some((it) => it.key === 'wifi')
+    // Café test 1 (2026-11-11): a café's "No Wi-Fi" shows as a friendly line on its page ("No Wi-Fi: a place to talk").
+    ? (declined.length > 1 ? L('These count as done. Your page says “No Wi-Fi: a place to talk”; nothing about the others shows on your public page.', 'Ils comptent comme faits. Votre fiche indique « Pas de Wi-Fi : un endroit pour discuter »; rien des autres ne paraît sur votre fiche publique.')
+      : L('This counts as done. Your page says “No Wi-Fi: a place to talk”.', 'Cela compte comme fait. Votre fiche indique « Pas de Wi-Fi : un endroit pour discuter ».'))
+    : L('These count as done. Only you see them: nothing about them shows on your public page.', 'Ils comptent comme faits. Vous seul les voyez : rien n’en paraît sur votre fiche publique.')}</p>` : '';
   // Next to the edit-page fields: the same button, placed by the page script under each field it fills.
   const inline = o.canDecline ? r.missing.filter((it) => it.noneEn && !it.waiting && it.target && it.target.id).map((it) => ({ key: it.key, id: it.target.id, label: fr ? it.noneFr : it.noneEn, got: gotText(it.key) })) : [];
   const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}" data-cb-undo-text="${esc(L('Undo', 'Annuler'))}"` : '';
@@ -975,4 +984,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

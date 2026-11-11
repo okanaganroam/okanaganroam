@@ -71,7 +71,8 @@ test('progress never goes backwards: Skip or "later" can’t replace an answer, 
   assert.equal((await prog(t, 'instagram', 'live')).body.progress.done.instagram, 'live');
   // Help and Welcome back read the same progress, so the menu is listed as sent.
   const html = await text(`/owner/${t}/setup`);
-  assert.match(html, /Menu: on your page within a day/);
+  // Café test 1 (2026-11-11): one set of success words and honest price wording while prices aren't public.
+  assert.match(html, /Menu: we’ll add it within a day/);
 });
 
 test('the score says what the portal still asks for, so the setup’s finish and the portal agree', async () => {
@@ -235,8 +236,9 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(s, /var n = inp\.value\.length; if \(!n\) return;/, 'the cursor is left alone in an empty box');
   // Average spend isn't shown publicly yet: the Saved screen says "soon", not "now".
   assert.equal(cfg.spendPublic, false);
-  assert.match(s, /if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSoon;/);
-  assert.equal(cfg.t.savedSoon, 'It’ll show on your page soon.');
+  // Café test 1 (2026-11-11): one set of success words and honest price wording while prices aren't public.
+  assert.match(s, /if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSpendOff;/);
+  assert.equal(cfg.t.savedSpendOff, 'Thanks. We’ll use this when prices go live on pages.');
   // French has every new line.
   const fr = cfgOf(await text(`/fr/owner/${t}/setup`)).t;
   for (const k of ['exitQ', 'exitSave', 'exitDrop', 'exitStay', 'changeQ', 'changeLead', 'pctWill', 'pctWillSub', 'pctRightNow', 'added', 'holidaysH', 'noneDiet', 'noneDietSub', 'savedSoon', 'pickKind', 'kindIs', 'fewMore', 'tapBigger', 'nextPlain', 'backToList', 'finishAlmost', 'menuSentEmail']) {

@@ -60,7 +60,8 @@ test('checklist: café weights sum to 100 in the spec groups; restaurants and pu
   assert.equal(pc.PUB_ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.deepEqual([...pc.NONE_KEYS].sort(), ['dietary', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'pyv_groups', 'pyv_reservations', 'pyv_takeout', 'specials', 'website']);
-  assert.deepEqual(pc.noneKeysFor('cafe').sort(), ['dietary', 'dogs', 'facebook', 'instagram', 'ordering', 'website', 'wifi']);
+  // Café test 1 (2026-11-11): the unscored optional questions (specials, events, groups, happy hour) may be answered "No" too.
+  assert.deepEqual(pc.noneKeysFor('cafe').sort(), ['dietary', 'dogs', 'entertainment', 'facebook', 'happy_hour', 'instagram', 'ordering', 'pyv_groups', 'specials', 'website', 'wifi']);
   for (const it of pc.CAFE_ITEMS) assert.ok(it.en && it.fr && it.whyEn && it.whyFr && (it.fix === false || (it.btnEn && it.btnFr)), `${it.key} has its words in both languages`);
   for (const k of pc.noneKeysFor('cafe')) assert.ok(pc.GOT_TEXT[k] && pc.GOT_TEXT[k].fr, `${k} has its Got it text`);
 });

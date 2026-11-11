@@ -710,4 +710,50 @@ fr.cafe = {
   happyQ: 'Avez-vous un happy hour?', styleDone: 'Terminé', aPersonCafe: 'environ {n} $ pour {words}', noWifi: 'Pas de Wi-Fi', noWifiSub: 'Nous n’avons pas de Wi-Fi pour les clients',
 };
 
+// First café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe1-2026-11-11/REPORT.md). Shared words first, then café words.
+// One set of success words (item 11): "It's on your page now" for what goes live, "We'll add it within a day" for what we
+// check first. While prices aren't public (AVG_SPEND_PUBLIC off) the price question promises nothing (item 4).
+Object.assign(en, {
+  savedDay: 'We’ll add it within a day.', photosSent: '✓ {n} photos sent. We’ll add them within a day.',
+  sentMeans: 'Sent means we check it first. We’ll add it within a day.',
+  savedFbName: 'We’ll find your Facebook link and add it within a day.', savedIgName: 'We’ll add your Instagram link within a day.',
+  savedMenuSocialName: 'We’ll find your menu on that page and add it within a day.',
+  phoneRestSite: 'We’ll add your website within a day, after we check it.', phoneRestAddr: 'We’ll add your new address within a day, after we check it.',
+  phoneRestBoth: 'We’ll add your new address and website within a day, after we check them.',
+  savedSpendOff: 'Thanks. We’ll use this when prices go live on pages.', stSoon: 'saved (prices aren’t on pages yet)',
+  helpSpend: 'Prices aren’t shown on pages yet. We’ll use yours when they are.',
+  snapSub: 'Snap your menu (a board or each page)',
+  closeYearly: 'Every year', closeYearlySub: 'Ticked: we also mark the same dates next year, like the holidays.', closeEnds: 'Closed {a} to {b}', addedYearly: '{x} (this year and next)',
+});
+en.st = Object.assign({}, en.st, { day: 'we’ll add it within a day' });
+en.spendLeadOff = en.spendLead;
+Object.assign(fr, {
+  savedDay: 'Nous l’ajouterons d’ici un jour.', photosSent: '✓ {n} photos envoyées. Nous les ajouterons d’ici un jour.',
+  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord. Nous l’ajouterons d’ici un jour.',
+  savedFbName: 'Nous trouverons le lien de votre page Facebook et l’ajouterons d’ici un jour.', savedIgName: 'Nous ajouterons votre lien Instagram d’ici un jour.',
+  savedMenuSocialName: 'Nous trouverons votre menu sur cette page et l’ajouterons d’ici un jour.',
+  phoneRestSite: 'Nous ajouterons votre site Web d’ici un jour, après vérification.', phoneRestAddr: 'Nous ajouterons votre nouvelle adresse d’ici un jour, après vérification.',
+  phoneRestBoth: 'Nous ajouterons votre nouvelle adresse et votre site Web d’ici un jour, après vérification.',
+  savedSpendOff: 'Merci. Nous l’utiliserons quand les prix seront affichés sur les pages.', stSoon: 'enregistré (les prix ne sont pas encore sur les pages)',
+  helpSpend: 'Les prix ne sont pas encore affichés sur les pages. Nous utiliserons le vôtre quand ils le seront.',
+  snapSub: 'Photographiez votre menu (un tableau ou chaque page)',
+  closeYearly: 'Chaque année', closeYearlySub: 'Coché : nous indiquons aussi les mêmes dates l’an prochain, comme pour les jours fériés.', closeEnds: 'Fermé du {a} au {b}', addedYearly: '{x} (cette année et l’an prochain)',
+});
+fr.st = Object.assign({}, fr.st, { day: 'nous l’ajouterons d’ici un jour' });
+fr.spendLeadOff = fr.spendLead;
+Object.assign(en.cafe, {
+  spendLeadOff: 'For one person, before tax and tip.',
+  specialEx: 'Soup of the day, with fresh bread', priceEx: '$7', specialsTypeQ: 'Your specials',
+  laptopSub: Object.assign({}, en.cafe.laptopSub, { none: 'Your page says “No laptops: a place to talk”' }),
+  noWifiSub: 'Your page says “No Wi-Fi: a place to talk”',
+  dietNoteLabel: 'Anything to add? (optional)', dietNoteEx: 'Oat & almond milk +50¢ · Gluten-free: macarons only',
+});
+Object.assign(fr.cafe, {
+  spendLeadOff: 'Pour une personne, avant taxes et pourboire.',
+  specialEx: 'Soupe du jour, avec pain frais', priceEx: '7 $', specialsTypeQ: 'Vos spéciaux',
+  laptopSub: Object.assign({}, fr.cafe.laptopSub, { none: 'Votre page indique « Pas d’ordinateurs portables : un endroit pour discuter »' }),
+  noWifiSub: 'Votre page indique « Pas de Wi-Fi : un endroit pour discuter »',
+  dietNoteLabel: 'Autre chose à ajouter? (facultatif)', dietNoteEx: 'Lait d’avoine et d’amande +50 ¢ · Sans gluten : macarons seulement',
+});
+
 module.exports = { en, fr };
