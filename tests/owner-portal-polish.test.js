@@ -86,10 +86,11 @@ test('photo section on the edit link: no "Slide it", the previews are explained;
 
 test('Help button on phones is a small "?" at the top right that scrolls with the page (restaurants only); its name stays "Help"', async () => {
   const html = await get(`/owner/${tokenFor(mk('restaurant').id)}`);
-  assert.match(html, /@media \(max-width: 699px\) \{[\s\S]*body\.owner-page \.ohb-btn, body\.owner-page:has\(\.op-unsent:not\(\[hidden\]\)\) \.ohb-btn \{ position: absolute; top: 88px; bottom: auto;/);
+  // Café test 1 (2026-11-11): 83px, centred on the "Owner edit page" line, clear of the page title.
+  assert.match(html, /@media \(max-width: 699px\) \{[\s\S]*body\.owner-page \.ohb-btn, body\.owner-page:has\(\.op-unsent:not\(\[hidden\]\)\) \.ohb-btn \{ position: absolute; top: 83px; bottom: auto;/);
   assert.match(html, /<button type="button" class="ohb-btn" id="ohbBtn"[^>]*><span class="ohb-q" aria-hidden="true">\?<\/span>Help<\/button>/);
   const winery = await get(`/owner/${tokenFor(mk('winery').id)}`);
-  assert.doesNotMatch(winery, /position: absolute; top: 88px/);
+  assert.doesNotMatch(winery, /position: absolute; top: 83px/);
 });
 
 // 2026-11-09: the list became 45 food labels (Asian and Fast Food moved out: too general / a kind of place) with up
