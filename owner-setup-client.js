@@ -1319,7 +1319,9 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ntt]'), function(inp){ S.nights[+inp.getAttribute('data-ntt')].start = inp.value; });
   }
   // "18" -> "$18": a bare number typed as a price gets its dollar sign.
-  function money(v){ v = String(v || '').trim(); return /^\d{1,4}(\.\d{1,2})?$/.test(v) ? '$' + v : v; }
+  // Café test 3 (2026-11-11): its own name. As a second `function money` it replaced the price screen's one, which
+  // showed "$$9" and "Yes, about $$7.25".
+  function moneyStr(v){ v = String(v || '').trim(); return /^\d{1,4}(\.\d{1,2})?$/.test(v) ? '$' + v : v; }
   function specialsSave(){
     readEntries(); var out = [];
     for (var i = 0; i < S.specials.length; i++) {
@@ -1334,7 +1336,7 @@
       // "Wing night, 60¢ a wing" → title "Wing night", deal "60¢ a wing" (pub fresh-eyes, 2026-11-10: the deal used to
       // repeat the title). With no comma the deal is the whole line (it's required; the page never shows a repeat).
       var cut = text.indexOf(','), t1 = (cut > 0 ? text.slice(0, cut) : text).trim().slice(0, 40), rest = cut > 0 ? text.slice(cut + 1).trim() : '';
-      out.push({ days: ds, title: sameText ? o0.title : t1, deal: sameText ? o0.deal : (rest || text), price: money(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
+      out.push({ days: ds, title: sameText ? o0.title : t1, deal: sameText ? o0.deal : (rest || text), price: moneyStr(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
         start: e.start || null, end: e.end || (e.endClose ? 'close' : null), title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: ss.from, season_to: ss.to });
     }
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
