@@ -174,12 +174,13 @@ test('5: "Yes, that’s right" with no website saves the "no website" answer, an
 });
 
 // ---------- 6: yearly custom closures, and the end date before Add ----------
-test('6: "Every year" on her own dates saves this year and next (plain dates, like the holidays); the end date shows before Add', async () => {
+test('6: "Every year" on her own dates saves (one yearly rule since café test 2); old pairs of dated closures still read; the end date shows before Add', async () => {
   const v = mk('cafe'); const t = tokenFor(v.id);
   const s = scriptOf(await setupOf(v));
   assert.match(s, /id="suCyear"/); assert.match(s, /function plusYear\(s\)/); assert.match(s, /id="suCends"/);
-  assert.match(s, /if \(S\.addYearly\) \{ var nf = plusYear\(cf\), nt = plusYear\(to\);/);
-  // What the setup sends for Jan 5 + 2 weeks, every year: two plain closures.
+  // Café test 2 (2026-11-11): one yearly rule, not this year and next.
+  assert.match(s, /if \(S\.addYearly\) \{ var yr = \{ from: cf\.slice\(5\), to: to\.slice\(5\), note: cnote, yearly: true \};/);
+  // Two plain closures (what the setup sent before café test 2) still save and show.
   const y = Number(today.slice(0, 4)) + 1;
   const pair = [{ from: `${y}-01-05`, to: `${y}-01-18`, note: 'Winter break' }, { from: `${y + 1}-01-05`, to: `${y + 1}-01-18`, note: 'Winter break' }];
   ok(await change(t, { closures: pair }));

@@ -51,8 +51,10 @@ test('owner page: what each category sees', async () => {
     const outdoor = await page('outdoor');
     assert.ok(badgeVisible(outdoor, 'patio'), 'outdoor still offers patio');
     const cafe = await page('cafe');
-    // Sports on TV is hidden for cafés since 2026-11-10 (SPEC-cafes.md); the other food badges stay.
-    for (const b of FOOD_BADGES.filter((x) => x !== 'sports_tv')) assert.ok(badgeVisible(cafe, b), `cafe offers ${b}`);
+    // Sports on TV is hidden for cafés since 2026-11-10 (SPEC-cafes.md), and Non-alcoholic options since café test 2
+    // (2026-11-11); the other food badges stay.
+    for (const b of FOOD_BADGES.filter((x) => x !== 'sports_tv' && x !== 'nonalcoholic')) assert.ok(badgeVisible(cafe, b), `cafe offers ${b}`);
     assert.ok(!badgeVisible(cafe, 'sports_tv'), 'cafe does not offer sports_tv');
+    assert.ok(!badgeVisible(cafe, 'nonalcoholic'), 'cafe does not offer nonalcoholic');
   } finally { srv.close(); }
 });
