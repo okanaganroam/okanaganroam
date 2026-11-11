@@ -89,7 +89,7 @@ test('edit page: a restaurant opens with the setup card; the checklist sends pho
   const t = tokenFor(v.id);
   const page = await get(`/owner/${t}`).then((x) => x.text());
   assert.match(page, new RegExp(`<a class="op-setup-card" id="opSetupCard" href="/owner/${t}/setup">`));
-  assert.ok(page.includes('Set up your page') && page.includes('about 10 to 15 minutes'));
+  assert.ok(page.includes('Set up your page') && page.includes('About 15 to 30 minutes'));
   assert.ok(page.indexOf('opSetupCard') < page.indexOf('id="opComplete"'), 'the card comes first');
   assert.match(page, new RegExp(`href="/owner/${t}/setup#photos">`), 'Add photos opens the photo step');
   assert.match(page, new RegExp(`href="/owner/${t}/setup#menu">`), 'the menu item opens the menu step');

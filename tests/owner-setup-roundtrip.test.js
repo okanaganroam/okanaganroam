@@ -175,7 +175,8 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start\) \{ out\.push\(e\.orig\); continue; \}/);
   assert.doesNotMatch(s, /text\.slice\(0, 80\)/);
   // Seasonal hours not touched are not sent; a holiday keeps the note it was stored with.
-  assert.match(s, /JSON\.stringify\(S\.winter\) === S\.winterWas/);
+  // Pub test 6: seasonal hours are only sent once the all-year question was answered on this visit (S.seaTouched).
+  assert.match(s, /if \(S\.seaTouched\) \{/);
   assert.match(s, /S\.holNotes\[o\.key\] != null \? S\.holNotes\[o\.key\] : holNote\(o\.key\)/);
   // "Save and exit" part-way through a tile step saves the picks but leaves the step open.
   assert.match(s, /if \(S\.exitAfter && HALF\.indexOf\(step\) >= 0 && !answered\(step\)\) \{ S\.busy = false; if \(onOk\) onOk\(\); return leave\(\); \}/);

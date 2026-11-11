@@ -1,5 +1,5 @@
 // Easy setup time line (2026-11-10): the green "Set up your page" card, the start screen and the help topic all say
-// the same thing: "about 10 to 15 minutes (a bit longer if you change your hours)", in English and French, for
+// the same thing (pub test 6, 2026-11-10): "About 15 to 30 minutes. You can stop any time and carry on later.", in English and French, for
 // restaurants and pubs. Runs on a throwaway database (like server.test.js); run `git checkout -q okanagan.db` afterwards.
 'use strict';
 const test = require('node:test');
@@ -23,8 +23,9 @@ let srv, base;
 test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
 const card = async (p) => (/id="opSetupCard"[^>]*>([\s\S]*?)<\/a>/.exec(await fetch(base + p).then((r) => r.text())) || [])[1] || '';
-const EN = /about 10 to 15 minutes \(a bit longer if you change your hours\)/;
-const FR = /de 10 à 15 minutes \(un peu plus si vous changez vos heures\)/;
+// Pub test 6 (2026-11-10): the honest line, the same everywhere.
+const EN = /About 15 to 30 minutes\. You can stop any time and carry on later\./;
+const FR = /Environ 15 à 30 minutes\. Vous pouvez arrêter à tout moment et continuer plus tard\./;
 
 test('the card says the same time as the start screen, for restaurants and pubs, in English and French', async () => {
   for (const type of ['restaurant', 'pub']) {
@@ -36,14 +37,14 @@ test('the card says the same time as the start screen, for restaurants and pubs,
 
 test('every start screen and the help topic use the same line; no shorter version is left anywhere', () => {
   const all = JSON.stringify(strings);
-  assert.doesNotMatch(all, /10 to 15 minutes\. /, 'no "10 to 15 minutes." without the hours note');
-  assert.doesNotMatch(all, /10 à 15 minutes\. /);
+  assert.doesNotMatch(all, /10 to 15 minutes|about 10 minutes/, 'no old time promise left');
+  assert.doesNotMatch(all, /10 à 15 minutes|environ 10 minutes/);
   for (const lang of ['en', 'fr']) {
     const leads = [strings[lang].hiLead, strings[lang].pub && strings[lang].pub.hiLead].filter(Boolean);
     assert.ok(leads.length >= 2, `${lang}: restaurant and pub start screens`);
     for (const l of leads) assert.match(l, lang === 'en' ? EN : FR);
   }
   const topic = app.OWNER_HELP_TOPICS.find((x) => x.id === 'easy-setup');
-  assert.match(topic.a, /about 10 to 15 minutes, a bit longer if you change your hours/);
-  assert.match(topic.aFr, /de 10 à 15 minutes, un peu plus si vous changez vos heures/);
+  assert.match(topic.a, EN);
+  assert.match(topic.aFr, FR);
 });

@@ -300,6 +300,9 @@ function scoreCompleteness(input, opts) {
   const noneKeys = noneKeysFor(input && input.type);
   const declaredAll = ((input && input.declaredNone) || []).filter((k) => noneKeys.includes(k));
   const none = new Set(declaredAll);
+  // "Not sure / someone else runs it" (pub test 6, 2026-11-10): Instagram and Facebook count as answered (no nagging),
+  // but are not a "we don't have one" (never in `declared`).
+  const unsure = new Set(((input && input.unsureKeys) || []).filter((k) => k === 'instagram' || k === 'facebook'));
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
@@ -316,7 +319,7 @@ function scoreCompleteness(input, opts) {
     if (na[base.key]) continue;
     let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
     if (base.key === 'menu' && !done.menu && input && sameAddress(input.menuUrl, input.website)) it = { ...base, ...MENU_SAME_SITE_COPY };
-    const ok = done[it.key] || none.has(it.key);
+    const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
     if (it.key === 'hours_fresh' && !ok && !done.hours) {
@@ -435,11 +438,14 @@ function renderCompleteness(result, opts) {
   // already had one): named too, so the line says exactly what is pending (pub test 3, 2026-11-10).
   const fieldNames = { phone: ['phone', 'téléphone'], address: ['address', 'adresse'], website: ['website', 'site Web'], name: ['name', 'nom'], description: ['your story', 'votre histoire'] };
   const extraFields = (Array.isArray(o.pendingFields) ? o.pendingFields : []).filter((k) => fieldNames[k]);
-  if (o.plainWaiting && (nw || extraFields.length)) {
+  const photosSent = Math.max(0, Number(o.pendingPhotos) || 0);
+  if (o.plainWaiting && (nw || extraFields.length || photosSent)) {
     const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
       website: ['website', 'site Web'], arrival: ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
+    // Every pending item is named, photos included (pub test 6: "Menu, website and address sent" left out the photo).
+    if (photosSent && !sentNames.includes('photos')) sentNames.unshift('photos');
     if (badgeNames.length) sentNames.push(L('features', 'caractéristiques'));
   }
   const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);

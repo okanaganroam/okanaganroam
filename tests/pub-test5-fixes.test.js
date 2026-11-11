@@ -118,7 +118,8 @@ test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only
     const html = await text(`/owner/${tokenFor(mk(type).id)}/setup`), s = scriptOf(html), cfg = cfgOf(html);
     assert.match(s, /h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
     assert.match(s, /var fresh = othersClosed\(d\);/);
-    assert.match(s, /&& \(fresh \|\| S\.week\[x\]\)\) S\.week\[x\] = clone\(src\);/);
+    // Pub test 6: the editor works on wk = W() (the usual week, or the other season's).
+    assert.match(s, /&& \(fresh \|\| wk\[x\]\)\) wk\[x\] = clone\(src\);/);
     assert.equal(cfg.t.copyOpen, 'Every open day');
     assert.equal(cfg.t.copyClosedNote, 'Days marked Closed stay closed.');
   }
@@ -128,9 +129,9 @@ test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only
   const copy = (week, d, all) => {
     const S = { week: JSON.parse(JSON.stringify(week)) };
     const clone = (o) => JSON.parse(JSON.stringify(o));
-    const othersClosed = new Function('S', 'DAYS', `${/function othersClosed\(d\)\{[^\n]*\}/.exec(s)[0]}; return othersClosed;`)(S, DAYS);
+    const othersClosed = new Function('S', 'DAYS', 'W', `${/function othersClosed\(d\)\{[^\n]*\}/.exec(s)[0]}; return othersClosed;`)(S, DAYS, () => S.week);
     const body = /var fresh = othersClosed\(d\);\n\s*(DAYS\.forEach[^\n]*)/.exec(s)[1];
-    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'othersClosed', `var fresh = othersClosed(d); ${body}`)(S, DAYS, d, all, S.week[d], clone, othersClosed);
+    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'othersClosed', 'wk', `var fresh = othersClosed(d); ${body}`)(S, DAYS, d, all, S.week[d], clone, othersClosed, S.week);
     return S.week;
   };
   const w0 = { mon: null, tue: [['12:00', '00:00']], wed: [['11:30', '23:00']], thu: [['11:30', '23:00']], fri: [['11:30', '23:00']], sat: [['11:30', '23:00']], sun: [['11:30', '23:00']] };
