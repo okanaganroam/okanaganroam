@@ -340,7 +340,7 @@
   function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!S.done[P1[i]]) return P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
   function entry(step){
-    if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations)) return 'book:yes';
+    if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations || CUR.booking_url)) return 'book:yes';
     if (step === 'takeout' && (S.badges.takeout || S.visit.takeout)) return 'takeout:yes';
     if (step === 'groups' && (S.badges.great_groups || S.visit.groups)) return 'groups:yes';
     if (step === 'season') return 'closures';
@@ -431,6 +431,13 @@
   // "https://tapandbarrelkitchen.ca/" from "https://tapandbarrelkitchen.ca/?utm_source=okanaganroam#top" (pub test 9).
   function siteOrigin(u){ var t = String(u || '').trim(); if (!t) return ''; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^([a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+)/i.exec(t); return m ? m[1] + '/' : ''; }
   function siteHostOf(u){ return siteOrigin(u).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
+  // A web address inside a line of text (pub test 9: "Book on OpenTable: opentable.ca/r/tap-and-barrel"): -> { url, rest } | null.
+  function linkIn(t){
+    var m = /(?:https?:\/\/|www\.)[^\s<>]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|ca|net|org|io|co|app|me|bar|pub|restaurant|menu|link|ly)\/[^\s<>]*/i.exec(String(t || ''));
+    if (!m) return null; var url = m[0].replace(/[.,;:!)]+$/, '');
+    var rest = (String(t).slice(0, m.index) + String(t).slice(m.index + url.length)).replace(/\s*[:\-–]\s*$/, '').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').replace(/^[\s,.:;\-–]+|[\s,:;\-–]+$/g, '').trim();
+    return { url: url, rest: rest };
+  }
   function siteOk(u){ var d = siteDomain(u); return /^[^\s\/]+\.[^\s\/]{2,}(\/\S*)?$/.test(d) && d.length <= 290; }
   // Phone (pub test 3, 2026-11-10): a new number goes on the page straight away; the server checks it is a real North
   // American number and writes it as 250-555-0123. The same digits typed another way are not a change.
@@ -859,6 +866,10 @@
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
       x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+        // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
+        // links"), and a link typed into the line above is offered a move into it instead of being refused.
+        + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
+          + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'lineSave:' + base(s) + ':' + cfg[0]) + '</div>'
         + (s === 'known' ? skip('known') : '<div class="su-skip"><button type="button" class="su-link" data-act="no:' + base(s) + '">' + h({ book: T.bookNoLink, takeout: T.takeoutNoLink, groups: T.groupsNoLink }[base(s)]) + '</button></div>');
     } else if (s === 'takeout') { x = yesNo('takeout', T.takeoutQ);
@@ -1422,16 +1433,26 @@
     if (k === 'musicSave') return musicSave();
     if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
     if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
-      if (!line) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
+      // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
+      var bkUrl = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bkUrl !== null) S.bookUrl = bkUrl;
+      if (bkUrl !== null) { var inl = linkIn(line); if (inl) { S.visit[key] = el('suLine').value; S.linkOffer = inl.url; S.nudge = ''; render(); var mv0 = el('suMoveLink'); if (mv0) mv0.scrollIntoView({ block: 'center' }); return; } S.linkOffer = ''; }
+      var linkChanged = bkUrl !== null && bkUrl !== (CUR.booking_url || '');
+      if (!line && !(bkUrl && step === 'book')) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
+      if (!line) { return saveAll(step, (S.badges.takes_reservations ? [] : [{ badges: { takes_reservations: true } }]).concat(linkChanged ? [{ booking_url: bkUrl }] : []), null, null, function(){ S.badges.takes_reservations = true; CUR.booking_url = bkUrl; }); }
+      var sameLine = (S.visit[key] || '') === line && ((S.visitSaved || CUR.visit_rows || {})[key] || '') === line;
       S.visit[key] = line; var vr = {}; vr[key] = line;
       var list2 = []; var nk = { reservations: 'pyv_reservations', takeout: 'pyv_takeout', groups: 'pyv_groups' }[key];
       if (nk && S.notOffered.indexOf(nk) >= 0) list2.push({ not_offered: S.notOffered.filter(function(z){ return z !== nk; }) });
       // Saying how to book (or order, or that groups are welcome) ticks the matching feature too.
+      // Pub test 9 (2026-11-10): only when it isn't ticked already (re-sending it came back "Nothing has changed yet").
       var bk = { reservations: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' }[key];
-      if (bk) { var bb = {}; bb[bk] = true; list2.push({ badges: bb }); S.badges[bk] = true; }
-      list2.push({ visit_rows: vr }); return saveAll(step, list2);
+      if (bk && !S.badges[bk]) { var bb = {}; bb[bk] = true; list2.push({ badges: bb }); S.badges[bk] = true; }
+      if (!sameLine) list2.push({ visit_rows: vr });
+      if (linkChanged) list2.push({ booking_url: bkUrl });
+      return saveAll(step, list2, null, null, function(){ S.visitSaved = clone(S.visitSaved || CUR.visit_rows || {}); S.visitSaved[key] = line; if (linkChanged) CUR.booking_url = bkUrl; });
     }
     if (k === 'socialSave') { var val = el('suSoc').value.trim(); if (!val) { S.nudge = fill(T.needValue, { no: v === 'instagram' ? T.igNo : T.fbNo }); return render(); } if (v === 'instagram') S.ig = val; else S.fb = val; return socialSave(v, val); }
     if (k === 'socialNo') return sayNo(v);

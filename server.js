@@ -45416,6 +45416,17 @@ function ownerWebsitePending(venueId) {
     return c && typeof c.website === 'string' && c.website.trim() ? normalizeWebsiteUrl(c.website.trim()) || '' : '';
   } catch (e) { return ''; }
 }
+// A link the owner sent that is still waiting for review (pub test 9, 2026-11-10: the setup's booking link box shows
+// it): the newest pending request that names `field` ('booking_url'), or ''.
+function ownerLinkPending(venueId, field) {
+  try {
+    for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
+      const c = JSON.parse(w.changes);
+      if (c && field in c) return typeof c[field] === 'string' ? c[field] : '';
+    }
+  } catch (e) { /* none */ }
+  return null;
+}
 // The researched badges among `keys` that are on and that the owner never set themselves (no venue_owner log row).
 function setupResearchTicks(venue, keys) {
   let row = null;
@@ -50714,6 +50725,8 @@ function renderOwnerSetupPage(found, opts) {
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
+    // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first) and TikTok.
+    booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(), tiktok_url: snap.tiktok_url || '',
     ...(pub ? { pub_info: snap.pub_info || {} } : {}),
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
