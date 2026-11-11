@@ -63935,6 +63935,7 @@ module.exports = {
   EVENT_PHOTO_SPECIAL,
   HOME_EVENT_IMAGES,
   recurringSeasonRow,
+  chainReopening, getSeasonRows, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
   stripJpegMetadata,
