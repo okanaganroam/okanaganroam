@@ -19778,7 +19778,9 @@ function pubSportsText(venue, fr) {
 const { CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS } = require('./portal-completeness');
 const CAFE_SERVE_LABELS = {
   espresso: { en: 'Espresso drinks', fr: 'Boissons espresso', icon: '☕' }, drip: { en: 'Drip coffee', fr: 'Café filtre', icon: '🫗' }, tea: { en: 'Tea', fr: 'Thé', icon: '🍵' },
-  baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
+  baked_here: { en: 'Baked fresh here', fr: 'Cuit sur place', icon: '🥖' }, made_here: { en: 'Made here', fr: 'Fait sur place', icon: '🧑‍🍳' },
+  sorbet: { en: 'Sorbet', fr: 'Sorbet', icon: '🍧' }, milkshakes: { en: 'Milkshakes', fr: 'Laits frappés', icon: '🥛' }, cones: { en: 'Cones & cups', fr: 'Cornets et coupes', icon: '🍦' },
+  affogato: { en: 'Affogato', fr: 'Affogato', icon: '☕' }, pastries: { en: 'Pastries', fr: 'Pâtisseries', icon: '🥐' }, breakfast: { en: 'Breakfast', fr: 'Déjeuner', icon: '🍳' },
   lunch: { en: 'Lunch (sandwiches, soup)', fr: 'Dîner (sandwichs, soupe)', icon: '🥪' }, ice_cream: { en: 'Ice cream / gelato', fr: 'Crème glacée / gelato', icon: '🍨' },
   desserts: { en: 'Desserts & cakes', fr: 'Desserts et gâteaux', icon: '🍰' }, bubble_tea: { en: 'Bubble tea', fr: 'Thé aux perles', icon: '🧋' },
   smoothies: { en: 'Smoothies & juice', fr: 'Smoothies et jus', icon: '🥤' }, beer_wine: { en: 'Beer & wine', fr: 'Bière et vin', icon: '🍷' },
@@ -19786,6 +19788,7 @@ const CAFE_SERVE_LABELS = {
 // The short words on the page ("Espresso drinks, pastries, lunch").
 const CAFE_SERVE_SHORT = {
   espresso: ['espresso drinks', 'boissons espresso'], drip: ['drip coffee', 'café filtre'], tea: ['tea', 'thé'], baked_here: ['baked fresh here', 'cuit sur place'], pastries: ['pastries', 'pâtisseries'],
+  made_here: ['made here', 'fait sur place'], sorbet: ['sorbet', 'sorbet'], milkshakes: ['milkshakes', 'laits frappés'], cones: ['cones & cups', 'cornets & coupes'], affogato: ['affogato', 'affogato'],
   // Two-part items use "&" (café test 1, 2026-11-11: "…lunch and desserts and cakes" read as a stumble inside the list).
   breakfast: ['breakfast', 'déjeuner'], lunch: ['lunch', 'dîner'], ice_cream: ['ice cream & gelato', 'crème glacée & gelato'], desserts: ['desserts & cakes', 'desserts & gâteaux'],
   bubble_tea: ['bubble tea', 'thé aux perles'], smoothies: ['smoothies & juice', 'smoothies & jus'], beer_wine: ['beer & wine', 'bière & vin'],
@@ -19873,13 +19876,16 @@ function cleanCafeInfoPart(key, x) {
     return { value: x.length ? CAFE_SERVES.filter((s) => x.includes(s)) : null };
   }
   if (key === 'diet') {
-    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note'])) return { error: CAFE_INFO_ERROR };
+    // Café test 2 (2026-11-11): ice cream and gelato answers too: dairy-free sorbet, vegan gelato, gluten-free cups or cones.
+    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note', 'df_sorbet', 'vegan_ice', 'gf_cones'])) return { error: CAFE_INFO_ERROR };
+    if (!bool(x.df_sorbet) || !bool(x.vegan_ice) || !pick(x.gf_cones, ['cups', 'cones'])) return { error: CAFE_INFO_ERROR };
     const dn = text(x.note, CAFE_TEXT_MAX); if (dn.error) return dn;
     const milks = x.milks === undefined ? [] : x.milks;
     if (!Array.isArray(milks) || milks.some((m) => !CAFE_MILKS.includes(m)) || new Set(milks).size !== milks.length) return { error: CAFE_INFO_ERROR };
     if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
     const v = { ...(milks.length ? { milks: CAFE_MILKS.filter((m) => milks.includes(m)) } : {}), ...(milks.length && x.milk_extra ? { milk_extra: x.milk_extra } : {}),
-      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}), ...(dn.text ? { note: dn.text } : {}) };
+      ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}),
+      ...(x.df_sorbet ? { df_sorbet: true } : {}), ...(x.vegan_ice ? { vegan_ice: true } : {}), ...(x.gf_cones ? { gf_cones: x.gf_cones } : {}), ...(dn.text ? { note: dn.text } : {}) };
     return { value: Object.keys(v).length ? v : null };
   }
   if (key === 'stay') {
@@ -19942,6 +19948,10 @@ function cafeInfoLinesHtml(venue, fr) {
   if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'pâtisseries sans gluten d’une cuisine réservée'));
   else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
+  if (d.df_sorbet) dBits.push(L('dairy-free sorbet', 'sorbet sans produits laitiers'));
+  if (d.vegan_ice) dBits.push(L('vegan gelato or ice cream', 'gelato ou crème glacée véganes'));
+  if (d.gf_cones === 'cups') dBits.push(L('gluten-free in a cup (cones have gluten)', 'sans gluten dans une coupe (les cornets contiennent du gluten)'));
+  else if (d.gf_cones === 'cones') dBits.push(L('gluten-free cones', 'cornets sans gluten'));
   if (d.nut_free) dBits.push(L('nut-free options', 'options sans noix'));
   // The owner's own note (her words, usually English) follows the details; the French page shows the details only.
   const dNote = d.note && !fr ? d.note : '';
@@ -19975,6 +19985,8 @@ function cafeTalkLine(venue, fr) {
   if (!venue || venue.type !== 'cafe') return '';
   const noWifi = !venueOwnerFeatures(venue.id).wifi && venueNotOffered(venue.id).includes('wifi');
   const noLaptops = (venueCafeInfo(venue.id).stay || {}).laptops === 'none';
+  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. A takeout window says nothing about it.
+  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return '';
   if (noWifi && noLaptops) return fr ? 'Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter' : 'No Wi-Fi or laptops: a place to talk';
   if (noWifi) return fr ? 'Pas de Wi-Fi : un endroit pour discuter' : 'No Wi-Fi: a place to talk';
   if (noLaptops) return fr ? 'Pas d’ordinateurs portables : un endroit pour discuter' : 'No laptops: a place to talk';
@@ -51340,7 +51352,7 @@ function renderOwnerSetupPage(found, opts) {
   for (const k of ownerExtraBadgesFor(venue.type)) offerLabels[k] = OWNER_EXTRA_BADGE_LABELS[k][lang];
   // A pub has its own "Local beer on tap" tile, so this one is just the wine (pub fresh-eyes 2, 2026-11-10).
   if (pub && offerLabels.local_beer_taps) offerLabels.local_drinks = fr ? 'Vins locaux' : 'Local wine';
-  if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (« puppuccino »)' : 'Dog treats (“puppuccino”)'; }
+  if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (p. ex. un puppuccino ou une coupe pour chien)' : 'Dog treats (e.g. a puppuccino or pup cup)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   const handle = String(venue.name || 'yourplace').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'yourplace';
@@ -56880,6 +56892,8 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
+    // Café test 2 (2026-11-11): closed for the season today (the storefront photo waits until it reopens).
+    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ?').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
     // "Not sure / someone else runs it" in the setup (pub test 6): answered, kept apart from "we don't have one".
     unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
