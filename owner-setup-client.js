@@ -167,9 +167,6 @@
   S.noWifi = (CUR.not_offered || []).indexOf('wifi') >= 0 && !(CUR.badges || {}).wifi;
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
-  // Café test 2: no "Your coffee" tile for a gelato window (unless it ticked espresso or drip coffee). Only the saved kind
-  // counts here, never a guess from the name.
-  if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   if (C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount)) S.spend = 9;
   S.cuiTouched = false;
   // A café's happy hour is a step only while it serves Beer & wine (outreach rule).
@@ -1971,6 +1968,9 @@
     loadImage(f).then(function(r){ S.door.photo = jpeg(r.img, 1600).toDataURL('image/jpeg', 0.85); S.error = ''; render(); }, function(){ S.error = T.cantOpen; render(); });
   };
   // Opened from the checklist: #photos, #menu or any step goes straight there.
+  // Café test 2: no "Your coffee" tile for a gelato window (unless it ticked espresso or drip coffee). Only the saved kind
+  // counts here, never a guess from the name.
+  if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   var startAt = String(location.hash || '').slice(1);
   if (startAt === 'season') startAt = 'closures';
   if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
