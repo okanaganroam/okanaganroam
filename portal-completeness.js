@@ -308,7 +308,7 @@ function doneMap(input, today) {
         stay: CAFE_LAPTOPS.includes(stay.laptops) || CAFE_SEATS.includes(stay.seats),
         wifi: feats.has('wifi'),
         dogs_kids: !!(i.dogFriendly || i.kidFriendly) || feats.has('stroller') || feats.has('dog_treats') || (i.declaredNone || []).includes('dogs'),
-        ordering: nonBlank(order.online_url) || !!(order.preorder && (nonBlank(order.preorder.url) || nonBlank(order.preorder.phone) || order.preorder.on)) || CAFE_ORDER_FEATURES.some((k) => feats.has(k)),
+        ordering: !!order.preorder || CAFE_ORDER_FEATURES.some((k) => feats.has(k)) || nonBlank((c.links || {}).order_url),
       };
     })() : {}),
     ...(i.type === 'pub' ? {

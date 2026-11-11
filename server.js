@@ -19781,9 +19781,9 @@ const CAFE_KIND_HINTS = [
   [/\b(?:deli|delicatessen|sandwich(?:es)?|subs)\b/i, 'Deli & sandwiches'],
   [/\b(?:brunch|breakfast)\b/i, 'Brunch café'],
   [/\b(?:chocolat(?:e|ier|es)|donuts?|doughnuts?|sweets|candy|cupcakes?|desserts?|patisserie|pâtisserie|macarons?)\b/i, 'Dessert & sweets'],
-  [/\b(?:bakery|bakeshop|bake ?shop|bakehouse|boulangerie|breads?)\b.*\b(?:caf[eé]|coffee)\b|\b(?:caf[eé]|coffee)\b.*\b(?:bakery|bakeshop|bakehouse|boulangerie)\b/i, 'Bakery café'],
+  [/\b(?:bakery|bakeshop|bake ?shop|bakehouse|boulangerie|breads?)\b.*\b(?:caf[eé]|coffee)(?![a-z])|\b(?:caf[eé]|coffee)(?![a-z]).*\b(?:bakery|bakeshop|bakehouse|boulangerie)\b/i, 'Bakery café'],
   [/\b(?:bakery|bakeshop|bake ?shop|bakehouse|boulangerie)\b/i, 'Bakery'],
-  [/\b(?:coffee|espresso|caf[eé]|coffeehouse|coffee house|java|brew bar)\b/i, 'Coffee shop'],
+  [/\b(?:coffee|espresso|caf[eé]|coffeehouse|coffee house|java|brew bar)(?![a-z])/i, 'Coffee shop'],
 ];
 function cafeKindSuggestion(venue) {
   if (!venue || venue.type !== 'cafe' || venuePlaceType(venue)) return '';
@@ -63833,6 +63833,9 @@ module.exports = {
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
+  // Cafés (2026-11-10).
+  CAFE_SETUP_PART1, CAFE_SETUP_PART2, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
+  cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
