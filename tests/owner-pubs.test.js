@@ -308,7 +308,7 @@ test('setup: what you offer with no game and no sports ticked says so; a later t
   // The client works the answers out when it sends them ({ add, remove }), never sending a stale list.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   // Pub fresh-eyes (2026-11-10, bug B): Save and exit never records an implicit "not offered".
-  assert.match(js, /if \(gameOn\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/);
+  assert.match(js, /if \(gameOn \|\| !S\.noGames\) rem\.push\('games'\); else if \(!partial\) add\.push\('games'\)/ /* pub test 9: only the "No games" tile */);
   assert.match(js, /function offerNext\(from\)/);
   assert.match(js, /'offer:sports'.*'offer:dogs'.*'offer:minors'/s);
 });
