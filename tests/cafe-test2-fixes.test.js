@@ -249,3 +249,203 @@ test('5: a summer-only special confirmed in November 2026 shows all summer 2027;
   // A winter season (wraps New Year), confirmed in May: still shown next January.
   assert.equal(app.specialsStale('2027-05-01', at('2028-01-15T12:00'), S('11-15', '03-31')), false);
 });
+
+test('5: end to end: Raj\'s Tuesday kids\' cones (Jul–Aug), confirmed Nov 11 2026, show on Jul 15 2026-style dates in 2027 too', async () => {
+  const v = await raj();
+  ok(await change(tokenFor(v.id), { specials: [{ days: ['tue'], title: 'Kids’ cones', deal: '$2 kids’ cones', price: null, kind: 'food', start: null, end: null, title_fr: null, deal_fr: null, season_from: '07-01', season_to: '08-31' }] }));
+  // Stored as checked today (the test date); move it to Nov 11 2026 like the report.
+  db.prepare("UPDATE venue_specials SET checked_at = '2026-11-11' WHERE venue_id = ?").run(v.id);
+  const shown = (local) => { const now = at(local); const venue = app.getVenue(v.id); const sp = app.venueSpecials(venue, app.hoursWithExtras(venue, now), false, now); return sp ? sp.rows.map((r) => r.s.title) : []; };
+  assert.deepEqual(shown('2026-11-11T12:00'), [], 'November: closed for the season, and out of season');
+  assert.deepEqual(shown('2027-07-13T12:00'), ['Kids’ cones'], 'Tue Jul 13 2027: shown');
+  assert.deepEqual(shown('2028-07-11T12:00'), [], 'summer 2028: stale until re-confirmed');
+});
+
+// ---------- 4: month + day pickers that repeat every year ----------
+test('4: the season pickers are month + day (no year, never a past year) and say the dates repeat every year; EN + FR', async () => {
+  const v = mk('cafe');
+  for (const lang of ['en', 'fr']) {
+    const html = await setupOf(v, lang);
+    const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
+    assert.ok(!/type="date" id="sxf/.test(s), 'no date input for the season');
+    assert.match(s, /function mdPick\(id, md, label\)/);
+    assert.match(s, /h\(T\.repeatsYearly\)/);
+    const cfg = cfgOf(html);
+    assert.equal(cfg.monthLong.length, 12);
+    assert.ok(cfg.t.repeatsYearly && cfg.t.mdMonth && cfg.t.mdDay);
+  }
+  assert.equal(TEXT.en.repeatsYearly, 'These dates repeat every year. No need to pick a year.');
+  assert.match(TEXT.fr.repeatsYearly, /chaque année/);
+});
+test('1 + 3: the Hours step asks "We\'re closed part of the year" for every type; the closures screen points to it; words in EN + FR', async () => {
+  for (const type of ['cafe', 'restaurant', 'pub']) {
+    const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(await setupOf(mk(type)))[1];
+    assert.match(s, /big\('🗓️', T\.allYearClosed, T\.allYearClosedSub, true, 'yearClosed'\)/, type);
+    assert.match(s, /\} else if \(s === 'hours:open'\) \{/);
+    assert.match(s, /data-act="openEdit">' \+ h\(T\.partYearBtn\)/, 'closures links to the one season answer');
+    // The closures save never writes the season (one place for it).
+    const save = s.slice(s.indexOf("if (k === 'closuresNone' || k === 'closuresSave')"), s.indexOf("if (k === 'closureAdd')"));
+    assert.ok(!/open_months: om/.test(save));
+  }
+  for (const k of ['allYearClosed', 'allYearClosedSub', 'openQ', 'openLead', 'openFrom', 'openTo', 'openSame', 'openSummer', 'openSaveOnly', 'openMonthsLink', 'openNeed', 'openSameDay', 'openNow', 'openChange', 'partYearBtn', 'everyYearRow', 'yearlyTooLong', 'mdMonth', 'mdDay']) {
+    assert.ok(TEXT.en[k] && TEXT.fr[k], k);
+  }
+  // A café's season answer also says "seasonal" on its checklist.
+  const v = mk('cafe');
+  ok(await change(tokenFor(v.id), { open_months: '04-25:10-12' }));
+  ok(await change(tokenFor(v.id), { cafe_info: { year: 'seasonal' } }));
+  const cfg = cfgOf(await setupOf(v));
+  assert.equal(cfg.cur.open_months, '04-25:10-12');
+  assert.ok(!cfg.progress.score.left.some((x) => x.k === 'season'));
+});
+test('1: the edit page shows an exact season with its days, and saves whole months the old way', async () => {
+  const v = mk('cafe');
+  ok(await change(tokenFor(v.id), { open_months: '04-25:10-12' }));
+  const html = (await get(`/owner/${tokenFor(v.id)}`)).text;
+  assert.match(html, /<select id="opSeasonFromD"[^>]*>[\s\S]*?<option value="25" selected>25<\/option>/);
+  assert.match(html, /<select id="opSeasonToD"[^>]*>[\s\S]*?<option value="12" selected>12<\/option>/);
+  assert.match(html, /fd === 1 && \(td === last\[tm - 1\]/);
+  // Yearly closures show as one row there too.
+  ok(await change(tokenFor(v.id), { closures: [{ from: '04-01', to: '04-24', note: '', yearly: true }] }));
+  const h2 = (await get(`/owner/${tokenFor(v.id)}`)).text;
+  assert.match(h2, /data-yfrom="04-01" data-yto="04-24"/);
+  assert.match(h2, /<strong>Every year:<\/strong> Apr 1 – Apr 24/);
+});
+
+// ---------- 6: café words by kind ----------
+test('6: café words by kind: photos, story, serves, dietary, dog treats, no-Wi-Fi line, takeout tile, no washroom, coffee tile', async () => {
+  const kinds = ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches'];
+  for (const L of ['en', 'fr']) for (const k of kinds) assert.ok(TEXT[L].cafe.kinds[k] && TEXT[L].cafe.kinds[k].photos && TEXT[L].cafe.kinds[k].story, `${L} ${k}`);
+  assert.equal(TEXT.en.cafe.kinds['Ice cream & gelato'].photos, 'Your shop front, your gelato case, a cone. Three photos is perfect.');
+  const v = mk('cafe'); ok(await change(tokenFor(v.id), { place_type: 'Ice cream & gelato' }));
+  const html = await setupOf(v); const cfg = cfgOf(html); const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
+  for (const k of ['sorbet', 'milkshakes', 'cones', 'affogato', 'made_here', 'baked_here']) assert.ok(cfg.serves.some((x) => x.k === k), k);
+  assert.match(s, /'Ice cream & gelato': 'ice_cream'/, 'the matching chip is pre-ticked as a suggestion');
+  assert.match(s, /\} else if \(s === 'diet' && iceKind\(\)\) \{/);
+  assert.equal(cfg.offerLabels.dog_treats, 'Dog treats (e.g. a puppuccino or pup cup)');
+  assert.match(s, /data-off="takeout_only"/); assert.match(s, /data-off="no_washroom"/);
+  assert.ok(!cfg.steps.includes('coffee') || /syncCoffee\(\)/.test(s));
+  // The gelato dietary answers save and show (EN + FR).
+  ok(await change(tokenFor(v.id), { cafe_info: { diet: { df_sorbet: true, vegan_ice: true, gf_cones: 'cups', nut_free: true } } }));
+  assert.match(page(v, 'en'), /Dairy-free sorbet · vegan gelato or ice cream · gluten-free in a cup \(cones have gluten\) · nut-free options/);
+  assert.match(page(v, 'fr'), /Sorbet sans produits laitiers/);
+  assert.ok((await change(tokenFor(v.id), { cafe_info: { diet: { gf_cones: 'waffles' } } })).status >= 400);
+  // Serves: the new chips save and show.
+  ok(await change(tokenFor(v.id), { cafe_info: { serves: ['ice_cream', 'sorbet', 'milkshakes', 'cones', 'affogato', 'made_here'] } }));
+  assert.match(page(v, 'en'), /Ice cream &amp; gelato, sorbet, milkshakes, cones &amp; cups, affogato and made here/);
+  // No Wi-Fi with no seats inside: no "a place to talk".
+  ok(await change(tokenFor(v.id), { not_offered: ['wifi'] }));
+  assert.match(page(v, 'en'), /No Wi-Fi: a place to talk/);
+  ok(await change(tokenFor(v.id), { cafe_info: { stay: { seats: 'takeout' } } }));
+  assert.ok(!/a place to talk/.test(page(v, 'en')), 'takeout only: nothing about talking');
+  assert.match(page(v, 'en'), /Takeout only/);
+  // "No washroom": stored, unscored, never on the page.
+  ok(await change(tokenFor(v.id), { not_offered: ['wifi', 'washroom'] }));
+  assert.deepEqual(db.prepare('SELECT item FROM venue_not_offered WHERE venue_id = ? ORDER BY item').all(v.id).map((r) => r.item), ['washroom', 'wifi']);
+  assert.ok(!/washroom/i.test(text(page(v, 'en'))));
+  // Words in both languages.
+  for (const k of ['servePre', 'iceDfQ', 'dfSorbet', 'veganIce', 'gfConesQ', 'nutFreeIce', 'dietNoteExIce', 'noWashroom', 'noWashroomSub', 'takeoutOnly', 'takeoutOnlySub', 'noWifiSubTakeout']) assert.ok(TEXT.en.cafe[k] && TEXT.fr.cafe[k], k);
+});
+
+// ---------- 7: pub and restaurant words gone from a café's screens ----------
+test('7: a café\'s edit page and header use café words; restaurants keep theirs', async () => {
+  const v = mk('cafe');
+  ok(await change(tokenFor(v.id), { place_type: 'Ice cream & gelato' }));
+  ok(await change(tokenFor(v.id), { cafe_info: { serves: ['espresso', 'ice_cream', 'desserts'] } }));
+  ok(await change(tokenFor(v.id), { visit_rows: { known_for: 'Pistachio gelato', dogs: 'Dogs welcome on the patio' } }));
+  const edit = (await get(`/owner/${tokenFor(v.id)}`)).text;
+  assert.ok(!/<label for="opAvg">[^<]*one main and a soft drink/.test(edit), 'no restaurant spend words');
+  assert.match(edit, /About how much is a single scoop\? \(for one person, before tax and tip\)/);
+  assert.ok(!/Not set: pick your kind of food/.test(edit));
+  assert.match(edit, /id="opCuisineHint">Ice cream &amp; gelato · Espresso drinks, Ice cream \/ gelato, Desserts &amp; cakes</);
+  assert.ok(edit.indexOf('data-cu="Breakfast &amp; Brunch"') < edit.indexOf('data-cu="Pub Fare"'), 'café food styles first');
+  assert.match(edit, /2 of 4 lines filled in/, 'Known for and Dogs counted, café lines only');
+  assert.ok(!/id="opVisitReservations"/.test(edit) && !/id="opVisitTakeout"/.test(edit));
+  for (const b of ['sports_tv', 'live_music', 'nonalcoholic', 'great_groups']) assert.match(edit, new RegExp(`<label class="amenity-check" hidden><input type="checkbox" name="badge" value="${b}"`), b);
+  // Public header: the kind, EN + FR; no URL changes.
+  assert.match(page(v, 'en'), /<p class="venue-at-a-glance">Ice cream &amp; gelato shop &middot; <a href="\/penticton">/);
+  assert.match(page(v, 'fr'), /<p class="venue-at-a-glance">Bar laitier et gelato &middot;/);
+  assert.ok(app.getVenue(v.id).slug.startsWith('ct2-cafe-'));
+  // Restaurants keep their words and their five boxes.
+  const r = mk('restaurant');
+  const re = (await get(`/owner/${tokenFor(r.id)}`)).text;
+  assert.match(re, /one main and a soft drink/); assert.match(re, /id="opVisitReservations"/);
+  assert.match(page(r, 'en'), /<p class="venue-at-a-glance">Restaurant &middot;/);
+  // The menu social example is neutral for everyone.
+  assert.equal(TEXT.en.menuSocialEx, '@yourname, or the link to your page or post');
+  assert.ok(!/yourpub/.test(TEXT.fr.menuSocialEx));
+});
+
+// ---------- 8: "Our menu changes daily" ----------
+test('8: "Flavours change daily: see Instagram" saves live, links Instagram, answers the menu, and never goes to the type-up queue', async () => {
+  const sent = [];
+  app.setVenueSubmissionTransport(async (f) => { sent.push(f._subject || f.subject || ''); });
+  const v = mk('cafe');
+  ok(await change(tokenFor(v.id), { place_type: 'Ice cream & gelato' }));
+  ok(await change(tokenFor(v.id), { cafe_info: { menu_daily: 'instagram' } }));
+  assert.match(page(v, 'en'), /Flavours change daily: see Instagram/);
+  assert.match(page(v, 'fr'), /Les saveurs changent chaque jour : voir Instagram/);
+  ok(await change(tokenFor(v.id), { instagram_url: 'https://www.instagram.com/sunnyscoopsgelato' }));
+  assert.match(page(v, 'en'), /<a href="https:\/\/www\.instagram\.com\/sunnyscoopsgelato\/?"[^>]*data-track="instagram">Flavours change daily: see Instagram<\/a>/, JSON.stringify(app.venueLinks(v.id)));
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ?").get(v.id).n, 0, 'nothing in the menu queue');
+  assert.ok(!cfgOf(await setupOf(v)).progress.score.left.some((x) => x.k === 'menu'), 'counts as the menu answered');
+  assert.ok(!sent.some((x) => /type up/.test(x)));
+  const c = mk('cafe');
+  ok(await change(tokenFor(c.id), { cafe_info: { menu_daily: 'board' } }));
+  assert.match(page(c, 'en'), /Our menu changes daily: see the board in the shop/);
+  assert.ok((await change(tokenFor(c.id), { cafe_info: { menu_daily: 'tiktok' } })).status >= 400);
+  // A page name for a menu on Facebook / Instagram: "[FIND LINK]", never "asked us to type up their menu".
+  const r = await post(`/owner/${tokenFor(c.id)}/menu/help`, { note: 'Our menu is on our Facebook or Instagram page: “Sunny Scoops”.', sheet: 'menu_social', contact_email: '', contact_phone: '' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const subj = sent.find((x) => /Sunny Scoops|CT2 cafe/.test(x) && /FIND LINK/.test(x)) || sent[sent.length - 1];
+  assert.match(subj, /^\[FIND LINK\] .* told us their menu on Facebook or Instagram: please find the link$/);
+  assert.ok(!sent.some((x) => /asked us to type up/.test(x)));
+  assert.equal(db.prepare("SELECT help_kind FROM venue_menus WHERE venue_id = ? AND status = 'help'").get(c.id).help_kind, 'menu_social');
+  // The setup offers an @handle typed on the menu step on the Instagram step.
+  const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(await setupOf(c))[1];
+  assert.match(s, /S\.igFromMenu = true/); assert.match(s, /sheet: 'menu_social'/);
+  for (const k of ['menuDaily', 'menuDailyIce', 'menuDailyQ', 'menuDailyQIce', 'menuDailyLead', 'menuDailyShows', 'savedMenuDaily', 'igFromMenu']) assert.ok(TEXT.en[k] && TEXT.fr[k], k);
+  app.setVenueSubmissionTransport(async () => {});
+});
+
+// ---------- 9: cents ----------
+test('9: a café price can have cents ($5.50) in 25-cent steps; stored additively; restaurants stay whole dollars', async () => {
+  const v = mk('cafe'); ok(await change(tokenFor(v.id), { place_type: 'Ice cream & gelato' }));
+  ok(await change(tokenFor(v.id), { avg_spend: 5.5 }));
+  const row = JSON.parse(db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(v.id).info);
+  assert.equal(row.amount, 6); assert.equal(row.exact, 5.5); assert.equal(row.source, 'owner');
+  for (const bad of [5.3, 1.5, 301]) assert.ok((await change(tokenFor(v.id), { avg_spend: bad })).status >= 400, String(bad));
+  ok(await change(tokenFor(v.id), { avg_spend: '4.75' }));
+  assert.equal(JSON.parse(db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(v.id).info).exact, 4.75);
+  // Whole dollars store exactly as before (no "exact").
+  ok(await change(tokenFor(v.id), { avg_spend: 7 }));
+  assert.deepEqual(Object.keys(JSON.parse(db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(v.id).info)).sort(), ['amount', 'basis', 'checked_at', 'source', 'source_url']);
+  ok(await change(tokenFor(v.id), { avg_spend: 5.5 }));
+  // Shown properly once prices go public.
+  process.env.AVG_SPEND_PUBLIC = '1';
+  try {
+    assert.match(page(v, 'en'), /About \$5\.50 for a single scoop/);
+    assert.match(page(v, 'fr'), /Environ 5,50 \$ pour une boule/);
+  } finally { delete process.env.AVG_SPEND_PUBLIC; }
+  assert.equal(app.cafePriceText(9, 'Coffee shop', false), 'About $9 for a coffee and a pastry');
+  // Restaurants: cents refused, as before.
+  const r = mk('restaurant');
+  assert.ok((await change(tokenFor(r.id), { avg_spend: 25.5 })).status >= 400);
+  ok(await change(tokenFor(r.id), { avg_spend: 25 }));
+});
+
+// ---------- 10: the storefront photo waits while closed for the season ----------
+test('10: closed for the season, the storefront item waits under "When you reopen" and doesn\'t block 100%; in season it counts again', () => {
+  const base0 = { type: 'cafe', address: 'a', latitude: 1, longitude: 1, phone: '1', hasHours: true, hoursCheckedAt: '2026-11-11' };
+  const shut = pc.scoreCompleteness({ ...base0, closedForSeason: true }, { today: '2026-11-11' });
+  assert.ok(!shut.missing.some((it) => it.key === 'arrival'));
+  assert.deepEqual(shut.afterReopen.map((it) => it.key), ['arrival']);
+  const open = pc.scoreCompleteness({ ...base0 }, { today: '2026-11-11' });
+  assert.ok(open.missing.some((it) => it.key === 'arrival'));
+  assert.equal(open.afterReopen.length, 0);
+  // Sent already: waiting for our check as before.
+  const sent = pc.scoreCompleteness({ ...base0, closedForSeason: true, pendingArrival: true }, { today: '2026-11-11' });
+  assert.ok(sent.missing.some((it) => it.key === 'arrival' && it.waiting));
+  // The owner page shows it under "When you reopen".
+  assert.match(pc.renderCompleteness(shut, { lang: 'en' }) || '', /When you reopen/);
+});

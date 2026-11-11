@@ -19942,7 +19942,8 @@ function cafeInfoLinesHtml(venue, fr) {
   const L = (en, f) => (fr ? f : en);
   const lines = [];
   const kind = venuePlaceType(venue);
-  const serves = (info.serves || []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
+  // Café test 2: "made here" reads last ("Ice cream & gelato, sorbet and made here").
+  const serves = (info.serves || []).filter((k) => k !== 'made_here').concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
   // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
@@ -36102,7 +36103,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
     const atAGlance = [
-      label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
+      venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
       venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';

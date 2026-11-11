@@ -166,7 +166,8 @@ const EXTRA_NONE_KEYS = ['dogs'];
 const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom'], pub: ['pyv_reservations', 'pyv_takeout'] };
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS))];
+// Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
