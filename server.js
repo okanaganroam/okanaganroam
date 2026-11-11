@@ -21427,7 +21427,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     stage.classList.remove('is-map-picker');
     roamView(previous.view);
     render(false);
-    openPanel();
+    openPanel(previous.location);
     panel.querySelector('.rn-panel-body').scrollTop = previous.scroll;
     $('rnPanelPin').focus({preventScroll:true});
   }
@@ -21435,6 +21435,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!pendingRoute) {
       mapPickerReturn = {
         view: stage.classList.contains('pm-map-view') ? 'map' : 'list',
+        location: choosingTown,
         scroll: panel.hidden ? 0 : panel.querySelector('.rn-panel-body').scrollTop
       };
       stage.classList.add('is-map-picker');
@@ -21481,10 +21482,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   $('rnMap').addEventListener('click',function(){roamView('map')});
   var choosingTown = false;
   function openTownPicker(){
-    openPanel();
-    choosingTown = true;
-    $('rnLocationOptions').scrollIntoView({block:'center',behavior:'instant'});
-    $('rnLocationOptions').focus({preventScroll:true});
+    openPanel(true);
   }
   $('rnLocation').addEventListener('click',openTownPicker);
   $('rnClear').addEventListener('click',clearAll);
@@ -21535,7 +21533,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
   else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
-  function openPanel(){
+  function openPanel(locationEntry){
+    choosingTown = !!locationEntry;
+    var locationMode = choosingTown || tab === 'events';
+    $('pmPanelTitle').textContent = locationMode ? (FR ? 'Choisir où chercher' : 'Choose where to search') : (FR ? 'Filtres' : 'Filters');
+    $('pmPanelDone').textContent = locationMode ? (FR ? 'Fermer' : 'Close') : (FR ? 'Fermer les filtres' : 'Close filters');
+    $('rnLocationOptions').hidden = locationMode;
     $('rnPanelPin').textContent = me && me.pin ? (FR ? 'Repère choisi · Modifier' : 'Map pin selected · Change') : (FR ? 'Choisir sur la carte' : 'Choose on map');
     $('rnBackdrop').hidden=false;panel.hidden = false; panel.querySelector('.rn-panel-body').scrollTop = 0; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus({preventScroll:true}); }
   function closePanel(){ choosingTown = false; if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
@@ -22035,13 +22038,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function routeSteps(r){
     return '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
   }
+  function routeStepsDisclosure(r, expanded){
+    return r.steps && r.steps.length ? '<details class="rn-all-steps"' + (expanded ? ' open' : '') + '><summary>' + esc(FR?'Toutes les étapes':'All steps') + '</summary>' + routeSteps(r) + '</details>' : '';
+  }
   function drawRoute(){
     var r = route;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
     stage.classList.toggle('is-route',!!r);
     if (!r) { routeEl.innerHTML = ''; drawNav(); showLook(); return; }
     if (r.started) {
-      routeEl.innerHTML = r.steps && r.steps.length ? '<details class="rn-all-steps"' + (r.allStepsOpen ? ' open' : '') + '><summary>' + esc(FR?'Toutes les étapes':'All steps') + '</summary>' + routeSteps(r) + '</details>' : '';
+      routeEl.innerHTML = routeStepsDisclosure(r, r.allStepsOpen);
       drawNav(); showLook(); return;
     }
     var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2>';
@@ -22057,7 +22063,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         html += '<button type="button" class="pm-panel-done rn-route-start" id="rnStartRoute">' + esc(FR ? 'Démarrer le guidage' : 'Start directions') + '</button>';
       }
       if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Le guidage en direct utilise votre position.':'Live guidance uses your location.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
-      html += routeSteps(r);
+      html += WIDE.matches ? routeSteps(r) : routeStepsDisclosure(r, r.previewStepsOpen);
 
     }
     if (x.ar && !r.started && !r.arrived) html += '<figure class="rn-look-pre"><img src="' + esc(x.ar.img) + '" alt="" loading="lazy"><figcaption>' + esc(FR ? 'Ce que vous cherchez à l’arrivée' : 'What to look for when you get there') + '</figcaption></figure>';
@@ -22066,8 +22072,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     drawNav();
     showLook();
   }
+  if (WIDE.addEventListener) WIDE.addEventListener('change', function(){ if (route && !route.started) drawRoute(); });
   routeEl.addEventListener('toggle',function(e){
-    if(route && e.target.matches('.rn-all-steps') && e.target.isConnected)route.allStepsOpen=e.target.open;
+    if (!route || !e.target.matches('.rn-all-steps') || !e.target.isConnected) return;
+    if (route.started) route.allStepsOpen = e.target.open;
+    else route.previewStepsOpen = e.target.open;
   },true);
   routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
   routeEl.addEventListener('click', function(e){
@@ -22478,7 +22487,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (n) best = { id: c.id, label: c.label, n: n };
     });
     if (!best) return esc(T.none);
-    return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(T.dropIt) + '</button>';
+    var action = best.id === 'open' ? (FR ? 'Afficher aussi les lieux fermés actuellement' : 'Show places that are closed now too') : T.dropIt;
+    return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(action) + '</button>';
   }
   listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return;
     if (b.getAttribute('data-relax') === 'town') { openTownPicker(); return; }
@@ -23677,6 +23687,16 @@ ${renderGolfHeaderHtml()}
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
       <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">${R('Close filters','Fermer les filtres')}</button></div>
       <div class="rn-panel-body">
+      <h3 id="rnLocationOptions">${R('Choose where to search','Choisir où chercher')}</h3><p class="rn-location-note">${R('Pick a town to browse. Use your location for live directions.','Choisissez une ville à explorer. Utilisez votre position pour le guidage en direct.')}</p><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
+      <div class="pm-panel-row">
+        <label><span>${R('Choose a town','Choisir une ville')}</span>
+          <select id="pmTown" class="pm-select pm-town"><option value="">${R('Town…','Ville…')}</option>${townOptions}</select></label>
+        <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
+          <select id="pmRadius" class="pm-select pm-radius" disabled>
+            <option value="1">1 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="0">Any</option>
+          </select></label>
+      </div>
+      <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
       <div class="rn-place-copy rn-place-options"><p class="rn-panel-note">${R('Tap a filter group below to see its options.','Touchez un groupe de filtres ci-dessous pour voir ses options.')}</p>
       <p class="pm-active" id="pmActive" hidden></p>
       <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
@@ -23685,16 +23705,6 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
       ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}</div>
-      <h3 id="rnLocationOptions" tabindex="-1">${R('Choose where to search','Choisir où chercher')}</h3><p class="rn-location-note">${R('Pick a town to browse. Use your location for live directions.','Choisissez une ville à explorer. Utilisez votre position pour le guidage en direct.')}</p><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
-      <div class="pm-panel-row">
-        <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
-          <select id="pmRadius" class="pm-select pm-radius" disabled>
-            <option value="1">1 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="0">Any</option>
-          </select></label>
-        <label><span>Go to a town</span>
-          <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select></label>
-      </div>
-      <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
       <h3>What the pins mean</h3>
       <ul class="pm-key" aria-label="What the pins mean">
         ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
