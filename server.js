@@ -51440,6 +51440,8 @@ function renderOwnerSetupPage(found, opts) {
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
     cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
+    // A café's kind as its page shows it ("Bubble tea shop"), for the preview line (café test 3).
+    ...(cafe ? { placeShow: Object.fromEntries(placeTypesFor('cafe').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])) } : {}),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
     offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', fireplace: '🪵', beach_access: '🏖️', free_parking: '🅿️', rv_parking: '🚚', off_sales: '🛒', service_dogs: '🦮', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' , wifi: '📶', laptop: '💻', dairy_free_milk: '🥛', drive_thru: '🚗', walk_up: '🪟', washroom: '🚻', stroller: '👶', dog_treats: '🦴' },
     // The first 6 show open (pub fresh-eyes 2026-11-10), so pubs lead with their usual nights.
