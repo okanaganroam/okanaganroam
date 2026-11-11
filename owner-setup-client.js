@@ -670,6 +670,8 @@
 
   // ---------- Screens ----------
   function render(){
+    // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
+    if (C.cafe && T.spendLabel) T.labels.spend = fill(T.spendLabel, { words: cafeWords() });
     bar();
     var s = S.step, p = s.split(':'), x = '';
     if (s === 'start' || s === 'more' || s === 'ess') { S.toList = false; S.toFinish = false; S.toEss = false; } else if (s === 'finish') { S.toList = false; S.toEss = false; }

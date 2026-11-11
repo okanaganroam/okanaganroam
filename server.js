@@ -19980,8 +19980,9 @@ function cafeInfoLinesHtml(venue, fr) {
   const c = info.coffee || {};
   const cBits = [];
   if (c.roast_own) cBits.push(L('We roast our own beans', 'Nous torréfions nos propres grains'));
-  else if (c.source && !fr) cBits.push(`Beans from ${c.source}`);
-  else if (c.source) cBits.push(`Grains de ${c.source}`);
+  // Café test 3 (2026-11-11): "Beans: …", not "Beans from …" ("Beans from Rotating roaster, now Monogram Coffee").
+  else if (c.source && !fr) cBits.push(`Beans: ${c.source}`);
+  else if (c.source) cBits.push(`Grains : ${c.source}`);
   if (c.beans) cBits.push(cBits.length ? L('beans for sale', 'grains en vente') : L('Beans for sale', 'Grains en vente'));
   if (cBits.length) lines.push(['coffee', '🫘', cBits.join(' · ')]);
   const o = info.order || {}, links = info.links || {};

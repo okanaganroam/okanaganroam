@@ -154,7 +154,7 @@ test('4: while AVG_SPEND_PUBLIC is off, the price question promises nothing; wit
     assert.match(s, /S\.done\.spend && S\.done\.spend !== 'skip' && C\.spendPublic \?/, 'the preview shows no price while prices are off');
   }
   assert.match(TEXT.en.cafe.spendLead, /Your page will say/, 'kept for when prices are on');
-  assert.equal(TEXT.en.savedSpendOff, 'Thanks. We’ll use this when prices go live on pages.');
+  assert.equal(TEXT.en.savedSpendOff, 'Thanks, it’s saved. Prices don’t show on pages yet. Your price will show when they do.'); // café test 3 wording
   process.env.AVG_SPEND_PUBLIC = '1';
   try { const v = mk('cafe'); assert.equal(cfgOf(await setupOf(v)).spendPublic, true); } finally { delete process.env.AVG_SPEND_PUBLIC; }
 });

@@ -639,7 +639,7 @@ en.cafe = {
   serveQ: 'What do you serve?', serveLead: 'Tap all that apply.', serveNeed: 'Please tap at least one, or tap Skip.', saveServe: 'Save',
   styleMore: 'Add a food style (optional)', styleLead: 'For example French or Ukrainian. Pick up to 3.', styleNone: 'No food style picked. That’s fine.',
   savedCuisine: 'Your kind of café and what you serve are on your page now.',
-  spendQ: 'About how much is {words}?', spendLead: 'For one person, before tax and tip. Your page will say “About ${n} for {words}”.',
+  spendQ: 'About how much is {words}?', spendLead: 'Before tax and tip. Your page will say “About ${n} for {words}”.',
   laptopQ: 'When are laptops welcome?', laptopLead: 'People who want to work for a while look for this. Pick what fits your café.',
   laptops: { all_day: 'All day', not_busy: 'Not at busy times', none: 'No laptops' },
   laptopSub: { all_day: 'Your page shows “Laptop friendly”', not_busy: 'Your page says “Laptops welcome, except at busy times”', none: 'Nothing about laptops shows on your page' },
@@ -678,7 +678,7 @@ fr.cafe = {
   serveQ: 'Que servez-vous?', serveLead: 'Touchez tout ce qui s’applique.', serveNeed: 'Touchez au moins une réponse, ou touchez Passer.', saveServe: 'Enregistrer',
   styleMore: 'Ajouter un style de cuisine (facultatif)', styleLead: 'Par exemple française ou ukrainienne. Choisissez-en jusqu’à 3.', styleNone: 'Aucun style de cuisine choisi. C’est correct.',
   savedCuisine: 'Votre genre de café et ce que vous servez sont sur votre page maintenant.',
-  spendQ: 'Combien coûte environ {words}?', spendLead: 'Pour une personne, avant taxes et pourboire. Votre page indiquera « Environ {n} $ pour {words} ».',
+  spendQ: 'Combien coûte environ {words}?', spendLead: 'Avant taxes et pourboire. Votre page indiquera « Environ {n} $ pour {words} ».',
   laptopQ: 'Quand les ordinateurs portables sont-ils bienvenus?', laptopLead: 'Les gens qui veulent travailler un moment cherchent cette information. Choisissez ce qui convient à votre café.',
   laptops: { all_day: 'Toute la journée', not_busy: 'Pas aux heures de pointe', none: 'Pas d’ordinateurs portables' },
   laptopSub: { all_day: 'Votre page affiche « Ordinateurs portables bienvenus »', not_busy: 'Votre page indique « Ordinateurs portables bienvenus, sauf aux heures de pointe »', none: 'Rien sur les ordinateurs portables ne s’affiche sur votre page' },
@@ -713,12 +713,13 @@ fr.cafe = {
 // check first. While prices aren't public (AVG_SPEND_PUBLIC off) the price question promises nothing (item 4).
 Object.assign(en, {
   savedDay: 'We’ll add it within a day.', photosSent: '✓ {n} photos sent. We’ll add them within a day.',
-  sentMeans: 'Sent means we check it first. We’ll add it within a day.',
+  // Café test 3 (2026-11-11): plainer.
+  sentMeans: 'We check it first, then add it to your page within a day.',
   savedFbName: 'We’ll find your Facebook link and add it within a day.', savedIgName: 'We’ll add your Instagram link within a day.',
   savedMenuSocialName: 'We’ll find your menu on that page and add it within a day.',
   phoneRestSite: 'We’ll add your website within a day, after we check it.', phoneRestAddr: 'We’ll add your new address within a day, after we check it.',
   phoneRestBoth: 'We’ll add your new address and website within a day, after we check them.',
-  savedSpendOff: 'Thanks. We’ll use this when prices go live on pages.', stSoon: 'saved (prices aren’t on pages yet)',
+  savedSpendOff: 'Thanks, it’s saved. Prices don’t show on pages yet. Your price will show when they do.', stSoon: 'saved (prices aren’t on pages yet)',
   helpSpend: 'Prices aren’t shown on pages yet. We’ll use yours when they are.',
   snapSub: 'Snap your menu (a board or each page)',
   closeYearly: 'Every year', closeYearlySub: 'Ticked: we also mark the same dates next year, like the holidays.', closeEnds: 'Closed {a} to {b}', addedYearly: '{x} (this year and next)',
@@ -727,12 +728,12 @@ en.st = Object.assign({}, en.st, { day: 'we’ll add it within a day' });
 en.spendLeadOff = en.spendLead;
 Object.assign(fr, {
   savedDay: 'Nous l’ajouterons d’ici un jour.', photosSent: '✓ {n} photos envoyées. Nous les ajouterons d’ici un jour.',
-  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord. Nous l’ajouterons d’ici un jour.',
+  sentMeans: 'Nous le vérifions d’abord, puis nous l’ajoutons à votre page d’ici un jour.',
   savedFbName: 'Nous trouverons le lien de votre page Facebook et l’ajouterons d’ici un jour.', savedIgName: 'Nous ajouterons votre lien Instagram d’ici un jour.',
   savedMenuSocialName: 'Nous trouverons votre menu sur cette page et l’ajouterons d’ici un jour.',
   phoneRestSite: 'Nous ajouterons votre site Web d’ici un jour, après vérification.', phoneRestAddr: 'Nous ajouterons votre nouvelle adresse d’ici un jour, après vérification.',
   phoneRestBoth: 'Nous ajouterons votre nouvelle adresse et votre site Web d’ici un jour, après vérification.',
-  savedSpendOff: 'Merci. Nous l’utiliserons quand les prix seront affichés sur les pages.', stSoon: 'enregistré (les prix ne sont pas encore sur les pages)',
+  savedSpendOff: 'Merci, c’est enregistré. Les prix ne s’affichent pas encore sur les pages. Votre prix s’affichera à ce moment-là.', stSoon: 'enregistré (les prix ne sont pas encore sur les pages)',
   helpSpend: 'Les prix ne sont pas encore affichés sur les pages. Nous utiliserons le vôtre quand ils le seront.',
   snapSub: 'Photographiez votre menu (un tableau ou chaque page)',
   closeYearly: 'Chaque année', closeYearlySub: 'Coché : nous indiquons aussi les mêmes dates l’an prochain, comme pour les jours fériés.', closeEnds: 'Fermé du {a} au {b}', addedYearly: '{x} (cette année et l’an prochain)',
@@ -740,7 +741,8 @@ Object.assign(fr, {
 fr.st = Object.assign({}, fr.st, { day: 'nous l’ajouterons d’ici un jour' });
 fr.spendLeadOff = fr.spendLead;
 Object.assign(en.cafe, {
-  spendLeadOff: 'For one person, before tax and tip.',
+  // Café test 3 (2026-11-11): the step is named for what it asks ("Price of one drink"), and no "for one person" beside it.
+  spendLabel: 'Price of {words}', spendLeadOff: 'Before tax and tip.',
   // Café test 3 (2026-11-11): café examples, not restaurant ones (soup, brunch).
   specialEx: 'Buy 9, get the 10th free', priceEx: '$1 off', specialsTypeQ: 'Your specials',
   specialTimeEx: '7 AM to 9 AM for an early-morning deal. Leave it empty if it’s on all day.',
@@ -749,7 +751,7 @@ Object.assign(en.cafe, {
   dietNoteLabel: 'Anything to add? (optional)', dietNoteEx: 'Oat & almond milk +50¢ · Gluten-free: macarons only',
 });
 Object.assign(fr.cafe, {
-  spendLeadOff: 'Pour une personne, avant taxes et pourboire.',
+  spendLabel: 'Prix : {words}', spendLeadOff: 'Avant taxes et pourboire.',
   specialEx: 'Achetez-en 9, le 10e est gratuit', priceEx: '1 $ de rabais', specialsTypeQ: 'Vos spéciaux',
   specialTimeEx: 'de 7 h à 9 h pour un spécial du matin. Laissez vide si c’est offert toute la journée.',
   laptopSub: Object.assign({}, fr.cafe.laptopSub, { none: 'Votre page indique « Pas d’ordinateurs portables : un endroit pour discuter »' }),
