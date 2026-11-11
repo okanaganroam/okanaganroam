@@ -756,4 +756,32 @@ Object.assign(fr.cafe, {
   dietNoteLabel: 'Autre chose à ajouter? (facultatif)', dietNoteEx: 'Lait d’avoine et d’amande +50 ¢ · Sans gluten : macarons seulement',
 });
 
+// Second first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe2-2026-11-11/REPORT.md). Shared words first.
+// "We're closed part of the year" in the Hours step (every type), month + day pickers that repeat every year, and one
+// yearly rule for "Every year" closures.
+Object.assign(en, {
+  allYearClosed: 'We’re closed part of the year', allYearClosedSub: 'Like open spring to fall. You pick the dates.',
+  openQ: 'When are you open each year?', openLead: 'Outside these dates your page says “Closed for the season”, and when you reopen.',
+  openFrom: 'Open from', openTo: 'Open until (your last day)', repeatsYearly: 'These dates repeat every year. No need to pick a year.',
+  openSame: 'Save: same hours all season', openSameSub: 'The hours you just set', openSummer: 'Save, and add different summer hours', openSummerSub: 'Like longer hours in July and August',
+  openSaveOnly: 'Save these dates', openMonthsLink: 'Closed for whole months? Tap the months instead',
+  openNeed: 'Please pick the first and last day you’re open.', openSameDay: 'The first and last day are the same. Please check them.',
+  openNow: 'Open {a} to {b} every year', openChange: 'Change', partYearBtn: '+ We’re closed part of the year (pick your open dates)',
+  mdMonth: 'Month', mdDay: 'Day',
+  everyYearRow: 'Every year: {a} – {b}', yearlyTooLong: 'A yearly closure must be shorter than a year. Please pick a shorter closure.',
+  closeYearlySub: 'Ticked: saved once as a yearly closure, the same dates every year.', addedYearly: '{x} (every year)',
+});
+Object.assign(fr, {
+  allYearClosed: 'Nous fermons une partie de l’année', allYearClosedSub: 'Par exemple ouvert du printemps à l’automne. Vous choisissez les dates.',
+  openQ: 'Quand êtes-vous ouvert chaque année?', openLead: 'En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture.',
+  openFrom: 'Ouvert à partir du', openTo: 'Ouvert jusqu’au (votre dernier jour)', repeatsYearly: 'Ces dates reviennent chaque année. Pas besoin de choisir l’année.',
+  openSame: 'Enregistrer : mêmes heures toute la saison', openSameSub: 'Les heures que vous venez d’indiquer', openSummer: 'Enregistrer et ajouter des heures d’été différentes', openSummerSub: 'Comme des heures plus longues en juillet et août',
+  openSaveOnly: 'Enregistrer ces dates', openMonthsLink: 'Fermé des mois entiers? Touchez plutôt les mois',
+  openNeed: 'Choisissez le premier et le dernier jour d’ouverture.', openSameDay: 'Le premier et le dernier jour sont les mêmes. Vérifiez-les.',
+  openNow: 'Ouvert du {a} au {b} chaque année', openChange: 'Modifier', partYearBtn: '+ Nous fermons une partie de l’année (choisissez vos dates d’ouverture)',
+  mdMonth: 'Mois', mdDay: 'Jour',
+  everyYearRow: 'Chaque année : du {a} au {b}', yearlyTooLong: 'Une fermeture annuelle doit durer moins d’un an. Choisissez une fermeture plus courte.',
+  closeYearlySub: 'Coché : enregistré une seule fois comme fermeture annuelle, aux mêmes dates chaque année.', addedYearly: '{x} (chaque année)',
+});
+
 module.exports = { en, fr };

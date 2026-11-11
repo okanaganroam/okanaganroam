@@ -54,10 +54,22 @@
   // The season box on a screen: "All year" / "Only some months", the month chips, and "Starts or ends mid-month? Pick the
   // exact dates" (two date boxes; the year is only there for the date picker).
   function seaObj(id){ var q2 = String(id).split('.'); if (q2[0] === 'happy') return S.happySea; if (q2[0] === 'hours') return S.sea; var e = S[q2[0]] && S[q2[0]][+q2[1]]; if (!e) return null; return e.sea || (e.sea = seaFrom()); }
-  function seaDateVal(md){ return md ? new Date().getFullYear() + '-' + md : ''; }
+  // Café test 2 (2026-11-11): a month and a day, no year ("the picker opened on Jun 1 2026, already past"). The dates repeat
+  // every year, and the screen says so. French reads day then month.
+  function mdPick(id, md, label){
+    var mm = /^\d{2}-\d{2}$/.test(md || '') ? +md.slice(0, 2) : 0, dd = mm ? +md.slice(3) : 0, names = C.monthLong || C.monthNames, ms = '', ds = '';
+    for (var i = 1; i <= 12; i++) ms += '<option value="' + i + '"' + (i === mm ? ' selected' : '') + '>' + h(names[i - 1]) + '</option>';
+    for (var j = 1; j <= 31; j++) ds += '<option value="' + j + '"' + (j === dd ? ' selected' : '') + '>' + j + '</option>';
+    var m = '<select class="su-field su-mdm" id="' + id + 'M" aria-label="' + h(label + ': ' + T.mdMonth) + '"><option value="">' + h(T.mdMonth) + '</option>' + ms + '</select>';
+    var d = '<select class="su-field su-mdd" id="' + id + 'D" aria-label="' + h(label + ': ' + T.mdDay) + '"><option value="">' + h(T.mdDay) + '</option>' + ds + '</select>';
+    return '<span class="su-md" id="' + id + '">' + (C.lang === 'fr' ? d + m : m + d) + '</span>';
+  }
+  function mdRead(id){ var m = el(id + 'M'), d = el(id + 'D'); if (!m || !d || !m.value || !d.value) return ''; var mm = +m.value; return pad2(mm) + '-' + pad2(Math.min(+d.value, MLAST[mm - 1])); }
+  // "Apr 25" / « 25 avr ».
+  function mdLabel(md){ if (!/^\d{2}-\d{2}$/.test(md || '')) return md || ''; var n = monthName(+md.slice(0, 2) - 1), d = +md.slice(3); return C.lang === 'fr' ? (d === 1 ? '1er' : d) + ' ' + n : n + ' ' + d; }
   function seaExactHtml(id, o){
-    return '<p class="su-hint" style="margin:10px 0 6px">' + h(T.seasonExactLead) + '</p><div class="su-seadates"><label class="su-q" for="sxf' + id + '">' + h(T.seasonFrom) + '</label><input class="su-field" type="date" id="sxf' + id + '" data-sexact="' + id + ':from" value="' + h(seaDateVal(o.exact.from)) + '">'
-      + '<label class="su-q" for="sxt' + id + '">' + h(T.seasonTo) + '</label><input class="su-field" type="date" id="sxt' + id + '" data-sexact="' + id + ':to" value="' + h(seaDateVal(o.exact.to)) + '"></div>'
+    return '<p class="su-hint" style="margin:10px 0 6px">' + h(T.seasonExactLead) + '</p><div class="su-seadates"><p class="su-q">' + h(T.seasonFrom) + '</p><span data-sexact="' + id + ':from" data-mdid="sxf' + id + '">' + mdPick('sxf' + id, o.exact.from, T.seasonFrom) + '</span>'
+      + '<p class="su-q">' + h(T.seasonTo) + '</p><span data-sexact="' + id + ':to" data-mdid="sxt' + id + '">' + mdPick('sxt' + id, o.exact.to, T.seasonTo) + '</span></div><p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p>'
       + '<p class="su-hint"><button type="button" class="su-link" data-sea="' + id + ':months">' + h(T.seasonExactMonths) + '</button></p>';
   }
   function seasonBox(id, o, title){
@@ -69,7 +81,7 @@
         + '<p class="su-hint"><button type="button" class="su-link" data-sea="' + id + ':exact">' + h(T.seasonExactLink) + '</button></p>') : '') + '</div>';
   }
   function readSeasons(){
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ var q2 = inp.getAttribute('data-sexact').split(':'), o = seaObj(q2[0]); if (!o || !o.exact) return; var m = /^\d{4}-(\d{2}-\d{2})$/.exec(inp.value || ''); o.exact[q2[1]] = m ? m[1] : ''; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ var q2 = inp.getAttribute('data-sexact').split(':'), o = seaObj(q2[0]); if (!o || !o.exact) return; o.exact[q2[1]] = mdRead(inp.getAttribute('data-mdid')); });
   }
   // "Heads up: you're closed on Tue (in your usual hours)." under a special or event on a weekday the place is closed in
   // the months it runs (pub test 7). Only with hours on file.
@@ -166,6 +178,19 @@
   }
   // Season months from "5-10".
   (function(){ var m = /^(\d+)-(\d+)$/.exec(CUR.open_months || ''); if (!m) return; var a = +m[1], b = +m[2], i = a; for (var n = 0; n < 12; n++) { S.months[i] = true; if (i === b) break; i = i % 12 + 1; } })();
+  // "We're closed part of the year" (café test 2, 2026-11-11): the yearly open season with exact days, asked in the Hours
+  // step. Stored in open_months as "04-25:10-12"; whole months stay "4-10" exactly as before.
+  function openSeaOf(v){
+    var m = /^(\d{1,2})-(\d{1,2})$/.exec(v || ''); if (m) return { from: pad2(+m[1]) + '-01', to: pad2(+m[2]) + '-' + MLAST[+m[2] - 1] };
+    var x = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(v || ''); return x ? { from: x[1], to: x[2] } : null;
+  }
+  function openVal(o){
+    if (!o) return '';
+    var a = +o.from.slice(0, 2), b = +o.to.slice(0, 2), whole = o.from.slice(3) === '01' && (+o.to.slice(3) === MLAST[b - 1] || (b === 2 && o.to.slice(3) === '28'));
+    return whole && a !== b ? a + '-' + b : o.from + ':' + o.to;
+  }
+  function openText(o){ return o ? fill(T.openNow, { a: mdLabel(o.from), b: mdLabel(o.to) }) : ''; }
+  S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
   // time for the days already open in the usual week, so "open daily in summer" kept Mon and Tue closed). Stored the same
   // way as always (hours_seasons: { from, to, label, hours: { mon: [...], ... } }); older sets read back as they are.
@@ -205,7 +230,7 @@
     if (nx && (CUR.closures || []).some(function(c2){ var t = HOL.filter(function(o){ return o.key === nx.key; })[0]; return t && c2.from === t.date; })) return;
     var hit = HOL.filter(function(x){ return x.date === c.from && (c.to || c.from) === c.from; })[0], note = c.note || '';
     if (hit && (!note || note === holNote(hit.key) || note === String((C.holidayAlt || {})[hit.key] || '').replace(/[()&<>]/g, ''))) { S.closures.push(hit.key); S.holNotes[hit.key] = note; if (hit.yearly) S.everyYear[hit.key] = !!seenNext[hit.key]; }
-    else S.extra.push({ from: c.from, to: c.to || c.from, note: note });
+    else S.extra.push(c.yearly ? { from: c.from, to: c.to || c.from, note: note, yearly: true } : { from: c.from, to: c.to || c.from, note: note });
   });
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
@@ -292,6 +317,14 @@
   function lenEnd(cf){ if (!cf || S.addLen === 'pick') return ''; var d0 = new Date(cf + 'T12:00:00'); if (isNaN(d0)) return ''; d0.setDate(d0.getDate() + (+S.addLen - 1)); return ymd(d0); }
   function closeEnds(cf){ var e = lenEnd(cf); return !e ? '' : e === cf ? dateLabel(cf) : fill(T.closeEnds, { a: dateLabel(cf), b: dateLabel(e) }); }
   function plusYear(s){ var d = new Date(s + 'T12:00:00'); d.setFullYear(d.getFullYear() + 1); return ymd(d); }
+  // A closure row (café test 2): "Every year: Apr 1 – Apr 24" for a yearly rule; a dated row shows its year when it isn't
+  // this year ("Thu, Apr 1, 2027"), so two years of the same dates never read as a duplicate.
+  function closureLabel(c){
+    if (c.yearly) return fill(T.everyYearRow, { a: mdLabel(c.from), b: mdLabel(c.to || c.from) });
+    var yr = function(d){ return d.slice(0, 4) !== String(new Date().getFullYear()) ? dateLabelY(d) : dateLabel(d); };
+    return yr(c.from) + (c.to && c.to !== c.from ? ' – ' + yr(c.to) : '');
+  }
+  function dateLabelY(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return s; } }
   function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
 
   // ---------- Talking to the server ----------
@@ -576,7 +609,7 @@
     var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:year': 'hoursSave', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
       'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook',
       'menu:web': 'menuWebSave', 'menu:social': 'menuSocialSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
-      'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave',
+      'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave', 'hours:open': 'openSave:keep',
       'hours:kitchentime': 'kitchenSave', 'offer:sports': 'sportsSave', 'offer:minors': 'minorsSave',
       'cuisine:serve': 'serveSave', 'offer:laptops': 'laptopSave', stay: 'staySave', order: 'orderSave', diet: 'dietSave', coffee: 'coffeeSave', sellout: 'selloutSave' }[st];
     if (here) return here;
@@ -668,8 +701,17 @@
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
       var mrN = S.sea.on ? monthRun(S.sea.months) : null;
-      x = q(T.allYearQ, T.allYearLead) + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) })) + '</p>' : '') + msgs()
-        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter') + '</div>';
+      x = q(T.allYearQ, T.allYearLead) + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) })) + '</p>' : '') + msgs()
+        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+        // Café test 2 (2026-11-11): a seasonal place says its open dates here, once, for every type.
+        + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') + '</div>';
+    } else if (s === 'hours:open') {
+      // Café test 2: "Open from [Apr 25] to [Oct 12] every year". Whole months stay a quick path (the months screen).
+      var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
+      x = q(T.openQ, T.openLead) + msgs() + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
+        + '<p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p><p class="su-hint"><button type="button" class="su-link" data-act="openMonths">' + h(T.openMonthsLink) + '</button></p>'
+        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
+        + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || s === 'hours:season') {
       var seas = s === 'hours:season';
       if (!S.week) { S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); }
@@ -733,14 +775,14 @@
         + field('suMnote', T.minorsNoteLabel, S.minors.note, { max: 120 }) + ex(T.minorsNoteEx) + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'minorsSave') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
     } else if (s === 'closures') {
-      var mr = monthRun(S.months), monthsOn = !mr.none && !mr.all && !mr.bad;
-      var nothing = !S.closures.length && !S.extra.length && !monthsOn;
+      var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0; }).length + Math.max(0, S.extra.length - S.savedExtra);
       x = (changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
-        + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(dateLabel(c.from) + (c.to && c.to !== c.from ? ' – ' + dateLabel(c.to) : '') + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
-        + (monthsOn ? '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(closedMonthsText(mr)) + '</span><button type="button" data-act="monthsClear" aria-label="' + h(T.remove) + '">✕</button></div>' : '')
+        + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
+        // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
+        + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
-        + '<button type="button" class="su-more" data-act="go:closures:months">' + h(T.wholeMonths) + '</button>'
+        + (S.openSea ? '' : '<button type="button" class="su-more" data-act="openEdit">' + h(T.partYearBtn) + '</button>')
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<button type="button" class="su-tile" aria-pressed="' + (S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0; }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(T.holidays[o.key] + ': ' + T.everyYear) + '</span></label>'; }).join('')
@@ -1176,9 +1218,13 @@
       }
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
-    saveAll('hours', [ch], null, C.pub ? 'hours:kitchen' : null, function(){
+    // Café test 2 (2026-11-11): the open season answered in this step ("We're closed part of the year").
+    var listH = [ch];
+    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
+    saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : null, function(){
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
-      S.seaTouched = false;
+      if ('open_months' in ch) CUR.open_months = ch.open_months;
+      S.seaTouched = false; S.openTouched = false;
     });
   }
   function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
@@ -1387,6 +1433,37 @@
     if (k === 'hoursOk') return go('hours:year');
     if (k === 'hoursNext') { readTimes(); if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); } return go('hours:year'); }
     if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; return hoursSave(); }
+    // Café test 2 (2026-11-11): "We're closed part of the year" and its dates.
+    if (k === 'yearClosed') { S.openFrom = 'hours'; S.openDraft = null; return go('hours:open'); }
+    if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
+    if (k === 'openMonths') {
+      var odm = { from: mdRead('suOf'), to: mdRead('suOt') }; S.openDraft = odm.from || odm.to ? odm : S.openDraft;
+      S.closedM = {}; var o0 = S.openDraft && S.openDraft.from && S.openDraft.to ? S.openDraft : S.openSea;
+      if (o0) { var om0 = seaMonths({ on: true, months: {}, exact: o0 }); for (var mi0 = 1; mi0 <= 12; mi0++) if (!om0[mi0]) S.closedM[mi0] = true; }
+      S.openMonthsBack = true; return go('closures:months');
+    }
+    if (k === 'openNone' || k === 'openSave') {
+      var oNew = null;
+      if (k === 'openSave') {
+        var of = mdRead('suOf'), ot = mdRead('suOt'); S.openDraft = { from: of, to: ot };
+        if (!of || !ot) { S.nudge = T.openNeed; return render(); }
+        if (of === ot) { S.nudge = T.openSameDay; return render(); }
+        oNew = { from: of, to: ot };
+      }
+      S.openSea = oNew; S.openDraft = null; S.openTouched = true; S.dirty = 'hours';
+      if (S.openFrom === 'hours') {
+        if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { S.sea.kind = 'summer'; S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } S.sea.on = true; S.sea.open = {}; S.seaTouched = true; return go('hours:season'); }
+        if (k === 'openNone') return go('hours:year', true);
+        if (v !== 'keep') { S.sea.on = false; S.seaTouched = true; }
+        return hoursSave();
+      }
+      // From the closures screen (or the checklist): just the dates.
+      var ovc = openVal(S.openSea), lc = [];
+      if (ovc !== (CUR.open_months || '')) lc.push({ open_months: ovc });
+      if (C.cafe) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
+      if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
+      return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
+    }
     if (k === 'yearSeason') {
       if (S.sea.kind !== v || !S.sea.week) {
         // A new season (or the other one): its usual months, and the usual week to start from (every day, closed ones too).
@@ -1444,21 +1521,25 @@
     if (k === 'monthsUse') {
       // The months tapped are the closed ones; the open months are the rest (none tapped: open all year).
       var cm = S.closedM || {}, nClosed = 0, openM = {}; for (var mj = 1; mj <= 12; mj++) { if (cm[mj]) nClosed++; else openM[mj] = true; }
-      if (!nClosed) { S.months = {}; S.closedM = null; S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
+      if (!nClosed) { S.months = {}; S.closedM = null; if (S.openMonthsBack) { S.openMonthsBack = false; S.openDraft = null; } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
       if (nClosed === 12) { S.nudge = T.monthsAllClosed; return render(); }
       var r = monthRun(openM); if (r.bad) { S.nudge = T.monthsClosedInRow; return render(); }
-      S.months = openM; S.closedM = null; S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
+      S.months = openM; S.closedM = null;
+      // Café test 2: the quick path from "When are you open each year?" fills its dates with the whole months.
+      if (S.openMonthsBack) { S.openMonthsBack = false; S.openDraft = { from: pad2(r.a) + '-01', to: pad2(r.b) + '-' + MLAST[r.b - 1] }; }
+      S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
       var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0; }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
       out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
-      var mr2 = monthRun(S.months); if (mr2.bad) { S.nudge = T.monthsInRow; return render(); }
-      var om = k === 'closuresNone' || mr2.none || mr2.all ? '' : mr2.a + '-' + mr2.b;
-      var cl = [{ closures: out }]; if (om !== (CUR.open_months || '')) cl.push({ open_months: om });
+      // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
+      // shows it and links to it, and never writes it (two places could disagree).
+      var om = CUR.open_months || '';
+      var cl = [{ closures: out }];
       // Cafés (2026-11-10): the answer itself ("open all year" or seasonal) counts on the checklist.
       if (C.cafe) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
-      return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ CUR.open_months = om; S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
+      return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
     }
     if (k === 'closureAdd') {
       var cf = el('suCf').value, ctEl = el('suCt'), cn = el('suCn').value.trim(); S.addFrom = cf; S.addNote = cn; if (ctEl) S.addTo = ctEl.value;
@@ -1467,9 +1548,11 @@
       if (S.addLen === 'pick') to = S.addTo && S.addTo >= cf ? S.addTo : cf;
       else { var d0 = new Date(cf + 'T12:00:00'); d0.setDate(d0.getDate() + (+S.addLen - 1)); to = ymd(d0); }
       var cnote = cn.replace(/[()&<>]/g, '').slice(0, 60), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
-      S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : '');
-      // Every year: the same dates next year too (stored as plain dates, like the holidays), while that is within the two years we take.
-      if (S.addYearly) { var nf = plusYear(cf), nt = plusYear(to); if (nf <= ymd(new Date(Date.now() + 729 * 864e5)) && !S.extra.some(function(c){ return c.from === nf && c.to === nt; })) { S.extra.push({ from: nf, to: nt, note: cnote }); S.added = fill(T.addedYearly, { x: S.added }); } }
+      // Café test 2 (2026-11-11): "Every year" is one yearly rule ({ from: 'MM-DD', to: 'MM-DD', yearly: true }, "Every year:
+      // Apr 1 – Apr 24"), not a dated copy for this year and next. Up to a year long, like any closure.
+      if (S.addYearly) { var yr = { from: cf.slice(5), to: to.slice(5), note: cnote, yearly: true }; if (to.slice(0, 4) !== cf.slice(0, 4) && yr.to >= yr.from) { S.nudge = T.yearlyTooLong; return render(); }
+        if (!S.extra.some(function(c){ return c.yearly && c.from === yr.from && c.to === yr.to; })) S.extra.push(yr); S.added = closureLabel(yr); }
+      else { S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : ''); }
       S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1'; S.addYearly = false;
       S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }

@@ -51374,7 +51374,7 @@ function renderOwnerSetupPage(found, opts) {
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
-    dayNames: shortDays, longDays: dayNames, monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
@@ -51654,6 +51654,11 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-day > .su-season:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   body.owner-setup .su-seadates { display: grid; gap: 6px; }
   body.owner-setup .su-seadates .su-field { margin-bottom: 8px; }
+  body.owner-setup .su-md { display: flex; gap: 8px; }
+  body.owner-setup .su-md select.su-field { flex: 1 1 0; min-width: 0; min-height: 48px; margin-bottom: 4px; }
+  body.owner-setup .su-md select.su-mdm { flex: 2 1 0; }
+  body.owner-setup .su-repeats { font-weight: 700; }
+  body.owner-setup .su-openrow .su-link { margin-left: auto; padding: 8px 4px; }
   body.owner-setup .su-closedwarn { margin: 10px 0 0; padding: 8px 12px; border-radius: 12px; background: var(--su-warn-bg); color: var(--su-warn); font-weight: 700; }
   body.owner-setup .su-closedwarn[hidden] { display: none; }
   body.owner-setup .su-fwrap-area > .su-field { padding-right: 64px; }
@@ -56502,7 +56507,11 @@ function ownerSeasonSummary(season, lang = 'en') {
     : `${label} ${hoursExtraDayText(season.from)}–${hoursExtraDayText(season.to)}`;
 }
 function ownerClosuresSummary(closures, lang = 'en', today = todayLocal()) {
-  const list = (closures || []).filter((c) => c && (c.to || c.from) >= today).sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  // Café test 2: a yearly closure counts once, at its next run.
+  const y = Number(today.slice(0, 4));
+  const dated = (closures || []).map((c) => (c && hoursModule && hoursModule.isYearlyClosure(c)
+    ? hoursModule.expandYearlyClosures([c], y - 1, y + 1).find((x) => x.to >= today) || null : c));
+  const list = dated.filter((c) => c && (c.to || c.from) >= today).sort((a, b) => String(a.from).localeCompare(String(b.from)));
   if (!list.length) return '';
   const fr = lang === 'fr', n = list.length, next = list[0].from >= today ? list[0].from : today;
   const when = hoursExtraDayText(next, fr);
@@ -56536,6 +56545,14 @@ function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
 // Special closures on the owner page (2026-10-18): one row per date or date range, with an optional note.
 function ownerClosureRowHtml(c, today, lang = 'en') {
   const L = (en, f) => (lang === 'fr' ? f : en);
+  // Café test 2 (2026-11-11): a yearly closure is one row, "Every year: Apr 1 – Apr 24 (note)", with Remove.
+  if (c && hoursModule && hoursModule.isYearlyClosure(c)) {
+    const range = lang === 'fr' ? `du ${hoursExtraDayText(c.from, true)} au ${hoursExtraDayText(c.to || c.from, true)}` : `${hoursExtraDayText(c.from)} \u2013 ${hoursExtraDayText(c.to || c.from)}`;
+    return `<div class="op-closure op-closure-yearly" data-yfrom="${escapeHtml(c.from)}" data-yto="${escapeHtml(c.to || c.from)}" data-ynote="${escapeHtml(c.note || '')}">
+          <p style="margin:0"><strong>${L('Every year', 'Chaque année')}:</strong> ${escapeHtml(range)}${c.note ? ` (${escapeHtml(c.note)})` : ''}</p>
+          <button type="button" class="op-cl-remove">${L('Remove', 'Retirer')}</button>
+        </div>`;
+  }
   return `<div class="op-closure">
           <label>${L('First day', 'Premier jour')} <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
           <label>${L('Last day (optional)', 'Dernier jour (facultatif)')} <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
@@ -57727,13 +57744,18 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}
       ${(() => {
         // Seasonal businesses (tours, golf, patios): the months they open every year.
-        const om = /^(\d{1,2})-(\d{1,2})$/.exec(snap.open_months || '');
+        // Café test 2 (2026-11-11): with the first and last day too ("04-25:10-12"); whole months stay "4-10".
+        const os = hoursModule ? hoursModule.parseOpenSeason(snap.open_months || '') : null;
+        const om = os ? [null, String(os.months[0]), String(os.months[1])] : null;
         const opts = (sel) => MONTH_NAMES[fr ? 'fr' : 'en'].map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
+        const dopts = (sel) => Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${i + 1}</option>`).join('');
+        const fromD = os ? Number(os.from.slice(3)) : 1, toD = os ? Number(os.to.slice(3)) : 31;
         return `<div class="op-season">
         <label for="opSeasonMode"><strong>${L('Season', 'Saison')}</strong>${waitChip('open_months')}</label>
         <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">${L('Open all year', 'Ouvert toute l’année')}</option><option value="season"${om ? ' selected' : ''}>${L('Open some months only', 'Ouvert certains mois seulement')}</option></select>
-        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'de')} <select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>
-        ${L('to', 'à')} <select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select></span>
+        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'du')} ${fr ? `<select id="opSeasonFromD" aria-label="Premier jour d’ouverture">${dopts(fromD)}</select> ` : ''}<select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>${fr ? '' : ` <select id="opSeasonFromD" aria-label="First day open">${dopts(fromD)}</select>`}
+        ${L('to', 'au')} ${fr ? `<select id="opSeasonToD" aria-label="Dernier jour d’ouverture">${dopts(toD)}</select> ` : ''}<select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select>${fr ? '' : ` <select id="opSeasonToD" aria-label="Last day open">${dopts(toD)}</select>`}
+        <small class="op-hint" style="display:block">${L('Every year. Leave the days at the 1st and the last day of the month for whole months.', 'Chaque année. Laissez le 1er et le dernier jour du mois pour des mois entiers.')}</small></span>
         <p class="lyv-error" id="opSeasonError" hidden></p>
         <p class="op-hint">${L('Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.', 'Hors saison, votre page indique « Fermé pour la saison » et la date de réouverture, au lieu de « Ouvert maintenant ».')}</p>
       </div>`;
@@ -58126,6 +58148,8 @@ ${ownerFooterHtml(fr)}
     if (!clBox) return { list: undefined };
     var out = [], err = '';
     Array.prototype.forEach.call(clBox.querySelectorAll('.op-closure'), function(row){
+      // Café test 2 (2026-11-11): a yearly closure ("Every year: Apr 1 – Apr 24") is kept as it is (Remove takes it off).
+      if (row.getAttribute('data-yfrom')) { out.push({ from: row.getAttribute('data-yfrom'), to: row.getAttribute('data-yto'), note: row.getAttribute('data-ynote') || '', yearly: true }); return; }
       var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, n = row.querySelector('.op-cl-note').value.trim();
       if (!f && !t && !n) return;
       if (!f) { err = T.clFirst; return; }
@@ -58241,7 +58265,14 @@ ${ownerFooterHtml(fr)}
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
       tiktok_url: document.getElementById('opTiktok') ? document.getElementById('opTiktok').value : (initial.tiktok_url || ''),
       description: document.getElementById('opDescription').value,
-      open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
+      open_months: document.getElementById('opSeasonMode').value ? (function(){
+        // Café test 2 (2026-11-11): exact days ("04-25:10-12") unless they are whole months ("4-10", as always).
+        var fm = +document.getElementById('opSeasonFrom').value, tm = +document.getElementById('opSeasonTo').value, last = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        var fdEl = document.getElementById('opSeasonFromD'), tdEl = document.getElementById('opSeasonToD');
+        var fd = fdEl ? Math.min(+fdEl.value, last[fm - 1]) : 1, td = tdEl ? Math.min(+tdEl.value, last[tm - 1]) : last[tm - 1];
+        var p2 = function(n){ return ('0' + n).slice(-2); };
+        return fd === 1 && (td === last[tm - 1] || (tm === 2 && td === 28)) ? fm + '-' + tm : p2(fm) + '-' + p2(fd) + ':' + p2(tm) + '-' + p2(td);
+      })() : '',
       badges: {}
     };
     if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', T.seasonMonths); jumpToError(form); return; }
