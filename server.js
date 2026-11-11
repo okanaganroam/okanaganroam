@@ -46705,7 +46705,7 @@ function ownerPhotoRateLimited(ip, now = Date.now()) {
 // photo): photos the owner moved first, by sort_order, then the rest oldest first.
 const OWNER_PHOTO_ORDER_SQL = 'sort_order IS NULL, sort_order, id';
 function ownerPhotosForVenue(venueId) {
-  return db.prepare(`SELECT id, file, preview_key, status, credit, submitted_at FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY ${OWNER_PHOTO_ORDER_SQL} LIMIT 60`).all(venueId);
+  return db.prepare(`SELECT id, file, preview_key, status, credit, submitted_at, main_requested FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY ${OWNER_PHOTO_ORDER_SQL} LIMIT 60`).all(venueId);
 }
 // Moves one photo a place earlier (-1) or later (+1) among the venue's photos other
 // than the main one, then numbers them all 1..n so the order is fixed from now on.
@@ -55623,6 +55623,19 @@ function ownerVenueSummary(venueId, lang = 'en') {
   return (parts.length ? parts.join(' ') : `<span class="op-status op-status-live">${L('Up to date', 'À jour')}</span>`) + lastHtml;
 }
 
+// POST /owner/<link>/photos/<photoId>/(up|down) (pub test 9, 2026-11-10): the edit link can change the photo order too.
+// Only the order: it never makes a photo live (a waiting photo keeps its review) and the main photo always comes first.
+async function handleOwnerLinkPhotoMove(req, res, token, photoId, action) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  const found = venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more.' });
+  const photo = db.prepare('SELECT id, status FROM owner_photos WHERE id = ? AND venue_id = ?').get(photoId, found.venue.id);
+  if (!photo || photo.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'That photo isn’t available any more.' });
+  const r = moveOwnerPhoto(found.venue.id, photo.id, action === 'up' ? -1 : 1);
+  if (!r.ok) return sendSubmissionResponse(res, 409, { ok: false, error: 'The main photo always comes first. Make another photo main to change it.' });
+  return sendSubmissionResponse(res, 200, { ok: true, order: r.order, moved: r.moved, position: r.position || null, total: r.total || r.order.length });
+}
+
 // POST /owner/account/venue/<id>/photos/<photoId>/(remove|main|up|down), signed-in owners only.
 async function handleOwnerPhotoAction(req, res, account, venueId, photoId, action) {
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
@@ -55880,19 +55893,36 @@ function ownerPhotoGridHtml(venueId, signedIn, lang = 'en') {
   if (!ph.length) return '';
   const main = ownerVenueMainImage(venueId);
   const isMain = (p) => main === `/images/owner/${p.file}`;
-  const ordered = ph.filter(isMain).concat(ph.filter((p) => !isMain(p)));
-  const movable = ordered.filter((p) => !isMain(p));
+  // Pub test 9 (2026-11-10): the main photo the owner picked in the setup (still waiting for our check) says so, and comes
+  // first like the main photo it will be ("Your main photo · on your page within a day").
+  const pick = ph.find((p) => p.status === 'pending' && Number(p.main_requested) === 1 && !isMain(p)) || null;
+  const isMainish = (p) => isMain(p) || p === pick;
+  const ordered = ph.filter(isMain).concat(pick ? [pick] : [], ph.filter((p) => !isMainish(p)));
+  const movable = ordered.filter((p) => !isMainish(p));
   return `<div class="op-photos" id="opPhotoGrid">${ordered.map((p) => {
     const m = isMain(p);
-    const st = p.status === 'approved' ? (m ? `<span class="op-status op-status-live">${L('Main photo', 'Photo principale')}</span>` : `<span class="op-status op-status-live">${L('Live', 'En ligne')}</span>`) : `<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
+    const st = p === pick ? `<span class="op-status op-status-wait">${L('Your main photo · on your page within a day', 'Votre photo principale · sur votre page d’ici un jour')}</span>`
+      : p.status === 'approved' ? (m ? `<span class="op-status op-status-live">${L('Main photo', 'Photo principale')}</span>` : `<span class="op-status op-status-live">${L('Live', 'En ligne')}</span>`) : `<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
     const k = movable.indexOf(p);
     const pos = k >= 0 ? L(`photo ${k + 1} of ${movable.length}`, `la photo ${k + 1} sur ${movable.length}`) : L('main photo', 'la photo principale');
     const arrows = k >= 0 && movable.length > 1 ? `<span class="op-photo-move"><button type="button" class="op-btn op-up" data-photo="${p.id}" data-move="up" aria-label="${L(`Move ${pos} earlier`, `Avancer ${pos}`)}"${k === 0 ? ' disabled' : ''}>&uarr;</button><button type="button" class="op-btn op-down" data-photo="${p.id}" data-move="down" aria-label="${L(`Move ${pos} later`, `Reculer ${pos}`)}"${k === movable.length - 1 ? ' disabled' : ''}>&darr;</button></span>` : '';
-    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">${L('Make main photo', 'Choisir comme photo principale')}</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="${L(`Remove ${pos}`, `Retirer ${pos}`)}">${L('Remove', 'Retirer')}</button>${arrows}</span>` : '';
+    // Pub test 9 (2026-11-10): the edit link gets the order arrows too (not Make main or Remove, which need a login).
+    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">${L('Make main photo', 'Choisir comme photo principale')}</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="${L(`Remove ${pos}`, `Retirer ${pos}`)}">${L('Remove', 'Retirer')}</button>${arrows}</span>`
+      : arrows ? `<span class="op-photo-btns">${arrows}</span>` : '';
     return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
   }).join('')}</div>`;
 }
 
+// "Your pick: on your page within a day" (pub test 9, 2026-11-10): the main photo the owner chose (setup or edit page),
+// still waiting for our check, as a small preview above the banner previews. '' when there is none or theirs is live.
+function ownerPickedMainHtml(venueId, ownLive, lang = 'en') {
+  if (ownLive) return '';
+  const L = (en, f) => (lang === 'fr' ? f : en);
+  let p = null;
+  try { p = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venueId); } catch (e) { p = null; }
+  if (!p) return '';
+  return `<div class="op-pick" id="opMainPick"><img src="/owner-photos/preview/${escapeHtml(p.preview_key)}.jpg" alt="" loading="lazy"><p><strong>${L('Your pick: on your page within a day', 'Votre choix : sur votre page d’ici un jour')}</strong><br>${L('This is your main photo. Once we’ve checked it, it replaces the one below.', 'C’est votre photo principale. Une fois vérifiée, elle remplace celle ci-dessous.')}</p></div>`;
+}
 // Main photo position (2026-10-19, JoieFarm asked): the venue banner crops the main photo to a wide strip, and the
 // photo was always centred, so a vineyard or a sign near the top could be cut off. This shows the main photo (ours
 // or the owner's) cropped the way the page crops it, on a computer and on a phone, with a slider to move it up or
@@ -55907,6 +55937,9 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
   let wide = false;
   try { wide = venueGalleryPhotos({ ...venue, image_url: main }, L).length < 2; } catch (e) { wide = false; }
   const own = /^\/images\/owner\//.test(main);
+  // Pub test 9 (2026-11-10): with a main photo picked in the setup and still waiting for our check, the page says so
+  // ("Your pick: on your page within a day") and never "We chose this photo for you … create a login".
+  const picked = !own && ownerPhotosForVenue(venue.id).some((p) => p.status === 'pending' && Number(p.main_requested) === 1);
   // Restaurant polish (2026-11-08): no "Slide it" on the edit link (sliding needs a login), and say what the previews are.
   const polish = COMPLETENESS_TYPES.has(venue.type);
   const img = (cls) => `<img src="${escapeHtml(main)}" alt="" loading="lazy" class="op-pos-img ${cls}" style="object-position: 50% ${y}%">`;
@@ -55919,10 +55952,10 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
     : `<p class="op-hint">${L('To move the photo up or down in the banner, <a href="#opLogin">create a login</a> (it takes 30 seconds) and open your listing from <strong>My listings</strong>.', 'Pour monter ou descendre la photo dans la bannière, <a href="#opLogin">créez un compte</a> (ça prend 30 secondes) et ouvrez votre fiche depuis <strong>Mes fiches</strong>.')}</p>`;
   return `<div class="op-pos" id="opPos">
       <h3 class="op-pos-title">${L('Main photo on your page', 'Photo principale de votre page')}</h3>
-      <p class="op-hint">${polish && !signedIn
+      ${ownerPickedMainHtml(venue.id, own, lang)}<p class="op-hint">${polish && !signedIn
         ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone.')
         : polish ? L('Your page crops the main photo to a wide banner. The two previews below show how it looks on a computer and on a phone. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Les deux aperçus ci-dessous montrent son allure sur un ordinateur et sur un téléphone. Faites-la glisser pour montrer la meilleure partie.')
-        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (!(polish && !signedIn) && ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
+        : L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own || picked ? '' : ' ' + (!(polish && !signedIn) && ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
         ? L('We chose this photo for you. To use one of yours instead, tap <strong>Make main photo</strong> on it below.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, touchez <strong>Choisir comme photo principale</strong> sous celle-ci.')
         : polish && !signedIn ? L('We chose this photo for you. To use one of yours instead, upload it below; once we’ve checked it, <a href="#opLogin">create a login</a> to make it your main photo, or email us and we’ll do it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous; une fois vérifiée, <a href="#opLogin">créez un compte</a> pour en faire votre photo principale, ou écrivez-nous et nous le ferons.')
         : L('We chose this photo for you. To use one of yours instead, upload it below, then tap <strong>Make main photo</strong> on it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous, puis touchez <strong>Choisir comme photo principale</strong>.'))}</p>
@@ -56837,6 +56870,10 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
   body.owner-page .op-photo-move { display: contents; }
   body.owner-page .op-pos { background: var(--paper); border-radius: 14px; padding: 14px 16px; margin: 12px 0 18px; }
+  /* Pub test 9 (2026-11-10): the main photo the owner picked, still waiting for our check. */
+  body.owner-page .op-pick { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: #EEF5F3; }
+  body.owner-page .op-pick img { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
+  body.owner-page .op-pick p { margin: 0; }
   body.owner-page .op-pos-title { font-size: 1rem; margin: 0 0 4px; }
   body.owner-page .op-pos-previews { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 10px 0; }
   body.owner-page .op-pos-previews figure { margin: 0; }
@@ -61787,6 +61824,8 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const photoMove = /^([A-Za-z0-9_-]+)\/photos\/(\d+)\/(up|down)$/.exec(rest);
+      if (photoMove && method === 'POST') return await handleOwnerLinkPhotoMove(req, res, photoMove[1], Number(photoMove[2]), photoMove[3]);
       const arrivalMatch = /^([A-Za-z0-9_-]+)\/arrival$/.exec(rest);
       if (arrivalMatch && method === 'POST') return await arrivalPoints.submit(req, res, arrivalMatch[1], res.ownerLang);
       const videoMatch = /^([A-Za-z0-9_-]+)\/video\/(start|done)$/.exec(rest);
