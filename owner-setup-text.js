@@ -608,6 +608,8 @@ fr.timeLine = 'Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et 
 Object.assign(en, {
   untilClose: 'Until close', untilCloseShort: 'close', closeUnknown: 'We don’t have your closing time for {day}. Please pick an end time instead, or add your hours first.',
   noGames: 'No games', noGamesSub: 'No pool, darts or other games',
+  staffLine: 'Managers and staff can use this link too. Each person can make their own login from it, and you’ll all see each other under “People with access”.',
+  staffLineIn: 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.',
   photoEarlier: 'Move photo {n} earlier', photoLater: 'Move photo {n} later', photoOrderHint: 'Your page shows your photos in this order, after your main photo. Use ◀ ▶ to change it. You can change it later on your edit page too.',
   ttLabel: 'TikTok (optional)', ttEx: '@yourplace, or your tiktok.com/@ link', ttSavedOnly: 'TikTok saved ✓ It’s on your page now. Add your Instagram too, or tap “We’re not on Instagram”.',
   bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'Like opentable.ca/r/yourplace or your website’s booking page', bookLinkHint: 'This is the link behind the Book button on your page. We check a new link first, usually within a day.',
@@ -617,6 +619,8 @@ Object.assign(en, {
 Object.assign(fr, {
   untilClose: 'Jusqu’à la fermeture', untilCloseShort: 'la fermeture', closeUnknown: 'Nous n’avons pas votre heure de fermeture du {day}. Choisissez plutôt une heure de fin, ou ajoutez d’abord vos heures.',
   noGames: 'Pas de jeux', noGamesSub: 'Pas de billard, de fléchettes ni d’autres jeux',
+  staffLine: 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci, et vous vous verrez tous sous « Personnes ayant accès ».',
+  staffLineIn: 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».',
   photoEarlier: 'Avancer la photo {n}', photoLater: 'Reculer la photo {n}', photoOrderHint: 'Votre page montre vos photos dans cet ordre, après votre photo principale. Utilisez ◀ ▶ pour le changer. Vous pourrez aussi le changer plus tard sur votre page de modification.',
   ttLabel: 'TikTok (facultatif)', ttEx: '@votreendroit, ou votre lien tiktok.com/@', ttSavedOnly: 'TikTok enregistré ✓ Il est sur votre page. Ajoutez aussi votre Instagram, ou touchez « Nous ne sommes pas sur Instagram ».',
   bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'Par exemple opentable.ca/r/votreendroit ou la page de réservation de votre site', bookLinkHint: 'C’est le lien du bouton Réserver de votre page. Nous vérifions d’abord un nouveau lien, en général d’ici un jour.',

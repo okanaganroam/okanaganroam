@@ -574,7 +574,9 @@
           + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
-        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
+        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>'
+          // Staff access (pub test 9, 2026-11-10): a manager or staff member can do this too, each with their own login.
+          + '<p class="su-hint su-staff" id="suStaff">' + h(C.mode === 'account' ? T.staffLineIn : T.staffLine) + '</p>';
     } else if (p[0] === 'saved') {
       var how = S.done[p[1]];
       // Two phrases only (pub fresh-eyes, 2026-11-10): "Saved ✓ It's on your page now." or "Sent ✓ It'll show on your page
@@ -901,7 +903,7 @@
       // "I'm done for now" is the end (pub test 6, 2026-11-10): "Nice work" and the number, the page, and the rest folded
       // under a small, optional "Want to add more later?" (it was a "To reach 100%" list that looked like more homework).
       if (S.doneNowSaid && left.length) {
-        x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview()
+        x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview() + (C.statsHtml || '')
           + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
           + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>'
           + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>';
@@ -912,6 +914,8 @@
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
         + (left.length ? '<h2 class="su-h2">' + h(T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
         + preview()
+        // Owner stats (pub test 9, 2026-11-10): the page's own numbers for the last 30 days (made on the server, owner-only).
+        + (C.statsHtml || '')
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
         + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>';
     }

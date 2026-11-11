@@ -18,6 +18,7 @@ const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
 const portalCompleteness = require('./portal-completeness');
+const ownerStatsModule = require('./owner-stats');
 const portalCounter = portalActivity.createPortalCounter(db);
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
@@ -50791,6 +50792,8 @@ function renderOwnerSetupPage(found, opts) {
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
     badgeChip: portalCompleteness.badgeChipHtml(fr), t,
+    // Owner stats (pub test 9, 2026-11-10): the short "your page in the last 30 days" box on the finish screen.
+    statsHtml: (() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { short: true, id: 'suStats' }); } catch (e) { return ''; } })(),
   };
   // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
   // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
@@ -50969,6 +50972,7 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-line { min-height: 64px; resize: vertical; }
   body.owner-setup .su-count { margin: -10px 0 16px; font-weight: 800; font-size: 16px; color: var(--su-soft); }
   body.owner-setup .su-count.su-ok { color: var(--su-good); }
+  ${ownerStatsModule.OWNER_STATS_CSS.replace(/\n\s*\./g, '\n  body.owner-setup .')}
   /* Pub test 9 (2026-11-10): the happy hour deal's live count under its box, red when over; "until close" in a time row. */
   body.owner-setup .su-day .su-count { margin: 4px 0 8px; font-size: 15px; }
   body.owner-setup .su-count.su-over { color: #A3271F; }
@@ -55927,6 +55931,15 @@ function ownerPickedMainHtml(venueId, ownLive, lang = 'en') {
   if (!p) return '';
   return `<div class="op-pick" id="opMainPick"><img src="/owner-photos/preview/${escapeHtml(p.preview_key)}.jpg" alt="" loading="lazy"><p><strong>${L('Your pick: on your page within a day', 'Votre choix : sur votre page d’ici un jour')}</strong><br>${L('This is your main photo. Once we’ve checked it, it replaces the one below.', 'C’est votre photo principale. Une fois vérifiée, elle remplace celle ci-dessous.')}</p></div>`;
 }
+// Staff access (pub test 9, 2026-11-10): one plain line on the edit page and the setup welcome.
+function ownerStaffLineHtml(lang = 'en', linkMode = true) {
+  const fr = lang === 'fr';
+  return linkMode
+    ? (fr ? 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci (<a href="#opLogin" data-open-login>Créer un compte</a>); vous vous verrez ensuite tous sous « Personnes ayant accès ».'
+      : 'Managers and staff can use this link too. Each person can make their own login from it (<a href="#opLogin" data-open-login>Create a login</a>); you’ll then all see each other under “People with access”.')
+    : (fr ? 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».'
+      : 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.');
+}
 // Main photo position (2026-10-19, JoieFarm asked): the venue banner crops the main photo to a wide strip, and the
 // photo was always centred, so a vineyard or a sign near the top could be cut off. This shows the main photo (ours
 // or the owner's) cropped the way the page crops it, on a computer and on a phone, with a slider to move it up or
@@ -56874,6 +56887,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
   body.owner-page .op-photo-move { display: contents; }
   body.owner-page .op-pos { background: var(--paper); border-radius: 14px; padding: 14px 16px; margin: 12px 0 18px; }
+  /* Pub test 9 (2026-11-10): the staff line and the owner's own numbers. */
+  body.owner-page .op-staff { margin: 8px 0 4px; color: #3E3A34; }
+  ${ownerStatsModule.OWNER_STATS_CSS.replace(/\n\s*\./g, '\n  body.owner-page .')}
   /* Pub test 9 (2026-11-10): the main photo the owner picked, still waiting for our check. */
   body.owner-page .op-pick { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: #EEF5F3; }
   body.owner-page .op-pick img { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
@@ -56961,6 +56977,8 @@ ${renderGolfHeaderHtml()}
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
       <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Aucuns frais, jamais.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
+      <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
+      ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
