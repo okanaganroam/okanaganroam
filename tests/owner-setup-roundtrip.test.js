@@ -172,7 +172,8 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /body\.blocks = happyBlocks\(\)/);
   // Specials and events: an untouched row goes back as stored.
   // Pub test 7: the season is part of what "untouched" means.
-  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.text \+ '\|' \+ e\.price \+ '\|' \+ seaKey\(e\.sea\)\) \{ out\.push\(e\.orig\); continue; \}/);
+  // Pub test 8: the special's own times are part of the "unchanged" check.
+  assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.text \+ '\|' \+ e\.price \+ '\|' \+ seaKey\(e\.sea\) \+ '\|' \+ \(e\.start \|\| ''\) \+ '\|' \+ \(e\.end \|\| ''\)\) \{ out\.push\(e\.orig\); continue; \}/);
   assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start \+ '\|' \+ seaKey\(e\.sea\)\) \{ out\.push\(e\.orig\); continue; \}/);
   assert.doesNotMatch(s, /text\.slice\(0, 80\)/);
   // Seasonal hours not touched are not sent; a holiday keeps the note it was stored with.
@@ -224,7 +225,7 @@ test('help: average spend says "soon" while it isn’t shown publicly; other typ
   assert.equal((await change(t, { avg_spend: 30 })).status, 201);
   await prog(t, { step: 'spend', status: 'live' });
   const html = await text(`/owner/${t}/setup`);
-  assert.match(html, /Average spend: on your page soon/);
+  assert.match(html, /Price per person: on your page soon/); // pub test 8: the label says what it asks
   assert.match(html, /Your average spend will show on your page soon\./);
   for (const type of ['brewery', 'cafe', 'winery']) {
     const o = mk(type);

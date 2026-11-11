@@ -81,7 +81,7 @@ test('B–E: Save and exit records no implicit "not offered"; the spend icon; th
   // Pub test 6: only an explicit "no sports" is recorded, and never from "Save and exit".
   assert.match(s, /if \(badges\.sports_tv \|\| !noSportsSaid\) rem\.push\('sports'\); else if \(!partial\) add\.push\('sports'\);/);
   // C: the average spend tile has its own icon, and a missing one is never "undefined".
-  assert.match(s, /spend: '💵'/); assert.match(s, /\(P2_ICONS\[k\] \|\| '•'\)/);
+  assert.match(s, /spend: '🍽️'/); /* pub test 8: a plate, not a money icon */ assert.match(s, /\(P2_ICONS\[k\] \|\| '•'\)/);
   // D: "pub", and no "Roam Now map" on the front-door step, in English and French.
   assert.equal(cfg.typeWord, 'pub');
   assert.equal(cfg.t.doorLead, 'So visitors can walk right to your door. It takes one photo, taken outside your {type}.');
