@@ -588,7 +588,7 @@ Object.assign(en, {
   lateLbl: 'Open after midnight?', lateQ: '{day}: open after midnight?',
   serviceDogsSub: 'Your page will say “No dogs (service dogs welcome)”',
   rightsStep: 'Tick this, then send',
-  specialTimeQ: 'What time? (optional)', specialTimeEx: 'Like 10 AM to 1 PM for Sunday brunch. Leave it empty if it’s on all day.', specialTimeSame: 'The start and end times are the same. Please check them, or clear them.',
+  specialTimeQ: 'What time? (optional)', specialTimeEx: '10 AM to 1 PM for Sunday brunch. Leave it empty if it’s on all day.', specialTimeSame: 'The start and end times are the same. Please check them, or clear them.',
 });
 Object.assign(fr, {
   freeLine: 'Gratuit. Aucuns frais, jamais.',
@@ -596,7 +596,7 @@ Object.assign(fr, {
   lateLbl: 'Ouvert après minuit?', lateQ: '{day} : ouvert après minuit?',
   serviceDogsSub: 'Votre page indiquera « Pas de chiens (chiens d’assistance bienvenus) »',
   rightsStep: 'Cochez ceci, puis envoyez',
-  specialTimeQ: 'À quelle heure? (facultatif)', specialTimeEx: 'Par exemple, de 10 h à 13 h pour le brunch du dimanche. Laissez vide si c’est offert toute la journée.', specialTimeSame: 'L’heure de début et l’heure de fin sont les mêmes. Vérifiez-les ou effacez-les.',
+  specialTimeQ: 'À quelle heure? (facultatif)', specialTimeEx: 'de 10 h à 13 h pour le brunch du dimanche. Laissez vide si c’est offert toute la journée.', specialTimeSame: 'L’heure de début et l’heure de fin sont les mêmes. Vérifiez-les ou effacez-les.',
 });
 
 // The one time promise (pub test 6, 2026-11-10: the essentials took a careful owner about 30 minutes, not 10 to 15).
@@ -612,7 +612,7 @@ Object.assign(en, {
   staffLineIn: 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.',
   photoEarlier: 'Move photo {n} earlier', photoLater: 'Move photo {n} later', photoOrderHint: 'Your page shows your photos in this order, after your main photo. Use ◀ ▶ to change it. You can change it later on your edit page too.',
   ttLabel: 'TikTok (optional)', ttEx: '@yourplace, or your tiktok.com/@ link', ttSavedOnly: 'TikTok saved ✓ It’s on your page now. Add your Instagram too, or tap “We’re not on Instagram”.',
-  bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'Like opentable.ca/r/yourplace or your website’s booking page', bookLinkHint: 'This is the link behind the Book button on your page. We check a new link first, usually within a day.',
+  bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'opentable.ca/r/yourplace or your website’s booking page', bookLinkHint: 'This is the link behind the Book button on your page. We check a new link first, usually within a day.',
   linkInLine: 'That looks like your booking link. It works best in its own box, so your page shows a Book button.', moveLink: 'Move it to the booking link box',
   charsLeft: '{n} characters left', charLeft1: '1 character left', charsOver: '{n} characters too many', charOver1: '1 character too many',
 });
@@ -623,7 +623,7 @@ Object.assign(fr, {
   staffLineIn: 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».',
   photoEarlier: 'Avancer la photo {n}', photoLater: 'Reculer la photo {n}', photoOrderHint: 'Votre page montre vos photos dans cet ordre, après votre photo principale. Utilisez ◀ ▶ pour le changer. Vous pourrez aussi le changer plus tard sur votre page de modification.',
   ttLabel: 'TikTok (facultatif)', ttEx: '@votreendroit, ou votre lien tiktok.com/@', ttSavedOnly: 'TikTok enregistré ✓ Il est sur votre page. Ajoutez aussi votre Instagram, ou touchez « Nous ne sommes pas sur Instagram ».',
-  bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'Par exemple opentable.ca/r/votreendroit ou la page de réservation de votre site', bookLinkHint: 'C’est le lien du bouton Réserver de votre page. Nous vérifions d’abord un nouveau lien, en général d’ici un jour.',
+  bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'opentable.ca/r/votreendroit ou la page de réservation de votre site', bookLinkHint: 'C’est le lien du bouton Réserver de votre page. Nous vérifions d’abord un nouveau lien, en général d’ici un jour.',
   linkInLine: 'On dirait votre lien de réservation. Il fonctionne mieux dans sa propre case, pour que votre page affiche un bouton Réserver.', moveLink: 'Le déplacer dans la case du lien de réservation',
   charsLeft: 'Il reste {n} caractères', charLeft1: 'Il reste 1 caractère', charsOver: '{n} caractères de trop', charOver1: '1 caractère de trop',
 });
@@ -650,7 +650,7 @@ en.cafe = {
   seatsQ: 'Seats inside?', seats: { takeout: 'Takeout only', few: 'A few seats', lots: 'Lots of seats' }, laptopsQ: 'Laptops?',
   stayExtras: 'Also true?', outlets: 'Power outlets for guests', quiet: 'A quiet spot', stayNeed: 'Please tap an answer for seats or laptops, or tap Skip.',
   orderQ: 'How can people order?', orderLead: 'Tap all that apply.', orderOnline: 'Order online', orderUrlLabel: 'Your online ordering link',
-  orderUrlEx: 'Like yourcafe.com/order, or your Square or DoorDash page', preorder: 'Custom cakes and pre-orders',
+  orderUrlEx: 'yourcafe.com/order, or your Square or DoorDash page', preorder: 'Custom cakes and pre-orders',
   preorderHowLabel: 'How do people pre-order? (optional)', preorderHowEx: 'Call us 48 hours ahead', preorderUrlLabel: 'Pre-order link (optional)',
   linkHint: 'We check a new link first, usually within a day. Everything else is on your page right away.',
   counterOnly: 'Order at the counter only', counterOnlySub: 'No online ordering, drive-thru or pre-orders', orderNeed: 'Please tap at least one, or tap “Order at the counter only”.',
@@ -664,7 +664,7 @@ en.cafe = {
   selloutQ: 'Anything that sells out early?', selloutLead: 'It shows as a tip on your page, so people come in time.', selloutLabel: 'What sells out, and when',
   selloutEx: 'Cinnamon buns usually gone by 11', selloutNo: 'Nothing sells out',
   noLabels: { sellout: 'nothing sells out', order: 'order at the counter only' },
-  specialsQ: 'Any daily specials?', specialsLead: 'Like soup of the day, or a special on a set day of the week.',
+  specialsQ: 'Any daily specials?', specialsLead: 'Like a loyalty card, or $1 off any drink before 9 AM.',
   musicQ: 'Anything on at your café?', musicLead: 'Like open mic, live music, art on the walls or a workshop.',
   knownEx: 'Cinnamon buns and the window seats', igLead: 'Type your Instagram name, like @yourcafe.',
   groupsLead: 'Book clubs, meetings, a birthday coffee.', storyEx: 'A small bakery café by the lake. Everything is baked here each morning, and the window seats catch the sun.',
@@ -689,7 +689,7 @@ fr.cafe = {
   seatsQ: 'Des places à l’intérieur?', seats: { takeout: 'Pour emporter seulement', few: 'Quelques places', lots: 'Beaucoup de places' }, laptopsQ: 'Ordinateurs portables?',
   stayExtras: 'Aussi vrai?', outlets: 'Prises électriques pour les clients', quiet: 'Un coin tranquille', stayNeed: 'Touchez une réponse pour les places ou les ordinateurs, ou touchez Passer.',
   orderQ: 'Comment les gens peuvent-ils commander?', orderLead: 'Touchez tout ce qui s’applique.', orderOnline: 'Commande en ligne', orderUrlLabel: 'Votre lien de commande en ligne',
-  orderUrlEx: 'Par exemple votrecafe.com/commande, ou votre page Square ou DoorDash', preorder: 'Gâteaux sur commande et précommandes',
+  orderUrlEx: 'votrecafe.com/commande, ou votre page Square ou DoorDash', preorder: 'Gâteaux sur commande et précommandes',
   preorderHowLabel: 'Comment précommander? (facultatif)', preorderHowEx: 'Appelez-nous 48 heures à l’avance', preorderUrlLabel: 'Lien de précommande (facultatif)',
   linkHint: 'Nous vérifions d’abord un nouveau lien, en général d’ici un jour. Tout le reste est sur votre page tout de suite.',
   counterOnly: 'Commande au comptoir seulement', counterOnlySub: 'Ni commande en ligne, ni service au volant, ni précommandes', orderNeed: 'Touchez au moins une réponse, ou touchez « Commande au comptoir seulement ».',
@@ -703,7 +703,7 @@ fr.cafe = {
   selloutQ: 'Quelque chose s’épuise tôt?', selloutLead: 'Cela s’affiche comme un conseil sur votre page, pour que les gens arrivent à temps.', selloutLabel: 'Ce qui s’épuise, et quand',
   selloutEx: 'Les brioches à la cannelle partent souvent avant 11 h', selloutNo: 'Rien ne s’épuise',
   noLabels: { sellout: 'rien ne s’épuise', order: 'commande au comptoir seulement' },
-  specialsQ: 'Des spéciaux du jour?', specialsLead: 'Comme la soupe du jour, ou un spécial un jour précis de la semaine.',
+  specialsQ: 'Des spéciaux du jour?', specialsLead: 'Comme une carte de fidélité, ou 1 $ de rabais sur toute boisson avant 9 h.',
   musicQ: 'Il se passe quelque chose à votre café?', musicLead: 'Comme une scène ouverte, de la musique en direct, de l’art aux murs ou un atelier.',
   knownEx: 'Les brioches à la cannelle et les places près de la fenêtre', igLead: 'Écrivez votre nom Instagram, comme @votrecafe.',
   groupsLead: 'Clubs de lecture, réunions, un café d’anniversaire.', storyEx: 'Un petit café-boulangerie au bord du lac. Tout est cuit ici chaque matin, et les places près de la fenêtre ont le soleil.',
@@ -743,14 +743,17 @@ fr.st = Object.assign({}, fr.st, { day: 'nous l’ajouterons d’ici un jour' })
 fr.spendLeadOff = fr.spendLead;
 Object.assign(en.cafe, {
   spendLeadOff: 'For one person, before tax and tip.',
-  specialEx: 'Soup of the day, with fresh bread', priceEx: '$7', specialsTypeQ: 'Your specials',
+  // Café test 3 (2026-11-11): café examples, not restaurant ones (soup, brunch).
+  specialEx: 'Buy 9, get the 10th free', priceEx: '$1 off', specialsTypeQ: 'Your specials',
+  specialTimeEx: '7 AM to 9 AM for an early-morning deal. Leave it empty if it’s on all day.',
   laptopSub: Object.assign({}, en.cafe.laptopSub, { none: 'Your page says “No laptops: a place to talk”' }),
   noWifiSub: 'Your page says “No Wi-Fi: a place to talk”',
   dietNoteLabel: 'Anything to add? (optional)', dietNoteEx: 'Oat & almond milk +50¢ · Gluten-free: macarons only',
 });
 Object.assign(fr.cafe, {
   spendLeadOff: 'Pour une personne, avant taxes et pourboire.',
-  specialEx: 'Soupe du jour, avec pain frais', priceEx: '7 $', specialsTypeQ: 'Vos spéciaux',
+  specialEx: 'Achetez-en 9, le 10e est gratuit', priceEx: '1 $ de rabais', specialsTypeQ: 'Vos spéciaux',
+  specialTimeEx: 'de 7 h à 9 h pour un spécial du matin. Laissez vide si c’est offert toute la journée.',
   laptopSub: Object.assign({}, fr.cafe.laptopSub, { none: 'Votre page indique « Pas d’ordinateurs portables : un endroit pour discuter »' }),
   noWifiSub: 'Votre page indique « Pas de Wi-Fi : un endroit pour discuter »',
   dietNoteLabel: 'Autre chose à ajouter? (facultatif)', dietNoteEx: 'Lait d’avoine et d’amande +50 ¢ · Sans gluten : macarons seulement',
