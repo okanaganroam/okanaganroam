@@ -102,6 +102,8 @@ const skiResortPages = require('./ski-resort-pages');
 const townPages = require('./town-pages');
 
 const homeSimple = require('./home-simple');
+// Optional like the other helper modules: a copy of server.js on its own still starts (pages then keep their old look).
+const roamPolish = (() => { try { return require('./roam-polish'); } catch (e) { return { block: '', apply: (h) => h }; } })();
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -17009,6 +17011,8 @@ const SHARED_STYLE_BLOCKS = [
   ['local-favourites', () => renderLocalFavouritesStyles()],
   ['outdoors-simple', () => renderOutdoorsSimplifiedStyles()],
   ['browse-hub', () => renderBrowseHubStyles()],
+  // Roam design system (2026-11-11): tokens, utilities and the guide template (roam-polish.js).
+  ['roam-polish', () => roamPolish.block],
 ];
 let sharedStyleTable = null;
 function sharedStyles() {
@@ -17713,7 +17717,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       return realEnd(req.restCardsJson ? m[2] : withVersionedImages(m[2]));
     }
     if (held && body != null && typeof body !== 'function') {
-      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(withChipWidths(String(body)))))))); } catch (e) { /* the inline page is still correct */ }
+      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(roamPolish.apply(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(withChipWidths(String(body))))))))); } catch (e) { /* the inline page is still correct */ }
       // Image cache busting (2026-10-19): last, so nothing above sees a query on an image URL, and the waiting cards'
       // hash (withRestCardsDeferred) is of their plain text, as /cards/rest/ computes it.
       try { body = withVersionedImages(body); } catch (e) { /* plain image URLs still work */ }
