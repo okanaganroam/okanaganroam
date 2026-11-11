@@ -48,7 +48,7 @@ const css = `
 #homeSimple .home-stats{gap:0}
 #homeSimple .home-stats li{padding:0 28px;border-left:1px solid var(--line)}
 #homeSimple .home-stats li:first-child{border-left:0}
-#homeSimple .home-stats a{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--ink-soft);transition:color .2s}
+#homeSimple .home-stats a{display:flex;align-items:baseline;gap:8px;padding:12px 0;margin:-12px 0;font-size:13px;color:var(--ink-soft);transition:color .2s}
 #homeSimple .home-stats a:hover{color:var(--ink)}
 #homeSimple .home-stats strong{font-family:${SERIF};font-size:24px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
 
@@ -64,7 +64,8 @@ const css = `
 /* ---- photo tiles (mood, gems, towns) ---- */
 #homeSimple .photo{border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .45s ${EASE},box-shadow .45s ${EASE};will-change:transform}
 #homeSimple .photo img{transition:transform .9s ${EASE};will-change:transform}
-#homeSimple .photo:after{background:linear-gradient(180deg,#0e1f2800 35%,#0e1f28d9 100%);transition:opacity .45s}
+#homeSimple .photo:after{background:linear-gradient(180deg,#0e1f2800 22%,#0e1f2873 56%,#0e1f28eb 100%);transition:opacity .45s}
+#homeSimple .photo b,#homeSimple .photo p,#homeSimple .bento .card-body{text-shadow:0 1px 14px #0e1f28b3}
 #homeSimple .photo b{font-family:${SERIF};font-weight:600;font-size:19px;letter-spacing:-.01em;transition:transform .45s ${EASE}}
 #homeSimple .photo p{transition:transform .45s ${EASE}}
 #homeSimple .photo:hover{transform:translateY(-4px);box-shadow:var(--shadow-up)}
@@ -88,7 +89,7 @@ const css = `
 #homeSimple .bento>.card .home-event-media{position:absolute;inset:0;z-index:-2}
 #homeSimple .bento>.card .home-event-media picture{display:block;width:100%;height:100%}
 #homeSimple .bento>.card img{width:100%;height:100%;min-height:0;object-fit:cover}
-#homeSimple .bento>.card:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,#0e1f2800 30%,#0e1f2899 62%,#0e1f28eb 100%)}
+#homeSimple .bento>.card:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,#0e1f2800 12%,#0e1f2899 54%,#0e1f28f2 100%)}
 #homeSimple .bento>.card .card-body{position:absolute;left:0;right:0;bottom:0;padding:20px 22px;transition:transform .45s ${EASE}}
 #homeSimple .bento>.card:hover .card-body{transform:translateY(-6px)}
 #homeSimple .bento .home-event-date{color:var(--gold-soft)}
@@ -139,7 +140,7 @@ const css = `
 #homeSimple .guide-tab:last-child{margin-right:48px}
 #homeSimple .guide-panel{background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 26px;margin-top:10px}
 #homeSimple .guide-panel h3{font-family:${SERIF};font-weight:600;font-size:24px;margin:0 0 14px;letter-spacing:-.01em}
-#homeSimple .guide-panel h3 a{display:inline-flex;align-items:center;gap:8px}
+#homeSimple .guide-panel h3 a{display:inline-flex;align-items:center;gap:8px;min-height:44px}
 #homeSimple .guide-panel h3 a:after{content:'→';font-family:${SANS};font-size:16px;transition:transform .3s ${EASE}}
 #homeSimple .guide-panel h3 a:hover:after{transform:translateX(4px)}
 #homeSimple .guide-chips{display:flex;flex-wrap:wrap;gap:9px}
@@ -224,7 +225,8 @@ const css = `
 @media(max-width:700px){
 #homeSimple .hero{padding:44px 18px 34px}
 #homeSimple .hero h1{font-size:42px;max-width:340px;margin:14px auto 12px}
-#homeSimple .hero p{font-size:15px;max-width:292px}
+#homeSimple .hero h1,#homeSimple .hero p{text-wrap:balance}
+#homeSimple .hero p{font-size:15px;max-width:320px}
 #homeSimple .hero .eyebrow{font-size:10px;letter-spacing:.2em}
 #homeSimple .quick-search{margin:24px auto 16px;padding:5px}
 #homeSimple .quick-search input{font-size:16px;padding:10px 14px}
@@ -264,7 +266,7 @@ const css = `
 #homeSimple .destination-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 #homeSimple .destination-grid .photo{min-height:112px}
 #homeSimple .guide-panel{padding:18px 16px}
-#homeSimple .guide-panel h3{font-size:21px}
+#homeSimple .guide-panel h3{font-size:21px;margin-bottom:8px}
 #homeSimple .guide-chip{font-size:13px;padding:8px 12px}
 #homeSimple .trip-banner{margin:44px 0 36px;padding:32px 24px;border-radius:22px}
 #homeSimple .trip-banner h2{font-size:31px}
