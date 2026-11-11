@@ -50868,6 +50868,10 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-ph img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
   body.owner-setup .su-ph.su-main { border-color: var(--su-gold); }
   body.owner-setup .su-x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 22px; font-weight: 800; cursor: pointer; }
+  /* Photo order (pub test 9): earlier / later at the photo's top left, clear of the ✕. */
+  body.owner-setup .su-order { position: absolute; top: 6px; left: 6px; display: flex; gap: 6px; }
+  body.owner-setup .su-ord { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.6); color: #fff; font-size: 18px; cursor: pointer; }
+  body.owner-setup .su-ord:disabled { opacity: .35; cursor: default; }
   body.owner-setup .su-tag { display: block; width: 100%; min-height: 44px; border: 0; background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 15px; font-weight: 800; padding: 8px; cursor: pointer; }
   body.owner-setup .su-main .su-tag { color: var(--su-gold); }
   body.owner-setup .su-ph.su-bad img { filter: grayscale(1) opacity(.45); }

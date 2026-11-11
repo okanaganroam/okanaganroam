@@ -608,6 +608,7 @@ fr.timeLine = 'Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et 
 Object.assign(en, {
   untilClose: 'Until close', untilCloseShort: 'close', closeUnknown: 'We don’t have your closing time for {day}. Please pick an end time instead, or add your hours first.',
   noGames: 'No games', noGamesSub: 'No pool, darts or other games',
+  photoEarlier: 'Move photo {n} earlier', photoLater: 'Move photo {n} later', photoOrderHint: 'Your page shows your photos in this order, after your main photo. Use ◀ ▶ to change it. You can change it later on your edit page too.',
   ttLabel: 'TikTok (optional)', ttEx: '@yourplace, or your tiktok.com/@ link', ttSavedOnly: 'TikTok saved ✓ It’s on your page now. Add your Instagram too, or tap “We’re not on Instagram”.',
   bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'Like opentable.ca/r/yourplace or your website’s booking page', bookLinkHint: 'This is the link behind the Book button on your page. We check a new link first, usually within a day.',
   linkInLine: 'That looks like your booking link. It works best in its own box, so your page shows a Book button.', moveLink: 'Move it to the booking link box',
@@ -616,6 +617,7 @@ Object.assign(en, {
 Object.assign(fr, {
   untilClose: 'Jusqu’à la fermeture', untilCloseShort: 'la fermeture', closeUnknown: 'Nous n’avons pas votre heure de fermeture du {day}. Choisissez plutôt une heure de fin, ou ajoutez d’abord vos heures.',
   noGames: 'Pas de jeux', noGamesSub: 'Pas de billard, de fléchettes ni d’autres jeux',
+  photoEarlier: 'Avancer la photo {n}', photoLater: 'Reculer la photo {n}', photoOrderHint: 'Votre page montre vos photos dans cet ordre, après votre photo principale. Utilisez ◀ ▶ pour le changer. Vous pourrez aussi le changer plus tard sur votre page de modification.',
   ttLabel: 'TikTok (facultatif)', ttEx: '@votreendroit, ou votre lien tiktok.com/@', ttSavedOnly: 'TikTok enregistré ✓ Il est sur votre page. Ajoutez aussi votre Instagram, ou touchez « Nous ne sommes pas sur Instagram ».',
   bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'Par exemple opentable.ca/r/votreendroit ou la page de réservation de votre site', bookLinkHint: 'C’est le lien du bouton Réserver de votre page. Nous vérifions d’abord un nouveau lien, en général d’ici un jour.',
   linkInLine: 'On dirait votre lien de réservation. Il fonctionne mieux dans sa propre case, pour que votre page affiche un bouton Réserver.', moveLink: 'Le déplacer dans la case du lien de réservation',
