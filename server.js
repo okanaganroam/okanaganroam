@@ -34517,6 +34517,9 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
     .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days }));
   if (!seasons.length && !shut) return '';
   const os = openMonths ? hoursModule.parseOpenSeason(openMonths) : null;
+  // Closed for the season with neither a seasonal set nor an open season of its own (a dated closure set by us): the
+  // usual hours fold away as before; a list of "Jan 1 – Dec 31" would add nothing.
+  if (!seasons.length && !os) return '';
   // Every day of a leap year as 'MM-DD', from the first open day (or the day after the first set ends) round the year.
   const all = [];
   for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) all.push(new Date(t).toISOString().slice(5, 10));
