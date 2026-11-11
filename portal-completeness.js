@@ -132,7 +132,7 @@ const CAFE_ITEMS = [
   { key: 'serves', group: 'serve', w: 6, fix: true, target: { setup: 'cuisine:serve' }, fields: ['cafe_info'],
     en: 'What you serve', fr: 'Ce que vous servez', whyEn: 'Espresso, pastries baked here, lunch, gelato, bubble tea: tick all that apply.', whyFr: 'Espresso, pâtisseries maison, dîner, gelato, thé aux perles : cochez tout ce qui s’applique.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥐' },
   R('menu', { group: 'serve', w: 6 }),
-  R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Whole dollars.', whyFr: 'Combien coûtent environ un café et une pâtisserie? En dollars entiers.' }),
+  R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Cents are fine, like $5.50.', whyFr: 'Combien coûtent environ un café et une pâtisserie? Les cents sont acceptés, par exemple 5,50 $.' }),
   R('dietary', { group: 'serve', w: 4, noneEn: 'None of these', noneFr: 'Aucune de ces options', whyEn: 'Vegan, vegetarian, gluten-free or dairy-free milks. Tick what you offer.', whyFr: 'Options véganes, végétariennes, sans gluten ou laits végétaux. Cochez ce que vous offrez.' }),
   { key: 'stay', group: 'yourvisit', w: 5, fix: true, target: { setup: 'stay' }, fields: ['cafe_info'],
     en: 'Seats and laptops', fr: 'Places et ordinateurs portables', whyEn: 'Takeout only, a few seats or lots, and whether laptops are welcome.', whyFr: 'Pour emporter seulement, quelques places ou beaucoup, et si les ordinateurs portables sont bienvenus.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💻' },
