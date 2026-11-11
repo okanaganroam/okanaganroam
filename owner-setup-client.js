@@ -176,7 +176,7 @@
   var KIND_SERVE = { 'Coffee shop': 'espresso', Bakery: 'baked_here', 'Bakery café': 'baked_here', Roastery: 'espresso', 'Tea house': 'tea', 'Bubble tea': 'bubble_tea', 'Ice cream & gelato': 'ice_cream', 'Dessert & sweets': 'desserts', 'Brunch café': 'breakfast', 'Juice & smoothie bar': 'smoothies', 'Deli & sandwiches': 'lunch' };
   var NO_COFFEE = ['Ice cream & gelato', 'Bubble tea', 'Juice & smoothie bar', 'Tea house', 'Dessert & sweets'];
   var BAKES = ['Bakery', 'Bakery café', 'Coffee shop', 'Roastery', 'Brunch café', 'Deli & sandwiches'];
-  function kindText(key){ var k = (T.kinds || {})[S.place]; return k && k[key] ? k[key] : ''; }
+  function kindText(key){ var k = (T.cafeKinds || {})[S.place]; return k && k[key] ? k[key] : ''; }
   function iceKind(){ return S.place === 'Ice cream & gelato'; }
   function coffeeOn(){ return !S.place || NO_COFFEE.indexOf(S.place) < 0 || !!(S.cafe.serves.espresso || S.cafe.serves.drip); }
   function syncCoffee(){ if (!C.cafe) return; var on = coffeeOn(), i = STEPS.indexOf('coffee'), j = P2.indexOf('coffee'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('coffee') >= 0) { STEPS.push('coffee'); P2.push('coffee'); } }

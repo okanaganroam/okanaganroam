@@ -787,7 +787,8 @@ Object.assign(fr, {
 // Café words by kind (café test 2, 2026-11-11): the photos prompt and the story example for each of the 11 kinds in
 // SPEC-cafes.md, gelato's own dietary questions, "No seats inside" and "No washroom" on "What you offer".
 Object.assign(en.cafe, {
-  kinds: {
+  // Café test 3 (2026-11-11): cafeKinds, not kinds (that name replaced the weekly-event kinds, so their buttons were blank).
+  cafeKinds: {
     'Coffee shop': { photos: 'Your counter, your coffee, your seats. Three photos is perfect.', story: 'A small coffee shop on the main street. Beans from a local roaster, and the window seats catch the morning sun.' },
     Bakery: { photos: 'Your shop front, your bread and pastries, your counter. Three photos is perfect.', story: 'A family bakery on Main Street. The bread comes out of the oven at 7, and the croissants sell out by noon.' },
     'Bakery café': { photos: 'Your counter, your coffee, your baking. Three photos is perfect.', story: 'A small bakery café by the lake. Everything is baked here each morning, and the window seats catch the sun.' },
@@ -809,7 +810,8 @@ Object.assign(en.cafe, {
   takeoutOnly: 'No seats inside (takeout only)', takeoutOnlySub: 'Your page says “Takeout only”',
 });
 Object.assign(fr.cafe, {
-  kinds: {
+  // Café test 3 (2026-11-11): cafeKinds, not kinds (that name replaced the weekly-event kinds, so their buttons were blank).
+  cafeKinds: {
     'Coffee shop': { photos: 'Votre comptoir, votre café, vos places assises. Trois photos, c’est parfait.', story: 'Un petit café sur la rue principale. Des grains d’un torréfacteur local, et les places près de la fenêtre ont le soleil du matin.' },
     Bakery: { photos: 'Votre devanture, vos pains et pâtisseries, votre comptoir. Trois photos, c’est parfait.', story: 'Une boulangerie familiale sur la rue Main. Le pain sort du four à 7 h, et les croissants sont épuisés avant midi.' },
     'Bakery café': { photos: 'Votre comptoir, votre café, vos pâtisseries. Trois photos, c’est parfait.', story: 'Un petit café-boulangerie au bord du lac. Tout est cuit ici chaque matin, et les places près de la fenêtre ont le soleil.' },
