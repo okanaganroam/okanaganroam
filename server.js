@@ -3237,6 +3237,7 @@ function rowToEventOccurrence(row) {
     id: row.id, event_id: row.event_id, start_date: row.start_date, end_date: row.end_date,
     start_time: row.start_time, end_time: row.end_time, ends_next_day: row.ends_next_day, all_day: row.all_day,
     status: row.status, label: row.label, source_ref: row.source_ref, created_at: row.created_at, updated_at: row.updated_at,
+    time_tbc: row.time_tbc ? 1 : 0,
   };
 }
 function rowToEventFull(row) {
@@ -31717,9 +31718,11 @@ function whatsOnStillOn(events, now = new Date()) {
 // All-day events (2026-10-19): a stored all-day flag, or a start of exactly 00:00 (how imported listings store
 // "no time given"), reads "All day" on cards and in search instead of nothing (or "12 am"). Exhibitions and other
 // long runs keep their "On now · until" line alone.
+const EVENT_TIME_TBC = 'Time to be confirmed';
 function whatsOnCardTime(ev) {
   if (ev.time) return ev.time;
   const occs = ev.windowOccurrences || (ev.firstOccurrence ? [ev.firstOccurrence] : []);
+  if (occs.length && occs.every((o) => Number(o.time_tbc) === 1 && !o.start_time)) return EVENT_TIME_TBC;
   if (!occs.length || !occs.every((o) => Number(o.all_day) === 1 || o.start_time === '00:00')) return '';
   const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
   return ev.occurrenceCount === 1 && span >= 7 ? '' : 'All day';
@@ -35870,6 +35873,8 @@ function describeEventOccurrence(o) {
   if (o.all_day === 1 || (o.start_time === '00:00' && (!o.end_time || o.end_time === '00:00'))) timeText = 'All day';
   else if (o.start_time && o.end_time) timeText = `${formatLocalTime(o.start_time)} – ${formatLocalTime(o.end_time)}${o.ends_next_day === 1 ? ' (next day)' : ''}`;
   else if (o.start_time) timeText = formatLocalTime(o.start_time);
+  // Owner events sent without a time (2026-11-11): flagged on approval, they say so; other untimed dates stay date-only.
+  else if (Number(o.time_tbc) === 1) timeText = EVENT_TIME_TBC;
   return { dateText, timeText };
 }
 // schema.org subtype: the stored `type` hint first, else the primary category.
@@ -43900,7 +43905,9 @@ function eventSubmissionRateLimited(ip, now = Date.now()) {
 // the browser's native YYYY-MM-DD / HH:MM values and are kept as Okanagan
 // civil values, never converted. The resulting occurrence is also run
 // through the existing validateEventOccurrence() as a final gate.
-function validateEventSubmission(body, now = new Date()) {
+// opts.timeOptional (2026-11-11): owner forms may leave the start time blank; a single-day event then reads
+// "Time to be confirmed". The public form keeps the start time required.
+function validateEventSubmission(body, now = new Date(), opts = {}) {
   const errors = {};
   const data = {};
   const present = (k) => body[k] !== undefined && body[k] !== null && body[k] !== '';
@@ -43983,10 +43990,12 @@ function validateEventSubmission(body, now = new Date()) {
   if (allDay) {
     if (present('start_time') || present('end_time')) errors.start_time = 'An all-day event has no start or end time.';
   } else {
-    if (!present('start_time')) errors.start_time = 'Please enter the start time, or tick All day.';
-    else if (!timeOk(body.start_time)) errors.start_time = 'Please enter a valid start time.';
+    if (!present('start_time')) {
+      if (!opts.timeOptional) errors.start_time = 'Please enter the start time, or tick All day.';
+      else if (present('end_time')) errors.start_time = 'Please add the start time too, or clear the end time.';
+    } else if (!timeOk(body.start_time)) errors.start_time = 'Please enter a valid start time.';
     else startTime = body.start_time;
-    if (present('end_time')) {
+    if (present('end_time') && startTime) {
       if (!timeOk(body.end_time)) errors.end_time = 'Please enter a valid end time.';
       else endTime = body.end_time;
     }
@@ -44282,6 +44291,8 @@ function approveEventSubmission(id, body, now = new Date()) {
        WHERE id = ? AND status = 'pending'`
   ).run(result.event.id, reviewer, id);
   setEventPartners(result.event.id, sub.partner_venue_ids);
+  // An owner's event sent without a start time (2026-11-11) reads "Time to be confirmed" until a time is added.
+  if (sub.owner_venue_id && !sub.start_time && !sub.all_day) db.prepare('UPDATE event_occurrences SET time_tbc = 1 WHERE event_id = ? AND start_time IS NULL AND all_day = 0').run(result.event.id);
   return { status: 200, body: { submission: getEventSubmission(id), event: result.event, categories: result.categories, occurrences: result.occurrences, review: result.review } };
 }
 
@@ -46527,13 +46538,20 @@ async function handleOwnerEventSubmission(req, res, token) {
   // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
   const { venue } = found;
   const full = { ...body, region: venue.region, venue_name: venue.name, organizer_name: venue.name, consent: true };
+  // Your name is filled in for the owner (2026-11-11): left blank, it is the name we already know for this login or
+  // edit link, else the business name, so a blank name never turns an owner's event back.
+  if (typeof full.contact_name !== 'string' || full.contact_name.trim().length < 2) {
+    const knownEmail = found.account ? found.account.email : (typeof body.contact_email === 'string' ? body.contact_email.trim() : '') || found.contactEmail || '';
+    full.contact_name = (knownEmail && ownerAccountName(knownEmail)) || venue.name;
+  }
+  if ((typeof full.contact_email !== 'string' || !full.contact_email.trim()) && found.contactEmail) full.contact_email = found.contactEmail;
   delete full.company_website;
   delete full.started_at;
   delete full.change_of;
   delete full.partner_venue_ids;
   delete full.image;
   delete full.image_rights;
-  const { data, errors } = validateEventSubmission(full);
+  const { data, errors } = validateEventSubmission(full, new Date(), { timeOptional: true });
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
   else data.partner_venue_ids = partners;
@@ -52945,6 +52963,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [`An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Please list longer runs in the schedule notes.`]: `Un événement peut durer au plus ${EVENT_SUBMISSION_MAX_SPAN_DAYS} jours. Indiquez les périodes plus longues sous « Autres dates ».`,
   'An all-day event has no start or end time.': 'Un événement d’une journée entière n’a pas d’heure de début ni de fin.',
   'Please enter the start time, or tick All day.': 'Entrez l’heure de début ou cochez « Toute la journée ».',
+  'Please add the start time too, or clear the end time.': 'Ajoutez aussi l’heure de début, ou effacez l’heure de fin.',
   'Please enter a valid start time.': 'Entrez une heure de début valide.',
   'Please enter a valid end time.': 'Entrez une heure de fin valide.',
   'The end time is the same as the start time.': 'L’heure de fin est la même que l’heure de début.',
@@ -56789,7 +56808,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   }
   const editableEventsJson = JSON.stringify(editableEvents).replace(/</g, '\\u003c');
   // Signed in (2026-10-18): "Your name" starts from the name this login gave last time.
-  const accountName = found.account ? ownerAccountName(found.account.email) : found.viewer ? ownerAccountName(found.viewer.email) : '';
+  // The edit link's own email too (2026-11-11), so "Your name" starts filled in whenever we know it.
+  const accountName = found.account ? ownerAccountName(found.account.email) : found.viewer ? ownerAccountName(found.viewer.email) : ownerAccountName(found.contactEmail || '');
   const viewer = found.viewer || null;
   // The page script's words (2026-10-18), in the page's language.
   const scriptText = {
@@ -57321,10 +57341,11 @@ ${priceFieldHtml}      </details>` : ''}
         <div class="form-field"><label for="oeEndDate">${L('End date (multi-day)', 'Date de fin (plusieurs jours)')}</label><input type="date" id="oeEndDate" min="${todayLocal()}"><p class="lyv-error" id="oeEndDateError" hidden></p></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label for="oeStartTime">${L('Start time', 'Heure de début')} *</label><input type="time" id="oeStartTime"><p class="lyv-error" id="oeStartTimeError" hidden></p></div>
+        <div class="form-field"><label for="oeStartTime">${L('Start time', 'Heure de début')}</label><input type="time" id="oeStartTime"><p class="lyv-error" id="oeStartTimeError" hidden></p></div>
         <div class="form-field"><label for="oeEndTime">${L('End time', 'Heure de fin')}</label><input type="time" id="oeEndTime"><p class="lyv-error" id="oeEndTimeError" hidden></p></div>
       </div>
       <div class="form-row full"><div class="form-field"><label class="op-closed" style="width:auto"><input type="checkbox" id="oeAllDay"> ${L('All-day event (no set times)', 'Toute la journée (sans heure fixe)')}</label></div></div>
+      <p class="op-hint">${L('Don’t know the time yet? Leave it blank and it will show as “Time to be confirmed”. You can add it later.', 'Vous ne connaissez pas encore l’heure? Laissez-la vide : elle s’affichera « Heure à confirmer ». Vous pourrez l’ajouter plus tard.')}</p>
       <div class="form-row">
         <div class="form-field"><label for="oeUrl">${L('Event or ticket link', 'Lien de l’événement ou des billets')}</label><input type="url" id="oeUrl" maxlength="500" placeholder="https://"><p class="lyv-error" id="oeEventUrlError" hidden></p></div>
         <div class="form-field"><label for="oePrice">${L('Price', 'Prix')}</label><input type="text" id="oePrice" maxlength="80" placeholder="${L('e.g. Free, or $25', 'ex. Gratuit ou 25 $')}"></div>
@@ -57349,7 +57370,7 @@ ${priceFieldHtml}      </details>` : ''}
       </div></div>
       <p class="op-hint" id="oeSendingAs" hidden></p>
       <div class="form-row" id="oeContactRow">
-        <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')} *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
+        <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')}</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
         <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
@@ -57684,6 +57705,12 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     if (changes.website === initial.website) delete changes.website;
     ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
     if (changes.description === initial.description) delete changes.description;
+    // Checked here first (2026-11-11): the two length rules owners hit most, shown before sending.
+    if ('description' in changes && changes.description.trim() && (changes.description.trim().length < ${OWNER_DESCRIPTION_MIN} || changes.description.trim().length > ${OWNER_DESCRIPTION_MAX})) {
+      show('opDescriptionError', ${JSON.stringify(L(`Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters. A sentence or two about what makes you special works well.`, `Gardez la description entre ${OWNER_DESCRIPTION_MIN} et ${OWNER_DESCRIPTION_MAX} caractères. Une ou deux phrases sur ce qui vous distingue suffisent.`))});
+      jumpToError(form); return;
+    }
+    if ('name' in changes && (changes.name.trim().length < 2 || changes.name.trim().length > 100)) { show('opBizNameError', ${JSON.stringify(L('Please enter your business name (2 to 100 characters).', 'Entrez le nom de votre entreprise (2 à 100 caractères).'))}); jumpToError(form); return; }
     var btn = document.getElementById('opSubmit');
     btn.disabled = true;
     fetch(location.pathname + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -58009,6 +58036,18 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       event_url: v('oeUrl'), price_text: v('oePrice'), schedule_notes: v('oeNotes'), contact_name: v('oeContactName'), contact_email: v('oeContactEmail'),
       company_website: v('oeHp'), started_at: evStarted, partner_venue_ids: partners.map(function(p){ return p.id; }) };
     if (changeOf) payload.change_of = changeOf;
+    // Checked here first (2026-11-11), so a missing box shows at once instead of after a round trip to the server.
+    var pre = {};
+    if (payload.name.trim().length < 2) pre.name = ${JSON.stringify(L('Please enter the event name.', 'Entrez le nom de l’événement.'))};
+    if (!cats.length) pre.categories = ${JSON.stringify(L('Please choose at least one category.', 'Choisissez au moins une catégorie.'))};
+    if (payload.description.trim().length < 20) pre.description = ${JSON.stringify(L('Please describe the event in a sentence or two (at least 20 characters).', 'Décrivez l’événement en une ou deux phrases (au moins 20 caractères).'))};
+    if (!payload.start_date) pre.start_date = ${JSON.stringify(L('Please choose the event date.', 'Choisissez la date de l’événement.'))};
+    if (!payload.all_day && payload.end_time && !payload.start_time) pre.start_time = ${JSON.stringify(L('Please add the start time too, or clear the end time.', 'Ajoutez aussi l’heure de début, ou effacez l’heure de fin.'))};
+    if (payload.contact_email.trim() && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.contact_email.trim())) pre.contact_email = ${JSON.stringify(L('Please enter a valid email address, like name@example.com.', 'Entrez une adresse courriel valide, comme nom@exemple.com.'))};
+    if (Object.keys(pre).length) {
+      Object.keys(pre).forEach(function(k){ if (ids[k]) show(ids[k], pre[k]); });
+      show('oeFormError', ${JSON.stringify(L('Please fix the highlighted fields.', 'Corrigez les champs indiqués.'))}); jumpToError(ev); return;
+    }
     var b = document.getElementById('oeSubmit'); b.disabled = true;
     // The picture (pub test 9): made smaller in the browser like an owner photo, then sent with the event.
     var pf0 = document.getElementById('oePhoto'), pfile = !changeOf && pf0 && pf0.files && pf0.files[0];
