@@ -831,4 +831,28 @@ Object.assign(fr.cafe, {
   takeoutOnly: 'Pas de places à l’intérieur (pour emporter seulement)', takeoutOnlySub: 'Votre page indique « Pour emporter seulement »',
 });
 
+// "Our menu changes daily" (café test 2, 2026-11-11), neutral menu examples and the Instagram name from the menu answer.
+Object.assign(en, {
+  menuSocialEx: '@yourname, or the link to your page or post',
+  menuDaily: 'Our menu changes daily', menuDailyIce: 'Our flavours change daily', menuDailySub: 'See Instagram, Facebook or the board in the shop',
+  menuDailyQ: 'Where do people see today’s menu?', menuDailyQIce: 'Where do people see today’s flavours?', menuDailyLead: 'Tap one. Your page says so, and it counts as your menu.',
+  menuDailyWhere: { instagram: 'On our Instagram', facebook: 'On our Facebook page', board: 'On the board in the shop' },
+  menuDailyLine: 'Our menu changes daily: ', menuDailyLineIce: 'Flavours change daily: ', menuDailySee: { instagram: 'see Instagram', facebook: 'see Facebook', board: 'see the board in the shop' },
+  menuDailyShows: 'Your page will say “{x}”.', savedMenuDaily: 'It’s on your page now: “{x}”.',
+  igFromMenu: 'From your menu answer: {x}. Tap Save if it’s right.',
+});
+Object.assign(fr, {
+  menuSocialEx: '@votrenom, ou le lien de votre page ou publication',
+  menuDaily: 'Notre menu change chaque jour', menuDailyIce: 'Nos saveurs changent chaque jour', menuDailySub: 'Voir Instagram, Facebook ou le tableau en boutique',
+  menuDailyQ: 'Où les gens voient-ils le menu du jour?', menuDailyQIce: 'Où les gens voient-ils les saveurs du jour?', menuDailyLead: 'Touchez-en un. Votre page l’indique, et cela compte comme votre menu.',
+  menuDailyWhere: { instagram: 'Sur notre Instagram', facebook: 'Sur notre page Facebook', board: 'Sur le tableau en boutique' },
+  menuDailyLine: 'Le menu change chaque jour : ', menuDailyLineIce: 'Les saveurs changent chaque jour : ', menuDailySee: { instagram: 'voir Instagram', facebook: 'voir Facebook', board: 'voir le tableau en boutique' },
+  menuDailyShows: 'Votre page indiquera « {x} ».', savedMenuDaily: 'C’est sur votre page maintenant : « {x} ».',
+  igFromMenu: 'D’après votre réponse sur le menu : {x}. Touchez Enregistrer si c’est bien ça.',
+});
+
+// Cents on the café price (café test 2, 2026-11-11).
+Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more' });
+Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus' });
+
 module.exports = { en, fr };

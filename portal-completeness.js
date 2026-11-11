@@ -312,6 +312,8 @@ function doneMap(input, today) {
         cafe_kind: CAFE_KINDS.includes(i.placeType),
         season: nonBlank(i.openMonths) || !!i.hasSeasons || c.year === 'all' || c.year === 'seasonal',
         serves: Array.isArray(c.serves) && c.serves.length > 0,
+        // Café test 2 (2026-11-11): "Our menu changes daily (see Instagram / Facebook / the board)" answers the menu.
+        menu: (nonBlank(i.menuUrl) && !sameAddress(i.menuUrl, i.website)) || !!i.hasPublishedMenu || ['instagram', 'facebook', 'board'].includes(c.menu_daily),
         // Dairy-free milks count as a dietary option for a café (the tile, or the milks named in Dietary details).
         dietary: !!(i.vegan || i.vegetarian || i.glutenFree) || labels.has('dietary') || feats.has('dairy_free_milk') || (Array.isArray((c.diet || {}).milks) && c.diet.milks.length > 0),
         stay: CAFE_LAPTOPS.includes(stay.laptops) || CAFE_SEATS.includes(stay.seats),

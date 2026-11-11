@@ -107,7 +107,7 @@
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
     week: parseWeek(CUR.hours), photos: [], rights: false, photosSent: 0, menuFiles: [], menuPages: [], sheetFiles: [], webUrl: null,
-    spend: CUR.avg_spend && CUR.avg_spend.amount ? CUR.avg_spend.amount : 25,
+    spend: CUR.avg_spend && CUR.avg_spend.exact ? CUR.avg_spend.exact : CUR.avg_spend && CUR.avg_spend.amount ? CUR.avg_spend.amount : 25,
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
@@ -160,7 +160,7 @@
   // Café test 2 (2026-11-11): ice cream and gelato answers, "No washroom" and the seats answer on "What you offer".
   S.cafe.diet.df_sorbet = !!CId.df_sorbet; S.cafe.diet.vegan_ice = !!CId.vegan_ice; S.cafe.diet.gf_cones = CId.gf_cones || '';
   S.noWash = (CUR.not_offered || []).indexOf('washroom') >= 0 && !(CUR.badges || {}).washroom;
-  S.seatsWas = S.cafe.stay.seats;
+  S.seatsWas = S.cafe.stay.seats; S.cafe.menuDaily = CI.menu_daily || '';
   (CId.milks || []).forEach(function(k){ S.cafe.diet.milks[k] = true; });
   // "Laptop friendly" is a tile on "What you offer" but stored as the three-way laptops answer.
   if (C.cafe) { S.badges.laptop = S.cafe.stay.laptops === 'all_day' || S.cafe.stay.laptops === 'not_busy'; S.badgesAtStart.laptop = S.badges.laptop; }
@@ -185,6 +185,8 @@
   function syncCoffee(){ if (!C.cafe) return; var on = coffeeOn(), i = STEPS.indexOf('coffee'), j = P2.indexOf('coffee'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('coffee') >= 0) { STEPS.push('coffee'); P2.push('coffee'); } }
   // The serve chips for the kind: "Baked fresh here" for bakeries, "Made here" for the rest (a ticked one always shows).
   function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; return true; }); }
+  // "5.50" for cents (French "5,50"), "9" for whole dollars.
+  function money(n){ var t = Math.round(n * 4) / 4 === Math.round(n) ? String(Math.round(n)) : (Math.round(n * 100) / 100).toFixed(2); return C.lang === 'fr' ? t.replace('.', ',') : t; }
   function cafeWords(){ return (C.priceWords || {})[S.place] || (C.priceWords || {}).default || ''; }
   function cafeStay(){ var st = S.cafe.stay, o = {}; if (st.laptops) o.laptops = st.laptops; if (st.seats) o.seats = st.seats; if (st.outlets) o.outlets = true; if (st.quiet) o.quiet = true; return o; }
   // Reads the café screens' text boxes into S.cafe (before a redraw or a save).
@@ -570,7 +572,7 @@
   }
   function preview(){
     return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: S.spend, words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: money(S.spend), words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
   }
   function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
 
@@ -826,8 +828,10 @@
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';
       // Cafés (Decided 2): "About how much is a coffee and a pastry?" in the words for their kind.
       var sw = C.cafe ? cafeWords() : '';
-      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: S.spend, words: sw }) + guess) + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? S.spend + ' $' : '$' + S.spend) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
-        + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: S.spend }), '', false, 'spendSave') + '</div>' + skip('spend');
+      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + ' $' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
+        // Café test 2 (2026-11-11): cents for cafés ($5.50 a scoop), in 25-cent steps.
+        + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">−25¢</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">+25¢</button></div>' : '')
+        + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: money(S.spend) }), '', false, 'spendSave') + '</div>' + skip('spend');
     } else if (s === 'cuisine' && C.cafe) {
       // Cafés (2026-11-10): "What kind of café?" first (one of 11), then "What do you serve?".
       x = doneLine('cuisine') + q(T.kindQ, T.kindLead) + (S.kindGuessed && S.place === S.kindGuessed ? '<p class="su-sent su-research" id="suKindGuess">' + h(fill(T.kindGuess, { kind: C.placeNames[S.place] || S.place })) + '</p>' : '') + msgs()
@@ -892,7 +896,13 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
-        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, '', true, 'go:menu:social') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
+        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, '', true, 'go:menu:social')
+        // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
+        + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
+    } else if (s === 'menu:daily') {
+      var mdw = S.cafe.menuDaily || '';
+      x = q(iceKind() ? T.menuDailyQIce : T.menuDailyQ, T.menuDailyLead) + msgs() + '<div class="su-stack" role="group">' + ['instagram', 'facebook', 'board'].map(function(k){ var on = mdw === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="menuDaily:' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : { instagram: '📸', facebook: '📘', board: '🪧' }[k]) + '</span><span>' + h(T.menuDailyWhere[k]) + '</span></button>'; }).join('') + '</div>'
+        + '<p class="su-hint">' + h(fill(T.menuDailyShows, { x: (iceKind() ? T.menuDailyLineIce : T.menuDailyLine) + T.menuDailySee.instagram })) + '</p>';
     } else if (s === 'menu:social') {
       // Pub test 5 (2026-11-10): the menu is on Facebook or Instagram. A link is the menu link (checked first, like the
       // website one); a page name goes to us to find (the Facebook "find the link" way).
@@ -1057,7 +1067,7 @@
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
-      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
         // TikTok (pub test 9, 2026-11-10): optional, on the Instagram screen; live straight away like Instagram.
         + (ig ? field('suTt', T.ttLabel, S.tt, { max: 200, data: 'autocapitalize="none" spellcheck="false"' }) + ex(T.ttEx) : '')
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
@@ -1590,7 +1600,7 @@
       S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1'; S.addYearly = false;
       S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }
-    if (k === 'spend') { S.spend = Math.max(5, Math.min(300, S.spend + (+v))); return render(); }
+    if (k === 'spend') { S.spend = Math.round(Math.max(C.cafe ? 2 : 5, Math.min(300, S.spend + (+v))) * 4) / 4; if (!C.cafe) S.spend = Math.round(S.spend); return render(); }
     if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
     if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
     if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }]); }
@@ -1607,12 +1617,20 @@
     if (k === 'sendMenuPages') return sendPages(S.menuPages, null, 'menu', T.menuNote);
     if (k === 'menuWebSave') { var u = el('suUrl').value.trim(); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
     if (k === 'menuEmailDone') return record('menu', 'email');
+    if (k === 'menuDaily') {
+      // Café test 2 (2026-11-11): saved as the café's answer (cafe_info.menu_daily), live at once; never the type-up queue.
+      S.cafe.menuDaily = v; S.savedLine.menu = fill(T.savedMenuDaily, { x: (iceKind() ? T.menuDailyLineIce : T.menuDailyLine) + T.menuDailySee[v] });
+      return saveAll('menu', [{ cafe_info: { menu_daily: v } }], null, null, function(){ CI.menu_daily = v; });
+    }
     if (k === 'menuSocialSave') {
       var ms = el('suMsoc').value.trim(); S.menuSoc = ms; if (!ms) { S.nudge = T.menuSocialEmpty; return render(); }
+      // Café test 2: an @handle typed here is offered on the Instagram step (when the page has no Instagram yet).
+      var mh = /(?:^|\s)@([A-Za-z0-9._]{2,30})\b/.exec(ms) || /instagram\.com\/([A-Za-z0-9._]{2,30})/i.exec(ms);
+      if (mh && !CUR.instagram_url && !S.ig) { S.ig = '@' + mh[1]; S.igFromMenu = true; }
       var mlink = /^@[A-Za-z0-9._]{2,30}$/.test(ms) ? 'https://www.instagram.com/' + ms.slice(1) : /(?:facebook\.com|fb\.com|instagram\.com)\//i.test(ms) && !/\s/.test(ms) ? ms : '';
       if (mlink) return saveAll('menu', [{ menu_url: mlink }], 'day');
       if (S.busy) return; S.busy = true; S.error = ''; render();
-      return post(C.base + '/menu/help', { note: fill(T.menuSocialNote, { name: ms }), contact_email: '', contact_phone: '' }).then(function(j){
+      return post(C.base + '/menu/help', { note: fill(T.menuSocialNote, { name: ms }), sheet: 'menu_social', contact_email: '', contact_phone: '' }).then(function(j){
         if (!(j && j.ok)) { S.busy = false; S.error = why(j); return render(); }
         S.savedLine.menu = T.savedMenuSocialName;
         return progress('menu', 'day').then(function(ok){ S.busy = false; if (ok) go('saved:menu'); else render(); });

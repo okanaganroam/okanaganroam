@@ -334,7 +334,8 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   restaurant: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   // Cafés get Price per person in café words (2026-11-10, SPEC-cafes.md Decided 2); happy hour only with Beer & wine.
   // Sports on TV is kept if set but not offered to a café (SPEC-cafes.md: hidden for cafés).
-  cafe: portalRow({ specials: true, nights: true, menu: true, avgSpend: true, hiddenBadges: Object.freeze(['sports_tv']) }),
+  // Café test 2 (2026-11-11): no Live music, Non-alcoholic options or Great for groups box either (kept if already set).
+  cafe: portalRow({ specials: true, nights: true, menu: true, avgSpend: true, hiddenBadges: Object.freeze(['sports_tv', 'live_music', 'nonalcoholic', 'great_groups']) }),
   pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
@@ -9748,11 +9749,25 @@ function avgSpendPublic() { return process.env.AVG_SPEND_PUBLIC === '1'; }
 // The words shown with the number once it's public (Dayton, 2026-11-09: always "before tax and tip").
 const AVG_SPEND_PUBLIC_TEXT = { en: 'About ${n} a person, before tax and tip', fr: 'Environ {n} $ par personne, avant taxes et pourboire' };
 function avgSpendPublicText(amount, fr) { return (fr ? AVG_SPEND_PUBLIC_TEXT.fr : AVG_SPEND_PUBLIC_TEXT.en).replace('{n}', String(amount)); }
+// Cents (café test 2, 2026-11-11): a café's price can be "$5.50" (a single scoop). Stored additively: `amount` stays the
+// whole-dollar number every reader already uses (rounded), and `exact` carries the price in steps of 25 cents, from
+// AVG_SPEND_EXACT_MIN. A row without `exact` reads exactly as before. cafePriceText() shows `exact` when there is one.
+const AVG_SPEND_EXACT_MIN = 2;
+function avgSpendExactOk(x) { return typeof x === 'number' && Number.isFinite(x) && Number.isInteger(x * 4) && x >= AVG_SPEND_EXACT_MIN && x <= AVG_SPEND_MAX; }
+// "$5.50" / "5,50 $" ("$9" for a whole number).
+function avgSpendMoney(spend, fr) {
+  const n = spend && avgSpendExactOk(spend.exact) ? spend.exact : spend ? spend.amount : null;
+  if (n == null) return '';
+  const t = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return fr ? `${t.replace('.', ',')} $` : `$${t}`;
+}
 function validateAvgSpend(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, detail: 'avg_spend must be an object or null' };
-  const extra = Object.keys(v).filter((k) => !['amount', 'source', 'source_url', 'basis', 'checked_at'].includes(k));
+  const extra = Object.keys(v).filter((k) => !['amount', 'source', 'source_url', 'basis', 'checked_at', 'exact'].includes(k));
   if (extra.length) return { ok: false, detail: `Unexpected field(s): ${extra.join(', ')}` };
-  if (!Number.isInteger(v.amount) || v.amount < AVG_SPEND_MIN || v.amount > AVG_SPEND_MAX) {
+  if (v.exact !== undefined && v.exact !== null) {
+    if (!avgSpendExactOk(v.exact) || v.amount !== Math.round(v.exact)) return { ok: false, detail: `exact must be in steps of $0.25 from ${AVG_SPEND_EXACT_MIN} to ${AVG_SPEND_MAX}, with amount its whole-dollar rounding` };
+  } else if (!Number.isInteger(v.amount) || v.amount < AVG_SPEND_MIN || v.amount > AVG_SPEND_MAX) {
     return { ok: false, detail: `amount must be a whole number of dollars from ${AVG_SPEND_MIN} to ${AVG_SPEND_MAX}` };
   }
   if (v.source !== 'research' && v.source !== 'owner') return { ok: false, detail: "source must be 'research' or 'owner'" };
@@ -9768,7 +9783,7 @@ function validateAvgSpend(v) {
     basis = v.basis.trim().replace(/\s+/g, ' ');
   }
   if (typeof v.checked_at !== 'string' || !parseLocalDate(v.checked_at)) return { ok: false, detail: 'checked_at must be YYYY-MM-DD' };
-  return { ok: true, info: { amount: v.amount, source: v.source, source_url: sourceUrl, basis, checked_at: v.checked_at } };
+  return { ok: true, info: { amount: v.amount, source: v.source, source_url: sourceUrl, basis, checked_at: v.checked_at, ...(v.exact != null ? { exact: v.exact } : {}) } };
 }
 function currentAvgSpendJson(venueId) {
   try { const r = db.prepare('SELECT info FROM venue_avg_spend WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
@@ -19797,7 +19812,10 @@ const CAFE_MILKS = ['oat', 'almond', 'soy', 'coconut'];
 const CAFE_MILK_LABELS = { oat: ['Oat', 'Avoine'], almond: ['Almond', 'Amande'], soy: ['Soy', 'Soya'], coconut: ['Coconut', 'Noix de coco'] };
 const CAFE_TEXT_MAX = 120;
 const CAFE_SOURCE_MAX = 80;
-const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year'];
+// menu_daily (café test 2, 2026-11-11): "Our menu changes daily": where people see today's ('instagram' | 'facebook' |
+// 'board'). Shown as one line ("Flavours change daily: see Instagram"); it answers the menu question.
+const CAFE_INFO_PARTS = ['serves', 'diet', 'stay', 'order', 'coffee', 'sellout', 'year', 'menu_daily'];
+const CAFE_MENU_DAILY = ['instagram', 'facebook', 'board'];
 const CAFE_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Price per person by kind (Decided 2): never compared with restaurant meal prices.
 const CAFE_PRICE_WORDS = {
@@ -19808,7 +19826,8 @@ const CAFE_PRICE_WORDS = {
 };
 function cafePriceWords(kind, fr) { return (CAFE_PRICE_WORDS[kind] || CAFE_PRICE_WORDS.default)[fr ? 'fr' : 'en']; }
 // "About $9 for a coffee and a pastry" / « Environ 9 $ pour un café et une pâtisserie ».
-function cafePriceText(amount, kind, fr) { return fr ? `Environ ${amount} $ pour ${cafePriceWords(kind, true)}` : `About $${amount} for ${cafePriceWords(kind, false)}`; }
+// Cents (café test 2): "About $5.50 for a single scoop" / « Environ 5,50 $ pour une boule ».
+function cafePriceText(amount, kind, fr) { const t = Number.isInteger(amount) ? String(amount) : Number(amount).toFixed(2); return fr ? `Environ ${t.replace('.', ',')} $ pour ${cafePriceWords(kind, true)}` : `About $${t} for ${cafePriceWords(kind, false)}`; }
 let venueCafeInfoCache = null;
 function clearVenueCafeInfoCache() { venueCafeInfoCache = null; }
 // The stored answers ({} when none).
@@ -19910,6 +19929,7 @@ function cleanCafeInfoPart(key, x) {
     return { value: t.text || null };
   }
   if (key === 'year') return x === 'all' || x === 'seasonal' ? { value: x } : { error: CAFE_INFO_ERROR };
+  if (key === 'menu_daily') return x === null || x === '' ? { value: null } : CAFE_MENU_DAILY.includes(x) ? { value: x } : { error: CAFE_INFO_ERROR };
   return { error: CAFE_INFO_ERROR };
 }
 const cafeList = (arr, fr) => (arr.length < 2 ? arr.join('') : `${arr.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${arr[arr.length - 1]}`);
@@ -19927,7 +19947,7 @@ function cafeInfoLinesHtml(venue, fr) {
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
   // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
   const spend = avgSpendPublic() ? venueAvgSpend(venue.id) : null;
-  if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(spend.amount, kind, fr)]);
+  if (spend && spend.source === 'owner' && Number.isInteger(spend.amount)) lines.push(['price', '💵', cafePriceText(avgSpendExactOk(spend.exact) ? spend.exact : spend.amount, kind, fr)]);
   const stay = info.stay || {};
   const stayBits = [];
   if (stay.laptops === 'all_day') stayBits.push(L('Laptops welcome all day', 'Ordinateurs portables bienvenus toute la journée'));
@@ -19974,10 +19994,30 @@ function cafeInfoLinesHtml(venue, fr) {
     oBits.push(links.preorder_url ? `<a href="${escapeHtml(links.preorder_url)}" rel="nofollow noopener" target="_blank" data-track="preorder">${escapeHtml(words)}</a>` : escapeHtml(words));
   }
   if (oBits.length) lines.push(['order', '🛍️', oBits.join(' · '), true]);
+  // Café test 2 (2026-11-11): "Flavours change daily: see Instagram" (linked when the page has its Instagram or Facebook).
+  const md = cafeMenuDailyHtml(venue, info, fr);
+  if (md) lines.push(['menu', '📋', md, true]);
   // The tip is in the business's own words (usually English): the French page leaves it out.
   if (info.sellout && !fr) lines.push(['sellout', '⏰', `Tip: ${info.sellout}`]);
   if (!lines.length) return '';
   return `<div class="venue-cafe-lines" style="margin:10px 0 0">${lines.map(([cls, icon, text, raw]) => `<p class="venue-cafe-line venue-cafe-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${icon}</span> ${cls === 'serves' || cls === 'price' ? `<strong>${escapeHtml(text)}</strong>` : raw ? text : escapeHtml(text)}</p>`).join('')}</div>`;
+}
+// "Flavours change daily: see Instagram" (café test 2): the words by kind (flavours for ice cream and gelato, the menu
+// for the rest), and where. '' when the café hasn't said.
+function cafeMenuDailyText(venue, where, fr) {
+  if (!CAFE_MENU_DAILY.includes(where)) return '';
+  const ice = venuePlaceType(venue) === 'Ice cream & gelato';
+  const lead = ice ? (fr ? 'Les saveurs changent chaque jour' : 'Flavours change daily') : (fr ? 'Le menu change chaque jour' : 'Our menu changes daily');
+  const see = { instagram: fr ? 'voir Instagram' : 'see Instagram', facebook: fr ? 'voir Facebook' : 'see Facebook', board: fr ? 'voir le tableau en boutique' : 'see the board in the shop' }[where];
+  return `${lead}${fr ? ' : ' : ': '}${see}`;
+}
+function cafeMenuDailyHtml(venue, info, fr) {
+  const where = (info || {}).menu_daily;
+  const t = cafeMenuDailyText(venue, where, fr);
+  if (!t) return '';
+  const links = venue && venue.id != null ? venueLinks(venue.id) : {};
+  const url = where === 'instagram' ? links.instagram_url : where === 'facebook' ? links.facebook_url : null;
+  return url ? `<a href="${escapeHtml(url)}" rel="nofollow noopener" target="_blank" data-track="${where}">${escapeHtml(t)}</a>` : escapeHtml(t);
 }
 // "No Wi-Fi or laptops: a place to talk" (café test 1, 2026-11-11), or the single version: the owner's own "No Wi-Fi"
 // (venue_not_offered 'wifi', with no Wi-Fi tile) and "No laptops" (stay.laptops 'none'). '' when neither was picked.
@@ -35749,7 +35789,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // page by adding this; it's a second, higher-visibility presentation of
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
-    venue.type === 'golf' ? golfKindLabel : label.singular,
+    // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
+    venue.type === 'golf' ? golfKindLabel : venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -45233,10 +45274,21 @@ const OWNER_NOT_OFFERED_ERRORS = {
   has: 'Your page already shows this. To say you don’t have it, remove it from your page first, then try again.',
 };
 const OWNER_AVG_SPEND_ERROR = 'Please enter a whole number of dollars from $' + AVG_SPEND_MIN + ' to $' + AVG_SPEND_MAX + ', like 25.';
+const OWNER_AVG_SPEND_CENTS_ERROR = 'Please enter a price from $2 to $300, like 5.50 (in steps of 25 cents).';
 const OWNER_AVG_SPEND_ERROR_FR = 'Entrez un nombre entier de dollars, de ' + AVG_SPEND_MIN + ' $ à ' + AVG_SPEND_MAX + ' $, par exemple 25.';
 // -> { blank: true } | { amount } | { error }. Accepts 25, "25", "$25", " 25 $ ". Not 25.50, 2,5, 1e2 or 0x19.
-function ownerAvgSpendAmount(raw) {
+function ownerAvgSpendAmount(raw, opts = {}) {
   if (raw == null) return { blank: true };
+  // Cafés (café test 2): cents in steps of 25 ("5.50", "$4.75"), and a price from $2. Whole dollars from $5 as always.
+  if (opts.cents && (typeof raw === 'number' || typeof raw === 'string')) {
+    const c = String(raw).trim().replace(/^[$]\s*/, '').replace(/\s*[$]$/, '').replace(',', '.');
+    if (/^\d{1,3}(?:\.\d{1,2})?$/.test(c)) {
+      const x = Number(c);
+      if (Number.isInteger(x) && x >= AVG_SPEND_MIN && x <= AVG_SPEND_MAX) return { amount: x };
+      if (!avgSpendExactOk(x)) return { error: OWNER_AVG_SPEND_CENTS_ERROR };
+      return { amount: Math.round(x), exact: x };
+    }
+  }
   if (typeof raw !== 'number' && typeof raw !== 'string') return { error: OWNER_AVG_SPEND_ERROR };
   const t = String(raw).trim().replace(/^[$]\s*/, '').replace(/\s*[$]$/, '');
   if (t === '') return { blank: true };
@@ -46273,9 +46325,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('avg_spend' in input) {
     if (!portalFields(venue.type).avgSpend) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
     else {
-      const a = ownerAvgSpendAmount(input.avg_spend);
+      const a = ownerAvgSpendAmount(input.avg_spend, { cents: venue.type === 'cafe' });
+      const curExact = current.avg_spend && current.avg_spend.exact != null ? current.avg_spend.exact : null;
       if (a.error) errors.avg_spend = a.error;
-      else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount)) changes.avg_spend = { amount: a.amount };
+      else if (!a.blank && !(current.avg_spend && current.avg_spend.source === 'owner' && current.avg_spend.amount === a.amount && curExact === (a.exact != null ? a.exact : null))) changes.avg_spend = { amount: a.amount, ...(a.exact != null ? { exact: a.exact } : {}) };
     }
   }
   // "We don't have one" (2026-11-08): the whole list of items the owner says their place doesn't offer. A new one is
@@ -48935,10 +48988,12 @@ function menuFiles(menuId) {
 }
 // Full easy setup (2026-11-09): happy hour and weekly specials sent as a file, photo or website to type up.
 const SETUP_SHEET_KINDS = ['happy_hour', 'specials'];
-const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials', facebook: 'Facebook page', instagram: 'Instagram name' };
+const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials', facebook: 'Facebook page', instagram: 'Instagram name', menu_social: 'menu on Facebook or Instagram' };
 // A page name instead of a link (2026-11-09): "What's your Facebook page called?" answered with plain words is a note
 // for us to find the link (never published as typed). Same queue, no pages.
-const SETUP_NOTE_KINDS = ['facebook', 'instagram'];
+// Café test 2 (2026-11-11): 'menu_social', a menu on their Facebook or Instagram given as a page name: "[FIND LINK] …
+// told us their menu on Facebook or Instagram", never "asked us to type up their menu".
+const SETUP_NOTE_KINDS = ['facebook', 'instagram', 'menu_social'];
 // -> { facebook: true, instagram: true } for names sent and still waiting for us.
 function setupSocialNotes(venueId) {
   const out = {};
@@ -51311,7 +51366,7 @@ function renderOwnerSetupPage(found, opts) {
   try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
     address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
-    hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source } : null,
+    hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
     happy_blocks: setupHappyBlocks(found),
@@ -54982,7 +55037,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     const value = values.avg_spend;
     const next = opts.undo
       ? (value && Number.isInteger(value.amount) ? value : null)
-      : { amount: value.amount, source: 'owner', source_url: null, basis: 'Entered by the owner', checked_at: todayLocal(now) };
+      : { amount: value.amount, source: 'owner', source_url: null, basis: 'Entered by the owner', checked_at: todayLocal(now), ...(value.exact != null ? { exact: value.exact } : {}) };
     const r = guardedAvgSpendUpdate(venue.id, currentAvgSpendJson(venue.id), next, { reason: meta.reason, batch_id: meta.batch_id, log_source: 'venue_owner', reviewed_by: reviewer, undo: !!opts.undo });
     if (!r.ok) return { ok: false, reason: 'avg_spend_failed', detail: r.reason, applied };
     applied.push('avg_spend');
@@ -55760,7 +55815,7 @@ function renderAdminMenuCard(m) {
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -56167,7 +56222,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
     for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? 'Happy hour envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: t });
     }
   } catch (e) { /* no menus table */ }
@@ -56879,7 +56934,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   // Sent through "do it for me" (the easy setup's menu photos or files, happy hour or specials sheets, a Facebook or
   // Instagram name): waiting for us, not "left" (fresh-eyes on the full setup, 2026-11-09).
   const pendingHelp = {};
-  try { for (const r of db.prepare("SELECT help_kind, status FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) { if (r.status === 'help' || !r.help_kind) pendingHelp[r.help_kind || 'menu'] = true; } } catch (e) { /* none */ }
+  try { for (const r of db.prepare("SELECT help_kind, status FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) { if (r.status === 'help' || !r.help_kind) pendingHelp[r.help_kind === 'menu_social' ? 'menu' : r.help_kind || 'menu'] = true; } } catch (e) { /* none */ }
   return {
     pendingHelp,
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
@@ -57158,7 +57213,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const avgSpendOn = !!portalFields(venue.type).avgSpend;
   const avgNow = avgSpendOn && snap.avg_spend && Number.isInteger(snap.avg_spend.amount) ? snap.avg_spend : null;
   const avgByOwner = !!avgNow && avgNow.source === 'owner';
-  const avgMoney = (n) => (fr ? `${n} $` : `$${n}`);
+  const avgMoney = (n) => (avgNow && n === avgNow.amount && avgSpendExactOk(avgNow.exact) ? avgSpendMoney(avgNow, fr) : fr ? `${n} $` : `$${n}`);
   // Completeness bar (2026-11-08): restaurants only; everything it adds is inside this flag.
   const completeOn = COMPLETENESS_TYPES.has(venue.type);
   // Every block says whether it goes live now or is checked first (final fresh-eyes 2026-11-09), like cuisine and Plan
@@ -57215,19 +57270,24 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const label = (c) => (fr ? frCuisine(c) : c);
     const placeLabel = (p) => (fr ? frPlaceType(p) : p);
     const legacy = picked.filter((c) => !OWNER_CUISINES.includes(c));
-    const popular = (venue.type === 'pub' ? PUB_CUISINES_POPULAR : OWNER_CUISINES_POPULAR).slice();
+    // Café test 2 (2026-11-11): a café's food styles start with café ones (never Pub Fare, Burgers, Pizza first).
+    const popular = (venue.type === 'pub' ? PUB_CUISINES_POPULAR : venue.type === 'cafe' ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR).slice();
     const rest = OWNER_CUISINES.filter((c) => !popular.includes(c)).sort((a, b) => label(a).localeCompare(label(b), fr ? 'fr' : 'en'));
     const tile = (c, more) => `<button type="button" class="op-cu-tile" data-cu="${escapeHtml(c)}" data-cu-label="${escapeHtml(label(c))}" aria-pressed="${picked.includes(c) ? 'true' : 'false'}"${more && !picked.includes(c) ? ' data-more="1" hidden' : ''}>${escapeHtml(label(c))}</button>`;
-    const hint = picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
+    // Café test 2: a café's line is its kind and what it serves ("Ice cream & gelato · Espresso drinks, ice cream & gelato").
+    const cafeServes = venue.type === 'cafe' ? ((snap.cafe_info || {}).serves || []).map((k) => (CAFE_SERVE_LABELS[k] || {})[fr ? 'fr' : 'en']).filter(Boolean) : [];
+    const hint = venue.type === 'cafe' && (place || cafeServes.length)
+      ? [place ? placeLabel(place) : '', cafeServes.join(', '), picked.map(label).join(', ')].filter(Boolean).join(' · ')
+      : picked.length ? picked.map(label).join(', ') + (place ? ` · ${placeLabel(place)}` : '') : L('Not set: pick your kind of food', 'Non indiquée : choisissez votre cuisine');
     return `
-      <details class="op-fold op-sec" id="cuisine" data-task="more"${picked.length ? '' : ' open'} data-max="${OWNER_CUISINES_MAX}"
+      <details class="op-fold op-sec" id="cuisine" data-task="more"${picked.length || (venue.type === 'cafe' && place) ? '' : ' open'} data-max="${OWNER_CUISINES_MAX}"
         data-empty="${escapeHtml(L('Please tap at least one kind of food first.', 'Touchez d’abord au moins un type de cuisine.'))}"
         data-limit="${escapeHtml(L('You can pick up to 3. Tap one you picked to remove it.', 'Vous pouvez en choisir 3 au plus. Touchez-en un choisi pour le retirer.'))}"
         data-picked="${escapeHtml(L('Picked: {c}', 'Choisi : {c}'))}"
         data-done="${escapeHtml(L('Saved. Your page now says {c}.', 'Enregistré. Votre page indique maintenant {c}.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
       <summary><span class="lyv-section-label" id="opCuisineLabel">${L('What you serve', 'Ce que vous servez')}${waitChip('cuisine', 'cuisines', 'place_type')}</span> <span class="op-fold-hint" id="opCuisineHint">${escapeHtml(hint)}</span></summary>
       <div class="form-row full"><div class="form-field">
-        <p class="op-cu-q" id="opCuisineQ">${L('What kind of food do you serve?', 'Quel type de cuisine servez-vous?')} <span class="op-hint">${L('Pick up to 3.', 'Choisissez-en jusqu’à 3.')}</span></p>
+        <p class="op-cu-q" id="opCuisineQ">${venue.type === 'cafe' ? L('A food style (optional)', 'Un style de cuisine (facultatif)') : L('What kind of food do you serve?', 'Quel type de cuisine servez-vous?')} <span class="op-hint">${L('Pick up to 3.', 'Choisissez-en jusqu’à 3.')}</span></p>
         <p class="op-cu-picked" id="opCuPicked" role="status"${picked.length ? '' : ' hidden'}>${escapeHtml(L('Picked: {c}', 'Choisi : {c}').replace('{c}', picked.map(label).join(', ')))}</p>
         <div class="op-cu-tiles" id="opCuTiles" role="group" aria-labelledby="opCuisineQ">${legacy.map((c) => tile(c, false)).join('')}${popular.map((c) => tile(c, false)).join('')}${rest.map((c) => tile(c, true)).join('')}</div>
         <button type="button" class="op-more op-cu-more" id="opCuMore">${L('Don’t see yours? Show more kinds of food', 'Vous ne la voyez pas? Afficher plus de cuisines')}</button>
@@ -57248,7 +57308,11 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const visitRowsHtml = () => {
     if (!completeOn) return '';
     const cur = snap.visit_rows || {};
-    const filled = OWNER_VISIT_EDIT_KEYS.filter((k) => cur[k]).length;
+    // Café test 2 (2026-11-11): cafés answer reservations and takeout under Ordering, so those boxes aren't here; and the
+    // count includes the Dogs line set from "What you offer" ("1 of 5 lines filled in" said so with Dogs and Known for set).
+    const editKeys = venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : OWNER_VISIT_EDIT_KEYS;
+    const countKeys = cur.dogs ? editKeys.concat(['dogs']) : editKeys;
+    const filled = countKeys.filter((k) => cur[k]).length;
     const fieldsEn = {
       known_for: ['Known for', 'What people come back for, in one line.', 'Wood-fired pizza and the lakeside patio'],
       reservations: ['Reservations', 'How to book, or say walk-ins only.', 'Book online or call; walk-ins welcome at the bar'],
@@ -57265,13 +57329,13 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     };
     const words = fr ? fieldsFr : fieldsEn;
     const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups' };
-    const boxes = OWNER_VISIT_EDIT_KEYS.map((k) => `
+    const boxes = editKeys.map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
           <textarea id="${ids[k]}" class="op-visit-ta" rows="1" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}">${escapeHtml(cur[k] || '')}</textarea></div>`).join('');
     return `
-      <details class="op-fold op-sec" id="visit" data-task="more"${filled < OWNER_VISIT_EDIT_KEYS.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
-      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${OWNER_VISIT_EDIT_KEYS.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${OWNER_VISIT_EDIT_KEYS.length} remplie${filled === 1 ? '' : 's'}`) : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
+      <details class="op-fold op-sec" id="visit" data-task="more"${filled < countKeys.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${countKeys.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${countKeys.length} remplie${filled === 1 ? '' : 's'}`) : venue.type === 'cafe' ? L('Known for, dietary note and more', 'Connu pour, note alimentaire et plus') : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
       <p class="op-hint">${L('These short lines show in the &ldquo;Plan your visit&rdquo; box on your page. One line each, plain words, no links. Leave a box empty to leave that line off.', 'Ces courtes lignes paraissent dans la case « Planifiez votre visite » de votre page. Une ligne chacune, des mots simples, sans liens. Laissez une case vide pour ne pas afficher cette ligne.')}</p>
       <div class="form-row full op-visit-rows">${boxes}
       </div>
@@ -57827,8 +57891,11 @@ ${priceFieldHtml}      </details>`}${!avgSpendOn ? '' : `
       <details class="op-fold op-sec" id="avgspend" data-task="more"${avgNow && !avgByOwner ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opAvgLabel">${L('Average spend per person', 'Dépense moyenne par personne')}</span> <span class="op-fold-hint" id="opAvgHint">${avgByOwner ? L(`${avgMoney(avgNow.amount)}, set by you`, `${avgMoney(avgNow.amount)}, indiqué par vous`) : avgNow ? L(`About ${avgMoney(avgNow.amount)}, our estimate: please check it`, `Environ ${avgMoney(avgNow.amount)}, notre estimation : veuillez la vérifier`) : L('Not set', 'Non indiqué')}</span></summary>
       <div class="form-row full"><div class="form-field">
-        <label for="opAvg">${L('About how much does one person spend? (one main and a soft drink, before tax and tip)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool, avant taxes et pourboire)')}</label>
-        <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="numeric" min="${AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="1" autocomplete="off" value="${avgNow ? avgNow.amount : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
+        <label for="opAvg">${venue.type === 'cafe'
+          // Café test 2 (2026-11-11): the café words for its kind ("a single scoop"), never "one main and a soft drink".
+          ? L(`About how much is ${escapeHtml(cafePriceWords(venuePlaceType(venue), false))}? (for one person, before tax and tip)`, `Combien coûte environ ${escapeHtml(cafePriceWords(venuePlaceType(venue), true))}? (pour une personne, avant taxes et pourboire)`)
+          : L('About how much does one person spend? (one main and a soft drink, before tax and tip)', 'À peu près combien une personne dépense-t-elle? (un plat principal et une boisson sans alcool, avant taxes et pourboire)')}</label>
+        <span class="op-money"><span aria-hidden="true">${fr ? '' : '$'}</span><input type="number" id="opAvg" inputmode="${venue.type === 'cafe' ? 'decimal' : 'numeric'}" min="${venue.type === 'cafe' ? AVG_SPEND_EXACT_MIN : AVG_SPEND_MIN}" max="${AVG_SPEND_MAX}" step="${venue.type === 'cafe' ? '0.25' : '1'}" autocomplete="off" value="${avgNow ? (avgSpendExactOk(avgNow.exact) ? avgNow.exact.toFixed(2) : avgNow.amount) : ''}" aria-describedby="opAvgNote"><span aria-hidden="true">${fr ? ' $' : ''}</span></span>
         <p class="op-hint" id="opAvgNote">${avgSpendPublic() ? L(`A whole number of dollars, like 25. Leave it blank to keep what we show now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous affichons.`) : L(`A whole number of dollars, like 25. Leave it blank to keep what we have now.`, `Un nombre entier de dollars, par exemple 25. Laissez vide pour garder ce que nous avons.`)}${completeOn ? ` <span class="op-live-note">${avgSpendPublic() ? L('Goes live as soon as you save it.', 'En ligne dès que vous l’enregistrez.') : L('Saved as soon as you tap Save. It’ll show on your page soon.', 'Enregistré dès que vous touchez Enregistrer. Cela s’affichera bientôt sur votre fiche.')}</span>` : ''}</p>
         <p class="lyv-error" id="opAvgError" hidden></p>
         ${avgNow && !avgByOwner ? `<div class="op-avg-est" id="opAvgEst"><p class="op-hint">${L(`Our estimate from your menu: ${avgMoney(avgNow.amount)}. Change it if it&rsquo;s off, or tap That's right`, `Notre estimation selon votre menu : ${avgMoney(avgNow.amount)}. Modifiez-la si elle est inexacte, ou touchez C&rsquo;est exact`)}</p><button type="button" class="op-btn" id="opAvgConfirm">${L("That's right", 'C’est exact')}</button></div>` : ''}
