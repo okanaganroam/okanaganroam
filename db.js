@@ -1159,6 +1159,11 @@ CREATE TABLE IF NOT EXISTS venue_links (
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'open_months')) {
   db.exec('ALTER TABLE venue_links ADD COLUMN open_months TEXT');
 }
+// TikTok (pub test 9, 2026-11-10): the owner's TikTok profile, https://www.tiktok.com/@handle. Live straight away like
+// Instagram; NULL = none. Additive: older rows read as no TikTok.
+if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'tiktok_url')) {
+  db.exec('ALTER TABLE venue_links ADD COLUMN tiktok_url TEXT');
+}
 
 // Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a
 // visitor sends a short tip and/or up to 3 photos for a listing. It stays

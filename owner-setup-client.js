@@ -101,6 +101,8 @@
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
     happy: [], specials: [], nights: [], story: CUR.description || '', visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
+    // TikTok (pub test 9): "@handle" from the stored https://www.tiktok.com/@handle.
+    tt: (CUR.tiktok_url || '').replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/\/$/, ''), ttSaved: (CUR.tiktok_url || '').replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/\/$/, ''),
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
     // "No dogs allowed" (pub test 4, 2026-11-10): the not-offered answer 'dogs'; never together with Dog friendly.
@@ -877,6 +879,8 @@
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
       x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+        // TikTok (pub test 9, 2026-11-10): optional, on the Instagram screen; live straight away like Instagram.
+        + (ig ? field('suTt', T.ttLabel, S.tt, { max: 200, data: 'autocapitalize="none" spellcheck="false"' }) + ex(T.ttEx) : '')
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
         + big('🤷', T.socialUnsure, T.socialUnsureSub, true, 'socialUnsure:' + s) + '</div>' + skip(s);
@@ -1454,7 +1458,16 @@
       if (linkChanged) list2.push({ booking_url: bkUrl });
       return saveAll(step, list2, null, null, function(){ S.visitSaved = clone(S.visitSaved || CUR.visit_rows || {}); S.visitSaved[key] = line; if (linkChanged) CUR.booking_url = bkUrl; });
     }
-    if (k === 'socialSave') { var val = el('suSoc').value.trim(); if (!val) { S.nudge = fill(T.needValue, { no: v === 'instagram' ? T.igNo : T.fbNo }); return render(); } if (v === 'instagram') S.ig = val; else S.fb = val; return socialSave(v, val); }
+    if (k === 'socialSave') {
+      var val = el('suSoc').value.trim(), ttb = el('suTt'), tt = ttb ? ttb.value.trim() : null;
+      if (tt !== null) S.tt = tt;
+      // TikTok on its own (no Instagram typed): saved, and the Instagram question stays open.
+      if (!val && tt !== null && tt !== S.ttSaved) { if (S.busy) return; S.busy = true; S.error = ''; S.nudge = ''; render(); return change({ tiktok_url: tt }).then(function(r){ S.busy = false; if (r) { S.ttSaved = tt; S.nudge = tt ? T.ttSavedOnly : ''; } render(); }); }
+      if (!val) { S.nudge = fill(T.needValue, { no: v === 'instagram' ? T.igNo : T.fbNo }); return render(); }
+      if (v === 'instagram') S.ig = val; else S.fb = val;
+      if (tt !== null && tt !== S.ttSaved) { if (S.busy) return; S.busy = true; S.error = ''; render(); return change({ tiktok_url: tt }).then(function(r){ S.busy = false; if (!r) return render(); S.ttSaved = tt; socialSave(v, val); }); }
+      return socialSave(v, val);
+    }
     if (k === 'socialNo') return sayNo(v);
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }

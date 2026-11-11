@@ -35234,8 +35234,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
     venueLinkRow.menu_url && !menuInVisitBox ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
-    (venueLinkRow.instagram_url || venueLinkRow.facebook_url) ? [L('Social', 'R\u00e9seaux'), [
+    (venueLinkRow.instagram_url || venueLinkRow.facebook_url || venueLinkRow.tiktok_url) ? [L('Social', 'R\u00e9seaux'), [
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
+      // TikTok (pub test 9, 2026-11-10): the owner's profile, beside Instagram and Facebook.
+      venueLinkRow.tiktok_url ? `<a href="${escapeHtml(venueLinkRow.tiktok_url)}" rel="nofollow noopener" target="_blank">TikTok</a>` : '',
       venueLinkRow.facebook_url ? `<a href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank">Facebook</a>` : '',
     ].filter(Boolean).join(' &middot; ')] : null,
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
@@ -44581,7 +44583,7 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
   // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
   'pub_info'];
@@ -44807,10 +44809,11 @@ function ownerMonthDay(value) {
   return len && d >= 1 && d <= len ? `${m[1]}-${m[2]}` : null;
 }
 // Name, address and links (2026-10-15). Links live in venue_links.
-const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+// TikTok (pub test 9, 2026-11-10): an owner link like Instagram (live straight away, strictly a profile).
+const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 function venueLinks(venueId) {
-  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
-    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, open_months: null };
+  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, tiktok_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
+    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, tiktok_url: null, open_months: null };
 }
 // ---------- Seasonal hours and special closures (2026-10-18) ----------
 // An owner can add one second week of hours for part of every year (winter hours Nov 1 - Apr 30) and dated special
@@ -45017,6 +45020,13 @@ function ownerSocialLink(field, raw) {
     const m = /^@([A-Za-z0-9._]{1,30})$/.exec(v) || /^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([A-Za-z0-9._]{1,30})\/?(?:[?#].*)?$/i.exec(v);
     if (!m || INSTAGRAM_NON_PROFILE.has(m[1].toLowerCase())) return null;
     return `https://www.instagram.com/${m[1]}/`;
+  }
+  // TikTok (pub test 9): "@handle" or (https://)(www.|m.)tiktok.com/@handle, never a video, tag or the For You page
+  // -> https://www.tiktok.com/@handle.
+  if (field === 'tiktok_url') {
+    const m = /^@([A-Za-z0-9._]{2,24})$/.exec(v) || /^(?:https?:\/\/)?(?:www\.|m\.)?tiktok\.com\/@([A-Za-z0-9._]{2,24})\/?(?:[?#].*)?$/i.exec(v);
+    if (!m || /^\.|\.$/.test(m[1])) return null;
+    return `https://www.tiktok.com/@${m[1]}`;
   }
   if (field !== 'facebook_url') return null;
   const m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?facebook\.com(\/[^?#]*)?(\?[^#]*)?(?:#.*)?$/i.exec(v);
@@ -45691,9 +45701,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     let url = '';
     if (raw) {
       // Instagram and Facebook go live straight away (Dayton, 2026-11-09), so only a real profile or page is accepted.
-      url = (f === 'instagram_url' || f === 'facebook_url') ? ownerSocialLink(f, raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
+      url = (f === 'instagram_url' || f === 'facebook_url' || f === 'tiktok_url') ? ownerSocialLink(f, raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
       if (!url) {
-        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name with @, like @yourbusiness, or your profile link.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.' : 'Please check the link, for example yourbusiness.com/menu.';
+        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name with @, like @yourbusiness, or your profile link.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.'
+          : f === 'tiktok_url' ? 'Please enter your TikTok name with @, like @yourbusiness, or your profile link.' : 'Please check the link, for example yourbusiness.com/menu.';
         continue;
       }
     }
@@ -46005,17 +46016,17 @@ function listOwnerChanges(status = 'pending') {
 }
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
-  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
+  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
   pub_info: 'Kitchen, who’s welcome and sports' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
-    name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
     price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
-    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
     price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
@@ -52798,6 +52809,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'Please enter your Instagram name, like @yourbusiness.': 'Entrez votre nom Instagram, comme @votreentreprise.',
   'Please enter your Instagram name with @, like @yourbusiness, or your profile link.': 'Entrez votre nom Instagram avec @, comme @votreentreprise, ou le lien de votre profil.',
   'Please enter your Facebook page link, like facebook.com/yourbusiness.': 'Entrez le lien de votre page Facebook, comme facebook.com/votreentreprise.',
+  'Please enter your TikTok name with @, like @yourbusiness, or your profile link.': 'Entrez votre nom TikTok avec @, comme @votreentreprise, ou le lien de votre profil.',
   'Please check the link, for example yourbusiness.com/menu.': 'Vérifiez le lien, par exemple votreentreprise.com/menu.',
   'Please pick the first and last month you’re open.': 'Choisissez le premier et le dernier mois où vous êtes ouverts.',
   'The badges could not be read. Please reload the page and try again.': 'Les caractéristiques sont illisibles. Rechargez la page et réessayez.',
@@ -54309,7 +54321,7 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Website, menu and booking links still wait for review.
 // Pub answers (2026-11-10) too: choices from fixed lists plus short notes checked like Plan your visit lines (no links
 // or < >); logged, in "Your updates", with Undo.
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'pub_info']);
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info']);
 // Full easy setup (Dayton, 2026-11-09): sent from the setup flow (from_setup: true) by a restaurant, these also go live
 // from the edit link: the business's hours, season, seasonal hours, closures, the badge tiles, happy hour (times and
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
@@ -54723,7 +54735,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
 
 // --- review actions ---------------------------------------------------------
 
-const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 
 // Applies the reviewer's edits to a pending update's text fields, checked
 // exactly like the owner's own input. The owner's original is kept in
@@ -55370,7 +55382,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   gluten_free: 'Options sans gluten', lake_view: 'Vue sur le lac ou le vignoble', nonalcoholic: 'Options sans alcool', sports_tv: 'Sports à la télé', live_music: 'Musique en direct',
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
-  name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
+  name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
@@ -57020,6 +57032,9 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opInstagram">${L('Instagram (optional)', 'Instagram (facultatif)')}</label><input type="text" id="opInstagram" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
         <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
       </div>
+      <div class="form-row">
+        <div class="form-field"><label for="opTiktok">${L('TikTok (optional)', 'TikTok (facultatif)')}</label><input type="text" id="opTiktok" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" spellcheck="false" value="${escapeHtml(snap.tiktok_url || '')}"><p class="lyv-error" id="opTiktokError" hidden></p></div>
+      </div>
       </details>
 
       <p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description${waitChip('description')}</p>
@@ -57473,7 +57488,7 @@ ${ownerFooterHtml(fr)}
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opTiktokError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -57484,6 +57499,7 @@ ${ownerFooterHtml(fr)}
       name: document.getElementById('opBizName').value, address: document.getElementById('opAddress').value,
       menu_url: document.getElementById('opMenu').value, booking_url: document.getElementById('opBooking').value,
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
+      tiktok_url: document.getElementById('opTiktok') ? document.getElementById('opTiktok').value : (initial.tiktok_url || ''),
       description: document.getElementById('opDescription').value,
       open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
       badges: {}
@@ -57535,7 +57551,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
     if (changes.website === initial.website) delete changes.website;
-    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
+    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
     if (changes.description === initial.description) delete changes.description;
     var btn = document.getElementById('opSubmit');
     btn.disabled = true;
@@ -57584,7 +57600,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
-        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
+        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url); show('opTiktokError', errs.tiktok_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}${completeOn ? " show('opCuisineError', errs.cuisine); show('opVisitError', errs.visit_rows);" : ''}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
