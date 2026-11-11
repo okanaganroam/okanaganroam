@@ -44080,6 +44080,8 @@ function buildEventSubmissionEmail(sub) {
   if (sub.schedule_notes) payload['Other dates / schedule notes (not published)'] = sub.schedule_notes;
   if (sub.price_text) payload['Price (as given)'] = sub.price_text;
   if (sub.image_link) payload['Poster / photo link (not published automatically)'] = sub.image_link;
+  // Pub test 9: the owner's uploaded picture, private until the event is approved (then it is the event's image).
+  if (sub.image_key) payload['Picture (uploaded; used as the event image when approved)'] = ownerPhotoPreviewUrl(sub.image_key);
   const existing = findExistingEventsForSubmission(sub);
   if (existing.length) payload['Possible existing event'] = existing.map((e) => `${e.name} (event #${e.event_id}, ${e.rule})`).join('; ');
   payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject event submission #${sub.id}.`;
@@ -44254,6 +44256,8 @@ function approveEventSubmission(id, body, now = new Date()) {
   if (venueId !== undefined) data.venue_id = venueId;
   else data.venue_name_text = sub.venue_name;
   if (body.type !== undefined) data.type = body.type;
+  // The owner's uploaded picture (pub test 9): reviewed with the event, so approving the event publishes it as its image.
+  if (sub.image_file && ownerPhotoPath(sub.image_file)) data.image_url = `/images/owner/${sub.image_file}`;
   // The price as the organizer gave it (2026-10-29): "Free", "By donation", "$25 in advance".
   const price = eventPriceFromText(sub.price_text, { priceField: true });
   if (price) Object.assign(data, price);
@@ -46495,7 +46499,7 @@ function setEventPartners(eventId, ids) {
 }
 
 const OWNER_EVENT_KEYS = new Set(['change_of', 'name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
-  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'partner_venue_ids', 'company_website', 'started_at']);
+  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'partner_venue_ids', 'company_website', 'started_at', 'image', 'image_rights']);
 async function handleOwnerEventSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Events are only accepted from the Okanagan Roam website.' });
@@ -46506,13 +46510,18 @@ async function handleOwnerEventSubmission(req, res, token) {
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
-    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES);
+    // An optional picture (pub test 9) rides along, so the owner's event can be as large as one owner photo plus the event.
+    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES + OWNER_PHOTO_MAX_BODY);
   } catch (err) {
     return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'Your event is too long. Please shorten it and try again.' : generic }, err.status === 413);
   }
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_EVENT_KEYS.has(k))) {
     return sendSubmissionResponse(res, 400, { ok: false, error: generic });
   }
+  // Only the picture may be large: the event itself keeps its own limit.
+  if (Buffer.byteLength(JSON.stringify({ ...body, image: '' })) > EVENT_SUBMISSION_MAX_BODY_BYTES) return sendSubmissionResponse(res, 413, { ok: false, error: 'Your event is too long. Please shorten it and try again.' }, true);
+  const picture = body.image == null || body.image === '' ? null : ownerEventPicture(body.image, body.image_rights);
+  if (picture && picture.error) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors: { image: picture.error } });
   if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
   // No fill-time check here (2026-10-18): the edit link or the login already proves who this is, and a quick Save
   // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
@@ -46522,6 +46531,8 @@ async function handleOwnerEventSubmission(req, res, token) {
   delete full.started_at;
   delete full.change_of;
   delete full.partner_venue_ids;
+  delete full.image;
+  delete full.image_rights;
   const { data, errors } = validateEventSubmission(full);
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
@@ -46536,9 +46547,32 @@ async function handleOwnerEventSubmission(req, res, token) {
   ).get(venue.id, data.start_date, data.name);
   if (duplicate) return sendSubmissionResponse(res, 409, { ok: false, error: 'You already sent this event. It is waiting for review.' });
   const id = insertEventSubmission(data, ip, req.headers['user-agent'], venue.id);
+  // The picture (pub test 9): written like an owner photo and kept with the submission, private until it is approved.
+  if (picture) {
+    const file = `${crypto.randomBytes(12).toString('hex')}.jpg`, key = crypto.randomBytes(18).toString('base64url');
+    try {
+      fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true });
+      fs.writeFileSync(ownerPhotoPath(file), picture.buf, { flag: 'wx' });
+      db.prepare('UPDATE event_submissions SET image_file = ?, image_key = ? WHERE id = ?').run(file, key, id);
+    } catch (err) { console.error(`[owner-portal] event #${id} picture not saved: ${err.message}`); }
+  }
   ownerMarkFrench(res, 'event_submissions', id);
   notifyInBackground(`owner event #${id}`, () => notifyEventSubmission(id));
   return sendSubmissionResponse(res, 201, { ok: true, id });
+}
+
+// An owner event's picture (pub test 9, 2026-11-10): the same checks as an owner photo (a JPEG the browser made, at least
+// OWNER_PHOTO_MIN_EDGE on its long edge, under OWNER_PHOTO_MAX_BYTES) and the same rights tick. -> { buf } | { error }
+function ownerEventPicture(image, rights) {
+  if (rights !== true) return { error: 'Please confirm you took this picture or have permission to share it.' };
+  const m = typeof image === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(image) : null;
+  const buf = m ? Buffer.from(m[1], 'base64') : null;
+  const dims = buf ? jpegDimensions(buf) : null;
+  if (!buf || !dims || buf.length > OWNER_PHOTO_MAX_BYTES) return { error: 'That file could not be read as a photo. Please try a JPG or PNG.' };
+  const longEdge = Math.max(dims.width, dims.height);
+  if (longEdge < OWNER_PHOTO_MIN_EDGE) return { error: `That picture is too small. Please use one at least ${OWNER_PHOTO_MIN_EDGE} pixels wide.` };
+  if (longEdge > OWNER_PHOTO_MAX_EDGE) return { error: 'That picture is too large. Please try again.' };
+  return { buf, dims };
 }
 
 // ---------- Owner photo uploads (2026-10-15) ----------
@@ -57276,7 +57310,15 @@ ${priceFieldHtml}      </details>` : ''}
         </div>
         <p class="lyv-error" id="oePartnersError" hidden></p>
       </div></div>
-      <div class="form-row">
+      <div class="form-row full"><div class="form-field oe-photo">
+        <label for="oePhoto">${L('Picture (optional)', 'Image (facultatif)')}</label>
+        <input type="file" id="oePhoto" accept="image/*" aria-describedby="oePhotoHint">
+        <p class="op-hint" id="oePhotoHint" style="margin:4px 0 0">${L('A photo or poster for a new event. We check it with the event, and it shows on What&rsquo;s On once the event is approved.', 'Une photo ou une affiche pour un nouvel événement. Nous la vérifions avec l’événement, et elle s’affiche dans À l’affiche une fois l’événement approuvé.')}</p>
+        <label class="op-closed" id="oePhotoRightsRow" style="width:auto;margin-top:8px" hidden><input type="checkbox" id="oePhotoRights"> ${L('I took this picture or have permission to share it.', 'J’ai pris cette image ou j’ai la permission de la partager.')}</label>
+        <p class="lyv-error" id="oeImageError" hidden></p>
+      </div></div>
+      <p class="op-hint" id="oeSendingAs" hidden></p>
+      <div class="form-row" id="oeContactRow">
         <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')} *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
         <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
@@ -57284,7 +57326,7 @@ ${priceFieldHtml}      </details>` : ''}
       <p class="lyv-error" id="oeFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="oeSubmit">${L('Send event', 'Envoyer l’événement')}</button>
     </form>
-    <div class="op-done" id="oeDone"><span id="oeDoneText">${L('Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.')}</span> <a href="#events" id="oeAnother">${L('Add another event', 'Ajouter un autre événement')}</a></div>
+    <div class="op-done" id="oeDone"><span id="oeDoneText">${L('Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.')}</span> <a href="#events" id="oeAnother" class="op-btn" style="display:inline-block;margin-top:10px">${L('Add another event', 'Ajouter un autre événement')}</a></div>
     </details>
     ${found.account ? ownerAccessPanelHtml(venue, found.account, lang) : ''}
 
@@ -57770,7 +57812,25 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       .then(function(j){ if (j && j.ok) { location.hash = 'opActivityHead'; location.reload(); return; } x.disabled = false; x.textContent = (j && j.error) || T.again; })
       .catch(function(){ x.disabled = false; x.textContent = T.connect; });
   });
-  document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
+  // "Add another event" (pub test 9, 2026-11-10): the name and email of the event just sent come back, folded into one
+  // "Sending as …" line with a Change button, so a second event needs neither typed again.
+  var sentAs = null;
+  function sendingAs(on){
+    var row = document.getElementById('oeContactRow'), line = document.getElementById('oeSendingAs');
+    if (!row || !line) return;
+    if (!on || !sentAs) { row.style.display = ''; line.hidden = true; return; }
+    line.textContent = '';
+    line.appendChild(document.createTextNode(${JSON.stringify(L('Sending as', 'Envoyé par'))} + ' ' + sentAs.name + ' (' + sentAs.email + '). '));
+    var ch = document.createElement('button'); ch.type = 'button'; ch.className = 'op-linkbtn'; ch.textContent = ${JSON.stringify(L('Change', 'Modifier'))};
+    ch.onclick = function(){ sendingAs(false); document.getElementById('oeContactName').focus(); };
+    line.appendChild(ch); line.hidden = false; row.style.display = 'none';
+  }
+  document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now();
+    document.getElementById('oeContactName').value = sentAs ? sentAs.name : savedName(); var em = sentAs ? sentAs.email : lastEmail; if (em) document.getElementById('oeContactEmail').value = em;
+    var pr = document.getElementById('oePhotoRightsRow'); if (pr) pr.hidden = true; sendingAs(!!sentAs);
+    setTimeout(function(){ var n = document.getElementById('oeName'); if (n) { n.scrollIntoView({ block: 'center' }); n.focus(); } }, 0); });
+  // The event's picture (pub test 9): the rights tick shows once a picture is chosen.
+  (function(){ var f = document.getElementById('oePhoto'), r = document.getElementById('oePhotoRightsRow'); if (f && r) f.addEventListener('change', function(){ r.hidden = !(f.files && f.files.length); show('oeImageError', ''); }); })();
   // Photos (2026-10-18): after an upload or a change, fetch this page again and swap in the new
   // grid (no reload, so nothing typed elsewhere on the page is lost).
   var photoBox = document.getElementById('opPhotoBox'), photoStatus = document.getElementById('opPhotoStatus');
@@ -57910,7 +57970,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   ev.addEventListener('submit', function(e){
     e.preventDefault();
     var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',
-      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError', partner_venue_ids:'oePartnersError' };
+      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError', partner_venue_ids:'oePartnersError', image:'oeImageError' };
     Object.keys(ids).forEach(function(k){ show(ids[k], ''); }); show('oeFormError', '');
     var cats = Array.prototype.map.call(document.querySelectorAll('#oeCategories input:checked'), function(c){ return c.value; });
     var v = function(id){ return document.getElementById(id).value; };
@@ -57920,11 +57980,18 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       company_website: v('oeHp'), started_at: evStarted, partner_venue_ids: partners.map(function(p){ return p.id; }) };
     if (changeOf) payload.change_of = changeOf;
     var b = document.getElementById('oeSubmit'); b.disabled = true;
-    fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
-      .then(function(r){ return r.json(); })
+    // The picture (pub test 9): made smaller in the browser like an owner photo, then sent with the event.
+    var pf0 = document.getElementById('oePhoto'), pfile = !changeOf && pf0 && pf0.files && pf0.files[0];
+    if (pfile && !document.getElementById('oePhotoRights').checked) { b.disabled = false; show('oeImageError', ${JSON.stringify(L('Please tick the box to confirm you can share this picture.', 'Cochez la case pour confirmer que vous pouvez partager cette image.'))}); jumpToError(ev); return; }
+    (pfile ? resize(pfile).then(function(r){ payload.image = r.image; payload.image_rights = true; }, function(err){ throw err; }) : Promise.resolve())
+      .then(function(){ return fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) }); }, function(err){
+        b.disabled = false; show('oeImageError', err && err.message === 'small' ? ${JSON.stringify(L('That picture is too small. Please use one at least 800 pixels wide.', 'Cette image est trop petite. Utilisez-en une d’au moins 800 pixels de large.'))} : ${JSON.stringify(L('That file could not be read as a picture. Please try a JPG or PNG.', 'Ce fichier n’a pas pu être lu comme une image. Essayez un JPG ou un PNG.'))}); jumpToError(ev); return null; })
+      .then(function(r){ if (!r) return null; return r.json(); })
       .then(function(j){
+        if (j === null) return;
         b.disabled = false;
         if (j && j.ok) {
+          sentAs = { name: v('oeContactName').trim(), email: v('oeContactEmail').trim() };
           rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
           if (j.updated) document.getElementById('oeDoneText').textContent = T.evUpdated;
           if (j.change) document.getElementById('oeDoneText').textContent = T.evChange;
@@ -59182,7 +59249,9 @@ const server = http.createServer(async (req, res) => {
     {
       const pm = /^\/owner-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
       if (pm && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1]);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1])
+          // An owner event's picture (pub test 9) has the same private preview.
+          || db.prepare("SELECT image_file AS file FROM event_submissions WHERE image_key = ? AND status != 'rejected' AND image_file IS NOT NULL").get(pm[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' });
       }
@@ -59202,7 +59271,9 @@ const server = http.createServer(async (req, res) => {
       // file's own ?v= hash (what withVersionedImages writes) is kept for a year like every other image.
       const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(160|240|480|960|1200))?\.jpg$/.exec(pathname);
       if (im && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`)
+          // An owner event's picture once the event is approved (pub test 9).
+          || (im[2] ? null : db.prepare("SELECT image_file AS file FROM event_submissions WHERE image_file = ? AND status = 'approved'").get(`${im[1]}.jpg`));
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         const cache = { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' };
         if (!im[2]) return sendOwnerPhotoFile(res, row.file, cache);
