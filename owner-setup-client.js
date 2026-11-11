@@ -386,7 +386,7 @@
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
   function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
-    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; return true; } S.error = why(j); return false; }); }
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
@@ -657,7 +657,8 @@
       + '<button type="button" class="su-big su-alt" id="suExitDrop"><span class="su-ico" aria-hidden="true">✕</span><span>' + h(T.exitDrop) + '</span></button></div>'
       + '<div class="su-skip"><button type="button" class="su-link" id="suExitStay">' + h(T.exitStay) + '</button></div></div>');
     window.scrollTo(0, 0); try { el('suExitQ').focus({ preventScroll: true }); } catch (e) {}
-    el('suExitDrop').onclick = leave;
+    // "Don't save": what was typed on this step is dropped here too.
+    el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave(); };
     el('suExitStay').onclick = function(){ var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
     el('suExitSave').onclick = function(){
       if (S.busy) return; var a = exitAction(); if (!a) return leave();
@@ -668,6 +669,85 @@
   }
   el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } if (unsaved()) { e.preventDefault(); askExit(); } };
 
+
+  // ---------- Unsaved answers kept on this device (café test 3, 2026-11-11) ----------
+  // Leaving or reloading lost what was typed on a step (seven days of hours, a price). Each step's unsaved answers are
+  // kept in sessionStorage (this tab only), keyed by the link and the step, and come back when the owner returns to that
+  // step; a successful save clears them. Only what changed is kept, each with the value it replaced: when the page
+  // has changed since (saved from another screen or the edit page), that answer is left as the page has it. Typed
+  // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
+  var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
+    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
+  var DR = { base: {}, s: {}, at: {}, last: '' };
+  function drKey(b){ return 'suDraft:' + C.base + ':' + b; }
+  function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function drPut(b, d){ try { window.sessionStorage.setItem(drKey(b), JSON.stringify(d)); } catch (e) {} }
+  function drDrop(b){ try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
+  function js(v){ return v === undefined ? '~' : JSON.stringify(v); }
+  function isObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function drSnap(){ var o = {}; DRAFT_KEYS.forEach(function(k){ o[k] = S[k] === undefined ? undefined : clone(S[k]); }); return o; }
+  // { 'badges.wifi': { was, now }, spend: { was, now } } (JSON strings) for what differs from the step's start.
+  function drDiff(b0){
+    var out = {};
+    DRAFT_KEYS.forEach(function(k){
+      var a = b0[k], c = S[k];
+      if (isObj(a) && isObj(c)) { var ks = {}; Object.keys(a).concat(Object.keys(c)).forEach(function(j){ ks[j] = 1; }); Object.keys(ks).forEach(function(j){ var x = js(a[j]), y = js(c[j]); if (x !== y) out[k + '.' + j] = { was: x, now: y }; }); }
+      else { var x2 = js(a), y2 = js(c); if (x2 !== y2) out[k] = { was: x2, now: y2 }; }
+    });
+    return out;
+  }
+  // A box on the screen by its id or its first data- attribute.
+  function drSel(inp){
+    if (inp.id) return '[id="' + inp.id + '"]';
+    for (var i = 0; i < inp.attributes.length; i++) { var a = inp.attributes[i]; if (/^data-/.test(a.name)) return '[' + a.name + '="' + String(a.value).replace(/"/g, '\\"') + '"]'; }
+    return '';
+  }
+  function drBoxes(){ return screen.querySelectorAll('input[type=text], input[type=tel], input[type=url], input[type=email], input[type=time], input[type=number], input[type=search], input:not([type]), textarea, select'); }
+  function drChanged(inp){
+    if (inp.tagName !== 'SELECT') return inp.value !== inp.defaultValue;
+    var di = 0; for (var i = 0; i < inp.options.length; i++) if (inp.options[i].defaultSelected) { di = i; break; }
+    return inp.selectedIndex !== di;
+  }
+  // Saves the current step's unsaved answers (or drops them when nothing differs).
+  function drSave(){
+    if (S.leaving) return;
+    var b = base(S.step); if (STEPS.indexOf(b) < 0 || !DR.base[b]) return;
+    // What's typed in the time and deal boxes, as the screen's own Save reads it (so "Are these your hours?" shows them).
+    try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); } catch (e) {}
+    var d = drGet(b) || { s: {}, boxes: {} };
+    d.s = drDiff(DR.base[b]);
+    var bx = {}; Array.prototype.forEach.call(drBoxes(), function(inp){ if (inp.id === 'suCq' || !drChanged(inp)) return; var sel = drSel(inp); if (sel) bx[sel] = inp.value; });
+    d.boxes = d.boxes || {}; if (Object.keys(bx).length) d.boxes[S.step] = bx; else delete d.boxes[S.step];
+    if (!Object.keys(d.s).length && !Object.keys(d.boxes).length) return drDrop(b);
+    drPut(b, d);
+  }
+  // After a screen is drawn. Entering a step: its starting point (as drawn, so a screen that adds an empty row compares
+  // like with like). Once per page load: its kept answers that the page still matches, then the screen again. Each time
+  // the screen is entered: the boxes typed on it but not saved.
+  function drAfter(){
+    var b = base(S.step); if (STEPS.indexOf(b) < 0) { DR.last = ''; DR.at = {}; return; }
+    if (DR.last !== b) { DR.last = b; if (!DR.base[b] || !drGet(b)) DR.base[b] = drSnap(); }
+    if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; render(); return true; } }
+    if (DR.at.step === S.step) return; DR.at = { step: S.step };
+    var d = drGet(b), bx = d && d.boxes && d.boxes[S.step]; if (!bx) return;
+    Object.keys(bx).forEach(function(sel){ var inp; try { inp = screen.querySelector(sel); } catch (e) { inp = null; } if (!inp || inp.value === bx[sel]) return; inp.value = bx[sel]; try { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} });
+    S.dirty = b;
+  }
+  function drApply(b){
+    var d = drGet(b); if (!d || !d.s) return false;
+    var any = false;
+    Object.keys(d.s).forEach(function(path){
+      var q = path.split('.'), k = q[0], j = q.length > 1 ? q.slice(1).join('.') : null, w = d.s[path];
+      if (DRAFT_KEYS.indexOf(k) < 0) return;
+      var cur = j === null ? js(S[k]) : isObj(S[k]) ? js(S[k][j]) : S[k] == null ? '~' : null;
+      if (cur !== w.was || cur === w.now) return;
+      var val = w.now === '~' ? undefined : JSON.parse(w.now);
+      if (j === null) S[k] = val; else { if (!isObj(S[k])) S[k] = {}; if (val === undefined) delete S[k][j]; else S[k][j] = val; }
+      any = true;
+    });
+    return any;
+  }
+  function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; if (DR.last === step) DR.last = ''; }
   // ---------- Screens ----------
   function render(){
     // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
@@ -1122,6 +1202,7 @@
     if (S.error && x.indexOf('su-error') < 0) x = msgs() + x;
     screen.innerHTML = x;
     wire();
+    if (drAfter()) return;
     var e2 = screen.querySelector('.su-error');
     if (e2) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }
     // A rejected answer (pub test 6: the website): the box is outlined in red and the cursor goes into it.
@@ -2009,6 +2090,10 @@
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge]') : null; if (t) mark(); }, true);
+  // Kept as the owner taps and types, and once more on the way out.
+  var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
+  screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
+  window.addEventListener('pagehide', drSave);
   render();
-  window.addEventListener('beforeunload', function(e){ if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', function(e){ drSave(); if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();
