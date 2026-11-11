@@ -6759,7 +6759,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   try { specialsByVenue = allVenueSpecials(); } catch (e) { specialsByVenue = new Map(); }
   const specialsFact = (v) => {
     if (!specialsByVenue.has(v.id)) return undefined;
-    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at, new Date(), x)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
     return list.length ? list : undefined;
   };
   const golfWindows = getGolfRateWindows();
@@ -8738,6 +8738,13 @@ const MONTH_NAMES = { en: ['January', 'February', 'March', 'April', 'May', 'June
   fr: ['janvier', 'f\u00e9vrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'ao\u00fbt', 'septembre', 'octobre', 'novembre', 'd\u00e9cembre'] };
 function openMonthsText(value, lang = 'en') {
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(value || ''));
+  // Exact days (café test 2, 2026-11-11): "April 25 – October 12" (fr: "25 avril au 12 octobre").
+  const ex = !m && hoursModule ? hoursModule.parseOpenSeason(value) : null;
+  if (ex && ex.exact) {
+    const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
+    const day = (md) => (lang === 'fr' ? `${Number(md.slice(3)) === 1 ? '1er' : Number(md.slice(3))} ${names[Number(md.slice(0, 2)) - 1]}` : `${names[Number(md.slice(0, 2)) - 1]} ${Number(md.slice(3))}`);
+    return lang === 'fr' ? `${day(ex.from)} au ${day(ex.to)}` : `${day(ex.from)} \u2013 ${day(ex.to)}`;
+  }
   if (!m) return '';
   const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
   return lang === 'fr' ? `${names[Number(m[1]) - 1]} \u00e0 ${names[Number(m[2]) - 1]}` : `${names[Number(m[1]) - 1]} \u2013 ${names[Number(m[2]) - 1]}`;
@@ -8746,23 +8753,37 @@ function openMonthsText(value, lang = 'en') {
 // out of season -> closed until the first day of the opening month; the last 30 days of the season -> open until the
 // last day; otherwise null (open as usual). Months can wrap the new year ("11-4", a winter business).
 function recurringSeasonRow(venueId, openMonths, today) {
-  const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(openMonths || ''));
-  if (!m || !parseLocalDate(today)) return null;
-  const from = Number(m[1]), to = Number(m[2]);
-  const y = Number(today.slice(0, 4)), mon = Number(today.slice(5, 7));
-  const iso = (yy, mm, dd) => { const d = new Date(Date.UTC(yy, mm - 1, dd)); return d.toISOString().slice(0, 10); };
-  const inSeason = from <= to ? mon >= from && mon <= to : mon >= from || mon <= to;
+  // Café test 2 (2026-11-11): exact days too ("04-25:10-12", hours.js parseOpenSeason). A month-only value ("4-10") is
+  // read as the 1st of its first month to the last day of its last month, which gives exactly the rows it always gave
+  // (tests/cafe-test2-fixes.test.js compares every day of a year against the month-only rule).
+  const os = hoursModule ? hoursModule.parseOpenSeason(openMonths) : null;
+  if (!os || !parseLocalDate(today)) return null;
+  const y = Number(today.slice(0, 4)), md = today.slice(5);
+  const leap = (yy) => (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0;
+  const on = (yy, d) => (d === '02-29' && !leap(yy) ? `${yy}-02-28` : `${yy}-${d}`);
+  const inSeason = hoursModule.mdInRange(md, os.from, os.to);
   if (inSeason) {
-    const endYear = from <= to || mon <= to ? y : y + 1;
-    const until = iso(endYear, to + 1, 0); // last day of the closing month
+    const endYear = os.from <= os.to || md <= os.to ? y : y + 1;
+    const until = on(endYear, os.to); // the last open day
     return addLocalDays(today, 30) >= until ? { venue_id: venueId, status: 'open_until', until_date: until, reopens_date: null, source_url: null, checked_at: today } : null;
   }
-  const openYear = mon < from ? y : y + 1;
-  const reopens = iso(openYear, from, 1);
-  const closedFrom = mon > to ? iso(y, to + 1, 1) : iso(y - 1, to + 1, 1);
+  const reopens = on(md < os.from ? y : y + 1, os.from);
+  const closedFrom = addLocalDays(on(md > os.to ? y : y - 1, os.to), 1);
   return { venue_id: venueId, status: 'closed', until_date: null, reopens_date: reopens, source_url: null, checked_at: closedFrom };
 }
-
+// Café test 2 (2026-11-11): a reopening date that falls inside a special closure running straight on from the closed
+// season (closed Nov - Mar, then Apr 1 - 24 as well) is the day after that closure, and the next one after it, and so
+// on: "Reopens April 25", not "April 1". `closures`: dated rows (a yearly rule already expanded).
+function chainReopening(reopens, closures) {
+  if (!reopens || !parseLocalDate(reopens)) return reopens;
+  let date = reopens;
+  for (let hop = 0; hop < 30; hop++) {
+    const c = (closures || []).find((x) => x && parseLocalDate(x.from) && x.from <= date && (x.to || x.from) >= date);
+    if (!c) break;
+    date = addLocalDays(c.to || c.from, 1);
+  }
+  return date;
+}
 // today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
 function getSeasonRows(today = todayLocal()) {
   const map = new Map();
@@ -8778,6 +8799,16 @@ function getSeasonRows(today = todayLocal()) {
     const row = recurringSeasonRow(r.venue_id, r.open_months, today);
     if (row) map.set(r.venue_id, row);
   }
+  // Café test 2: a closed season's reopening date steps over a special closure that runs straight on from it.
+  let extras = null;
+  try { extras = hoursExtrasMap(); } catch (e) { extras = null; }
+  if (extras) {
+    for (const [id, row] of map) {
+      if (!row.reopens_date || !extras.has(id)) continue;
+      const next = chainReopening(row.reopens_date, extras.get(id).closures);
+      if (next !== row.reopens_date) map.set(id, { ...row, reopens_date: next });
+    }
+  }
   return map;
 }
 
@@ -8786,7 +8817,7 @@ function getSeasonStates(now = new Date()) {
   const today = todayLocal(now);
   const map = new Map();
   const ending = [];
-  for (const [id, s] of getSeasonRows()) {
+  for (const [id, s] of getSeasonRows(today)) {
     const st = seasonStateOn(s, today);
     if (st) map.set(id, st);
     if (st && st.kind === 'open_until') ending.push([id, s]);
@@ -9258,9 +9289,34 @@ function parseHappyHourDealsJson(json) {
     return ok.length ? ok : null;
   } catch (e) { return null; }
 }
-// Is a deals check too old to show? (more than HH_DEALS_STALE_DAYS days before today, or no real date)
-function happyHourDealsStale(checkedAt, now = new Date()) {
+// Seasonal items don't go stale between seasons (café test 2, 2026-11-11). A summer-only special (Jul - Aug) the owner
+// confirmed in November vanished on Jul 15 next year: 246 days had passed, over the 120-day window, although the
+// special had not run once since the check. For an item with its own season ('MM-DD' from/to), the days out of season
+// since the check don't count, up to one whole off-season: so the owner never has to re-confirm in winter something
+// that runs every summer, but a check is still only good for about one season (a Jul - Aug special confirmed in
+// November 2026 shows all summer 2027 and is hidden again in summer 2028 until re-confirmed). Items without a season
+// keep the plain rule (more than `windowDays` days since the check).
+// -> true when the check is too old to show.
+function seasonalCheckStale(checkedAt, now, windowDays, from, to) {
   if (!parseLocalDate(checkedAt)) return true;
+  const today = todayLocal(now);
+  const age = localDaysBetween(checkedAt, today);
+  if (age <= windowDays) return false;
+  if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '') || from === to || !hoursModule) return true;
+  // Days out of season after the check, through today, and the length of one off-season.
+  let off = 0, offYear = 0;
+  for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) if (!hoursModule.mdInRange(new Date(t).toISOString().slice(5, 10), from, to)) offYear++;
+  for (let d = addLocalDays(checkedAt, 1), n = 0; d <= today && n < 1200; d = addLocalDays(d, 1), n++) if (!hoursModule.mdInRange(d.slice(5), from, to)) off++;
+  return age - Math.min(off, offYear) > windowDays;
+}
+function seasonOfHappyHour(times) {
+  try { const o = typeof times === 'string' ? JSON.parse(times) : times; return o && o._season ? o._season : null; } catch (e) { return null; }
+}
+// Is a deals check too old to show? (more than HH_DEALS_STALE_DAYS days before today, or no real date). `season`: the
+// happy hour's own season ({ from, to } 'MM-DD', from its stored week's _season), see seasonalCheckStale.
+function happyHourDealsStale(checkedAt, now = new Date(), season = null) {
+  if (!parseLocalDate(checkedAt)) return true;
+  if (season) return seasonalCheckStale(checkedAt, now, HH_DEALS_STALE_DAYS, season.from, season.to);
   return localDaysBetween(checkedAt, todayLocal(now)) > HH_DEALS_STALE_DAYS;
 }
 // The deals a page may show for a venue row (needs happy_hour, happy_hour_deals, happy_hour_deals_fr,
@@ -9268,7 +9324,7 @@ function happyHourDealsStale(checkedAt, now = new Date()) {
 // place has no happy_hour badge, or the check is stale.
 function happyHourDealsShown(row, now = new Date()) {
   if (!row || !Number(row.happy_hour) || !row.happy_hour_deals) return null;
-  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now)) return null;
+  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now, row.happy_hour_times !== undefined ? seasonOfHappyHour(row.happy_hour_times) : null)) return null;
   const en = parseHappyHourDealsJson(row.happy_hour_deals);
   if (!en) return null;
   return { en, fr: parseHappyHourDealsJson(row.happy_hour_deals_fr), checked: row.happy_hour_deals_checked_at };
@@ -9388,8 +9444,8 @@ function withTripListHappyHour(plan, now = new Date()) {
 // /admin/review (2026-10-26): places whose deals are on file but no longer shown (checked more than
 // HH_DEALS_STALE_DAYS days ago), oldest first, so they get re-checked.
 function staleHappyHourDeals(now = new Date()) {
-  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
-  return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now));
+  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at, happy_hour_times FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
+  return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now, seasonOfHappyHour(r.happy_hour_times))).map(({ happy_hour_times, ...r }) => r);
 }
 
 // ---- Weekly specials (2026-10-27) ----
@@ -9921,8 +9977,10 @@ function visitInfoHtml(info, fr = false) {
 function venueServesAlcohol(v) {
   return !!v && (portalFields(v.type).happyHour || Number(v.happy_hour) === 1 || (v.type === 'cafe' && v.id != null && cafeServesBeerWine(v.id)));
 }
-function specialsStale(checkedAt, now = new Date()) {
+// `item` (café test 2): the special itself; one with a season (season_from/season_to) uses seasonalCheckStale.
+function specialsStale(checkedAt, now = new Date(), item = null) {
   if (!parseLocalDate(checkedAt)) return true;
+  if (item && item.season_from && item.season_to) return seasonalCheckStale(checkedAt, now, SPECIALS_STALE_DAYS, item.season_from, item.season_to);
   return localDaysBetween(checkedAt, todayLocal(now)) > SPECIALS_STALE_DAYS;
 }
 // Inside its season on a date ('YYYY-MM-DD')? A season may wrap the new year (11-15 to 03-31).
@@ -9935,7 +9993,7 @@ function specialInSeason(s, date) {
 // `date` (today by default).
 function specialsShown(venue, list, now = new Date(), date = todayLocal(now)) {
   const alcohol = venueServesAlcohol(venue);
-  return (list || []).filter((s) => !specialsStale(s.checked_at, now) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
+  return (list || []).filter((s) => !specialsStale(s.checked_at, now, s) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
 }
 // Where a special's time stands at `minutes` on its day: 'allday' (no time given), 'later', 'now' or 'over'.
 function specialTimeState(s, minutes) {
@@ -10183,7 +10241,7 @@ function withTripSpecials(plan, now = new Date()) {
 function staleVenueSpecials(now = new Date()) {
   const out = [];
   for (const [venueId, list] of allVenueSpecials()) {
-    const stale = list.filter((s) => specialsStale(s.checked_at, now));
+    const stale = list.filter((s) => specialsStale(s.checked_at, now, s));
     if (!stale.length) continue;
     const v = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId);
     if (!v || v.redirect_to) continue;
@@ -10367,15 +10425,17 @@ function guardedWeeklyNightsUpdate(id, expectedCurrent, input, meta, now = new D
     throw err;
   }
 }
-function nightsStale(checkedAt, now = new Date()) {
+// `item` (café test 2): the night itself; one with a season uses seasonalCheckStale.
+function nightsStale(checkedAt, now = new Date(), item = null) {
   if (!parseLocalDate(checkedAt)) return true;
+  if (item && item.season_from && item.season_to) return seasonalCheckStale(checkedAt, now, NIGHTS_STALE_DAYS, item.season_from, item.season_to);
   return localDaysBetween(checkedAt, todayLocal(now)) > NIGHTS_STALE_DAYS;
 }
 // The nights a visitor may see: not stale, and in season today (pub test 7: a summer-only night is hidden in winter,
 // like an out-of-season special).
 function nightsShown(list, now = new Date()) {
   const today = todayLocal(now);
-  return (list || []).filter((s) => !nightsStale(s.checked_at, now) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
+  return (list || []).filter((s) => !nightsStale(s.checked_at, now, s) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
 }
 // Is a night on this date ('YYYY-MM-DD')? Its day of the week, then its frequency: weekly and every other week always
 // (we don't know which week, so "every other week" may be tonight and says so), monthly-1st the first such day of the
@@ -10621,7 +10681,7 @@ function withTripListNights(plan, now = new Date()) {
 function staleVenueWeeklyNights(now = new Date()) {
   const out = [];
   for (const [venueId, list] of allVenueWeeklyNights()) {
-    const stale = list.filter((s) => nightsStale(s.checked_at, now));
+    const stale = list.filter((s) => nightsStale(s.checked_at, now, s));
     if (!stale.length) continue;
     const v = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId);
     if (!v || v.redirect_to) continue;
@@ -12378,11 +12438,11 @@ function guideIntroContext(badge, venues, now = new Date()) {
       if (d) ctx.deals.set(r.id, d.en);
     }
   } catch (e) { /* older schema: no happy hour facts */ }
-  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
+  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now, x)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
   try {
     for (const [id, list] of allVenueWeeklyNights()) {
       if (!idSet.has(id) || !NIGHT_TYPES.has(types.get(id))) continue;
-      const kinds = list.filter((x) => !nightsStale(x.checked_at, now)).map((x) => x.kind);
+      const kinds = list.filter((x) => !nightsStale(x.checked_at, now, x)).map((x) => x.kind);
       if (kinds.length) ctx.nights.set(id, kinds);
     }
   } catch (e) { /* no weekly nights */ }
@@ -15386,6 +15446,10 @@ const SEO_PAGE_CSS = `
   .venue-hours-season { margin: 4px 0 6px; font-weight: 800; }
   .venue-hours-usual summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; opacity: 0.8; }
   .venue-hours-usual .hours-list { opacity: 0.75; }
+  .venue-hours-year { margin: 10px 0 8px; }
+  .venue-hours-year-h { margin: 0 0 4px; font-size: 0.95rem; }
+  .venue-hours-year-list li { gap: 12px; }
+  .venue-hours-year-list li span:first-child { font-weight: 700; }
   .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-muted, #6B5D54); }
   .venue-hours-stale { margin: 4px 0 0; font-size: 0.84rem; font-weight: 700; color: #8A4B1F; }
 
@@ -34386,6 +34450,51 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
   }
   return out.join('');
 }
+// Hours through the year (café test 2, 2026-11-11): a seasonal place's hours for each part of its year in one short
+// list, always shown, closed for the season included (in November a visitor planning July saw only "Usual hours when
+// open 12–8", never the summer 11–10):
+//   Apr 25 – Jun 20 and Sep 2 – Oct 12: Daily 12 PM – 8 PM
+//   Jun 21 – Sep 1: Daily 11 AM – 10 PM
+// From the owner's open season (open_months, exact days or whole months) and seasonal sets (venue_hours_extra.seasons).
+// '' when the place has no seasonal set and isn't closed for the season (nothing to add to the usual list).
+function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
+  if (!hoursModule || !parsed || !parsed.known) return '';
+  const x = hoursExtrasMap().get(venueId);
+  const seasons = ((x && x.seasons) || []).filter((z) => z && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to) && z.hours)
+    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days }));
+  if (!seasons.length && !shut) return '';
+  const os = openMonths ? hoursModule.parseOpenSeason(openMonths) : null;
+  // Every day of a leap year as 'MM-DD', from the first open day (or the day after the first set ends) round the year.
+  const all = [];
+  for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) all.push(new Date(t).toISOString().slice(5, 10));
+  const startMd = os ? os.from : seasons.length ? all[(all.indexOf(seasons[0].to) + 1) % all.length] : '01-01';
+  const start = Math.max(0, all.indexOf(startMd));
+  const runs = [];
+  for (let i = 0; i < all.length; i++) {
+    const md = all[(start + i) % all.length];
+    if (os && !hoursModule.mdInRange(md, os.from, os.to)) break;
+    const k = seasons.findIndex((z) => hoursModule.mdInRange(md, z.from, z.to));
+    const last = runs[runs.length - 1];
+    if (last && last.k === k) last.to = md; else runs.push({ k, from: md, to: md });
+  }
+  if (!runs.length) return '';
+  const SHORT = { en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, fr: { mon: 'lun.', tue: 'mar.', wed: 'mer.', thu: 'jeu.', fri: 'ven.', sat: 'sam.', sun: 'dim.' } }[fr ? 'fr' : 'en'];
+  const weekText = (days) => {
+    const W = hoursModule.HOURS_WEEKDAYS, texts = W.map((d) => venueDayHoursText(days[d], fr));
+    if (texts.every((t) => t === texts[0])) return `${fr ? 'Tous les jours' : 'Daily'} ${texts[0]}`;
+    const parts = [];
+    for (let i = 0; i < 7;) { let j = i; while (j + 1 < 7 && texts[j + 1] === texts[i]) j++; parts.push(`${SHORT[W[i]]}${j > i ? `${j - i > 1 ? '\u2013' : ', '}${SHORT[W[j]]}` : ''} ${texts[i]}`); i = j + 1; }
+    return parts.join(' \u00b7 ');
+  };
+  const order = [];
+  for (const r of runs) if (!order.includes(r.k)) order.push(r.k);
+  const and = fr ? ' et ' : ' and ';
+  const lines = order.map((k) => {
+    const when = runs.filter((r) => r.k === k).map((r) => (r.from === r.to ? hoursExtraDayText(r.from, fr) : hoursExtraRangeText(r.from, r.to, fr))).join(and);
+    return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days))}</span></li>`;
+  });
+  return `<div class="venue-hours-year"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list">${lines.join('')}</ul></div>`;
+}
 function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   if (!hoursModule || !pageHours || hasAdvisory) return null;
   const clock = okanaganClock(now);
@@ -34518,7 +34627,9 @@ function happyHourOffOn(v, date, now = new Date(), openMonthsById = null) {
   if (!inMonthDaySeason(happyHourSeasonOf(v.happy_hour_times), date)) return true;
   const g = happyHourGateOpts(v, now, openMonthsById);
   const om = /^(\d{1,2})-(\d{1,2})$/.exec(String(g.openMonths || ''));
-  return hoursModule.gateClosedOn({ place: g.placeHours ? hoursModule.parseHours(g.placeHours) : null, openMonths: om && om[1] !== om[2] ? [Number(om[1]), Number(om[2])] : null }, date);
+  // Exact days (café test 2): "04-25:10-12".
+  const os = !om ? hoursModule.parseOpenSeason(g.openMonths) : null;
+  return hoursModule.gateClosedOn({ place: g.placeHours ? hoursModule.parseHours(g.placeHours) : null, openMonths: om && om[1] !== om[2] ? [Number(om[1]), Number(om[2])] : null, openSeason: os && os.exact ? { from: os.from, to: os.to } : null }, date);
 }
 // Every owner's yearly open months at once (venue id -> '5-10').
 function openMonthsMap() {
@@ -35424,6 +35535,13 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
         return `<h2>${L('Hours', 'Heures')}</h2>${tempClosureLine}${list}`;
       })();
     if (datedWeek) hoursHtml += venueHoursExtrasHtml(parsedHours, clockNow, fr, (d) => escapeHtml(venueDayHoursText(d, fr)), dayNames, tempClosure);
+    // Café test 2 (2026-11-11): every part of a seasonal place's year with its hours, in and out of season.
+    if (pageHours === venue.hours && !venue.redirect_to) {
+      let om = null;
+      try { om = venueLinks(venue.id).open_months; } catch (e) { om = null; }
+      const yearHtml = venueSeasonHoursHtml(venue.id, hoursModule.parseHours(venue.hours), om, fr, seasonShut);
+      if (yearHtml) hoursHtml = seasonShut ? hoursHtml.replace('<details class="venue-hours-usual">', `${yearHtml}<details class="venue-hours-usual">`) : hoursHtml + yearHtml;
+    }
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -35433,7 +35551,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   if (openMonths) {
     // Round 13 (2026-10-21): French elides before avril, août and octobre (« Ouvert d’avril à octobre »).
     const monthsText = openMonthsText(openMonths, fr ? 'fr' : 'en');
-    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (/^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? '' : ' each year'}</p>`;
+    const exactSeason = !/^\d{1,2}-\d{1,2}$/.test(String(openMonths));
+    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (exactSeason ? 'Ouvert du ' : /^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? (exactSeason ? ' chaque année' : '') : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
@@ -45148,7 +45267,16 @@ function hoursExtrasMap() {
         try { closures = JSON.parse(r.closures || '[]') || []; } catch (e) { closures = []; }
         if (!Array.isArray(seasons)) seasons = [];
         if (!Array.isArray(closures)) closures = [];
-        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures });
+        // Yearly closures (café test 2, 2026-11-11): a row stored as { from: 'MM-DD', to: 'MM-DD', yearly: true } is
+        // one rule ("Every year: Apr 1 – Apr 24"); every reader of closures gets it as dated rows for last year through
+        // two years on (hours.js expandYearlyClosures), so Open Now, the notices and the reopening date work on it
+        // unchanged. `raw` is the list as stored, for the owner's own screens. Dated rows read exactly as before.
+        const raw = closures;
+        if (raw.some((c) => hoursModule && hoursModule.isYearlyClosure(c))) {
+          const y = Number(todayLocal().slice(0, 4));
+          closures = hoursModule.expandYearlyClosures(raw, y - 1, y + 2);
+        }
+        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures, raw });
       }
     } catch (e) { /* table missing in an old copy: no extras */ }
     hoursExtraCache = { at: Date.now(), map };
@@ -45159,7 +45287,11 @@ function clearHoursExtraCache() { hoursExtraCache = null; }
 // -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
 function venueHoursExtras(venueId) {
   const x = hoursExtrasMap().get(venueId);
-  return x ? { seasons: x.seasons, closures: x.closures } : { seasons: [], closures: [] };
+  return x ? { seasons: x.seasons, closures: x.closures, raw: x.raw || x.closures } : { seasons: [], closures: [], raw: [] };
+}
+// The closures an owner keeps (café test 2): as stored (a yearly rule stays one row), without dated ones already over.
+function ownerClosuresKept(venueId, today = todayLocal()) {
+  return venueHoursExtras(venueId).raw.filter((c) => c && ((hoursModule && hoursModule.isYearlyClosure(c)) || (c.to || c.from) >= today));
 }
 // Closures that haven't ended yet (yesterday's is kept for a night that ran past midnight).
 function upcomingClosures(list, now = new Date()) {
@@ -45694,7 +45826,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // Price range, seasonal hours and special closures (2026-10-18). Closures already over are left out.
     price_range: venue.price ? String(venue.price) : '',
     hours_seasons: venueHoursExtras(venue.id).seasons,
-    closures: venueHoursExtras(venue.id).closures.filter((c) => (c.to || c.from) >= todayLocal()),
+    closures: ownerClosuresKept(venue.id),
     // Happy hour deals (2026-10-26): { deals, deals_fr, source, checked_at } or null. The owner sends { deals,
     // deals_fr }; the source and date are kept here so an Undo can put the old ones back.
     happy_hour_deals: ownerHappyHourDealsSnapshot(venue.id),
@@ -46028,7 +46160,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('open_months' in input) {
     const raw = typeof input.open_months === 'string' ? input.open_months.trim() : '';
     const m = /^(1[0-2]|[1-9])-(1[0-2]|[1-9])$/.exec(raw);
-    if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
+    // Café test 2 (2026-11-11): or exact days every year, "04-25:10-12" (open Apr 25 to Oct 12; may wrap New Year).
+    const exact = !m && hoursModule ? hoursModule.parseOpenSeason(raw) : null;
+    if (raw && exact && exact.exact) { if (raw !== (current.open_months || '')) changes.open_months = raw; }
+    else if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
     else if (raw !== (current.open_months || '')) changes.open_months = raw || null;
   }
   if ('badges' in input) {
@@ -46232,6 +46367,16 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     else {
       const out = [];
       for (const x of list) {
+        // Every year (café test 2, 2026-11-11): one yearly rule, { from: 'MM-DD', to: 'MM-DD', note, yearly: true }
+        // ("Every year: Apr 1 – Apr 24"; may run over New Year), instead of a dated copy for this year and next.
+        if (x && x.yearly === true) {
+          const yf = ownerMonthDay(x.from), yt = x.to ? ownerMonthDay(x.to) : yf;
+          if (!yf || !yt) { errors.closures = 'Please pick a date for each closure.'; break; }
+          const ynote = typeof x.note === 'string' ? x.note.trim().replace(/\s+/g, ' ') : '';
+          if (ynote.length > HOURS_EXTRA_NOTE_MAX || /[<>&()]/.test(ynote)) { errors.closures = `Please keep each note short (up to ${HOURS_EXTRA_NOTE_MAX} characters), without < > & or brackets.`; break; }
+          out.push({ from: yf, to: yt, note: ynote, yearly: true });
+          continue;
+        }
         const from = x && typeof x.from === 'string' && parseLocalDate(x.from) ? x.from : null;
         const to = x && typeof x.to === 'string' && x.to ? (parseLocalDate(x.to) ? x.to : null) : from;
         if (!from || !to) { errors.closures = 'Please pick a date for each closure.'; break; }

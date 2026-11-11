@@ -161,6 +161,8 @@ function gateClosedOn(gate, date) {
   if (!gate) return false;
   var md = date.slice(5), mon = Number(date.slice(5, 7));
   if (gate.season && !mdInRange(md, gate.season.from, gate.season.to)) return true;
+  // Café test 2 (2026-11-11): an owner's open season with exact days ("open Apr 25 to Oct 12 every year").
+  if (gate.openSeason && !mdInRange(md, gate.openSeason.from, gate.openSeason.to)) return true;
   if (gate.openMonths) {
     var a = gate.openMonths[0], b = gate.openMonths[1];
     if (!(a <= b ? mon >= a && mon <= b : mon >= a || mon <= b)) return true;
@@ -170,6 +172,47 @@ function gateClosedOn(gate, date) {
     if (d && d.status === 'closed') return true;
   }
   return false;
+}
+// ---- Open season and yearly closures (café test 2, 2026-11-11) ----
+// An owner's open season (venue_links.open_months) is either the months it is open every year, "5-10" (May to October)
+// or "11-4" (a winter business), stored since 2026-10-17, or, since café test 2, exact days every year: "04-25:10-12"
+// (open Apr 25 to Oct 12; may wrap New Year). -> { from: 'MM-DD', to: 'MM-DD', months: [first, last], exact } | null.
+// Month-only values read exactly as before: from the 1st of the first month to the last day of the last month (Feb
+// ends '02-29', which every February date is inside).
+var OPEN_SEASON_LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function parseOpenSeason(value) {
+  var s = String(value == null ? '' : value).trim();
+  var m = /^(\d{1,2})-(\d{1,2})$/.exec(s);
+  var p2 = function(n) { return (n < 10 ? '0' : '') + n; };
+  if (m) {
+    var a = Number(m[1]), b = Number(m[2]);
+    if (!(a >= 1 && a <= 12 && b >= 1 && b <= 12)) return null;
+    return { from: p2(a) + '-01', to: p2(b) + '-' + OPEN_SEASON_LAST[b - 1], months: [a, b], exact: false };
+  }
+  m = /^(\d{2})-(\d{2}):(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  var ma = Number(m[1]), da = Number(m[2]), mb = Number(m[3]), db = Number(m[4]);
+  if (!(ma >= 1 && ma <= 12 && mb >= 1 && mb <= 12 && da >= 1 && da <= OPEN_SEASON_LAST[ma - 1] && db >= 1 && db <= OPEN_SEASON_LAST[mb - 1])) return null;
+  var from = m[1] + '-' + m[2], to = m[3] + '-' + m[4];
+  if (from === to) return null;
+  return { from: from, to: to, months: [ma, mb], exact: true };
+}
+// A yearly closure ("Every year: Apr 1 - Apr 24", stored { from: 'MM-DD', to: 'MM-DD', note, yearly: true }) as dated
+// rows, one per year from `firstYear` to `lastYear`, so every reader of dated closures (Open Now, the notices, the
+// reopening date, Build My Trip) works on them unchanged. A range that wraps New Year ends the next year; Feb 29 is
+// Feb 28 in other years. Dated rows pass through as they are. Each expanded row keeps `yearly: true`.
+function isYearlyClosure(c) { return !!c && /^\d{2}-\d{2}$/.test(c.from || '') && /^\d{2}-\d{2}$/.test(c.to || c.from || ''); }
+function expandYearlyClosures(list, firstYear, lastYear) {
+  var out = [];
+  var leap = function(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; };
+  var on = function(y, md) { return md === '02-29' && !leap(y) ? y + '-02-28' : y + '-' + md; };
+  (list || []).forEach(function(c) {
+    if (!c) return;
+    if (!isYearlyClosure(c)) { out.push(c); return; }
+    var to = c.to || c.from;
+    for (var y = firstYear; y <= lastYear; y++) out.push({ from: on(y, c.from), to: on(c.from <= to ? y : y + 1, to), note: c.note || '', yearly: true });
+  });
+  return out.sort(function(a, b) { return String(a.from).localeCompare(String(b.from)) || String(a.to).localeCompare(String(b.to)); });
 }
 // One calendar day: a closure wins, then a seasonal set, then the usual week. A happy-hour week built by happyHourState()
 // also carries the place's own closed days (`gate`): those are closed like a closure (stepped over, not counted).
@@ -422,6 +465,9 @@ function happyHourState(hh, clock, placeClosedNow, closures, opts) {
   }
   const om = /^(\d{1,2})-(\d{1,2})$/.exec(String(o.openMonths || ''));
   if (om && Number(om[1]) !== Number(om[2])) (gate = gate || {}).openMonths = [Number(om[1]), Number(om[2])];
+  // Exact days (café test 2): "04-25:10-12".
+  const os = !om ? parseOpenSeason(o.openMonths) : null;
+  if (os && os.exact) (gate = gate || {}).openSeason = { from: os.from, to: os.to };
   if (o.season && /^\d{2}-\d{2}$/.test(o.season.from || '') && /^\d{2}-\d{2}$/.test(o.season.to || '') && o.season.from !== o.season.to) (gate = gate || {}).season = { from: o.season.from, to: o.season.to };
   if ((cl.length || gate) && parsed && parsed.known && clock && /^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) {
     const days = {};
@@ -515,6 +561,9 @@ module.exports = {
   dayOnDate,
   mdInRange,
   gateClosedOn,
+  parseOpenSeason,
+  isYearlyClosure,
+  expandYearlyClosures,
   isTemporaryClosure,
   hoursForClock,
   nextOpeningByDate,
