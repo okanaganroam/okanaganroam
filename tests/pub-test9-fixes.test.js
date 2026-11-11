@@ -49,8 +49,8 @@ const editChange = (t, changes) => post(`/owner/${t}/changes`, { changes, note: 
 const ok = (r) => assert.ok([200, 201].includes(r.status), JSON.stringify(r.body));
 const cfgOf = (html) => JSON.parse(/window\.SETUP_CFG = (\{.*?\});<\/script>/.exec(html)[1]);
 const scriptOf = (html) => /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
-// Okanagan local time on a date (PST, UTC-8, in November and December).
-const at = (date, hhmm) => { const [h, m] = hhmm.split(':').map(Number); return new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), h + 8, m)); };
+// Okanagan local time on a date: the site's clock is UTC-7 from Nov 1, 2026 (okanaganClock, BC's permanent time).
+const at = (date, hhmm) => { const [h, m] = hhmm.split(':').map(Number); return new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), h + 7, m)); };
 // A tiny JPEG header the server reads as 900 x 1200 (like the other owner photo tests).
 const JPEG = `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x04, 0xB0, 0x03, 0x84, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]).toString('base64')}`;
 const photo = (t, o = {}) => post(`/owner/${t}/photos`, { image: JPEG, credit: 'Tap & Barrel', rights: true, contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000, notify: false, ...o });
@@ -117,15 +117,19 @@ test('3: a happy hour "until close" ends at that day\'s closing time (after midn
   const fri = hours.happyHourState(stored, { weekday: 'fri', minutes: 18 * 60, date: '2026-11-20' }, false, null, { placeHours: TAP_HOURS });
   assert.equal(fri.state, 'later'); assert.deepEqual(fri.to, { weekday: 'sat', minutes: 60 });
   // The valley-wide count sees it on at 9:30 PM Sunday and not at 10:15 PM (closed).
-  const counts = (when) => app.happyHourNowSummary(when);
-  assert.ok(counts(at('2026-11-15', '21:30')).on >= 1);
-  const before = counts(at('2026-11-15', '22:15')).on;
+  const onNow = (when) => { const x = app.happyHourNowSummary(when); return x.state === 'now' ? x.count : 0; };
+  assert.ok(onNow(at('2026-11-15', '21:30')) >= 1);
+  const before = onNow(at('2026-11-15', '22:15'));
   db.prepare('UPDATE venues SET hours = ? WHERE id = ?').run(JSON.stringify(TAP_HOURS), v.id);
-  assert.equal(counts(at('2026-11-15', '22:15')).on, before + 1, 'with the 11 PM close it is still on at 10:15 PM');
+  assert.equal(onNow(at('2026-11-15', '22:15')), before + 1, 'with the 11 PM close it is still on at 10:15 PM');
   // The client map gets the same function (HOURS_CLIENT_SRC carries happyHourUntilClose).
   assert.match(hours.HOURS_CLIENT_SRC, /function happyHourUntilClose/);
   // An edit-page save of the week without "_close" keeps it for the windows that still start at the same time.
-  ok(await editChange(t, { happy_hour: { mon: [], tue: [], wed: [], thu: [], fri: [['22:00', '01:00']], sat: [], sun: [['21:00', '23:00']] }, hours: TAP_HOURS }).catch(() => ({ status: 200 })));
+  // (So the same week sent again is "nothing changed", and "_close" is still there.)
+  const same = await editChange(t, { happy_hour: { mon: [], tue: [], wed: [], thu: [], fri: [['22:00', '01:00']], sat: [], sun: [['21:00', '23:00']] } });
+  assert.equal(same.status, 400); assert.match(same.body.errors.form, /Nothing has changed/);
+  ok(await editChange(t, { happy_hour: { mon: [['16:00', '18:00']], tue: [], wed: [], thu: [], fri: [['22:00', '01:00']], sat: [], sun: [['21:00', '23:00']] } }));
+  assert.deepEqual(JSON.parse(db.prepare('SELECT happy_hour_times AS h FROM venues WHERE id = ?').get(v.id).h)._close, { fri: ['22:00'], sun: ['21:00'] });
   // Old rows (no _close) read exactly as before.
   const old = { sun: [['21:00', '00:00']] };
   assert.equal(app.happyHourWeekText(JSON.stringify(old), false), 'Sun 9 PM–⁠midnight');
@@ -223,7 +227,7 @@ test('8/9: the thanks shows once; a line save sends only what changed; prefilled
 test('10: the edit page and the setup finish show the page\'s own 30-day numbers, from venue_event_counts, owner-only, honest when small', async () => {
   const v = mk('pub'); const t = tokenFor(v.id);
   const now = new Date();
-  const dayOf = (back) => new Date(now.getTime() - back * 86400000 - 8 * 3600000).toISOString().slice(0, 10);
+  const dayOf = (back) => require('../trip-demand.js').dayOf(new Date(now.getTime() - back * 86400000));
   const add = (back, name, k) => db.prepare('INSERT INTO venue_event_counts (day, venue_id, name, n) VALUES (?, ?, ?, ?) ON CONFLICT(day, venue_id, name) DO UPDATE SET n = n + excluded.n').run(dayOf(back), v.id, name, k);
   // Zero first: an honest line, no numbers made up.
   let st = ownerStats.ownerStats(db, v.id, now);
@@ -313,8 +317,8 @@ test('12: the edit link can reorder photos (stored, used by the page and gallery
 // ---------- 13: events: a picture, and "Add another event" ----------
 test('13: an event can carry a picture (reviewed with the event, published as its image when approved); Add another keeps name and email', async () => {
   const v = mk('pub'); const t = tokenFor(v.id);
-  const d = new Date(Date.now() + 5 * 86400000 - 8 * 3600000).toISOString().slice(0, 10);
-  const ev = { name: 'Grey Cup Party', categories: ['food-drink'], description: 'Watch the Grey Cup on every screen, with wings and pitchers all afternoon.', start_date: d, end_date: '', start_time: '15:00', end_time: '',
+  const d = new Date(Date.now() + 5 * 86400000 - 7 * 3600000).toISOString().slice(0, 10);
+  const ev = { name: 'Grey Cup Party', categories: ['sports-recreation'], description: 'Watch the Grey Cup on every screen, with wings and pitchers all afternoon.', start_date: d, end_date: '', start_time: '15:00', end_time: '',
     all_day: false, event_url: 'https://tapandbarrelkitchen.ca/events?utm_source=okanaganroam', price_text: 'Free', schedule_notes: '', contact_name: 'Jess', contact_email: 'jess@example.com', company_website: '', started_at: Date.now() - 60000, partner_venue_ids: [] };
   // No rights tick: refused with the field's own message.
   const noRights = await post(`/owner/${t}/events`, { ...ev, image: JPEG });
