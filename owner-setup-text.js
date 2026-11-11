@@ -9,7 +9,7 @@ const en = {
   welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet' },
   labels: {
-    basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Average spend', cuisine: 'What you serve',
+    basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Price per person', cuisine: 'What you serve',
     photos: 'Photos', menu: 'Menu', offer: 'What you offer', happy: 'Happy hour', specials: 'Weekly specials', music: 'Weekly events', story: 'Your story',
     book: 'Booking', takeout: 'Takeout', known: 'Known for', groups: 'Groups', instagram: 'Instagram', facebook: 'Facebook', door: 'Your front door',
   },
@@ -96,7 +96,7 @@ const fr = {
   welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait' },
   labels: {
-    basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Dépense moyenne', cuisine: 'Ce que vous servez',
+    basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
     photos: 'Photos', menu: 'Menu', offer: 'Ce que vous offrez', happy: 'Happy hour', specials: 'Spéciaux de la semaine', music: 'Événements de la semaine', story: 'Votre histoire',
     book: 'Réservations', takeout: 'À emporter', known: 'Reconnu pour', groups: 'Groupes', instagram: 'Instagram', facebook: 'Facebook', door: 'Votre porte d’entrée',
   },
@@ -578,6 +578,25 @@ Object.assign(fr, {
   useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
   curMainPending: 'Votre nouvelle photo principale (sur votre page d’ici un jour)', keepMainPending: 'Garder celle-ci',
   hoursDoneDayAria: 'Terminé pour {day}',
+});
+
+// Pub test 8 (2026-11-10): "Free. No cost, ever.", a safer "Mark closed" with Undo, full day names, "Open after midnight?",
+// service dogs, a clearer photo tick box and optional times for a special.
+Object.assign(en, {
+  freeLine: 'Free. No cost, ever.',
+  closeDayBtn: 'Mark closed', openDayBtn: 'Open this day', dayClosedNow: '{day} closed', undo: 'Undo',
+  lateLbl: 'Open after midnight?', lateQ: '{day}: open after midnight?',
+  serviceDogsSub: 'Your page will say “No dogs (service dogs welcome)”',
+  rightsStep: 'Tick this, then send',
+  specialTimeQ: 'What time? (optional)', specialTimeEx: 'Like 10 AM to 1 PM for Sunday brunch. Leave it empty if it’s on all day.', specialTimeSame: 'The start and end times are the same. Please check them, or clear them.',
+});
+Object.assign(fr, {
+  freeLine: 'Gratuit. Aucuns frais, jamais.',
+  closeDayBtn: 'Indiquer fermé', openDayBtn: 'Ouvrir ce jour', dayClosedNow: '{day} : fermé', undo: 'Annuler',
+  lateLbl: 'Ouvert après minuit?', lateQ: '{day} : ouvert après minuit?',
+  serviceDogsSub: 'Votre page indiquera « Pas de chiens (chiens d’assistance bienvenus) »',
+  rightsStep: 'Cochez ceci, puis envoyez',
+  specialTimeQ: 'À quelle heure? (facultatif)', specialTimeEx: 'Par exemple, de 10 h à 13 h pour le brunch du dimanche. Laissez vide si c’est offert toute la journée.', specialTimeSame: 'L’heure de début et l’heure de fin sont les mêmes. Vérifiez-les ou effacez-les.',
 });
 
 // The one time promise (pub test 6, 2026-11-10: the essentials took a careful owner about 30 minutes, not 10 to 15).

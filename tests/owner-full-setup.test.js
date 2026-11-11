@@ -54,7 +54,7 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   assert.equal(cfg.t.savedEmail, 'Great. Once you’ve emailed it, we’ll add it within a day.');
   assert.equal(cfg.offerGroups.length, 3);
   // Happy hour and Takeout aren't tiles any more (asked twice): their own questions in Part 2 set them.
-  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 18); // + Fireplace (pub test 6), + Beach access (pub test 7)
+  assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 20); // + Fireplace (pub test 6), + Beach access (pub test 7), + Free parking and Room for RVs (pub test 8)
   assert.ok(!cfg.offerGroups.some((g) => g.keys.includes('happy_hour') || g.keys.includes('takeout')));
   assert.equal(cfg.offerLabels.wheelchair_accessible, 'Wheelchair accessible');
   assert.equal(cfg.cuisines.length, 45);

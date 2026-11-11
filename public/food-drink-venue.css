@@ -183,3 +183,7 @@ body.fd-venue-page .fd-tasting-list a {color:#286962;font-weight:800}
 body.fd-venue-page .venue-cta-row:has(> :nth-child(4)) {display:grid!important;grid-template-columns:1fr 1fr;gap:8px}
 body.fd-venue-page .venue-cta-row:has(> :nth-child(4)) .cta {width:auto}
 }
+/* Pub test 8 (2026-11-10): at 300px with large text the summary ran 15px past the screen (a grid track of 1fr grows to its content). The columns may shrink and long lines wrap. */
+body.fd-venue-page .fd-layout>*,body.fd-venue-page .fd-summary,body.fd-venue-page .fd-summary>*{min-width:0;max-width:100%}
+@media (max-width:899px){body.fd-venue-page .fd-layout{grid-template-columns:minmax(0,1fr)}}
+body.fd-venue-page .fd-summary h1,body.fd-venue-page .fd-summary p,body.fd-venue-page .fd-summary a,body.fd-venue-page .fd-highlights span{overflow-wrap:anywhere}
