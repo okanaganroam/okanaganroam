@@ -288,10 +288,13 @@
   })();
   // Specials and weekly events: each row remembers the stored line it came from. A row the owner doesn't touch is sent
   // back exactly as stored (times, French, season and all); a changed one keeps what it can.
+  // A long line cut between words when it was saved (café test 3): the title is 25+ characters without an end mark, and
+  // the deal goes on in lower case. It reads back as the one line that was typed.
+  function longCut(t, d){ t = String(t || ''); return t.length >= 25 && !/[.,;:!?)]$/.test(t) && /^[a-z0-9(]/.test(String(d || '')); }
   function daysKey(days){ return DAYS.filter(function(d){ return days[d]; }).join(','); }
   // Seasons (pub test 7, 2026-11-10): each special and event, and the happy hour, can run all year or only some months
   // (or exact days, "May 20 to Sep 6"). Stored as 'MM-DD' from/to like the specials' season_from/season_to.
-  (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? ', ' + x.deal : '');
+  (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? (longCut(x.title, x.deal) ? ' ' : ', ') + x.deal : '');
     // Pub test 8 (2026-11-10): a special's optional times ("Sunday brunch 10 AM to 1 PM"), the start/end it always had.
     var e = { days: days, text: text, price: x.price || '', start: x.start || '', end: x.end && x.end !== 'close' ? x.end : '', endClose: x.end === 'close', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + e.start + '|' + e.end; S.specials.push(e); });
   (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea); S.nights.push(e); });
@@ -1333,9 +1336,12 @@
       if (e.start && e.end && e.start === e.end) { S.nudge = T.specialTimeSame; return render(); }
       if (text.length > 80) { S.nudge = fill(T.textLong, { n: i + 1, max: 80 }); return render(); }
       var o0 = e.orig || {}, sameText = e.orig && e.was.split('|')[1] === e.text;
-      // "Wing night, 60¢ a wing" → title "Wing night", deal "60¢ a wing" (pub fresh-eyes, 2026-11-10: the deal used to
-      // repeat the title). With no comma the deal is the whole line (it's required; the page never shows a repeat).
-      var cut = text.indexOf(','), t1 = (cut > 0 ? text.slice(0, cut) : text).trim().slice(0, 40), rest = cut > 0 ? text.slice(cut + 1).trim() : '';
+      // Café test 3 (2026-11-11): one typed line stays one line. A comma no longer splits it ("Buy 9, get the 10th free"
+      // became "Buy 9" over "get the 10th free"). A line that fits a title (40) is the title, and the deal repeats it
+      // (the deal is required; the page never shows a repeat). A longer line is cut between words: the title is the words
+      // that fit, the deal the rest, so the page reads it in order.
+      var t1 = text, rest = '';
+      if (text.length > 40) { var cut = text.lastIndexOf(' ', 40); if (cut < 10) cut = 40; t1 = text.slice(0, cut).trim(); rest = text.slice(cut).trim(); }
       out.push({ days: ds, title: sameText ? o0.title : t1, deal: sameText ? o0.deal : (rest || text), price: moneyStr(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
         start: e.start || null, end: e.end || (e.endClose ? 'close' : null), title_fr: sameText ? o0.title_fr || null : null, deal_fr: sameText ? o0.deal_fr || null : null, season_from: ss.from, season_to: ss.to });
     }
