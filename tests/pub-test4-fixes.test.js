@@ -212,7 +212,7 @@ test('5b: the Facebook screen no longer mentions Instagram; the Instagram screen
     assert.doesNotMatch(TEXT[lang].fbWhy, /Instagram/);
     assert.doesNotMatch(TEXT[lang].savedFbName, /Instagram/);
   }
-  assert.equal(TEXT.en.fbWhy, 'We find your Facebook link for you, so it shows within a day.');
+  assert.equal(TEXT.en.fbWhy, 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.'); // café test 4: a link is live right away
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`), cfg = cfgOf(html);
   assert.doesNotMatch(cfg.t.fbWhy + cfg.t.fbLead + cfg.t.fbQ, /Instagram/);
   assert.match(cfg.t.igLead, /Instagram/);

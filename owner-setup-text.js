@@ -863,9 +863,12 @@ Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMo
 // Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
 Object.assign(en, {
   holCovered: 'Covered by your closed dates',
+  // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
+  fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
 });
 Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture',
+  fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
 });
 
 module.exports = { en, fr };

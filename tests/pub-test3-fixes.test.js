@@ -182,7 +182,7 @@ test('6–7: the sports tip, the events question once, "Save kitchen time", one 
   assert.equal(TEXT.fr.pub.saveKitchen, 'Enregistrer l’heure de la cuisine');
   assert.match(s, /if \(explain\) line = T\.sentMeans;/);
   assert.doesNotMatch(s, /'<p class="su-hint" id="suSentMeans">'/, 'no second line under the lead');
-  assert.equal(cfg.t.fbWhy, 'We find your Facebook link for you, so it shows within a day.'); // pub test 4: no Instagram line
+  assert.equal(cfg.t.fbWhy, 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.'); // pub test 4: no Instagram line // café test 4: a link is live right away
   assert.ok(TEXT.fr.fbWhy);
   assert.match(s, /\(ig \? '' : '<p class="su-hint" id="suFbWhy">' \+ h\(T\.fbWhy\) \+ '<\/p>'\)/);
 });
