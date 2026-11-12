@@ -9953,12 +9953,27 @@ function isPresetAnswer(text) {
   const parts = presetAnswerParts(text).filter((x, i) => i % 2 === 0).map((x) => presetAnswerNorm(x.replace(/\.$/, ''))).filter(Boolean);
   return parts.length > 0 && parts.every((x) => map.has(x));
 }
+// Bug-check (2026-11-12): the answer in `lang` only when it is wholly made of presets and some part is in the other
+// language; otherwise exactly as stored (an English line keeps its own capitals and words: "Takeout available; call to
+// order." is never rewritten to "...; Call to order.").
+function presetInLang(text, lang) {
+  if (typeof text !== 'string' || !text || !isPresetAnswer(text)) return text;
+  const out = presetAnswer(text, lang);
+  return presetAnswerNorm(out) === presetAnswerNorm(text) ? text : out;
+}
+// A French page's text for an owner's line: the French list's translation first (as before), else, for a line made
+// only of presets, the presets in French; else null (left off, as before).
+function presetOrFr(text, frFn) {
+  const t = frFn(text);
+  if (t != null && t !== '') return t;
+  return isPresetAnswer(text) ? presetInLang(text, 'fr') : null;
+}
 // A closure's note as a page shows it: a holiday name in the page's language; on French pages other notes only when
 // they have a French version (as before).
 function closureNoteFor(note, fr) {
   if (!note) return '';
-  if (!fr) return presetAnswer(note, 'en');
-  return isPresetAnswer(note) ? presetAnswer(note, 'fr') : frText(note) || '';
+  if (!fr) return presetInLang(note, 'en');
+  return presetOrFr(note, frText) || '';
 }
 function visitTextFr(text) {
   const t = frLookup(visitTextPolish(text));
@@ -9996,11 +10011,15 @@ function visitDropRepeatedKnownFor(info, description) {
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // An owner's tap-to-answer lines in the page's language (café test 6): "Patio only" on English pages, never "Terrasse seulement".
-  info = { ...info, rows: info.rows.map((r) => (r && typeof r.text === 'string' ? { ...r, text: presetAnswer(r.text, fr ? 'fr' : 'en') } : r)) };
+  // Bug-check (2026-11-12): only an answer that is wholly made of presets is swapped; a line with words of her own
+  // ("Takeout available; call to order.") stays as typed on English pages and keeps its French translation (it was
+  // half-swapped, and then dropped from the French page).
   if (fr) {
-    const rowsFr = info.rows.map((r) => ({ ...r, text: isPresetAnswer(r.text) ? r.text : visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    const rowsFr = info.rows.map((r) => ({ ...r, text: typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
+  } else {
+    info = { ...info, rows: info.rows.map((r) => (r && typeof r.text === 'string' ? { ...r, text: presetInLang(r.text, 'en') } : r)) };
   }
   const rowHtml = (r) => {
     const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
@@ -20297,7 +20316,7 @@ function venueCardHtml(venue, opts = {}) {
   const showBadge = isHiddenGem && !venue.redirect_to && !hideHiddenGemBadge;
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to && !hideLocalFavouriteBadge;
   // Café test 6: a tapped dog answer in English on the (English) card.
-  const dogNoteEn = typeof dogFriendlyNote === 'string' && dogFriendlyNote ? presetAnswer(dogFriendlyNote, 'en') : dogFriendlyNote;
+  const dogNoteEn = presetInLang(dogFriendlyNote, 'en');
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
   const showCv = !venue.redirect_to && COMPLETENESS_TYPES.has(venue.type) && completeVerifiedIds().has(venue.id);
   const cvCardChip = showCv ? completeVerifiedCardChipHtml(false) + ' ' : '';
@@ -34316,7 +34335,7 @@ function frenchTwinHtml(html, enPath, search = '') {
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
   // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
   // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
-  html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml(frTextOr(presetAnswer(frDecode(t), 'fr')))}${b}`);
+  html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml((() => { const d = frDecode(t); const x = presetOrFr(d, frText); return x == null ? d : x; })())}${b}`);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -35603,7 +35622,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
   let dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
   // Café test 6: a tapped answer ("Terrasse seulement") in the page's language.
-  if (typeof dogFriendlyNote === 'string' && dogFriendlyNote) dogFriendlyNote = presetAnswer(dogFriendlyNote, fr ? 'fr' : 'en');
+  // Bug-check: only a line made wholly of presets; a French page keeps a line the French list translates (done later).
+  if (typeof dogFriendlyNote === 'string' && dogFriendlyNote && !(fr && frText(dogFriendlyNote))) dogFriendlyNote = presetInLang(dogFriendlyNote, fr ? 'fr' : 'en');
   // A pub whose owner said dogs are welcome on the patio only says so in the highlights ("Dogs on the patio"), instead
   // of a plain "Dog-friendly" that oversells it (pub fresh-eyes 2, 2026-11-10).
   if (!venue.redirect_to && venue.type === 'pub' && venue.dog_friendly) {
@@ -64201,7 +64221,7 @@ if (require.main === module) {
 module.exports = {
   visitDropRepeatedKnownFor,
   // Café test 6 (2026-11-12): preset answers in the page's language
-  presetAnswer, isPresetAnswer, closureNoteFor,
+  presetAnswer, isPresetAnswer, closureNoteFor, presetInLang, visitInfoHtml,
   displayPhone,
   browseFeatureChipsHtml,
   // Card badges (2026-10-29)
