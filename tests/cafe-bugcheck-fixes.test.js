@@ -282,3 +282,7 @@ test('Review 2, 5: a failed or stopped save-and-switch never later switches lang
   assert.match(CLIENT, /if \(!S\.busy && !S\.leaving\) \{ S\.exitAfter = false; S\.langGo = false; \}/);
   assert.match(CLIENT, /el\('suExitDrop'\)\.onclick = function\(\)\{ drDrop\(base\(S\.step\)\); leave\(\{ box: true, drop: true \}\); \};/);
 });
+
+test('Review 6: photos sent on the way to the other language land on the next question, not back on Photos', () => {
+  assert.match(CLIENT, /if \(S\.exitAfter\) \{ if \(S\.langGo\) S\.step = step; return leave\(\); \}/);
+});

@@ -549,7 +549,9 @@
     if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
     var fl = S.flash || ''; S.flash = '';
     step = entry(step); S.fresh = false;
-    if (S.exitAfter) return leave();
+    // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
+    // not back on the screen just saved.
+    if (S.exitAfter) { if (S.langGo) S.step = step; return leave(); }
     if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
     if (step === 'happy' && S.done.happy === 'live' && S.happy.length) return 'happy:type';
