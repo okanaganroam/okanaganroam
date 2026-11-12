@@ -55896,7 +55896,10 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
-  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links' || field === 'winery_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  // Winery test 1 (2026-11-12): the winery answers are stored in WINERY_INFO_PARTS order, the request in the order the
+  // owner's saves merged them ("year" before "food"): compared with sorted keys, so an Undo of a winery answer works.
+  if (field === 'winery_info') { const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v)); return canon(a || {}) === canon(b || {}); }
+  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links') return JSON.stringify(a || {}) === JSON.stringify(b || {});
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -65026,7 +65029,7 @@ module.exports = {
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
-  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
+  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, OWNER_NONE_WORDS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)

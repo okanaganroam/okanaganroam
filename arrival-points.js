@@ -111,6 +111,13 @@ function createArrivalPoints(deps) {
   // The portal section. L(en, fr) is the page's own language helper. Portal pages send no referrer, and the map tiles refuse
   // requests without one (a blocked image instead of a map), so the tiles ask for the site's name to be sent.
   function sectionHtml(venue, L, esc, siteName) {
+    // Winery test 1 (2026-11-12): a winery has a tasting room door, not a storefront (the same words, swapped).
+    if (venue && venue.type === 'winery') {
+      const L0 = L;
+      const en = (x) => String(x).replace(/storefront spot/g, 'tasting room door').replace(/storefront/g, 'tasting room door');
+      const fr = (x) => String(x).replace(/ma devanture/g, 'la porte de ma salle de dégustation').replace(/l’emplacement de votre devanture/g, 'la porte de votre salle de dégustation').replace(/votre devanture/g, 'la porte de votre salle de dégustation').replace(/la devanture/g, 'la porte de la salle de dégustation');
+      L = (e, f) => L0(en(e), fr(f));
+    }
     const live = latest(venue.id, 'approved'); const waiting = latest(venue.id, 'pending');
     const now = waiting || live;
     const T = { noGps: L('We couldn’t get your location. Drag the pin to your storefront, and we’ll check it.', 'Impossible d’obtenir votre position. Glissez l’épingle sur votre devanture, et nous la vérifierons.'), finding: L('Finding your location…', 'Recherche de votre position…'), good: L('Location saved, accurate to about {m} m. Drag the pin if it’s a little off.', 'Position enregistrée, précise à environ {m} m. Glissez l’épingle si elle est un peu décalée.'), rough: L('Your location is only accurate to about {m} m. Drag the pin to the right spot, and we’ll check it.', 'Votre position est précise à environ {m} m seulement. Glissez l’épingle au bon endroit, et nous la vérifierons.'), bad: L('That didn’t work. Please try again.', 'Cela n’a pas fonctionné. Veuillez réessayer.'), needRights: L('Please tick the box to confirm you can share this photo.', 'Veuillez cocher la case pour confirmer que vous pouvez partager cette photo.'), needSpot: L('Please wait for the map, or drag the pin to your storefront.', 'Veuillez attendre la carte, ou glisser l’épingle sur votre devanture.'), sending: L('Sending…', 'Envoi…'), send: L('Save my storefront', 'Enregistrer ma devanture'), live: L('Saved! Thank you. Your storefront spot is in.', 'Enregistré! Merci. L’emplacement de votre devanture est ajouté.'), review: L('Thanks! We’ll check it and add it soon.', 'Merci! Nous allons le vérifier et l’ajouter bientôt.') };
