@@ -116,22 +116,23 @@ test('2: "craft beer and live music ... with my kids" never plans a 19+ pub (liv
 test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only a page with no other hours fills every day', async () => {
   for (const type of ['pub', 'restaurant']) {
     const html = await text(`/owner/${tokenFor(mk(type).id)}/setup`), s = scriptOf(html), cfg = cfgOf(html);
-    assert.match(s, /h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
-    assert.match(s, /var fresh = othersClosed\(d\);/);
-    // Pub test 6: the editor works on wk = W() (the usual week, or the other season's).
-    assert.match(s, /&& \(fresh \|\| wk\[x\]\)\) wk\[x\] = clone\(src\);/);
+    // Café test 4: the rule lives in copyGets(d, x) (also skips days the owner marked Closed on this screen).
+    assert.match(s, /h\(DAYS\.every\(function\(x\)\{ return x === d \|\| copyGets\(d, x\); \}\) \? T\.copyAll : T\.copyOpen\)/);
+    assert.match(s, /var gets = DAYS\.filter\(function\(x\)\{ return copyGets\(d, x\); \}\);/);
     assert.equal(cfg.t.copyOpen, 'Every open day');
     assert.equal(cfg.t.copyClosedNote, 'Days marked Closed stay closed.');
   }
   // The copy rule itself, run as the page runs it: Mon closed, Tue set to noon–midnight, "Every open day".
   const s = scriptOf(await text(`/owner/${tokenFor(mk('pub').id)}/setup`));
   const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const copy = (week, d, all) => {
-    const S = { week: JSON.parse(JSON.stringify(week)) };
+  const copy = (week, d, all, tapped) => {
+    const S = { week: JSON.parse(JSON.stringify(week)), step: 'hours:edit' };
     const clone = (o) => JSON.parse(JSON.stringify(o));
-    const othersClosed = new Function('S', 'DAYS', 'W', `${/function othersClosed\(d\)\{[^\n]*\}/.exec(s)[0]}; return othersClosed;`)(S, DAYS, () => S.week);
-    const body = /var fresh = othersClosed\(d\);\n\s*(DAYS\.forEach[^\n]*)/.exec(s)[1];
-    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'othersClosed', 'wk', `var fresh = othersClosed(d); ${body}`)(S, DAYS, d, all, S.week[d], clone, othersClosed, S.week);
+    const fns = ['othersClosed', 'tapClosed', 'copyGets'].map((n) => new RegExp(`function ${n}\\(d(, \\w+)?\\)\\{[^\\n]*\\}`).exec(s)[0]).join('\n');
+    const F = new Function('S', 'DAYS', 'W', `${fns}; return { othersClosed, tapClosed, copyGets };`)(S, DAYS, () => S.week);
+    (tapped || []).forEach((x) => F.tapClosed(x, true));
+    const body = /(var gets = DAYS\.filter[^\n]*\n[^\n]*)/.exec(s)[1];
+    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'copyGets', 'wk', body)(S, DAYS, d, all, S.week[d], clone, F.copyGets, S.week);
     return S.week;
   };
   const w0 = { mon: null, tue: [['12:00', '00:00']], wed: [['11:30', '23:00']], thu: [['11:30', '23:00']], fri: [['11:30', '23:00']], sat: [['11:30', '23:00']], sun: [['11:30', '23:00']] };
@@ -143,6 +144,9 @@ test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only
   // A new page (every other day closed): Every day fills them all, as before.
   const fresh = copy({ mon: [['11:00', '21:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }, 'mon', true);
   for (const d of DAYS) assert.deepEqual(fresh[d], [['11:00', '21:00']], d);
+  // Café test 4: a day marked Closed on this screen stays closed even on a new page.
+  const fresh2 = copy({ mon: [['05:30', '14:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }, 'mon', true, ['sun']);
+  assert.equal(fresh2.sun, null); assert.deepEqual(fresh2.sat, [['05:30', '14:00']]);
   for (const k of ['copyOpen', 'copyClosedNote']) assert.ok(TEXT.fr[k] && TEXT.fr[k] !== TEXT.en[k], `FR ${k}`);
 });
 
@@ -169,7 +173,8 @@ test('4b: "My menu is on Facebook or Instagram": a link is the menu link (checke
   for (const type of ['pub', 'restaurant']) {
     const html = await text(`/owner/${tokenFor(mk(type).id)}/setup`), s = scriptOf(html), cfg = cfgOf(html);
     assert.equal(cfg.t.menuSocial, 'My menu is on Facebook or Instagram');
-    assert.match(s, /big\('📘', T\.menuSocial, '', true, 'go:menu:social'\)/);
+    // Café test 4: the Facebook link already known shows under it ("Your Facebook: facebook.com/…").
+    assert.match(s, /big\('📘', T\.menuSocial, fbKnown\(\) \? fill\(T\.menuFbKnown, \{ x: siteDomain\(fbKnown\(\)\) \}\) : '', true, 'go:menu:social'\)/);
     assert.match(s, /if \(mlink\) return saveAll\('menu', \[\{ menu_url: mlink \}\], 'day'\);/);
     assert.match(s, /post\(C\.base \+ '\/menu\/help', \{ note: fill\(T\.menuSocialNote, \{ name: ms \}\)/);
   }
