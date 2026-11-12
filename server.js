@@ -19962,7 +19962,7 @@ function cafeInfoLinesHtml(venue, fr) {
   // Café test 1 (2026-11-11): "No Wi-Fi" and "No laptops" were deliberate ("we want people to talk"), so they show as one
   // friendly line, only when the owner picked them (and never beside a Wi-Fi tile).
   const talk = cafeTalkLine(venue, fr);
-  if (talk) lines.push(['talk', '💬', talk]);
+  if (talk) lines.push(['talk', /talk|discuter/.test(talk) ? '💬' : '📵', talk]);
   const d = info.diet || {};
   const dBits = [];
   if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
@@ -20027,8 +20027,9 @@ function cafeTalkLine(venue, fr) {
   if (!venue || venue.type !== 'cafe') return '';
   const noWifi = !venueOwnerFeatures(venue.id).wifi && venueNotOffered(venue.id).includes('wifi');
   const noLaptops = (venueCafeInfo(venue.id).stay || {}).laptops === 'none';
-  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. A takeout window says nothing about it.
-  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return '';
+  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. Café test 4 (2026-11-11): a takeout window
+  // that said "No Wi-Fi" gets a plain "No Wi-Fi" (the setup promised it); "No laptops" means nothing there.
+  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return noWifi ? (fr ? 'Pas de Wi-Fi' : 'No Wi-Fi') : '';
   if (noWifi && noLaptops) return fr ? 'Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter' : 'No Wi-Fi or laptops: a place to talk';
   if (noWifi) return fr ? 'Pas de Wi-Fi : un endroit pour discuter' : 'No Wi-Fi: a place to talk';
   if (noLaptops) return fr ? 'Pas d’ordinateurs portables : un endroit pour discuter' : 'No laptops: a place to talk';

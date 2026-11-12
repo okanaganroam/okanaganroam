@@ -186,6 +186,9 @@
   var CAKE_KINDS = ['Bakery', 'Bakery café', 'Dessert & sweets'];
   function cakesShown(){ return !S.place || CAKE_KINDS.indexOf(S.place) >= 0 || !!S.cafe.order.preorder; }
   // "No dogs allowed": no patio named when the place has none (café test 3).
+  // Café test 4 (2026-11-11): the "No Wi-Fi" tile says what the page will show. A takeout-only café's page says a plain
+  // "No Wi-Fi" (no "a place to talk": there's nowhere to sit), and the line changes as "No seats inside" is tapped.
+  function wifiSubText(){ return S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub; }
   function dogSubText(){ return S.badges.patio ? T.noDogsSub : T.noDogsSubInside || T.noDogsSub; }
   function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; if (ICE_ONLY.indexOf(o.k) >= 0) return iceKind(); return true; }); }
   // "5.50" for cents (French "5,50"), "9" for whole dollars.
@@ -1038,7 +1041,7 @@
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
-          + (C.cafe && g.keys.indexOf('wifi') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWifi ? 'true' : 'false') + '" data-off="no_wifi"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWifi) + '<span class="su-tile-sub">' + h(S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub) + '</span></button>' : '')
+          + (C.cafe && g.keys.indexOf('wifi') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWifi ? 'true' : 'false') + '" data-off="no_wifi"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWifi) + '<span class="su-tile-sub" id="suNoWifiSub">' + h(wifiSubText()) + '</span></button>' : '')
           // Café test 2 (2026-11-11): "No seats inside (takeout only)" up front, and an explicit "No washroom" (never shown).
           + (C.cafe && g.keys.indexOf('washroom') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWash ? 'true' : 'false') + '" data-off="no_washroom"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWashroom) + '<span class="su-tile-sub">' + h(T.noWashroomSub) + '</span></button>'
             + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.cafe.stay.seats === 'takeout' ? 'true' : 'false') + '" data-off="takeout_only"><span class="su-e" aria-hidden="true">🥡</span>' + h(T.takeoutOnly) + '<span class="su-tile-sub">' + h(T.takeoutOnlySub) + '</span></button>' : '')
@@ -1987,7 +1990,7 @@
       if (k === 'no_games') { S.noGames = !S.noGames; press('no_games', S.noGames); if (S.noGames) GAMES.forEach(function(gk){ S.badges[gk] = false; press(gk, false); }); return; }
       if (k === 'no_washroom') { S.noWash = !S.noWash; press('no_washroom', S.noWash); if (S.noWash) { S.badges.washroom = false; press('washroom', false); } return; }
       if (k === 'washroom' && !S.badges.washroom) { S.noWash = false; press('no_washroom', false); }
-      if (k === 'takeout_only') { S.cafe.stay.seats = S.cafe.stay.seats === 'takeout' ? '' : 'takeout'; press('takeout_only', S.cafe.stay.seats === 'takeout'); return; }
+      if (k === 'takeout_only') { S.cafe.stay.seats = S.cafe.stay.seats === 'takeout' ? '' : 'takeout'; press('takeout_only', S.cafe.stay.seats === 'takeout'); var wsub = el('suNoWifiSub'); if (wsub) wsub.textContent = wifiSubText(); return; }
       if (k === 'no_wifi') { S.noWifi = !S.noWifi; press('no_wifi', S.noWifi); if (S.noWifi) { S.badges.wifi = false; press('wifi', false); } return; }
       if (k === 'wifi' && !S.badges.wifi) { S.noWifi = false; press('no_wifi', false); }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }

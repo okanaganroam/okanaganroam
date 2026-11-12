@@ -808,7 +808,7 @@ Object.assign(en.cafe, {
   iceDfQ: 'Dairy-free or vegan?', dfSorbet: 'Dairy-free sorbet', veganIce: 'Vegan gelato or ice cream',
   gfConesQ: 'Gluten-free?', gfCones: { cups: 'Gluten-free in a cup (our cones have gluten)', cones: 'Gluten-free cones too' },
   nutFreeIce: 'Nut-free flavours', dietNoteExIce: 'Sorbets are vegan · Ask for a clean scoop',
-  noWifiSubTakeout: 'We don’t have Wi-Fi for guests',
+  noWifiSubTakeout: 'Your page says “No Wi-Fi”',
   noWashroom: 'No customer washroom', noWashroomSub: 'Only for our records. It isn’t shown on your page.',
   takeoutOnly: 'No seats inside (takeout only)', takeoutOnlySub: 'Your page says “Takeout only”',
 });
@@ -831,7 +831,7 @@ Object.assign(fr.cafe, {
   iceDfQ: 'Sans produits laitiers ou végane?', dfSorbet: 'Sorbet sans produits laitiers', veganIce: 'Gelato ou crème glacée véganes',
   gfConesQ: 'Sans gluten?', gfCones: { cups: 'Sans gluten dans une coupe (nos cornets contiennent du gluten)', cones: 'Cornets sans gluten aussi' },
   nutFreeIce: 'Saveurs sans noix', dietNoteExIce: 'Les sorbets sont véganes · Demandez une cuillère propre',
-  noWifiSubTakeout: 'Nous n’avons pas de Wi-Fi pour les clients',
+  noWifiSubTakeout: 'Votre page indique « Pas de Wi-Fi »',
   noWashroom: 'Pas de toilettes pour les clients', noWashroomSub: 'Seulement pour nos dossiers. Ce n’est pas affiché sur votre page.',
   takeoutOnly: 'Pas de places à l’intérieur (pour emporter seulement)', takeoutOnlySub: 'Votre page indique « Pour emporter seulement »',
 });
