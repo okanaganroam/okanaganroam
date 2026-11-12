@@ -2404,6 +2404,8 @@
     // Bug-check (2026-11-12): mid-edit, the edit screen itself (with the unsaved answers), never the summary that read as saved.
     if (s0 === 'hours:edit' || s0 === 'hours:season') return 'hours:edit';
     if (s0 === 'basics:edit') return s0;
+    // The screens the address can open on their own (the pubs' kitchen, sports and who's-welcome; a café's serves).
+    if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.cafe && s0 === 'cuisine:serve')) return s0;
     if (s0 === 'hours:year') return s0;
     if (STEPS.indexOf(b0) >= 0) return b0;
     return s0 === 'more' ? 'more' : '';
