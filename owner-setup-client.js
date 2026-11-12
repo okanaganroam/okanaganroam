@@ -251,6 +251,10 @@
   // A stored closure is a holiday tile only when its note is that holiday's own name (or empty): a note the owner wrote
   // ("Staff party") stays a row of its own, so saving again never rewrites it.
   function holNote(key){ return String(T.holidays[key]).replace(/[()&<>]/g, ''); }
+  // Café test 6 (2026-11-12): a holiday's name is saved in English (the page shows it in its own language), so "Noël"
+  // tapped on the French screen no longer shows as "Dec 25 (Noël)" on the English page. A note she typed is kept as is.
+  function holEn(key){ var a = C.lang === 'fr' && C.holidayAlt && C.holidayAlt[key]; return a ? String(a).replace(/[()&<>]/g, '') : holNote(key); }
+  function holKeep(key, n){ return n === holNote(key) ? holEn(key) : n; }
   S.holNotes = {};
   // Recurring holidays (pub fresh-eyes, 2026-11-10): Christmas Day, Boxing Day and New Year's Day are the same date every
   // year. A closure is stored as dates only (no repeat rule), so "This year and next" also saves next year's date; it
@@ -1885,8 +1889,8 @@
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
+      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
