@@ -898,4 +898,21 @@ Object.assign(fr, {
   savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
 });
 
+// Café setup in 13 screens (Dayton, 2026-11-11: "seems like a lot of questions for a café"). Holidays and closures are the
+// end of the Hours step, and Instagram and Facebook share one screen.
+en.cafe.labels = Object.assign({}, en.cafe.labels, { hours: 'Hours and holidays', social: 'Instagram and Facebook' });
+en.cafe.noLabels = Object.assign({}, en.cafe.noLabels, { social: 'not on Instagram or Facebook' });
+Object.assign(en.cafe, {
+  socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.',
+  socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
+  hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.',
+});
+fr.cafe.labels = Object.assign({}, fr.cafe.labels, { hours: 'Heures et jours fériés', social: 'Instagram et Facebook' });
+fr.cafe.noLabels = Object.assign({}, fr.cafe.noLabels, { social: 'pas sur Instagram ni Facebook' });
+Object.assign(fr.cafe, {
+  socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
+  socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
+  hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
+});
+
 module.exports = { en, fr };
