@@ -56787,7 +56787,11 @@ const OWNER_CUISINE_HOURS_CSS = `
       /* One layer under the sticky site header (z-index 60), so when the page scrolls the "?" slides under the header
          instead of sitting on top of the menu button (fresh-eyes 3, 2026-11-09). */
       body.owner-page .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
+      /* Café test 4 (2026-11-11): with a large phone font the "?" sat on the title. The heading lines keep clear of it. */
+      body.owner-page .op-head > .eyebrow, body.owner-page .op-head > h1 { padding-right: 52px; }
     }
+    /* Café test 4: at 360px with a large font "Build My Trip" ran over the logo. Owners on a phone find it in the menu. */
+    @media (max-width: 480px) { body.owner-page #navTripBtn { display: none; } }
     body.owner-page .op-hours-ok { margin: 12px 0 4px; padding: 12px 14px; background: #EEF5F3; border-radius: 12px; }
     body.owner-page .op-hours-ok .op-hint { margin: 0 0 8px; }
     body.owner-page .op-hours-ok-btn { min-height: 44px; }
