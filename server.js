@@ -46830,9 +46830,10 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Changes are only accepted from the Okanagan Roam website.' });
   const fromSetupUrl = /[?&]from=setup(?:&|$)/.test(String(req.url || ''));
-  if (fromSetupUrl ? ownerSetupRateLimited(requestClientIp(req)) : ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+  if (fromSetupUrl ? ownerSetupIpLimited(requestClientIp(req)) : ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: fromSetupUrl ? SETUP_RATE_ERROR : 'Too many attempts. Please wait a while and try again.', rate_limited: true });
   const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (fromSetupUrl && found.venue && ownerSetupVenueLimited(found.venue.id)) return sendSubmissionResponse(res, 429, { ok: false, error: SETUP_RATE_ERROR, rate_limited: true });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
@@ -51297,15 +51298,25 @@ if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice(
 // (no nagging) without saying they have no account, so it is never stored as a "we don't have one" (not_offered).
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no', 'unsure'];
 const SETUP_UNSURE_STEPS = ['instagram', 'facebook', 'social'];
-const SETUP_RATE_LIMIT = 80;
+// Bug-check (2026-11-12): one full setup is about 40 saves, and 80 an hour per IP was shared by everyone behind one
+// network (a hotel's or a mall's wifi, a phone carrier) and by an owner with two places, who then got "Too many
+// attempts" and a step that wouldn't move. The budget is now per place (its owner link or account listing), with a much
+// higher per-IP ceiling against abuse. The classic edit page's and sign-in limits are unchanged.
+const SETUP_RATE_LIMIT = 300; // saves per place per hour
+const SETUP_RATE_LIMIT_IP = 1000; // saves per IP per hour, all places together
+const SETUP_RATE_ERROR = 'You’ve saved a lot in a short time, so we’ve paused saving for a few minutes. Nothing you entered is lost: please wait a little and tap the button again.';
 const ownerSetupAttempts = new Map();
-function ownerSetupRateLimited(ip, now = Date.now()) {
-  const recent = (ownerSetupAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
+function setupRateHit(key, limit, now) {
+  const recent = (ownerSetupAttempts.get(key) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
   recent.push(now);
-  ownerSetupAttempts.set(ip, recent);
+  ownerSetupAttempts.set(key, recent);
   if (ownerSetupAttempts.size > 5000) for (const [k, t] of ownerSetupAttempts) if (!t.some((x) => now - x < OWNER_CHANGE_RATE_WINDOW_MS)) ownerSetupAttempts.delete(k);
-  return recent.length > SETUP_RATE_LIMIT;
+  return recent.length > limit;
 }
+// The per-IP ceiling (checked before the link is looked up).
+function ownerSetupIpLimited(ip, now = Date.now()) { return setupRateHit(`ip:${ip}`, SETUP_RATE_LIMIT_IP, now); }
+// The per-place budget.
+function ownerSetupVenueLimited(venueId, now = Date.now()) { return setupRateHit(`venue:${venueId}`, SETUP_RATE_LIMIT, now); }
 function setupProgress(venueId) {
   const done = {};
   try {
@@ -51422,7 +51433,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   if (method === 'GET') return send(200, { ok: true, progress: { done: setupProgress(found.venue.id).done }, score: setupScore(found) });
   if (method !== 'POST') return send(405, { ok: false, error: 'Not allowed.' });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: 'Only accepted from the Okanagan Roam website.' });
-  if (ownerSetupRateLimited(requestClientIp(req))) return send(429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+  if (ownerSetupIpLimited(requestClientIp(req)) || ownerSetupVenueLimited(found.venue.id)) return send(429, { ok: false, error: SETUP_RATE_ERROR, rate_limited: true });
   let body;
   try { body = await readLimitedJsonBody(req, 8192); } catch (e) { return send(400, { ok: false, error: 'Please try again.' }); }
   // "I'm done for now" after the essentials: the portal's own checklist may speak up again.

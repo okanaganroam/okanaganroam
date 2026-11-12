@@ -387,7 +387,10 @@
   function post(url, body){
     var attempt = function(){
       return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
-        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy'); return r.json().catch(function(){ return { ok: false }; }); });
+        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy');
+          // Bug-check (2026-11-12): too many saves in an hour says so kindly, in her language (nothing typed is lost).
+          if (r.status === 429) return { ok: false, error: T.tooFast || T.failed, rateLimited: true };
+          return r.json().catch(function(){ return { ok: false }; }); });
     };
     return attempt().catch(function(){ return new Promise(function(ok){ setTimeout(ok, 1500); }).then(attempt); }).catch(function(){ return { ok: false }; });
   }
