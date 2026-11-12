@@ -51349,7 +51349,7 @@ function saveSetupProgress(venueId, step, status) {
 // the closures part was saved or skipped too (leaving on that screen used to mark Hours done).
 function setupDoneSteps(venueId, type) {
   const done = { ...setupProgress(venueId).done };
-  if ((type || setupTypeOf(venueId)) === 'cafe' && done.hours && !done.closures) delete done.hours;
+  if ((type || setupTypeOf(venueId)) === 'cafe' && done.hours && done.hours !== 'skip' && done.hours !== 'later' && !done.closures) delete done.hours;
   return done;
 }
 function setupFinished(venueId) {

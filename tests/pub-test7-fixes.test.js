@@ -255,7 +255,7 @@ test('7 + 8: "Which months are you closed?" stores the open months as before; ea
   assert.match(s, /S\.months = openM;/);
   assert.match(s, /data-hoff="' \+ d \+ '"/);
   assert.equal(TEXT.en.monthsClosedQ, 'Which months are you closed?');
-  assert.equal(TEXT.fr.monthsClosedQ, 'Quels mois êtes-vous fermé?');
+  assert.equal(TEXT.fr.monthsClosedQ, 'Quels mois êtes-vous fermé\u202f?');
   // The stored season is the open months, exactly as before.
   ok(await change(tokenFor(v.id), { open_months: '2-12' }));
   const cfg = cfgOf((await get(`/owner/${tokenFor(v.id)}/setup`)).text);

@@ -480,7 +480,8 @@
   // Café test 6 (2026-11-12): a café's Hours step is two parts (the hours, then holidays and closures). It only counts
   // as done once the closures part is saved or skipped; leaving on the closures screen used to show Hours ✓ and
   // "Carry on" went past the holidays. fin(k) is the step's answer as far as progress goes.
-  function half(k){ return C.cafe && k === 'hours' && !!S.done.hours && !S.done.closures; }
+  // (Hours skipped or put off as a whole: nothing half-done, as before.)
+  function half(k){ var d = S.done.hours; return C.cafe && k === 'hours' && !!d && d !== 'skip' && d !== 'later' && !S.done.closures; }
   function fin(k){ return half(k) ? '' : S.done[k]; }
   function allDone(){ return STEPS.every(function(k){ return fin(k); }); }
   function p1Done(){ return P1.every(function(k){ return fin(k); }); }

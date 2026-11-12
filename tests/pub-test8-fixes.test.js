@@ -116,14 +116,14 @@ test('2: "Free. No cost, ever." on the setup welcome and the edit page; softer w
   const v = mk('pub');
   const t = tokenFor(v.id);
   assert.equal(TEXT.en.freeLine, 'Free. No cost, ever.');
-  assert.equal(TEXT.fr.freeLine, 'Gratuit. Aucuns frais, jamais.');
+  assert.equal(TEXT.fr.freeLine, 'Gratuit. Sans frais, pour toujours.'); // café test 6 wording
   const s = scriptOf((await get(`/owner/${t}/setup`)).text);
   assert.match(s, /'<p class="su-free" id="suFree">.*h\(T\.freeLine\)/);
   const edit = (await get(`/owner/${t}`)).text;
   assert.match(edit, /id="opFree"[^>]*>.*Free\. No cost, ever\./);
   assert.doesNotMatch(edit, /Features, prices and deals/);
   assert.match(edit, /Features and deals/);
-  assert.match((await get(`/fr/owner/${t}`)).text, /Gratuit\. Aucuns frais, jamais\./);
+  assert.match((await get(`/fr/owner/${t}`)).text, /Gratuit\. Sans frais, pour toujours\./);
   assert.equal(TEXT.en.labels.spend, 'Price per person');
   assert.equal(TEXT.fr.labels.spend, 'Prix par personne');
   assert.match(s, /spend: '🍽️'/);
@@ -140,7 +140,7 @@ test('3: "Mark closed" sits on its own line with Undo; full day names; "Open aft
   assert.match(row, /T\.undo/);
   assert.match(s, /fill\(T\.sameAs, \{ day: longDay\(DAYS\[i - 1\]\) \}\)/);
   assert.equal(TEXT.en.lateLbl, 'Open after midnight?');
-  assert.equal(TEXT.fr.lateLbl, 'Ouvert après minuit?');
+  assert.equal(TEXT.fr.lateLbl, 'Ouvert après minuit\u202f?');
   assert.equal(TEXT.en.closeDayBtn, 'Mark closed');
   assert.equal(TEXT.en.undo, 'Undo');
   const css = (await get(`/owner/${tokenFor(v.id)}/setup`)).text;

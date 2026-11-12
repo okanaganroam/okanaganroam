@@ -179,7 +179,8 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Seasonal hours not touched are not sent; a holiday keeps the note it was stored with.
   // Pub test 6: seasonal hours are only sent once the all-year question was answered on this visit (S.seaTouched).
   assert.match(s, /if \(S\.seaTouched\) \{/);
-  assert.match(s, /S\.holNotes\[o\.key\] != null \? S\.holNotes\[o\.key\] : holNote\(o\.key\)/);
+  // Café test 6: a holiday's own name is saved in English (holEn / holKeep); a typed note stays as typed.
+  assert.match(s, /S\.holNotes\[o\.key\] != null \? holKeep\(o\.key, S\.holNotes\[o\.key\]\) : holEn\(o\.key\)/);
   // "Save and exit" part-way through a tile step saves the picks but leaves the step open.
   assert.match(s, /if \(S\.exitAfter && HALF\.indexOf\(step\) >= 0 && !answered\(step\)\) \{ S\.busy = false; if \(onOk\) onOk\(\); return leave\(\); \}/);
   assert.match(s, /var HALF = \['offer', 'cuisine', 'closures'\];/);

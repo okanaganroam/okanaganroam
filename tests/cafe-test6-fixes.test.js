@@ -110,7 +110,10 @@ test('3: a café\'s Hours step is done only once its holidays and closures part 
     assert.equal(app.setupState(v.id), 'done', type);
   }
   // The page: the half-done step is not ✓, says what's left, and Continue opens the closures part.
-  assert.match(CLIENT, /function half\(k\)\{ return C\.cafe && k === 'hours' && !!S\.done\.hours && !S\.done\.closures; \}/);
+  assert.match(CLIENT, /function half\(k\)\{ var d = S\.done\.hours; return C\.cafe && k === 'hours' && !!d && d !== 'skip' && d !== 'later' && !S\.done\.closures; \}/);
+  // Hours skipped as a whole: nothing half-done.
+  const c3 = mk('cafe'); for (const k of app.CAFE_SETUP_PART1) app.saveSetupProgress(c3.id, k, k === 'hours' ? 'skip' : 'live');
+  assert.equal(app.setupState(c3.id), 'essentials');
   assert.match(CLIENT, /function firstOpen\(\)\{ for \(var i = 0; i < P1\.length; i\+\+\) if \(!fin\(P1\[i\]\)\) return half\(P1\[i\]\) \? 'closures' : P1\[i\];/);
   assert.match(CLIENT, /var d = half\(s\) \? 'half' : fin\(s\) \|\| 'none'/);
   assert.equal(TEXT.en.st.half, 'hours saved, holidays and closures still to do');

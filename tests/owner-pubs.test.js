@@ -269,7 +269,7 @@ test('setup: the pub parts and screens; restaurants keep theirs', async () => {
   assert.equal(cfg.t.spendLead, 'One main and a soft drink, before tax and tip.', 'the restaurant wording (Dayton)');
   assert.equal(cfg.sports.length, 8); assert.equal(cfg.tvs.length, 4);
   const fr = cfgOf((await get(`/fr/owner/${tokenFor(v.id)}/setup`)).text);
-  assert.equal(fr.t.minorsQ, 'Qui est le bienvenu?');
+  assert.equal(fr.t.minorsQ, 'Qui est le bienvenu\u202f?');
   // The pub help topics.
   assert.match(s.text, /pub-kids/);
   // Restaurants: unchanged.

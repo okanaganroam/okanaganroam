@@ -89,7 +89,8 @@ test('3b: a one-line special saved through the setup path stays one line on the 
 });
 
 test('4: unsaved answers on a step are kept in sessionStorage by link and step, restored, and cleared on save', () => {
-  assert.match(CLIENT, /'suDraft:' \+ C\.base \+ ':' \+ b/);
+  // Café test 6: the same key on the French address (/fr/owner/...), so switching language keeps the draft.
+  assert.match(CLIENT, /'suDraft:' \+ String\(C\.base\)\.replace\(\/\^\\\/fr\(\?=\\\/owner\\\/\)\/, ''\) \+ ':' \+ b/);
   for (const k of ['getItem', 'setItem', 'removeItem']) assert.match(CLIENT, new RegExp(`try \\{[^}]*sessionStorage\\.${k}`));
   assert.match(CLIENT, /S\.dirty = ''; drSaved\(step\); return true;/);
   assert.match(CLIENT, /if \(drAfter\(\)\) return;/);

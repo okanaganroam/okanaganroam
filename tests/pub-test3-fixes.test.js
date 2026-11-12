@@ -160,7 +160,7 @@ test('5: Instagram is a top tile beside Facebook; the "Add more" subtitle names 
   assert.match(s, /concat\(social\.map\(function\(k\)\{ return T\.labels\[k\]; \}\)\)/, 'named with their capital letters');
   // Run moreSub() on its own.
   const src = /function moreSub\(\)\{[\s\S]*?\n  \}/.exec(s)[0];
-  const ctx = { P2: ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door'], C: { pub: true }, T: { ...TEXT.en }, answered: () => false };
+  const ctx = { P2: ['music', 'specials', 'story', 'groups', 'spend', 'known', 'book', 'takeout', 'instagram', 'facebook', 'door'], C: { pub: true }, T: { ...TEXT.en }, answered: () => false, cl: (a) => a + ': ' };
   vm.createContext(ctx); vm.runInContext(src + '; this.moreSub = moreSub;', ctx);
   assert.equal(ctx.moreSub(), 'Optional: weekly events, Instagram, Facebook and more');
 });
@@ -170,7 +170,7 @@ test('6–7: the sports tip, the events question once, "Save kitchen time", one 
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`), s = scriptOf(html), cfg = cfgOf(html);
   assert.match(cfg.t.sportsEx, /^Tip: /);
   assert.doesNotMatch(cfg.t.sportsEx, /\?/, 'not a question to answer');
-  assert.match(TEXT.fr.pub.sportsEx, /^Astuce : /);
+  assert.match(TEXT.fr.pub.sportsEx, /^Astuce\u00a0: /);
   assert.match(s, /'<p class="su-hint" id="suSportsTip">' \+ h\(T\.sportsEx\)/);
   assert.doesNotMatch(s, /ex\(T\.sportsEx\)/);
   assert.equal(s.split('h(T.whatEvent)').length - 1, 1, 'the events question is written once');
@@ -196,7 +196,7 @@ test('8: the front door waits for a visit; a researched spend asks "About $24 a 
   assert.equal(TEXT.en.doorNextTime.replace('{type}', 'pub'), 'Do this next time you’re at your pub');
   assert.ok(TEXT.fr.doorNextTime.includes('{type}'));
   assert.equal(TEXT.en.spendAsk.replace('{n}', 24), 'About $24 a person?');
-  assert.equal(TEXT.fr.spendAsk.replace('{n}', 24), 'Environ 24 $ par personne?');
+  assert.equal(TEXT.fr.spendAsk.replace('{n}', 24), 'Environ 24 $ par personne\u202f?');
   assert.match(s, /big\('✓', fill\(T\.spendAskYes, \{ n: n \}\), '', false, 'spendConfirm'\) \+ big\('✎', T\.spendAskNo, '', true, 'jump:spend'\)/);
   // Yes saves her number through the usual avg_spend save (shown publicly only when AVG_SPEND_PUBLIC is on).
   assert.match(s, /if \(k === 'spendConfirm'\) \{ S\.spend = spendGuess\(\) \|\| S\.spend; S\.toFinish = true; if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSpendOff; return saveAll\('spend', \[\{ avg_spend: S\.spend \}\]/);
