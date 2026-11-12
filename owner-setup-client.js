@@ -563,6 +563,9 @@
     var rest = ch.address != null && ch.website != null ? T.phoneRestBoth : ch.address != null ? T.phoneRestAddr : ch.website != null ? T.phoneRestSite : '';
     if (rest) S.savedLine.basics = T.phoneLiveNow + ' ' + rest;
     var d = digitsOf(ch.phone); CUR.phone = d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ch.phone; S.phone = null; }
+  // "facebook.com/gords", "m.facebook.com/gords", "fb.com/gords" (with or without https://) -> https://www.facebook.com/gords.
+  function fbFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com(\/\S*)$/i.exec(String(v || '').trim()); return m && m[1].length > 1 ? 'https://www.facebook.com' + m[1] : ''; }
+  function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
   function field(id, label, value, opts){ opts = opts || {}; return '<label class="su-q" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
@@ -1000,7 +1003,7 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
-        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, '', true, 'go:menu:social')
+        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '') + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
     } else if (s === 'menu:daily') {
@@ -1010,7 +1013,7 @@
     } else if (s === 'menu:social') {
       // Pub test 5 (2026-11-10): the menu is on Facebook or Instagram. A link is the menu link (checked first, like the
       // website one); a page name goes to us to find (the Facebook "find the link" way).
-      x = q(T.menuSocialQ, T.menuSocialLead) + msgs() + field('suMsoc', T.menuSocialLabel, S.menuSoc || '', { mode: 'url', max: 300 }) + ex(T.menuSocialEx)
+      x = q(T.menuSocialQ, T.menuSocialLead) + msgs() + field('suMsoc', T.menuSocialLabel, S.menuSoc || fbKnown(), { mode: 'url', max: 300 }) + ex(T.menuSocialEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'menuSocialSave') + '</div>';
     } else if (s === 'menu:upload' || s === 'happy:sheet' || s === 'specials:sheet') {
       var isMenu = s === 'menu:upload', files = isMenu ? S.menuFiles : S.sheetFiles;
@@ -1568,7 +1571,18 @@
       S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = el('suSite').value;
       var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (phoneChanged(S.phone)) ch.phone = S.phone;
       // Website (2026-11-10): typed as "example.com" is fine (the server adds https://); it's checked first, like today.
-      var site = S.site.trim(); if (site && !siteOk(site)) { S.nudge = T.websiteBad; S.badField = 'suSite'; return render(); }
+      var site = S.site.trim();
+      // Café test 4 (2026-11-11): a Facebook page typed as the website is the Facebook link (saved and live, checked the
+      // same way as the Facebook step's) and the website stays "none", so Facebook isn't asked again later.
+      var fbl = fbFromSite(site);
+      if (fbl) {
+        delete ch.website; var nlF = S.notOffered.filter(function(z){ return z !== 'facebook'; });
+        if (!CUR.website && !C.website && nlF.indexOf('website') < 0) nlF.push('website');
+        var listF = []; if (Object.keys(ch).length) listF.push(ch); listF.push({ facebook_url: fbl });
+        if (nlF.slice().sort().join() !== S.notOffered.slice().sort().join()) listF.push({ not_offered: nlF });
+        return saveAll('basics', listF, null, null, function(){ phoneSaved(ch); S.site = null; S.fb = fbl; CUR.facebook_url = fbl; S.savedLine.basics = T.fbFromSite + (S.savedLine.basics ? ' ' + S.savedLine.basics : ''); if (STEPS.indexOf('facebook') >= 0 && !answered('facebook')) progress('facebook', 'live'); });
+      }
+      if (site && !siteOk(site)) { S.nudge = T.websiteBad; S.badField = 'suSite'; return render(); }
       if (siteDomain(site) !== siteDomain(CUR.website)) ch.website = site;
       if (!Object.keys(ch).length) { S.nudge = T.noChange; return render(); }
       var listB = [ch]; if (site && S.notOffered.indexOf('website') >= 0) listB.unshift({ not_offered: S.notOffered.filter(function(z){ return z !== 'website'; }) });

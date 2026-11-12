@@ -865,10 +865,12 @@ Object.assign(en, {
   holCovered: 'Covered by your closed dates',
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
+  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', menuFbKnown: 'Your Facebook: {x}',
 });
 Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
+  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', menuFbKnown: 'Votre Facebook : {x}',
 });
 
 module.exports = { en, fr };
