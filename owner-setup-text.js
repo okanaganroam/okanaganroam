@@ -879,7 +879,7 @@ fr.cafe.noLabels = Object.assign({}, fr.cafe.noLabels, { specials: 'pas de spéc
 
 // Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
 Object.assign(en, {
-  holCovered: 'Covered by your closed dates',
+  holCovered: 'Covered by your closed dates', holSeason: 'You’re closed for the season',
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
   fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', menuFbKnown: 'Your Facebook: {x}',
@@ -890,7 +890,7 @@ Object.assign(en, {
   savedSpendOff: 'When prices go on pages, yours will show as your price range.',
 });
 Object.assign(fr, {
-  holCovered: 'Compris dans vos dates de fermeture',
+  holCovered: 'Compris dans vos dates de fermeture', holSeason: 'Vous êtes fermé pour la saison',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
   fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', menuFbKnown: 'Votre Facebook : {x}',
   sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',

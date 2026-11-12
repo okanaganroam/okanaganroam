@@ -277,7 +277,9 @@
   // range) is covered by them. Its tile shows ticked with "Covered by your closed dates" and no row of its own is saved
   // (the page listed Christmas Day three times). Yearly ranges may wrap over New Year.
   function coveredBy(date){ var md = String(date).slice(5); return S.extra.some(function(c){ var t = c.to || c.from; if (c.yearly) return c.from <= t ? md >= c.from && md <= t : md >= c.from || md <= t; return date >= c.from && date <= t; }); }
-  function holCovered(o){ return coveredBy(o.date); }
+  // Bug-check (2026-11-12): a day outside the open season (open Apr 15 – Oct 15: Christmas, New Year's) is covered too.
+  function offSeason(date){ var o = S.openSea; if (!o || !o.from || !o.to) return false; var md = String(date).slice(5); return o.from <= o.to ? md < o.from || md > o.to : md < o.from && md > o.to; }
+  function holCovered(o){ return coveredBy(o.date) || offSeason(o.date); }
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
@@ -506,7 +508,11 @@
   // Save is tapped, so "Carry on" comes back to it (fresh-eyes 2026-11-10: a half-done closures step was skipped).
   var HALF = ['offer', 'cuisine', 'closures'];
   function answered(step){ var d = fin(step); return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
-  function leave(){ S.leaving = true; location.href = C.back; }
+  // Bug-check (2026-11-12): leaving for the other language (after "Save these first?" or photos sent) goes there instead.
+  function leave(){
+    if (S.langGo && typeof window.suLangGo === 'function') { drSave(); navKeep(); S.leaving = true; if (window.suLangGo()) return; S.leaving = false; }
+    S.leaving = true; location.href = C.back;
+  }
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
@@ -569,6 +575,10 @@
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
   function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (C.cafe && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
+    // Bug-check (2026-11-12): a café's hours saved but not its holidays: "Next: Holidays and closures", never "Skip".
+    if (half(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
+    // Unsaved answers brought back on this screen (a reload, a language switch): only the screen's own Save moves on.
+    if (answered(step) && pending(step)) return '';
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
@@ -576,6 +586,8 @@
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
+    // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
+    if (pending(step)) return '';
     var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
     if (d === 'unsure') return '<p class="su-sent">' + h(fill(T.youSaid, { a: T.st.unsure })) + '</p>';
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
@@ -778,7 +790,7 @@
     window.scrollTo(0, 0); try { el('suExitQ').focus({ preventScroll: true }); } catch (e) {}
     // "Don't save": what was typed on this step is dropped here too.
     el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave(); };
-    el('suExitStay').onclick = function(){ var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
+    el('suExitStay').onclick = function(){ S.langGo = false; var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
     el('suExitSave').onclick = function(){
       if (S.busy) return; var a = exitAction(); if (!a) return leave();
       S.exitAfter = true; act(a);
@@ -786,7 +798,7 @@
       if (!S.busy && !S.leaving) S.exitAfter = false;
     };
   }
-  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; }
+  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } S.langGo = false;
     // Café test 5 (2026-11-12): photos picked with the rights box ticked are sent on the way out (then the page is left).
     if (S.step === 'photos:review' && goodPhotos().length && S.rights) { e.preventDefault(); S.exitAfter = true; return sendPhotos(); }
     if (unsaved()) { e.preventDefault(); askExit(); } };
@@ -803,7 +815,9 @@
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
     'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
-  var DR = { base: {}, s: {}, at: {}, last: '' };
+  var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
+  // True while answers kept on this device (not saved yet) are shown on the step's screens.
+  function pending(step){ return S.dirty === step && !!DR.restored[step]; }
   // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
   function drKey(b){ return 'suDraft:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, '') + ':' + b; }
   function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
@@ -853,11 +867,11 @@
   function drAfter(){
     var b = base(S.step); if (!isStep(b)) { DR.last = ''; DR.at = {}; return; }
     if (DR.last !== b) { DR.last = b; if (!DR.base[b] || !drGet(b)) DR.base[b] = drSnap(); }
-    if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; render(); return true; } }
+    if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; DR.restored[b] = true; render(); return true; } }
     if (DR.at.step === S.step) return; DR.at = { step: S.step };
     var d = drGet(b), bx = d && d.boxes && d.boxes[S.step]; if (!bx) return;
     Object.keys(bx).forEach(function(sel){ var inp; try { inp = screen.querySelector(sel); } catch (e) { inp = null; } if (!inp || inp.value === bx[sel]) return; inp.value = bx[sel]; try { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} });
-    S.dirty = b;
+    S.dirty = b; DR.restored[b] = true;
   }
   function drApply(b){
     var d = drGet(b); if (!d || !d.s) return false;
@@ -873,7 +887,7 @@
     });
     return any;
   }
-  function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; if (DR.last === step) DR.last = ''; }
+  function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; delete DR.restored[step]; if (DR.last === step) DR.last = ''; }
   // ---------- Screens ----------
   function render(){
     // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
@@ -1032,7 +1046,7 @@
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         // Café test 4 (2026-11-11): "We're closed part of the year" is asked once, in Hours ("Are these your hours all
         // year?"). This screen only shows a saved open season, with Change.
-        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(cl(T.holidays[o.key]) + T.everyYear) + '</span></label>'; }).join('')
         + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
@@ -1349,6 +1363,7 @@
     if (S.error && x.indexOf('su-error') < 0) x = msgs() + x;
     screen.innerHTML = x;
     wire();
+    navSync();
     if (drAfter()) return;
     var e2 = screen.querySelector('.su-error');
     if (e2) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }
@@ -1921,7 +1936,7 @@
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
       var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next) && !offSeason(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
@@ -2324,6 +2339,12 @@
   // counts here, never a guess from the name.
   if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   var startAt = String(location.hash || '').slice(1);
+  // Bug-check (2026-11-12): where she was, for a reload (history.state) or a language switch (kept a minute in this tab),
+  // so "Save" there carries on as it would have (a first pass goes on to the next question, not back to the list).
+  var navWas = null;
+  try { navWas = history.state && history.state.suNav || null; } catch (e) {}
+  try { var nl = window.sessionStorage.getItem(navKey()); if (nl) { window.sessionStorage.removeItem(navKey()); nl = JSON.parse(nl); if (!navWas && nl && Date.now() - (nl.at || 0) < 120000) navWas = nl; } } catch (e) {}
+  if (navWas && navWas.h !== startAt) navWas = null;
   if (startAt === 'season') startAt = 'closures';
   if (C.cafe && (startAt === 'instagram' || startAt === 'facebook')) startAt = 'social';
   if (C.cafe && startAt === 'closures') { S.hist = ['start']; S.step = 'closures'; S.toList = true; }
@@ -2334,6 +2355,9 @@
   else if (C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) { S.hist = ['start']; S.step = startAt; S.toList = true; }
   // Cafés: the checklist's "What you serve" row opens its own screen (the kind first while none is picked).
   else if (C.cafe && startAt === 'cuisine:serve') { S.hist = ['start']; S.step = S.place && CUR.place_type ? 'cuisine:serve' : 'cuisine'; S.toList = true; }
+  // A reload or a language switch on an edit screen comes back to it (with what was typed), not to the summary.
+  else if (startAt === 'hours:edit' || startAt === 'basics:edit') { S.hist = ['start', base(startAt)]; S.step = startAt; }
+  if (navWas) { S.toList = !!navWas.toList; S.toFinish = !!navWas.toFinish; S.toEss = !!navWas.toEss; }
   // Answers tapped or typed but not saved yet (for "Exit setup").
   screen.addEventListener('input', function(e){ if (e.target && e.target.id !== 'suCq') mark(); });
   // Keep the after-midnight note in step with the time boxes as the owner types.
@@ -2347,16 +2371,39 @@
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
   window.addEventListener('pagehide', drSave);
+  // ---------- Where she is, in the address (bug-check 2026-11-12) ----------
+  // The address's #step follows the question on screen, so a reload (or iOS reloading a tab) comes back to it, or to the
+  // Welcome back list from screens without one. It used to keep the step a language switch had put there.
+  function navKey(){ return 'suNav:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, ''); }
+  function navRec(){ return { h: window.suLangHash ? window.suLangHash() : '', toList: !!S.toList, toFinish: !!S.toFinish, toEss: !!S.toEss }; }
+  function navSync(){
+    try {
+      var r = navRec(), url = location.pathname + location.search + (r.h ? '#' + r.h : '');
+      if (location.pathname + location.search + location.hash !== url || !history.state || JSON.stringify(history.state.suNav) !== JSON.stringify(r)) history.replaceState({ suNav: r }, '', url);
+    } catch (e) {}
+  }
+  function navKeep(){ try { var r = navRec(); r.at = Date.now(); window.sessionStorage.setItem(navKey(), JSON.stringify(r)); } catch (e) {} }
   // Café test 6 (2026-11-12): "Français / English" opens the same question in the other language. What she typed is kept
   // as a draft (above) and there is no "leave this page?" prompt.
   window.suLangHash = function(){
     var s0 = S.step, b0 = base(s0);
     if (b0 === 'closures') return 'closures';
+    // Bug-check (2026-11-12): mid-edit, the edit screen itself (with the unsaved answers), never the summary that read as saved.
+    if (s0 === 'hours:edit' || s0 === 'hours:season') return 'hours:edit';
+    if (s0 === 'basics:edit') return s0;
     if (s0 === 'hours:year') return s0;
     if (STEPS.indexOf(b0) >= 0) return b0;
     return s0 === 'more' ? 'more' : '';
   };
-  window.suBeforeLang = function(){ try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); } catch (e) {} drSave(); S.leaving = true; };
+  // Bug-check (2026-11-12): photos, menu pages or files picked but not sent are never dropped by a language switch. Photos
+  // with the box ticked are sent first (as when leaving); anything else asks "Save these first?". false: don't go yet.
+  window.suBeforeLang = function(){
+    if (S.busy) return false;
+    if (S.step === 'photos:review' && goodPhotos().length && S.rights) { S.langGo = true; S.exitAfter = true; sendPhotos(); return false; }
+    if (S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { S.langGo = true; askExit(); return false; }
+    try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); } catch (e) {}
+    drSave(); navKeep(); S.leaving = true; return true;
+  };
   render();
   window.addEventListener('beforeunload', function(e){ drSave(); if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

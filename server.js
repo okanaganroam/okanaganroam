@@ -53933,17 +53933,23 @@ const OWNER_LANG_SWITCH_SCRIPT = `<script>
     var st = typeof window.suLangHash === 'function' ? window.suLangHash() : String(location.hash || '').slice(1);
     return h + (st ? '#' + st : '');
   }
-  document.addEventListener('click', function(e){
-    var el = e.target && e.target.closest ? e.target.closest('#langToggle, .owner-lang-link, .nav-lang-opt') : null;
-    if (!el || (el.classList.contains('nav-lang-opt') && el.getAttribute('data-lang') === cur())) return;
-    var h = target(); if (!h) return;
-    e.preventDefault(); e.stopPropagation();
+  function go(){
+    var h = target(); if (!h) return false;
     var to = cur() === 'fr' ? 'en' : 'fr';
     try { localStorage.setItem('okanaganLang', to); } catch (x) {}
     try { if (window.trackEvent) window.trackEvent('language_change', { language: to }); } catch (x) {}
-    if (typeof window.suBeforeLang === 'function') window.suBeforeLang();
-    location.assign(h);
+    location.assign(h); return true;
+  }
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('#langToggle, .owner-lang-link, .nav-lang-opt') : null;
+    if (!el || (el.classList.contains('nav-lang-opt') && el.getAttribute('data-lang') === cur())) return;
+    if (!target()) return;
+    e.preventDefault(); e.stopPropagation();
+    // The setup can hold the switch (photos picked but not sent): it switches once they're saved (window.suLangGo).
+    if (typeof window.suBeforeLang === 'function' && window.suBeforeLang() === false) return;
+    go();
   }, true);
+  window.suLangGo = go;
 })();
 </script>`;
 // The small "Français" / "English" link at the top of the owner edit page and the setup screens (café test 6).
