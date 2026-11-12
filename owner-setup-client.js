@@ -519,8 +519,13 @@
   var HALF = ['offer', 'cuisine', 'closures'];
   function answered(step){ var d = fin(step); return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
   // Bug-check (2026-11-12): leaving for the other language (after "Save these first?" or photos sent) goes there instead.
-  function leave(){
-    if (S.langGo && typeof window.suLangGo === 'function') { drSave(); navKeep(); S.leaving = true; if (window.suLangGo()) return; S.leaving = false; }
+  // Review fix (2026-11-12): only while that save-and-go is still on (S.exitAfter), or from the "Save these first?" box
+  // itself (how.box); a save that failed or stopped clears S.langGo, so a later "I'm done for now" returns to the portal.
+  // "Don't save" (how.drop) doesn't keep the dropped answers as a draft on the way.
+  function leave(how){
+    how = how || {};
+    var lang = S.langGo && (S.exitAfter || how.box); S.langGo = false;
+    if (lang && typeof window.suLangGo === 'function') { if (!how.drop) drSave(); navKeep(); S.leaving = true; if (window.suLangGo()) return; S.leaving = false; }
     S.leaving = true; location.href = C.back;
   }
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
@@ -800,13 +805,13 @@
       + '<div class="su-skip"><button type="button" class="su-link" id="suExitStay">' + h(T.exitStay) + '</button></div></div>');
     window.scrollTo(0, 0); try { el('suExitQ').focus({ preventScroll: true }); } catch (e) {}
     // "Don't save": what was typed on this step is dropped here too.
-    el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave(); };
+    el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave({ box: true, drop: true }); };
     el('suExitStay').onclick = function(){ S.langGo = false; var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
     el('suExitSave').onclick = function(){
-      if (S.busy) return; var a = exitAction(); if (!a) return leave();
+      if (S.busy) return; var a = exitAction(); if (!a) return leave({ box: true });
       S.exitAfter = true; act(a);
       // Something still needs fixing (a missing tick, an empty box): the reason is on the screen, and we stay.
-      if (!S.busy && !S.leaving) S.exitAfter = false;
+      if (!S.busy && !S.leaving) { S.exitAfter = false; S.langGo = false; }
     };
   }
   el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } S.langGo = false;
@@ -1369,7 +1374,7 @@
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
         + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>';
     }
-    if (S.error || S.nudge) S.exitAfter = false;
+    if (S.error || S.nudge) { S.exitAfter = false; S.langGo = false; }
     // A failed save always says so, whatever the screen.
     if (S.error && x.indexOf('su-error') < 0) x = msgs() + x;
     screen.innerHTML = x;
@@ -1405,7 +1410,7 @@
   function sendPhotos(){
     var list = goodPhotos();
     if (!list.length) { S.nudge = T.needPhoto; return render(); }
-    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
+    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.langGo = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
     var total = list.length, i = 0, mainP = list.filter(function(ph){ return ph.main; })[0];
     S.busy = true; S.error = ''; S.nudge = ''; S.rightsAsk = false; S.lastBatch = total; render();
     var next = function(){

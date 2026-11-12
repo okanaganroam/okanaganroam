@@ -257,3 +257,28 @@ test('Review 4: once the price step is answered, a change of kind never changes 
   assert.match(CLIENT, /var sp0 = spendFollows\(\);/);
   assert.match(CLIENT, /saveAll\('spend', \[\{ avg_spend: S\.spend \}\], null, null, function\(\)\{ spendAuto = false; \}\)/);
 });
+
+test('Review 2, 5: a failed or stopped save-and-switch never later switches language; "Don\'t save" keeps no draft', () => {
+  const src = /  function leave\(how\)\{[\s\S]*?\n  \}/.exec(CLIENT)[0];
+  const run = (S, how, langOk = true) => {
+    const log = [];
+    const C = { back: '/owner/x' }, location = { href: '' };
+    const window = { suLangGo: () => { log.push('lang'); return langOk; } };
+    new Function('S', 'C', 'location', 'window', 'drSave', 'navKeep', src + '; leave(' + (how ? JSON.stringify(how) : '') + ');')(S, C, location, window, () => log.push('drSave'), () => log.push('navKeep'));
+    if (location.href) log.push('portal');
+    return log;
+  };
+  // Save-and-switch still on: switches (keeping the draft).
+  assert.deepEqual(run({ langGo: true, exitAfter: true }), ['drSave', 'navKeep', 'lang']);
+  // The save failed or stopped earlier (exitAfter cleared, langGo left on): "I'm done for now" goes back to the portal.
+  assert.deepEqual(run({ langGo: true, exitAfter: false }), ['portal']);
+  // From the "Save these first?" box: "Don't save" switches without writing the dropped draft back.
+  assert.deepEqual(run({ langGo: true, exitAfter: false }, { box: true, drop: true }), ['navKeep', 'lang']);
+  assert.deepEqual(run({ langGo: true, exitAfter: false }, { box: true }), ['drSave', 'navKeep', 'lang']);
+  assert.deepEqual(run({ langGo: false, exitAfter: true }), ['portal']);
+  // Everywhere the save-and-go is called off, the language switch is too.
+  assert.match(CLIENT, /if \(S\.error \|\| S\.nudge\) \{ S\.exitAfter = false; S\.langGo = false; \}/);
+  assert.match(CLIENT, /S\.rightsAsk = true; S\.exitAfter = false; S\.langGo = false;/);
+  assert.match(CLIENT, /if \(!S\.busy && !S\.leaving\) \{ S\.exitAfter = false; S\.langGo = false; \}/);
+  assert.match(CLIENT, /el\('suExitDrop'\)\.onclick = function\(\)\{ drDrop\(base\(S\.step\)\); leave\(\{ box: true, drop: true \}\); \};/);
+});
