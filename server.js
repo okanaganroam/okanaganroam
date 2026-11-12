@@ -20,6 +20,9 @@ const portalActivity = require('./portal-activity');
 const portalCompleteness = require('./portal-completeness');
 const ownerStatsModule = require('./owner-stats');
 const portalCounter = portalActivity.createPortalCounter(db);
+// Places to stay scans (2026-11-11): QR code scans and email link opens per hotel or rental (see stay-scans.js).
+const stayScans = require('./stay-scans').createStayScanCounter(db);
+const { renderStaysPage } = require('./stay-scans-page');
 const referrals = require('./referrals');
 const referralCounter = referrals.createReferralCounter(db);
 const pageStats = require('./page-stats').createPageStats(db);
@@ -43846,7 +43849,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used, how often the QR code on a hotel&rsquo;s or rental&rsquo;s guest card is scanned and the link in our email to them is opened, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -59696,6 +59699,7 @@ const server = http.createServer(async (req, res) => {
       const sm = /^\/(guests|q)\/([a-z0-9-]+)\/?$/.exec(pathname);
       const shortHotel = sm && method === 'GET' ? findHotel(sm[2]) : null;
       if (shortHotel) {
+        stayScans.record(req, sm[1], shortHotel.slug, requestClientIp(req));
         res.writeHead(302, { Location: `/near/${shortHotel.slug}?${sm[1] === 'q' ? HOTEL_QR_UTM(shortHotel.slug) : HOTEL_EMAIL_UTM(shortHotel.slug)}`, 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
         return res.end();
       }
@@ -63096,6 +63100,32 @@ const server = http.createServer(async (req, res) => {
       if (digestManual.length < 3) { digestManual.push(nowMs); result = await sendWeeklyDigest(); }
       res.writeHead(303, { Location: `/admin/dashboard?digest=${result}`, 'Cache-Control': 'no-store' });
       return res.end();
+    }
+    // Places to stay scans (2026-11-11). GET /api/admin/stay-scans?days=30 -> this site's scans per place. Admin token.
+    if (pathname === '/api/admin/stay-scans' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, stayScans.report(query.days, hotelList()));
+    }
+    // The page: /admin/dashboard/stays (both sites side by side).
+    if ((pathname === '/admin/dashboard/stays' || pathname === '/admin/dashboard/stays/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Places to stay', '<h1>Places to stay</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      let whistler;
+      if (!wToken) whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.' };
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/stay-scans?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          whistler = r.status === 200 ? { key: 'whistler', name: 'Whistler Roam', data: await r.json() }
+            : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t count scans yet.' : `Whistler Roam answered ${r.status}.` };
+        } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
+      }
+      return res.end(renderStaysPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: stayScans.report(days, hotelList()) }, whistler] }));
     }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
