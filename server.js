@@ -20049,6 +20049,9 @@ function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = 
   if (hasSpecials && !hasHappyDeals) out.dealsLabel = hasNights ? 'Specials & events' : 'Specials';
   const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
   if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
+  // Café test 5 (2026-11-12): vegan (or else vegetarian) options lead a café's top highlights; the four-chip limit cut
+  // them, though they're often what a café is chosen for. The badges themselves are unchanged.
+  if (venue.vegan || venue.vegetarian) out.highlightFirst = [venue.vegan ? 'vegan' : 'vegetarian'].concat(profile.highlightFirst || []);
   return out;
 }
 // A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
