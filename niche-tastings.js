@@ -66,10 +66,16 @@ function wineryTastingsHtml(info, esc, prices = null) {
   let host = '';
   try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
   const checked = /^\d{4}-\d{2}-\d{2}$/.test(info.checked_at || '') ? new Date(info.checked_at + 'T12:00:00Z').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  // Winery test 1 (2026-11-12): a line the owner gave us in setup (owner_labels) is the winery's own word, not the
+  // website's: credited "From the winery" with no checked date. Research rows beside it keep their source.
+  const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  const ownCount = shown.filter((r) => owned.has(r.label)).length;
+  const credit = ownCount === shown.length ? 'From the winery'
+    : (ownCount ? 'From the winery and ' + (host ? esc(host) : 'our research') : host ? 'From ' + esc(host) : 'From the winery') + (checked ? ' \u00b7 checked ' + esc(checked) : '');
   const heading = shown.length > 1 ? 'Tastings &amp; visits' : 'Tastings';
   return '<section class="fd-card fd-tastings" id="fdTastings"><div class="fd-eyebrow">A little wine-country time</div><h2>' + heading + ' \ud83c\udf47</h2>'
     + '<ul class="fd-tasting-list">' + items + '</ul>'
-    + '<p class="fd-note">' + (host ? 'From ' + esc(host) : 'From the winery') + (checked ? ' \u00b7 checked ' + esc(checked) : '') + '. Confirm current options when booking.</p></section>';
+    + '<p class="fd-note">' + credit + '. Confirm current options when booking.</p></section>';
 }
 // The Plan your visit box under the Tastings card (2026-11-08): leave out the rows the card already shows, so a winery
 // page never lists the same tasting twice. The card's own rows: the priced Niche card shows Tastings and Vineyard walk;

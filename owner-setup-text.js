@@ -945,6 +945,7 @@ en.winery = {
   labels: { hours: 'Hours and holidays', winery: 'Your winery', tastings: 'Tastings', visit: 'Booking and groups', photos: 'Photos', offer: 'What you offer',
     story: 'Your story and Known for', experiences: 'Experiences', menu: 'Tasting menu or wine list', social: 'Instagram and Facebook', door: 'Your tasting room door' },
   noLabels: { experiences: 'no extras', social: 'not on Instagram or Facebook' },
+  picnicFromFood: 'Picnic area is ticked from your “Food here” answer. Tap it if that’s wrong.',
   photosLead: 'Your tasting room, your view, the vines. Three photos is perfect.', photosNoMore: 'No, next: what you offer',
   // Your winery
   wkindQ: 'What kind of winery is it?', wkindLead: 'Pick the one visitors would use to describe you.', wkindNeed: 'Please tap the kind of winery that fits best.',
@@ -1007,6 +1008,7 @@ fr.winery = {
   labels: { hours: 'Heures et jours fériés', winery: 'Votre vignoble', tastings: 'Dégustations', visit: 'Réservations et groupes', photos: 'Photos', offer: 'Ce que vous offrez',
     story: 'Votre histoire et ce pour quoi vous êtes connus', experiences: 'Expériences', menu: 'Menu de dégustation ou carte des vins', social: 'Instagram et Facebook', door: 'La porte de votre salle de dégustation' },
   noLabels: { experiences: 'pas d’extras', social: 'pas sur Instagram ni Facebook' },
+  picnicFromFood: 'Aire de pique-nique est cochée d’après votre réponse « Nourriture sur place ». Touchez-la si c’est faux.',
   photosLead: 'Votre salle de dégustation, votre vue, les vignes. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
   wkindQ: 'Quel genre de vignoble est-ce?', wkindLead: 'Choisissez celui que les visiteurs utiliseraient pour vous décrire.', wkindNeed: 'Touchez le genre de vignoble qui convient le mieux.',
   wkindSubs: { 'Estate winery': 'Votre propre vignoble et votre salle de dégustation', 'Boutique winery': 'Une petite équipe, souvent la famille', 'Tasting room in town': 'Une salle de dégustation loin des vignes',
