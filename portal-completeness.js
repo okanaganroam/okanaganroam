@@ -110,6 +110,9 @@ if (PUB_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-comp
 // 100 points. Seven items are new: what kind of café, all year or seasonal, what you serve, staying a while (seats and
 // laptops), Wi-Fi, dogs and kids, and ordering. Wi-Fi, laptops and ordering are owner-only (never researched). Happy
 // hour, events and specials are optional and unscored, so a café that has none can still reach 100%.
+// 13 screens (Dayton, 2026-11-11): staying a while, ordering and "Known for" are no longer asked of cafés, so they no
+// longer count (their 13 points went to the description, menu, what you serve, dietary, Wi-Fi, dogs and kids and photos).
+// What a café answered before stays stored and on its page; "Order at the counter only" stays a valid answer.
 const CAFE_KINDS = ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches'];
 // Café test 2 (2026-11-11): sorbet, milkshakes, cones & cups, affogato and a general "Made here" (beside "Baked fresh
 // here", kept for bakeries). Additive: stored lists read as before.
@@ -128,22 +131,17 @@ const CAFE_ITEMS = [
   { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
     en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Ice cream and patio cafés often close for winter. Say so, so nobody drives out to a closed door.', whyFr: 'Les bars laitiers et les cafés-terrasses ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
   R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your counter, your coffee, your baking.', whyFr: 'De vraies photos seulement, prises par vous. Votre comptoir, votre café, vos pâtisseries.' }),
-  R('photo_extra', { w: 7, whyEn: 'Your counter, your coffee, your baking, your seats.', whyFr: 'Votre comptoir, votre café, vos pâtisseries, vos places assises.' }),
-  { key: 'serves', group: 'serve', w: 6, fix: true, target: { setup: 'cuisine:serve' }, fields: ['cafe_info'],
+  R('photo_extra', { w: 8, whyEn: 'Your counter, your coffee, your baking, your seats.', whyFr: 'Votre comptoir, votre café, vos pâtisseries, vos places assises.' }),
+  { key: 'serves', group: 'serve', w: 8, fix: true, target: { setup: 'cuisine:serve' }, fields: ['cafe_info'],
     en: 'What you serve', fr: 'Ce que vous servez', whyEn: 'Espresso, pastries baked here, lunch, gelato, bubble tea: tick all that apply.', whyFr: 'Espresso, pâtisseries maison, dîner, gelato, thé aux perles : cochez tout ce qui s’applique.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥐' },
-  R('menu', { group: 'serve', w: 6 }),
+  R('menu', { group: 'serve', w: 8 }),
   R('avg_spend', { group: 'serve', w: 4, en: 'Price per person', fr: 'Prix par personne', whyEn: 'About how much is a coffee and a pastry? Cents are fine, like $5.50.', whyFr: 'Combien coûtent environ un café et une pâtisserie? Les cents sont acceptés, par exemple 5,50 $.' }),
-  R('dietary', { group: 'serve', w: 4, noneEn: 'None of these', noneFr: 'Aucune de ces options', whyEn: 'Vegan, vegetarian, gluten-free or dairy-free milks. Tick what you offer.', whyFr: 'Options véganes, végétariennes, sans gluten ou laits végétaux. Cochez ce que vous offrez.' }),
-  { key: 'stay', group: 'yourvisit', w: 5, fix: true, target: { setup: 'stay' }, fields: ['cafe_info'],
-    en: 'Seats and laptops', fr: 'Places et ordinateurs portables', whyEn: 'Takeout only, a few seats or lots, and whether laptops are welcome.', whyFr: 'Pour emporter seulement, quelques places ou beaucoup, et si les ordinateurs portables sont bienvenus.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💻' },
-  { key: 'wifi', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'], noneEn: 'We don’t have Wi-Fi', noneFr: 'Nous n’avons pas de Wi-Fi',
+  R('dietary', { group: 'serve', w: 6, noneEn: 'None of these', noneFr: 'Aucune de ces options', whyEn: 'Vegan, vegetarian, gluten-free or dairy-free milks. Tick what you offer.', whyFr: 'Options véganes, végétariennes, sans gluten ou laits végétaux. Cochez ce que vous offrez.' }),
+  { key: 'wifi', group: 'yourvisit', w: 4, fix: true, target: { setup: 'offer' }, fields: ['owner_features'], noneEn: 'We don’t have Wi-Fi', noneFr: 'Nous n’avons pas de Wi-Fi',
     en: 'Wi-Fi', fr: 'Wi-Fi', whyEn: 'Visitors look for it on the map.', whyFr: 'Les visiteurs le cherchent sur la carte.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📶' },
-  { key: 'dogs_kids', group: 'yourvisit', w: 4, fix: true, target: { setup: 'offer' }, fields: ['badges', 'owner_features'],
+  { key: 'dogs_kids', group: 'yourvisit', w: 6, fix: true, target: { setup: 'offer' }, fields: ['badges', 'owner_features'],
     en: 'Dogs and kids', fr: 'Chiens et enfants', whyEn: 'Dogs welcome, dog treats, kids welcome, stroller space, or no dogs allowed.', whyFr: 'Chiens bienvenus, gâteries pour chiens, enfants bienvenus, place pour poussettes, ou chiens non admis.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🐕' },
-  { key: 'ordering', group: 'yourvisit', w: 5, fix: true, target: { setup: 'order' }, fields: ['cafe_info', 'owner_features'], noneEn: 'Order at the counter only', noneFr: 'Commande au comptoir seulement',
-    en: 'Ordering', fr: 'Commander', whyEn: 'Order online, a drive-thru or walk-up window, or custom cakes and pre-orders.', whyFr: 'Commande en ligne, service au volant ou comptoir extérieur, ou gâteaux sur commande.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🛍️' },
-  R('description', { w: 5 }),
-  R('pyv_known', { group: 'about', w: 3, whyEn: 'One line, like “Cinnamon buns and the window seats”.', whyFr: 'Une ligne, comme « Les brioches à la cannelle et les places près de la fenêtre ».' }),
+  R('description', { w: 8 }),
   R('instagram', { w: 3 }),
   R('facebook', { w: 3 }),
   R('arrival', { w: 2 }),
@@ -163,7 +161,7 @@ const EXTRA_NONE_KEYS = ['dogs'];
 // any other (remembered, research doesn't add them back), never scored and never in that type's checklist. Pubs are
 // asked about booking and takeout in the setup without scoring them.
 // Café test 2 (2026-11-11): "No washroom" is an explicit answer too (never shown on the page).
-const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom'], pub: ['pyv_reservations', 'pyv_takeout'] };
+const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom', 'ordering'], pub: ['pyv_reservations', 'pyv_takeout'] };
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
