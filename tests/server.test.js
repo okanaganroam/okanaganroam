@@ -26263,7 +26263,7 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   assert.match(frPage, /<span>Fermé<\/span>/);
   assert.doesNotMatch(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);
   assert.match(frPage, /<summary>Heures saisonnières \(1er nov\. – 30 avr\.\)<\/summary>/);
-  assert.match(frPage, /Fermetures spéciales:<\/strong>/);
+  assert.match(frPage, /Fermetures spéciales :<\/strong>/);
   // In winter the seasonal set is the week shown, and the usual hours fold away.
   const nov = app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-11-02T20:00:00Z') });
   assert.match(nov, /<li class="is-today"><span>Monday<\/span><span>10 AM – 4 PM<\/span><\/li>/);

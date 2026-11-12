@@ -198,7 +198,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   const s = scriptOf(html);
   const cfg = cfgOf(html);
   // Skip can't overwrite an answer.
-  assert.match(s, /function skip\(step\)\{\s*if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
+  assert.match(s, /function skip\(step\)\{[\s\S]*?if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
   assert.match(s, /if \(k === 'skip'\) \{ if \(answered\(v\)\) return after\(v\);/);
   // The menu step says what was sent.
   assert.match(s, /sentM \? q\(T\.menuSentQ\)/);

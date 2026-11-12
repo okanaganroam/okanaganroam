@@ -334,7 +334,8 @@ test('6: café words by kind: photos, story, serves, dietary, dog treats, no-Wi-
   assert.ok((await change(tokenFor(v.id), { cafe_info: { diet: { gf_cones: 'waffles' } } })).status >= 400);
   // Serves: the new chips save and show.
   ok(await change(tokenFor(v.id), { cafe_info: { serves: ['ice_cream', 'sorbet', 'milkshakes', 'cones', 'affogato', 'made_here'] } }));
-  assert.match(page(v, 'en'), /Ice cream &amp; gelato, sorbet, milkshakes, cones &amp; cups, affogato and made here/);
+  // Bug-check (2026-11-12): the kind already says "Ice cream & gelato", so the serves list doesn't repeat it.
+  assert.match(page(v, 'en'), /Sorbet, milkshakes, cones &amp; cups, affogato and made here/);
   // No Wi-Fi with no seats inside: no "a place to talk".
   ok(await change(tokenFor(v.id), { not_offered: ['wifi'] }));
   assert.match(page(v, 'en'), /No Wi-Fi: a place to talk/);

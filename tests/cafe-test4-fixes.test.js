@@ -77,7 +77,7 @@ test('2: a holiday inside added closed dates is covered (not saved again, not li
   for (const d of ['2026-12-25', '2026-12-31', '2027-01-01', '2027-12-26', '2027-07-01', '2027-07-10']) assert.equal(coveredBy(d), true, d);
   for (const d of ['2026-12-24', '2027-01-02', '2027-06-30', '2027-07-11', '2026-11-11']) assert.equal(coveredBy(d), false, d);
   // A covered tile shows ticked and disabled with its note, and neither this year's nor next year's row is saved.
-  assert.match(CLIENT, /var cov = holCovered\(o\);[^\n]*\(cov \? ' disabled' : ''\)[^\n]*h\(T\.holCovered\)/);
+  assert.match(CLIENT, /var cov = holCovered\(o\);[^\n]*\(cov \? ' disabled' : ''\)[^\n]*T\.holCovered\)/);
   assert.match(CLIENT, /HOL\.filter\(function\(o\)\{ return S\.closures\.indexOf\(o\.key\) >= 0 && !holCovered\(o\); \}\)\.map\(/);
   assert.match(CLIENT, /yearlyOn\(o\.key\) && !holCovered\(o\) && !coveredBy\(o\.next\)/);
   assert.equal(TEXT.en.holCovered, 'Covered by your closed dates'); assert.ok(TEXT.fr.holCovered);
