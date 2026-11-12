@@ -440,3 +440,168 @@ test('restaurants, pubs and cafés are unchanged: no winery fields, kinds or own
   }
   assert.deepEqual(app.ownerExtraBadgesFor('cafe'), ['wifi', 'dairy_free_milk', 'drive_thru', 'walk_up', 'washroom', 'stroller', 'dog_treats', 'free_parking', 'wheelchair_accessible', 'locally_owned', 'takeout', 'service_dogs']);
 });
+
+// ---------- Winery test 1 fixes (2026-11-12; drafts/fresh-eyes-winery1-2026-11-12/REPORT.md) ----------
+const vpage = (v, lang, now) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now });
+const statusLine = (html) => (/<p class="venue-open-status" data-open="([a-z]+)" id="venueOpenStatus">([^<]*)/.exec(html) || []).slice(1).map((x) => x.trim());
+
+test('venue page: a winery by appointment in its off-season says so, like its card; walk-in season keeps open/closed', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { winery_info: { year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  const nov = new Date('2026-11-18T20:00:00Z'), jul = new Date('2026-07-15T20:00:00Z');
+  const off = vpage(w, 'en', nov);
+  assert.deepEqual(statusLine(off), ['appointment', 'By appointment · call ahead']);
+  assert.ok(!/Open now/.test(statusLine(off)[1] || ''));
+  assert.match(off, /class="venue-season venue-winery-offseason"[^>]*>Nov 1 – Apr 30: by appointment, call ahead</);
+  const offFr = vpage(w, 'fr', nov);
+  assert.deepEqual(statusLine(offFr), ['appointment', 'Sur rendez-vous · appelez avant']);
+  assert.match(offFr, /venue-winery-offseason"[^>]*>Du 1er nov\.? au 30 avr\.? : sur rendez-vous, appelez avant</);
+  const on = vpage(w, 'en', jul);
+  assert.equal(statusLine(on)[0], 'open', 'walk-in season: the normal open line');
+  assert.match(on, /Nov 1 – Apr 30: by appointment, call ahead/, 'the off-season line stays in Hours all year');
+  // All year by appointment: the status line, no off-season line. A winery that never answered: unchanged.
+  const a = mk('winery');
+  assert.equal((await change(tokenFor(a.id), { winery_info: { visit: 'appointment' } })).status, 200);
+  assert.deepEqual(statusLine(vpage(a, 'en', jul)), ['appointment', 'By appointment · call ahead']);
+  assert.ok(!vpage(a, 'en', jul).includes('venue-winery-offseason'));
+  const plain = mk('winery');
+  assert.equal(statusLine(vpage(plain, 'en', nov))[0], 'open');
+  // A restaurant's page is unchanged.
+  const r = mk('restaurant');
+  assert.equal(statusLine(vpage(r, 'en', nov))[0], 'open');
+});
+
+test('help: the tasting price answer says how to change it and never offers the price range topic', async () => {
+  const tp = app.OWNER_HELP_TOPICS.find((x) => x.id === 'winery-price') || null;
+  assert.equal(tp, null, 'a winery topic, not a general one');
+  const w = mk('winery'); const t = tokenFor(w.id);
+  const ohb = (html) => JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+  for (const p of [`/owner/${t}/setup`, `/owner/${t}`, `/fr/owner/${t}/setup`]) {
+    const r = await get(p); assert.equal(r.status, 200, p);
+    const topic = ohb(r.text).topics.find((x) => x.id === 'winery-price');
+    assert.ok(topic, p);
+    assert.match(topic.a, /To change it, open <strong>Set up your page<\/strong> and tap <strong>Tastings<\/strong>/);
+    assert.match(topic.aFr, /Pour le changer, ouvrez <strong>Configurez votre page<\/strong> et touchez <strong>Dégustations<\/strong>/);
+    assert.ok(topic.noRelated.includes('price-range') && topic.noRelated.includes('avg-spend'));
+    assert.ok(topic.over.includes('price-range'));
+    assert.ok(topic.keys.includes('wrong tasting price'));
+  }
+  // The widget leaves noRelated topics out of the "pick another topic" chips.
+  assert.match((await get(`/owner/${t}/setup`)).text, /\(t\.noRelated \|\| \[\]\)\.forEach\(function\(x\)\{ seen\[x\] = 1; \}\)/);
+  // The French answer names the renamed question.
+  const ap = (await get(`/owner/${t}/setup`)).text;
+  assert.ok(!ap.includes('Comment vous visite-t-on'));
+});
+
+test('none words: “we don’t take bookings online” reads in words, and every none key has words', async () => {
+  for (const type of ['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery']) {
+    for (const k of pc.noneKeysFor(type)) {
+      const w = app.OWNER_NONE_WORDS[k];
+      assert.ok(Array.isArray(w) && w[0] && w[1] && !w[0].includes('_'), `${type}: ${k}`);
+    }
+  }
+  const v = mk('winery'); const t = tokenFor(v.id);
+  assert.equal((await change(t, { not_offered: ['booking_link'] }, false)).status, 200);
+  const home = (await get(`/owner/${t}`)).text;
+  assert.match(home, /You told us you don’t have: online booking/);
+  assert.ok(!/don’t have: booking_link/.test(home));
+  assert.match((await get(`/fr/owner/${t}`)).text, /Vous nous avez dit que vous n’avez pas : de réservation en ligne/);
+});
+
+test('tastings card: the owner’s own line is credited “From the winery”, not the website or a checked date', () => {
+  const nt = require('../niche-tastings.js');
+  const esc = (s) => String(s);
+  const base = { source_url: 'https://www.sunfield.example/visit', checked_at: '2026-11-12' };
+  const own = nt.wineryTastingsHtml({ ...base, rows: [{ label: 'Tastings', text: 'From $10 a person.' }], owner_labels: ['Tastings'] }, esc);
+  assert.match(own, /<p class="fd-note">From the winery\. Confirm/);
+  assert.ok(!own.includes('sunfield.example') && !own.includes('checked'));
+  const res = nt.wineryTastingsHtml({ ...base, rows: [{ label: 'Tastings', text: '$10.' }] }, esc);
+  assert.match(res, /From sunfield\.example · checked Nov 12, 2026\./);
+  const mixed = nt.wineryTastingsHtml({ ...base, rows: [{ label: 'Tastings', text: '$10.' }, { label: 'Tours', text: 'Daily.' }], owner_labels: ['Tastings'] }, esc);
+  assert.match(mixed, /From the winery and sunfield\.example · checked/);
+});
+
+test('plan your visit: a full box drops research that repeats an answer before unrelated research; Undo brings it back', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [
+    { label: 'Tastings', text: 'Tastings $10 a person.' }, { label: 'Groups', text: 'Groups of 10 or more, call ahead.' },
+    { label: 'Picnics', text: 'Picnic tables on the lawn.' }, { label: 'Parking', text: 'Free parking by the tasting room.' },
+    { label: 'Patio', text: 'Lake-view patio.' }, { label: 'Good to know', text: 'Cash and cards.' },
+  ]);
+  assert.equal((await change(t, { winery_info: { year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  assert.equal(visitRows(w.id).length, 7);
+  assert.equal((await change(t, { winery_info: { food: 'picnic' } })).status, 200);
+  const labels = visitRows(w.id).map((r) => r.label);
+  assert.equal(labels.length, 7);
+  assert.ok(labels.includes('Food') && labels.includes('Parking'), labels.join());
+  assert.ok(!labels.includes('Picnics'), 'the research line that repeats “Food: Picnic area” goes first');
+  // Undo the food answer: the picnic line comes back.
+  const req = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%picnic%' ORDER BY id DESC").get(w.id).id;
+  const un = app.undoOwnerInstantChange(req, 'dayton', new Date(), 'test');
+  assert.equal(un.ok, true, JSON.stringify(un));
+  const after = visitRows(w.id).map((r) => r.label);
+  assert.ok(after.includes('Picnics') && after.includes('Parking') && !after.includes('Food'), after.join());
+  // The same when the owner's own line fills the box (a Dogs line from "What you offer", as in the test).
+  assert.equal((await change(t, { winery_info: { food: 'picnic' } })).status, 200);
+  assert.equal(visitRows(w.id).length, 7);
+  assert.ok(!visitRows(w.id).some((r) => r.label === 'Picnics'));
+  research(w.id, [{ label: 'Tastings', text: 'Tastings $10 a person.' }, { label: 'Parking', text: 'Free parking by the tasting room.' }, { label: 'Picnics', text: 'Picnic tables on the lawn.' }]);
+  const w2 = mk('winery'); const t2 = tokenFor(w2.id);
+  research(w2.id, [
+    { label: 'Tastings', text: 'Tastings $10 a person.' }, { label: 'Groups', text: 'Groups of 10 or more, call ahead.' },
+    { label: 'Picnics', text: 'Picnic tables on the lawn.' }, { label: 'Parking', text: 'Free parking by the tasting room.' },
+  ]);
+  assert.equal((await change(t2, { winery_info: { food: 'picnic', year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  assert.equal((await change(t2, { visit_rows: { known_for: 'Pinot Noir from estate vines' } })).status, 200);
+  assert.equal(visitRows(w2.id).length, 7);
+  assert.equal((await change(t2, { badges: { dog_friendly: true }, visit_rows: { dogs: 'Leashed dogs welcome on the patio.' } })).status, 200);
+  const l2 = visitRows(w2.id).map((r) => r.label);
+  assert.ok(l2.includes('Dogs') && l2.includes('Parking') && !l2.includes('Picnics'), l2.join());
+  // A restaurant's full box still drops its last research row, as before.
+  const r = mk('restaurant');
+  research(r.id, ['A', 'B', 'C', 'D', 'E', 'F', 'Picnics'].map((x) => ({ label: x, text: `${x} line.` })));
+  assert.equal((await change(tokenFor(r.id), { visit_rows: { known_for: 'Good food' } })).status, 200);
+  assert.deepEqual(visitRows(r.id).map((x) => x.label), ['A', 'B', 'C', 'D', 'E', 'F', 'Known for']);
+});
+
+test('setup: “Change an answer” on the essentials-done screen, winery icons, wording and the picnic suggestion', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  const r = await get(`/owner/${t}/setup`);
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /id="suChangeAnswer" data-act="go:start">' \+ h\(T\.changeAnswer\)/);
+  assert.match(js, /experiences: '🍇', menu: '🍷'/);
+  // Every Part 2 tile of every type has an icon (no '•').
+  const icons = /var P2_ICONS = (\{[^}]*\})/.exec(js)[1];
+  for (const type of ['restaurant', 'pub', 'cafe', 'winery']) for (const k of app.setupParts(type).part2) assert.ok(new RegExp(`\\b${k}: '`).test(icons), `${type}: ${k}`);
+  const cfg = cfgOf(r.text);
+  assert.equal(cfg.t.changeAnswer, 'Change an answer');
+  assert.equal(text.fr.changeAnswer, 'Modifier une réponse');
+  assert.equal(cfg.t.webQ, 'Is this where your wine list is?'); assert.equal(cfg.t.webLabel, 'Wine list web address');
+  assert.equal(cfg.t.bookLinkEx, 'your website’s booking page');
+  assert.equal(cfg.t.groupsSizeLead, 'For example: “Groups of 8 or more, please book ahead”.');
+  assert.equal(cfg.t.wkindLead, 'Pick the one visitors would use to describe you.');
+  assert.equal(cfg.t.foodLead, 'Pick the main one. Add the rest under Experiences.');
+  assert.equal(text.fr.winery.wkindSubs['Boutique winery'], 'Une petite équipe, souvent la famille');
+  assert.equal(text.fr.winery.visitQ, 'Comment les visiteurs viennent-ils ?');
+  assert.equal(text.fr.winery.groupsSizeLead, 'Par exemple : « Groupes de 8 personnes ou plus : réservez à l’avance ».');
+  assert.ok(!JSON.stringify(text.en.winery).includes('Tock') && !JSON.stringify(text.fr.winery).includes('Tock'));
+  assert.ok(text.en.winery.stStoryKnown && text.fr.winery.stStoryKnown && text.en.winery.picnicFromFood && text.fr.winery.picnicFromFood);
+  // A restaurant keeps its menu words.
+  const rc = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
+  assert.equal(rc.t.webQ, 'Is this where your menu is?');
+});
+
+test('checklist: finished groups open their setup screen; dogs and kids answered by What you offer; no “storefront” for a winery', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { tasting_fee: 10, winery_info: { visit: 'walk_in', groups: 8, buses: 'welcome' } })).status, 200);
+  const home = (await get(`/owner/${t}`)).text;
+  assert.match(home, new RegExp(`<a href="/owner/${t}/setup#tastings" class="op-cb-g full op-cb-g-link">`));
+  const shown = home.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]*>/g, ' ');
+  assert.ok(!/storefront|devanture/i.test(shown), (shown.match(/.{60}storefront.{40}/i) || [''])[0]);
+  assert.ok(!/storefront|devanture/i.test((await get(`/fr/owner/${t}`)).text.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]*>/g, ' ')), 'nor in French: ' + ((await get(`/fr/owner/${t}`)).text.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]*>/g, ' ').match(/[\s\S]{80}devanture[\s\S]{40}/i) || [''])[0]);
+  // Dogs and kids: answered once What you offer is saved, with no dog or kid tile.
+  const inp = { type: 'winery', offerAnswered: true };
+  assert.equal(pc.doneMap(inp, today).dogs_kids, true);
+  assert.equal(pc.doneMap({ type: 'winery' }, today).dogs_kids, false);
+  assert.equal(pc.doneMap({ type: 'cafe', offerAnswered: true }, today).dogs_kids, false, 'cafés unchanged');
+});

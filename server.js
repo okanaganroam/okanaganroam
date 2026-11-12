@@ -20417,6 +20417,34 @@ function wineryVisitLines(venue, info) {
 }
 // The labels the winery answers manage (the rest of the box is research's, or the restaurant setup's Known for / Dogs).
 const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Winter'];
+// Winery test 1 (2026-11-12): keeps a Plan your visit box to VISIT_ROWS_MAX rows, in place. Rows set aside earlier
+// (`stash`, stored as owner_dropped) come back first, so an answer taken back by Undo brings them back. Then, while the
+// box is too full: a research row that repeats a winery answer goes first (research "Picnics" beside the owner's "Food:
+// Picnic area", before an unrelated "Parking") and is set aside; then the last research row (never one `isOwn` keeps)
+// drops. -> the rows set aside (store them as owner_dropped).
+function visitCapRows(rows, isOwn, owned, managed, stash) {
+  for (const r of Array.isArray(stash) ? stash : []) {
+    if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) });
+  }
+  const dropped = [];
+  const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
+  while (rows.length > VISIT_ROWS_MAX) {
+    let j = -1;
+    for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
+    if (j >= 0) { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }); rows.splice(j, 1); continue; }
+    for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
+    rows.splice(j >= 0 ? j : rows.length - 1, 1);
+  }
+  return dropped;
+}
+// Research labels that say the same thing as an answer's row (winery test 1): set aside first when the box is full.
+const WINERY_REPEAT_LABELS = {
+  Food: /^(?:picnics?|picnic area|picnic tables|food|snacks|cheese(?: plates?)?|charcuterie|eats?)$/i,
+  Restaurant: /^(?:restaurant|bistro|dining|food|kitchen|lunch)$/i,
+  Tastings: /^(?:tastings?|wine tastings?|tasting fees?|tasting room)$/i,
+  Groups: /^(?:groups?|large groups|group tastings?|tour buses|buses|limos?)$/i,
+  Winter: /^(?:winter|off-?season|winter hours|seasons?)$/i,
+};
 // Labels that are never one of the box's "extra" (experience) rows.
 const WINERY_CORE_LABELS = new Set([...WINERY_MANAGED_LABELS, 'Known for', 'Dogs', 'Good to know', 'Booking', 'Reservations', 'Takeout', 'To go', 'Dietary', 'Menu', 'Patio', 'Prices', 'Parking']);
 // Writes the answers' lines into the stored Plan your visit box as the owner's rows (owner_labels), keeping what each
@@ -20469,13 +20497,10 @@ function writeWineryVisitRows(venueId, now = new Date()) {
     for (const r of wasExtra || []) { if (!rows.some((x) => x.label === r.label)) rows.push({ ...r }); owned.delete(r.label); }
     wasExtra = null; extraLabels = [];
   }
-  // The box holds at most VISIT_ROWS_MAX rows: the answers' and the owner's come first; research rows beyond that drop.
-  while (rows.length > VISIT_ROWS_MAX) {
-    let j = -1;
-    for (let k = rows.length - 1; k >= 0; k--) if (!owned.has(rows[k].label)) { j = k; break; }
-    rows.splice(j >= 0 ? j : rows.length - 1, 1);
-  }
+  // The box holds at most VISIT_ROWS_MAX rows: the answers' and the owner's come first (visitCapRows).
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, cur && cur.owner_dropped);
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
+  if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
   if (Object.keys(frMap).length) next.owner_fr = frMap; else delete next.owner_fr;
   if (managed.size) next.winery_labels = [...managed].sort(); else delete next.winery_labels;
@@ -20502,6 +20527,24 @@ function wineryAppointmentOn(venueId, date) {
   return false;
 }
 const WINERY_APPOINTMENT_LINE = 'By appointment · call ahead';
+// The venue page's status (winery test 1, 2026-11-12): true when the winery's own answer says it is by appointment
+// today and no closure for the season (or a current temporary one) is on, the same rule as foodDrinkOpenNowInfo.
+function venueWineryAppointmentToday(venue, now = new Date()) {
+  if (!venue || venue.type !== 'winery' || venue.redirect_to) return false;
+  if (wineryAppointmentOn(venue.id, todayLocal(now)) !== true) return false;
+  const ss = getSeasonStates(now).get(venue.id);
+  return !(ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)));
+}
+// The off-season line for the venue page's Hours (winery test 1): the days outside the owner's walk-in dates.
+function wineryOffSeasonLineHtml(venue, fr) {
+  if (!venue || venue.type !== 'winery' || venue.redirect_to) return '';
+  const w = venueWineryInfo(venue.id);
+  if (w.visit === 'appointment' || w.year !== 'appointment' || !w.season || !w.season.from || !w.season.to) return '';
+  const a = wineryMdShift(w.season.to, 1), b = wineryMdShift(w.season.from, -1);
+  const text = fr ? `Du ${wineryMd(a, true)} au ${wineryMd(b, true)}\u00a0: sur rendez-vous, appelez avant`
+    : `${wineryMd(a, false)} \u2013 ${wineryMd(b, false)}: by appointment, call ahead`;
+  return `<p class="venue-season venue-winery-offseason" style="margin:0 0 10px;font-weight:700">${escapeHtml(text)}</p>`;
+}
 // The same for a venue id of any type (null for anything but a winery that answered).
 function wineryAppointmentForId(venueId, date) {
   try { const t = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId); if (!t || t.type !== 'winery') return null; } catch (e) { return null; }
@@ -34891,6 +34934,7 @@ function frStatusText(text) {
   return time(text
     .replace('Open now \u00b7 Closes ', 'Ouvert \u00b7 ferme \u00e0 ')
     .replace('Open 24 hours', 'Ouvert 24 h sur 24')
+    .replace('By appointment \u00b7 call ahead', 'Sur rendez-vous \u00b7 appelez avant')
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
@@ -36089,6 +36133,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (exactSeason ? 'Ouvert du ' : /^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? (exactSeason ? ' chaque année' : '') : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
+  // Winery test 1 (2026-11-12): the off-season answer under the hours, from the owner's walk-in dates
+  // ("Nov 1 – Apr 30: by appointment, call ahead").
+  const wineryOffLine = wineryOffSeasonLineHtml(venue, fr);
+  if (wineryOffLine) hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wineryOffLine}`) : `<h2>${L('Hours', 'Heures')}</h2>${wineryOffLine}`;
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
   const pubLines = pubInfoLinesHtml(venue, fr, opts.now || new Date());
   if (pubLines) hoursHtml = hoursHtml ? hoursHtml + pubLines : `<h2>${L('Hours', 'Heures')}</h2>${pubLines}`;
@@ -36535,7 +36583,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Pub test 8: a season or closure notice that does not say the place is closed for the season (an upcoming closure,
   // "open until", "reopening", a closure day the hours already read as closed) keeps the open-now line, as on the cards
   // (foodDrinkOpenNowInfo / seasonNonBlockingIds).
-  const openStatus = venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
+  // Winery test 1 (2026-11-12): a winery that is by appointment today (its own answer, all year or in its off-season)
+  // says so here exactly as its cards do (cardStatusFor / foodDrinkOpenNowInfo), never "Open now"; a closure still wins.
+  const wineryApptToday = venueWineryAppointmentToday(venue, opts.now || new Date());
+  const openStatus = wineryApptToday ? { state: 'appointment', text: WINERY_APPOINTMENT_LINE }
+    : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
   const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
@@ -45736,14 +45788,12 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
     } else if (i >= 0) rows.splice(i, 1);
     owned.add(label);
   }
-  // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop.
-  while (rows.length > VISIT_ROWS_MAX) {
-    let j = -1;
-    // A winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's.
-    for (let k = rows.length - 1; k >= 0; k--) if (!slotLabels.has(rows[k].label) && !owned.has(rows[k].label)) { j = k; break; }
-    rows.splice(j >= 0 ? j : rows.length - 1, 1);
-  }
+  // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop. A
+  // winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's; research
+  // that repeats one of them goes first (visitCapRows, winery test 1).
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), cur && cur.owner_dropped);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
+  if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (!rows.length && !info.booking_url && !info.owner_labels.length) {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
     return { before, after: null };
@@ -52142,14 +52192,18 @@ const CAFE_SETUP_HELP_TOPICS = [
 ];
 // Wineries (2026-11-12): what winery owners ask about the winery questions.
 const WINERY_SETUP_HELP_TOPICS = [
-  { id: 'winery-price', pages: ['setup', 'edit'], q: 'When does my tasting price show?', qFr: 'Quand mon prix de dégustation s’affiche-t-il?',
-    keys: ['tasting price', 'tasting fee', 'price', 'how much', 'cost', 'free tasting', 'waived'], keysFr: ['prix', 'dégustation', 'combien', 'gratuite', 'offerte'],
-    a: '<p>Right away, on your page and on your card (“From $15”, or “Free tasting”). A price over $75 is checked first and shows within a day. Your price replaces the one we found on your website, and our weekly price check leaves it alone.</p>',
-    aFr: '<p>Tout de suite, sur votre page et sur votre fiche (« Dès 15 $ », ou « Dégustation gratuite »). Un prix de plus de 75 $ est vérifié d’abord et s’affiche d’ici un jour. Votre prix remplace celui trouvé sur votre site Web, et notre vérification hebdomadaire des prix n’y touche pas.</p>' },
+  // Winery test 1 (2026-11-12): "how do I change it" is answered first, and a tasting-fee question never offers the
+  // restaurant "price range" or "average spend" topics as the next thing to read (noRelated).
+  { id: 'winery-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend', 'menu-add'], noRelated: ['price-range', 'avg-spend', 'cafe-price'],
+    q: 'How do I change my tasting price?', qFr: 'Comment changer mon prix de dégustation?',
+    keys: ['tasting price', 'tasting fee', 'tasting cost', 'tastings', 'tasting', 'change the tasting price', 'change my tasting price', 'wrong tasting price', 'wrong price', 'price', 'how much', 'cost', 'free tasting', 'waived'],
+    keysFr: ['prix', 'dégustation', 'degustation', 'prix de degustation', 'changer le prix', 'mauvais prix', 'combien', 'gratuite', 'offerte'],
+    a: '<p>To change it, open <strong>Set up your page</strong> and tap <strong>Tastings</strong>. Pick the new price and tap <strong>Save these</strong>.</p><p>It shows right away, on your page and on your card (“From $15”, or “Free tasting”). A price over $75 is checked first and shows within a day. Your price replaces the one we found on your website, and our weekly price check leaves it alone.</p>',
+    aFr: '<p>Pour le changer, ouvrez <strong>Configurez votre page</strong> et touchez <strong>Dégustations</strong>. Choisissez le nouveau prix et touchez <strong>Enregistrer</strong>.</p><p>Il s’affiche tout de suite, sur votre page et sur votre fiche (« Dès 15 $ », ou « Dégustation gratuite »). Un prix de plus de 75 $ est vérifié d’abord et s’affiche d’ici un jour. Votre prix remplace celui trouvé sur votre site Web, et notre vérification hebdomadaire des prix n’y touche pas.</p>' },
   { id: 'winery-appointment', pages: ['setup', 'edit'], q: 'We’re by appointment in winter', qFr: 'Nous sommes sur rendez-vous l’hiver',
     keys: ['by appointment', 'appointment', 'appointment only', 'off-season', 'off season', 'winter', 'call ahead'], keysFr: ['rendez-vous', 'sur rendez-vous', 'basse saison', 'hiver', 'appelez'],
     a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”. By appointment all year? Pick <strong>By appointment only</strong> under “How do people visit?”.</p>',
-    aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez quand vous accueillez les visiteurs sans réservation. En dehors de ces dates, votre fiche et Planifier mon voyage indiquent « Sur rendez-vous · appelez avant ». Sur rendez-vous toute l’année? Choisissez <strong>Sur rendez-vous seulement</strong> sous « Comment vous visite-t-on? ».</p>' },
+    aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez quand vous accueillez les visiteurs sans réservation. En dehors de ces dates, votre fiche et Planifier mon voyage indiquent « Sur rendez-vous · appelez avant ». Sur rendez-vous toute l’année? Choisissez <strong>Sur rendez-vous seulement</strong> sous « Comment les visiteurs viennent-ils? ».</p>' },
   { id: 'winery-restaurant', pages: ['setup'], q: 'Our restaurant has its own page', qFr: 'Notre restaurant a sa propre page',
     keys: ['restaurant', 'bistro', 'restaurant hours', 'restaurant menu', 'kitchen'], keysFr: ['restaurant', 'bistro', 'heures du restaurant', 'menu du restaurant'],
     a: '<p>One page, one setup. When your restaurant has its own page with us, update its hours and menu there, with its own link (ask us for it at info@okanaganroam.com). Here, “Food here” only points to it.</p>',
@@ -53792,7 +53846,7 @@ const OWNER_HELP_SCRIPT = String.raw`
     // A page can answer a topic itself with what is true right now (the setup's "did it go through?").
     var lv = (window.ohbLive || {})[id];
     var a = say(lv ? lv(curLang, function(html){ a.innerHTML = html; }) : curLang === 'fr' ? t.aFr : t.a);
-    var seen = {}; seen[id] = 1;
+    var seen = {}; seen[id] = 1; (t.noRelated || []).forEach(function(x){ seen[x] = 1; });
     var more = (related || []).concat(cfg.start || []).filter(function(x){ if (seen[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
     say(ui('more'));
     chips(more);
@@ -54010,7 +54064,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     signedIn: !!opts.signedIn,
     start: OWNER_HELP_START[page],
     // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
-    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
+    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [],
       a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI,
@@ -55845,7 +55899,10 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
-  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links' || field === 'winery_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  // Winery test 1 (2026-11-12): the winery answers are stored in WINERY_INFO_PARTS order, the request in the order the
+  // owner's saves merged them ("year" before "food"): compared with sorted keys, so an Undo of a winery answer works.
+  if (field === 'winery_info') { const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v)); return canon(a || {}) === canon(b || {}); }
+  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links') return JSON.stringify(a || {}) === JSON.stringify(b || {});
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -56888,6 +56945,8 @@ const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['veg
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
   pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
   cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'],
+  // Winery test 1 (2026-11-12): every "none" key a setup can send has words (it read "booking_link").
+  booking_link: ['online booking', 'de réservation en ligne'], washroom: ['a customer washroom', 'de toilettes pour les clients'],
   wifi: ['Wi-Fi', 'de Wi-Fi'], ordering: ['online ordering, a drive-thru or pre-orders (order at the counter only)', 'de commande en ligne, de service au volant ni de précommandes (commande au comptoir seulement)'] };
 // What one save changed, in the owner's words (pub test 6, 2026-11-10): only what actually changed. A kitchen-only save
 // is "Kitchen" (not "Kitchen, who's welcome and sports"); a happy hour save is "Happy hour" (the Happy hour badge and the
@@ -57768,7 +57827,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
-    fr, canDecline: true, noScore: true,
+    fr, canDecline: true, noScore: true, winery: venue.type === 'winery',
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
@@ -58530,7 +58589,7 @@ ${renderGolfHeaderHtml()}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
-          ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
+          ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
@@ -64973,7 +65032,7 @@ module.exports = {
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
-  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
+  validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, OWNER_NONE_WORDS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)

@@ -381,7 +381,8 @@ function doneMap(input, today) {
         booking_link: nonBlank(i.bookingUrl) || w.visit === 'walk_in',
         winery_groups: Number.isInteger(w.groups) || ['welcome', 'book', 'no'].includes(w.buses),
         food_here: WINERY_FOOD.includes(w.food),
-        dogs_kids: !!(i.dogFriendly || i.kidFriendly) || (i.declaredNone || []).includes('dogs'),
+        // Winery test 1 (2026-11-12): "What you offer" saved answers it too (no dog or kid tile ticked is an answer), as for access.
+        dogs_kids: !!(i.dogFriendly || i.kidFriendly) || (i.declaredNone || []).includes('dogs') || !!i.offerAnswered,
         access: ['wheelchair_accessible', 'free_parking', 'rv_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),
@@ -452,6 +453,10 @@ function scoreCompleteness(input, opts) {
   let got = 0, max = 0;
   // Groups in the order their items come (the same as GROUPS for restaurants).
   const per = new Map([...new Set(list.map((it) => it.group))].map((k) => [k, { key: k, got: 0, max: 0 }]));
+  // Winery test 1 (2026-11-12): the setup screen that answers each group (its first item's), so a finished group in
+  // "See what's done" opens that screen to change an answer.
+  const GROUP_STEP = { address_pin: 'basics', phone: 'basics', website: 'basics', hours: 'hours', hours_fresh: 'hours', photo_main: 'photos', photo_extra: 'photos', menu: 'menu', description: 'story', arrival: 'door' };
+  for (const it of list) { const g = per.get(it.group); const st = GROUP_STEP[it.key] || (it.target && it.target.setup); if (g && !g.setup && st) g.setup = st; }
   const missing = [], coming = [], afterReopen = [];
   for (const base of list) {
     if (na[base.key]) continue;
@@ -551,6 +556,9 @@ function renderCompleteness(result, opts) {
   const fr = !!o.fr;
   const L = (en, f) => (fr ? f : en);
   const r = result;
+  // Winery test 1 (2026-11-12): a winery has a tasting room door, not a storefront.
+  const spotEn = o.winery ? 'your tasting room door' : 'your storefront spot';
+  const spotFr = o.winery ? 'la porte de votre salle de dégustation' : 'l’emplacement de votre devanture';
   const gotText = (k) => (GOT_TEXT[k] ? `${fr ? GOT_TEXT[k].fr : GOT_TEXT[k].en} \u2713` : '');
   const waitingList = r.waiting || r.missing.filter((it) => it.waiting);
   // Ticked badges waiting for our check (final fresh-eyes 2026-11-09): most badges (patio, kid-friendly…) belong to no
@@ -586,7 +594,7 @@ function renderCompleteness(result, opts) {
   const photosSent = Math.max(0, Number(o.pendingPhotos) || 0);
   if (o.plainWaiting && (nw || extraFields.length || photosSent)) {
     const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
-      website: ['website', 'site Web'], arrival: ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
+      website: ['website', 'site Web'], arrival: o.winery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     // Every pending item is named, photos included (pub test 6: "Menu, website and address sent" left out the photo).
@@ -601,8 +609,8 @@ function renderCompleteness(result, opts) {
     : nq
       ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}${waitTxt}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}${waitTxt}. Touchez pour commencer.`)
       : left && r.missing.filter((it) => !it.waiting).every((it) => CEILING_KEYS.includes(it.key))
-        ? L(`Last steps: ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? 'photos and your storefront spot' : 'your storefront spot') : 'photos'}${waitTxt}. Tap to see.`,
-          `Dernières étapes : ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? 'les photos et l’emplacement de votre devanture' : 'l’emplacement de votre devanture') : 'les photos'}${waitTxt}. Touchez pour voir.`)
+        ? L(`Last steps: ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? `photos and ${spotEn}` : spotEn) : 'photos'}${waitTxt}. Tap to see.`,
+          `Dernières étapes : ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? `les photos et ${spotFr}` : spotFr) : 'les photos'}${waitTxt}. Touchez pour voir.`)
       : left
         ? L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes${waitTxt}. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes${waitTxt}. Touchez pour voir.`)
         : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
@@ -672,9 +680,9 @@ function renderCompleteness(result, opts) {
   const ceilPhotos = leftKeys.includes('photo_main') || leftKeys.includes('photo_extra');
   const ceilDoor = leftKeys.includes('arrival');
   const onlyCeiling = leftKeys.length > 0 && leftKeys.every((k) => CEILING_KEYS.includes(k));
-  const ceilingText = ceilPhotos && ceilDoor ? L('Photos and your storefront spot are the last steps to 100%.', 'Les photos et l’emplacement de votre devanture sont les dernières étapes vers 100 %.')
+  const ceilingText = ceilPhotos && ceilDoor ? L(`Photos and ${spotEn} are the last steps to 100%.`, `Les photos et ${spotFr} sont les dernières étapes vers 100 %.`)
     : ceilPhotos ? L('Photos are the last step to 100%.', 'Les photos sont la dernière étape vers 100 %.')
-      : ceilDoor ? L('Your storefront spot is the last step to 100%.', 'L’emplacement de votre devanture est la dernière étape vers 100 %.') : '';
+      : ceilDoor ? L(`${spotEn.charAt(0).toUpperCase()}${spotEn.slice(1)} is the last step to 100%.`, `${spotFr.charAt(0).toUpperCase()}${spotFr.slice(1)} est la dernière étape vers 100 %.`) : '';
   const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${noScore ? ceilingText.replace(' to 100%', '').replace(' vers 100 %', '') : ceilingText}${onlyCeiling ? '' : ceilPhotos && ceilDoor
     ? L(' Do them when you’re at your place with a few minutes.', ' Faites-les quand vous êtes sur place avec quelques minutes.')
     : L(' Do it when you’re at your place with a few minutes.', ' Faites-le quand vous êtes sur place avec quelques minutes.')}</p>` : '';
@@ -687,7 +695,10 @@ function renderCompleteness(result, opts) {
   // Café test 2 (2026-11-11): the storefront photo of a place closed for the season waits until it reopens.
   const reopenHtml = (r.afterReopen || []).length ? `<h3 class="op-cb-h3">${L('When you reopen', 'À votre réouverture')}</h3><p class="op-cb-note">${L('You’re closed for the season, so this waits. It doesn’t count against you until you reopen.', 'Vous êtes fermé pour la saison, alors ceci attend. Cela ne compte pas contre vous avant la réouverture.')}</p><ul class="op-cb-soon">${r.afterReopen.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${L('Stand at your front door and take one photo when you’re open again.', 'Placez-vous devant votre porte et prenez une photo quand vous serez rouvert.')}</span></li>`).join('')}</ul>` : '';
   const comingHtml = reopenHtml + askHtml + (comingPlain.length ? `<h3 class="op-cb-h3">${L('We’re adding these', 'Nous ajoutons ceci')}</h3><p class="op-cb-note">${L('You can’t fill these in yet. They’ll count once you can.', 'Vous ne pouvez pas encore les remplir. Ils compteront dès que ce sera possible.')}</p><ul class="op-cb-soon">${comingPlain.map((it) => `<li><strong>${esc(fr ? it.fr : it.en)}</strong> <span>${esc(fr ? it.whyFr : it.whyEn)}</span></li>`).join('')}</ul>` : '');
-  const groups = r.groups.map((g) => `<div class="op-cb-g${g.full ? ' full' : ''}"><b>${esc(gName.get(g.key))}${g.full ? ' ✓' : ''}</b><em>${L(`${g.got} of ${g.max}`, `${g.got} sur ${g.max}`)}</em><div class="op-cb-bar"><i style="width:${Math.round((g.got / g.max) * 100)}%"></i></div></div>`).join('');
+  const groups = r.groups.map((g) => {
+    const link = !!(o.setupHref && g.setup);
+    return `<${link ? `a href="${esc(o.setupHref)}#${esc(g.setup)}"` : 'div'} class="op-cb-g${g.full ? ' full' : ''}${link ? ' op-cb-g-link' : ''}"><b>${esc(gName.get(g.key))}${g.full ? ' ✓' : ''}${link ? ' <span class="op-cb-g-chev" aria-hidden="true">›</span>' : ''}</b><em>${L(`${g.got} of ${g.max}`, `${g.got} sur ${g.max}`)}</em><div class="op-cb-bar"><i style="width:${Math.round((g.got / g.max) * 100)}%"></i></div></${link ? 'a' : 'div'}>`;
+  }).join('');
   const declined = r.declined || [];
   const declinedHtml = o.canDecline && declined.length ? `<h3 class="op-cb-h3">${L('You told us you don’t have these', 'Vous nous avez dit ne pas avoir ceci')}</h3><ul class="op-cb-declined">${declined.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span>${L('Not offered', 'Non offert')} ✓</span></span><button type="button" class="op-cb-undo" data-cb-undo="${esc(it.key)}">${L('Undo', 'Annuler')}</button></li>`).join('')}</ul><p class="op-cb-note">${declined.some((it) => it.key === 'wifi')
     // Café test 1 (2026-11-11): a café's "No Wi-Fi" shows as a friendly line on its page ("No Wi-Fi: a place to talk").
@@ -786,6 +797,8 @@ const COMPLETENESS_CSS = `${BADGE_CSS}
     body.owner-page .op-cb-g { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
     body.owner-page .op-cb-g b { font-weight: 800; font-size: .95rem; }
     body.owner-page .op-cb-g.full b { color: #1E6B3A; }
+    body.owner-page a.op-cb-g-link { color: inherit; text-decoration: none; min-height: 44px; padding: 4px 0; }
+    body.owner-page a.op-cb-g-link .op-cb-g-chev { color: #1E4F4C; font-weight: 800; }
     body.owner-page .op-cb-g em { font-style: normal; color: #6B5D54; font-weight: 800; font-size: .85rem; }
     body.owner-page .op-cb-bar { grid-column: 1 / -1; height: 7px; background: #EAE6D9; border-radius: 99px; overflow: hidden; }
     body.owner-page .op-cb-bar i { display: block; height: 100%; background: #2A6B67; border-radius: 99px; }

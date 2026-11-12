@@ -480,7 +480,12 @@
     return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
-  function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
+  function stText(step, d){
+    // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
+    // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
+    if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
+    if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
+    return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
@@ -588,7 +593,7 @@
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
     // not back on the screen just saved.
     if (S.exitAfter) { if (S.langGo) S.step = step; return leave(); }
-    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
+    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; S.flashOn = fl ? S.step : ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
     if (step === 'happy' && S.done.happy === 'live' && S.happy.length) return 'happy:type';
     if (step === 'specials' && S.done.specials === 'live' && S.specials.length) return 'specials:type';
@@ -612,7 +617,7 @@
     }
     S.backWarned = false; goBack();
   };
-  function goBack(){ var fl = S.flash || ''; S.flash = ''; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); showToast(fl); }
+  function goBack(){ var fl = S.flash || ''; S.flash = ''; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; S.flashOn = fl ? S.step : ''; render(); showToast(fl); }
   function bar(){
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
@@ -641,6 +646,9 @@
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
     // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
     if (pending(step)) return '';
+    // Winery test 1 (2026-11-12): a screen reached by moving on after a save already shows that save's "Saved" line, so
+    // it never stacks a second "Saved. You can change it here." on top.
+    if (S.flashOn && S.flashOn === S.step) return '';
     var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
     if (d === 'unsure') return '<p class="su-sent">' + h(fill(T.youSaid, { a: T.st.unsure })) + '</p>';
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
@@ -726,7 +734,7 @@
     var seq = []; if (C.pub && S.badges.sports_tv) seq.push('offer:sports'); if (S.badges.dog_friendly) seq.push('offer:dogs'); if (C.pub) seq.push('offer:minors');
     return seq[(from === 'offer' ? -1 : seq.indexOf(from)) + 1] || null;
   }
-  var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸' };
+  var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸', experiences: '🍇', menu: '🍷' };
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
   // "87 %" in French, as the line beside it says (café test 6).
@@ -991,7 +999,10 @@
       x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.essReady) + '</h1><p class="su-lead" id="suEssCount">' + h(fill(T.essCount, { n: nd, total: P1.length })) + '</p></div>'
         + (open1.length ? '<p class="su-q">' + h(T.essSkipped) + '</p><div class="su-stack" style="margin-bottom:18px">' + open1.map(function(k){ return big('➜', T.labels[k], '', true, 'jumpEss:' + k); }).join('') + '</div>' : '')
         + preview() + scoreBox(true)
-        + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, moreSub(), false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>';
+        + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, moreSub(), false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>'
+        // Winery test 1 (2026-11-12): one clear way back to fix an answer: the "Tap any line to change it" list. A line
+        // changed from there comes back to that list.
+        + '<div class="su-skip" style="margin-top:14px"><button type="button" class="su-link" id="suChangeAnswer" data-act="go:start">' + h(T.changeAnswer) + '</button></div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
       var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
@@ -1141,7 +1152,7 @@
       var wr = S.wine, rp = C.restaurantPage;
       x = doneLine('winery') + q(T.wkindQ, T.wkindLead) + msgs()
         + '<div class="su-stack" role="group" id="suKindTiles">' + C.placeTypes.map(function(pt){ var on = S.place === pt; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-place="' + h(pt) + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(C.placeNames[pt] || pt) + ((T.wkindSubs || {})[pt] ? '<small>' + h(T.wkindSubs[pt]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'
-        + '<h2 class="su-h2">' + h(T.foodQ) + '</h2>' + wpicks('food', ['none', 'snacks', 'picnic', 'restaurant'], T.foods)
+        + '<h2 class="su-h2">' + h(T.foodQ) + '</h2>' + (T.foodLead ? '<p class="su-hint">' + h(T.foodLead) + '</p>' : '') + wpicks('food', ['none', 'snacks', 'picnic', 'restaurant'], T.foods)
         + (wr.food === 'restaurant' ? (rp ? '<div class="su-day su-ownpage" id="suOwnPage"><p class="su-q" style="margin-top:0">' + h(fill(T.ownPage, { name: rp.name })) + '</p><p class="su-hint">' + h(T.ownPageSub) + '</p><a class="su-link" href="' + h(rp.url) + '" target="_blank" rel="noopener">' + h(fill(T.ownPageLink, { name: rp.name })) + ' ↗</a></div>'
             : field('suRname', T.rnameLabel, wr.rname, { max: 60 }) + ex(T.rnameEx) + field('suRwhen', T.rwhenLabel, wr.rwhen, { max: 60 }) + ex(T.rwhenEx)) : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'winerySave') + '</div>' + skip('winery');
@@ -1290,9 +1301,13 @@
       x = q(T.emailQ, fill(T.emailLead, { name: C.name })) + '<div class="su-row su-mail"><span aria-hidden="true">✉️</span><span id="suEm">' + h(C.email) + '</span><button type="button" data-act="copy">' + h(T.copy) + '</button></div><p class="su-note" id="suCopied" role="status"></p>'
         + '<div class="su-stack"><a class="su-big su-alt" href="' + h(mail) + '"><span class="su-ico" aria-hidden="true">✉️</span><span>' + h(T.openMail) + '<small>' + h(T.openMailSub) + '</small></span></a>' + big('✓', T.willEmail, '', false, 'menuEmailDone') + '</div>';
     } else if (s === 'offer') {
+      // Winery test 1 (2026-11-12): "Food here: Picnic area" pre-ticks the Picnic area tile, as a suggestion only (saved with
+      // this screen, like the research ticks), while this screen has never been saved.
+      if (C.winery && !S.done.offer && !S.picnicSuggested && S.wine.food === 'picnic' && C.offerLabels.picnic_area && !S.badges.picnic_area) { S.badges.picnic_area = true; S.picnicSuggested = true; }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && (C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; });
-      x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
+      x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
+        + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
           + (C.cafe && g.keys.indexOf('wifi') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noWifi ? 'true' : 'false') + '" data-off="no_wifi"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noWifi) + '<span class="su-tile-sub" id="suNoWifiSub">' + h(wifiSubText()) + '</span></button>' : '')
@@ -2554,7 +2569,9 @@
   if (COMBO && startAt === 'closures') { S.hist = ['start']; S.step = 'closures'; S.toList = true; }
   // Café test 4 (2026-11-11): the checklist's "Open all year, or seasonal?" opens the Hours question that asks it.
   if (startAt === 'hours:year') { S.hist = ['start']; S.step = 'hours:year'; S.toList = true; }
-  if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
+  // Winery test 1 (2026-11-12): opening a step that is already answered (from the checklist, a help answer or "See
+  // what's done") is a fix: saving it goes back to the list, not on through the next questions.
+  if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); if (S.done[startAt] && S.done[startAt] !== 'skip') S.toList = true; } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
   // Pubs: the checklist's kitchen, sports and who's-welcome rows open their own screens.
   else if (C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) { S.hist = ['start']; S.step = startAt; S.toList = true; }
   // Cafés: the checklist's "What you serve" row opens its own screen (the kind first while none is picked).
