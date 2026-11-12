@@ -10015,6 +10015,11 @@ function visitDropRepeatedKnownFor(info, description) {
 }
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
+  // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
+  // under "More" at the end, never lost.
+  const parkedOwn = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned && r.label && typeof r.text === 'string' && !info.rows.some((x) => x.label === r.label));
+  const parkedSet = new Set(parkedOwn.map((r) => r.label));
+  if (parkedOwn.length) info = { ...info, rows: info.rows.concat(parkedOwn.map((r) => ({ label: r.label, text: r.text, ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) }))) };
   // An owner's tap-to-answer lines in the page's language (café test 6): "Patio only" on English pages, never "Terrasse seulement".
   // Bug-check (2026-11-12): only an answer that is wholly made of presets is swapped; a line with words of her own
   // ("Takeout available; call to order.") stays as typed on English pages and keeps its French translation (it was
@@ -10038,8 +10043,13 @@ function visitInfoHtml(info, fr = false) {
     return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
   };
   const enLabel = (r) => (fr ? r.__en : r.label);
-  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(enLabel(r))).sort((a, b) => (enLabel(b) === 'The hike') * 2 + (enLabel(b) === 'Known for') - ((enLabel(a) === 'The hike') * 2 + (enLabel(a) === 'Known for')));
-  const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(enLabel(r)));
+  // Winery test 2 (2026-11-12): in a winery box with the owner's answers, her lines show first and never fold, research's
+  // after them (her Groups and Private tasting were under "More" while research Parking showed).
+  const ownFirst = (Array.isArray(info.winery_labels) || Array.isArray(info.winery_extra)) && Array.isArray(info.owner_labels) && info.owner_labels.length;
+  const ownSet = new Set(ownFirst ? info.owner_labels : []);
+  const isShown = (r) => !parkedSet.has(enLabel(r)) && (VISIT_ROWS_SHOWN.has(enLabel(r)) || ownSet.has(enLabel(r)));
+  const shown = info.rows.filter(isShown).sort((a, b) => (enLabel(b) === 'The hike') * 2 + (enLabel(b) === 'Known for') - ((enLabel(a) === 'The hike') * 2 + (enLabel(a) === 'Known for')) || (ownSet.has(enLabel(b)) - ownSet.has(enLabel(a))));
+  const folded = info.rows.filter((r) => !isShown(r));
   // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
   if (!shown.length && folded.length) shown.push(folded.shift());
   // A single folded row shows open too (2026-10-31): a "More" that hides one line only costs a tap (Geo Cider's
@@ -20364,7 +20374,10 @@ function wineryVisitLines(venue, info) {
   // Does research have this line? A line these answers wrote is not research's: what it replaced (owner_was) says.
   const managedNow = new Set(box.winery_labels || []), wasNow = box.owner_was || {};
   const researchHas = (label) => (managedNow.has(label) ? !!(wasNow[label] && wasNow[label].text) : rows.some((r) => r.label === label));
-  const book = { walk_in: ['Walk-ins welcome.', 'Sans réservation.'], recommended: ['Booking recommended.', 'Réservation conseillée.'], needed: ['Please book ahead.', 'Réservez à l’avance.'], appointment: ['By appointment only. Please call or book ahead.', 'Sur rendez-vous seulement. Appelez ou réservez à l’avance.'] }[w.visit];
+  // Winery test 2 (2026-11-12): in appointment season the Tastings line never says "Walk-ins welcome" (the card and the
+  // Winter line say by appointment); it says when walk-ins are welcome instead.
+  const apptSeason = w.year === 'appointment' && w.season && w.season.from && w.season.to;
+  const book = apptSeason && w.visit === 'walk_in' ? [`Walk-ins welcome ${wineryMd(w.season.from, false)} – ${wineryMd(w.season.to, false)}.`, `Sans réservation du ${wineryMd(w.season.from, true)} au ${wineryMd(w.season.to, true)}.`] : { walk_in: ['Walk-ins welcome.', 'Sans réservation.'], recommended: ['Booking recommended.', 'Réservation conseillée.'], needed: ['Please book ahead.', 'Réservez à l’avance.'], appointment: ['By appointment only. Please call or book ahead.', 'Sur rendez-vous seulement. Appelez ou réservez à l’avance.'] }[w.visit];
   // Tastings: the price (and whether it is waived), then how to visit. Written once the price is answered, or once how
   // to visit is answered on a page whose box has no Tastings line of research to keep.
   const researchTastings = researchHas('Tastings');
@@ -20378,7 +20391,9 @@ function wineryVisitLines(venue, info) {
   if (Number.isInteger(w.groups) || w.buses) {
     const g = Number.isInteger(w.groups) ? [`Groups of ${w.groups} or more, please book ahead.`, `Groupes de ${w.groups} personnes ou plus : réservez à l’avance.`] : null;
     const b = { welcome: ['Tour buses and limos welcome.', 'Autobus et limousines bienvenus.'], book: ['Tour buses and limos: please book ahead.', 'Autobus et limousines : réservez à l’avance.'], no: ['No tour buses or limos at this time.', 'Pas d’autobus ni de limousines pour le moment.'] }[w.buses];
-    out.Groups = { en: [g && g[0], b && b[0]].filter(Boolean).join(' '), fr: [g && g[1], b && b[1]].filter(Boolean).join(' ') };
+    // Winery test 2 (2026-11-12): both asking to book ahead read as one sentence, not "book ahead" twice.
+    if (g && w.buses === 'book') out.Groups = { en: `Groups of ${w.groups} or more and tour buses, please book ahead.`, fr: `Groupes de ${w.groups} personnes ou plus et autobus : réservez à l’avance.` };
+    else out.Groups = { en: [g && g[0], b && b[0]].filter(Boolean).join(' '), fr: [g && g[1], b && b[1]].filter(Boolean).join(' ') };
   }
   // Food here: a restaurant (its own page, or a name and when it's open), snacks, a picnic area, or nothing.
   if (w.food) {
@@ -20399,7 +20414,9 @@ function wineryVisitLines(venue, info) {
     }
   }
   // Winter: the off-season answer.
-  if (w.year === 'all') out.Winter = { en: 'Open all year.', fr: 'Ouvert toute l’année.' };
+  // Winery test 2 (2026-11-12): open all year needs no line (it took a slot in a full box); a research Winter line that
+  // says otherwise goes.
+  if (w.year === 'all') out.Winter = '';
   else if (w.year === 'appointment' && w.season) {
     const a = wineryMdShift(w.season.to, 1), b = wineryMdShift(w.season.from, -1);
     out.Winter = { en: `${wineryMd(a, false)} – ${wineryMd(b, false)}: by appointment. Please call ahead.`, fr: `Du ${wineryMd(a, true)} au ${wineryMd(b, true)} : sur rendez-vous. Appelez à l’avance.` };
@@ -20420,20 +20437,23 @@ const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Wint
 // Winery test 1 (2026-11-12): keeps a Plan your visit box to VISIT_ROWS_MAX rows, in place. Rows set aside earlier
 // (`stash`, stored as owner_dropped) come back first, so an answer taken back by Undo brings them back. Then, while the
 // box is too full: a research row that repeats a winery answer goes first (research "Picnics" beside the owner's "Food:
-// Picnic area", before an unrelated "Parking") and is set aside; then the last research row (never one `isOwn` keeps)
-// drops. -> the rows set aside (store them as owner_dropped).
+// Picnic area", before an unrelated "Parking"); then the last research row (never one `isOwn` keeps).
+// Winery test 2 (2026-11-12): nothing drops silently. Every row set aside is returned (stored as owner_dropped, so an Undo
+// that makes room brings it back). A box full of the owner's own rows keeps the cap: the last of hers is set aside with
+// `owned: true`, kept, and shown folded under "More" on the page (visitInfoHtml), never lost.
+// -> the rows set aside (store them as owner_dropped).
 function visitCapRows(rows, isOwn, owned, managed, stash) {
   for (const r of Array.isArray(stash) ? stash : []) {
-    if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) });
+    if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) });
   }
   const dropped = [];
+  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
   while (rows.length > VISIT_ROWS_MAX) {
     let j = -1;
     for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
-    if (j >= 0) { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }); rows.splice(j, 1); continue; }
-    for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
-    rows.splice(j >= 0 ? j : rows.length - 1, 1);
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
+    setAside(j >= 0 ? j : rows.length - 1);
   }
   return dropped;
 }
@@ -20446,7 +20466,10 @@ const WINERY_REPEAT_LABELS = {
   Winter: /^(?:winter|off-?season|winter hours|seasons?)$/i,
 };
 // Labels that are never one of the box's "extra" (experience) rows.
-const WINERY_CORE_LABELS = new Set([...WINERY_MANAGED_LABELS, 'Known for', 'Dogs', 'Good to know', 'Booking', 'Reservations', 'Takeout', 'To go', 'Dietary', 'Menu', 'Patio', 'Prices', 'Parking']);
+// Winery test 2 (2026-11-12): and the practical lines research writes (Accessibility, Ages, Time needed...), so they are
+// never offered as Experiences, nor removed by clearing Experiences.
+const WINERY_CORE_LABELS = new Set([...WINERY_MANAGED_LABELS, 'Known for', 'Dogs', 'Good to know', 'Booking', 'Reservations', 'Takeout', 'To go', 'Dietary', 'Menu', 'Patio', 'Prices', 'Parking',
+  'Accessibility', 'Wheelchair access', 'Ages', 'Kids', 'Kids & dogs', 'Pets', 'Time needed', 'Season', 'Hours', 'What to bring', 'Getting there', 'Directions', 'Transit', 'Shuttle', 'Location']);
 // Writes the answers' lines into the stored Plan your visit box as the owner's rows (owner_labels), keeping what each
 // replaced (owner_was), so an answer taken back (an Undo) puts research's line back. French text rides along in
 // owner_fr, used on French pages while the English line is unchanged. -> { before, after } (JSON or null).
@@ -20498,7 +20521,10 @@ function writeWineryVisitRows(venueId, now = new Date()) {
     wasExtra = null; extraLabels = [];
   }
   // The box holds at most VISIT_ROWS_MAX rows: the answers' and the owner's come first (visitCapRows).
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, cur && cur.owner_dropped);
+  // Rows set aside earlier come back, except a line these answers now decide (its row is above, or removed on purpose)
+  // and, while the owner manages Experiences, any extra row (hers are above).
+  const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(Array.isArray(info.experiences) && !WINERY_CORE_LABELS.has(r.label)));
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash);
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45761,7 +45787,9 @@ function ownerVisitText(raw) {
 }
 // The five lines as the box holds them now: { known_for, reservations, takeout, dietary, groups } ('' when none).
 function ownerVisitRows(venueId) {
-  const rows = ((venueVisitInfo(venueId) || {}).rows) || [];
+  const info = venueVisitInfo(venueId) || {};
+  // Winery test 2: a line of the owner's set aside because the box was full (owner_dropped, owned) still counts as hers.
+  const rows = (info.rows || []).concat((Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned));
   const out = {};
   for (const slot of OWNER_VISIT_SLOTS) {
     const r = slot.labels.map((l) => rows.find((x) => x.label === l)).find(Boolean);
@@ -45777,11 +45805,17 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const rows = cur && Array.isArray(cur.rows) ? cur.rows.map((r) => ({ ...r })) : [];
   const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
   const slotLabels = new Set(OWNER_VISIT_SLOTS.flatMap((x) => x.labels));
+  const confirmed = new Set(Array.isArray((value || {})._confirm) ? value._confirm : []);
+  // A line of hers set aside earlier because the box was full (owner_dropped, owned) is still hers: found there too.
+  const parked = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && r.owned);
   for (const slot of OWNER_VISIT_SLOTS) {
+    if (!rows.some((r) => slot.labels.includes(r.label))) { const pk = parked.find((r) => slot.labels.includes(r.label)); if (pk) rows.push({ label: pk.label, text: pk.text }); }
     const next = typeof (value || {})[slot.key] === 'string' ? value[slot.key] : '';
     const i = rows.findIndex((r) => slot.labels.includes(r.label));
     const old = i >= 0 ? rows[i].text : '';
-    if (next === old) continue;
+    // Winery test 2 (2026-11-12): a line the owner confirmed unchanged in the setup (`_confirm`) is the owner's from now
+    // on, so a full box never drops it as research's.
+    if (next === old) { if (next && i >= 0 && confirmed.has(slot.key)) owned.add(rows[i].label); continue; }
     const label = i >= 0 ? rows[i].label : slot.def;
     if (next) {
       if (i >= 0) rows[i] = { label, text: next }; else rows.push({ label, text: next });
@@ -45791,7 +45825,9 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop. A
   // winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's; research
   // that repeats one of them goes first (visitCapRows, winery test 1).
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), cur && cur.owner_dropped);
+  // Her parked lines are back in `rows` above (or cleared on purpose): only the other rows set aside come back here.
+  const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (!rows.length && !info.booking_url && !info.owner_labels.length) {
@@ -46503,6 +46539,27 @@ function setupResearchTicks(venue, keys) {
     return on.filter((k) => !owned.has(k));
   } catch (e) { return on; }
 }
+// Winery test 2 (2026-11-12): the "What you offer" tiles research's Plan your visit lines say yes to, for a winery whose
+// owner hasn't set them: free parking, step-free / wheelchair access, dogs welcome. Only research's lines (not hers),
+// never a tile she set herself (on or off) or a "No dogs" answer. -> badge keys.
+function wineryVisitTicks(venue, badges) {
+  const info = venueVisitInfo(venue.id) || {};
+  const mine = new Set(info.owner_labels || []);
+  const rows = (info.rows || []).filter((r) => r && typeof r.text === 'string' && !mine.has(r.label));
+  const line = (re) => rows.filter((r) => re.test(r.label)).map((r) => r.text).join(' ');
+  const out = [];
+  const park = line(/^(?:parking|getting there)$/i);
+  if (/\bfree\b[^.]*\bparking\b|\bparking\b[^.]*\bfree\b/i.test(park) && !/\b(?:no|not|paid)\b[^.]*parking|parking[^.]*\b(?:not free|paid)\b/i.test(park)) out.push('free_parking');
+  const acc = line(/^(?:accessibility|wheelchair access)$/i);
+  if (/step-?free|wheelchair|accessible|\bramps?\b|no stairs/i.test(acc) && !/\bnot (?:fully |wheelchair )?accessible|inaccessible|\bno (?:wheelchair|ramp)|stairs only|only by stairs/i.test(acc)) out.push('wheelchair_accessible');
+  const dogs = line(/^(?:dogs|pets|kids & dogs)$/i);
+  if (/\bdogs?\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|leashed dogs|dog[- ]friendly/i.test(dogs) && !/\bno dogs\b|\bdogs? (?:are )?not\b|service (?:dogs|animals) only/i.test(dogs)) out.push('dog_friendly');
+  if (!out.length) return out;
+  let owned = new Set();
+  try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
+  const no = new Set(venueNotOffered(venue.id));
+  return out.filter((k) => !(badges || {})[k] && !owned.has(k) && !(k === 'dog_friendly' && no.has('dogs')));
+}
 // New hours from the edit link still waiting for review?
 function ownerHoursWaiting(venueId) {
   const w = db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(venueId);
@@ -46939,7 +46996,17 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         if (t.error) { errors.visit_rows = t.error; errors.visit_rows_key = k; break; }
         next[k] = t.text;
       }
-      if (!errors.visit_rows && OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k])) changes.visit_rows = next;
+      // Winery test 2 (2026-11-12): from the setup, a line sent back unchanged is the owner confirming research's line: it
+      // becomes hers (writeOwnerVisitRows), so a full box never drops it. Only while it isn't hers yet.
+      const ownedNow = new Set((venueVisitInfo(venue.id) || {}).owner_labels || []);
+      const vrows = (venueVisitInfo(venue.id) || {}).rows || [];
+      const confirm = errors.visit_rows || (body || {}).from_setup !== true ? [] : Object.keys(x).filter((k) => {
+        if (!next[k] || next[k] !== cur[k]) return false;
+        const slot = OWNER_VISIT_SLOTS.find((z) => z.key === k);
+        const row = vrows.find((r) => slot.labels.includes(r.label));
+        return !!row && !ownedNow.has(row.label);
+      });
+      if (!errors.visit_rows && (OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k]) || confirm.length)) changes.visit_rows = confirm.length ? { ...next, _confirm: confirm } : next;
     }
   }
   if ('price_range' in input) {
@@ -52080,6 +52147,9 @@ function renderOwnerSetupPage(found, opts) {
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
       extras: (((venueVisitInfo(venue.id) || {}).rows) || []).filter((r) => !WINERY_CORE_LABELS.has(r.label)).slice(0, WINERY_EXPERIENCES_MAX).map((r) => ({ label: String(r.label).slice(0, 24), text: String(r.text || '').slice(0, 120) })),
       placeShow: Object.fromEntries(placeTypesFor('winery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
+      // Winery test 2 (2026-11-12): "What you offer" tiles research's Plan your visit lines support (free parking,
+      // step-free, dogs welcome), pre-ticked as suggestions while the screen is unsaved, like the other research ticks.
+      visitTicks: wineryVisitTicks(venue, snap.badges),
     } : {}),
     cafe, pub, winery, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
     base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
@@ -52200,6 +52270,13 @@ const WINERY_SETUP_HELP_TOPICS = [
     keysFr: ['prix', 'dégustation', 'degustation', 'prix de degustation', 'changer le prix', 'mauvais prix', 'combien', 'gratuite', 'offerte'],
     a: '<p>To change it, open <strong>Set up your page</strong> and tap <strong>Tastings</strong>. Pick the new price and tap <strong>Save these</strong>.</p><p>It shows right away, on your page and on your card (“From $15”, or “Free tasting”). A price over $75 is checked first and shows within a day. Your price replaces the one we found on your website, and our weekly price check leaves it alone.</p>',
     aFr: '<p>Pour le changer, ouvrez <strong>Configurez votre page</strong> et touchez <strong>Dégustations</strong>. Choisissez le nouveau prix et touchez <strong>Enregistrer</strong>.</p><p>Il s’affiche tout de suite, sur votre page et sur votre fiche (« Dès 15 $ », ou « Dégustation gratuite »). Un prix de plus de 75 $ est vérifié d’abord et s’affiche d’ici un jour. Votre prix remplace celui trouvé sur votre site Web, et notre vérification hebdomadaire des prix n’y touche pas.</p>' },
+  // Winery test 2 (2026-11-12): the winery version of "Where do I put our booking link?" (it replaces the restaurant one,
+  // which pointed to "How do people book?" and "the private link we emailed you").
+  { id: 'booking-link', over: ['links'], q: 'Where do I put our booking link?', qFr: 'Où mettre notre lien de réservation?', pages: ['edit', 'setup'],
+    keys: ['booking link', 'book button', 'tock', 'opentable', 'open table', 'reservation link', 'reservations link', 'link to book', 'booking url', 'online booking', 'book online', 'put our booking link', 'add our booking link', 'group booking', 'booking page'],
+    keysFr: ['lien de reservation', 'bouton reserver', 'reserver en ligne', 'reservation en ligne', 'lien pour reserver', 'reservation de groupe'],
+    a: '<ul><li>In <strong>Set up your page</strong>, tap <strong>Booking and groups</strong>. The <strong>Booking link</strong> box is under “How do people visit?”. It’s there for walk-ins too, for a group or tasting booking page.</li><li>On your edit page, it’s <strong>Booking or tickets link</strong> in <strong>Name, address &amp; links</strong>.</li></ul><p>Both are the same link. A new one is checked first, usually within a day; then your page shows a <strong>Book</strong> button.</p>',
+    aFr: '<ul><li>Dans <strong>Configurez votre page</strong>, touchez <strong>Réservations et groupes</strong>. La case <strong>Lien de réservation</strong> est sous « Comment les visiteurs viennent-ils ? ». Elle y est aussi pour les visites sans réservation, pour une page de réservation de groupe ou de dégustation.</li><li>Sur votre page de modification, c’est <strong>Lien de réservation ou de billets</strong> dans <strong>Nom, adresse et liens</strong>.</li></ul><p>C’est le même lien aux deux endroits. Un nouveau lien est vérifié d’abord, en général d’ici un jour; ensuite, votre page affiche un bouton <strong>Réserver</strong>.</p>' },
   { id: 'winery-appointment', pages: ['setup', 'edit'], q: 'We’re by appointment in winter', qFr: 'Nous sommes sur rendez-vous l’hiver',
     keys: ['by appointment', 'appointment', 'appointment only', 'off-season', 'off season', 'winter', 'call ahead'], keysFr: ['rendez-vous', 'sur rendez-vous', 'basse saison', 'hiver', 'appelez'],
     a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”. By appointment all year? Pick <strong>By appointment only</strong> under “How do people visit?”.</p>',
