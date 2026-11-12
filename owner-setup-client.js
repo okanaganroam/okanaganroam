@@ -469,11 +469,17 @@
   function sub(b){ return C.cafe && b === 'closures'; }
   function isStep(b){ return STEPS.indexOf(b) >= 0 || sub(b); }
   function stepOf(b){ return sub(b) ? 'hours' : b; }
-  function allDone(){ return STEPS.every(function(k){ return S.done[k]; }); }
-  function p1Done(){ return P1.every(function(k){ return S.done[k]; }); }
-  function p2Count(){ return P2.filter(function(k){ return S.done[k]; }).length; }
+  // Café test 6 (2026-11-12): a café's Hours step is two parts (the hours, then holidays and closures). It only counts
+  // as done once the closures part is saved or skipped; leaving on the closures screen used to show Hours ✓ and
+  // "Carry on" went past the holidays. fin(k) is the step's answer as far as progress goes.
+  function half(k){ return C.cafe && k === 'hours' && !!S.done.hours && !S.done.closures; }
+  function fin(k){ return half(k) ? '' : S.done[k]; }
+  function allDone(){ return STEPS.every(function(k){ return fin(k); }); }
+  function p1Done(){ return P1.every(function(k){ return fin(k); }); }
+  function p2Count(){ return P2.filter(function(k){ return fin(k); }).length; }
   function nextOf(step){ if (C.cafe && step === 'hours') return 'closures'; step = stepOf(step); if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
-  function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!S.done[P1[i]]) return P1[i]; return allDone() ? 'finish' : 'more'; }
+  // The hours part saved but not the holidays: carry on at the holidays and closures.
+  function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!fin(P1[i])) return half(P1[i]) ? 'closures' : P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
   function entry(step){
     if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations || CUR.booking_url)) return 'book:yes';
@@ -487,7 +493,7 @@
   // Steps with several things on one screen: "Save and exit" keeps the picks but the step isn't done until its own
   // Save is tapped, so "Carry on" comes back to it (fresh-eyes 2026-11-10: a half-done closures step was skipped).
   var HALF = ['offer', 'cuisine', 'closures'];
-  function answered(step){ var d = S.done[step]; return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
+  function answered(step){ var d = fin(step); return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
   function leave(){ S.leaving = true; location.href = C.back; }
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
@@ -633,7 +639,7 @@
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
     return list(steps.map(function(s){
-      var d = S.done[s] || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      var d = half(s) ? 'half' : fin(s) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
       return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
@@ -687,7 +693,7 @@
     // Facebook name sent were still listed).
     var tickedBy = { book: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' };
     STEPS.forEach(function(k){
-      if (S.done[k] && S.done[k] !== 'skip' && S.done[k] !== 'later') return;
+      if (fin(k) && fin(k) !== 'skip' && fin(k) !== 'later') return;
       if (k === 'spend' && S.spendNotSure) return; // "Not sure? Skip": not asked again on this screen
       if (tickedBy[k] && S.badges[tickedBy[k]]) return;
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score

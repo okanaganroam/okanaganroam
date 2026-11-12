@@ -51272,14 +51272,21 @@ function saveSetupProgress(venueId, step, status) {
   return p;
 }
 // Every step answered (skips and "later" count: the owner went through it all).
+// Café test 6 (2026-11-12): a café's Hours step is the hours and then its holidays and closures. It is done only when
+// the closures part was saved or skipped too (leaving on that screen used to mark Hours done).
+function setupDoneSteps(venueId, type) {
+  const done = { ...setupProgress(venueId).done };
+  if ((type || setupTypeOf(venueId)) === 'cafe' && done.hours && !done.closures) delete done.hours;
+  return done;
+}
 function setupFinished(venueId) {
-  const { done } = setupProgress(venueId);
+  const done = setupDoneSteps(venueId);
   return setupStepsFor(setupTypeOf(venueId), venueId).every((k) => done[k]);
 }
 // Where the owner is: 'none' (not started), 'partial' (some answered), 'essentials' (Part 1 answered), 'done' (all).
 function setupState(venueId) {
-  const { done } = setupProgress(venueId);
   const type = setupTypeOf(venueId), steps = setupStepsFor(type, venueId);
+  const done = setupDoneSteps(venueId, type);
   if (steps.every((k) => done[k])) return 'done';
   if (setupParts(type).part1.every((k) => done[k])) return 'essentials';
   return steps.some((k) => done[k]) ? 'partial' : 'none';

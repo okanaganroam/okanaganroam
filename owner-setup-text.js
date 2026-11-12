@@ -7,7 +7,7 @@ const en = {
   title: 'Set up your page', exit: 'Exit setup', back: '← Back', skip: 'Skip this for now', step: 'Step {n} of {total}', allDone: 'All done',
   hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.', start: 'Start',
   welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
-  st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet' },
+  st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet', half: 'hours saved, holidays and closures still to do' },
   labels: {
     basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Price per person', cuisine: 'What you serve',
     photos: 'Photos', menu: 'Menu', offer: 'What you offer', happy: 'Happy hour', specials: 'Weekly specials', music: 'Weekly events', story: 'Your story',
@@ -94,7 +94,7 @@ const fr = {
   title: 'Configurez votre page', exit: 'Quitter', back: '← Retour', skip: 'Passer pour l’instant', step: 'Étape {n} sur {total}', allDone: 'Terminé',
   hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
   welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
-  st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait' },
+  st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait', half: 'heures enregistrées, jours fériés et fermetures à faire' },
   labels: {
     basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
     photos: 'Photos', menu: 'Menu', offer: 'Ce que vous offrez', happy: 'Happy hour', specials: 'Spéciaux de la semaine', music: 'Événements de la semaine', story: 'Votre histoire',
