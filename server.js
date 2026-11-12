@@ -56402,11 +56402,14 @@ function ownerLastUpdatedAt(venueId) {
 
 const OWNER_UPDATED_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 // "Sept 2, 2026" (or "2 sept. 2026" in French), in Okanagan time.
+// Café test 5 (2026-11-12): the site's own local date (todayLocal: fixed UTC-7 since BC stopped changing clocks), the same
+// one "Hours checked" and "Confirmed by" use. Intl's America/Vancouver still falls back to PST, so between midnight and
+// 1 AM the page said "updated Nov 11" beside "checked Nov 12".
 function ownerUpdatedDate(utc, fr = false) {
   const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
   if (Number.isNaN(d.getTime())) return '';
-  if (fr) return d.toLocaleDateString('fr-CA', { timeZone: OKANAGAN_TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
-  const [y, m, day] = d.toLocaleDateString('en-CA', { timeZone: OKANAGAN_TIME_ZONE }).split('-').map(Number);
+  const [y, m, day] = todayLocal(d).split('-').map(Number);
+  if (fr) return new Date(Date.UTC(y, m - 1, day, 12)).toLocaleDateString('fr-CA', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
   return `${OWNER_UPDATED_MONTHS[m - 1]} ${day}, ${y}`;
 }
 
