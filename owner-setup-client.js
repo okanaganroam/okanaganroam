@@ -1119,9 +1119,11 @@
       // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
       var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
-      x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
+      var urlNow = S.webUrl != null ? S.webUrl : site;
+      x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
-        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
+        // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
+        + (site ? '<p class="su-hint" id="suUseSiteRow"' + (urlNow.trim() === site ? ' hidden' : '') + '><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
         + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: siteHost || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
@@ -1937,7 +1939,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
@@ -2234,6 +2236,7 @@
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
+    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It

@@ -923,14 +923,12 @@ Object.assign(en, {
   copyWeekend: 'Sat–Sun', rightsAsk: 'Tick this box, then tap Send.',
   photosBackAsk: 'Your photos aren’t sent yet. Tick the box and tap Send, or tap Back again to leave without them.',
   spendWhyOff: 'This helps visitors know what to expect. We’ll show it soon.', savedSpendOff: 'We’ll show it on your page soon.',
-  dogsPatioToo: 'Patio only counts too',
 });
 Object.assign(fr, {
   savedDayMany: 'Nous les ajouterons d’ici un jour.', sentMeansMany: 'Nous les vérifions d’abord, puis nous les ajoutons à votre page d’ici un jour.',
   copyWeekend: 'Sam–dim', rightsAsk: 'Cochez cette case, puis touchez Envoyer.',
   photosBackAsk: 'Vos photos ne sont pas encore envoyées. Cochez la case et touchez Envoyer, ou touchez Retour de nouveau pour partir sans elles.',
   spendWhyOff: 'Cela aide les visiteurs à savoir à quoi s’attendre. Nous l’afficherons bientôt.', savedSpendOff: 'Nous l’afficherons sur votre page bientôt.',
-  dogsPatioToo: 'La terrasse seulement compte aussi',
 });
 
 module.exports = { en, fr };
