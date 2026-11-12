@@ -65,7 +65,7 @@ test('1: hours start as a short list of the 7 days, each with a big Change butto
     // Pub test 5: "Every open day" unless no other day is open; a day marked Closed is never reopened by a copy.
     assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(DAYS\.every\(function\(x\)\{ return x === d \|\| copyGets\(d, x\); \}\) \? T\.copyAll : T\.copyOpen\)/); // café test 4
     assert.match(s, /data-copywk="' \+ d \+ '">' \+ h\(T\.copyWeek\)/);
-    assert.match(s, /gets\.forEach\(function\(x\)\{ if \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\) wk\[x\] = clone\(src\); \}\);/); // café test 4: copyGets
+    assert.match(s, /gets\.forEach\(function\(x\)\{ if \(all \|\| \(we \? \['sat', 'sun'\] : \['mon', 'tue', 'wed', 'thu', 'fri'\]\)\.indexOf\(x\) >= 0\) wk\[x\] = clone\(src\); \}\);/); // café test 5: Sat–Sun too // café test 4: copyGets
     // Saving sends the whole week as before (every day, opened or not).
     assert.match(s, /var week = \{\}; DAYS\.forEach\(function\(d\)\{ week\[d\] = S\.week\[d\] \|\| \[\]; \}\);/);
     assert.match(html, /\.su-hchg \{[^}]*min-height: 56px;/, 'the Change button is big enough to tap');

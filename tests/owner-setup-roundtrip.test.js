@@ -65,7 +65,7 @@ test('happy hours: the setup gets its own rows back exactly as typed, while the 
   // Saving the very same thing again changes nothing on the page.
   const before = db.prepare('SELECT happy_hour_times, happy_hour_deals FROM venues WHERE id = ?').get(v.id) || {};
   const again = await change(t, { happy_hour: WEEK, happy_hour_deals: { deals: DEALS, deals_fr: [] }, badges: { happy_hour: true } });
-  assert.equal(again.status, 400, 'nothing new to send');
+  assert.equal(again.status, 200, 'nothing new to send'); assert.equal(again.body.unchanged, true); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
   assert.deepEqual(db.prepare('SELECT happy_hour_times, happy_hour_deals FROM venues WHERE id = ?').get(v.id) || {}, before);
   await prog(t, { step: 'happy', status: 'live', blocks: BLOCKS });
   assert.deepEqual((await cur(t)).happy_blocks, BLOCKS);
@@ -109,8 +109,8 @@ test('weekly specials and weekly events: every stored field reaches the setup, a
   assert.equal(c.weekly_nights[0].host, 'Quiz Bob'); assert.equal(c.weekly_nights[0].detail_fr, 'Équipes de six au plus'); assert.equal(c.weekly_nights[0].end, '21:00');
   const sp0 = rows('venue_specials', v.id), wn0 = rows('venue_weekly_nights', v.id);
   // What the page script sends for rows the owner didn't touch: the stored lines themselves.
-  assert.equal((await change(t, { specials: c.specials })).status, 400, 'nothing new to send');
-  assert.equal((await change(t, { weekly_nights: c.weekly_nights })).status, 400, 'nothing new to send');
+  assert.equal((await change(t, { specials: c.specials })).status, 200, 'nothing new to send'); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
+  assert.equal((await change(t, { weekly_nights: c.weekly_nights })).status, 200, 'nothing new to send');
   assert.equal(rows('venue_specials', v.id), sp0);
   assert.equal(rows('venue_weekly_nights', v.id), wn0);
   // One changed row: the other is still exactly as stored.
@@ -131,9 +131,9 @@ test('closures, Plan your visit lines and the dog note: sent back unchanged, not
   assert.deepEqual(c.closures.map((x) => [x.from, x.to || x.from, x.note || '']), closures.map((x) => [x.from, x.to, x.note]), 'the note the owner wrote comes back, also on a holiday date');
   assert.equal(c.visit_rows.dogs, 'Dogs on the patio only');
   const extras0 = JSON.stringify(c.closures), visit0 = JSON.stringify(c.visit_rows);
-  assert.equal((await change(t, { closures: c.closures.map((x) => ({ from: x.from, to: x.to || x.from, note: x.note || '' })) })).status, 400);
-  assert.equal((await change(t, { visit_rows: { dogs: c.visit_rows.dogs } })).status, 400);
-  assert.equal((await change(t, { visit_rows: { reservations: c.visit_rows.reservations } })).status, 400);
+  assert.equal((await change(t, { closures: c.closures.map((x) => ({ from: x.from, to: x.to || x.from, note: x.note || '' })) })).status, 200); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
+  assert.equal((await change(t, { visit_rows: { dogs: c.visit_rows.dogs } })).status, 200);
+  assert.equal((await change(t, { visit_rows: { reservations: c.visit_rows.reservations } })).status, 200);
   const c2 = await cur(t);
   assert.equal(JSON.stringify(c2.closures), extras0);
   assert.equal(JSON.stringify(c2.visit_rows), visit0);

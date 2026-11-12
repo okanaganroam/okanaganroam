@@ -67,7 +67,7 @@ function highlightsFor(venue, dogNote, profile = {}) {
     nonalc: venue.nonalcoholic ? 'Non-alcoholic options' : '',
   };
   const keys = Array.isArray(profile.highlightKeys) ? profile.highlightKeys : HIGHLIGHTS.map(([k]) => k);
-  const out = [];
+  const out = [], got = [];
   // profile.highlightFirst: keys that lead (a heated patio, pub test 3 2026-11-10: in November it's the selling point).
   const first = Array.isArray(profile.highlightFirst) ? profile.highlightFirst : [];
   const order = HIGHLIGHTS.filter(([k]) => first.includes(k)).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
@@ -75,9 +75,14 @@ function highlightsFor(venue, dogNote, profile = {}) {
     if (!keys.includes(key)) continue;
     let label = text[key];
     if (label && profile.highlightLabels && profile.highlightLabels[key]) label = profile.highlightLabels[key];
-    if (label) out.push([icon, label]);
+    if (label) { out.push([icon, label]); got.push(key); }
   }
-  return out.slice(0, profile.highlightMax || 4);
+  // Café test 5 (2026-11-12): vegan or vegetarian options, when set, always make the row (the limit used to cut them).
+  // The first of them takes the last place; the limit is unchanged.
+  const max = profile.highlightMax || 4;
+  const diet = got.findIndex((k) => k === 'vegan' || k === 'vegetarian');
+  if (diet >= max) return out.slice(0, max - 1).concat([out[diet]]);
+  return out.slice(0, max);
 }
 
 // The label of the deals tab and card, from what the venue really has.

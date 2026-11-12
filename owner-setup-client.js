@@ -126,7 +126,7 @@
   // What the page holds now (café test 1, 2026-11-11): kept up to date by each save, so a screen never re-sends a value
   // that is already stored (the ordering screen sent "no drive-thru, no walk-up" again, which came back "Nothing has
   // changed yet": harmless, but a refused save in the server log every time).
-  S.savedBadges = clone(CUR.badges || {}); S.savedOrder = JSON.stringify((CUR.cafe_info || {}).order || null);
+  S.savedBadges = clone(CUR.badges || {}); S.savedYear = (CUR.cafe_info || {}).year || ''; S.savedOrder = JSON.stringify((CUR.cafe_info || {}).order || null);
   // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
   var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
   function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
@@ -338,10 +338,11 @@
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
   // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
   // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the
-  // 2nd Monday of October, not the same day of the month). The eves (Dec 24, Dec 31) stay one-off.
+  // 2nd Monday of October, not the same day of the month). Café test 5 (2026-11-12): every tile has it, the eves (Dec 24,
+  // Dec 31) too (Christmas Eve was the only December tile without "This year and next").
   function holidays(){
     var today = new Date(); today.setHours(0, 0, 0, 0); var y = today.getFullYear();
-    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, next: ymd(fn(d.getFullYear() + 1)), yearly: key !== 'xmasEve' && key !== 'nye' }; };
+    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, next: ymd(fn(d.getFullYear() + 1)), yearly: true }; };
     var list = [
       make('xmasEve', function(yy){ return new Date(yy, 11, 24); }), make('xmas', function(yy){ return new Date(yy, 11, 25); }), make('boxing', function(yy){ return new Date(yy, 11, 26); }),
       make('nye', function(yy){ return new Date(yy, 11, 31); }), make('nyd', function(yy){ return new Date(yy, 0, 1); }), make('family', function(yy){ return thirdMonday(yy, 1); }),
@@ -387,6 +388,12 @@
     return (j && j.error) || T.failed;
   }
   function nothingChanged(j){ return !!(j && j.errors && j.errors.form && Object.keys(j.errors).length === 1 && C.nothing.some(function(x){ return j.errors.form.indexOf(x) >= 0; })); }
+  // Café test 5 (2026-11-12): what this visit already sent, by field (by part for the fields the server merges), with how it
+  // went. A save whose every part was already sent is not sent again (saving holidays re-sent "Yes, all year"; saving
+  // unchanged answers came back 400 "nothing new to send"). Anything sent with a "we don't have" answer or the pub's
+  // kitchen can change other fields on the server, so those forget what was sent.
+  var MERGED = ['badges', 'cafe_info', 'pub_info', 'visit_rows'], sentMemo = {};
+  function memoParts(changes){ var out = []; Object.keys(changes).forEach(function(k){ var v = changes[k]; if (MERGED.indexOf(k) >= 0 && v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function(j){ out.push([k + '.' + j, JSON.stringify(v[j] === undefined ? null : v[j])]); }); else out.push([k, JSON.stringify(v === undefined ? null : v)]); }); return out; }
   // One save through /changes. -> 'live' | 'day' | null (error shown).
   function change(changes){
     if (changes.not_offered === 'ADD_DIETARY') changes = { not_offered: addNot('dietary') };
@@ -397,10 +404,14 @@
       if (nl.slice().sort().join() === S.notOffered.slice().sort().join()) return Promise.resolve('live');
       changes = { not_offered: nl };
     }
+    var parts = memoParts(changes);
+    if (parts.length && parts.every(function(x){ return sentMemo[x[0]] && sentMemo[x[0]].v === x[1]; })) return Promise.resolve(parts.some(function(x){ return sentMemo[x[0]].st === 'day'; }) ? 'day' : 'live');
+    var remember = function(st){ if (changes.not_offered || changes.pub_info) sentMemo = {}; else parts.forEach(function(x){ sentMemo[x[0]] = { v: x[1], st: st }; }); return st; };
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
       if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
-        if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); return j.review && j.review.length ? 'day' : 'live'; }
-      if (nothingChanged(j)) return 'live';
+        if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); if (changes.cafe_info && 'year' in changes.cafe_info) S.savedYear = changes.cafe_info.year || '';
+        return remember(j.review && j.review.length ? 'day' : 'live'); }
+      if (nothingChanged(j)) return remember('live');
       S.error = why(j); return null;
     });
   }
@@ -428,7 +439,8 @@
     var next = function(i){
       if (i >= list.length) {
         if (S.exitAfter && HALF.indexOf(step) >= 0 && !answered(step)) { S.busy = false; if (onOk) onOk(); return leave(); }
-        var st = forced || (statuses.indexOf('day') >= 0 ? 'day' : 'live');
+        // Nothing needed sending (all of it saved already): the step keeps the answer it had ("within a day" stays so).
+        var st = forced || (statuses.indexOf('day') >= 0 || (!statuses.length && S.done[step] === 'day') ? 'day' : 'live');
         return progress(step, st).then(function(ok){ S.busy = false; if (!ok) return render(); if (onOk) onOk(); go(to || 'saved:' + step); });
       }
       return change(list[i]).then(function(r){ if (!r) { S.busy = false; return render(); } statuses.push(r); return next(i + 1); });
@@ -477,9 +489,29 @@
   var HALF = ['offer', 'cuisine', 'closures'];
   function answered(step){ var d = S.done[step]; return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
   function leave(){ S.leaving = true; location.href = C.back; }
-  function go(step, replace){ step = entry(step); S.fresh = false;
+  // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
+  // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
+  // "your description still talks about sports" screen after "What you offer": it carries a real choice.
+  function savedKept(step){ return step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
+  function savedText(step){
+    var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
+    var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' || how === 'unsure' ? T.gotIt : how === 'day' ? T.sentTitle : T.savedTitle;
+    var line = S.savedLine[step] || (how === 'day' ? (many ? T.savedDayMany : T.savedDay) : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
+    // The first "Sent" says what it means (pub fresh-eyes 2), once.
+    if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
+    return '✓ ' + String(title).replace(/[.!]$/, '') + '. ' + line;
+  }
+  var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
+  screen.parentNode.insertBefore(toastEl, screen);
+  // Shown on the screen it was made for, gone on the next one. Set a moment after the screen is drawn, so it is announced.
+  function showToast(t){ toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t; }, 60); }
+  function go(step, replace){
+    var sv = /^saved:(.+)$/.exec(step);
+    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
+    var fl = S.flash || ''; S.flash = '';
+    step = entry(step); S.fresh = false;
     if (S.exitAfter) return leave();
-    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
+    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
     if (step === 'happy' && S.done.happy === 'live' && S.happy.length) return 'happy:type';
     if (step === 'specials' && S.done.specials === 'live' && S.specials.length) return 'specials:type';
@@ -493,7 +525,17 @@
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
-  el('suBack').onclick = function(){ if (S.busy) return; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); };
+  // Café test 5 (2026-11-12): Back with photos picked but not sent. Box ticked: they're sent first (then back). Not
+  // ticked: one gentle line ("tap Back again to leave without them"); a second Back goes.
+  el('suBack').onclick = function(){
+    if (S.busy) return;
+    if (S.step === 'photos:review' && goodPhotos().length) {
+      if (S.rights) { S.backAfter = true; return sendPhotos(); }
+      if (!S.backWarned) { S.backWarned = true; S.rightsAsk = true; render(); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); return; }
+    }
+    S.backWarned = false; goBack();
+  };
+  function goBack(){ var fl = S.flash || ''; S.flash = ''; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); showToast(fl); }
   function bar(){
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
@@ -703,7 +745,13 @@
       if (!S.busy && !S.leaving) S.exitAfter = false;
     };
   }
-  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } if (unsaved()) { e.preventDefault(); askExit(); } };
+  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; }
+    // Café test 5 (2026-11-12): photos picked with the rights box ticked are sent on the way out (then the page is left).
+    if (S.step === 'photos:review' && goodPhotos().length && S.rights) { e.preventDefault(); S.exitAfter = true; return sendPhotos(); }
+    if (unsaved()) { e.preventDefault(); askExit(); } };
+  // Interrupted (another app, the phone locked) with photos picked and the box ticked: they're sent right away, so
+  // nothing picked is lost. Unticked, nothing is sent without her say-so (the photos wait on the screen).
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden' && S.step === 'photos:review' && S.rights && !S.busy && goodPhotos().length) sendPhotos(); });
 
 
   // ---------- Unsaved answers kept on this device (café test 3, 2026-11-11) ----------
@@ -878,7 +926,7 @@
       // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
       if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
-      var wk = W(), hop = HO();
+      var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
       x = (seas ? q(T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer, T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
           + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2">' + h(T.seasonDaysH) + '</h2>'
@@ -901,8 +949,11 @@
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
-            + (seas && !othersClosed(d) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>' + hDone(d) + '</div>'
-            + (!seas && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
+            + (seas && !othersClosed(d) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>'
+            // Café test 5 (2026-11-12): Sat–Sun beside Mon–Fri (same rule: a day marked Closed stays closed).
+            + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
+            // Said once, under the first open card (café test 5: it repeated under every open day).
+            + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext')) + '</div>';
     } else if (s === 'hours:kitchen') {
@@ -1022,9 +1073,13 @@
           + (S.photos.length > 1 && !S.busy ? '<span class="su-order"><button type="button" class="su-ord" data-pmove="' + i + ':-1" aria-label="' + h(fill(T.photoEarlier, { n: i + 1 })) + '"' + (i === 0 ? ' disabled' : '') + '>◀</button><button type="button" class="su-ord" data-pmove="' + i + ':1" aria-label="' + h(fill(T.photoLater, { n: i + 1 })) + '"' + (i === S.photos.length - 1 ? ' disabled' : '') + '>▶</button></span>' : '')
           + (ph.bad ? '<div class="su-badmsg">' + h(m) + '</div><span class="su-tag">' + h(T.wontAdd) + '</span>' : '<button type="button" class="su-tag" data-main="' + i + '" aria-pressed="' + (ph.main ? 'true' : 'false') + '">' + h(ph.main ? T.isMain : T.makeMain) + '</button>') + '</div>';
       }).join('') + '</div>' + (S.photos.length > 1 ? '<p class="su-hint">' + h(T.photoOrderHint) + '</p>' : '') + (S.busy ? '' : '<button type="button" class="su-more" data-act="pick">' + h(T.addAnother) + '</button>')
-        + msgs() + '<label class="su-tick su-rights' + (S.rights ? ' su-ticked' : '') + (S.nudge === T.needRights ? ' su-need' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span><small>' + h(T.rightsStep) + '</small>' + h(T.rights) + '</span></label>'
+        + msgs() + '<p class="su-note" id="suProgress" role="status"></p>' + (S.busy ? '' : '<p class="su-hint" id="suSendFirst">' + h(T.sendBeforeLeave) + '</p>')
         // Café test 4 (2026-11-11): a picked photo isn't kept if the page is left before Send.
-        + '<p class="su-note" id="suProgress" role="status"></p>' + (S.busy ? '' : '<p class="su-hint" id="suSendFirst">' + h(T.sendBeforeLeave) + '</p>') + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
+        // Café test 5 (2026-11-12): the rights box sits right above Send. Send tapped first asks for it gently (a gold outline
+        // and "Tick this box, then tap Send." in it), never a red error.
+        + '<label class="su-tick su-rights' + (S.rights ? ' su-ticked' : '') + (S.rightsAsk && !S.rights ? ' su-ask' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span><small>' + h(T.rightsStep) + '</small>' + h(T.rights)
+        + '<span class="su-rightsask" id="suRightsAsk" role="status">' + (S.rightsAsk && !S.rights ? h(S.backWarned ? T.photosBackAsk : T.rightsAsk) : '') + '</span></span></label>'
+        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
     } else if (s === 'menu') {
       var sentM = S.done.menu === 'day';
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
@@ -1064,9 +1119,11 @@
       // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
       var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
-      x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, S.webUrl != null ? S.webUrl : site, { mode: 'url', max: 300 })
+      var urlNow = S.webUrl != null ? S.webUrl : site;
+      x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
-        + (site ? '<p class="su-hint"><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
+        // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
+        + (site ? '<p class="su-hint" id="suUseSiteRow"' + (urlNow.trim() === site ? ' hidden' : '') + '><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
         + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: siteHost || 'yourplace.com' })))
         + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
     } else if (s === 'menu:email') {
@@ -1277,15 +1334,18 @@
   function sendPhotos(){
     var list = goodPhotos();
     if (!list.length) { S.nudge = T.needPhoto; return render(); }
-    if (!S.rights) { S.nudge = T.needRights; render(); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); return; }
+    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
     var total = list.length, i = 0, mainP = list.filter(function(ph){ return ph.main; })[0];
-    S.busy = true; S.error = ''; S.nudge = ''; render();
+    S.busy = true; S.error = ''; S.nudge = ''; S.rightsAsk = false; S.lastBatch = total; render();
     var next = function(){
       var ph = list[i];
       if (!ph) {
         if (mainP) { try { S.mainSrc = jpeg(mainP.img, 1200).toDataURL('image/jpeg', 0.8); C.image = S.mainSrc; C.imageSource = 'pending'; S.keepMain = true; } catch (e) {} }
         S.photosSent += total; S.photos = []; S.rights = false;
-        return progress('photos', 'day').then(function(ok){ S.busy = false; if (ok) go('saved:photos'); else render(); });
+        return progress('photos', 'day').then(function(ok){ S.busy = false; if (!ok) return render();
+          // Sent on the way back (Back with the box ticked): the toast, then the question before.
+          if (S.backAfter) { S.backAfter = false; S.flash = savedText('photos'); return goBack(); }
+          go('saved:photos'); });
       }
       say('suProgress', fill(T.adding, { i: i + 1, n: total }));
       var body = photoPayload(ph); body.credit = C.credit; body.rights = true; body.contact_name = ''; body.contact_email = ''; body.company_website = ''; body.started_at = started; body.notify = i === total - 1; body.main = !!ph.main;
@@ -1403,7 +1463,7 @@
     }
     // Café test 2 (2026-11-11): the open season answered in this step ("We're closed part of the year").
     var listH = [ch];
-    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
+    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
     saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : C.cafe ? 'closures' : null, function(){
       if (C.cafe) S.hoursJust = true;
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
@@ -1715,7 +1775,7 @@
     // Café test 3 (2026-11-11): "Yes, all year" also clears a saved open season (open_months), so the page stops saying
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
-    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (C.cafe && CI.year !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
+    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (C.cafe && S.savedYear !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
     // Café test 2 (2026-11-11): "We're closed part of the year" and its dates.
     if (k === 'yearClosed') { S.openFrom = 'hours'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
@@ -1743,7 +1803,7 @@
       // From the closures screen (or the checklist): just the dates.
       var ovc = openVal(S.openSea), lc = [];
       if (ovc !== (CUR.open_months || '')) lc.push({ open_months: ovc });
-      if (C.cafe) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
+      if (C.cafe && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
       if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
       return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
     }
@@ -1820,9 +1880,11 @@
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
-      var cl = [{ closures: out }];
+      // Café test 5 (2026-11-12): only what changed is sent. Unchanged holidays and closed dates aren't sent again, nor the
+      // "open all year" answer the Hours step just saved (it came back 400 "nothing new to send").
+      var cl = closuresKey() === S.closuresWas ? [] : [{ closures: out }];
       // Cafés (2026-11-10): the answer itself ("open all year" or seasonal) counts on the checklist.
-      if (C.cafe) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
+      if (C.cafe && (om ? 'seasonal' : 'all') !== S.savedYear) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
       return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
     }
     if (k === 'closureAdd') {
@@ -1877,7 +1939,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
@@ -2080,13 +2142,14 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copyevery]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copyevery'), src = wk[d]; if (!src) return;
       DAYS.forEach(function(x){ if (x !== d) wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk]'), function(b){ b.onclick = function(){
-      readTimes(); var wk = W(), all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : 'data-copywk'), src = wk[d]; if (!src) return;
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk],[data-copywe]'), function(b){ b.onclick = function(){
+      var we = b.hasAttribute('data-copywe');
+      readTimes(); var wk = W(), all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : we ? 'data-copywe' : 'data-copywk'), src = wk[d]; if (!src) return;
       // Pub test 5 (2026-11-10): copying never reopens a day marked Closed ("Every day" opened a closed Monday again). It
       // copies to the open days only ("Every open day", Mon–Fri's open days); a Tue–Sun pub is one tap. Only when every
       // other day is closed (a new page with no hours yet) does it fill them all.
       var gets = DAYS.filter(function(x){ return copyGets(d, x); });
-      gets.forEach(function(x){ if (all || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(x) >= 0) wk[x] = clone(src); });
+      gets.forEach(function(x){ if (all || (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).indexOf(x) >= 0) wk[x] = clone(src); });
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -2169,10 +2232,11 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-main]'), function(b){ b.onclick = function(){ var k = +b.getAttribute('data-main'); S.photos.forEach(function(ph, i){ ph.main = i === k; }); S.keepMain = false; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-fdel]'), function(b){ b.onclick = function(){ var l = S.step === 'menu:upload' ? S.menuFiles : S.sheetFiles; l.splice(+b.getAttribute('data-fdel'), 1); S.error = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-pdel]'), function(b){ b.onclick = function(){ S.menuPages.splice(+b.getAttribute('data-pdel'), 1); S.error = ''; render(); }; });
-    var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked && S.nudge === T.needRights) { S.nudge = ''; render(); } };
+    var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) { tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked) { tb0.classList.remove('su-ask'); S.rightsAsk = false; S.backWarned = false; var ra = el('suRightsAsk'); if (ra) ra.textContent = ''; } } if (rt.checked && S.nudge) { S.nudge = ''; render(); } };
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
+    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
@@ -2233,7 +2297,7 @@
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });

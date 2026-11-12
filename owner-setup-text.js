@@ -915,4 +915,20 @@ Object.assign(fr.cafe, {
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
 });
 
+// Fifth first-time café test (Dayton, 2026-11-12; drafts/fresh-eyes-cafe5-2026-11-12/REPORT.md). Shared words: no "Saved →
+// Next" screens (the success line shows on the next question), "them" for more than one photo, a Sat–Sun copy button,
+// a gentle photo-rights ask, and a price line that doesn't sound pointless.
+Object.assign(en, {
+  savedDayMany: 'We’ll add them within a day.', sentMeansMany: 'We check them first, then add them to your page within a day.',
+  copyWeekend: 'Sat–Sun', rightsAsk: 'Tick this box, then tap Send.',
+  photosBackAsk: 'Your photos aren’t sent yet. Tick the box and tap Send, or tap Back again to leave without them.',
+  spendWhyOff: 'This helps visitors know what to expect. It will show on your page when we add prices.', savedSpendOff: 'It will show on your page when we add prices.',
+});
+Object.assign(fr, {
+  savedDayMany: 'Nous les ajouterons d’ici un jour.', sentMeansMany: 'Nous les vérifions d’abord, puis nous les ajoutons à votre page d’ici un jour.',
+  copyWeekend: 'Sam–dim', rightsAsk: 'Cochez cette case, puis touchez Envoyer.',
+  photosBackAsk: 'Vos photos ne sont pas encore envoyées. Cochez la case et touchez Envoyer, ou touchez Retour de nouveau pour partir sans elles.',
+  spendWhyOff: 'Cela aide les visiteurs à savoir à quoi s’attendre. Votre prix s’affichera sur votre page quand nous ajouterons les prix.', savedSpendOff: 'Votre prix s’affichera sur votre page quand nous ajouterons les prix.',
+});
+
 module.exports = { en, fr };

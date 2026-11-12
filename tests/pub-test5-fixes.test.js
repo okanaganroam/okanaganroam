@@ -125,14 +125,14 @@ test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only
   // The copy rule itself, run as the page runs it: Mon closed, Tue set to noon–midnight, "Every open day".
   const s = scriptOf(await text(`/owner/${tokenFor(mk('pub').id)}/setup`));
   const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const copy = (week, d, all, tapped) => {
+  const copy = (week, d, all, tapped, we = false) => {
     const S = { week: JSON.parse(JSON.stringify(week)), step: 'hours:edit' };
     const clone = (o) => JSON.parse(JSON.stringify(o));
     const fns = ['othersClosed', 'tapClosed', 'copyGets'].map((n) => new RegExp(`function ${n}\\(d(, \\w+)?\\)\\{[^\\n]*\\}`).exec(s)[0]).join('\n');
     const F = new Function('S', 'DAYS', 'W', `${fns}; return { othersClosed, tapClosed, copyGets };`)(S, DAYS, () => S.week);
     (tapped || []).forEach((x) => F.tapClosed(x, true));
     const body = /(var gets = DAYS\.filter[^\n]*\n[^\n]*)/.exec(s)[1];
-    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'copyGets', 'wk', body)(S, DAYS, d, all, S.week[d], clone, F.copyGets, S.week);
+    new Function('S', 'DAYS', 'd', 'all', 'src', 'clone', 'copyGets', 'wk', 'we', body)(S, DAYS, d, all, S.week[d], clone, F.copyGets, S.week, we);
     return S.week;
   };
   const w0 = { mon: null, tue: [['12:00', '00:00']], wed: [['11:30', '23:00']], thu: [['11:30', '23:00']], fri: [['11:30', '23:00']], sat: [['11:30', '23:00']], sun: [['11:30', '23:00']] };
@@ -147,6 +147,11 @@ test('3: "Copy these hours to" skips days marked Closed ("Every open day"); only
   // Café test 4: a day marked Closed on this screen stays closed even on a new page.
   const fresh2 = copy({ mon: [['05:30', '14:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }, 'mon', true, ['sun']);
   assert.equal(fresh2.sun, null); assert.deepEqual(fresh2.sat, [['05:30', '14:00']]);
+  // Café test 5 (2026-11-12): Sat–Sun copies to the weekend's open days only (Sunday marked Closed stays closed).
+  const we1 = copy(w0, 'tue', false, [], true);
+  assert.deepEqual(we1.sat, [['12:00', '00:00']]); assert.deepEqual(we1.sun, [['12:00', '00:00']]); assert.deepEqual(we1.wed, [['11:30', '23:00']]); assert.equal(we1.mon, null);
+  const we2 = copy({ mon: [['07:00', '16:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null }, 'mon', false, ['sun'], true);
+  assert.deepEqual(we2.sat, [['07:00', '16:00']]); assert.equal(we2.sun, null, 'a day marked Closed stays closed'); assert.equal(we2.fri, null);
   for (const k of ['copyOpen', 'copyClosedNote']) assert.ok(TEXT.fr[k] && TEXT.fr[k] !== TEXT.en[k], `FR ${k}`);
 });
 
@@ -230,7 +235,7 @@ test('6: holiday tiles cover every BC stat holiday with the right dates, next fi
   const by = Object.fromEntries(list.map((o) => [o.key, o]));
   assert.equal(by.thanks.next, '2028-10-09', 'Thanksgiving next year is its own 2nd Monday');
   assert.equal(by.victoria.next, '2028-05-22'); assert.equal(by.goodFri.next, '2028-04-14'); assert.equal(by.remembrance.next, '2027-11-11');
-  assert.equal(by.xmasEve.yearly, false); assert.equal(by.thanks.yearly, true);
+  assert.equal(by.xmasEve.yearly, true); // café test 5: the eves have "This year and next" too assert.equal(by.thanks.yearly, true);
   // Canada Day on a Sunday (2029) is Monday July 2.
   assert.equal(Object.fromEntries(holidaysAt(s, '2029-06-01').map((o) => [o.key, o.date])).canada, '2029-07-02');
   // The screen stays short: the next 6 (and any ticked), then "Show all holidays".

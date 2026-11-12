@@ -120,8 +120,7 @@ test('4: a phone sent from the setup goes live at once, written 250-555-0123, lo
   assert.equal(JSON.parse(row.previous).phone, '250-555-0100', 'the old number is kept for Undo');
   // The same digits typed another way: nothing changed.
   const same = await change(t, { phone: '(250) 555-0177' });
-  assert.equal(same.status, 400);
-  assert.ok(same.body.errors.form);
+  assert.equal(same.status, 200); assert.equal(same.body.unchanged, true); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
   const ext = await change(t, { phone: '250.555.0188 ext 12' });
   assert.equal(ext.status, 201);
   assert.equal(app.getVenue(v.id).phone, '250-555-0188 ext. 12');

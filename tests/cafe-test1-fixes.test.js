@@ -154,7 +154,7 @@ test('4: while AVG_SPEND_PUBLIC is off, the price question promises nothing; wit
     assert.match(s, /S\.done\.spend && S\.done\.spend !== 'skip' && C\.spendPublic \?/, 'the preview shows no price while prices are off');
   }
   assert.match(TEXT.en.cafe.spendLead, /Your page will say/, 'kept for when prices are on');
-  assert.equal(TEXT.en.savedSpendOff, 'When prices go on pages, yours will show as your price range.'); // café test 4 wording
+  assert.equal(TEXT.en.savedSpendOff, 'It will show on your page when we add prices.'); // café test 5 wording (2026-11-12)
   process.env.AVG_SPEND_PUBLIC = '1';
   try { const v = mk('cafe'); assert.equal(cfgOf(await setupOf(v)).spendPublic, true); } finally { delete process.env.AVG_SPEND_PUBLIC; }
 });
@@ -257,7 +257,7 @@ test('12: the ordering screen no longer re-sends "no drive-thru, no walk-up" (it
   const v = mk('cafe'); const t = tokenFor(v.id);
   // The request the tester's server logged: unchanged badges, refused as "Nothing has changed yet" (400, errors.form).
   const r = await change(t, { badges: { drive_thru: false, walk_up: false } });
-  assert.equal(r.status, 400); assert.deepEqual(Object.keys(r.body.errors), ['form']); assert.match(r.body.errors.form, /Nothing has changed yet/);
+  assert.equal(r.status, 200); assert.equal(r.body.unchanged, true); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
   // The setup now sends only what differs from what is stored.
   const s = scriptOf(await setupOf(v));
   // Café test 4 (2026-11-11): the ordering screen never sends the drive-thru / walk-up badges ("What you offer" asks them).

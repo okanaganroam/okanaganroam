@@ -20049,6 +20049,9 @@ function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = 
   if (hasSpecials && !hasHappyDeals) out.dealsLabel = hasNights ? 'Specials & events' : 'Specials';
   const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
   if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
+  // Café test 5 (2026-11-12): vegan (or else vegetarian) options lead a café's top highlights; the four-chip limit cut
+  // them, though they're often what a café is chosen for. The badges themselves are unchanged.
+  if (venue.vegan || venue.vegetarian) out.highlightFirst = [venue.vegan ? 'vegan' : 'vegetarian'].concat(profile.highlightFirst || []);
   return out;
 }
 // A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
@@ -46783,6 +46786,13 @@ async function handleOwnerChangeSubmission(req, res, token) {
   if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length || Object.keys(carried).length)) delete errors.form;
   // Pressing Save again with nothing new while earlier changes are still waiting (2026-11-07): say they are safe.
   if (errors.form === OWNER_NOTHING_CHANGED && waiting && Object.keys(waitingChanges).length) errors.form = OWNER_NOTHING_NEW_WAITING;
+  // Café test 5 (2026-11-12): from the easy setup, sending again what is already saved (or already waiting for review) is
+  // not an error: nothing is written and the answer is a plain success. `review` names the fields sent that are still
+  // waiting, so the setup can say "within a day" honestly. The classic edit page keeps its "Nothing has changed yet".
+  if (fromSetupUrl && body.from_setup === true && Object.keys(errors).length === 1 && (errors.form === OWNER_NOTHING_CHANGED || errors.form === OWNER_NOTHING_NEW_WAITING)) {
+    const sent = body.changes && typeof body.changes === 'object' ? Object.keys(body.changes) : [];
+    return sendSubmissionResponse(res, 200, { ok: true, unchanged: true, fields: [], live: [], review: sent.filter((k) => k in waitingChanges) });
+  }
   if (Object.keys(errors).length) {
     // Which boxes were refused, never what was typed, so a save that keeps failing can be traced.
     console.warn(`[owner-portal] refused changes for venue #${venue.id}: ${Object.keys(errors).join(', ')}`);
@@ -51172,9 +51182,21 @@ const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS);
 SETUP_TOP2.cafe = CAFE_SETUP_PART2.slice();
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 // The steps one venue answers, in order. Restaurants and pubs: SETUP_STEPS.
-function setupStepsFor(type) {
+// Café test 5 (2026-11-12): with a venue id, only the steps that apply to it. A café whose saved kind serves no coffee
+// (gelato, bubble tea, juice, tea, dessert) has no "Your coffee" step unless it ticked espresso or drip coffee: the same
+// rule as the setup page's syncCoffee, so a gelato shop that answered everything isn't "partly done".
+const CAFE_NO_COFFEE_KINDS = ['Ice cream & gelato', 'Bubble tea', 'Juice & smoothie bar', 'Tea house', 'Dessert & sweets'];
+function cafeCoffeeStepApplies(venueId) {
+  let place = '';
+  try { place = venuePlaceType({ id: venueId, type: 'cafe' }); } catch (e) { place = ''; }
+  if (!place || !CAFE_NO_COFFEE_KINDS.includes(place)) return true;
+  const serves = (venueCafeInfo(venueId) || {}).serves || [];
+  return serves.includes('espresso') || serves.includes('drip');
+}
+function setupStepsFor(type, venueId) {
   if (type !== 'cafe') return SETUP_STEPS;
-  return CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
+  const all = CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
+  return venueId != null && !cafeCoffeeStepApplies(venueId) ? all.filter((k) => k !== 'coffee') : all;
 }
 function setupTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || 'restaurant'; } catch (e) { return 'restaurant'; } }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
@@ -51824,6 +51846,17 @@ const OWNER_SETUP_CSS = `
   @media (max-width: 699px) { body.owner-setup.su-help-inrow .su-top { padding-right: 0; } }
   body.owner-setup .su-free { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 8px 14px; border-radius: 999px; background: var(--su-good-bg); color: var(--su-good); font-weight: 800; }
   body.owner-setup .su-subtile[hidden] { display: none; }
+  /* Café test 5 (2026-11-12): the "✓ Saved" line on the next question (no "Saved → Next" screens). Empty, it takes no room
+     but stays in place, so screen readers announce it when it is filled. */
+  body.owner-setup .su-toast { background: var(--su-good-bg); color: var(--su-good); font-weight: 800; font-size: 16px; line-height: 1.35; padding: 10px 14px; border-radius: 14px; margin: 0 0 12px; }
+  body.owner-setup .su-toast:empty { padding: 0; margin: 0; }
+  /* The photo-rights box asked for gently (no red error) when Send is tapped first. */
+  body.owner-setup .su-tick.su-rights.su-ask { border-color: #C9A34A; background: #FBF3DE; box-shadow: 0 0 0 3px rgba(201, 163, 74, 0.25); }
+  body.owner-setup .su-rightsask { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #7A5A12; }
+  /* Small phones (iPhone SE): a day's Change and Mark closed share one line under its hours. */
+  @media (max-width: 380px) { body.owner-setup .su-hrow .su-hoffrow { flex-basis: auto; margin: 0 0 0 auto; padding-top: 0; border-top: 0; } }
+  /* Short screens (an SE is 568px tall): the header and the Save bar scroll with the page, so the question gets the room. */
+  @media (max-height: 640px) { body.owner-setup .su-head { position: static; } body.owner-setup .su-sticky { position: static; box-shadow: none; } }
 `;
 
 // The page script (owner-setup-client.js), read once and served inline. It never contains "</script".
@@ -56381,11 +56414,14 @@ function ownerLastUpdatedAt(venueId) {
 
 const OWNER_UPDATED_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 // "Sept 2, 2026" (or "2 sept. 2026" in French), in Okanagan time.
+// Café test 5 (2026-11-12): the site's own local date (todayLocal: fixed UTC-7 since BC stopped changing clocks), the same
+// one "Hours checked" and "Confirmed by" use. Intl's America/Vancouver still falls back to PST, so between midnight and
+// 1 AM the page said "updated Nov 11" beside "checked Nov 12".
 function ownerUpdatedDate(utc, fr = false) {
   const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
   if (Number.isNaN(d.getTime())) return '';
-  if (fr) return d.toLocaleDateString('fr-CA', { timeZone: OKANAGAN_TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
-  const [y, m, day] = d.toLocaleDateString('en-CA', { timeZone: OKANAGAN_TIME_ZONE }).split('-').map(Number);
+  const [y, m, day] = todayLocal(d).split('-').map(Number);
+  if (fr) return new Date(Date.UTC(y, m - 1, day, 12)).toLocaleDateString('fr-CA', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
   return `${OWNER_UPDATED_MONTHS[m - 1]} ${day}, ${y}`;
 }
 
