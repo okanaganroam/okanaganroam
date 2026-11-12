@@ -46783,6 +46783,13 @@ async function handleOwnerChangeSubmission(req, res, token) {
   if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length || Object.keys(carried).length)) delete errors.form;
   // Pressing Save again with nothing new while earlier changes are still waiting (2026-11-07): say they are safe.
   if (errors.form === OWNER_NOTHING_CHANGED && waiting && Object.keys(waitingChanges).length) errors.form = OWNER_NOTHING_NEW_WAITING;
+  // Café test 5 (2026-11-12): from the easy setup, sending again what is already saved (or already waiting for review) is
+  // not an error: nothing is written and the answer is a plain success. `review` names the fields sent that are still
+  // waiting, so the setup can say "within a day" honestly. The classic edit page keeps its "Nothing has changed yet".
+  if (fromSetupUrl && body.from_setup === true && Object.keys(errors).length === 1 && (errors.form === OWNER_NOTHING_CHANGED || errors.form === OWNER_NOTHING_NEW_WAITING)) {
+    const sent = body.changes && typeof body.changes === 'object' ? Object.keys(body.changes) : [];
+    return sendSubmissionResponse(res, 200, { ok: true, unchanged: true, fields: [], live: [], review: sent.filter((k) => k in waitingChanges) });
+  }
   if (Object.keys(errors).length) {
     // Which boxes were refused, never what was typed, so a save that keeps failing can be traced.
     console.warn(`[owner-portal] refused changes for venue #${venue.id}: ${Object.keys(errors).join(', ')}`);

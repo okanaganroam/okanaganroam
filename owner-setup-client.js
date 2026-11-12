@@ -126,7 +126,7 @@
   // What the page holds now (café test 1, 2026-11-11): kept up to date by each save, so a screen never re-sends a value
   // that is already stored (the ordering screen sent "no drive-thru, no walk-up" again, which came back "Nothing has
   // changed yet": harmless, but a refused save in the server log every time).
-  S.savedBadges = clone(CUR.badges || {}); S.savedOrder = JSON.stringify((CUR.cafe_info || {}).order || null);
+  S.savedBadges = clone(CUR.badges || {}); S.savedYear = (CUR.cafe_info || {}).year || ''; S.savedOrder = JSON.stringify((CUR.cafe_info || {}).order || null);
   // Pub test 5 (2026-11-10): the words in a description that are about sports on TV. [start, end] of the first, or null.
   var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
   function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
@@ -387,6 +387,12 @@
     return (j && j.error) || T.failed;
   }
   function nothingChanged(j){ return !!(j && j.errors && j.errors.form && Object.keys(j.errors).length === 1 && C.nothing.some(function(x){ return j.errors.form.indexOf(x) >= 0; })); }
+  // Café test 5 (2026-11-12): what this visit already sent, by field (by part for the fields the server merges), with how it
+  // went. A save whose every part was already sent is not sent again (saving holidays re-sent "Yes, all year"; saving
+  // unchanged answers came back 400 "nothing new to send"). Anything sent with a "we don't have" answer or the pub's
+  // kitchen can change other fields on the server, so those forget what was sent.
+  var MERGED = ['badges', 'cafe_info', 'pub_info', 'visit_rows'], sentMemo = {};
+  function memoParts(changes){ var out = []; Object.keys(changes).forEach(function(k){ var v = changes[k]; if (MERGED.indexOf(k) >= 0 && v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function(j){ out.push([k + '.' + j, JSON.stringify(v[j] === undefined ? null : v[j])]); }); else out.push([k, JSON.stringify(v === undefined ? null : v)]); }); return out; }
   // One save through /changes. -> 'live' | 'day' | null (error shown).
   function change(changes){
     if (changes.not_offered === 'ADD_DIETARY') changes = { not_offered: addNot('dietary') };
@@ -397,10 +403,14 @@
       if (nl.slice().sort().join() === S.notOffered.slice().sort().join()) return Promise.resolve('live');
       changes = { not_offered: nl };
     }
+    var parts = memoParts(changes);
+    if (parts.length && parts.every(function(x){ return sentMemo[x[0]] && sentMemo[x[0]].v === x[1]; })) return Promise.resolve(parts.some(function(x){ return sentMemo[x[0]].st === 'day'; }) ? 'day' : 'live');
+    var remember = function(st){ if (changes.not_offered || changes.pub_info) sentMemo = {}; else parts.forEach(function(x){ sentMemo[x[0]] = { v: x[1], st: st }; }); return st; };
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
       if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
-        if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); return j.review && j.review.length ? 'day' : 'live'; }
-      if (nothingChanged(j)) return 'live';
+        if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); if (changes.cafe_info && 'year' in changes.cafe_info) S.savedYear = changes.cafe_info.year || '';
+        return remember(j.review && j.review.length ? 'day' : 'live'); }
+      if (nothingChanged(j)) return remember('live');
       S.error = why(j); return null;
     });
   }
@@ -428,7 +438,8 @@
     var next = function(i){
       if (i >= list.length) {
         if (S.exitAfter && HALF.indexOf(step) >= 0 && !answered(step)) { S.busy = false; if (onOk) onOk(); return leave(); }
-        var st = forced || (statuses.indexOf('day') >= 0 ? 'day' : 'live');
+        // Nothing needed sending (all of it saved already): the step keeps the answer it had ("within a day" stays so).
+        var st = forced || (statuses.indexOf('day') >= 0 || (!statuses.length && S.done[step] === 'day') ? 'day' : 'live');
         return progress(step, st).then(function(ok){ S.busy = false; if (!ok) return render(); if (onOk) onOk(); go(to || 'saved:' + step); });
       }
       return change(list[i]).then(function(r){ if (!r) { S.busy = false; return render(); } statuses.push(r); return next(i + 1); });
@@ -1446,7 +1457,7 @@
     }
     // Café test 2 (2026-11-11): the open season answered in this step ("We're closed part of the year").
     var listH = [ch];
-    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
+    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
     saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : C.cafe ? 'closures' : null, function(){
       if (C.cafe) S.hoursJust = true;
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
@@ -1758,7 +1769,7 @@
     // Café test 3 (2026-11-11): "Yes, all year" also clears a saved open season (open_months), so the page stops saying
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
-    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (C.cafe && CI.year !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
+    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (C.cafe && S.savedYear !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
     // Café test 2 (2026-11-11): "We're closed part of the year" and its dates.
     if (k === 'yearClosed') { S.openFrom = 'hours'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
@@ -1786,7 +1797,7 @@
       // From the closures screen (or the checklist): just the dates.
       var ovc = openVal(S.openSea), lc = [];
       if (ovc !== (CUR.open_months || '')) lc.push({ open_months: ovc });
-      if (C.cafe) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
+      if (C.cafe && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
       if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
       return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
     }
@@ -1863,9 +1874,11 @@
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
-      var cl = [{ closures: out }];
+      // Café test 5 (2026-11-12): only what changed is sent. Unchanged holidays and closed dates aren't sent again, nor the
+      // "open all year" answer the Hours step just saved (it came back 400 "nothing new to send").
+      var cl = closuresKey() === S.closuresWas ? [] : [{ closures: out }];
       // Cafés (2026-11-10): the answer itself ("open all year" or seasonal) counts on the checklist.
-      if (C.cafe) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
+      if (C.cafe && (om ? 'seasonal' : 'all') !== S.savedYear) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
       return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
     }
     if (k === 'closureAdd') {
