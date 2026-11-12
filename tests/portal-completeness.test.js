@@ -234,7 +234,7 @@ test('edit page: French restaurant page has the bar and the French help topic', 
   assert.match(fr, /Ajouter des photos/);
   const t = app.OWNER_HELP_TOPICS.find((x) => x.id === 'page-complete');
   assert.ok(t && t.a && t.aFr && t.q && t.qFr && t.completenessOnly);
-  assert.match(t.a, /Only you see this score/); assert.match(t.aFr, /Vous seul voyez ce pointage/);
+  assert.match(t.a, /Only you see this checklist/); assert.match(t.aFr, /Vous seul voyez cette liste/);
 });
 
 test('edit page: every other type (pubs, cafes, wineries, breweries, beaches, shops...) has no bar, no CSS, no script, no help topic; English and French', async () => {
