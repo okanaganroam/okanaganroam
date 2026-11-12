@@ -125,7 +125,7 @@ const CAFE_ITEMS = [
     en: 'What kind of café', fr: 'Quel genre de café', whyEn: 'Coffee shop, bakery, gelato, bubble tea and so on. Pick one.', whyFr: 'Café, boulangerie, gelato, thé aux perles, etc. Choisissez-en un.', btnEn: 'Pick one', btnFr: 'Choisir', icon: '☕' },
   R('hours', { w: 8 }),
   R('hours_fresh', { w: 4 }),
-  { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'closures' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
+  { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
     en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Ice cream and patio cafés often close for winter. Say so, so nobody drives out to a closed door.', whyFr: 'Les bars laitiers et les cafés-terrasses ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
   R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your counter, your coffee, your baking.', whyFr: 'De vraies photos seulement, prises par vous. Votre comptoir, votre café, vos pâtisseries.' }),
   R('photo_extra', { w: 7, whyEn: 'Your counter, your coffee, your baking, your seats.', whyFr: 'Votre comptoir, votre café, vos pâtisseries, vos places assises.' }),

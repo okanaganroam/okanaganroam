@@ -59,11 +59,11 @@ test('1: hours start as a short list of the 7 days, each with a big Change butto
     // An open day keeps everything it had: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, Same as.
     assert.match(s, /\(j === w\.length - 1 \? lateBtns\(d, j, y\) : ''\)/);
     assert.match(s, /id="suLate' \+ d \+ j \+ '"/);
-    assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\)\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/);
+    assert.doesNotMatch(s, /id="suLateHint"/); // café test 4: said once, beside each day's buttons
     assert.match(s, /data-same="' \+ d \+ '"/); assert.match(s, /data-samemon="' \+ d \+ '"/);
     // Copy shortcuts: every day, or Mon–Fri.
     // Pub test 5: "Every open day" unless no other day is open; a day marked Closed is never reopened by a copy.
-    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
+    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(DAYS\.every\(function\(x\)\{ return x === d \|\| copyGets\(d, x\); \}\) \? T\.copyAll : T\.copyOpen\)/); // café test 4
     assert.match(s, /data-copywk="' \+ d \+ '">' \+ h\(T\.copyWeek\)/);
     assert.match(s, /DAYS\.forEach\(function\(x\)\{ if \(x !== d && \(all \|\| \['mon', 'tue', 'wed', 'thu', 'fri'\]\.indexOf\(x\) >= 0\) && \(fresh \|\| wk\[x\]\)\) wk\[x\] = clone\(src\); \}\);/);
     // Saving sends the whole week as before (every day, opened or not).

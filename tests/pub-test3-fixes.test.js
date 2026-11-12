@@ -65,7 +65,7 @@ test('2: Midnight / 1 AM / 2 AM buttons under each day, and the early-morning hi
     assert.match(s, /\(j === w\.length - 1 \? lateBtns\(d, j, y\) : ''\)/, 'under the day’s last closing time');
     assert.match(s, /data-late="' \+ d \+ ':' \+ j \+ ':' \+ t \+ '">' \+ h\(t12\(t\)\)/);
     assert.match(s, /w4\[1\] = q4\[2\] \+ ':' \+ q4\[3\]; mark\(\);/, 'a tap sets that closing time');
-    assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\)\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/); // pub test 6: the season screen shares it
+    assert.doesNotMatch(s, /id="suLateHint"/); // café test 4: said once, beside each day's buttons // pub test 6: the season screen shares it
     assert.match(cfg.t.lateHint, /1 AM early Saturday morning/);
   }
   assert.match(TEXT.fr.lateHint, /1 h tôt samedi matin/);

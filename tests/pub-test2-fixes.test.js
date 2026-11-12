@@ -71,7 +71,7 @@ test('1: closing times after midnight get a plain note (EN+FR); "Copy Monday to 
     assert.match(s, /n3\.textContent = t3; n3\.hidden = !t3;/);
     // Pub test 4: the copy buttons are on every open day ("Copy these hours to: Every day / Mon–Fri").
     // Pub test 5: "Every open day" (Every day only when no other day is open).
-    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(othersClosed\(d\) \? T\.copyAll : T\.copyOpen\)/);
+    assert.match(s, /data-copyall="' \+ d \+ '">' \+ h\(DAYS\.every\(function\(x\)\{ return x === d \|\| copyGets\(d, x\); \}\) \? T\.copyAll : T\.copyOpen\)/); // café test 4
     assert.doesNotMatch(s, /msgs\(\) \+ \(anyOpenDay/);
   }
   assert.equal(TEXT.en.sameEvery, 'Copy Monday to every day');
