@@ -860,4 +860,12 @@ Object.assign(fr, {
 Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more' });
 Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus' });
 
+// Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
+Object.assign(en, {
+  holCovered: 'Covered by your closed dates',
+});
+Object.assign(fr, {
+  holCovered: 'Compris dans vos dates de fermeture',
+});
+
 module.exports = { en, fr };

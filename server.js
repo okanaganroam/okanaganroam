@@ -34498,7 +34498,11 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
       out.push(`<details class="venue-hours-usual"><summary>${name} (${range})</summary>${list(s.days)}</details>`);
     }
   }
-  const soon = (parsed.closures || []).filter((c) => c !== shown && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
+  // Café test 4 (2026-11-11): a one-day closure inside a longer one ("Dec 25 (Christmas Day)" inside "Dec 25 – Jan 1")
+  // is not listed again. Done here, so closures saved before the setup stopped adding them read right too.
+  const all = parsed.closures || [];
+  const inside = (c) => (c.to || c.from) === c.from && all.some((d) => d !== c && (d.to || d.from) !== d.from && d.from <= c.from && c.from <= (d.to || d.from));
+  const soon = all.filter((c) => c !== shown && !inside(c) && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
   if (soon.length) {
     // Round 10: the owner's (English) note stays off the French page unless the French list has it.
     out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note && (!fr || frText(c.note)) ? ` (${escapeHtml(fr ? frText(c.note) : c.note)})` : ''}`).join(' &middot; ')}</p>`);
@@ -51629,6 +51633,8 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-tile[aria-pressed="true"]::after { content: "✓"; color: var(--su-teal); font-size: 16px; }
   body.owner-setup .su-tile .su-e { font-size: 28px; line-height: 1; }
   body.owner-setup .su-tile-sub { font-size: 14px; color: var(--su-soft); font-weight: 700; }
+  body.owner-setup .su-tile.su-covered { cursor: default; opacity: .9; }
+  body.owner-setup .su-tile .su-covered-note { color: var(--su-teal); }
   body.owner-setup .su-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   body.owner-setup .su-chip { min-width: 56px; min-height: 48px; padding: 0 12px; border-radius: 14px; border: 2px solid var(--su-line); background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; }
   body.owner-setup .su-chip[aria-pressed="true"] { background: var(--su-teal); color: #fff; border-color: var(--su-teal); }
