@@ -34828,6 +34828,15 @@ function venueSpecialsDaysText(days, fr) {
   return fr ? out.charAt(0).toUpperCase() + out.slice(1) : out;
 }
 // "4–9 PM", "from 4 PM", "until 2 PM" (French "16 h–21 h", "dès 16 h", "jusqu’à 14 h"); '' for all day.
+// A café special's day label, or null for the usual one (some days: "Mon–Fri"). '' for a loyalty or punch card ("Buy 9,
+// get the 10th free") and for a special on every day (or no day) with no time; "Every day" when every day has a time.
+const CAFE_LOYALTY_RE = /\b(punch|loyalty|stamp|rewards?)\s*card|carte (de )?fidélité|\bfidélité\b|\b\d+\s*(st|nd|rd|th|e)\b[^.]{0,30}\b(free|gratuite?)\b/i;
+function cafeSpecialDaysLabel(s, fr) {
+  const days = s.days || [];
+  if (CAFE_LOYALTY_RE.test(`${s.title || ''} ${s.deal || ''}`)) return '';
+  if (days.length && days.length < 7) return null;
+  return days.length === 7 && (s.start || s.end) ? (fr ? 'Tous les jours' : 'Every day') : '';
+}
 function specialTimeText(s, fr) {
   const a = specialMinutes(s.start), b = s.end === 'close' ? null : specialMinutes(s.end);
   if (!hoursModule || (a === null && b === null)) return '';
@@ -34854,6 +34863,12 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
       // Audit fix (2026-10-27): "Today" only until the special ends (weeklyRowTag), on the Okanagan clock.
       const tag = weeklyRowTag({ onToday: !closedToday && s.days.includes(clock.weekday), onYesterday: s.days.includes(yesterday), a: specialMinutes(s.start),
         b: s.end === 'close' ? null : specialMinutes(s.end), fallbackToday: hoursCloseOn(statusHours, clock.weekday), yesterdayNeedsEnd: true }, clock);
+      // Café test 4 (2026-11-11): a café's punch card or an any-day special shows just its text, never "Daily" (Gord's
+      // punch card read "Daily" though he closes Sundays). Every day with a time ("7–9 AM") reads "Every day".
+      if (venue.type === 'cafe') {
+        const dl = cafeSpecialDaysLabel(s, fr);
+        if (dl !== null) return { s, days: dl, today: dl ? !!tag : false, onNow: dl ? tag === 'now' : false, time: specialTimeText(s, fr) };
+      }
       return { s, days: venueSpecialsDaysText(s.days, fr), today: !!tag, onNow: tag === 'now', time: specialTimeText(s, fr) };
     });
   const oldest = shown.map((s) => s.checked_at).sort()[0];

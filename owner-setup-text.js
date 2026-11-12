@@ -864,11 +864,18 @@ Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMo
 Object.assign(en.cafe, {
   quickDogsWindow: ['Dogs welcome at the window', 'Dog treats at the window'], quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
   photosTakeout: 'Your window, your coffee, your sign. Three photos is perfect.',
+  // One name for a café's specials (the tile said "Weekly specials", the question "Any daily specials?").
+  specialsQ: 'Any specials?',
 });
+en.cafe.labels = Object.assign({}, en.cafe.labels, { specials: 'Specials' });
+en.cafe.noLabels = Object.assign({}, en.cafe.noLabels, { specials: 'no specials' });
 Object.assign(fr.cafe, {
   quickDogsWindow: ['Chiens bienvenus au comptoir', 'Gâteries pour chiens au comptoir'], quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
   photosTakeout: 'Votre comptoir extérieur, votre café, votre enseigne. Trois photos, c’est parfait.',
+  specialsQ: 'Des spéciaux?',
 });
+fr.cafe.labels = Object.assign({}, fr.cafe.labels, { specials: 'Spéciaux' });
+fr.cafe.noLabels = Object.assign({}, fr.cafe.noLabels, { specials: 'pas de spéciaux' });
 
 // Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
 Object.assign(en, {
