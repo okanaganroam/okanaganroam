@@ -22,6 +22,7 @@ const NAV = [
     { key: 'business', label: 'Look up a business', href: '/admin/dashboard/business', ask: 'How is one business doing?' },
     { key: 'outbound', label: 'Clicks to businesses', href: '/admin/dashboard/outbound', ask: 'Which businesses are we sending customers to?' },
     { key: 'portal', label: 'Business portal', href: '/admin/dashboard/portal', ask: 'Are owners logging in and using it?' },
+    { key: 'stays', label: 'Places to stay', href: '/admin/dashboard/stays', ask: 'Are guests scanning the QR cards at hotels?' },
   ] },
   { group: 'Upkeep', items: [
     { key: 'email', label: 'Email results', href: '/admin/dashboard/email', ask: 'Is our email getting through?' },
@@ -34,7 +35,7 @@ const NAV = [
 const ICON = {
   home: 'M3 11l9-8 9 8M5 10v10h14V10', search: 'M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM12 12a2 2 0 100-4 2 2 0 000 4z', searches: 'M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5',
   pages: 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7', 'roam-now': 'M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14', funnels: 'M3 5h18l-7 8v6l-4 2v-8z', events: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
-  business: 'M4 21V9l8-5 8 5v12M9 21v-6h6v6', outbound: 'M7 17L17 7M9 7h8v8', portal: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0', email: 'M3 6h18v12H3zM3 7l9 7 9-7', errors: 'M12 3l10 18H2zM12 10v5M12 18v.5', help: 'M4 5h7a2 2 0 012 2v13a3 3 0 00-3-2H4zM20 5h-5a2 2 0 00-2 2v13a3 3 0 013-2h4z',
+  business: 'M4 21V9l8-5 8 5v12M9 21v-6h6v6', stays: 'M3 20V10l9-6 9 6v10M3 20h18M8 20v-5h3v5M14 12h3v3h-3z', outbound: 'M7 17L17 7M9 7h8v8', portal: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0', email: 'M3 6h18v12H3zM3 7l9 7 9-7', errors: 'M12 3l10 18H2zM12 10v5M12 18v.5', help: 'M4 5h7a2 2 0 012 2v13a3 3 0 00-3-2H4zM20 5h-5a2 2 0 00-2 2v13a3 3 0 013-2h4z',
 };
 const icon = (k) => (ICON[k] ? `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON[k]}"/></svg>` : '');
 const groupOf = (active) => { const g = NAV.find((x) => x.items.some((i) => i.key === active)); return g && g.group ? g.group.toLowerCase() : 'home'; };
