@@ -20417,6 +20417,26 @@ function wineryVisitLines(venue, info) {
 }
 // The labels the winery answers manage (the rest of the box is research's, or the restaurant setup's Known for / Dogs).
 const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Winter'];
+// Winery test 1 (2026-11-12): keeps a Plan your visit box to VISIT_ROWS_MAX rows, in place. Rows set aside earlier
+// (`stash`, stored as owner_dropped) come back first, so an answer taken back by Undo brings them back. Then, while the
+// box is too full: a research row that repeats a winery answer goes first (research "Picnics" beside the owner's "Food:
+// Picnic area", before an unrelated "Parking") and is set aside; then the last research row (never one `isOwn` keeps)
+// drops. -> the rows set aside (store them as owner_dropped).
+function visitCapRows(rows, isOwn, owned, managed, stash) {
+  for (const r of Array.isArray(stash) ? stash : []) {
+    if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) });
+  }
+  const dropped = [];
+  const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
+  while (rows.length > VISIT_ROWS_MAX) {
+    let j = -1;
+    for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
+    if (j >= 0) { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }); rows.splice(j, 1); continue; }
+    for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
+    rows.splice(j >= 0 ? j : rows.length - 1, 1);
+  }
+  return dropped;
+}
 // Research labels that say the same thing as an answer's row (winery test 1): set aside first when the box is full.
 const WINERY_REPEAT_LABELS = {
   Food: /^(?:picnics?|picnic area|picnic tables|food|snacks|cheese(?: plates?)?|charcuterie|eats?)$/i,
@@ -20477,23 +20497,8 @@ function writeWineryVisitRows(venueId, now = new Date()) {
     for (const r of wasExtra || []) { if (!rows.some((x) => x.label === r.label)) rows.push({ ...r }); owned.delete(r.label); }
     wasExtra = null; extraLabels = [];
   }
-  // Winery test 1 (2026-11-12): research rows set aside earlier because an answer said the same thing come back first
-  // (an answer taken back by Undo makes them useful again); the cap below sets them aside again while they repeat one.
-  for (const r of (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : [])) {
-    if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) });
-  }
-  const dropped = [];
-  // The box holds at most VISIT_ROWS_MAX rows: the answers' and the owner's come first. A research row that repeats an
-  // answer (research "Picnics" beside the owner's "Food: Picnic area") goes before an unrelated one (Parking); then the
-  // last research rows drop.
-  const repeatsAnswer = (r) => !owned.has(r.label) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && rows.some((x) => x.label === l && owned.has(l)) && WINERY_REPEAT_LABELS[l].test(r.label));
-  while (rows.length > VISIT_ROWS_MAX) {
-    let j = -1;
-    for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
-    if (j >= 0) { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }); rows.splice(j, 1); continue; }
-    for (let k = rows.length - 1; k >= 0; k--) if (!owned.has(rows[k].label)) { j = k; break; }
-    rows.splice(j >= 0 ? j : rows.length - 1, 1);
-  }
+  // The box holds at most VISIT_ROWS_MAX rows: the answers' and the owner's come first (visitCapRows).
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, cur && cur.owner_dropped);
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45783,14 +45788,12 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
     } else if (i >= 0) rows.splice(i, 1);
     owned.add(label);
   }
-  // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop.
-  while (rows.length > VISIT_ROWS_MAX) {
-    let j = -1;
-    // A winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's.
-    for (let k = rows.length - 1; k >= 0; k--) if (!slotLabels.has(rows[k].label) && !owned.has(rows[k].label)) { j = k; break; }
-    rows.splice(j >= 0 ? j : rows.length - 1, 1);
-  }
+  // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop. A
+  // winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's; research
+  // that repeats one of them goes first (visitCapRows, winery test 1).
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), cur && cur.owner_dropped);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
+  if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (!rows.length && !info.booking_url && !info.owner_labels.length) {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
     return { before, after: null };

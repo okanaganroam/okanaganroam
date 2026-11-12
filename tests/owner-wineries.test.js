@@ -541,6 +541,27 @@ test('plan your visit: a full box drops research that repeats an answer before u
   assert.equal(un.ok, true, JSON.stringify(un));
   const after = visitRows(w.id).map((r) => r.label);
   assert.ok(after.includes('Picnics') && after.includes('Parking') && !after.includes('Food'), after.join());
+  // The same when the owner's own line fills the box (a Dogs line from "What you offer", as in the test).
+  assert.equal((await change(t, { winery_info: { food: 'picnic' } })).status, 200);
+  assert.equal(visitRows(w.id).length, 7);
+  assert.ok(!visitRows(w.id).some((r) => r.label === 'Picnics'));
+  research(w.id, [{ label: 'Tastings', text: 'Tastings $10 a person.' }, { label: 'Parking', text: 'Free parking by the tasting room.' }, { label: 'Picnics', text: 'Picnic tables on the lawn.' }]);
+  const w2 = mk('winery'); const t2 = tokenFor(w2.id);
+  research(w2.id, [
+    { label: 'Tastings', text: 'Tastings $10 a person.' }, { label: 'Groups', text: 'Groups of 10 or more, call ahead.' },
+    { label: 'Picnics', text: 'Picnic tables on the lawn.' }, { label: 'Parking', text: 'Free parking by the tasting room.' },
+  ]);
+  assert.equal((await change(t2, { winery_info: { food: 'picnic', year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  assert.equal((await change(t2, { visit_rows: { known_for: 'Pinot Noir from estate vines' } })).status, 200);
+  assert.equal(visitRows(w2.id).length, 7);
+  assert.equal((await change(t2, { badges: { dog_friendly: true }, visit_rows: { dogs: 'Leashed dogs welcome on the patio.' } })).status, 200);
+  const l2 = visitRows(w2.id).map((r) => r.label);
+  assert.ok(l2.includes('Dogs') && l2.includes('Parking') && !l2.includes('Picnics'), l2.join());
+  // A restaurant's full box still drops its last research row, as before.
+  const r = mk('restaurant');
+  research(r.id, ['A', 'B', 'C', 'D', 'E', 'F', 'Picnics'].map((x) => ({ label: x, text: `${x} line.` })));
+  assert.equal((await change(tokenFor(r.id), { visit_rows: { known_for: 'Good food' } })).status, 200);
+  assert.deepEqual(visitRows(r.id).map((x) => x.label), ['A', 'B', 'C', 'D', 'E', 'F', 'Known for']);
 });
 
 test('setup: “Change an answer” on the essentials-done screen, winery icons, wording and the picnic suggestion', async () => {
