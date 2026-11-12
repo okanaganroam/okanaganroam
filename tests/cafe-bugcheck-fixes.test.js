@@ -210,7 +210,11 @@ test('M: the specials "closed on" warning counts a day open in any of the specia
 
 test('N, O: gelato prices start at a single scoop; vegan gelato ticks Vegan; the kind is not said twice', async () => {
   assert.match(CLIENT, /function cafeSpendStart\(\)\{ return S\.place === 'Ice cream & gelato' \? 6 : S\.place === 'Bubble tea' \? 7 : 9; \}/);
-  assert.match(CLIENT, /if \(dv\.vegan_ice && !S\.badges\.vegan\) \{[\s\S]*?dl\.push\(\{ badges: \{ vegan: true \} \}\);/);
+  assert.match(CLIENT, /var veganIce = dv\.vegan_ice && !S\.badges\.vegan[\s\S]*?if \(veganIce\) \{[\s\S]*?dl\.push\(\{ badges: \{ vegan: true \} \}\);/);
+  // Review 8: the tiles are marked ticked only after the save went through (a failed save's retry sends them again).
+  const dietSave = /var dfMilk = [\s\S]*?\n      \}\);/.exec(CLIENT)[0];
+  assert.doesNotMatch(dietSave.split('saveAll(')[0], /S\.badges\.(vegan|dairy_free_milk) = true/);
+  assert.match(dietSave.split('saveAll(')[1], /S\.badges\.dairy_free_milk = true[\s\S]*S\.badges\.vegan = true/);
   const g = mk('cafe'); const t = tokenFor(g.id);
   ok(await change(t, { place_type: 'Ice cream & gelato', cafe_info: { serves: ['ice_cream', 'sorbet'] } }));
   const en = page(g, 'en');

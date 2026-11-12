@@ -2112,14 +2112,21 @@
       if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dv.df_sorbet && !dv.vegan_ice && !dv.gf_cones && !dnote) { S.nudge = T.dietNeed; return render(); }
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
-      if (mk.length && !S.badges.dairy_free_milk) { dl.push({ badges: { dairy_free_milk: true } }); S.badges.dairy_free_milk = true; }
+      // Review fix (2026-11-12): the tiles are marked ticked only once the save went through, so a retry sends them again.
+      var dfMilk = mk.length && !S.badges.dairy_free_milk;
+      if (dfMilk) dl.push({ badges: { dairy_free_milk: true } });
       // Bug-check (2026-11-12): vegan gelato or ice cream ticks "Vegan options" too (never unticks it), taking back an
       // earlier "None of these" for dietary options.
-      if (dv.vegan_ice && !S.badges.vegan) {
-        if (S.notOffered.indexOf('dietary') >= 0) { dl.push({ not_offered: { remove: ['dietary'] } }); S.notOffered = S.notOffered.filter(function(z){ return z !== 'dietary'; }); }
-        dl.push({ badges: { vegan: true } }); S.badges.vegan = true; S.noDiet = false;
+      var veganIce = dv.vegan_ice && !S.badges.vegan, dietNone = veganIce && S.notOffered.indexOf('dietary') >= 0;
+      if (veganIce) {
+        if (dietNone) dl.push({ not_offered: { remove: ['dietary'] } });
+        dl.push({ badges: { vegan: true } });
       }
-      return saveAll('diet', dl);
+      return saveAll('diet', dl, null, null, function(){
+        if (dfMilk) S.badges.dairy_free_milk = true;
+        if (dietNone) S.notOffered = S.notOffered.filter(function(z){ return z !== 'dietary'; });
+        if (veganIce) { S.badges.vegan = true; S.noDiet = false; }
+      });
     }
     if (k === 'coffeeSave') {
       readCafe(); var cf2 = S.cafe.coffee;
