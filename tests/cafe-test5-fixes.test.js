@@ -150,7 +150,7 @@ test('6 + 7: Sat–Sun copy beside Mon–Fri (closed days stay closed), shorter 
 
 test('8 + 9: wording, the menu "Use <site>" button, and picked photos never silently lost', async () => {
   for (const L of ['en', 'fr']) { assert.doesNotMatch(TEXT[L].spendWhyOff, /once prices|quand les prix/); assert.ok(TEXT[L].rightsAsk && TEXT[L].photosBackAsk, L); }
-  assert.equal(TEXT.en.spendWhyOff, 'This helps visitors know what to expect. We’ll show it soon.');
+  assert.equal(TEXT.en.spendWhyOff, 'This helps visitors know what to expect. It will show on your page when we add prices.');
   assert.match(CLIENT, /id="suUseSiteRow"' \+ \(urlNow\.trim\(\) === site \? ' hidden' : ''\)/);
   // The rights box sits right above Send and is asked for gently (no red error).
   assert.match(CLIENT, /if \(!S\.rights\) \{ S\.rightsAsk = true;/);

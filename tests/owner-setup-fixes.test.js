@@ -238,7 +238,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.equal(cfg.spendPublic, false);
   // Café test 1 (2026-11-11): one set of success words and honest price wording while prices aren't public.
   assert.match(s, /if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSpendOff;/);
-  assert.equal(cfg.t.savedSpendOff, 'We’ll show it on your page soon.'); // café test 5 wording (2026-11-12)
+  assert.equal(cfg.t.savedSpendOff, 'It will show on your page when we add prices.'); // café test 5 wording (2026-11-12)
   // French has every new line.
   const fr = cfgOf(await text(`/fr/owner/${t}/setup`)).t;
   for (const k of ['exitQ', 'exitSave', 'exitDrop', 'exitStay', 'changeQ', 'changeLead', 'pctWill', 'pctWillSub', 'pctRightNow', 'added', 'holidaysH', 'noneDiet', 'noneDietSub', 'savedSoon', 'pickKind', 'kindIs', 'fewMore', 'tapBigger', 'nextPlain', 'backToList', 'finishAlmost', 'menuSentEmail']) {

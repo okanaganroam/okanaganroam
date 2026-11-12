@@ -922,13 +922,13 @@ Object.assign(en, {
   savedDayMany: 'We’ll add them within a day.', sentMeansMany: 'We check them first, then add them to your page within a day.',
   copyWeekend: 'Sat–Sun', rightsAsk: 'Tick this box, then tap Send.',
   photosBackAsk: 'Your photos aren’t sent yet. Tick the box and tap Send, or tap Back again to leave without them.',
-  spendWhyOff: 'This helps visitors know what to expect. We’ll show it soon.', savedSpendOff: 'We’ll show it on your page soon.',
+  spendWhyOff: 'This helps visitors know what to expect. It will show on your page when we add prices.', savedSpendOff: 'It will show on your page when we add prices.',
 });
 Object.assign(fr, {
   savedDayMany: 'Nous les ajouterons d’ici un jour.', sentMeansMany: 'Nous les vérifions d’abord, puis nous les ajoutons à votre page d’ici un jour.',
   copyWeekend: 'Sam–dim', rightsAsk: 'Cochez cette case, puis touchez Envoyer.',
   photosBackAsk: 'Vos photos ne sont pas encore envoyées. Cochez la case et touchez Envoyer, ou touchez Retour de nouveau pour partir sans elles.',
-  spendWhyOff: 'Cela aide les visiteurs à savoir à quoi s’attendre. Nous l’afficherons bientôt.', savedSpendOff: 'Nous l’afficherons sur votre page bientôt.',
+  spendWhyOff: 'Cela aide les visiteurs à savoir à quoi s’attendre. Votre prix s’affichera sur votre page quand nous ajouterons les prix.', savedSpendOff: 'Votre prix s’affichera sur votre page quand nous ajouterons les prix.',
 });
 
 module.exports = { en, fr };

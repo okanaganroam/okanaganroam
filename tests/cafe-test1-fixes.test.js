@@ -149,12 +149,12 @@ test('4: while AVG_SPEND_PUBLIC is off, the price question promises nothing; wit
     const v = mk(type); const html = await setupOf(v); const cfg = cfgOf(html), s = scriptOf(html);
     assert.equal(cfg.spendPublic, false);
     assert.ok(!/Your page will say|indiquera/.test(cfg.t.spendLeadOff), `${type}: no promise`);
-    assert.ok(!/soon|bientôt/.test(cfg.t.stSoon + cfg.t.helpSpend), `${type}: no "soon"`); // café test 5 (2026-11-12): Dayton's price line says "We’ll show it soon"
+    assert.ok(!/soon|bientôt/.test(cfg.t.savedSpendOff + cfg.t.stSoon + cfg.t.helpSpend), `${type}: no "soon"`);
     assert.match(s, /fill\(C\.spendPublic \? T\.spendLead : T\.spendLeadOff \|\| T\.spendLead/);
     assert.match(s, /S\.done\.spend && S\.done\.spend !== 'skip' && C\.spendPublic \?/, 'the preview shows no price while prices are off');
   }
   assert.match(TEXT.en.cafe.spendLead, /Your page will say/, 'kept for when prices are on');
-  assert.equal(TEXT.en.savedSpendOff, 'We’ll show it on your page soon.'); // café test 5 wording (2026-11-12)
+  assert.equal(TEXT.en.savedSpendOff, 'It will show on your page when we add prices.'); // café test 5 wording (2026-11-12)
   process.env.AVG_SPEND_PUBLIC = '1';
   try { const v = mk('cafe'); assert.equal(cfgOf(await setupOf(v)).spendPublic, true); } finally { delete process.env.AVG_SPEND_PUBLIC; }
 });
@@ -244,12 +244,12 @@ test('11: success words: "It’s on your page now" for live answers, "We’ll ad
     const t = cfgOf(await setupOf(mk(type))).t;
     assert.equal(t.savedLive, 'It’s on your page now.'); assert.equal(t.savedDay, 'We’ll add it within a day.');
     for (const k of ['savedDay', 'photosSent', 'sentMeans', 'savedFbName', 'savedIgName', 'savedMenuSocialName', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) assert.match(t[k], k === 'sentMeans' ? /add it to your page within a day/ : /We’ll (add|find)/, `${type} ${k}`); // café test 3: plainer Sent line
-    for (const k of Object.keys(t)) if (typeof t[k] === 'string' && !['savedSoon', 'spendWhyOff', 'savedSpendOff'].includes(k)) assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`); // café test 5: the price lines
+    for (const k of Object.keys(t)) if (typeof t[k] === 'string' && k !== 'savedSoon') assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`);
     assert.equal(t.st.day, 'we’ll add it within a day');
   }
   const f = cfgOf(await setupOf(mk('cafe'), 'fr')).t;
   assert.equal(f.savedDay, 'Nous l’ajouterons d’ici un jour.');
-  for (const k of Object.keys(f)) if (typeof f[k] === 'string' && !['savedSoon', 'spendWhyOff', 'savedSpendOff'].includes(k)) assert.ok(!/bientôt/.test(f[k]), `fr: no "bientôt" in ${k}`);
+  for (const k of Object.keys(f)) if (typeof f[k] === 'string' && k !== 'savedSoon') assert.ok(!/bientôt/.test(f[k]), `fr: no "bientôt" in ${k}`);
 });
 
 // ---------- 12: the "refused changes … : form" log line ----------
