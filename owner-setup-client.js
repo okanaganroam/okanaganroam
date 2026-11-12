@@ -10,11 +10,14 @@
   var el = function(id){ return document.getElementById(id); };
   var screen = el('suScreen');
   var started = Date.now();
-  function fill(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return o && o[k] != null ? o[k] : m; }); }
+  // A value ending in a dot ("sept.") before the sentence's own dot gives one dot, not two.
+  function fill(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k, at, all){ if (!(o && o[k] != null)) return m; var v = String(o[k]); return /\.$/.test(v) && all.charAt(at + m.length) === '.' ? v.slice(0, -1) : v; }); }
   function h(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
   function dayName(d){ return C.dayNames[d]; }
   function monthName(i){ return C.monthNames[i]; }
+  // "Noël : …" in French, "Christmas Day: …" in English (café test 6: the French space before a colon).
+  function cl(a){ return a + (C.lang === 'fr' ? '\u00a0: ' : ': '); }
   // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
@@ -89,11 +92,12 @@
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
     for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
-    var u = [], z = [];
-    DAYS.forEach(function(d){ if (!days[d]) return; if (usual && !S.week[d]) u.push(d); if (seas && !S.sea.week[d]) z.push(d); });
-    var all = DAYS.filter(function(d){ return u.indexOf(d) >= 0 || z.indexOf(d) >= 0; });
+    if (!usual && !seas) return '';
+    // Bug-check (2026-11-12): a day open in any of the special's seasons is not "closed" (Sun closed in the usual week but
+    // open in summer, for a special that runs all year).
+    var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
-    var when = hasSea ? (z.length && !u.length ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : u.length && !z.length ? T.closedWarnUsual : '') : '';
+    var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
     return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
   function warnHtml(key, i, e){ var t = closedWarn(e.days, e.sea); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
@@ -165,7 +169,15 @@
   S.noWifi = (CUR.not_offered || []).indexOf('wifi') >= 0 && !(CUR.badges || {}).wifi;
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
-  if (C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount)) S.spend = 9;
+  // Bug-check (2026-11-12): the starting price fits the kind: a single scoop starts at $6 and a bubble tea at $7, not the
+  // $9 coffee and pastry. It follows the kind she picks until she changes the price.
+  function cafeSpendStart(){ return S.place === 'Ice cream & gelato' ? 6 : S.place === 'Bubble tea' ? 7 : 9; }
+  // Review fix (2026-11-12): only until the price step is answered (saved, sent or skipped); after that a change of kind
+  // never changes the price shown under "✓ Saved" (spendFollows).
+  var spendAuto = C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount);
+  if (spendAuto) S.spend = cafeSpendStart();
+  if (S.done.spend) spendAuto = false;
+  function spendFollows(){ return spendAuto && !S.done.spend && S.spend === cafeSpendStart(); }
   // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
   S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
@@ -251,6 +263,10 @@
   // A stored closure is a holiday tile only when its note is that holiday's own name (or empty): a note the owner wrote
   // ("Staff party") stays a row of its own, so saving again never rewrites it.
   function holNote(key){ return String(T.holidays[key]).replace(/[()&<>]/g, ''); }
+  // Café test 6 (2026-11-12): a holiday's name is saved in English (the page shows it in its own language), so "Noël"
+  // tapped on the French screen no longer shows as "Dec 25 (Noël)" on the English page. A note she typed is kept as is.
+  function holEn(key){ var a = C.lang === 'fr' && C.holidayAlt && C.holidayAlt[key]; return a ? String(a).replace(/[()&<>]/g, '') : holNote(key); }
+  function holKeep(key, n){ return n === holNote(key) ? holEn(key) : n; }
   S.holNotes = {};
   // Recurring holidays (pub fresh-eyes, 2026-11-10): Christmas Day, Boxing Day and New Year's Day are the same date every
   // year. A closure is stored as dates only (no repeat rule), so "This year and next" also saves next year's date; it
@@ -271,7 +287,10 @@
   // range) is covered by them. Its tile shows ticked with "Covered by your closed dates" and no row of its own is saved
   // (the page listed Christmas Day three times). Yearly ranges may wrap over New Year.
   function coveredBy(date){ var md = String(date).slice(5); return S.extra.some(function(c){ var t = c.to || c.from; if (c.yearly) return c.from <= t ? md >= c.from && md <= t : md >= c.from || md <= t; return date >= c.from && date <= t; }); }
-  function holCovered(o){ return coveredBy(o.date); }
+  // Bug-check (2026-11-12): a day outside the open season (open Apr 15 – Oct 15: Christmas, New Year's) is covered too.
+  // saved (review fix 2026-11-12): the season the page has (CUR), never an unsaved draft one, when saving the holidays.
+  function offSeason(date, saved){ var o = saved ? openSeaOf(CUR.open_months) : S.openSea; if (!o || !o.from || !o.to) return false; var md = String(date).slice(5); return o.from <= o.to ? md < o.from || md > o.to : md < o.from && md > o.to; }
+  function holCovered(o, saved){ return coveredBy(o.date) || offSeason(o.date, saved); }
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
@@ -372,14 +391,19 @@
     var yr = function(d){ return d.slice(0, 4) !== String(new Date().getFullYear()) ? dateLabelY(d) : dateLabel(d); };
     return yr(c.from) + (c.to && c.to !== c.from ? ' – ' + yr(c.to) : '');
   }
-  function dateLabelY(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return s; } }
-  function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
+  // « ven. 1er janv. » in French (café test 6), as the rest of the site writes the first of the month.
+  function first1(t, s){ return C.lang === 'fr' && /-01$/.test(s) ? String(t).replace(/(^|\s)1(\s)/, '$11er$2') : t; }
+  function dateLabelY(s){ var d = new Date(s + 'T12:00:00'); try { return first1(d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), s); } catch (e) { return s; } }
+  function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return first1(d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }), s); } catch (e) { return s; } }
 
   // ---------- Talking to the server ----------
   function post(url, body){
     var attempt = function(){
       return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
-        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy'); return r.json().catch(function(){ return { ok: false }; }); });
+        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy');
+          // Bug-check (2026-11-12): too many saves in an hour says so kindly, in her language (nothing typed is lost).
+          if (r.status === 429) return { ok: false, error: T.tooFast || T.failed, rateLimited: true };
+          return r.json().catch(function(){ return { ok: false }; }); });
     };
     return attempt().catch(function(){ return new Promise(function(ok){ setTimeout(ok, 1500); }).then(attempt); }).catch(function(){ return { ok: false }; });
   }
@@ -423,7 +447,7 @@
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
-    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(T.labels[k]) + ': ' + h(stText(k, done[k])) + '</li>'; }).join('');
+    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
   window.ohbLive = window.ohbLive || {};
@@ -469,11 +493,18 @@
   function sub(b){ return C.cafe && b === 'closures'; }
   function isStep(b){ return STEPS.indexOf(b) >= 0 || sub(b); }
   function stepOf(b){ return sub(b) ? 'hours' : b; }
-  function allDone(){ return STEPS.every(function(k){ return S.done[k]; }); }
-  function p1Done(){ return P1.every(function(k){ return S.done[k]; }); }
-  function p2Count(){ return P2.filter(function(k){ return S.done[k]; }).length; }
+  // Café test 6 (2026-11-12): a café's Hours step is two parts (the hours, then holidays and closures). It only counts
+  // as done once the closures part is saved or skipped; leaving on the closures screen used to show Hours ✓ and
+  // "Carry on" went past the holidays. fin(k) is the step's answer as far as progress goes.
+  // (Hours skipped or put off as a whole: nothing half-done, as before.)
+  function half(k){ var d = S.done.hours; return C.cafe && k === 'hours' && !!d && d !== 'skip' && d !== 'later' && !S.done.closures; }
+  function fin(k){ return half(k) ? '' : S.done[k]; }
+  function allDone(){ return STEPS.every(function(k){ return fin(k); }); }
+  function p1Done(){ return P1.every(function(k){ return fin(k); }); }
+  function p2Count(){ return P2.filter(function(k){ return fin(k); }).length; }
   function nextOf(step){ if (C.cafe && step === 'hours') return 'closures'; step = stepOf(step); if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
-  function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!S.done[P1[i]]) return P1[i]; return allDone() ? 'finish' : 'more'; }
+  // The hours part saved but not the holidays: carry on at the holidays and closures.
+  function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!fin(P1[i])) return half(P1[i]) ? 'closures' : P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
   function entry(step){
     if (step === 'book' && (S.badges.takes_reservations || S.visit.reservations || CUR.booking_url)) return 'book:yes';
@@ -487,8 +518,17 @@
   // Steps with several things on one screen: "Save and exit" keeps the picks but the step isn't done until its own
   // Save is tapped, so "Carry on" comes back to it (fresh-eyes 2026-11-10: a half-done closures step was skipped).
   var HALF = ['offer', 'cuisine', 'closures'];
-  function answered(step){ var d = S.done[step]; return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
-  function leave(){ S.leaving = true; location.href = C.back; }
+  function answered(step){ var d = fin(step); return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
+  // Bug-check (2026-11-12): leaving for the other language (after "Save these first?" or photos sent) goes there instead.
+  // Review fix (2026-11-12): only while that save-and-go is still on (S.exitAfter), or from the "Save these first?" box
+  // itself (how.box); a save that failed or stopped clears S.langGo, so a later "I'm done for now" returns to the portal.
+  // "Don't save" (how.drop) doesn't keep the dropped answers as a draft on the way.
+  function leave(how){
+    how = how || {};
+    var lang = S.langGo && (S.exitAfter || how.box); S.langGo = false;
+    if (lang && typeof window.suLangGo === 'function') { if (!how.drop) drSave(); navKeep(); S.leaving = true; if (window.suLangGo()) return; S.leaving = false; }
+    S.leaving = true; location.href = C.back;
+  }
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
@@ -499,7 +539,7 @@
     var line = S.savedLine[step] || (how === 'day' ? (many ? T.savedDayMany : T.savedDay) : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
     // The first "Sent" says what it means (pub fresh-eyes 2), once.
     if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
-    return '✓ ' + String(title).replace(/[.!]$/, '') + '. ' + line;
+    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line;
   }
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);
@@ -510,7 +550,9 @@
     if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
     var fl = S.flash || ''; S.flash = '';
     step = entry(step); S.fresh = false;
-    if (S.exitAfter) return leave();
+    // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
+    // not back on the screen just saved.
+    if (S.exitAfter) { if (S.langGo) S.step = step; return leave(); }
     if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
     if (step === 'happy' && S.done.happy === 'live' && S.happy.length) return 'happy:type';
@@ -551,6 +593,10 @@
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
   function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (C.cafe && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
+    // Bug-check (2026-11-12): a café's hours saved but not its holidays: "Next: Holidays and closures", never "Skip".
+    if (half(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
+    // Unsaved answers brought back on this screen (a reload, a language switch): only the screen's own Save moves on.
+    if (answered(step) && pending(step)) return '';
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
@@ -558,6 +604,8 @@
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
+    // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
+    if (pending(step)) return '';
     var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
     if (d === 'unsure') return '<p class="su-sent">' + h(fill(T.youSaid, { a: T.st.unsure })) + '</p>';
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
@@ -633,7 +681,7 @@
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
     return list(steps.map(function(s){
-      var d = S.done[s] || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      var d = half(s) ? 'half' : fin(s) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
       return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
@@ -646,20 +694,44 @@
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸' };
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
+  // "87 %" in French, as the line beside it says (café test 6).
+  function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
     // One number only (two read as a grade): where the page will be once we add what was sent.
-    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + sc.soon + '%</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
+    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + pct(sc.soon) + '</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
       + h(T.pctAboutSub) + '</span>' + (raise ? '<small>' + h(T.pctRaise) + '</small>' : '') + '</div></div>';
-    return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + sc.pct + '%</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
+    return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + pct(sc.pct) + '</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
       + h(sc.pct >= 100 ? T.pctDone : raise ? T.pctRaise : T.niceWork) + '</span></div></div>';
   }
   function preview(){
     return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       // Café test 3 (2026-11-11): a café's kind comes first, as its page says it ("Bubble tea shop · Korean · Dessert", not
       // "Korean · Dessert · Bubble tea", which read like a Korean restaurant).
-      + h([C.cafe && S.place ? (C.placeShow || {})[S.place] || C.placeNames[S.place] || S.place : '', S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, !C.cafe && S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: money(S.spend), words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([C.cafe && S.place ? (C.placeShow || {})[S.place] || C.placeNames[S.place] || S.place : '', S.cuis.length ? S.cuis.map(function(c){ return (C.cuisineShow || {})[c] || C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, !C.cafe && S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: money(S.spend), words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+  }
+  // Café test 6 (2026-11-12): reopening the Hours step showed only the usual week, and an owner with summer hours
+  // feared they were lost. One line per saved season: "Summer (Jun–Sep): 7 AM – 3 PM every day ✓". No new question.
+  function weekShort(w){
+    var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
+    if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
+    var out = [], i = 0;
+    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
+    return out.join(' · ');
+  }
+  function seasonLines(){
+    return (CUR.hours_seasons || []).map(function(sz){
+      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
+      var w = parseWeek(sz.hours); if (!w) return '';
+      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
+      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
+      var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
+      var last = new Date(2025, b, 0).getDate();
+      var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
+      var range = md2(a, da, da > 1) + '–' + md2(b, db, db < last);
+      return '<p class="su-sent su-seasonnow su-seahours">' + h(fill(T.seasonHoursLine, { kind: kw, range: range, hours: weekShort(w) })) + '</p>';
+    }).join('');
   }
   function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
 
@@ -679,7 +751,7 @@
     if (C.cafe && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase(); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
-    return T.optional + ': ' + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
+    return cl(T.optional) + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
   }
   function leftList(){
     var out = [], seen = {};
@@ -687,7 +759,7 @@
     // Facebook name sent were still listed).
     var tickedBy = { book: 'takes_reservations', takeout: 'takeout', groups: 'great_groups' };
     STEPS.forEach(function(k){
-      if (S.done[k] && S.done[k] !== 'skip' && S.done[k] !== 'later') return;
+      if (fin(k) && fin(k) !== 'skip' && fin(k) !== 'later') return;
       if (k === 'spend' && S.spendNotSure) return; // "Not sure? Skip": not asked again on this screen
       if (tickedBy[k] && S.badges[tickedBy[k]]) return;
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
@@ -736,16 +808,16 @@
       + '<div class="su-skip"><button type="button" class="su-link" id="suExitStay">' + h(T.exitStay) + '</button></div></div>');
     window.scrollTo(0, 0); try { el('suExitQ').focus({ preventScroll: true }); } catch (e) {}
     // "Don't save": what was typed on this step is dropped here too.
-    el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave(); };
-    el('suExitStay').onclick = function(){ var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
+    el('suExitDrop').onclick = function(){ drDrop(base(S.step)); leave({ box: true, drop: true }); };
+    el('suExitStay').onclick = function(){ S.langGo = false; var b2 = el('suExitBox'); if (b2) b2.parentNode.removeChild(b2); };
     el('suExitSave').onclick = function(){
-      if (S.busy) return; var a = exitAction(); if (!a) return leave();
+      if (S.busy) return; var a = exitAction(); if (!a) return leave({ box: true });
       S.exitAfter = true; act(a);
       // Something still needs fixing (a missing tick, an empty box): the reason is on the screen, and we stay.
-      if (!S.busy && !S.leaving) S.exitAfter = false;
+      if (!S.busy && !S.leaving) { S.exitAfter = false; S.langGo = false; }
     };
   }
-  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; }
+  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } S.langGo = false;
     // Café test 5 (2026-11-12): photos picked with the rights box ticked are sent on the way out (then the page is left).
     if (S.step === 'photos:review' && goodPhotos().length && S.rights) { e.preventDefault(); S.exitAfter = true; return sendPhotos(); }
     if (unsaved()) { e.preventDefault(); askExit(); } };
@@ -762,8 +834,11 @@
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
     'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
-  var DR = { base: {}, s: {}, at: {}, last: '' };
-  function drKey(b){ return 'suDraft:' + C.base + ':' + b; }
+  var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
+  // True while answers kept on this device (not saved yet) are shown on the step's screens.
+  function pending(step){ return S.dirty === step && !!DR.restored[step]; }
+  // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
+  function drKey(b){ return 'suDraft:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, '') + ':' + b; }
   function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function drPut(b, d){ try { window.sessionStorage.setItem(drKey(b), JSON.stringify(d)); } catch (e) {} }
   function drDrop(b){ try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
@@ -811,11 +886,11 @@
   function drAfter(){
     var b = base(S.step); if (!isStep(b)) { DR.last = ''; DR.at = {}; return; }
     if (DR.last !== b) { DR.last = b; if (!DR.base[b] || !drGet(b)) DR.base[b] = drSnap(); }
-    if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; render(); return true; } }
+    if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; DR.restored[b] = true; render(); return true; } }
     if (DR.at.step === S.step) return; DR.at = { step: S.step };
     var d = drGet(b), bx = d && d.boxes && d.boxes[S.step]; if (!bx) return;
     Object.keys(bx).forEach(function(sel){ var inp; try { inp = screen.querySelector(sel); } catch (e) { inp = null; } if (!inp || inp.value === bx[sel]) return; inp.value = bx[sel]; try { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} });
-    S.dirty = b;
+    S.dirty = b; DR.restored[b] = true;
   }
   function drApply(b){
     var d = drGet(b); if (!d || !d.s) return false;
@@ -831,7 +906,7 @@
     });
     return any;
   }
-  function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; if (DR.last === step) DR.last = ''; }
+  function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; delete DR.restored[step]; if (DR.last === step) DR.last = ''; }
   // ---------- Screens ----------
   function render(){
     // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
@@ -893,7 +968,7 @@
         + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + big('✕', T.noWebsiteBtn, '', true, 'basicsNoSite') + '</div>';
     } else if (s === 'hours') {
-      x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
+      x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
         : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + '</div>') + skip('hours');
     } else if (s === 'hours:year') {
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
@@ -942,14 +1017,17 @@
           // ("Monday closed · Undo").
           + '<span class="su-hbtns"><button type="button" class="su-hchg" data-hopen="' + d + '" aria-label="' + h(fill(T.hoursChangeDay, { day: longDay(d) })) + '"><span aria-hidden="true">✎</span> ' + h(T.hoursChange) + '</button></span>'
           + '<div class="su-hoffrow">' + (w ? '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="false" aria-label="' + h(fill(T.closeDayAria, { day: longDay(d) })) + '">' + h(T.closeDayBtn) + '</button>'
-            : hoffUndo(d) ? '<span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span> <button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.undo) + '</button>'
+            // Café test 6 (2026-11-12): "Reopen" takes the place of "Mark closed" (same spot, same height) and the "Monday
+            // closed" note comes after it, so a quick second tap on the next day's button never lands on another day.
+            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
-            + (seas && !othersClosed(d) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>'
+            // Café test 6 (2026-11-12): not when the first button already says "Every day" (every day open: two identical buttons).
+            + (seas && !othersClosed(d) && !DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>'
             // Café test 5 (2026-11-12): Sat–Sun beside Mon–Fri (same rule: a day marked Closed stays closed).
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
             // Said once, under the first open card (café test 5: it repeated under every open day).
@@ -987,9 +1065,9 @@
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         // Café test 4 (2026-11-11): "We're closed part of the year" is asked once, in Hours ("Are these your hours all
         // year?"). This screen only shows a saved open season, with Change.
-        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
-        + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(T.holidays[o.key] + ': ' + T.everyYear) + '</span></label>'; }).join('')
+        + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(cl(T.holidays[o.key]) + T.everyYear) + '</span></label>'; }).join('')
         + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
         // Pub test 6 (2026-11-10): not sticky. On a 375x667 phone the big button sat over the holiday tiles; it now comes
         // after them.
@@ -1014,7 +1092,7 @@
       var sw = C.cafe ? cafeWords() : '';
       x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + ' $' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
         // Café test 2 (2026-11-11): cents for cafés ($5.50 a scoop), in 25-cent steps.
-        + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">−25¢</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">+25¢</button></div>' : '')
+        + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">' + h(T.centsDown || '−25¢') + '</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">' + h(T.centsUp || '+25¢') + '</button></div>' : '')
         + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: money(S.spend) }), '', false, 'spendSave') + '</div>' + skip('spend');
     } else if (s === 'cuisine' && C.cafe) {
       // Cafés (2026-11-10): "What kind of café?" first (one of 11), then "What do you serve?".
@@ -1051,7 +1129,7 @@
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
     } else if (s === 'photos') {
-      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ')) + '</p>' + q(T.photosMore) : q(T.photosQ, photosHint())) + msgs()
+      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ').replace(/^✓ (\S)/, function(m, c){ return '✓ ' + c.toUpperCase(); })) + '</p>' + q(T.photosMore) : q(T.photosQ, photosHint())) + msgs()
         + '<div class="su-stack">' + big('📷', T.take, T.takeSub, false, 'take') + big('🖼️', T.choose, '', true, 'pick') + (S.photosSent || S.done.photos === 'day' ? big('➜', T.photosNoMore, '', true, 'after:photos') : '') + '</div>' + (S.photosSent || S.done.photos ? '' : skip('photos'));
     } else if (s === 'photos:review') {
       var g = goodPhotos();
@@ -1299,11 +1377,12 @@
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
         + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>';
     }
-    if (S.error || S.nudge) S.exitAfter = false;
+    if (S.error || S.nudge) { S.exitAfter = false; S.langGo = false; }
     // A failed save always says so, whatever the screen.
     if (S.error && x.indexOf('su-error') < 0) x = msgs() + x;
     screen.innerHTML = x;
     wire();
+    navSync();
     if (drAfter()) return;
     var e2 = screen.querySelector('.su-error');
     if (e2) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }
@@ -1334,7 +1413,7 @@
   function sendPhotos(){
     var list = goodPhotos();
     if (!list.length) { S.nudge = T.needPhoto; return render(); }
-    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
+    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.langGo = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
     var total = list.length, i = 0, mainP = list.filter(function(ph){ return ph.main; })[0];
     S.busy = true; S.error = ''; S.nudge = ''; S.rightsAsk = false; S.lastBatch = total; render();
     var next = function(){
@@ -1707,7 +1786,7 @@
     var lab = String(s0.label || '').toLowerCase(), m = +s0.from.slice(0, 2);
     return { from: s0.from, to: s0.to, kind: /winter|hiver/.test(lab) ? 'winter' : /summer|été/.test(lab) ? 'summer' : (m >= 4 && m <= 9 ? 'summer' : 'winter') };
   }
-  function mdText(md){ return monthName(+md.slice(0, 2) - 1) + ' ' + (+md.slice(3)); }
+  function mdText(md){ return mdLabel(md); }
   function readKsea(){ var e = el('suKsto'); if (e) S.kitchen.sea.closes = e.value; }
   // ---------- Wiring ----------
   function act(a){
@@ -1875,8 +1954,8 @@
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? S.holNotes[o.key] : holNote(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? S.holNotes[o.key] : holNote(o.key) }; })).concat(S.extra);
+      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o, true); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o, true) && !coveredBy(o.next) && !offSeason(o.next, true); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
@@ -1905,7 +1984,7 @@
     if (k === 'spend') { S.spend = Math.round(Math.max(C.cafe ? 2 : 5, Math.min(300, S.spend + (+v))) * 4) / 4; if (!C.cafe) S.spend = Math.round(S.spend); return render(); }
     if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
     if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
-    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }]); }
+    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ spendAuto = false; }); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'holAll') { S.holAll = !S.holAll; var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
@@ -2045,8 +2124,21 @@
       if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dv.df_sorbet && !dv.vegan_ice && !dv.gf_cones && !dnote) { S.nudge = T.dietNeed; return render(); }
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
-      if (mk.length && !S.badges.dairy_free_milk) { dl.push({ badges: { dairy_free_milk: true } }); S.badges.dairy_free_milk = true; }
-      return saveAll('diet', dl);
+      // Review fix (2026-11-12): the tiles are marked ticked only once the save went through, so a retry sends them again.
+      var dfMilk = mk.length && !S.badges.dairy_free_milk;
+      if (dfMilk) dl.push({ badges: { dairy_free_milk: true } });
+      // Bug-check (2026-11-12): vegan gelato or ice cream ticks "Vegan options" too (never unticks it), taking back an
+      // earlier "None of these" for dietary options.
+      var veganIce = dv.vegan_ice && !S.badges.vegan, dietNone = veganIce && S.notOffered.indexOf('dietary') >= 0;
+      if (veganIce) {
+        if (dietNone) dl.push({ not_offered: { remove: ['dietary'] } });
+        dl.push({ badges: { vegan: true } });
+      }
+      return saveAll('diet', dl, null, null, function(){
+        if (dfMilk) S.badges.dairy_free_milk = true;
+        if (dietNone) S.notOffered = S.notOffered.filter(function(z){ return z !== 'dietary'; });
+        if (veganIce) { S.badges.vegan = true; S.noDiet = false; }
+      });
     }
     if (k === 'coffeeSave') {
       readCafe(); var cf2 = S.cafe.coffee;
@@ -2165,7 +2257,7 @@
       S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y);
     }; });
     var cq = el('suCq'); if (cq) { var filt = function(){ S.cuiQ = cq.value; var tq = cq.value.trim().toLowerCase(), n = 0; Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ var c = b.getAttribute('data-cui'), on = !tq || c.toLowerCase().indexOf(tq) >= 0 || String(C.cuisineNames[c] || '').toLowerCase().indexOf(tq) >= 0; b.hidden = !on; if (on) n++; }); el('suCuiNone').hidden = n > 0; }; cq.oninput = filt; filt(); }
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ S.place = b.getAttribute('data-place'); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ var sp0 = spendFollows(); S.place = b.getAttribute('data-place'); if (sp0) S.spend = cafeSpendStart(); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Café screens (2026-11-10).
     var redraw = function(){ S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ctog]'), function(b){ b.onclick = function(){
@@ -2279,6 +2371,12 @@
   // counts here, never a guess from the name.
   if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   var startAt = String(location.hash || '').slice(1);
+  // Bug-check (2026-11-12): where she was, for a reload (history.state) or a language switch (kept a minute in this tab),
+  // so "Save" there carries on as it would have (a first pass goes on to the next question, not back to the list).
+  var navWas = null;
+  try { navWas = history.state && history.state.suNav || null; } catch (e) {}
+  try { var nl = window.sessionStorage.getItem(navKey()); if (nl) { window.sessionStorage.removeItem(navKey()); nl = JSON.parse(nl); if (!navWas && nl && Date.now() - (nl.at || 0) < 120000) navWas = nl; } } catch (e) {}
+  if (navWas && navWas.h !== startAt) navWas = null;
   if (startAt === 'season') startAt = 'closures';
   if (C.cafe && (startAt === 'instagram' || startAt === 'facebook')) startAt = 'social';
   if (C.cafe && startAt === 'closures') { S.hist = ['start']; S.step = 'closures'; S.toList = true; }
@@ -2289,6 +2387,9 @@
   else if (C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) { S.hist = ['start']; S.step = startAt; S.toList = true; }
   // Cafés: the checklist's "What you serve" row opens its own screen (the kind first while none is picked).
   else if (C.cafe && startAt === 'cuisine:serve') { S.hist = ['start']; S.step = S.place && CUR.place_type ? 'cuisine:serve' : 'cuisine'; S.toList = true; }
+  // A reload or a language switch on an edit screen comes back to it (with what was typed), not to the summary.
+  else if (startAt === 'hours:edit' || startAt === 'basics:edit') { S.hist = ['start', base(startAt)]; S.step = startAt; }
+  if (navWas) { S.toList = !!navWas.toList; S.toFinish = !!navWas.toFinish; S.toEss = !!navWas.toEss; }
   // Answers tapped or typed but not saved yet (for "Exit setup").
   screen.addEventListener('input', function(e){ if (e.target && e.target.id !== 'suCq') mark(); });
   // Keep the after-midnight note in step with the time boxes as the owner types.
@@ -2302,6 +2403,41 @@
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
   window.addEventListener('pagehide', drSave);
+  // ---------- Where she is, in the address (bug-check 2026-11-12) ----------
+  // The address's #step follows the question on screen, so a reload (or iOS reloading a tab) comes back to it, or to the
+  // Welcome back list from screens without one. It used to keep the step a language switch had put there.
+  function navKey(){ return 'suNav:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, ''); }
+  function navRec(){ return { h: window.suLangHash ? window.suLangHash() : '', toList: !!S.toList, toFinish: !!S.toFinish, toEss: !!S.toEss }; }
+  function navSync(){
+    try {
+      var r = navRec(), url = location.pathname + location.search + (r.h ? '#' + r.h : '');
+      if (location.pathname + location.search + location.hash !== url || !history.state || JSON.stringify(history.state.suNav) !== JSON.stringify(r)) history.replaceState({ suNav: r }, '', url);
+    } catch (e) {}
+  }
+  function navKeep(){ try { var r = navRec(); r.at = Date.now(); window.sessionStorage.setItem(navKey(), JSON.stringify(r)); } catch (e) {} }
+  // Café test 6 (2026-11-12): "Français / English" opens the same question in the other language. What she typed is kept
+  // as a draft (above) and there is no "leave this page?" prompt.
+  window.suLangHash = function(){
+    var s0 = S.step, b0 = base(s0);
+    if (b0 === 'closures') return 'closures';
+    // Bug-check (2026-11-12): mid-edit, the edit screen itself (with the unsaved answers), never the summary that read as saved.
+    if (s0 === 'hours:edit' || s0 === 'hours:season') return 'hours:edit';
+    if (s0 === 'basics:edit') return s0;
+    // The screens the address can open on their own (the pubs' kitchen, sports and who's-welcome; a café's serves).
+    if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.cafe && s0 === 'cuisine:serve')) return s0;
+    if (s0 === 'hours:year') return s0;
+    if (STEPS.indexOf(b0) >= 0) return b0;
+    return s0 === 'more' ? 'more' : '';
+  };
+  // Bug-check (2026-11-12): photos, menu pages or files picked but not sent are never dropped by a language switch. Photos
+  // with the box ticked are sent first (as when leaving); anything else asks "Save these first?". false: don't go yet.
+  window.suBeforeLang = function(){
+    if (S.busy) return false;
+    if (S.step === 'photos:review' && goodPhotos().length && S.rights) { S.langGo = true; S.exitAfter = true; sendPhotos(); return false; }
+    if (S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { S.langGo = true; askExit(); return false; }
+    try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); } catch (e) {}
+    drSave(); navKeep(); S.leaving = true; return true;
+  };
   render();
   window.addEventListener('beforeunload', function(e){ drSave(); if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

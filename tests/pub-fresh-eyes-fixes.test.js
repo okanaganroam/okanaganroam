@@ -198,7 +198,7 @@ test('hours editor, happy hour and closures: Same every day, Same as Monday, Ope
   assert.match(s, /yearly: true \}/); // café test 5 (2026-11-12): every holiday tile, the eves too
   assert.match(s, /S\.everyYear\[key\] !== false/);
   assert.match(s, /data-yearly/); assert.match(s, /mapFailQ/);
-  assert.equal(cfgOf(await text(`/fr/owner/${tokenFor(mk('pub').id)}/setup`)).t.everyYear, 'Cette année et l’an prochain');
+  assert.equal(cfgOf(await text(`/fr/owner/${tokenFor(mk('pub').id)}/setup`)).t.everyYear, 'cette année et l’an prochain'); // café test 6: after « Noël : »
 });
 
 test('recurring holidays: this year\'s and next year\'s Christmas save together and both show', async () => {

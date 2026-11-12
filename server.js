@@ -9903,6 +9903,78 @@ const VISIT_LABELS_FR = {
   'The hike': 'La randonnée', 'Dogs': 'Chiens', 'Parking': 'Stationnement', 'Best season': 'Meilleure saison', 'Before you go': 'Avant de partir', 'Trail map': 'Carte du sentier',
 };
 function visitLabelFr(label) { return VISIT_LABELS_FR[label] || frLookup(label) || label; }
+// ---------- Preset answers in the page's language (café test 6, 2026-11-12) ----------
+// The easy setup's tap-to-answer chips ("Patio only" / "Terrasse seulement", "Call us", ...) and holiday names ("Christmas
+// Day" / "Noël") are written into the owner's answer in the language of the screen she used, so French answers showed
+// on the English page ("Dogs: Terrasse seulement", "Dec 25 (Noël)"). They are now shown in the page's language: each
+// part of the answer (split at ". ", ", " or "; ") that is exactly a known preset is swapped for the same preset in
+// the page's language. Anything the owner typed in her own words stays exactly as typed.
+let PRESET_ANSWERS = null;
+function presetAnswerNorm(t) { return String(t || '').toLowerCase().replace(/[‘’ʼ]/g, "'").replace(/\s+/g, ' ').trim(); }
+function presetAnswerMap() {
+  if (PRESET_ANSWERS) return PRESET_ANSWERS;
+  const T = require('./owner-setup-text');
+  const map = new Map();
+  const add = (en, fr) => {
+    if (typeof en !== 'string' || typeof fr !== 'string' || !en.trim() || !fr.trim()) return;
+    const clean = (x) => x.replace(/[()&<>]/g, '').trim();
+    const e = { en: clean(en), fr: clean(fr) };
+    for (const k of [presetAnswerNorm(e.en), presetAnswerNorm(e.fr)]) if (!map.has(k)) map.set(k, e);
+  };
+  const walk = (e, f, pre) => {
+    if (!e || !f || typeof e !== 'object' || typeof f !== 'object') return;
+    for (const k of Object.keys(e)) {
+      const isPre = pre || /^quick/.test(k) || k === 'holidays';
+      const ev = e[k], fv = f[k];
+      if (isPre && typeof ev === 'string') add(ev, fv);
+      else if (isPre && Array.isArray(ev) && Array.isArray(fv) && ev.length === fv.length) ev.forEach((x, i) => add(x, fv[i]));
+      else if (ev && typeof ev === 'object' && !Array.isArray(ev)) walk(ev, fv, isPre);
+    }
+  };
+  walk(T.en, T.fr, false);
+  PRESET_ANSWERS = map;
+  return map;
+}
+function presetAnswerParts(text) { return String(text == null ? '' : text).split(/(\s*[.,;]\s+)/); }
+// The answer with its preset parts in `lang` ('en' or 'fr').
+function presetAnswer(text, lang) {
+  if (text == null || text === '') return text;
+  const map = presetAnswerMap();
+  return presetAnswerParts(text).map((seg, i) => {
+    if (i % 2) return seg;
+    const m = /^(.*?)(\.?)$/.exec(seg);
+    const hit = map.get(presetAnswerNorm(m[1]));
+    return hit ? hit[lang === 'fr' ? 'fr' : 'en'] + m[2] : seg;
+  }).join('');
+}
+// True when every part of the answer is a known preset (so it can be shown in either language).
+function isPresetAnswer(text) {
+  const map = presetAnswerMap();
+  const parts = presetAnswerParts(text).filter((x, i) => i % 2 === 0).map((x) => presetAnswerNorm(x.replace(/\.$/, ''))).filter(Boolean);
+  return parts.length > 0 && parts.every((x) => map.has(x));
+}
+// Bug-check (2026-11-12): the answer in `lang` only when it is wholly made of presets and some part is in the other
+// language; otherwise exactly as stored (an English line keeps its own capitals and words: "Takeout available; call to
+// order." is never rewritten to "...; Call to order.").
+function presetInLang(text, lang) {
+  if (typeof text !== 'string' || !text || !isPresetAnswer(text)) return text;
+  const out = presetAnswer(text, lang);
+  return presetAnswerNorm(out) === presetAnswerNorm(text) ? text : out;
+}
+// A French page's text for an owner's line: the French list's translation first (as before), else, for a line made
+// only of presets, the presets in French; else null (left off, as before).
+function presetOrFr(text, frFn) {
+  const t = frFn(text);
+  if (t != null && t !== '') return t;
+  return isPresetAnswer(text) ? presetInLang(text, 'fr') : null;
+}
+// A closure's note as a page shows it: a holiday name in the page's language; on French pages other notes only when
+// they have a French version (as before).
+function closureNoteFor(note, fr) {
+  if (!note) return '';
+  if (!fr) return presetInLang(note, 'en');
+  return presetOrFr(note, frText) || '';
+}
 function visitTextFr(text) {
   const t = frLookup(visitTextPolish(text));
   return t == null ? null : frTidy(t);
@@ -9938,10 +10010,16 @@ function visitDropRepeatedKnownFor(info, description) {
 }
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
+  // An owner's tap-to-answer lines in the page's language (café test 6): "Patio only" on English pages, never "Terrasse seulement".
+  // Bug-check (2026-11-12): only an answer that is wholly made of presets is swapped; a line with words of her own
+  // ("Takeout available; call to order.") stays as typed on English pages and keeps its French translation (it was
+  // half-swapped, and then dropped from the French page).
   if (fr) {
-    const rowsFr = info.rows.map((r) => ({ ...r, text: visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    const rowsFr = info.rows.map((r) => ({ ...r, text: typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
+  } else {
+    info = { ...info, rows: info.rows.map((r) => (r && typeof r.text === 'string' ? { ...r, text: presetInLang(r.text, 'en') } : r)) };
   }
   const rowHtml = (r) => {
     const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
@@ -13854,18 +13932,18 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="${SKI_SNOW_PATH}" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a></li>
           <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
           <li><a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a></li>
-          <li><a href="/dog-friendly">Dog Friendly Finds</a></li>
-          <li><a href="/secret-spots">Secret Spots</a></li>
+          <li><a href="/dog-friendly" data-i18n="footer.dogFriendly">Dog Friendly Finds</a></li>
+          <li><a href="/secret-spots" data-i18n="gems.secretSpots.title">Secret Spots</a></li>
           <li><a href="/guides">Guides</a></li>
         </ul>
       </details>
       <div class="home-footer-col">
         <h2 data-i18n="footer.about">About</h2>
         <ul>
-          <li><a href="/about">About Okanagan Roam</a></li>
+          <li><a href="/about" data-i18n="footer.aboutSite">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
-          <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="/owner/login">Business login</a></li>
+          <li><a href="/list-an-event" data-i18n="footer.listEvent">List an Event</a></li>
+          <li><a href="/owner/login" data-i18n="footer.businessLogin">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
           <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>
@@ -13876,12 +13954,12 @@ function renderHomeFooterHTML(fromBrowse) {
           <div class="home-footer-region-subcol">${regionSubcol1}</div>
           <div class="home-footer-region-subcol">${regionSubcol2}</div>
         </div>
-        <p class="home-footer-all-regions"><a href="/destinations">See all destinations &rarr;</a></p>
+        <p class="home-footer-all-regions"><a href="/destinations" data-i18n="footer.allDestinations">See all destinations &rarr;</a></p>
       </details>
     </div>
   </div>
   <div class="wrap-wide home-footer-bottom">
-    <p class="home-footer-legal"><a href="/privacy">Privacy</a><span aria-hidden="true"> &middot; </span><a href="/terms">Terms</a><span aria-hidden="true"> &middot; </span><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></p>
+    <p class="home-footer-legal"><a href="/privacy" data-i18n="footer.privacy">Privacy</a><span aria-hidden="true"> &middot; </span><a href="/terms" data-i18n="footer.terms">Terms</a><span aria-hidden="true"> &middot; </span><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></p>
     <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
   </div>
   <script>
@@ -16789,7 +16867,7 @@ html[lang="fr"] .desc-en { display: none; }
   .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 184px) / 9.3)); }
   .nav #navTripBtn { padding: 0 8px; font-size: 0.76rem; }
 }
-/* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */
+/* French is longer ("Planifier mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */
 @media (max-width: 560px) {
   html[lang="fr"] .nav #navTripBtn { max-width: 92px; padding: 0 10px; white-space: normal; text-align: center; line-height: 1.05; font-size: 0.7rem; }
   html[lang="fr"] .nav #navTripBtn svg { display: none; }
@@ -19935,6 +20013,8 @@ function cleanCafeInfoPart(key, x) {
   if (key === 'menu_daily') return x === null || x === '' ? { value: null } : CAFE_MENU_DAILY.includes(x) ? { value: x } : { error: CAFE_INFO_ERROR };
   return { error: CAFE_INFO_ERROR };
 }
+// What each café kind already says, so the serves line doesn't repeat it ("Bubble tea shop · Bubble tea").
+const CAFE_KIND_SAYS = { 'Bubble tea': ['bubble_tea'], 'Ice cream & gelato': ['ice_cream'], 'Tea house': ['tea'], 'Juice & smoothie bar': ['smoothies'] };
 const cafeList = (arr, fr) => (arr.length < 2 ? arr.join('') : `${arr.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${arr[arr.length - 1]}`);
 const cafeCap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // The café's own lines under its hours ('' when it hasn't said anything): kind and what it serves, the price per person
@@ -19946,7 +20026,10 @@ function cafeInfoLinesHtml(venue, fr) {
   const lines = [];
   const kind = venuePlaceType(venue);
   // Café test 2: "made here" reads last ("Ice cream & gelato, sorbet and made here").
-  const serves = (info.serves || []).filter((k) => k !== 'made_here').concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
+  // Bug-check (2026-11-12): what the kind already says is not said again ("Ice cream & gelato shop · Ice cream & gelato").
+  // Review fix (2026-11-12): an explicit list per kind, not a substring match ("Bubble tea" dropped a plain "tea").
+  const saidByKind = (k) => (CAFE_KIND_SAYS[kind] || []).includes(k);
+  const serves = (info.serves || []).filter((k) => k !== 'made_here' && !saidByKind(k)).concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
   // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
@@ -19971,9 +20054,9 @@ function cafeInfoLinesHtml(venue, fr) {
   if (talk) lines.push(['talk', /talk|discuter/.test(talk) ? '💬' : '📵', talk]);
   const d = info.diet || {};
   const dBits = [];
-  if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
-  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'pâtisseries sans gluten d’une cuisine réservée'));
-  else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
+  if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? '\u00a0: ' : ': '));
+  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'options sans gluten d’une cuisine réservée'));
+  else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'options sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
   if (d.df_sorbet) dBits.push(L('dairy-free sorbet', 'sorbet sans produits laitiers'));
   if (d.vegan_ice) dBits.push(L('vegan gelato or ice cream', 'gelato ou crème glacée véganes'));
@@ -20051,7 +20134,10 @@ function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = 
   if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
   // Café test 5 (2026-11-12): vegan (or else vegetarian) options lead a café's top highlights; the four-chip limit cut
   // them, though they're often what a café is chosen for. The badges themselves are unchanged.
-  if (venue.vegan || venue.vegetarian) out.highlightFirst = [venue.vegan ? 'vegan' : 'vegetarian'].concat(profile.highlightFirst || []);
+  // Café test 6 (2026-11-12): every dietary option leads (vegan, vegetarian, then gluten-free) ahead of dogs, kids and
+  // the patio, so a buckwheat-crêpe café with gluten-free and vegetarian shows both within the four chips.
+  const dietFirst = [venue.vegan && 'vegan', venue.vegetarian && 'vegetarian', venue.gluten_free && 'gluten'].filter(Boolean);
+  if (dietFirst.length) out.highlightFirst = dietFirst.concat((profile.highlightFirst || []).filter((k) => !dietFirst.includes(k)));
   return out;
 }
 // A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
@@ -20091,6 +20177,31 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
     })
     .concat(ownerFeatureChipsHtml(venue, fr, (g) => `chip chip-vb chip-vb-${g}`) || [])
     .join(' ');
+}
+
+// Bug-check (2026-11-12): a French café page shows the same chips as the English one: the same top four first (dietary
+// options first, a gluten-free kitchen said as on the English page), then every other chip of the row (Terrasse, Vue sur
+// le lac, Musique, the café's own tiles...), each once. The dog chip, when the page has a dog note, is its own chip (as
+// before) and still counts in the four. The English page's profile for a café is cafePageProfile(venue, {}) too (its
+// Copper and Niche profiles never apply to a café; the deals options only change the tab label).
+const HIGHLIGHT_BADGE_FIELD = { dog: 'dog_friendly', kid: 'kid_friendly', patio: 'patio', lake: 'lake_view', gluten: 'gluten_free', vegan: 'vegan',
+  vegetarian: 'vegetarian', music: 'live_music', groups: 'great_groups', tv: 'sports_tv', nonalc: 'nonalcoholic' };
+function cafeFrChipsHtml(venue, dogNote, { skipHappyHour = false } = {}) {
+  const keys = foodDrinkHighlights(venue, dogNote, { ...cafePageProfile(venue, {}), returnKeys: true });
+  const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
+  const feats = venueOwnerFeatures(venue.id);
+  const topFields = keys.map((k) => HIGHLIGHT_BADGE_FIELD[k]).filter(Boolean);
+  const chips = keys.map((k) => {
+    const f = HIGHLIGHT_BADGE_FIELD[k];
+    if (!f || (k === 'dog' && dogNote !== undefined)) return '';
+    const label = k === 'gluten' && gf === 'shared' ? 'Options sans gluten (cuisine partagée)' : k === 'gluten' && gf === 'dedicated' ? 'Sans gluten (cuisine réservée)'
+      : k === 'patio' && feats.heated_patio ? OWNER_EXTRA_BADGE_LABELS.heated_patio.fr : frBadgeLabel(f);
+    const icon = (CARD_BADGE_SHORT[f] || [])[0];
+    return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
+  }).filter(Boolean);
+  // The rest: the usual row without the four already shown (and the café's own tiles, as on the English row).
+  const rest = venueBadgeChipsHtml({ ...venue, ...Object.fromEntries(topFields.map((f) => [f, 0])) }, { fr: true, skipDogFriendly: dogNote !== undefined, skipHappyHour });
+  return chips.concat(rest ? [rest] : []).join(' ');
 }
 
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
@@ -20234,12 +20345,14 @@ function venueCardHtml(venue, opts = {}) {
   // and /local-favorites leave off the badge every card on them would carry.
   const showBadge = isHiddenGem && !venue.redirect_to && !hideHiddenGemBadge;
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to && !hideLocalFavouriteBadge;
+  // Café test 6: a tapped dog answer in English on the (English) card.
+  const dogNoteEn = presetInLang(dogFriendlyNote, 'en');
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
   const showCv = !venue.redirect_to && COMPLETENESS_TYPES.has(venue.type) && completeVerifiedIds().has(venue.id);
   const cvCardChip = showCv ? completeVerifiedCardChipHtml(false) + ' ' : '';
-  const editorialChips = cvCardChip + (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const editorialChips = cvCardChip + (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogNoteEn) + ' ' : '');
   const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
-    ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogFriendlyNote).trim())}</p>`
+    ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogNoteEn).trim())}</p>`
     : '';
   // cardNotes (2026-10-11): an optional Map of venue id -> a short visible
   // line, used by the /indoor hub's "Also good on a rainy day" section to say
@@ -33260,7 +33373,14 @@ function frBadgeLabel(field) {
   return APP_TRANSLATIONS.fr[key] || (BADGE_LABELS[field] ? BADGE_LABELS[field].title : field);
 }
 // A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
+// Café test 6 (2026-11-12): a cuisine name in French qualifies « cuisine », so it is feminine like the rest (« Française »,
+// « Italienne »); these few fell back to masculine names (« Américain » next to « Française »).
+const FR_CUISINE_FEMININE = { American: 'Américaine', Canadian: 'Canadienne', Taiwanese: 'Taïwanaise', 'Spanish & Tapas': 'Espagnole et tapas',
+  'Contemporary & Global': 'Contemporaine et internationale', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne' };
+const FR_CUISINE_ADJECTIVE = new Set(['American', 'Canadian', 'Chinese', 'Ethiopian', 'Filipino', 'French', 'German', 'Greek', 'Indian', 'Italian', 'Japanese', 'Korean',
+  'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Polish', 'Portuguese', 'Taiwanese', 'Thai', 'Turkish', 'Ukrainian', 'Vietnamese', 'Spanish & Tapas']);
 function frCuisine(cuisine) {
+  if (FR_CUISINE_FEMININE[cuisine]) return FR_CUISINE_FEMININE[cuisine];
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
   if (key && APP_TRANSLATIONS.fr[key]) return APP_TRANSLATIONS.fr[key];
   // French gaps (2026-10-18): cuisines app.js has no key for ("Soup", "Coffee", "West Coast" ...) use french-text.js's list.
@@ -34185,7 +34305,7 @@ function frJsonLd(json) {
   return JSON.stringify(out);
 }
 function twinHeadLinks(enPath, search = '') {
-  const q = search.replace(/&/g, '&amp;');
+  const q = escapeHtml(search);
   const en = `https://okanaganroam.com${enPath}${q}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}${q}`;
   return `<link rel="alternate" hreflang="en-CA" href="${en}">\n<link rel="alternate" hreflang="fr-CA" href="${fr}">\n<link rel="alternate" hreflang="x-default" href="${en}">\n`;
 }
@@ -34215,7 +34335,7 @@ function englishTwinHtml(html, enPath, search = '') {
   let out = (frEventUntranslated(enPath) ? html : addTwinHead(html, enPath, search))
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
-  out = withTwinLangSwitch(out, frHrefPath + search.replace(/&/g, '&amp;'), 'en');
+  out = withTwinLangSwitch(out, escapeHtml(frHrefPath + search), 'en');
   // French readers are sent to the twin, so an English card carries its English blurb only (lighter list pages).
   out = out.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1');
   return out;
@@ -34245,7 +34365,7 @@ function frenchTwinHtml(html, enPath, search = '') {
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
   // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
   // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
-  html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml(frTextOr(frDecode(t)))}${b}`);
+  html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml((() => { const d = frDecode(t); const x = presetOrFr(d, frText); return x == null ? d : x; })())}${b}`);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -34262,7 +34382,7 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
-  out = withTwinLangSwitch(out, enPath + search.replace(/&/g, '&amp;'), 'fr');
+  out = withTwinLangSwitch(out, escapeHtml(enPath + search), 'fr');
   // Calendar links (2026-10-19): the .ics download is the French one, and Google Calendar gets the French details
   // line and the /fr page address.
   out = out.replace(/href="(\/[a-z-]+\/events\/[a-z0-9-]+\/calendar\.ics)"/g, 'href="/fr$1"')
@@ -34514,7 +34634,7 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
   const soon = all.filter((c) => c !== shown && !inside(c) && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
   if (soon.length) {
     // Round 10: the owner's (English) note stays off the French page unless the French list has it.
-    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note && (!fr || frText(c.note)) ? ` (${escapeHtml(fr ? frText(c.note) : c.note)})` : ''}`).join(' &middot; ')}</p>`);
+    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures:', 'Fermetures spéciales\u00a0:')}</strong> ${soon.map((c) => { const n = closureNoteFor(c.note, fr); return `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${n ? ` (${escapeHtml(n)})` : ''}`; }).join(' &middot; ')}</p>`);
   }
   return out.join('');
 }
@@ -35531,6 +35651,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
   let dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
+  // Café test 6: a tapped answer ("Terrasse seulement") in the page's language.
+  // Bug-check: only a line made wholly of presets; a French page keeps a line the French list translates (done later).
+  if (typeof dogFriendlyNote === 'string' && dogFriendlyNote && !(fr && frText(dogFriendlyNote))) dogFriendlyNote = presetInLang(dogFriendlyNote, fr ? 'fr' : 'en');
   // A pub whose owner said dogs are welcome on the patio only says so in the highlights ("Dogs on the patio"), instead
   // of a plain "Dog-friendly" that oversells it (pub fresh-eyes 2, 2026-11-10).
   if (!venue.redirect_to && venue.type === 'pub' && venue.dog_friendly) {
@@ -35540,7 +35663,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       if (/patio|terrasse/i.test(dt) && !/inside|indoor|int[ée]rieur/i.test(dt)) dogFriendlyNote = fr ? 'Chiens sur la terrasse' : 'Dogs on the patio';
     } catch (e) { /* no visit info */ }
   }
-  const attributeChipsFor = (skipHappyHour) => venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour });
+  const attributeChipsFor = (skipHappyHour) => (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote, { skipHappyHour }) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour }));
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
@@ -35582,7 +35705,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Round 8 (2026-10-19): a closure of three days or more without a note is a temporary closure, not "(holiday)".
     // Round 10 (2026-10-19): the owner's note is their own words, usually English, so a French page says only « Fermé »
     // unless the French list has that note.
-    const closedWord = (c) => (c.note ? (fr ? (frText(c.note) ? `Fermé (${escapeHtml(frText(c.note))})` : 'Fermé') : `Closed (${escapeHtml(c.note)})`)
+    const closedWord = (c) => (c.note ? (fr ? (closureNoteFor(c.note, true) ? `Fermé (${escapeHtml(closureNoteFor(c.note, true))})` : 'Fermé') : `Closed (${escapeHtml(closureNoteFor(c.note, false))})`)
       : hoursModule.isTemporaryClosure && hoursModule.isTemporaryClosure(c) ? L('Temporarily closed', 'Fermeture temporaire') : `${L('Closed', 'Fermé')} (${L('holiday', 'jour férié')})`);
     // Temporary closures in the hours (2026-10-19, round 10): a closure of three days or more (Sugar Quail, Oct 11 -
     // Nov 3) is said once above the list, as a range in the page's language ("Closed Oct 11 – Nov 3, back Nov 4."),
@@ -43493,7 +43616,7 @@ ${renderGolfHeaderHtml()}
       <div class="mt-actions" id="mtActions" hidden>
         <button type="button" class="mt-btn primary" id="mtShare" hidden>${L('Share trip', 'Partager le voyage')}</button>
         <button type="button" class="mt-btn primary" id="mtCopy">${L('Copy trip link', 'Copier le lien du voyage')}</button>
-        <a class="mt-btn" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a>
+        <a class="mt-btn" href="/trip">${L('Build My Trip', 'Planifier mon voyage')}</a>
         <button type="button" class="mt-btn" id="mtClear">${T.clearTrip}</button>
       </div>
     </div>
@@ -43507,7 +43630,7 @@ ${renderGolfHeaderHtml()}
     <div class="mt-empty" id="mtEmpty" hidden>
       <h2>${L('Your trip is empty', 'Votre voyage est vide')}</h2>
       <p>${L('Tap <strong>Add to trip</strong> on any place, or let us plan it for you.', 'Touchez <strong>Ajouter au voyage</strong> sur un endroit, ou laissez-nous planifier le voyage pour vous.')}</p>
-      <div class="mt-actions"><a class="mt-btn primary" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
+      <div class="mt-actions"><a class="mt-btn primary" href="/trip">${L('Build My Trip', 'Planifier mon voyage')}</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
     </div>
   </div>
   </main>
@@ -45131,7 +45254,7 @@ const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine 
   'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
   'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house (golf ou ski)',
   'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur', 'Tea house': 'Salon de thé', 'Bubble tea': 'Thé aux perles',
-  'Ice cream & gelato': 'Crème glacée et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
+  'Ice cream & gelato': 'Crème glacée et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Délicatessen et sandwichs' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
 // Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
 // read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
@@ -45145,7 +45268,7 @@ const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family
   'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
   'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house de golf ou de ski',
   'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur de café', 'Tea house': 'Salon de thé', 'Bubble tea': 'Comptoir de thé aux perles',
-  'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
+  'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Délicatessen et sandwichs' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -46737,9 +46860,10 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Changes are only accepted from the Okanagan Roam website.' });
   const fromSetupUrl = /[?&]from=setup(?:&|$)/.test(String(req.url || ''));
-  if (fromSetupUrl ? ownerSetupRateLimited(requestClientIp(req)) : ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+  if (fromSetupUrl ? ownerSetupIpLimited(requestClientIp(req)) : ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: fromSetupUrl ? SETUP_RATE_ERROR : 'Too many attempts. Please wait a while and try again.', rate_limited: true });
   const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (fromSetupUrl && found.venue && ownerSetupVenueLimited(found.venue.id)) return sendSubmissionResponse(res, 429, { ok: false, error: SETUP_RATE_ERROR, rate_limited: true });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
@@ -51204,15 +51328,25 @@ if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice(
 // (no nagging) without saying they have no account, so it is never stored as a "we don't have one" (not_offered).
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no', 'unsure'];
 const SETUP_UNSURE_STEPS = ['instagram', 'facebook', 'social'];
-const SETUP_RATE_LIMIT = 80;
+// Bug-check (2026-11-12): one full setup is about 40 saves, and 80 an hour per IP was shared by everyone behind one
+// network (a hotel's or a mall's wifi, a phone carrier) and by an owner with two places, who then got "Too many
+// attempts" and a step that wouldn't move. The budget is now per place (its owner link or account listing), with a much
+// higher per-IP ceiling against abuse. The classic edit page's and sign-in limits are unchanged.
+const SETUP_RATE_LIMIT = 300; // saves per place per hour
+const SETUP_RATE_LIMIT_IP = 1000; // saves per IP per hour, all places together
+const SETUP_RATE_ERROR = 'You’ve saved a lot in a short time, so we’ve paused saving for a few minutes. Nothing you entered is lost: please wait a little and tap the button again.';
 const ownerSetupAttempts = new Map();
-function ownerSetupRateLimited(ip, now = Date.now()) {
-  const recent = (ownerSetupAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
+function setupRateHit(key, limit, now) {
+  const recent = (ownerSetupAttempts.get(key) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
   recent.push(now);
-  ownerSetupAttempts.set(ip, recent);
+  ownerSetupAttempts.set(key, recent);
   if (ownerSetupAttempts.size > 5000) for (const [k, t] of ownerSetupAttempts) if (!t.some((x) => now - x < OWNER_CHANGE_RATE_WINDOW_MS)) ownerSetupAttempts.delete(k);
-  return recent.length > SETUP_RATE_LIMIT;
+  return recent.length > limit;
 }
+// The per-IP ceiling (checked before the link is looked up).
+function ownerSetupIpLimited(ip, now = Date.now()) { return setupRateHit(`ip:${ip}`, SETUP_RATE_LIMIT_IP, now); }
+// The per-place budget.
+function ownerSetupVenueLimited(venueId, now = Date.now()) { return setupRateHit(`venue:${venueId}`, SETUP_RATE_LIMIT, now); }
 function setupProgress(venueId) {
   const done = {};
   try {
@@ -51272,14 +51406,21 @@ function saveSetupProgress(venueId, step, status) {
   return p;
 }
 // Every step answered (skips and "later" count: the owner went through it all).
+// Café test 6 (2026-11-12): a café's Hours step is the hours and then its holidays and closures. It is done only when
+// the closures part was saved or skipped too (leaving on that screen used to mark Hours done).
+function setupDoneSteps(venueId, type) {
+  const done = { ...setupProgress(venueId).done };
+  if ((type || setupTypeOf(venueId)) === 'cafe' && done.hours && done.hours !== 'skip' && done.hours !== 'later' && !done.closures) delete done.hours;
+  return done;
+}
 function setupFinished(venueId) {
-  const { done } = setupProgress(venueId);
+  const done = setupDoneSteps(venueId);
   return setupStepsFor(setupTypeOf(venueId), venueId).every((k) => done[k]);
 }
 // Where the owner is: 'none' (not started), 'partial' (some answered), 'essentials' (Part 1 answered), 'done' (all).
 function setupState(venueId) {
-  const { done } = setupProgress(venueId);
   const type = setupTypeOf(venueId), steps = setupStepsFor(type, venueId);
+  const done = setupDoneSteps(venueId, type);
   if (steps.every((k) => done[k])) return 'done';
   if (setupParts(type).part1.every((k) => done[k])) return 'essentials';
   return steps.some((k) => done[k]) ? 'partial' : 'none';
@@ -51322,7 +51463,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   if (method === 'GET') return send(200, { ok: true, progress: { done: setupProgress(found.venue.id).done }, score: setupScore(found) });
   if (method !== 'POST') return send(405, { ok: false, error: 'Not allowed.' });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: 'Only accepted from the Okanagan Roam website.' });
-  if (ownerSetupRateLimited(requestClientIp(req))) return send(429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+  if (ownerSetupIpLimited(requestClientIp(req)) || ownerSetupVenueLimited(found.venue.id)) return send(429, { ok: false, error: SETUP_RATE_ERROR, rate_limited: true });
   let body;
   try { body = await readLimitedJsonBody(req, 8192); } catch (e) { return send(400, { ok: false, error: 'Please try again.' }); }
   // "I'm done for now" after the essentials: the portal's own checklist may speak up again.
@@ -51491,8 +51632,12 @@ function renderOwnerSetupPage(found, opts) {
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
-    cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
+    // Café test 6 (2026-11-12): the full list in French alphabetical order on the French setup (it was sorted by the English
+    // names, so « Philippine » sat by F and « Grilladerie » by S).
+    cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
+    // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
+    cuisineShow: fr ? Object.fromEntries(OWNER_CUISINES.filter((c) => FR_CUISINE_ADJECTIVE.has(c)).map((c) => [c, `Cuisine ${frCuisine(c).toLowerCase()}`])) : {},
     // A café's kind as its page shows it ("Bubble tea shop"), for the preview line (café test 3).
     ...(cafe ? { placeShow: Object.fromEntries(placeTypesFor('cafe').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])) } : {}),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
@@ -51503,7 +51648,7 @@ function renderOwnerSetupPage(found, opts) {
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
-    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
@@ -51570,7 +51715,7 @@ const CAFE_SETUP_HELP_TOPICS = [
   { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
     keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
     a: '<p>About how much one person pays for a coffee and a pastry. Cents are fine (like $5.50): use the 25¢ buttons. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
-    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
+    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25 ¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
   { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
     keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
     a: '<p>The setup doesn’t ask for ordering links any more, to keep it short. A link you gave us before stays on your page. A drive-thru or walk-up window is a tile under “What you offer”, on your page right away. To add or change an order link, email us at info@okanaganroam.com.</p>',
@@ -51834,7 +51979,12 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-hoffrow { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--su-line); }
   body.owner-setup .su-hoffrow .su-hoff { min-height: 48px; min-width: 0; padding: 0 4px; border: 0; background: none; color: var(--su-warn); font-size: 16px; text-decoration: underline; text-underline-offset: 3px; }
   body.owner-setup .su-hoffrow .su-hoff[aria-pressed="true"] { background: none; color: var(--su-teal); border: 0; }
-  body.owner-setup .su-hoffrow .su-hoff.su-hoff-undo[aria-pressed] { min-height: 48px; padding: 0 14px; border: 2px solid var(--su-teal); border-radius: 14px; background: #fff; text-decoration: none; }
+  body.owner-setup .su-hoffrow .su-hoff.su-hoff-undo[aria-pressed] { box-sizing: border-box; height: 48px; min-height: 48px; padding: 0 14px; border: 2px solid var(--su-teal); border-radius: 14px; background: #fff; text-decoration: none; }
+  /* Café test 6: the row keeps one height whether the day says "Mark closed" or "Reopen · Monday closed". */
+  body.owner-setup .su-hoffrow { min-height: 54px; box-sizing: border-box; }
+  body.owner-setup .su-hoffrow .su-hoff { box-sizing: border-box; height: 48px; }
+  body.owner-setup .su-hoffrow:has(.su-hoff-undo) { flex-wrap: nowrap; }
+  body.owner-setup .su-hoffrow .su-hundo { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.owner-setup .su-hundo { font-weight: 800; color: var(--su-warn); }
   body.owner-setup .su-tick.su-rights { margin: 18px 0 12px; padding: 18px 16px; min-height: 72px; align-items: center; border: 3px solid var(--su-gold); background: #FFF8E6; font-size: 19px; }
   body.owner-setup .su-tick.su-rights input { width: 36px; height: 36px; }
@@ -53021,11 +53171,11 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>{ON}, find <strong>Website</strong> under <strong>Contact</strong>.</li><li>Paste the working address. Copying it from your browser’s address bar, starting with https://, is the surest way.</li><li>Tap {SEND}.</li></ol><p>A new website is <strong>always checked by us first</strong>, usually within a day, even when you’re signed in, so the old link shows until then and the field says <strong>Waiting for review</strong>. A broken booking, menu or social link? Those are in <strong>Name, address &amp; links</strong>, and work the same way.</p>',
     aFr: '<ol><li>{ON}, trouvez <strong>Site Web</strong> sous <strong>Coordonnées</strong>.</li><li>Collez la bonne adresse. Le plus sûr est de la copier dans la barre d’adresse de votre navigateur, en commençant par https://.</li><li>Touchez {SEND}.</li></ol><p>Un nouveau site Web est <strong>toujours vérifié par nous d’abord</strong>, en général d’ici un jour, même avec un compte : l’ancien lien reste affiché d’ici là et le champ indique <strong>En attente de vérification</strong>. Un lien de réservation, de menu ou de réseau social brisé? Ils sont dans <strong>Nom, adresse et liens</strong>, et fonctionnent de la même façon.</p>' },
   // French portal (2026-10-18): every signed-in page is in French now; the bot says so and names the French buttons.
-  { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim'],
+  { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim', 'setup'],
     keys: ['in french', 'french version', 'french page', 'francais', 'language', 'translate', 'translation'],
     keysFr: ['en francais', 'version francaise', 'anglais', 'en anglais', 'langue', 'traduire', 'traduction', 'traduit'],
-    a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>EN / FR</strong> at the top of the page to switch; this device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
-    aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>FR / EN</strong> en haut de la page pour changer de langue; cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
+    a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>Français</strong> at the top of your edit page or of the setup screens to switch (on a French page it says <strong>English</strong>). On a phone it is also in the ☰ menu (<strong>EN / FR</strong>). This device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
+    aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>Français</strong> en haut de votre page de modification ou des écrans de configuration pour changer de langue (sur une page en français, le lien dit <strong>English</strong>). Sur un téléphone, c’est aussi dans le menu ☰ (<strong>EN / FR</strong>). Cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
   // Round 10 (2026-10-19): « ma fiche dit fermé mais on est ouvert » got the Claim answer on My listings; "my photos
   // are blurry" had no photo tips; "who are you" / « qui êtes-vous » got "not sure".
   { id: 'shows-closed', over: ['hours', 'season', 'claim'], q: 'My page says closed but we’re open', qFr: 'Ma fiche dit fermé, mais nous sommes ouverts', pages: ['edit', 'account'],
@@ -53789,39 +53939,84 @@ function ownerPortalLangRequest(method, rawUrl) {
   const m = OWNER_FR_PORTAL_RE.exec(String(rawUrl || ''));
   if (m) {
     if (getLike && /^\/owner\/(?:login|link|forgot)$/.test(m[1])) return null;
-    return { lang: 'fr', enPath: m[1], enUrl: m[1] + (m[2] || '') };
+    return { lang: 'fr', enPath: m[1], enUrl: m[1] + (m[2] || ''), search: m[2] || '' };
   }
   const p = String(rawUrl || '').split('?')[0];
-  if (getLike && OWNER_EN_PORTAL_PAGE_RE.test(p)) return { lang: 'en', enPath: p, enUrl: rawUrl };
+  if (getLike && OWNER_EN_PORTAL_PAGE_RE.test(p)) { const q = String(rawUrl).indexOf('?'); return { lang: 'en', enPath: p, enUrl: rawUrl, search: q >= 0 ? String(rawUrl).slice(q) : '' }; }
   return null;
 }
 // The header switch remembers the language picked, like app.js does on the rest of the site (the portal pages
 // don't load app.js), so an English portal page doesn't send someone straight back to French.
+// Café test 6 (2026-11-12): on a phone the header's EN / FR sits in the ☰ menu, whose buttons pressed the hidden header
+// link; with the menu open that link is inert, so FR did nothing on the owner pages. Every switch on a portal page (the
+// header link, the menu's EN and FR, the "Français / English" link at the top of the edit page and the setup) now goes
+// straight to the other language's address, read from the page (the link's href, else <html data-twin-path>), keeping
+// the query and, in the setup, the question she is on (window.suLangHash). No hreflang: these pages stay noindex.
 const OWNER_LANG_SWITCH_SCRIPT = `<script>
 (function(){
-  var t = document.getElementById('langToggle'); if (!t) return;
-  t.addEventListener('click', function(){ try { localStorage.setItem('okanaganLang', t.getAttribute('hreflang') === 'fr' ? 'fr' : 'en'); } catch (e) {} });
+  var root = document.documentElement;
+  function cur(){ return /^fr/i.test(root.lang || '') ? 'fr' : 'en'; }
+  function target(){
+    var a = document.querySelector('.owner-lang-link') || document.getElementById('langToggle'), h = a && a.getAttribute('href');
+    if (!h || h.charAt(0) === '#') { var p = root.getAttribute('data-twin-path'); if (!p) return ''; h = p + location.search; }
+    h = h.split('#')[0];
+    var st = typeof window.suLangHash === 'function' ? window.suLangHash() : String(location.hash || '').slice(1);
+    return h + (st ? '#' + st : '');
+  }
+  function go(){
+    var h = target(); if (!h) return false;
+    var to = cur() === 'fr' ? 'en' : 'fr';
+    try { localStorage.setItem('okanaganLang', to); } catch (x) {}
+    try { if (window.trackEvent) window.trackEvent('language_change', { language: to }); } catch (x) {}
+    location.assign(h); return true;
+  }
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('#langToggle, .owner-lang-link, .nav-lang-opt') : null;
+    if (!el || (el.classList.contains('nav-lang-opt') && el.getAttribute('data-lang') === cur())) return;
+    if (!target()) return;
+    e.preventDefault(); e.stopPropagation();
+    // The setup can hold the switch (photos picked but not sent): it switches once they're saved (window.suLangGo).
+    if (typeof window.suBeforeLang === 'function' && window.suBeforeLang() === false) return;
+    go();
+  }, true);
+  window.suLangGo = go;
 })();
 </script>`;
+// The small "Français" / "English" link at the top of the owner edit page and the setup screens (café test 6).
+function ownerLangLinkHtml(lang, href, cls) {
+  const to = lang === 'fr' ? 'en' : 'fr';
+  return `<a class="owner-lang-link${cls ? ` ${cls}` : ''}" href="${href}" hreflang="${to}" lang="${to}" rel="nofollow">${to === 'fr' ? 'Français' : 'English'}</a>`;
+}
+const OWNER_LANG_LINK_CSS = '<style>body.owner-page .op-lang{margin:0 0 4px;font-size:.95rem}body.owner-page .op-lang a,body.owner-setup .su-lang{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;font-weight:800;color:#1E4F4C;text-decoration:underline;text-underline-offset:3px}body.owner-setup .su-head .su-lang{margin-left:auto;font-size:16px}</style>';
 function ownerLangHtml(html, lang, enPath, search) {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   let out = html;
   const pageFr = /<html lang="fr/.test(out);
+  // Where the switch goes (the other language's address, no query: the script adds the page's own). A data attribute,
+  // never a hreflang alternate: portal pages are private and noindex.
+  const twinPath = lang === 'fr' ? enPath : frTwinPath(enPath);
+  if (!/\/menu$/.test(enPath) && !(lang === 'en' && pageFr)) {
+    out = out.replace(/<html lang="([^"]*)"(?![^>]*data-twin-path)/, (m, l) => `<html lang="${l}" data-twin-path="${escapeHtml(twinPath)}"`);
+    const linkHref = escapeHtml(twinPath + (search || ''));
+    // The setup screens: beside Exit. The edit page: above its title.
+    if (out.includes('<a class="su-exit"')) out = out.replace('<a class="su-exit"', `${ownerLangLinkHtml(lang, linkHref, 'su-lang')}<a class="su-exit"`).replace('</head>', `${OWNER_LANG_LINK_CSS}\n</head>`);
+    else if (out.includes('<div class="op-head">')) out = out.replace('<div class="op-head">', `<div class="op-head">\n      <p class="op-lang">${ownerLangLinkHtml(lang, linkHref, '')}</p>`).replace('</head>', `${OWNER_LANG_LINK_CSS}\n</head>`);
+  }
   if (lang === 'fr') {
     // The site header in French, as on the French menu screen (ownerSimplePage may already have run frA11yLabels on it).
     const hdr = renderGolfHeaderHtml();
     for (const h of [hdr, frA11yLabels(hdr)]) if (h && out.includes(h)) { out = out.split(h).join(frenchHeaderFragment(hdr)); break; }
     out = frA11yLabels(out).replace(/<html lang="en(?:-CA)?"/, '<html lang="fr"');
     // The menu screen on its English address follows a French browser unless ?lang=en says otherwise.
-    out = withTwinLangSwitch(out, `${enPath}${/\/menu$/.test(enPath) ? '?lang=en' : search ? search.replace(/&/g, '&amp;') : ''}`, 'fr');
+    out = withTwinLangSwitch(out, `${escapeHtml(enPath)}${/\/menu$/.test(enPath) ? '?lang=en' : search ? escapeHtml(search) : ''}`, 'fr');
   } else {
     // An English address showing French (the menu screen's ?lang=fr) keeps its own switch.
     if (pageFr) return out;
     const frPath = frTwinPath(enPath);
     out = out.replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
-    out = withTwinLangSwitch(out, `${frPath}${search ? search.replace(/&/g, '&amp;') : ''}`, 'en');
+    out = withTwinLangSwitch(out, `${escapeHtml(frPath)}${search ? escapeHtml(search) : ''}`, 'en');
   }
-  return out.includes('id="langToggle"') && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
+  return (out.includes('id="langToggle"') || out.includes('class="owner-lang-link')) && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
 }
 function installOwnerLangResponse(req, res, lang, enPath, search = '') {
   res.ownerLang = lang;
@@ -56281,7 +56476,8 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
           : (fr ? 'Vous avez retiré une réponse « nous n’en avons pas »' : 'You took back a “we don’t have one” answer');
       }
     } catch (e) { /* unreadable */ }
-    const what = fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+    // Café test 6 (2026-11-12): names keep their capitals (« site Web », Instagram, Facebook; it read « Site web »).
+    const what = fields.join(', ').toLowerCase().replace(/\bsite web\b/g, 'site Web').replace(/\binstagram\b/g, 'Instagram').replace(/\bfacebook\b/g, 'Facebook').replace(/\btiktok\b/g, 'TikTok').replace(/^./, (c) => c.toUpperCase());
     const base = fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update';
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.undone_at ? r.undo_reason || null : r.rejection_reason,
       title: none ? (fields.length ? `${base}. ${none}` : none) : base });
@@ -57835,14 +58031,14 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Aucuns frais, jamais.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
+      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
         const tile = (task, icon, title, sub) => `<button type="button" class="op-task" data-pick="${task}"><span class="op-task-icon" aria-hidden="true">${icon}</span><span class="op-task-text"><strong>${title}</strong><span>${sub}</span></span></button>`;
-        const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(`Please update ${venue.name}`)}`;
+        const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(L(`Please update ${venue.name}`, `Mise à jour de ${venue.name}`))}`;
         return `<section class="op-tasks" id="opTasks" data-task="home" hidden aria-labelledby="opTasksHead">
         <h2 id="opTasksHead">${L('What would you like to do today?', 'Que souhaitez-vous faire aujourd’hui?')}</h2>
         <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : completeOn ? L('Quick answers go live right away. Other changes go live after a quick check, usually within a day.', 'Les réponses rapides sont en ligne tout de suite. Les autres modifications le sont après une courte vérification, habituellement en moins d’une journée.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>
@@ -59436,7 +59632,7 @@ const server = http.createServer(async (req, res) => {
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
   {
     const op = ownerPortalLangRequest(req.method, req.url);
-    if (op) { req.url = op.enUrl; installOwnerLangResponse(req, res, op.lang, op.enPath); }
+    if (op) { req.url = op.enUrl; installOwnerLangResponse(req, res, op.lang, op.enPath, op.search); }
   }
   // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
   // English page of a pair gets its hreflang and EN / FR switch the same way.
@@ -64071,6 +64267,8 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   visitDropRepeatedKnownFor,
+  // Café test 6 (2026-11-12): preset answers in the page's language
+  presetAnswer, isPresetAnswer, closureNoteFor, presetInLang, visitInfoHtml, cafeFrChipsHtml,
   displayPhone,
   browseFeatureChipsHtml,
   // Card badges (2026-10-29)

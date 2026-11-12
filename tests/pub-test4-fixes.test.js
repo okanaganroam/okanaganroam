@@ -172,7 +172,7 @@ test('4: "About $24 a person?" has a "Not sure? Skip" that leaves the question o
   const t = tokenFor(v.id);
   const html = await text(`/owner/${t}/setup`), s = scriptOf(html), cfg = cfgOf(html);
   assert.equal(cfg.t.spendSkip, 'Not sure? Skip');
-  assert.equal(TEXT.fr.spendSkip, 'Pas certain? Passer');
+  assert.equal(TEXT.fr.spendSkip, 'Je ne sais pas, passer'); // café test 6 wording
   // Yes and No are as they were; the skip is a quiet link under them.
   assert.match(s, /big\('✓', fill\(T\.spendAskYes, \{ n: n \}\), '', false, 'spendConfirm'\) \+ big\('✎', T\.spendAskNo, '', true, 'jump:spend'\) \+ '<\/div>'/);
   assert.match(s, /data-act="spendSkip">' \+ h\(T\.spendSkip\)/);

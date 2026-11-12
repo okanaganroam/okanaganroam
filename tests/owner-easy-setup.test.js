@@ -60,7 +60,7 @@ test('route: a restaurant gets the setup page (edit link, French, signed in); th
   assert.equal(cfg.mode, 'token');
   const fr = await get(`/fr/owner/${t}/setup`).then((x) => x.text());
   assert.match(fr, /<html lang="fr"/);
-  assert.ok(fr.includes('Ajoutez des photos de votre établissement') && fr.includes('Comment ajouter votre menu?') && fr.includes('Téléverser mon menu'));
+  assert.ok(fr.includes('Ajoutez des photos de votre établissement') && fr.includes('Comment ajouter votre menu\u202f?') && fr.includes('Téléverser mon menu'));
   assert.equal(JSON.parse(/window\.SETUP_CFG = (\{.*?\});<\/script>/.exec(fr)[1]).base, `/fr/owner/${t}`);
   // Signed in.
   const made = await post(`/owner/${t}/account`, { email: `easy${n}@example.com`, password: 'a long enough password' });

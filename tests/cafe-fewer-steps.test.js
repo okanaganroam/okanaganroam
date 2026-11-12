@@ -97,6 +97,9 @@ test('holidays and closures inside Hours: saved through the hours flow, recorded
   // The essentials are the 7, without closures: a café that answered them (and skipped closures) is at "essentials".
   const v3 = mk('cafe');
   for (const k of app.CAFE_SETUP_PART1) app.saveSetupProgress(v3.id, k, 'live');
+  // Café test 6 (2026-11-12): the Hours step counts once its holidays part is answered too (here skipped).
+  assert.equal(app.setupState(v3.id), 'partial');
+  app.saveSetupProgress(v3.id, 'closures', 'skip');
   assert.equal(app.setupState(v3.id), 'essentials');
   for (const k of app.CAFE_SETUP_PART2) app.saveSetupProgress(v3.id, k, k === 'door' ? 'later' : 'live');
   assert.equal(app.setupState(v3.id), 'done', 'the 13 screens are the whole setup');

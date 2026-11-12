@@ -198,7 +198,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   const s = scriptOf(html);
   const cfg = cfgOf(html);
   // Skip can't overwrite an answer.
-  assert.match(s, /function skip\(step\)\{\s*if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
+  assert.match(s, /function skip\(step\)\{[\s\S]*?if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
   assert.match(s, /if \(k === 'skip'\) \{ if \(answered\(v\)\) return after\(v\);/);
   // The menu step says what was sent.
   assert.match(s, /sentM \? q\(T\.menuSentQ\)/);
@@ -206,8 +206,8 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(html, /<a class="su-exit" id="suExit" href="/);
   assert.match(s, /el\('suExit'\)\.onclick = function\(e\)\{ if \(S\.busy\) \{ e\.preventDefault\(\); return; \}[\s\S]{0,400}?if \(unsaved\(\)\) \{ e\.preventDefault\(\); askExit\(\); \} \};/); // café test 5: photos with the box ticked are sent first
   assert.ok(s.indexOf('id="suExitSave"') < s.indexOf('id="suExitDrop"'), 'Save and exit comes first');
-  assert.match(s, /if \(S\.exitAfter\) return leave\(\);/);
-  assert.match(s, /if \(S\.error \|\| S\.nudge\) S\.exitAfter = false;/, 'a save that needs fixing keeps her on the page');
+  assert.match(s, /if \(S\.exitAfter\) (?:\{ if \(S\.langGo\) S\.step = step; )?return leave\(\);/);
+  assert.match(s, /if \(S\.error \|\| S\.nudge\) \{ S\.exitAfter = false; S\.langGo = false; \}/, 'a save that needs fixing keeps her on the page');
   assert.equal(cfg.t.exitQ, 'Save these first?');
   assert.equal(cfg.t.exitSave, 'Save and exit');
   assert.equal(cfg.t.exitDrop, 'Exit without saving');

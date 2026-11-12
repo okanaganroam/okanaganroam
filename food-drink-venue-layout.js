@@ -70,7 +70,8 @@ function highlightsFor(venue, dogNote, profile = {}) {
   const out = [], got = [];
   // profile.highlightFirst: keys that lead (a heated patio, pub test 3 2026-11-10: in November it's the selling point).
   const first = Array.isArray(profile.highlightFirst) ? profile.highlightFirst : [];
-  const order = HIGHLIGHTS.filter(([k]) => first.includes(k)).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
+  // In the order given (café test 6, 2026-11-12: a café's vegan, vegetarian and gluten-free options lead, in that order).
+  const order = first.map((k) => HIGHLIGHTS.find(([h]) => h === k)).filter((x, i, a) => x && a.indexOf(x) === i).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
   for (const [key, icon] of order) {
     if (!keys.includes(key)) continue;
     let label = text[key];
@@ -81,8 +82,9 @@ function highlightsFor(venue, dogNote, profile = {}) {
   // The first of them takes the last place; the limit is unchanged.
   const max = profile.highlightMax || 4;
   const diet = got.findIndex((k) => k === 'vegan' || k === 'vegetarian');
-  if (diet >= max) return out.slice(0, max - 1).concat([out[diet]]);
-  return out.slice(0, max);
+  // profile.returnKeys (bug-check 2026-11-12): the chosen keys instead, so the French café page picks the same four.
+  const pick = (arr) => (diet >= max ? arr.slice(0, max - 1).concat([arr[diet]]) : arr.slice(0, max));
+  return profile.returnKeys ? pick(got) : pick(out);
 }
 
 // The label of the deals tab and card, from what the venue really has.

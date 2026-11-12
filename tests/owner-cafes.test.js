@@ -290,7 +290,7 @@ test('setup: the café parts, screens and tiles; restaurants and pubs keep their
   assert.equal(cfg.t.labels.stay, 'Staying a while');
   assert.match(s.text, /cafe-laptops/, 'the café help topics are on the setup page');
   const fr = cfgOf((await get(`/fr/owner/${tokenFor(v.id)}/setup`)).text || '{}');
-  assert.equal(fr.t.kindQ, 'Quel genre de café est-ce?');
+  assert.equal(fr.t.kindQ, 'Quel genre de café est-ce\u202f?');
   // Restaurants and pubs unchanged.
   const rc = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.deepEqual(rc.part1, ['basics', 'hours', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer']);

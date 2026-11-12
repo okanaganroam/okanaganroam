@@ -76,8 +76,8 @@ test('two parts: 8 essentials then 11 optional; seasons are part of closures; an
   const own = html.slice(0, html.indexOf('class="ohb-btn"'));
   assert.doesNotMatch(own, /waiting for (our check|review)|en attente/i, 'the setup never says "waiting"');
   const fr = cfgOf(await text(`/fr/owner/${tokenFor(v.id)}/setup`));
-  assert.equal(fr.t.essQ, 'L’essentiel est fait!');
-  assert.equal(fr.t.fbQ, 'Comment s’appelle votre page Facebook?');
+  assert.equal(fr.t.essQ, 'L’essentiel est fait\u202f!');
+  assert.equal(fr.t.fbQ, 'Comment s’appelle votre page Facebook\u202f?');
   assert.equal(fr.t.noLabels.instagram, 'pas sur Instagram');
   for (const k of Object.keys(cfg.t)) assert.ok(k in fr.t, `French has ${k}`);
   // Old links keep working: #season opens the closures step (the page script maps it).

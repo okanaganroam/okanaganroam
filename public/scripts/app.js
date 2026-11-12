@@ -342,6 +342,14 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Follow Along',
     'footer.listVenue': 'List your venue',
     'footer.contact': 'Contact',
+    // Café test 6 (2026-11-12): footer links that stayed English on French pages.
+    'footer.dogFriendly': 'Dog Friendly Finds',
+    'footer.aboutSite': 'About Okanagan Roam',
+    'footer.listEvent': 'List an Event',
+    'footer.businessLogin': 'Business login',
+    'footer.allDestinations': 'See all destinations \u2192',
+    'footer.privacy': 'Privacy',
+    'footer.terms': 'Terms',
 
     // New homepage-only footer (2026-09-17): footer.directory/
     // footer.followAlong above are left untouched -- /browse still serves
@@ -583,7 +591,7 @@ var TRANSLATIONS = {
     'trip.lead': 'Dites-nous ce que vous recherchez. On vous aide \u00e0 planifier votre aventure.',
     'trip.example': '\u00ab\u00a0Je suis \u00e0 Kelowna pour 3 jours. Je veux du golf, des vignobles, de bons repas et des terrasses, une plage, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
     'trip.exampleFall': '\u00ab\u00a0Je suis \u00e0 Kelowna pour une fin de semaine d\u2019automne. Je veux des vignobles en pleine r\u00e9colte, un souper r\u00e9confortant, une randonn\u00e9e d\u2019automne, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
-    'trip.buildMyTrip': 'Planifiez mon voyage',
+    'trip.buildMyTrip': 'Planifier mon voyage',
     'trip.openMap': 'Ouvrir la carte interactive',
 
     'homeFooter.taglineFull': 'Vall\u00e9e de l\u2019Okanagan, Colombie-Britannique',
@@ -734,7 +742,7 @@ var TRANSLATIONS = {
     'trip.toastAdded': 'Ajout\u00e9 \u00e0 Mon voyage.',
     'trip.toastView': 'Voir Mon voyage',
 
-    'trip.planner.title': 'Planifiez mon voyage',
+    'trip.planner.title': 'Planifier mon voyage',
     'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
     'trip.planner.step1.label': 'O\u00f9 allez-vous?',
     'trip.planner.regionPlaceholder': 'Choisissez une r\u00e9gion\u2026',
@@ -819,12 +827,19 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Suivez-nous',
     'footer.listVenue': 'Inscrire votre \u00e9tablissement',
     'footer.contact': 'Contact',
+    'footer.dogFriendly': 'Trouvailles pour chiens',
+    'footer.aboutSite': '\u00c0 propos d\u2019Okanagan Roam',
+    'footer.listEvent': 'Inscrire un \u00e9v\u00e9nement',
+    'footer.businessLogin': 'Espace entreprises',
+    'footer.allDestinations': 'Voir toutes les destinations \u2192',
+    'footer.privacy': 'Confidentialit\u00e9',
+    'footer.terms': 'Conditions',
 
     'homeFooter.explore': 'Explorer',
     'homeFooter.socialMedia': 'Réseaux sociaux',
     // Build My Trip V3 interface (2026-10-04): French for the keys above.
     'tripv3.crumbHome': 'Accueil',
-    'tripv3.name': 'Planifiez mon voyage',
+    'tripv3.name': 'Planifier mon voyage',
     'tripv3.title': 'D\u00e9crivez le voyage. On s\u2019occupe du plan.',
     'tripv3.lead': 'Dites ce que vous voulez. Nous le planifions jour par jour avec de vrais endroits ouverts, et nous vous disons pourquoi chacun vous convient.',
     'tripv3.inputLabel': 'D\u00e9crivez le voyage que vous voulez',
@@ -1073,6 +1088,13 @@ function setLanguage(lang){
   var twin = document.querySelector('link[rel="alternate"][hreflang="' + lang + '-CA"]');
   if (twin && document.documentElement.getAttribute('data-page-lang') && document.documentElement.getAttribute('data-page-lang') !== lang) {
     window.location.assign(twin.getAttribute('href').replace(/^https:\/\/okanaganroam\.com/, ''));
+    return;
+  }
+  // A private page with a twin but no hreflang (the business portal: noindex, never in a sitemap) names its other
+  // language's address in data-twin-path (café test 6, 2026-11-12). The query and #step come along.
+  var twinPath = document.documentElement.getAttribute('data-twin-path');
+  if (twinPath && /^\//.test(twinPath) && (document.documentElement.lang || '').slice(0, 2) !== lang) {
+    window.location.assign(twinPath + window.location.search + window.location.hash);
     return;
   }
   applyTranslations();

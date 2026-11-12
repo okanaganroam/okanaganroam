@@ -41,7 +41,7 @@ test('step 1 asks for the website too, for restaurants and pubs, in English and 
     assert.equal(en.t.noWebsiteBtn, 'We don’t have a website');
     assert.equal(en.t.labels.basics, 'Address, phone and website');
     const fr = await cfgOf(`/fr/owner/${token(v.id)}/setup`);
-    assert.equal(fr.t.basicsQ, 'Est-ce bien votre adresse, votre téléphone et votre site Web?');
+    assert.equal(fr.t.basicsQ, 'Est-ce bien votre adresse, votre téléphone et votre site Web\u202f?');
     assert.equal(fr.t.noWebsiteBtn, 'Nous n’avons pas de site Web');
   }
   for (const lang of ['en', 'fr']) for (const k of ['website', 'noWebsiteYet', 'noWebsiteSaid', 'websiteLabel', 'websiteEx', 'noWebsiteBtn', 'websiteBad']) assert.ok(strings[lang][k], `${lang}.${k}`);

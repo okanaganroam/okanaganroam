@@ -114,7 +114,7 @@ test('1: the setup asks "Are these your hours all year?" and gives the other sea
     // Untouched seasonal hours are never sent.
     assert.match(s, /if \(S\.seaTouched\) \{/);
     const fr = cfgOf(await text(`/fr/owner/${tokenFor(mk(type).id)}/setup`));
-    assert.equal(fr.t.allYearQ, 'Ce sont vos heures toute l’année?');
+    assert.equal(fr.t.allYearQ, 'Ces heures sont-elles les mêmes toute l’année\u202f?'); // café test 6 wording
     assert.equal(fr.t.seasonEditQ.summer, 'Vos heures d’été');
   }
 });
@@ -294,7 +294,7 @@ test('9: "Not sure / someone else runs it" answers Instagram and Facebook withou
   assert.equal(cfg.t.st.unsure, 'not sure (that’s fine)');
   assert.match(s, /'socialUnsure:' \+ s/);
   assert.match(s, /if \(k === 'socialUnsure'\) \{ S\.savedLine\[v\] = T\.savedUnsure; return record\(v, 'unsure'\); \}/);
-  assert.equal(cfgOf(await text(`/fr/owner/${t}/setup`)).t.socialUnsure, 'Pas certain / quelqu’un d’autre s’en occupe');
+  assert.equal(cfgOf(await text(`/fr/owner/${t}/setup`)).t.socialUnsure, 'Je ne sais pas / quelqu’un d’autre s’en occupe'); // café test 6 wording
 });
 
 test('9: "I\'m done for now" ends on "Nice work!" with the rest folded under an optional "Want to add more later?"', async () => {

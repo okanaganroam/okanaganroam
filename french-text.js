@@ -1321,7 +1321,7 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Add to Google Calendar': 'Ajouter à Google Agenda',
   'Tickets & info ↗': 'Billets et infos ↗',
   'Tickets & info': 'Billets et infos',
-  'Website': 'Site web',
+  'Website': 'Site Web',
   'Featured in our guides:': 'Dans nos guides :',
   'Upcoming dates': 'Dates à venir',
   '(past)': '(passée)',
