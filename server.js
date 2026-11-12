@@ -19958,7 +19958,10 @@ function cafeInfoLinesHtml(venue, fr) {
   else if (stay.seats === 'lots') stayBits.push(L('Lots of seats inside', 'Beaucoup de places à l’intérieur'));
   if (stay.outlets) stayBits.push(L('power outlets', 'prises électriques'));
   if (stay.quiet) stayBits.push(L('a quiet spot', 'un coin tranquille'));
-  if (stayBits.length) lines.push(['stay', '💻', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
+  // Café test 4 (2026-11-11): the laptop icon only beside a laptop answer; "Takeout only" gets the takeout box (as on the
+  // setup tile), and seats alone a chair.
+  const laptopBit = stay.laptops === 'all_day' || stay.laptops === 'not_busy';
+  if (stayBits.length) lines.push(['stay', laptopBit ? '💻' : stay.seats === 'takeout' ? '🥡' : '🪑', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
   // Café test 1 (2026-11-11): "No Wi-Fi" and "No laptops" were deliberate ("we want people to talk"), so they show as one
   // friendly line, only when the owner picked them (and never beside a Wi-Fi tile).
   const talk = cafeTalkLine(venue, fr);
