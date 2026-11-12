@@ -926,7 +926,7 @@
       // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
       if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
-      var wk = W(), hop = HO();
+      var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
       x = (seas ? q(T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer, T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
           + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2">' + h(T.seasonDaysH) + '</h2>'
@@ -949,8 +949,11 @@
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
-            + (seas && !othersClosed(d) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>' + hDone(d) + '</div>'
-            + (!seas && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
+            + (seas && !othersClosed(d) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>'
+            // Café test 5 (2026-11-12): Sat–Sun beside Mon–Fri (same rule: a day marked Closed stays closed).
+            + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
+            // Said once, under the first open card (café test 5: it repeated under every open day).
+            + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext')) + '</div>';
     } else if (s === 'hours:kitchen') {
@@ -2137,13 +2140,14 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copyevery]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copyevery'), src = wk[d]; if (!src) return;
       DAYS.forEach(function(x){ if (x !== d) wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk]'), function(b){ b.onclick = function(){
-      readTimes(); var wk = W(), all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : 'data-copywk'), src = wk[d]; if (!src) return;
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-copyall],[data-copywk],[data-copywe]'), function(b){ b.onclick = function(){
+      var we = b.hasAttribute('data-copywe');
+      readTimes(); var wk = W(), all = b.hasAttribute('data-copyall'), d = b.getAttribute(all ? 'data-copyall' : we ? 'data-copywe' : 'data-copywk'), src = wk[d]; if (!src) return;
       // Pub test 5 (2026-11-10): copying never reopens a day marked Closed ("Every day" opened a closed Monday again). It
       // copies to the open days only ("Every open day", Mon–Fri's open days); a Tue–Sun pub is one tap. Only when every
       // other day is closed (a new page with no hours yet) does it fill them all.
       var gets = DAYS.filter(function(x){ return copyGets(d, x); });
-      gets.forEach(function(x){ if (all || ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(x) >= 0) wk[x] = clone(src); });
+      gets.forEach(function(x){ if (all || (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).indexOf(x) >= 0) wk[x] = clone(src); });
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -2290,7 +2294,7 @@
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
