@@ -378,8 +378,10 @@
     var yr = function(d){ return d.slice(0, 4) !== String(new Date().getFullYear()) ? dateLabelY(d) : dateLabel(d); };
     return yr(c.from) + (c.to && c.to !== c.from ? ' – ' + yr(c.to) : '');
   }
-  function dateLabelY(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return s; } }
-  function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return s; } }
+  // « ven. 1er janv. » in French (café test 6), as the rest of the site writes the first of the month.
+  function first1(t, s){ return C.lang === 'fr' && /-01$/.test(s) ? String(t).replace(/(^|\s)1(\s)/, '$11er$2') : t; }
+  function dateLabelY(s){ var d = new Date(s + 'T12:00:00'); try { return first1(d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), s); } catch (e) { return s; } }
+  function dateLabel(s){ var d = new Date(s + 'T12:00:00'); try { return first1(d.toLocaleDateString(C.lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric' }), s); } catch (e) { return s; } }
 
   // ---------- Talking to the server ----------
   function post(url, body){
@@ -511,7 +513,7 @@
     var line = S.savedLine[step] || (how === 'day' ? (many ? T.savedDayMany : T.savedDay) : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
     // The first "Sent" says what it means (pub fresh-eyes 2), once.
     if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
-    return '✓ ' + String(title).replace(/[.!]$/, '') + '. ' + line;
+    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line;
   }
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);

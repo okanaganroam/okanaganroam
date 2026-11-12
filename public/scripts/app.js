@@ -342,6 +342,14 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Follow Along',
     'footer.listVenue': 'List your venue',
     'footer.contact': 'Contact',
+    // Café test 6 (2026-11-12): footer links that stayed English on French pages.
+    'footer.dogFriendly': 'Dog Friendly Finds',
+    'footer.aboutSite': 'About Okanagan Roam',
+    'footer.listEvent': 'List an Event',
+    'footer.businessLogin': 'Business login',
+    'footer.allDestinations': 'See all destinations \u2192',
+    'footer.privacy': 'Privacy',
+    'footer.terms': 'Terms',
 
     // New homepage-only footer (2026-09-17): footer.directory/
     // footer.followAlong above are left untouched -- /browse still serves
@@ -819,6 +827,13 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Suivez-nous',
     'footer.listVenue': 'Inscrire votre \u00e9tablissement',
     'footer.contact': 'Contact',
+    'footer.dogFriendly': 'Trouvailles pour chiens',
+    'footer.aboutSite': '\u00c0 propos d\u2019Okanagan Roam',
+    'footer.listEvent': 'Inscrire un \u00e9v\u00e9nement',
+    'footer.businessLogin': 'Espace entreprises',
+    'footer.allDestinations': 'Voir toutes les destinations \u2192',
+    'footer.privacy': 'Confidentialit\u00e9',
+    'footer.terms': 'Conditions',
 
     'homeFooter.explore': 'Explorer',
     'homeFooter.socialMedia': 'Réseaux sociaux',

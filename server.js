@@ -13913,18 +13913,18 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="${SKI_SNOW_PATH}" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a></li>
           <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
           <li><a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a></li>
-          <li><a href="/dog-friendly">Dog Friendly Finds</a></li>
-          <li><a href="/secret-spots">Secret Spots</a></li>
+          <li><a href="/dog-friendly" data-i18n="footer.dogFriendly">Dog Friendly Finds</a></li>
+          <li><a href="/secret-spots" data-i18n="gems.secretSpots.title">Secret Spots</a></li>
           <li><a href="/guides">Guides</a></li>
         </ul>
       </details>
       <div class="home-footer-col">
         <h2 data-i18n="footer.about">About</h2>
         <ul>
-          <li><a href="/about">About Okanagan Roam</a></li>
+          <li><a href="/about" data-i18n="footer.aboutSite">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
-          <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="/owner/login">Business login</a></li>
+          <li><a href="/list-an-event" data-i18n="footer.listEvent">List an Event</a></li>
+          <li><a href="/owner/login" data-i18n="footer.businessLogin">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
           <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>
@@ -13935,12 +13935,12 @@ function renderHomeFooterHTML(fromBrowse) {
           <div class="home-footer-region-subcol">${regionSubcol1}</div>
           <div class="home-footer-region-subcol">${regionSubcol2}</div>
         </div>
-        <p class="home-footer-all-regions"><a href="/destinations">See all destinations &rarr;</a></p>
+        <p class="home-footer-all-regions"><a href="/destinations" data-i18n="footer.allDestinations">See all destinations &rarr;</a></p>
       </details>
     </div>
   </div>
   <div class="wrap-wide home-footer-bottom">
-    <p class="home-footer-legal"><a href="/privacy">Privacy</a><span aria-hidden="true"> &middot; </span><a href="/terms">Terms</a><span aria-hidden="true"> &middot; </span><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></p>
+    <p class="home-footer-legal"><a href="/privacy" data-i18n="footer.privacy">Privacy</a><span aria-hidden="true"> &middot; </span><a href="/terms" data-i18n="footer.terms">Terms</a><span aria-hidden="true"> &middot; </span><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></p>
     <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
   </div>
   <script>
