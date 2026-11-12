@@ -194,10 +194,10 @@ test('edit page: after-send line, toast, back-to-my-list, description goal, happ
     if (m[1] && /type="application\/(ld\+)?json"/.test(m[1])) continue;
     assert.doesNotThrow(() => new vm.Script(m[2]), 'inline script parses');
   }
-  // Help answer leads with "Score didn't go up?".
+  // Help answer leads with "Sent something and it's not ticked yet?" (café test 4: the edit page shows a checklist, no percent).
   const topic = app.OWNER_HELP_TOPICS.find((t) => t.id === 'page-complete');
-  assert.match(topic.a, /^<p><strong>Score didn’t go up\?<\/strong> It worked\./);
-  assert.match(topic.aFr, /^<p><strong>Le pointage n’a pas monté\?<\/strong> Ça a marché\./);
+  assert.match(topic.a, /^<p><strong>Sent something and it’s not ticked yet\?<\/strong> It worked\./);
+  assert.match(topic.aFr, /^<p><strong>Vous avez envoyé quelque chose et ce n’est pas encore coché\?<\/strong> Ça a marché\./);
 });
 
 test('last step wording: "Do it" for one step, "Do them" for two', () => {

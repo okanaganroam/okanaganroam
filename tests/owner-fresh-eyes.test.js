@@ -222,7 +222,7 @@ test('help bot: "my score didn\'t go up, did it work?" gets the completeness ans
     assert.equal(r.lang, lang, q);
   }
   const t = c.topics.find((x) => x.id === 'page-complete');
-  assert.match(t.a, /Score didn’t go up\?/);
+  assert.match(t.a, /not ticked yet\?/);
   assert.match(t.a, /Waiting for our check/);
   assert.match(t.aFr, /En attente de notre vérification/);
 });

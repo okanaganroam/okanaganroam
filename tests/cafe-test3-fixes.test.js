@@ -163,7 +163,7 @@ test('10 + 11: café kind first in the preview; plainer words; price step named 
 });
 
 test('12: "Yes, all year" clears a saved open season', async () => {
-  assert.match(CLIENT, /if \(k === 'yearAll'\) \{ S\.sea\.on = false; S\.seaTouched = true; if \(S\.openSea \|\| CUR\.open_months\) \{ S\.openSea = null; S\.openTouched = true; \} return hoursSave\(\); \}/);
+  assert.match(CLIENT, /if \(k === 'yearAll'\) \{ S\.sea\.on = false; S\.seaTouched = true; if \(S\.openSea \|\| CUR\.open_months[^)]*\)\) \{ S\.openSea = null; S\.openTouched = true; \} return hoursSave\(\); \}/);
   // What it sends (hoursSave: open_months '' and the café's year answer) clears the season on the page.
   const v = mk('cafe'); const t = tokenFor(v.id);
   ok(await change(t, { open_months: '04-25:10-12' }));

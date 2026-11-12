@@ -228,9 +228,9 @@ test('edit page: the bar tracks the data (hours, avg spend, photos, links) and s
 test('edit page: French restaurant page has the bar and the French help topic', async () => {
   const v = mk('restaurant');
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
-  assert.match(fr, /Votre fiche est complète à \d+ %/);
+  assert.match(fr, /La liste de votre fiche/); assert.doesNotMatch(fr, /Votre fiche est compl.+te à \d+ %/); // café test 4: a checklist, no percent
   assert.match(fr, /Rapides|Quand vous aurez quelques minutes/);
-  assert.match(fr, /Vous seul voyez ce pointage/);
+  assert.doesNotMatch(fr, /Vous seul voyez ce pointage/);
   assert.match(fr, /Ajouter des photos/);
   const t = app.OWNER_HELP_TOPICS.find((x) => x.id === 'page-complete');
   assert.ok(t && t.a && t.aFr && t.q && t.qFr && t.completenessOnly);
