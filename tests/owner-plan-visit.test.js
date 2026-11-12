@@ -158,7 +158,7 @@ test('completeness: all five Plan your visit items are in "Still to add" with bu
   for (const name of ['Known for', 'Reservations', 'Takeout and delivery', 'Dietary note', 'Groups and good to know']) assert.ok(!soon.includes(`<strong>${name}</strong>`), name);
   assert.ok(soon.includes('Confirmed by you'));
   assert.ok(!p.includes('Don’t offer these?'), 'no separate list any more: the buttons sit with their items');
-  const pctOf = (html) => Number((html.match(/Your page is (\d+)% complete/) || [])[1]);
+  const pctOf = (html) => Number((html.match(/data-cb-pct="(\d+)"/) || [])[1]);
   const before = pctOf(p);
   assert.equal((await post(tokenFor(v.id), { visit_rows: { known_for: 'Pizza', reservations: 'Walk-ins only', takeout: 'By phone', dietary: 'Vegan pizza', groups: 'Call for 8+' } })).status, 201);
   const after = panel(await get(`/owner/${tokenFor(v.id)}`));

@@ -83,10 +83,9 @@ test('3: one number: the setup and the edit page both show the score that counts
   assert.ok(sc.soon > sc.pct, `soon ${sc.soon} > now ${sc.pct}`);
   const edit = await text(`/owner/${t}`);
   const card = edit.slice(edit.indexOf('id="opComplete"'), edit.indexOf('id="opCbPanel"'));
-  assert.match(card, new RegExp(`Your page is about ${sc.soon}% complete`), 'the edit page shows the setup’s number');
-  assert.match(card, new RegExp(`<b>${sc.soon}%</b>`));
-  assert.match(card, new RegExp(`--p:${sc.pct};--w:${sc.soon}`), 'the ring’s dark part is still the live score');
-  assert.match(card, new RegExp(`<strong>${sc.soon}%</strong> counts what you sent\\. We add it, usually within a day\\.`));
+  // Café test 4 (2026-11-11): no percent on the edit page; the number it remembers is still the setup's.
+  assert.match(card, new RegExp(`data-cb-pct="${sc.soon}"`), 'the edit page keeps the setup’s number');
+  assert.doesNotMatch(card, /% complete|counts what you sent|op-cb-ring/);
   assert.doesNotMatch(card, /% now<\/strong>/);
   // Badge: only live data counts. A result whose only missing item is waiting is not "earned".
   const r = { ...pc.scoreCompleteness({}, { today: app.todayLocal() }) };
