@@ -127,7 +127,7 @@ test('6: a Facebook page typed as the website becomes the Facebook link (live), 
 test('7: the price step says why it is asked while prices are not on pages', async () => {
   const cfg = cfgOf(await setupOf(mk('cafe')));
   assert.equal(cfg.spendPublic, false);
-  assert.equal(cfg.t.spendWhyOff, 'We’ll use this to show your price range once prices go on pages.');
+  assert.equal(cfg.t.spendWhyOff, 'This helps visitors know what to expect. We’ll show it soon.'); // café test 5 (2026-11-12): plainer
   assert.match(CLIENT, /\(C\.spendPublic \? '' : '<p class="su-hint" id="suSpendWhy">' \+ h\(T\.spendWhyOff\) \+ '<\/p>'\)/);
   assert.doesNotMatch(TEXT.en.savedSpendOff, /don’t show/);
 });

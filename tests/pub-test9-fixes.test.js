@@ -89,7 +89,7 @@ test('2: the menu step prefills only the website origin, never its query or frag
   assert.equal(ctx.h, 'sandbarpub.ca');
   assert.doesNotMatch(TEXT.en.webLead, /add to the end/i);
   assert.match(TEXT.en.webLead, /after the last \//); assert.match(TEXT.fr.webLead, /après le dernier \//);
-  assert.match(js, /S\.webUrl != null \? S\.webUrl : site,/);
+  assert.match(js, /var urlNow = S\.webUrl != null \? S\.webUrl : site;/); // café test 5 (2026-11-12): named, for the Use-site check
 });
 
 // ---------- 3: happy hour (and specials) until close ----------
@@ -220,9 +220,9 @@ test('8/9: the thanks shows once; a line save sends only what changed; prefilled
   assert.match(js, /if \(bk && !S\.badges\[bk\]\)/);
   assert.match(js, /if \(!sameLine\) list2\.push\(\{ visit_rows: vr \}\);/);
   assert.match(js, /select\(\)/, 'a prefilled one-line box is selected on its first tap');
-  // The server still answers a repeat with "nothing changed" (the setup no longer sends one).
+  // A repeat from the setup is a plain success that changes nothing (café test 5, 2026-11-12; it was a 400).
   ok(await change(t, { badges: { takes_reservations: true } }));
-  assert.equal((await change(t, { badges: { takes_reservations: true } })).status, 400);
+  assert.equal((await change(t, { badges: { takes_reservations: true } })).status, 200);
 });
 
 // ---------- 10: owner stats ----------

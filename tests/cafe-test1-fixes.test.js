@@ -149,12 +149,12 @@ test('4: while AVG_SPEND_PUBLIC is off, the price question promises nothing; wit
     const v = mk(type); const html = await setupOf(v); const cfg = cfgOf(html), s = scriptOf(html);
     assert.equal(cfg.spendPublic, false);
     assert.ok(!/Your page will say|indiquera/.test(cfg.t.spendLeadOff), `${type}: no promise`);
-    assert.ok(!/soon|bientôt/.test(cfg.t.savedSpendOff + cfg.t.stSoon + cfg.t.helpSpend), `${type}: no "soon"`);
+    assert.ok(!/soon|bientôt/.test(cfg.t.stSoon + cfg.t.helpSpend), `${type}: no "soon"`); // café test 5 (2026-11-12): Dayton's price line says "We’ll show it soon"
     assert.match(s, /fill\(C\.spendPublic \? T\.spendLead : T\.spendLeadOff \|\| T\.spendLead/);
     assert.match(s, /S\.done\.spend && S\.done\.spend !== 'skip' && C\.spendPublic \?/, 'the preview shows no price while prices are off');
   }
   assert.match(TEXT.en.cafe.spendLead, /Your page will say/, 'kept for when prices are on');
-  assert.equal(TEXT.en.savedSpendOff, 'When prices go on pages, yours will show as your price range.'); // café test 4 wording
+  assert.equal(TEXT.en.savedSpendOff, 'We’ll show it on your page soon.'); // café test 5 wording (2026-11-12)
   process.env.AVG_SPEND_PUBLIC = '1';
   try { const v = mk('cafe'); assert.equal(cfgOf(await setupOf(v)).spendPublic, true); } finally { delete process.env.AVG_SPEND_PUBLIC; }
 });
@@ -244,12 +244,12 @@ test('11: success words: "It’s on your page now" for live answers, "We’ll ad
     const t = cfgOf(await setupOf(mk(type))).t;
     assert.equal(t.savedLive, 'It’s on your page now.'); assert.equal(t.savedDay, 'We’ll add it within a day.');
     for (const k of ['savedDay', 'photosSent', 'sentMeans', 'savedFbName', 'savedIgName', 'savedMenuSocialName', 'phoneRestSite', 'phoneRestAddr', 'phoneRestBoth']) assert.match(t[k], k === 'sentMeans' ? /add it to your page within a day/ : /We’ll (add|find)/, `${type} ${k}`); // café test 3: plainer Sent line
-    for (const k of Object.keys(t)) if (typeof t[k] === 'string' && k !== 'savedSoon') assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`);
+    for (const k of Object.keys(t)) if (typeof t[k] === 'string' && !['savedSoon', 'spendWhyOff', 'savedSpendOff'].includes(k)) assert.ok(!/\bsoon\b/.test(t[k]), `${type}: no "soon" in ${k}`); // café test 5: the price lines
     assert.equal(t.st.day, 'we’ll add it within a day');
   }
   const f = cfgOf(await setupOf(mk('cafe'), 'fr')).t;
   assert.equal(f.savedDay, 'Nous l’ajouterons d’ici un jour.');
-  for (const k of Object.keys(f)) if (typeof f[k] === 'string' && k !== 'savedSoon') assert.ok(!/bientôt/.test(f[k]), `fr: no "bientôt" in ${k}`);
+  for (const k of Object.keys(f)) if (typeof f[k] === 'string' && !['savedSoon', 'spendWhyOff', 'savedSpendOff'].includes(k)) assert.ok(!/bientôt/.test(f[k]), `fr: no "bientôt" in ${k}`);
 });
 
 // ---------- 12: the "refused changes … : form" log line ----------
@@ -257,7 +257,7 @@ test('12: the ordering screen no longer re-sends "no drive-thru, no walk-up" (it
   const v = mk('cafe'); const t = tokenFor(v.id);
   // The request the tester's server logged: unchanged badges, refused as "Nothing has changed yet" (400, errors.form).
   const r = await change(t, { badges: { drive_thru: false, walk_up: false } });
-  assert.equal(r.status, 400); assert.deepEqual(Object.keys(r.body.errors), ['form']); assert.match(r.body.errors.form, /Nothing has changed yet/);
+  assert.equal(r.status, 200); assert.equal(r.body.unchanged, true); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
   // The setup now sends only what differs from what is stored.
   const s = scriptOf(await setupOf(v));
   // Café test 4 (2026-11-11): the ordering screen never sends the drive-thru / walk-up badges ("What you offer" asks them).

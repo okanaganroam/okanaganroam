@@ -207,5 +207,5 @@ test('the page script parses and never shows Saved before the server answers', a
   assert.doesNotThrow(() => new (require('node:vm').Script)(script));
   assert.match(script, /return change\(list\[i\]\)\.then\(function\(r\)\{ if \(!r\) \{ S\.busy = false; return render\(\); \}/);
   // A button never silently does nothing: the photo send explains a missing tick.
-  assert.match(script, /if \(!S\.rights\) \{ S\.nudge = T\.needRights;/);
+  assert.match(script, /if \(!S\.rights\) \{ S\.rightsAsk = true;/); // café test 5 (2026-11-12): asked gently, right above Send
 });

@@ -196,7 +196,7 @@ test('reservations, takeout and groups: saying how sets the feature; only an exp
   assert.equal((await change(t, { badges: { takes_reservations: true } })).status, 201);
   assert.equal(!!feats().takes_reservations, true);
   // "How do people book?" keeps it on.
-  assert.equal((await change(t, { badges: { takes_reservations: true } })).status, 400, 'unchanged: nothing new to send (the page counts that as saved)');
+  assert.equal((await change(t, { badges: { takes_reservations: true } })).status, 200, 'unchanged: nothing new to send (the page counts that as saved)'); // café test 5 (2026-11-12): an unchanged setup re-send is a 200 no-op
   assert.equal((await change(t, { visit_rows: { reservations: 'Call us. Walk-ins welcome too.' } })).status, 201);
   assert.equal(!!feats().takes_reservations, true);
   // An explicit No: the line goes, the feature goes, "we don't" is stored.
@@ -249,7 +249,7 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
   assert.equal((script.match(/progress\([^)]*\)\.then\(function\(\)\{/g) || []).length, 0, 'no caller ignores the answer');
   assert.match(script, /if \(S\.error && x\.indexOf\('su-error'\) < 0\) x = msgs\(\) \+ x;/, 'an error shows on every screen');
   // "nothing new to send" for an unchanged answer counts as saved (it is already true on the server).
-  assert.match(script, /if \(nothingChanged\(j\)\) return 'live';/);
+  assert.match(script, /if \(nothingChanged\(j\)\) return remember\('live'\);/);
   // Help: "did it go through?" is answered from a fresh read of the progress, through the help bot's hook.
   assert.match(script, /window\.ohbLive\['setup-status'\] = function\(lang, update\)\{/);
   assert.match(script, /fetch\(C\.base \+ '\/setup\/progress', \{ headers: \{ 'Accept': 'application\/json' \}, credentials: 'same-origin', cache: 'no-store' \}\)/);
