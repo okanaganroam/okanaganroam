@@ -80,7 +80,7 @@ test('2: the setup screens carry a small "Français / English" link that keeps t
   assert.match(fr.text, /<a class="owner-lang-link su-lang" href="\/owner\/[^"]+\/setup" hreflang="en" lang="en" rel="nofollow">English<\/a>/);
   // The step goes along as #step; the draft key is the same on both addresses; no "leave this page?" prompt.
   assert.match(CLIENT, /window\.suLangHash = function\(\)\{/);
-  assert.match(CLIENT, /window\.suBeforeLang = function\(\)\{[^\n]*drSave\(\); S\.leaving = true; \};/);
+  assert.match(CLIENT, /window\.suBeforeLang = function\(\)\{[\s\S]*?drSave\(\); navKeep\(\); S\.leaving = true; return true;\n  \};/);
   assert.match(CLIENT, /function drKey\(b\)\{ return 'suDraft:' \+ String\(C\.base\)\.replace\(\/\^\\\/fr\(\?=\\\/owner\\\/\)\/, ''\)/);
   // The help bot says where the switch is, also in the setup.
   assert.match(SERVER, /Tap <strong>Français<\/strong> at the top of your edit page or of the setup screens/);
