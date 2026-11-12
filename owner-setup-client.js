@@ -477,9 +477,29 @@
   var HALF = ['offer', 'cuisine', 'closures'];
   function answered(step){ var d = S.done[step]; return d === 'live' || d === 'day' || d === 'email' || d === 'no' || d === 'unsure'; }
   function leave(){ S.leaving = true; location.href = C.back; }
-  function go(step, replace){ step = entry(step); S.fresh = false;
+  // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
+  // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
+  // "your description still talks about sports" screen after "What you offer": it carries a real choice.
+  function savedKept(step){ return step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
+  function savedText(step){
+    var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
+    var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' || how === 'unsure' ? T.gotIt : how === 'day' ? T.sentTitle : T.savedTitle;
+    var line = S.savedLine[step] || (how === 'day' ? (many ? T.savedDayMany : T.savedDay) : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
+    // The first "Sent" says what it means (pub fresh-eyes 2), once.
+    if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
+    return '✓ ' + String(title).replace(/[.!]$/, '') + '. ' + line;
+  }
+  var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
+  screen.parentNode.insertBefore(toastEl, screen);
+  // Shown on the screen it was made for, gone on the next one. Set a moment after the screen is drawn, so it is announced.
+  function showToast(t){ toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t; }, 60); }
+  function go(step, replace){
+    var sv = /^saved:(.+)$/.exec(step);
+    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
+    var fl = S.flash || ''; S.flash = '';
+    step = entry(step); S.fresh = false;
     if (S.exitAfter) return leave();
-    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
+    if (S.dirty && base(step) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; if (!replace) S.hist.push(S.step); S.step = step; S.error = ''; S.nudge = ''; render(); showToast(fl); window.scrollTo(0, 0); var f = screen.querySelector('h1'); if (f) { f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) {} } }
   function filled(step){
     if (step === 'happy' && S.done.happy === 'live' && S.happy.length) return 'happy:type';
     if (step === 'specials' && S.done.specials === 'live' && S.specials.length) return 'specials:type';
@@ -493,7 +513,17 @@
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
-  el('suBack').onclick = function(){ if (S.busy) return; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); };
+  // Café test 5 (2026-11-12): Back with photos picked but not sent. Box ticked: they're sent first (then back). Not
+  // ticked: one gentle line ("tap Back again to leave without them"); a second Back goes.
+  el('suBack').onclick = function(){
+    if (S.busy) return;
+    if (S.step === 'photos:review' && goodPhotos().length) {
+      if (S.rights) { S.backAfter = true; return sendPhotos(); }
+      if (!S.backWarned) { S.backWarned = true; S.rightsAsk = true; render(); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); return; }
+    }
+    S.backWarned = false; goBack();
+  };
+  function goBack(){ var fl = S.flash || ''; S.flash = ''; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); showToast(fl); }
   function bar(){
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
@@ -703,7 +733,13 @@
       if (!S.busy && !S.leaving) S.exitAfter = false;
     };
   }
-  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; } if (unsaved()) { e.preventDefault(); askExit(); } };
+  el('suExit').onclick = function(e){ if (S.busy) { e.preventDefault(); return; }
+    // Café test 5 (2026-11-12): photos picked with the rights box ticked are sent on the way out (then the page is left).
+    if (S.step === 'photos:review' && goodPhotos().length && S.rights) { e.preventDefault(); S.exitAfter = true; return sendPhotos(); }
+    if (unsaved()) { e.preventDefault(); askExit(); } };
+  // Interrupted (another app, the phone locked) with photos picked and the box ticked: they're sent right away, so
+  // nothing picked is lost. Unticked, nothing is sent without her say-so (the photos wait on the screen).
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden' && S.step === 'photos:review' && S.rights && !S.busy && goodPhotos().length) sendPhotos(); });
 
 
   // ---------- Unsaved answers kept on this device (café test 3, 2026-11-11) ----------
@@ -1022,9 +1058,13 @@
           + (S.photos.length > 1 && !S.busy ? '<span class="su-order"><button type="button" class="su-ord" data-pmove="' + i + ':-1" aria-label="' + h(fill(T.photoEarlier, { n: i + 1 })) + '"' + (i === 0 ? ' disabled' : '') + '>◀</button><button type="button" class="su-ord" data-pmove="' + i + ':1" aria-label="' + h(fill(T.photoLater, { n: i + 1 })) + '"' + (i === S.photos.length - 1 ? ' disabled' : '') + '>▶</button></span>' : '')
           + (ph.bad ? '<div class="su-badmsg">' + h(m) + '</div><span class="su-tag">' + h(T.wontAdd) + '</span>' : '<button type="button" class="su-tag" data-main="' + i + '" aria-pressed="' + (ph.main ? 'true' : 'false') + '">' + h(ph.main ? T.isMain : T.makeMain) + '</button>') + '</div>';
       }).join('') + '</div>' + (S.photos.length > 1 ? '<p class="su-hint">' + h(T.photoOrderHint) + '</p>' : '') + (S.busy ? '' : '<button type="button" class="su-more" data-act="pick">' + h(T.addAnother) + '</button>')
-        + msgs() + '<label class="su-tick su-rights' + (S.rights ? ' su-ticked' : '') + (S.nudge === T.needRights ? ' su-need' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span><small>' + h(T.rightsStep) + '</small>' + h(T.rights) + '</span></label>'
+        + msgs() + '<p class="su-note" id="suProgress" role="status"></p>' + (S.busy ? '' : '<p class="su-hint" id="suSendFirst">' + h(T.sendBeforeLeave) + '</p>')
         // Café test 4 (2026-11-11): a picked photo isn't kept if the page is left before Send.
-        + '<p class="su-note" id="suProgress" role="status"></p>' + (S.busy ? '' : '<p class="su-hint" id="suSendFirst">' + h(T.sendBeforeLeave) + '</p>') + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
+        // Café test 5 (2026-11-12): the rights box sits right above Send. Send tapped first asks for it gently (a gold outline
+        // and "Tick this box, then tap Send." in it), never a red error.
+        + '<label class="su-tick su-rights' + (S.rights ? ' su-ticked' : '') + (S.rightsAsk && !S.rights ? ' su-ask' : '') + '" id="suTickBox"><input type="checkbox" id="suRights"' + (S.rights ? ' checked' : '') + '><span><small>' + h(T.rightsStep) + '</small>' + h(T.rights)
+        + '<span class="su-rightsask" id="suRightsAsk" role="status">' + (S.rightsAsk && !S.rights ? h(S.backWarned ? T.photosBackAsk : T.rightsAsk) : '') + '</span></span></label>'
+        + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : g.length === 1 ? T.sendOne : fill(T.sendMany, { n: g.length }), '', false, 'sendPhotos') + '</div>';
     } else if (s === 'menu') {
       var sentM = S.done.menu === 'day';
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
@@ -1277,15 +1317,18 @@
   function sendPhotos(){
     var list = goodPhotos();
     if (!list.length) { S.nudge = T.needPhoto; return render(); }
-    if (!S.rights) { S.nudge = T.needRights; render(); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); return; }
+    if (!S.rights) { S.rightsAsk = true; S.exitAfter = false; S.backAfter = false; var y0 = window.scrollY; render(); window.scrollTo(0, y0); var tb = el('suTickBox'); if (tb) tb.scrollIntoView({ block: 'center' }); var rb = el('suRights'); if (rb) try { rb.focus({ preventScroll: true }); } catch (e) {} return; }
     var total = list.length, i = 0, mainP = list.filter(function(ph){ return ph.main; })[0];
-    S.busy = true; S.error = ''; S.nudge = ''; render();
+    S.busy = true; S.error = ''; S.nudge = ''; S.rightsAsk = false; S.lastBatch = total; render();
     var next = function(){
       var ph = list[i];
       if (!ph) {
         if (mainP) { try { S.mainSrc = jpeg(mainP.img, 1200).toDataURL('image/jpeg', 0.8); C.image = S.mainSrc; C.imageSource = 'pending'; S.keepMain = true; } catch (e) {} }
         S.photosSent += total; S.photos = []; S.rights = false;
-        return progress('photos', 'day').then(function(ok){ S.busy = false; if (ok) go('saved:photos'); else render(); });
+        return progress('photos', 'day').then(function(ok){ S.busy = false; if (!ok) return render();
+          // Sent on the way back (Back with the box ticked): the toast, then the question before.
+          if (S.backAfter) { S.backAfter = false; S.flash = savedText('photos'); return goBack(); }
+          go('saved:photos'); });
       }
       say('suProgress', fill(T.adding, { i: i + 1, n: total }));
       var body = photoPayload(ph); body.credit = C.credit; body.rights = true; body.contact_name = ''; body.contact_email = ''; body.company_website = ''; body.started_at = started; body.notify = i === total - 1; body.main = !!ph.main;
@@ -2169,7 +2212,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-main]'), function(b){ b.onclick = function(){ var k = +b.getAttribute('data-main'); S.photos.forEach(function(ph, i){ ph.main = i === k; }); S.keepMain = false; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-fdel]'), function(b){ b.onclick = function(){ var l = S.step === 'menu:upload' ? S.menuFiles : S.sheetFiles; l.splice(+b.getAttribute('data-fdel'), 1); S.error = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-pdel]'), function(b){ b.onclick = function(){ S.menuPages.splice(+b.getAttribute('data-pdel'), 1); S.error = ''; render(); }; });
-    var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked && S.nudge === T.needRights) { S.nudge = ''; render(); } };
+    var rt = el('suRights'); if (rt) rt.onchange = function(){ S.rights = rt.checked; var tb0 = el('suTickBox'); if (tb0) { tb0.classList.toggle('su-ticked', rt.checked); if (rt.checked) { tb0.classList.remove('su-ask'); S.rightsAsk = false; S.backWarned = false; var ra = el('suRightsAsk'); if (ra) ra.textContent = ''; } } if (rt.checked && S.nudge) { S.nudge = ''; render(); } };
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();

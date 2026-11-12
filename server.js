@@ -51824,6 +51824,17 @@ const OWNER_SETUP_CSS = `
   @media (max-width: 699px) { body.owner-setup.su-help-inrow .su-top { padding-right: 0; } }
   body.owner-setup .su-free { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 8px 14px; border-radius: 999px; background: var(--su-good-bg); color: var(--su-good); font-weight: 800; }
   body.owner-setup .su-subtile[hidden] { display: none; }
+  /* Café test 5 (2026-11-12): the "✓ Saved" line on the next question (no "Saved → Next" screens). Empty, it takes no room
+     but stays in place, so screen readers announce it when it is filled. */
+  body.owner-setup .su-toast { background: var(--su-good-bg); color: var(--su-good); font-weight: 800; font-size: 16px; line-height: 1.35; padding: 10px 14px; border-radius: 14px; margin: 0 0 12px; }
+  body.owner-setup .su-toast:empty { padding: 0; margin: 0; }
+  /* The photo-rights box asked for gently (no red error) when Send is tapped first. */
+  body.owner-setup .su-tick.su-rights.su-ask { border-color: #C9A34A; background: #FBF3DE; box-shadow: 0 0 0 3px rgba(201, 163, 74, 0.25); }
+  body.owner-setup .su-rightsask { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #7A5A12; }
+  /* Small phones (iPhone SE): a day's Change and Mark closed share one line under its hours. */
+  @media (max-width: 380px) { body.owner-setup .su-hrow .su-hoffrow { flex-basis: auto; margin: 0 0 0 auto; padding-top: 0; border-top: 0; } }
+  /* Short screens (an SE is 568px tall): the header and the Save bar scroll with the page, so the question gets the room. */
+  @media (max-height: 640px) { body.owner-setup .su-head { position: static; } body.owner-setup .su-sticky { position: static; box-shadow: none; } }
 `;
 
 // The page script (owner-setup-client.js), read once and served inline. It never contains "</script".
