@@ -45736,7 +45736,8 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // The box holds at most VISIT_ROWS_MAX rows: the owner's come first, so the last research rows beyond that drop.
   while (rows.length > VISIT_ROWS_MAX) {
     let j = -1;
-    for (let k = rows.length - 1; k >= 0; k--) if (!slotLabels.has(rows[k].label)) { j = k; break; }
+    // A winery's answer lines (owner_labels, 2026-11-12) are the owner's too, so they never drop for research's.
+    for (let k = rows.length - 1; k >= 0; k--) if (!slotLabels.has(rows[k].label) && !owned.has(rows[k].label)) { j = k; break; }
     rows.splice(j >= 0 ? j : rows.length - 1, 1);
   }
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
@@ -51889,12 +51890,14 @@ function setupImageSource(venue, pendingMain) {
   return /google/i.test(credit) || /googleusercontent|maps\.googleapis|ggpht/i.test(url) ? 'google' : 'other';
 }
 // The big first card on a restaurant's edit page.
-function ownerSetupCardHtml(href, lang, state = 'none') {
+function ownerSetupCardHtml(href, lang, state = 'none', type = '') {
   const fr = lang === 'fr';
+  // Wineries (2026-11-12): their own time promise ("About 10 to 20 minutes").
+  const timeLine = ((OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'][type] || {}).timeLine) || OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'].timeLine;
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
   const [cardTitle, cardSub] = {
-    none: fr ? ['Configurez votre page', `Une question à la fois. ${OWNER_SETUP_STRINGS.fr.timeLine}`] : ['Set up your page', `One question at a time. ${OWNER_SETUP_STRINGS.en.timeLine}`],
+    none: fr ? ['Configurez votre page', `Une question à la fois. ${timeLine}`] : ['Set up your page', `One question at a time. ${timeLine}`],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
@@ -52018,6 +52021,11 @@ function renderOwnerSetupPage(found, opts) {
     // to, never asked again) and the quick tasting prices.
     ...(winery ? {
       allSteps: WINERY_SETUP_PART1.concat(WINERY_SETUP_PART2), restaurantPage: wineryRestaurantPage(venue), feeLiveMax: TASTING_FEE_LIVE_MAX,
+      // The researched card price ("From $10"), offered as a starting point while the owner hasn't given one.
+      researchFee: (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 ? Number(e.from) : null; })(),
+      // The Book button research found (when the owner's own link isn't set), and research's extra lines (experiences).
+      bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
+      extras: (((venueVisitInfo(venue.id) || {}).rows) || []).filter((r) => !WINERY_CORE_LABELS.has(r.label)).slice(0, WINERY_EXPERIENCES_MAX).map((r) => ({ label: String(r.label).slice(0, 24), text: String(r.text || '').slice(0, 120) })),
       placeShow: Object.fromEntries(placeTypesFor('winery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
     } : {}),
     cafe, pub, winery, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
@@ -58504,7 +58512,7 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
+      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id), venue.type) : ''}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
