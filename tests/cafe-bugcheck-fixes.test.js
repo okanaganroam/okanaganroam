@@ -220,3 +220,16 @@ test('N, O: gelato prices start at a single scoop; vegan gelato ticks Vegan; the
   ok(await change(t, { cafe_info: { diet: { milks: [], milk_extra: '', gf_kitchen: '', vegan_baking: false, nut_free: false, vegan_ice: true } }, badges: { vegan: true } }));
   assert.ok(app.getVenue(g.id).vegan);
 });
+
+test('Review 3: the serves line drops only what the kind itself says (Bubble tea keeps a plain "tea")', async () => {
+  const b = mk('cafe');
+  ok(await change(tokenFor(b.id), { place_type: 'Bubble tea', cafe_info: { serves: ['bubble_tea', 'tea', 'smoothies'] } }));
+  const line = (/venue-cafe-serves[\s\S]*?<strong>([^<]*)<\/strong>/.exec(page(b, 'en')) || [])[1];
+  assert.match(line, /^Bubble tea shop · Tea and smoothies &amp; juice$/, line);
+  const h = mk('cafe');
+  ok(await change(tokenFor(h.id), { place_type: 'Tea house', cafe_info: { serves: ['tea', 'pastries'] } }));
+  assert.match(page(h, 'en'), /<strong>Tea house · Pastries<\/strong>/);
+  const j = mk('cafe');
+  ok(await change(tokenFor(j.id), { place_type: 'Juice & smoothie bar', cafe_info: { serves: ['smoothies', 'tea'] } }));
+  assert.match((/venue-cafe-serves[\s\S]*?<strong>([^<]*)<\/strong>/.exec(page(j, 'en')) || [])[1], /· Tea$/);
+});

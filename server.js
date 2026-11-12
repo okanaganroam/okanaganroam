@@ -20013,6 +20013,8 @@ function cleanCafeInfoPart(key, x) {
   if (key === 'menu_daily') return x === null || x === '' ? { value: null } : CAFE_MENU_DAILY.includes(x) ? { value: x } : { error: CAFE_INFO_ERROR };
   return { error: CAFE_INFO_ERROR };
 }
+// What each café kind already says, so the serves line doesn't repeat it ("Bubble tea shop · Bubble tea").
+const CAFE_KIND_SAYS = { 'Bubble tea': ['bubble_tea'], 'Ice cream & gelato': ['ice_cream'], 'Tea house': ['tea'], 'Juice & smoothie bar': ['smoothies'] };
 const cafeList = (arr, fr) => (arr.length < 2 ? arr.join('') : `${arr.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${arr[arr.length - 1]}`);
 const cafeCap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // The café's own lines under its hours ('' when it hasn't said anything): kind and what it serves, the price per person
@@ -20025,8 +20027,8 @@ function cafeInfoLinesHtml(venue, fr) {
   const kind = venuePlaceType(venue);
   // Café test 2: "made here" reads last ("Ice cream & gelato, sorbet and made here").
   // Bug-check (2026-11-12): what the kind already says is not said again ("Ice cream & gelato shop · Ice cream & gelato").
-  const kindEn = kind ? String(placeTypeDisplay(venue, false) || kind).toLowerCase() : '';
-  const saidByKind = (k) => !!kindEn && (kindEn.includes(String((CAFE_SERVE_SHORT[k] || [])[0] || '\u0000').toLowerCase()) || (k === 'smoothies' && /juice|smoothie/.test(kindEn)));
+  // Review fix (2026-11-12): an explicit list per kind, not a substring match ("Bubble tea" dropped a plain "tea").
+  const saidByKind = (k) => (CAFE_KIND_SAYS[kind] || []).includes(k);
   const serves = (info.serves || []).filter((k) => k !== 'made_here' && !saidByKind(k)).concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
