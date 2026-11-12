@@ -315,8 +315,8 @@ test('1: the edit page shows an exact season with its days, and saves whole mont
 // ---------- 6: café words by kind ----------
 test('6: café words by kind: photos, story, serves, dietary, dog treats, no-Wi-Fi line, takeout tile, no washroom, coffee tile', async () => {
   const kinds = ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches'];
-  for (const L of ['en', 'fr']) for (const k of kinds) assert.ok(TEXT[L].cafe.kinds[k] && TEXT[L].cafe.kinds[k].photos && TEXT[L].cafe.kinds[k].story, `${L} ${k}`);
-  assert.equal(TEXT.en.cafe.kinds['Ice cream & gelato'].photos, 'Your shop front, your gelato case, a cone. Three photos is perfect.');
+  for (const L of ['en', 'fr']) for (const k of kinds) assert.ok(TEXT[L].cafe.cafeKinds[k] && TEXT[L].cafe.cafeKinds[k].photos && TEXT[L].cafe.cafeKinds[k].story, `${L} ${k}`);
+  assert.equal(TEXT.en.cafe.cafeKinds['Ice cream & gelato'].photos, 'Your shop front, your gelato case, a cone. Three photos is perfect.');
   const v = mk('cafe'); ok(await change(tokenFor(v.id), { place_type: 'Ice cream & gelato' }));
   const html = await setupOf(v); const cfg = cfgOf(html); const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(html)[1];
   for (const k of ['sorbet', 'milkshakes', 'cones', 'affogato', 'made_here', 'baked_here']) assert.ok(cfg.serves.some((x) => x.k === k), k);

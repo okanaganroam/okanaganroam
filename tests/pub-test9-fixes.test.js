@@ -195,16 +195,18 @@ test('7: Help answers "I\'m not the owner", TikTok, photo order, stats, event pi
     const ctx = { T: c.topics, cfg: c };
     vm.runInNewContext(`${html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'))}; this.best = best;`, ctx);
     for (const [q, id] of [["I'm not the owner, can I edit?", 'not-owner'], ["I'm staff, can I edit the page?", 'not-owner'], ['I’m the marketing manager, am I allowed to make changes?', 'not-owner'],
-      ['Can I add our TikTok?', 'tiktok'], ['How do I change the order of my photos?', 'photo-order'], ['how many people see my page', 'stats'], ['Can I add a picture to my event?', 'event-picture'],
+      ['How do I change the order of my photos?', 'photo-order'], ['how many people see my page', 'stats'], ['Can I add a picture to my event?', 'event-picture'],
       ['add another event', 'event-picture'], ['where do I put my booking link', 'booking-link'], ['can my staff log in', 'staff'],
-      ['je ne suis pas le propriétaire, puis-je modifier?', 'not-owner'], ['ajouter notre tiktok', 'tiktok'], ['changer l ordre des photos', 'photo-order']]) {
+      ['je ne suis pas le propriétaire, puis-je modifier?', 'not-owner'], ['changer l ordre des photos', 'photo-order']]) {
       assert.equal(ctx.best(q).id, id, `${page}: ${q}`);
     }
     const by = Object.fromEntries(c.topics.map((x) => [x.id, x]));
     assert.match(by.stats.a, /Your page in the last 30 days/); assert.doesNotMatch(by.stats.a, /aren’t in the business portal yet/);
     assert.match(by.stats.aFr, /Votre page ces 30 derniers jours/);
     assert.match(by['not-owner'].a, /People with access/); assert.match(by['not-owner'].aFr, /Personnes ayant accès/);
-    for (const id of ['tiktok', 'photo-order', 'event-picture', 'booking-link']) assert.ok(by[id].a && by[id].aFr, id);
+    // Café test 3 (2026-11-11): no TikTok topic any more (the TikTok box is gone).
+    assert.ok(!by.tiktok);
+    for (const id of ['photo-order', 'event-picture', 'booking-link']) assert.ok(by[id].a && by[id].aFr, id);
   }
 });
 
@@ -273,13 +275,12 @@ test('11: TikTok is validated like Instagram, goes live like Instagram and shows
   ok(r); assert.deepEqual(r.body.live, ['tiktok_url']);
   const pub = app.renderVenuePage(app.getVenue(v.id), [], [], []);
   assert.match(pub, /<a href="https:\/\/www\.tiktok\.com\/@tapandbarrel" rel="nofollow noopener" target="_blank">TikTok<\/a>/);
+  // Café test 3 (2026-11-11): no TikTok box on the edit page or in the setup any more; a saved one stays on the page.
   const edit = (await get(`/owner/${t}`)).text;
-  assert.match(edit, /id="opTiktok"[^>]*value="https:\/\/www\.tiktok\.com\/@tapandbarrel"/);
-  assert.match((await get(`/fr/owner/${t}`)).text, /TikTok \(facultatif\)/);
-  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
-  assert.equal(cfg.cur.tiktok_url, 'https://www.tiktok.com/@tapandbarrel');
-  assert.match(scriptOf((await get(`/owner/${t}/setup`)).text), /field\('suTt', T\.ttLabel/);
-  assert.ok(TEXT.en.ttLabel && TEXT.fr.ttLabel && TEXT.fr.ttSavedOnly);
+  assert.doesNotMatch(edit, /id="opTiktok"/);
+  assert.doesNotMatch((await get(`/fr/owner/${t}`)).text, /TikTok \(facultatif\)/);
+  assert.doesNotMatch(scriptOf((await get(`/owner/${t}/setup`)).text), /suTt|ttLabel/);
+  assert.ok(!TEXT.en.ttLabel && !TEXT.fr.ttLabel);
   // Cleared again.
   ok(await change(t, { tiktok_url: '' }));
   assert.doesNotMatch(app.renderVenuePage(app.getVenue(v.id), [], [], []), />TikTok</);

@@ -19980,8 +19980,9 @@ function cafeInfoLinesHtml(venue, fr) {
   const c = info.coffee || {};
   const cBits = [];
   if (c.roast_own) cBits.push(L('We roast our own beans', 'Nous torréfions nos propres grains'));
-  else if (c.source && !fr) cBits.push(`Beans from ${c.source}`);
-  else if (c.source) cBits.push(`Grains de ${c.source}`);
+  // Café test 3 (2026-11-11): "Beans: …", not "Beans from …" ("Beans from Rotating roaster, now Monogram Coffee").
+  else if (c.source && !fr) cBits.push(`Beans: ${c.source}`);
+  else if (c.source) cBits.push(`Grains : ${c.source}`);
   if (c.beans) cBits.push(cBits.length ? L('beans for sale', 'grains en vente') : L('Beans for sale', 'Grains en vente'));
   if (cBits.length) lines.push(['coffee', '🫘', cBits.join(' · ')]);
   const o = info.order || {}, links = info.links || {};
@@ -34905,7 +34906,8 @@ const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volu
 // and a "Tonight" tag on tonight's row (words, not only colour; "Today" for a night before 4 PM), then a line with the
 // kind, the detail, the host, the cost and "every other week". French without a French title or detail shows the
 // English, marked lang="en".
-function venueWeeklyNightsHtml(wn, fr) {
+// Café test 3 (2026-11-11): a café's card says "Weekly events" (« Événements de la semaine »); "nights" is a pub word.
+function venueWeeklyNightsHtml(wn, fr, opts = {}) {
   if (!wn || !wn.rows.length) return '';
   const row = ({ s, days, today, onNow, time, freq }) => {
     const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
@@ -34926,7 +34928,7 @@ function venueWeeklyNightsHtml(wn, fr) {
     const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
     return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${seasonTagSpan(s, fr)}${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
-  const label = fr ? 'Soirées de la semaine' : 'Weekly nights';
+  const label = opts.events ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
   return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
 }
 // ---------- Happy hour access (2026-10-26) ----------
@@ -36147,7 +36149,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false), extraDealsHtml,
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe' }), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
@@ -36249,7 +36251,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
        in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
   <div class="venue-extra">
   ${venueDealsCardHtml}
-  ${venueWeeklyNightsHtml(weeklyNights, fr)}
+  ${venueWeeklyNightsHtml(weeklyNights, fr, { events: venue.type === 'cafe' })}
   ${fr ? '' : outdoorGoodToKnowHtml(venue)}${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
@@ -51379,8 +51381,9 @@ function renderOwnerSetupPage(found, opts) {
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
-    // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first) and TikTok.
-    booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(), tiktok_url: snap.tiktok_url || '',
+    // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
+    // box any more (café test 3, 2026-11-11: keep it easy); a TikTok already saved stays stored and on the page.
+    booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(),
     ...(pub ? { pub_info: snap.pub_info || {} } : {}),
     ...(cafe ? { cafe_info: snap.cafe_info || {}, cafe_links: snap.cafe_links || { order_url: '', preorder_url: '' } } : {}),
   };
@@ -51438,6 +51441,8 @@ function renderOwnerSetupPage(found, opts) {
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
     cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
+    // A café's kind as its page shows it ("Bubble tea shop"), for the preview line (café test 3).
+    ...(cafe ? { placeShow: Object.fromEntries(placeTypesFor('cafe').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])) } : {}),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
     offerGroups, offerLabels, offerIcons: { patio: '🌿', heated_patio: '🔥', fireplace: '🪵', beach_access: '🏖️', free_parking: '🅿️', rv_parking: '🚚', off_sales: '🛒', service_dogs: '🦮', kid_friendly: '🧒', dog_friendly: '🐕', vegan: '🌱', vegetarian: '🥗', gluten_free: '🌾', nonalcoholic: '🍹', local_drinks: '🍷', lake_view: '🌊', sports_tv: '📺', live_music: '🎸', great_groups: '👥', happy_hour: '🍻', wheelchair_accessible: '♿', locally_owned: '🏡', takes_reservations: '📅', takeout: '🥡', local_beer_taps: '🍺', pool: '🎱', darts: '🎯', shuffleboard: '🥌', arcade: '🕹️', board_games: '🎲' , wifi: '📶', laptop: '💻', dairy_free_milk: '🥛', drive_thru: '🚗', walk_up: '🪟', washroom: '🚻', stroller: '👶', dog_treats: '🦴' },
     // The first 6 show open (pub fresh-eyes 2026-11-10), so pubs lead with their usual nights.
@@ -52679,8 +52684,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'links', q: 'Add a booking, menu or social link', qFr: 'Ajouter un lien de réservation, de menu ou de réseau social', pages: ['edit'],
     keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'change website', 'change our website', 'new website'],
     keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'nouveau site'],
-    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong>, <strong>Facebook</strong> and <strong>TikTok</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
-    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong>, votre <strong>Facebook</strong> et votre <strong>TikTok</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
+    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
+    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
   // French pass 6 (2026-10-19): a phone number of its own ("changer mon numéro de téléphone" got the links answer).
   { id: 'phone', over: ['links'], q: 'Change our phone number', qFr: 'Changer notre numéro de téléphone', pages: ['edit'],
     keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number',
@@ -52891,18 +52896,13 @@ const OWNER_HELP_TOPICS = [
     // Pub test 9 (2026-11-10): the numbers are on the edit page now ("Your page in the last 30 days").
     a: '<p>{ON}, near the top, tap <strong>Your page in the last 30 days</strong>. It shows how many times your page was viewed and how many people tapped <strong>Website</strong>, <strong>Call</strong>, <strong>Directions</strong>, <strong>Book</strong> and <strong>Menu</strong>, with the 30 days before beside each one. The easy setup shows the same numbers when you finish.</p><ul><li>Only you (and anyone with your link or a login) can see them.</li><li>They count Okanagan Roam only. Search robots and our own team aren\u2019t counted.</li><li>Small numbers are normal at first. They grow as more people find your page.</li></ul>',
     aFr: '<p>{ON}, en haut, touchez <strong>Votre page ces 30 derniers jours</strong>. Vous y voyez combien de fois votre page a été vue et combien de personnes ont touché <strong>Site Web</strong>, <strong>Appeler</strong>, <strong>Itinéraire</strong>, <strong>Réserver</strong> et <strong>Menu</strong>, avec les 30 jours précédents à côté de chacun. La configuration facile montre les mêmes chiffres à la fin.</p><ul><li>Seuls vous (et toute personne qui a votre lien ou un compte) pouvez les voir.</li><li>Ils ne comptent qu\u2019Okanagan Roam. Les robots de recherche et notre équipe ne sont pas comptés.</li><li>De petits chiffres sont normaux au début. Ils grandissent à mesure que plus de gens trouvent votre page.</li></ul>' },
-  // Pub test 9 (2026-11-10): a marketing or social media manager's questions -- may I edit if I'm not the owner, TikTok,
+  // Pub test 9 (2026-11-10): a marketing or social media manager's questions -- may I edit if I'm not the owner,
   // photo order, a picture on an event, and where the booking link goes.
   { id: 'not-owner', over: ['staff', 'claim', 'login-create', 'changes-review'], q: 'I’m not the owner. Can I still edit our page?', qFr: 'Je ne suis pas le propriétaire. Puis-je quand même modifier notre page?', pages: ['edit', 'setup', 'account'],
     keys: ['not the owner', 'im not the owner', 'i am not the owner', 'not an owner', 'not owner', 'i work here', 'i work there', 'i work for', 'im staff', 'i am staff', 'im an employee', 'im the manager', 'i am the manager', 'im a manager', 'general manager', 'marketing manager', 'social media manager', 'marketing', 'social media', 'on behalf', 'for my boss', 'for the owner', 'can i edit', 'can staff edit', 'allowed to edit', 'am i allowed', 'can a manager edit', 'manager edit'],
     keysFr: ['pas le proprietaire', 'pas la proprietaire', 'pas proprietaire', 'je travaille', 'je suis employe', 'je suis employee', 'je suis le gerant', 'je suis la gerante', 'responsable marketing', 'responsable des reseaux sociaux', 'marketing', 'au nom de', 'pour mon patron', 'puis je modifier', 'ai je le droit', 'le droit de modifier'],
     a: '<p><strong>Yes.</strong> Managers, marketing and staff can update the page too. Anyone the business trusts with this private link can use it.</p><ul><li>Best: each person makes their <strong>own login</strong>. {ON}, they tap <strong>Create a login</strong> and use their own email. Please don’t share one password.</li><li>Signed in, <strong>People with access</strong> shows everyone who can update the page, and you can remove people added after you.</li><li>The same rules apply to everyone: quick answers go live straight away, and a new website, description or link is checked first, usually within a day.</li></ul>',
     aFr: '<p><strong>Oui.</strong> Les gérants, le marketing et le personnel peuvent aussi mettre la page à jour. Toute personne à qui l’entreprise confie ce lien privé peut l’utiliser.</p><ul><li>Le mieux : chaque personne crée <strong>son propre compte</strong>. {ON}, elle touche <strong>Créer un compte</strong> et utilise son propre courriel. Évitez de partager un mot de passe.</li><li>Une fois connecté, <strong>Personnes ayant accès</strong> montre toutes les personnes qui peuvent modifier la page, et vous pouvez retirer celles ajoutées après vous.</li><li>Les mêmes règles s’appliquent à tous : les réponses rapides sont en ligne tout de suite, et un nouveau site Web, une description ou un lien sont vérifiés d’abord, en général d’ici un jour.</li></ul>' },
-  { id: 'tiktok', over: ['links', 'social-post'], q: 'Can I add our TikTok?', qFr: 'Puis-je ajouter notre TikTok?', pages: ['edit', 'setup'],
-    keys: ['tiktok', 'tik tok', 'our tiktok', 'add tiktok', 'add our tiktok', 'tiktok link', 'tiktok account'],
-    keysFr: ['tiktok', 'tik tok', 'notre tiktok', 'ajouter tiktok', 'ajouter notre tiktok', 'compte tiktok'],
-    a: '<p><strong>Yes.</strong> Type your TikTok name with @ (like <strong>@yourplace</strong>) or paste your tiktok.com/@ link:</p><ul><li>in the easy setup, on the <strong>Instagram</strong> question (the TikTok box is under it), or</li><li>{ON}, in <strong>Name, address &amp; links</strong>, then tap {SEND}.</li></ul><p>It goes on your page straight away, beside Instagram and Facebook.</p>',
-    aFr: '<p><strong>Oui.</strong> Tapez votre nom TikTok avec @ (comme <strong>@votreendroit</strong>) ou collez votre lien tiktok.com/@ :</p><ul><li>dans la configuration facile, à la question <strong>Instagram</strong> (la case TikTok est dessous), ou</li><li>{ON}, dans <strong>Nom, adresse et liens</strong>, puis touchez {SEND}.</li></ul><p>Il s’affiche tout de suite sur votre page, à côté d’Instagram et de Facebook.</p>' },
   { id: 'photo-order', over: ['photo-main', 'photo-add'], q: 'How do I change the order of my photos?', qFr: 'Comment changer l’ordre de mes photos?', pages: ['edit', 'setup'],
     keys: ['photo order', 'order of my photos', 'order of the photos', 'order of photos', 'reorder', 'reorder photos', 'rearrange', 'rearrange photos', 'change the order', 'move a photo', 'move photo', 'move my photo', 'sort photos', 'which photo comes first', 'photo first', 'swap photos'],
     keysFr: ['ordre des photos', 'ordre de mes photos', 'changer l ordre', 'reorganiser', 'deplacer une photo', 'deplacer la photo', 'trier les photos', 'quelle photo en premier'],
@@ -57873,9 +57873,6 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opInstagram">${L('Instagram (optional)', 'Instagram (facultatif)')}</label><input type="text" id="opInstagram" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
         <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="text" inputmode="url" spellcheck="false" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
       </div>
-      <div class="form-row">
-        <div class="form-field"><label for="opTiktok">${L('TikTok (optional)', 'TikTok (facultatif)')}</label><input type="text" id="opTiktok" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" spellcheck="false" value="${escapeHtml(snap.tiktok_url || '')}"><p class="lyv-error" id="opTiktokError" hidden></p></div>
-      </div>
       </details>
 
       <p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description${waitChip('description')}</p>
@@ -57943,7 +57940,7 @@ ${priceFieldHtml}      </details>` : ''}
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      <summary><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
       ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
@@ -58343,7 +58340,7 @@ ${ownerFooterHtml(fr)}
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opTiktokError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'${avgSpendOn ? ",'opAvgError'" : ''}].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -58354,7 +58351,6 @@ ${ownerFooterHtml(fr)}
       name: document.getElementById('opBizName').value, address: document.getElementById('opAddress').value,
       menu_url: document.getElementById('opMenu').value, booking_url: document.getElementById('opBooking').value,
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
-      tiktok_url: document.getElementById('opTiktok') ? document.getElementById('opTiktok').value : (initial.tiktok_url || ''),
       description: document.getElementById('opDescription').value,
       open_months: document.getElementById('opSeasonMode').value ? (function(){
         // Café test 2 (2026-11-11): exact days ("04-25:10-12") unless they are whole months ("4-10", as always).
@@ -58468,7 +58464,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
-        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url); show('opTiktokError', errs.tiktok_url);
+        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);${avgSpendOn ? " show('opAvgError', errs.avg_spend);" : ''}${completeOn ? " show('opCuisineError', errs.cuisine); show('opVisitError', errs.visit_rows);" : ''}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
