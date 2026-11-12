@@ -860,6 +860,16 @@ Object.assign(fr, {
 Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more' });
 Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus' });
 
+// Fourth first-time café test (Dayton, 2026-11-11): café words that fit a takeout window or a café with no patio.
+Object.assign(en.cafe, {
+  quickDogsWindow: ['Dogs welcome at the window', 'Dog treats at the window'], quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
+  photosTakeout: 'Your window, your coffee, your sign. Three photos is perfect.',
+});
+Object.assign(fr.cafe, {
+  quickDogsWindow: ['Chiens bienvenus au comptoir', 'Gâteries pour chiens au comptoir'], quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
+  photosTakeout: 'Votre comptoir extérieur, votre café, votre enseigne. Trois photos, c’est parfait.',
+});
+
 // Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
 Object.assign(en, {
   holCovered: 'Covered by your closed dates',

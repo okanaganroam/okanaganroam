@@ -191,6 +191,8 @@
   // Café test 4 (2026-11-11): "A bit more would be great" stayed under a 105-character, three-sentence story. Two short
   // sentences (80 characters) is a good length.
   var STORY_OK = 80;
+  // Café test 4: no "your seats" for a takeout window (the coffee shop's photo hint).
+  function photosHint(){ var t = kindText('photos') || T.photosLead; return C.cafe && S.cafe.stay.seats === 'takeout' && T.photosTakeout && /seats|room|places assises|salle/i.test(t) ? T.photosTakeout : t; }
   function wifiSubText(){ return S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub; }
   function dogSubText(){ return S.badges.patio ? T.noDogsSub : T.noDogsSubInside || T.noDogsSub; }
   function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; if (ICE_ONLY.indexOf(o.k) >= 0) return iceKind(); return true; }); }
@@ -511,6 +513,9 @@
   function has(v, t){ return String(v || '').toLowerCase().indexOf(String(t).toLowerCase()) >= 0; }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
+    // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
+    // isn't offered "Patio only".
+    if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
     return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (has(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
@@ -981,7 +986,7 @@
       x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
     } else if (s === 'photos') {
-      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ')) + '</p>' + q(T.photosMore) : q(T.photosQ, kindText('photos') || T.photosLead)) + msgs()
+      x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ')) + '</p>' + q(T.photosMore) : q(T.photosQ, photosHint())) + msgs()
         + '<div class="su-stack">' + big('📷', T.take, T.takeSub, false, 'take') + big('🖼️', T.choose, '', true, 'pick') + (S.photosSent || S.done.photos === 'day' ? big('➜', T.photosNoMore, '', true, 'after:photos') : '') + '</div>' + (S.photosSent || S.done.photos ? '' : skip('photos'));
     } else if (s === 'photos:review') {
       var g = goodPhotos();
