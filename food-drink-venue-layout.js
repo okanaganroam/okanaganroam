@@ -82,8 +82,9 @@ function highlightsFor(venue, dogNote, profile = {}) {
   // The first of them takes the last place; the limit is unchanged.
   const max = profile.highlightMax || 4;
   const diet = got.findIndex((k) => k === 'vegan' || k === 'vegetarian');
-  if (diet >= max) return out.slice(0, max - 1).concat([out[diet]]);
-  return out.slice(0, max);
+  // profile.returnKeys (bug-check 2026-11-12): the chosen keys instead, so the French café page picks the same four.
+  const pick = (arr) => (diet >= max ? arr.slice(0, max - 1).concat([arr[diet]]) : arr.slice(0, max));
+  return profile.returnKeys ? pick(got) : pick(out);
 }
 
 // The label of the deals tab and card, from what the venue really has.

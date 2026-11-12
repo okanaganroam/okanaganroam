@@ -20024,7 +20024,10 @@ function cafeInfoLinesHtml(venue, fr) {
   const lines = [];
   const kind = venuePlaceType(venue);
   // Café test 2: "made here" reads last ("Ice cream & gelato, sorbet and made here").
-  const serves = (info.serves || []).filter((k) => k !== 'made_here').concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
+  // Bug-check (2026-11-12): what the kind already says is not said again ("Ice cream & gelato shop · Ice cream & gelato").
+  const kindEn = kind ? String(placeTypeDisplay(venue, false) || kind).toLowerCase() : '';
+  const saidByKind = (k) => !!kindEn && (kindEn.includes(String((CAFE_SERVE_SHORT[k] || [])[0] || '\u0000').toLowerCase()) || (k === 'smoothies' && /juice|smoothie/.test(kindEn)));
+  const serves = (info.serves || []).filter((k) => k !== 'made_here' && !saidByKind(k)).concat((info.serves || []).includes('made_here') ? ['made_here'] : []).map((k) => (CAFE_SERVE_SHORT[k] || [])[fr ? 1 : 0]).filter(Boolean);
   if (kind || serves.length) lines.push(['serves', '☕', [kind ? placeTypeDisplay(venue, fr) : '', serves.length ? cafeCap(cafeList(serves, fr)) : ''].filter(Boolean).join(' · ')]);
   // The owner's own number only (never a research estimate), in café words (Decided 2). Like every average spend, it
   // stays off public pages until AVG_SPEND_PUBLIC=1 (avgSpendPublic).
@@ -20049,7 +20052,7 @@ function cafeInfoLinesHtml(venue, fr) {
   if (talk) lines.push(['talk', /talk|discuter/.test(talk) ? '💬' : '📵', talk]);
   const d = info.diet || {};
   const dBits = [];
-  if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
+  if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? '\u00a0: ' : ': '));
   if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'options sans gluten d’une cuisine réservée'));
   else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'options sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
@@ -20172,6 +20175,26 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
     })
     .concat(ownerFeatureChipsHtml(venue, fr, (g) => `chip chip-vb chip-vb-${g}`) || [])
     .join(' ');
+}
+
+// Bug-check (2026-11-12): a French café page shows the same chips as the English one: the same top four (dietary options
+// first, a gluten-free kitchen said as on the English page), then the café's own tiles. The dog chip, when the page has
+// a dog note, is its own chip (as before) and still counts in the four.
+const HIGHLIGHT_BADGE_FIELD = { dog: 'dog_friendly', kid: 'kid_friendly', patio: 'patio', lake: 'lake_view', gluten: 'gluten_free', vegan: 'vegan',
+  vegetarian: 'vegetarian', music: 'live_music', groups: 'great_groups', tv: 'sports_tv', nonalc: 'nonalcoholic' };
+function cafeFrChipsHtml(venue, dogNote) {
+  const keys = foodDrinkHighlights(venue, dogNote, { ...cafePageProfile(venue, {}), returnKeys: true });
+  const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
+  const feats = venueOwnerFeatures(venue.id);
+  const chips = keys.map((k) => {
+    const f = HIGHLIGHT_BADGE_FIELD[k];
+    if (!f || (k === 'dog' && dogNote !== undefined)) return '';
+    const label = k === 'gluten' && gf === 'shared' ? 'Options sans gluten (cuisine partagée)' : k === 'gluten' && gf === 'dedicated' ? 'Sans gluten (cuisine réservée)'
+      : k === 'patio' && feats.heated_patio ? OWNER_EXTRA_BADGE_LABELS.heated_patio.fr : frBadgeLabel(f);
+    const icon = (CARD_BADGE_SHORT[f] || [])[0];
+    return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
+  }).filter(Boolean);
+  return chips.concat(cafeOwnerHighlights(venue, true).map(([icon, label]) => `<span class="chip chip-vb chip-vb-place">${icon ? `<span aria-hidden="true">${icon}</span> ` : ''}${escapeHtml(label)}</span>`)).join(' ');
 }
 
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
@@ -34604,7 +34627,7 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
   const soon = all.filter((c) => c !== shown && !inside(c) && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
   if (soon.length) {
     // Round 10: the owner's (English) note stays off the French page unless the French list has it.
-    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => { const n = closureNoteFor(c.note, fr); return `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${n ? ` (${escapeHtml(n)})` : ''}`; }).join(' &middot; ')}</p>`);
+    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures:', 'Fermetures spéciales\u00a0:')}</strong> ${soon.map((c) => { const n = closureNoteFor(c.note, fr); return `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${n ? ` (${escapeHtml(n)})` : ''}`; }).join(' &middot; ')}</p>`);
   }
   return out.join('');
 }
@@ -35633,7 +35656,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       if (/patio|terrasse/i.test(dt) && !/inside|indoor|int[ée]rieur/i.test(dt)) dogFriendlyNote = fr ? 'Chiens sur la terrasse' : 'Dogs on the patio';
     } catch (e) { /* no visit info */ }
   }
-  const attributeChipsFor = (skipHappyHour) => venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour });
+  const attributeChipsFor = (skipHappyHour) => (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour }));
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
@@ -51618,7 +51641,7 @@ function renderOwnerSetupPage(found, opts) {
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
-    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
@@ -64238,7 +64261,7 @@ if (require.main === module) {
 module.exports = {
   visitDropRepeatedKnownFor,
   // Café test 6 (2026-11-12): preset answers in the page's language
-  presetAnswer, isPresetAnswer, closureNoteFor, presetInLang, visitInfoHtml,
+  presetAnswer, isPresetAnswer, closureNoteFor, presetInLang, visitInfoHtml, cafeFrChipsHtml,
   displayPhone,
   browseFeatureChipsHtml,
   // Card badges (2026-10-29)

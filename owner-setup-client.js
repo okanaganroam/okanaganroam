@@ -10,7 +10,8 @@
   var el = function(id){ return document.getElementById(id); };
   var screen = el('suScreen');
   var started = Date.now();
-  function fill(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return o && o[k] != null ? o[k] : m; }); }
+  // A value ending in a dot ("sept.") before the sentence's own dot gives one dot, not two.
+  function fill(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k, at, all){ if (!(o && o[k] != null)) return m; var v = String(o[k]); return /\.$/.test(v) && all.charAt(at + m.length) === '.' ? v.slice(0, -1) : v; }); }
   function h(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
   function dayName(d){ return C.dayNames[d]; }
@@ -91,11 +92,12 @@
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
     for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
-    var u = [], z = [];
-    DAYS.forEach(function(d){ if (!days[d]) return; if (usual && !S.week[d]) u.push(d); if (seas && !S.sea.week[d]) z.push(d); });
-    var all = DAYS.filter(function(d){ return u.indexOf(d) >= 0 || z.indexOf(d) >= 0; });
+    if (!usual && !seas) return '';
+    // Bug-check (2026-11-12): a day open in any of the special's seasons is not "closed" (Sun closed in the usual week but
+    // open in summer, for a special that runs all year).
+    var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
-    var when = hasSea ? (z.length && !u.length ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : u.length && !z.length ? T.closedWarnUsual : '') : '';
+    var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
     return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
   function warnHtml(key, i, e){ var t = closedWarn(e.days, e.sea); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
@@ -167,7 +169,11 @@
   S.noWifi = (CUR.not_offered || []).indexOf('wifi') >= 0 && !(CUR.badges || {}).wifi;
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
-  if (C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount)) S.spend = 9;
+  // Bug-check (2026-11-12): the starting price fits the kind: a single scoop starts at $6 and a bubble tea at $7, not the
+  // $9 coffee and pastry. It follows the kind she picks until she changes the price.
+  function cafeSpendStart(){ return S.place === 'Ice cream & gelato' ? 6 : S.place === 'Bubble tea' ? 7 : 9; }
+  var spendAuto = C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount);
+  if (spendAuto) S.spend = cafeSpendStart();
   // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
   S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
@@ -710,7 +716,8 @@
       var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
       var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
       var last = new Date(2025, b, 0).getDate();
-      var range = monthName(a - 1) + (da > 1 ? ' ' + da : '') + '–' + monthName(b - 1) + (db < last ? ' ' + db : '');
+      var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
+      var range = md2(a, da, da > 1) + '–' + md2(b, db, db < last);
       return '<p class="su-sent su-seasonnow su-seahours">' + h(fill(T.seasonHoursLine, { kind: kw, range: range, hours: weekShort(w) })) + '</p>';
     }).join('');
   }
@@ -1767,7 +1774,7 @@
     var lab = String(s0.label || '').toLowerCase(), m = +s0.from.slice(0, 2);
     return { from: s0.from, to: s0.to, kind: /winter|hiver/.test(lab) ? 'winter' : /summer|été/.test(lab) ? 'summer' : (m >= 4 && m <= 9 ? 'summer' : 'winter') };
   }
-  function mdText(md){ return monthName(+md.slice(0, 2) - 1) + ' ' + (+md.slice(3)); }
+  function mdText(md){ return mdLabel(md); }
   function readKsea(){ var e = el('suKsto'); if (e) S.kitchen.sea.closes = e.value; }
   // ---------- Wiring ----------
   function act(a){
@@ -2106,6 +2113,12 @@
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
       if (mk.length && !S.badges.dairy_free_milk) { dl.push({ badges: { dairy_free_milk: true } }); S.badges.dairy_free_milk = true; }
+      // Bug-check (2026-11-12): vegan gelato or ice cream ticks "Vegan options" too (never unticks it), taking back an
+      // earlier "None of these" for dietary options.
+      if (dv.vegan_ice && !S.badges.vegan) {
+        if (S.notOffered.indexOf('dietary') >= 0) { dl.push({ not_offered: { remove: ['dietary'] } }); S.notOffered = S.notOffered.filter(function(z){ return z !== 'dietary'; }); }
+        dl.push({ badges: { vegan: true } }); S.badges.vegan = true; S.noDiet = false;
+      }
       return saveAll('diet', dl);
     }
     if (k === 'coffeeSave') {
@@ -2225,7 +2238,7 @@
       S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y);
     }; });
     var cq = el('suCq'); if (cq) { var filt = function(){ S.cuiQ = cq.value; var tq = cq.value.trim().toLowerCase(), n = 0; Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ var c = b.getAttribute('data-cui'), on = !tq || c.toLowerCase().indexOf(tq) >= 0 || String(C.cuisineNames[c] || '').toLowerCase().indexOf(tq) >= 0; b.hidden = !on; if (on) n++; }); el('suCuiNone').hidden = n > 0; }; cq.oninput = filt; filt(); }
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ S.place = b.getAttribute('data-place'); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ var sp0 = spendAuto && S.spend === cafeSpendStart(); S.place = b.getAttribute('data-place'); if (sp0) S.spend = cafeSpendStart(); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Café screens (2026-11-10).
     var redraw = function(){ S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ctog]'), function(b){ b.onclick = function(){
