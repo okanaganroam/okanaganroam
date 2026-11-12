@@ -172,8 +172,12 @@
   // Bug-check (2026-11-12): the starting price fits the kind: a single scoop starts at $6 and a bubble tea at $7, not the
   // $9 coffee and pastry. It follows the kind she picks until she changes the price.
   function cafeSpendStart(){ return S.place === 'Ice cream & gelato' ? 6 : S.place === 'Bubble tea' ? 7 : 9; }
+  // Review fix (2026-11-12): only until the price step is answered (saved, sent or skipped); after that a change of kind
+  // never changes the price shown under "✓ Saved" (spendFollows).
   var spendAuto = C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount);
   if (spendAuto) S.spend = cafeSpendStart();
+  if (S.done.spend) spendAuto = false;
+  function spendFollows(){ return spendAuto && !S.done.spend && S.spend === cafeSpendStart(); }
   // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
   S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
@@ -1972,7 +1976,7 @@
     if (k === 'spend') { S.spend = Math.round(Math.max(C.cafe ? 2 : 5, Math.min(300, S.spend + (+v))) * 4) / 4; if (!C.cafe) S.spend = Math.round(S.spend); return render(); }
     if (k === 'spendConfirm') { S.spend = spendGuess() || S.spend; S.toFinish = true; if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ CUR.avg_spend = { amount: S.spend, source: 'owner' }; }); }
     if (k === 'spendSkip') { S.spendNotSure = true; if (answered('spend') || S.done.spend === 'skip') return render(); return record('spend', 'skip', function(){ render(); }); }
-    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }]); }
+    if (k === 'spendSave') { if (!C.spendPublic) S.savedLine.spend = T.savedSpendOff; return saveAll('spend', [{ avg_spend: S.spend }], null, null, function(){ spendAuto = false; }); }
     if (k === 'cuiAll') { S.cuiAll = true; return render(); }
     if (k === 'holAll') { S.holAll = !S.holAll; var yh = window.scrollY; render(); window.scrollTo(0, yh); return; }
     if (k === 'cuisineNext') { if (!S.cuis.length) { S.nudge = T.pickOne; return render(); } return go('cuisine:place'); }
@@ -2245,7 +2249,7 @@
       S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y);
     }; });
     var cq = el('suCq'); if (cq) { var filt = function(){ S.cuiQ = cq.value; var tq = cq.value.trim().toLowerCase(), n = 0; Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ var c = b.getAttribute('data-cui'), on = !tq || c.toLowerCase().indexOf(tq) >= 0 || String(C.cuisineNames[c] || '').toLowerCase().indexOf(tq) >= 0; b.hidden = !on; if (on) n++; }); el('suCuiNone').hidden = n > 0; }; cq.oninput = filt; filt(); }
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ var sp0 = spendAuto && S.spend === cafeSpendStart(); S.place = b.getAttribute('data-place'); if (sp0) S.spend = cafeSpendStart(); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-place]'), function(b){ b.onclick = function(){ var sp0 = spendFollows(); S.place = b.getAttribute('data-place'); if (sp0) S.spend = cafeSpendStart(); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Café screens (2026-11-10).
     var redraw = function(){ S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ctog]'), function(b){ b.onclick = function(){

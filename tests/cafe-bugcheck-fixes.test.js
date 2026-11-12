@@ -237,3 +237,23 @@ test('Review 3: the serves line drops only what the kind itself says (Bubble tea
   ok(await change(tokenFor(j.id), { place_type: 'Juice & smoothie bar', cafe_info: { serves: ['smoothies', 'tea'] } }));
   assert.match((/venue-cafe-serves[\s\S]*?<strong>([^<]*)<\/strong>/.exec(page(j, 'en')) || [])[1], /· Tea$/);
 });
+
+test('Review 4: once the price step is answered, a change of kind never changes the price shown (or saved)', () => {
+  const src = /var spendAuto = [\s\S]*?function spendFollows\(\)\{[^\n]*\}/.exec(CLIENT)[0];
+  const mkS = (done, amount) => {
+    const S = { place: 'Coffee shop', spend: 25, done };
+    const f = new Function('S', 'C', 'CUR', `function cafeSpendStart(){ return S.place === 'Ice cream & gelato' ? 6 : S.place === 'Bubble tea' ? 7 : 9; }\n${src}\nreturn { follows: spendFollows, saved: function(){ spendAuto = false; }, start: cafeSpendStart };`)(S, { cafe: true }, { avg_spend: amount ? { amount } : null });
+    return { S, f };
+  };
+  // Not answered yet: the starting price follows the kind (Coffee $9 → Gelato $6).
+  let { S, f } = mkS({});
+  assert.equal(S.spend, 9); assert.equal(f.follows(), true);
+  // Saved this visit (spendSave's success): no longer follows, even with the same number.
+  f.saved(); assert.equal(f.follows(), false);
+  // Answered on an earlier visit (skipped, or sent): the shown starting price is the kind's, but it doesn't follow.
+  ({ S, f } = mkS({ spend: 'skip' })); assert.equal(S.spend, 9); assert.equal(f.follows(), false);
+  // Answered this visit (S.done.spend set by progress): stops following.
+  ({ S, f } = mkS({})); S.done.spend = 'live'; assert.equal(f.follows(), false);
+  assert.match(CLIENT, /var sp0 = spendFollows\(\);/);
+  assert.match(CLIENT, /saveAll\('spend', \[\{ avg_spend: S\.spend \}\], null, null, function\(\)\{ spendAuto = false; \}\)/);
+});
