@@ -105,7 +105,7 @@ test('cuisine: Comfort food is pickable, with its French name', async () => {
 test('help answer matches the panel (no "We\'re adding these"); signed-in restaurant intro has no time total', async () => {
   const t = app.OWNER_HELP_TOPICS.find((x) => x.id === 'page-complete');
   assert.doesNotMatch(t.a, /We’re adding these/); assert.doesNotMatch(t.aFr, /Nous ajoutons ceci/);
-  assert.match(t.a, /Quick ones/); assert.match(t.a, /Show all/); assert.match(t.a, /last steps to 100%/);
+  assert.match(t.a, /Quick ones/); assert.match(t.a, /Show all/); assert.match(t.a, /are the last steps for most places/); assert.doesNotMatch(t.a + t.aFr + t.q + t.qFr, /%/);
   assert.match(t.aFr, /Tout afficher/);
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const i = src.indexOf('${instantOn && completeOn');

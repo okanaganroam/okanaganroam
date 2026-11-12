@@ -125,7 +125,7 @@ const CAFE_ITEMS = [
     en: 'What kind of café', fr: 'Quel genre de café', whyEn: 'Coffee shop, bakery, gelato, bubble tea and so on. Pick one.', whyFr: 'Café, boulangerie, gelato, thé aux perles, etc. Choisissez-en un.', btnEn: 'Pick one', btnFr: 'Choisir', icon: '☕' },
   R('hours', { w: 8 }),
   R('hours_fresh', { w: 4 }),
-  { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'closures' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
+  { key: 'season', group: 'hours', w: 3, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'cafe_info'],
     en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Ice cream and patio cafés often close for winter. Say so, so nobody drives out to a closed door.', whyFr: 'Les bars laitiers et les cafés-terrasses ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
   R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your counter, your coffee, your baking.', whyFr: 'De vraies photos seulement, prises par vous. Votre comptoir, votre café, vos pâtisseries.' }),
   R('photo_extra', { w: 7, whyEn: 'Your counter, your coffee, your baking, your seats.', whyFr: 'Votre comptoir, votre café, vos pâtisseries, vos places assises.' }),
@@ -502,7 +502,11 @@ function renderCompleteness(result, opts) {
   // decides the badge (badgeState) and the ring's dark part.
   const shownPct = !r.complete && r.pctWithWaiting != null && r.pctWithWaiting > r.pct ? r.pctWithWaiting : r.pct;
   const counting = shownPct > r.pct;
-  const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : counting ? L(`Your page is about ${shownPct}% complete`, `Votre fiche est complète à environ ${shownPct} %`) : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
+  // Café test 4 (2026-11-11): on the owner's edit page (o.noScore) the card is the checklist, without the percent or the
+  // badge talk ("Complete & Verified", "21% counts what you sent" was noise for a first-time owner). The score itself,
+  // the badge rules and the setup's own numbers are unchanged; data-cb-pct still carries the number for the page script.
+  const noScore = !!o.noScore;
+  const headline = r.complete ? L('Your page is complete', 'Votre fiche est complète') : noScore ? L('Your page checklist', 'La liste de votre fiche') : counting ? L(`Your page is about ${shownPct}% complete`, `Votre fiche est complète à environ ${shownPct} %`) : L(`Your page is ${r.pct}% complete`, `Votre fiche est complète à ${r.pct} %`);
   // Never a big total up front: lead with what takes under a minute or two (2026-11-08).
   const quick = r.quick || [], later = r.later || r.missing;
   const nq = quick.length;
@@ -609,7 +613,7 @@ function renderCompleteness(result, opts) {
   const ceilingText = ceilPhotos && ceilDoor ? L('Photos and your storefront spot are the last steps to 100%.', 'Les photos et l’emplacement de votre devanture sont les dernières étapes vers 100 %.')
     : ceilPhotos ? L('Photos are the last step to 100%.', 'Les photos sont la dernière étape vers 100 %.')
       : ceilDoor ? L('Your storefront spot is the last step to 100%.', 'L’emplacement de votre devanture est la dernière étape vers 100 %.') : '';
-  const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${ceilingText}${onlyCeiling ? '' : ceilPhotos && ceilDoor
+  const ceilingHtml = ceilingText ? `<p class="op-cb-note op-cb-ceiling">${noScore ? ceilingText.replace(' to 100%', '').replace(' vers 100 %', '') : ceilingText}${onlyCeiling ? '' : ceilPhotos && ceilDoor
     ? L(' Do them when you’re at your place with a few minutes.', ' Faites-les quand vous êtes sur place avec quelques minutes.')
     : L(' Do it when you’re at your place with a few minutes.', ' Faites-le quand vous êtes sur place avec quelques minutes.')}</p>` : '';
   const still = quickHtml + laterHtml + ceilingHtml + waitingHtml;
@@ -638,9 +642,9 @@ function renderCompleteness(result, opts) {
   // where they'll land: "61% now · about 95% once we check your 8 changes", with a legend for the ring's two colours.
   // The real score (r.pct) never counts waiting items.
   // One number (pub test 3, 2026-11-10): the headline already counts what was sent; this line only says so.
-  const prov = !r.complete && nw > 0 && counting ? shownPct : null;
+  const prov = !noScore && !r.complete && nw > 0 && counting ? shownPct : null;
   const provHtml = prov != null ? `<p class="op-cb-prov" id="opCbProv">${L(`<strong>${prov}%</strong> counts what you sent. ${o.plainWaiting ? 'We add it' : `We check your ${nw} ${nw === 1 ? 'change' : 'changes'}`}, usually within a day.`, `<strong>${prov} %</strong> compte ce que vous avez envoyé. ${o.plainWaiting ? 'Nous l’ajoutons' : `Nous vérifions vos ${nw} ${nw === 1 ? 'modification' : 'modifications'}`}, habituellement d’ici un jour.`)}<span class="op-cb-legend"><i class="op-cb-key op-cb-key-done"></i>${L('Done', 'Fait')} <i class="op-cb-key op-cb-key-wait"></i>${L('Sent, we’re checking', 'Envoyé, en cours de vérification')}</span></p>` : '';
-  const yay = ` data-cb-pct="${shownPct}" data-cb-yay="${esc(L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
+  const yay = ` data-cb-pct="${shownPct}" data-cb-yay="${esc(noScore ? L('Nice! That’s done.', 'Bravo! C’est fait.') : L('Nice! You’re now at {p}%.', 'Bravo! Vous êtes maintenant à {p} %.'))}"`;
   // Complete & Verified (2026-11-09): what the business sees about the badge, under the ring.
   const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
   const chip = badgeChipHtml(fr);
@@ -648,12 +652,12 @@ function renderCompleteness(result, opts) {
     ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
     : bState === 'paused'
     ? `<div class="op-cb-badge op-cb-badge-paused" id="opCbBadge"><p><span aria-hidden="true">⏰</span> ${L('Your', 'Votre badge')} ${chip} ${L('badge is paused. Are your hours still right?', 'est en pause. Vos heures sont-elles toujours exactes?')}</p><button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify({ hours_checked: true }))}" data-cb-done="${esc(L('Thanks! Your badge is back.', 'Merci! Votre badge est de retour.'))}">${L('Yes, these are right', 'Oui, elles sont exactes')}</button></div>`
-    : bState === 'none'
+    : bState === 'none' && !noScore
     ? `<div class="op-cb-badge" id="opCbBadge"><p>${chip}</p><p class="op-cb-badge-note">${L('Reach 100% to earn the Complete &amp; Verified badge for your page.', 'Atteignez 100 % pour obtenir le badge Complète et vérifiée pour votre fiche.')}</p></div>`
     : '';
   const seePage = o.pageHref ? `<p class="op-cb-see"><a href="${esc(o.pageHref)}" target="_blank" rel="noopener">${L('See your page', 'Voir votre fiche')} &#8599;</a></p>` : '';
   return `<section class="op-cb" id="opComplete" data-task="home all" aria-labelledby="opCbHead"${dataAttrs}${yay}${moreAttrs}>
-      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel"><span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${shownPct}%</b></span><span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(o.quietCta && !r.complete ? quietSub : subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
+      <button type="button" class="op-cb-head" id="opCbToggle" aria-expanded="false" aria-controls="opCbPanel">${noScore ? `<span class="op-cb-ico op-cb-list-ico" aria-hidden="true">${r.complete ? '✅' : '📋'}</span>` : `<span class="op-cb-ring${r.pct >= 100 ? ' op-cb-ring-100' : ''}" style="--p:${r.pct};--w:${r.pctWithWaiting != null ? r.pctWithWaiting : r.pct}" aria-hidden="true"><b>${shownPct}%</b></span>`}<span class="op-cb-title"><strong id="opCbHead">${esc(headline)}</strong><span id="opCbSub" data-closed="${esc(sub)}" data-opened="${esc(o.quietCta && !r.complete ? quietSub : subOpen)}">${esc(sub)}</span>${sentLineHtml}</span><span class="op-cb-chev" aria-hidden="true"></span></button>
       ${badgeBlock}${provHtml}<p class="op-cb-yay" id="opCbYay" role="status" hidden></p>${seePage}
       <div class="op-cb-panel" id="opCbPanel" hidden>${o.canDecline ? `
         <p class="op-cb-err" id="opCbErr" role="alert" hidden></p>` : ''}
@@ -661,7 +665,7 @@ function renderCompleteness(result, opts) {
         <details class="op-cb-done"><summary>${L('See what’s done', 'Voir ce qui est fait')}</summary><div class="op-cb-groups">${groups}</div></details>
         ${declinedHtml}
         ${comingHtml}
-        <p class="op-cb-note">${L('Only you see this score. It never changes where you show up in search.', 'Vous seul voyez ce pointage. Il ne change jamais votre position dans les recherches.')}</p>
+        ${noScore ? '' : `<p class="op-cb-note">${L('Only you see this score. It never changes where you show up in search.', 'Vous seul voyez ce pointage. Il ne change jamais votre position dans les recherches.')}</p>`}
       </div>
     </section>`;
 }
@@ -677,6 +681,7 @@ const COMPLETENESS_CSS = `${BADGE_CSS}
     body.owner-page .op-cb-head { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 44px; padding: 14px 16px; background: none; border: 0; border-radius: 16px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
     body.owner-page .op-cb-ring { --p: 0; position: relative; flex: 0 0 60px; width: 60px; height: 60px; border-radius: 50%; --w: 0; background: conic-gradient(#2A6B67 calc(var(--p) * 1%), #E2A23B 0 calc(var(--w) * 1%), #EAE6D9 0); }
     body.owner-page .op-cb-back { display: block; margin: 12px 0 4px; }
+    body.owner-page .op-cb-list-ico { flex: 0 0 auto; font-size: 30px; line-height: 1; }
     body.owner-page .op-desc-goal { margin-top: 2px; font-weight: 700; color: #67470C; }
     body.owner-page .op-desc-goal.op-desc-ok { color: #1E6B3A; }
     body.owner-page .op-copy-row { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.8); margin-top: 6px; }

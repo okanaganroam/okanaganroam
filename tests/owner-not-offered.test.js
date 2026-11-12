@@ -100,7 +100,7 @@ test('edit page (restaurant): the buttons show in English and French, never on p
 test('saving from the edit link: live at once, logged, in "Your updates"; the panel shows Not offered with Undo; the score goes up', async () => {
   const v = mk('restaurant');
   const token = tokenFor(v.id);
-  const pctOf = (html) => Number((html.match(/Your page is (\d+)% complete/) || [])[1]);
+  const pctOf = (html) => Number((html.match(/data-cb-pct="(\d+)"/) || [])[1]);
   const before = pctOf(await get(`/owner/${token}`));
   const r = await post(token, { not_offered: ['instagram', 'happy_hour'] });
   assert.equal(r.status, 201, JSON.stringify(r.body));

@@ -43,7 +43,7 @@ const get = (p) => fetch(base + p).then((r) => r.text());
 const post = (token, changes, lang = '') => fetch(`${base}${lang}/owner/${token}/changes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.7.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` },
   body: JSON.stringify({ changes, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 }) }).then(async (r) => ({ status: r.status, body: await r.json() }));
 const bar = async (token, lang = '') => { const r = await fetch(`${base}${lang}/owner/${token}/completeness`); return { status: r.status, headers: r.headers, body: await r.json() }; };
-const pctOf = (html) => Number((/Your page is (\d+)% complete/.exec(html) || /complète à (\d+) %/.exec(html) || [])[1]);
+const pctOf = (html) => Number((/data-cb-pct="(\d+)"/.exec(html) || [])[1]);
 const research = (amount) => ({ amount, source: 'research', source_url: 'https://example.com/menu', basis: 'Estimated from the menu: median main $26 plus a soft drink', checked_at: today });
 
 test('redraw instead of reload: GET .../completeness gives the bar for a restaurant (EN + FR), nothing for other types', async () => {
@@ -59,7 +59,7 @@ test('redraw instead of reload: GET .../completeness gives the bar for a restaur
   const inPage = page.slice(page.indexOf('<section class="op-cb" id="opComplete"'), page.indexOf('</section>', page.indexOf('id="opComplete"')) + 10);
   assert.equal(en.body.html, inPage, 'the redraw is exactly the bar on the page');
   const fr = await bar(token, '/fr');
-  assert.match(fr.body.html, /Votre fiche est complète à \d+ %/);
+  assert.match(fr.body.html, /La liste de votre fiche/); // café test 4: no percent on the edit page
   for (const type of ['distillery', 'brewery', 'winery']) assert.equal((await bar(tokenFor(mk(type).id))).status, 404, type); // cafés have the setup and checklist since 2026-11-10
   assert.equal((await bar('not-a-real-token')).status, 404);
   // After a live save the redraw shows the new score (this is what the page swaps in, with no reload).
@@ -222,7 +222,7 @@ test('help bot: "my score didn\'t go up, did it work?" gets the completeness ans
     assert.equal(r.lang, lang, q);
   }
   const t = c.topics.find((x) => x.id === 'page-complete');
-  assert.match(t.a, /Score didn’t go up\?/);
+  assert.match(t.a, /not ticked yet\?/);
   assert.match(t.a, /Waiting for our check/);
   assert.match(t.aFr, /En attente de notre vérification/);
 });

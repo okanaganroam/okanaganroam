@@ -282,7 +282,9 @@ test('1 + 3: the Hours step asks "We\'re closed part of the year" for every type
     const s = /<script>(\/\/ Full easy setup[\s\S]*?)<\/script>/.exec(await setupOf(mk(type)))[1];
     assert.match(s, /big\('🗓️', T\.allYearClosed, T\.allYearClosedSub, true, 'yearClosed'\)/, type);
     assert.match(s, /\} else if \(s === 'hours:open'\) \{/);
-    assert.match(s, /data-act="openEdit">' \+ h\(T\.partYearBtn\)/, 'closures links to the one season answer');
+    // Café test 4: closures no longer repeats "We're closed part of the year"; a saved season still shows there with Change.
+    assert.doesNotMatch(s, /data-act="openEdit">' \+ h\(T\.partYearBtn\)/, 'asked once, in Hours');
+    assert.match(s, /data-act="openEdit" aria-label="' \+ h\(T\.openChange\)/);
     // The closures save never writes the season (one place for it).
     const save = s.slice(s.indexOf("if (k === 'closuresNone' || k === 'closuresSave')"), s.indexOf("if (k === 'closureAdd')"));
     assert.ok(!/open_months: om/.test(save));

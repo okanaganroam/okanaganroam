@@ -19961,11 +19961,14 @@ function cafeInfoLinesHtml(venue, fr) {
   else if (stay.seats === 'lots') stayBits.push(L('Lots of seats inside', 'Beaucoup de places à l’intérieur'));
   if (stay.outlets) stayBits.push(L('power outlets', 'prises électriques'));
   if (stay.quiet) stayBits.push(L('a quiet spot', 'un coin tranquille'));
-  if (stayBits.length) lines.push(['stay', '💻', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
+  // Café test 4 (2026-11-11): the laptop icon only beside a laptop answer; "Takeout only" gets the takeout box (as on the
+  // setup tile), and seats alone a chair.
+  const laptopBit = stay.laptops === 'all_day' || stay.laptops === 'not_busy';
+  if (stayBits.length) lines.push(['stay', laptopBit ? '💻' : stay.seats === 'takeout' ? '🥡' : '🪑', stayBits.map((b, i) => (i ? b.charAt(0).toLowerCase() + b.slice(1) : b)).join(' · ')]);
   // Café test 1 (2026-11-11): "No Wi-Fi" and "No laptops" were deliberate ("we want people to talk"), so they show as one
   // friendly line, only when the owner picked them (and never beside a Wi-Fi tile).
   const talk = cafeTalkLine(venue, fr);
-  if (talk) lines.push(['talk', '💬', talk]);
+  if (talk) lines.push(['talk', /talk|discuter/.test(talk) ? '💬' : '📵', talk]);
   const d = info.diet || {};
   const dBits = [];
   if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
@@ -20030,8 +20033,9 @@ function cafeTalkLine(venue, fr) {
   if (!venue || venue.type !== 'cafe') return '';
   const noWifi = !venueOwnerFeatures(venue.id).wifi && venueNotOffered(venue.id).includes('wifi');
   const noLaptops = (venueCafeInfo(venue.id).stay || {}).laptops === 'none';
-  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. A takeout window says nothing about it.
-  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return '';
+  // Café test 2 (2026-11-11): "a place to talk" only where people can sit. Café test 4 (2026-11-11): a takeout window
+  // that said "No Wi-Fi" gets a plain "No Wi-Fi" (the setup promised it); "No laptops" means nothing there.
+  if ((venueCafeInfo(venue.id).stay || {}).seats === 'takeout') return noWifi ? (fr ? 'Pas de Wi-Fi' : 'No Wi-Fi') : '';
   if (noWifi && noLaptops) return fr ? 'Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter' : 'No Wi-Fi or laptops: a place to talk';
   if (noWifi) return fr ? 'Pas de Wi-Fi : un endroit pour discuter' : 'No Wi-Fi: a place to talk';
   if (noLaptops) return fr ? 'Pas d’ordinateurs portables : un endroit pour discuter' : 'No laptops: a place to talk';
@@ -34500,7 +34504,11 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
       out.push(`<details class="venue-hours-usual"><summary>${name} (${range})</summary>${list(s.days)}</details>`);
     }
   }
-  const soon = (parsed.closures || []).filter((c) => c !== shown && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
+  // Café test 4 (2026-11-11): a one-day closure inside a longer one ("Dec 25 (Christmas Day)" inside "Dec 25 – Jan 1")
+  // is not listed again. Done here, so closures saved before the setup stopped adding them read right too.
+  const all = parsed.closures || [];
+  const inside = (c) => (c.to || c.from) === c.from && all.some((d) => d !== c && (d.to || d.from) !== d.from && d.from <= c.from && c.from <= (d.to || d.from));
+  const soon = all.filter((c) => c !== shown && !inside(c) && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
   if (soon.length) {
     // Round 10: the owner's (English) note stays off the French page unless the French list has it.
     out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note && (!fr || frText(c.note)) ? ` (${escapeHtml(fr ? frText(c.note) : c.note)})` : ''}`).join(' &middot; ')}</p>`);
@@ -34823,6 +34831,15 @@ function venueSpecialsDaysText(days, fr) {
   return fr ? out.charAt(0).toUpperCase() + out.slice(1) : out;
 }
 // "4–9 PM", "from 4 PM", "until 2 PM" (French "16 h–21 h", "dès 16 h", "jusqu’à 14 h"); '' for all day.
+// A café special's day label, or null for the usual one (some days: "Mon–Fri"). '' for a loyalty or punch card ("Buy 9,
+// get the 10th free") and for a special on every day (or no day) with no time; "Every day" when every day has a time.
+const CAFE_LOYALTY_RE = /\b(punch|loyalty|stamp|rewards?)\s*card|carte (de )?fidélité|\bfidélité\b|\b\d+\s*(st|nd|rd|th|e)\b[^.]{0,30}\b(free|gratuite?)\b/i;
+function cafeSpecialDaysLabel(s, fr) {
+  const days = s.days || [];
+  if (CAFE_LOYALTY_RE.test(`${s.title || ''} ${s.deal || ''}`)) return '';
+  if (days.length && days.length < 7) return null;
+  return days.length === 7 && (s.start || s.end) ? (fr ? 'Tous les jours' : 'Every day') : '';
+}
 function specialTimeText(s, fr) {
   const a = specialMinutes(s.start), b = s.end === 'close' ? null : specialMinutes(s.end);
   if (!hoursModule || (a === null && b === null)) return '';
@@ -34849,6 +34866,12 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
       // Audit fix (2026-10-27): "Today" only until the special ends (weeklyRowTag), on the Okanagan clock.
       const tag = weeklyRowTag({ onToday: !closedToday && s.days.includes(clock.weekday), onYesterday: s.days.includes(yesterday), a: specialMinutes(s.start),
         b: s.end === 'close' ? null : specialMinutes(s.end), fallbackToday: hoursCloseOn(statusHours, clock.weekday), yesterdayNeedsEnd: true }, clock);
+      // Café test 4 (2026-11-11): a café's punch card or an any-day special shows just its text, never "Daily" (Gord's
+      // punch card read "Daily" though he closes Sundays). Every day with a time ("7–9 AM") reads "Every day".
+      if (venue.type === 'cafe') {
+        const dl = cafeSpecialDaysLabel(s, fr);
+        if (dl !== null) return { s, days: dl, today: dl ? !!tag : false, onNow: dl ? tag === 'now' : false, time: specialTimeText(s, fr) };
+      }
       return { s, days: venueSpecialsDaysText(s.days, fr), today: !!tag, onNow: tag === 'now', time: specialTimeText(s, fr) };
     });
   const oldest = shown.map((s) => s.checked_at).sort()[0];
@@ -51631,6 +51654,8 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-tile[aria-pressed="true"]::after { content: "✓"; color: var(--su-teal); font-size: 16px; }
   body.owner-setup .su-tile .su-e { font-size: 28px; line-height: 1; }
   body.owner-setup .su-tile-sub { font-size: 14px; color: var(--su-soft); font-weight: 700; }
+  body.owner-setup .su-tile.su-covered { cursor: default; opacity: .9; }
+  body.owner-setup .su-tile .su-covered-note { color: var(--su-teal); }
   body.owner-setup .su-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   body.owner-setup .su-chip { min-width: 56px; min-height: 48px; padding: 0 12px; border-radius: 14px; border: 2px solid var(--su-line); background: var(--su-card); color: var(--su-ink); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; }
   body.owner-setup .su-chip[aria-pressed="true"] { background: var(--su-teal); color: #fff; border-color: var(--su-teal); }
@@ -52852,12 +52877,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['depense moyenne', 'depense par personne', 'depense moyenne par personne', 'par personne', 'combien une personne depense', 'combien par personne', 'addition moyenne', 'cout par personne', 'prix moyen par personne', 'c est exact', 'estimation', 'votre estimation', 'notre estimation', 'l estimation est fausse', 'modifier l estimation'],
     a: '<ol><li>{ON}, open <strong>Average spend per person</strong> (it shows for restaurants and pubs).</li><li>Type about what <strong>one person spends on one main and a soft drink, before tax and tip</strong>, in whole dollars (like <strong>25</strong>, from $5 to $300). If we already worked out an estimate from your menu, it’s filled in: change it if it’s off, or tap <strong>That\'s right</strong>.</li><li>Tap {SEND} if you changed the number. <strong>That\'s right</strong> saves on its own.</li></ol><p>{LIVE} It’s your number from then on: we won’t replace it. Leave the box blank to keep what we have. This is different from <strong>Price range</strong> ($ to $$$$), which stays as it is.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Dépense moyenne par personne</strong> (affichée pour les restaurants et les pubs).</li><li>Indiquez à peu près ce que <strong>dépense une personne pour un plat principal et une boisson sans alcool, avant taxes et pourboire</strong>, en dollars entiers (par exemple <strong>25</strong>, de 5 $ à 300 $). Si nous avons déjà calculé une estimation d’après votre menu, elle est déjà inscrite : modifiez-la si elle est inexacte, ou touchez <strong>C’est exact</strong>.</li><li>Touchez {SEND} si vous avez changé le nombre. <strong>C’est exact</strong> enregistre tout seul.</li></ol><p>{LIVE} C’est ensuite votre chiffre : nous ne le remplacerons pas. Laissez la case vide pour garder ce que nous avons. Ce n’est pas la même chose que la <strong>Gamme de prix</strong> ($ à $$$$), qui reste telle quelle.</p>' },
-  // Completeness bar (2026-11-08): only offered on the edit page of a restaurant (completenessOnly).
-  { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What does “Your page is 79% complete” mean?', qFr: 'Que veut dire « Votre fiche est complète à 79 % »?', pages: ['edit'],
-    keys: ['percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'show all', 'see what s done', 'last steps', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
-    keysFr: ['pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage', 'pointage n a pas monte', 'n a pas monte', 'ne monte pas', 'est ce que ca a marche', 'en attente de notre verification', 'en attente de verification'],
-    a: '<p><strong>Score didn’t go up?</strong> It worked. Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> (the orange part of the ring) and count once we approve them, usually within a day. The bar says where you’ll land, like “61% now · about 95% once we check your 8 changes”.</p><p>The bar at the top of this page shows <strong>how much of your page is filled in</strong>. Tap it to see what is still missing, with a button that takes you straight to the right spot.</p><ul><li>Each item is worth a few points. Hours, photos and your menu count the most.</li><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Quick ones</strong> come first: each takes a few seconds. The rest are under <strong>When you have a few minutes</strong>; tap <strong>Show all</strong> to see every one, and <strong>See what’s done</strong> for what already counts.</li><li><strong>Photos and your storefront spot</strong> are the last steps to 100% for most places. Do them when you’re at your place with a few minutes.</li><li>Saving any change counts as <strong>Confirmed by you</strong> and adds the Verified mark to your page.</li></ul><p><strong>Only you see this score.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
-    aFr: '<p><strong>Le pointage n’a pas monté?</strong> Ça a marché. Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> (la partie orange de l’anneau) et compte dès que nous l’approuvons, habituellement en moins d’une journée. La barre indique où vous arriverez, par exemple « 61 % maintenant · environ 95 % une fois vos 8 modifications vérifiées ».</p><p>La barre en haut de cette page montre <strong>à quel point votre fiche est remplie</strong>. Touchez-la pour voir ce qui manque, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Chaque élément vaut quelques points. Les heures, les photos et votre menu comptent le plus.</li><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li>Les <strong>éléments rapides</strong> viennent en premier : chacun prend quelques secondes. Les autres sont sous <strong>Quand vous aurez quelques minutes</strong>; touchez <strong>Tout afficher</strong> pour tous les voir, et <strong>Voir ce qui est fait</strong> pour ce qui compte déjà.</li><li><strong>Les photos et l’emplacement de votre devanture</strong> sont les dernières étapes vers 100 % pour la plupart des établissements. Faites-les quand vous êtes sur place avec quelques minutes.</li><li>Enregistrer une modification compte comme <strong>Confirmée par vous</strong> et ajoute la mention Vérifiée à votre fiche.</li></ul><p><strong>Vous seul voyez ce pointage.</strong> Il n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
+  // Completeness bar (2026-11-08): only offered on the edit page of a restaurant (completenessOnly). Café test 4 (2026-11-11): the edit page shows it as a checklist without the percent, so the answer talks about the checklist.
+  { id: 'page-complete', completenessOnly: true, over: ['price-range', 'cost'], q: 'What is “Your page checklist” at the top?', qFr: 'Qu’est-ce que « La liste de votre fiche » en haut?', pages: ['edit'],
+    keys: ['checklist', 'page checklist', 'your page checklist', 'percent complete', 'complete mean', 'page is complete', 'percentage', 'page complete', 'how complete', 'complete score', 'completeness', 'what is missing', 'whats missing', 'still to add', 'show all', 'see what s done', 'last steps', 'how do i get to 100', '100 percent', '100%', 'does it affect search', 'does it change my ranking', 'search ranking', 'who sees the score', 'who sees the percentage', 'score didnt go up', 'score did not go up', 'didnt go up', 'did not go up', 'not going up', 'score not changing', 'did it work', 'waiting for our check', 'waiting for review'],
+    keysFr: ['liste de votre fiche', 'pourcentage', 'pourcentage de la fiche', 'fiche est complete', 'fiche complete', 'fiche completee', 'pointage', 'completude', 'qu est ce qui manque', 'reste a ajouter', 'comment atteindre 100', '100 pour cent', 'position dans les recherches', 'qui voit le pointage', 'qui voit le pourcentage', 'pointage n a pas monte', 'n a pas monte', 'ne monte pas', 'est ce que ca a marche', 'en attente de notre verification', 'en attente de verification'],
+    a: '<p><strong>Sent something and it’s not ticked yet?</strong> It worked. Quick answers count straight away. Changes you send with <strong>Send changes</strong> show under <strong>Waiting for our check</strong> and count once we approve them, usually within a day.</p><p>The checklist at the top of this page shows <strong>what is still missing from your page</strong>. Tap it to see each item, with a button that takes you straight to the right spot.</p><ul><li>Things we already filled in from your website and our research count as done. Please check they’re right. Our average-spend estimate counts once you tap <strong>Yes, that’s right</strong>.</li><li><strong>Quick ones</strong> come first: each takes a few seconds. The rest are under <strong>When you have a few minutes</strong>; tap <strong>Show all</strong> to see every one, and <strong>See what’s done</strong> for what already counts.</li><li><strong>Photos and your storefront spot</strong> are the last steps for most places. Do them when you’re at your place with a few minutes.</li><li>Saving any change counts as <strong>Confirmed by you</strong> and adds the Verified mark to your page.</li></ul><p><strong>Only you see this checklist.</strong> It isn’t shown on your public page, and it never changes where you show up in search.</p>',
+    aFr: '<p><strong>Vous avez envoyé quelque chose et ce n’est pas encore coché?</strong> Ça a marché. Les réponses rapides comptent tout de suite. Ce que vous envoyez avec <strong>Envoyer les modifications</strong> apparaît sous <strong>En attente de notre vérification</strong> et compte dès que nous l’approuvons, habituellement en moins d’une journée.</p><p>La liste en haut de cette page montre <strong>ce qui manque encore à votre fiche</strong>. Touchez-la pour voir chaque élément, avec un bouton qui vous amène directement au bon endroit.</p><ul><li>Ce que nous avons déjà rempli d’après votre site Web et nos recherches compte comme fait. Vérifiez que c’est exact. Notre estimation de la dépense moyenne compte dès que vous touchez <strong>Oui, c’est exact</strong>.</li><li>Les <strong>éléments rapides</strong> viennent en premier : chacun prend quelques secondes. Les autres sont sous <strong>Quand vous aurez quelques minutes</strong>; touchez <strong>Tout afficher</strong> pour tous les voir, et <strong>Voir ce qui est fait</strong> pour ce qui compte déjà.</li><li><strong>Les photos et l’emplacement de votre devanture</strong> sont les dernières étapes pour la plupart des établissements. Faites-les quand vous êtes sur place avec quelques minutes.</li><li>Enregistrer une modification compte comme <strong>Confirmée par vous</strong> et ajoute la mention Vérifiée à votre fiche.</li></ul><p><strong>Vous seul voyez cette liste.</strong> Elle n’apparaît pas sur votre page publique et ne change jamais votre position dans les recherches.</p>' },
   // "We don't have one" (2026-11-08): also only on a restaurant's edit page (completenessOnly).
   { id: 'dont-have', completenessOnly: true, over: ['page-complete'], q: 'We don’t have a happy hour (or Instagram…). What do I do?', qFr: 'Nous n’avons pas de happy hour (ni d’Instagram…). Que faire?', pages: ['edit'],
     keys: ['dont have', 'we dont have', 'dont have one', 'we dont have one', 'not offered', 'dont offer', 'we dont offer', 'doesnt apply', 'does not apply', 'not applicable', 'we dont do', 'no website', 'not on instagram', 'not on facebook', 'no takeout', 'no reservations', 'walk ins only'],
@@ -56765,7 +56790,11 @@ const OWNER_CUISINE_HOURS_CSS = `
       /* One layer under the sticky site header (z-index 60), so when the page scrolls the "?" slides under the header
          instead of sitting on top of the menu button (fresh-eyes 3, 2026-11-09). */
       body.owner-page .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
+      /* Café test 4 (2026-11-11): with a large phone font the "?" sat on the title. The heading lines keep clear of it. */
+      body.owner-page .op-head > .eyebrow, body.owner-page .op-head > h1 { padding-right: 52px; }
     }
+    /* Café test 4: at 360px with a large font "Build My Trip" ran over the logo. Owners on a phone find it in the menu. */
+    @media (max-width: 480px) { body.owner-page #navTripBtn { display: none; } }
     body.owner-page .op-hours-ok { margin: 12px 0 4px; padding: 12px 14px; background: #EEF5F3; border-radius: 12px; }
     body.owner-page .op-hours-ok .op-hint { margin: 0 0 8px; }
     body.owner-page .op-hours-ok-btn { min-height: 44px; }
@@ -57011,7 +57040,8 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   let week = null;
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
-    fr, canDecline: true,
+    // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
+    fr, canDecline: true, noScore: true,
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',

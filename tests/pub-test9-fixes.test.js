@@ -350,6 +350,6 @@ test('14: the edit page and the setup welcome say managers and staff can use the
   assert.match((await get(`/owner/${t}`)).text, /Managers and staff can use this link too\. Each person can make their own login from it/);
   assert.match((await get(`/fr/owner/${t}`)).text, /Les gérants et le personnel peuvent aussi utiliser ce lien/);
   const js = scriptOf((await get(`/owner/${t}/setup`)).text);
-  assert.match(js, /id="suStaff"/);
+  assert.doesNotMatch(js, /id="suStaff"/); // café test 4: the setup's first screen no longer says it (the edit page does)
   assert.match(TEXT.en.staffLine, /People with access/); assert.match(TEXT.fr.staffLine, /Personnes ayant accès/);
 });

@@ -49,7 +49,7 @@ const postFr = (token, changes) => fetch(`${base}/fr/owner/${token}/changes`, { 
 const lastInstantId = (id) => db.prepare('SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 ORDER BY id DESC').get(id).id;
 const panel = (html) => { const a = html.indexOf('id="opComplete"'); return a < 0 ? '' : html.slice(a, html.indexOf('</section>', a)); };
 const row = (id) => db.prepare('SELECT cuisine, hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id);
-const pctOf = (html) => Number((html.match(/Your page is (\d+)% complete/) || [])[1]);
+const pctOf = (html) => Number((html.match(/data-cb-pct="(\d+)"/) || [])[1]);
 
 test('cuisine list: labels the site already uses, each with a French name, no duplicates', () => {
   const list = app.OWNER_CUISINES;

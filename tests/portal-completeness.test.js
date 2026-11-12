@@ -185,7 +185,7 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
   const v = mk('restaurant');
   const html = await get(`/owner/${tokenFor(v.id)}`);
   assert.match(html, /<section class="op-cb" id="opComplete" data-task="home all"/);
-  const pct = Number(/Your page is (\d+)% complete/.exec(html)[1]);
+  const pct = Number(/data-cb-pct="(\d+)"/.exec(html)[1]);
   assert.ok(pct > 0 && pct < 40, `a bare fixture is low: ${pct}`);
   for (const w of ['Add your hours', 'Add photos', 'Enter amount', 'Add menu', 'Add Instagram', 'At the door']) assert.ok(html.includes(w), w);
   assert.match(html, /data-cb-task="more" data-cb-id="opAvg"/);
@@ -204,15 +204,15 @@ test('edit page: a restaurant shows the bar, and the missing list names what the
 test('edit page: the bar tracks the data (hours, avg spend, photos, links) and shows Complete when nothing is left', async () => {
   const v = mk('restaurant', { website: 'https://example.com', cuisine: 'Pizza', image_url: '/images/venues/complete-own.jpg', vegan: true, live_music: true, description: 'z'.repeat(140),
     hours: JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [['11:00', '21:00']] }) });
-  const before = Number(/Your page is (\d+)% complete/.exec(await get(`/owner/${tokenFor(v.id)}`))[1]);
+  const before = Number(/data-cb-pct="(\d+)"/.exec(await get(`/owner/${tokenFor(v.id)}`))[1]);
   db.prepare('UPDATE venues SET hours_source = ?, hours_checked_at = ? WHERE id = ?').run('venue_owner', today, v.id);
-  const withHours = Number(/Your page is (\d+)% complete/.exec(await get(`/owner/${tokenFor(v.id)}`))[1]);
+  const withHours = Number(/data-cb-pct="(\d+)"/.exec(await get(`/owner/${tokenFor(v.id)}`))[1]);
   assert.ok(withHours >= before, `${before} -> ${withHours}`);
   const r = app.guardedAvgSpendUpdate(v.id, app.currentAvgSpendJson(v.id), { amount: 25, source: 'research', source_url: 'https://example.com/menu', basis: 'Estimated from the menu: median main $20 plus a soft drink', checked_at: today }, { reason: 'fixture', batch_id: 'test-complete' });
   assert.equal(r.ok, true);
   // A research estimate counts once the owner confirms it (fresh-eyes 2026-11-08): the row offers "Yes, that's right".
   const est = await get(`/owner/${tokenFor(v.id)}`);
-  const withEstimate = Number(/Your page is (\d+)% complete/.exec(est)[1]);
+  const withEstimate = Number(/data-cb-pct="(\d+)"/.exec(est)[1]);
   assert.equal(withEstimate, withHours, 'an unconfirmed estimate adds nothing yet');
   assert.match(est, /data-cb-save="\{&quot;avg_spend&quot;:&quot;25&quot;\}"[^>]*>Yes, that’s right</);
   assert.match(est, /Our estimate from your menu: about \$25/);
@@ -220,7 +220,7 @@ test('edit page: the bar tracks the data (hours, avg spend, photos, links) and s
     body: JSON.stringify({ changes: { avg_spend: '25' }, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 5000 }) });
   assert.equal(ok.status, 201);
   const html = await get(`/owner/${tokenFor(v.id)}`);
-  const withSpend = Number(/Your page is (\d+)% complete/.exec(html)[1]);
+  const withSpend = Number(/data-cb-pct="(\d+)"/.exec(html)[1]);
   assert.ok(withSpend > withHours, `confirming the average spend adds points: ${withHours} -> ${withSpend}`);
   assert.doesNotMatch(html, /data-cb-id="opAvg"/, 'the average spend row is gone once it is confirmed');
 });
@@ -228,13 +228,13 @@ test('edit page: the bar tracks the data (hours, avg spend, photos, links) and s
 test('edit page: French restaurant page has the bar and the French help topic', async () => {
   const v = mk('restaurant');
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
-  assert.match(fr, /Votre fiche est complète à \d+ %/);
+  assert.match(fr, /La liste de votre fiche/); assert.doesNotMatch(fr, /Votre fiche est compl.+te à \d+ %/); // café test 4: a checklist, no percent
   assert.match(fr, /Rapides|Quand vous aurez quelques minutes/);
-  assert.match(fr, /Vous seul voyez ce pointage/);
+  assert.doesNotMatch(fr, /Vous seul voyez ce pointage/);
   assert.match(fr, /Ajouter des photos/);
   const t = app.OWNER_HELP_TOPICS.find((x) => x.id === 'page-complete');
   assert.ok(t && t.a && t.aFr && t.q && t.qFr && t.completenessOnly);
-  assert.match(t.a, /Only you see this score/); assert.match(t.aFr, /Vous seul voyez ce pointage/);
+  assert.match(t.a, /Only you see this checklist/); assert.match(t.aFr, /Vous seul voyez cette liste/);
 });
 
 test('edit page: every other type (pubs, cafes, wineries, breweries, beaches, shops...) has no bar, no CSS, no script, no help topic; English and French', async () => {

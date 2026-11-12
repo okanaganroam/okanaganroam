@@ -122,20 +122,14 @@ test('score while waiting: "61% now · about 95% once we check your N changes", 
   const r = await post(token, { description: 'A family-run spot on Main Street with wood-fired pizza, house-made pasta and a sunny patio for long summer evenings with friends.', menu_url: 'fe3w.example/menu' });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const after = await bar(token);
-  // Pub test 3 (2026-11-10): one number. The headline and ring count what was sent; the ring's dark part stays the real score.
-  const pct = Number(/--p:(\d+);/.exec(after)[1]);
-  const shown = Number(/Your page is about (\d+)% complete/.exec(after)[1]);
-  const m = /<strong>(\d+)%<\/strong> counts what you sent\. We check your (\d+) changes, usually within a day\./.exec(after);
-  assert.ok(m, 'provisional line shown');
-  assert.equal(Number(/--p:(\d+);/.exec(before)[1]), pct, 'the real score is unchanged');
-  assert.ok(shown > pct);
-  assert.equal(Number(m[1]), shown);
-  assert.equal(Number(m[2]), 2);
-  assert.match(after, new RegExp(`<b>${shown}%</b>`));
-  assert.match(after, /class="op-cb-key op-cb-key-done"><\/i>Done <i class="op-cb-key op-cb-key-wait"><\/i>Sent, we’re checking/);
-  assert.match(after, /--w:\d+/);
+  // Café test 4 (2026-11-11): the edit page's card is the checklist without the percent or the "counts what you sent" line.
+  // The number the page script remembers (data-cb-pct) still counts what was sent, and the sent items are listed as waiting.
+  const shown = Number(/data-cb-pct="(\d+)"/.exec(after)[1]), was = Number(/data-cb-pct="(\d+)"/.exec(before)[1]);
+  assert.ok(shown > was, `${was} -> ${shown}`);
+  assert.doesNotMatch(after, /% complete|counts what you sent|op-cb-ring|--w:\d+/);
+  assert.match(after, /Waiting for our check/);
   const fr = (await fetch(`${base}/fr/owner/${token}/completeness`).then((x) => x.json())).html;
-  assert.match(fr, /<strong>\d+ %<\/strong> compte ce que vous avez envoyé\. Nous vérifions vos 2 modifications, habituellement d’ici un jour\./);
+  assert.doesNotMatch(fr, /compte ce que vous avez envoyé|complète à/);
 });
 
 test('storefront: a spot sent for our check shows as waiting and counts in the provisional score', () => {
@@ -200,10 +194,10 @@ test('edit page: after-send line, toast, back-to-my-list, description goal, happ
     if (m[1] && /type="application\/(ld\+)?json"/.test(m[1])) continue;
     assert.doesNotThrow(() => new vm.Script(m[2]), 'inline script parses');
   }
-  // Help answer leads with "Score didn't go up?".
+  // Help answer leads with "Sent something and it's not ticked yet?" (café test 4: the edit page shows a checklist, no percent).
   const topic = app.OWNER_HELP_TOPICS.find((t) => t.id === 'page-complete');
-  assert.match(topic.a, /^<p><strong>Score didn’t go up\?<\/strong> It worked\./);
-  assert.match(topic.aFr, /^<p><strong>Le pointage n’a pas monté\?<\/strong> Ça a marché\./);
+  assert.match(topic.a, /^<p><strong>Sent something and it’s not ticked yet\?<\/strong> It worked\./);
+  assert.match(topic.aFr, /^<p><strong>Vous avez envoyé quelque chose et ce n’est pas encore coché\?<\/strong> Ça a marché\./);
 });
 
 test('last step wording: "Do it" for one step, "Do them" for two', () => {

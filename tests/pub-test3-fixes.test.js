@@ -65,7 +65,7 @@ test('2: Midnight / 1 AM / 2 AM buttons under each day, and the early-morning hi
     assert.match(s, /\(j === w\.length - 1 \? lateBtns\(d, j, y\) : ''\)/, 'under the day’s last closing time');
     assert.match(s, /data-late="' \+ d \+ ':' \+ j \+ ':' \+ t \+ '">' \+ h\(t12\(t\)\)/);
     assert.match(s, /w4\[1\] = q4\[2\] \+ ':' \+ q4\[3\]; mark\(\);/, 'a tap sets that closing time');
-    assert.match(s, /q\(T\.hoursEditQ, T\.hoursEditLead\)\) \+ '<p class="su-hint" id="suLateHint">' \+ h\(T\.lateHint\)/); // pub test 6: the season screen shares it
+    assert.doesNotMatch(s, /id="suLateHint"/); // café test 4: said once, beside each day's buttons // pub test 6: the season screen shares it
     assert.match(cfg.t.lateHint, /1 AM early Saturday morning/);
   }
   assert.match(TEXT.fr.lateHint, /1 h tôt samedi matin/);
@@ -83,10 +83,9 @@ test('3: one number: the setup and the edit page both show the score that counts
   assert.ok(sc.soon > sc.pct, `soon ${sc.soon} > now ${sc.pct}`);
   const edit = await text(`/owner/${t}`);
   const card = edit.slice(edit.indexOf('id="opComplete"'), edit.indexOf('id="opCbPanel"'));
-  assert.match(card, new RegExp(`Your page is about ${sc.soon}% complete`), 'the edit page shows the setup’s number');
-  assert.match(card, new RegExp(`<b>${sc.soon}%</b>`));
-  assert.match(card, new RegExp(`--p:${sc.pct};--w:${sc.soon}`), 'the ring’s dark part is still the live score');
-  assert.match(card, new RegExp(`<strong>${sc.soon}%</strong> counts what you sent\\. We add it, usually within a day\\.`));
+  // Café test 4 (2026-11-11): no percent on the edit page; the number it remembers is still the setup's.
+  assert.match(card, new RegExp(`data-cb-pct="${sc.soon}"`), 'the edit page keeps the setup’s number');
+  assert.doesNotMatch(card, /% complete|counts what you sent|op-cb-ring/);
   assert.doesNotMatch(card, /% now<\/strong>/);
   // Badge: only live data counts. A result whose only missing item is waiting is not "earned".
   const r = { ...pc.scoreCompleteness({}, { today: app.todayLocal() }) };
@@ -182,7 +181,7 @@ test('6–7: the sports tip, the events question once, "Save kitchen time", one 
   assert.equal(TEXT.fr.pub.saveKitchen, 'Enregistrer l’heure de la cuisine');
   assert.match(s, /if \(explain\) line = T\.sentMeans;/);
   assert.doesNotMatch(s, /'<p class="su-hint" id="suSentMeans">'/, 'no second line under the lead');
-  assert.equal(cfg.t.fbWhy, 'We find your Facebook link for you, so it shows within a day.'); // pub test 4: no Instagram line
+  assert.equal(cfg.t.fbWhy, 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.'); // pub test 4: no Instagram line // café test 4: a link is live right away
   assert.ok(TEXT.fr.fbWhy);
   assert.match(s, /\(ig \? '' : '<p class="su-hint" id="suFbWhy">' \+ h\(T\.fbWhy\) \+ '<\/p>'\)/);
 });

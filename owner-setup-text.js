@@ -651,7 +651,7 @@ en.cafe = {
   orderUrlEx: 'yourcafe.com/order, or your Square or DoorDash page', preorder: 'Custom cakes and pre-orders',
   preorderHowLabel: 'How do people pre-order? (optional)', preorderHowEx: 'Call us 48 hours ahead', preorderUrlLabel: 'Pre-order link (optional)',
   linkHint: 'We check a new link first, usually within a day. Everything else is on your page right away.',
-  counterOnly: 'Order at the counter only', counterOnlySub: 'No online ordering, drive-thru or pre-orders', counterOnlySubNoCakes: 'No online ordering or drive-thru', orderNeed: 'Please tap at least one, or tap “Order at the counter only”.',
+  counterOnly: 'Order at the counter only', counterOnlySub: 'No online ordering or pre-orders', counterOnlySubNoCakes: 'No online ordering', orderNeed: 'Please tap at least one, or tap “Order at the counter only”.',
   orderUrlNeed: 'Please type your ordering link, or untick “Order online”.', badLink: 'Please check the link, for example yourcafe.com/order.',
   dietQ: 'Dietary details', dietLead: 'Visitors with allergies or diets check this before they come.',
   milksQ: 'Dairy-free milks?', milkExtraQ: 'Do they cost extra?', milkExtra: { no: 'No extra charge', yes: 'Yes, extra' },
@@ -690,7 +690,7 @@ fr.cafe = {
   orderUrlEx: 'votrecafe.com/commande, ou votre page Square ou DoorDash', preorder: 'Gâteaux sur commande et précommandes',
   preorderHowLabel: 'Comment précommander? (facultatif)', preorderHowEx: 'Appelez-nous 48 heures à l’avance', preorderUrlLabel: 'Lien de précommande (facultatif)',
   linkHint: 'Nous vérifions d’abord un nouveau lien, en général d’ici un jour. Tout le reste est sur votre page tout de suite.',
-  counterOnly: 'Commande au comptoir seulement', counterOnlySub: 'Ni commande en ligne, ni service au volant, ni précommandes', counterOnlySubNoCakes: 'Ni commande en ligne, ni service au volant', orderNeed: 'Touchez au moins une réponse, ou touchez « Commande au comptoir seulement ».',
+  counterOnly: 'Commande au comptoir seulement', counterOnlySub: 'Ni commande en ligne, ni précommandes', counterOnlySubNoCakes: 'Pas de commande en ligne', orderNeed: 'Touchez au moins une réponse, ou touchez « Commande au comptoir seulement ».',
   orderUrlNeed: 'Écrivez votre lien de commande, ou décochez « Commande en ligne ».', badLink: 'Vérifiez le lien, par exemple votrecafe.com/commande.',
   dietQ: 'Détails alimentaires', dietLead: 'Les visiteurs qui ont des allergies ou un régime vérifient ceci avant de venir.',
   milksQ: 'Laits sans produits laitiers?', milkExtraQ: 'Coûtent-ils plus cher?', milkExtra: { no: 'Sans frais', yes: 'Oui, en supplément' },
@@ -808,7 +808,7 @@ Object.assign(en.cafe, {
   iceDfQ: 'Dairy-free or vegan?', dfSorbet: 'Dairy-free sorbet', veganIce: 'Vegan gelato or ice cream',
   gfConesQ: 'Gluten-free?', gfCones: { cups: 'Gluten-free in a cup (our cones have gluten)', cones: 'Gluten-free cones too' },
   nutFreeIce: 'Nut-free flavours', dietNoteExIce: 'Sorbets are vegan · Ask for a clean scoop',
-  noWifiSubTakeout: 'We don’t have Wi-Fi for guests',
+  noWifiSubTakeout: 'Your page says “No Wi-Fi”',
   noWashroom: 'No customer washroom', noWashroomSub: 'Only for our records. It isn’t shown on your page.',
   takeoutOnly: 'No seats inside (takeout only)', takeoutOnlySub: 'Your page says “Takeout only”',
 });
@@ -831,7 +831,7 @@ Object.assign(fr.cafe, {
   iceDfQ: 'Sans produits laitiers ou végane?', dfSorbet: 'Sorbet sans produits laitiers', veganIce: 'Gelato ou crème glacée véganes',
   gfConesQ: 'Sans gluten?', gfCones: { cups: 'Sans gluten dans une coupe (nos cornets contiennent du gluten)', cones: 'Cornets sans gluten aussi' },
   nutFreeIce: 'Saveurs sans noix', dietNoteExIce: 'Les sorbets sont véganes · Demandez une cuillère propre',
-  noWifiSubTakeout: 'Nous n’avons pas de Wi-Fi pour les clients',
+  noWifiSubTakeout: 'Votre page indique « Pas de Wi-Fi »',
   noWashroom: 'Pas de toilettes pour les clients', noWashroomSub: 'Seulement pour nos dossiers. Ce n’est pas affiché sur votre page.',
   takeoutOnly: 'Pas de places à l’intérieur (pour emporter seulement)', takeoutOnlySub: 'Votre page indique « Pour emporter seulement »',
 });
@@ -859,5 +859,43 @@ Object.assign(fr, {
 // Cents on the café price (café test 2, 2026-11-11).
 Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more' });
 Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus' });
+
+// Fourth first-time café test (Dayton, 2026-11-11): café words that fit a takeout window or a café with no patio.
+Object.assign(en.cafe, {
+  quickDogsWindow: ['Dogs welcome at the window', 'Dog treats at the window'], quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
+  photosTakeout: 'Your window, your coffee, your sign. Three photos is perfect.',
+  // One name for a café's specials (the tile said "Weekly specials", the question "Any daily specials?").
+  specialsQ: 'Any specials?',
+});
+en.cafe.labels = Object.assign({}, en.cafe.labels, { specials: 'Specials' });
+en.cafe.noLabels = Object.assign({}, en.cafe.noLabels, { specials: 'no specials' });
+Object.assign(fr.cafe, {
+  quickDogsWindow: ['Chiens bienvenus au comptoir', 'Gâteries pour chiens au comptoir'], quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
+  photosTakeout: 'Votre comptoir extérieur, votre café, votre enseigne. Trois photos, c’est parfait.',
+  specialsQ: 'Des spéciaux?',
+});
+fr.cafe.labels = Object.assign({}, fr.cafe.labels, { specials: 'Spéciaux' });
+fr.cafe.noLabels = Object.assign({}, fr.cafe.noLabels, { specials: 'pas de spéciaux' });
+
+// Fourth first-time café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe4-2026-11-11/REPORT.md). Shared words.
+Object.assign(en, {
+  holCovered: 'Covered by your closed dates',
+  // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
+  fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
+  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', menuFbKnown: 'Your Facebook: {x}',
+  sendBeforeLeave: 'Tap Send before you leave this screen.',
+  // The price question while prices aren't on pages (AVG_SPEND_PUBLIC off): why we ask, and an after-save line that says
+  // what it's for ("Prices don't show on pages yet" made it sound pointless).
+  spendWhyOff: 'We’ll use this to show your price range once prices go on pages.',
+  savedSpendOff: 'When prices go on pages, yours will show as your price range.',
+});
+Object.assign(fr, {
+  holCovered: 'Compris dans vos dates de fermeture',
+  fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
+  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', menuFbKnown: 'Votre Facebook : {x}',
+  sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',
+  spendWhyOff: 'Nous l’utiliserons pour afficher votre gamme de prix quand les prix seront sur les pages.',
+  savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
+});
 
 module.exports = { en, fr };
