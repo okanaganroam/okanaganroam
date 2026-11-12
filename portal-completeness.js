@@ -455,7 +455,8 @@ function scoreCompleteness(input, opts) {
   const per = new Map([...new Set(list.map((it) => it.group))].map((k) => [k, { key: k, got: 0, max: 0 }]));
   // Winery test 1 (2026-11-12): the setup screen that answers each group (its first item's), so a finished group in
   // "See what's done" opens that screen to change an answer.
-  for (const it of list) { const g = per.get(it.group); const st = { photo_main: 'photos', photo_extra: 'photos', menu: 'menu' }[it.key] || (it.target && it.target.setup); if (g && !g.setup && st) g.setup = st; }
+  const GROUP_STEP = { address_pin: 'basics', phone: 'basics', website: 'basics', hours: 'hours', hours_fresh: 'hours', photo_main: 'photos', photo_extra: 'photos', menu: 'menu', description: 'story', arrival: 'door' };
+  for (const it of list) { const g = per.get(it.group); const st = GROUP_STEP[it.key] || (it.target && it.target.setup); if (g && !g.setup && st) g.setup = st; }
   const missing = [], coming = [], afterReopen = [];
   for (const base of list) {
     if (na[base.key]) continue;
