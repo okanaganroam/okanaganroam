@@ -20502,6 +20502,24 @@ function wineryAppointmentOn(venueId, date) {
   return false;
 }
 const WINERY_APPOINTMENT_LINE = 'By appointment · call ahead';
+// The venue page's status (winery test 1, 2026-11-12): true when the winery's own answer says it is by appointment
+// today and no closure for the season (or a current temporary one) is on, the same rule as foodDrinkOpenNowInfo.
+function venueWineryAppointmentToday(venue, now = new Date()) {
+  if (!venue || venue.type !== 'winery' || venue.redirect_to) return false;
+  if (wineryAppointmentOn(venue.id, todayLocal(now)) !== true) return false;
+  const ss = getSeasonStates(now).get(venue.id);
+  return !(ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)));
+}
+// The off-season line for the venue page's Hours (winery test 1): the days outside the owner's walk-in dates.
+function wineryOffSeasonLineHtml(venue, fr) {
+  if (!venue || venue.type !== 'winery' || venue.redirect_to) return '';
+  const w = venueWineryInfo(venue.id);
+  if (w.visit === 'appointment' || w.year !== 'appointment' || !w.season || !w.season.from || !w.season.to) return '';
+  const a = wineryMdShift(w.season.to, 1), b = wineryMdShift(w.season.from, -1);
+  const text = fr ? `Du ${wineryMd(a, true)} au ${wineryMd(b, true)}\u00a0: sur rendez-vous, appelez avant`
+    : `${wineryMd(a, false)} \u2013 ${wineryMd(b, false)}: by appointment, call ahead`;
+  return `<p class="venue-season venue-winery-offseason" style="margin:0 0 10px;font-weight:700">${escapeHtml(text)}</p>`;
+}
 // The same for a venue id of any type (null for anything but a winery that answered).
 function wineryAppointmentForId(venueId, date) {
   try { const t = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId); if (!t || t.type !== 'winery') return null; } catch (e) { return null; }
@@ -34891,6 +34909,7 @@ function frStatusText(text) {
   return time(text
     .replace('Open now \u00b7 Closes ', 'Ouvert \u00b7 ferme \u00e0 ')
     .replace('Open 24 hours', 'Ouvert 24 h sur 24')
+    .replace('By appointment \u00b7 call ahead', 'Sur rendez-vous \u00b7 appelez avant')
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
@@ -36089,6 +36108,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (exactSeason ? 'Ouvert du ' : /^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? (exactSeason ? ' chaque année' : '') : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
+  // Winery test 1 (2026-11-12): the off-season answer under the hours, from the owner's walk-in dates
+  // ("Nov 1 – Apr 30: by appointment, call ahead").
+  const wineryOffLine = wineryOffSeasonLineHtml(venue, fr);
+  if (wineryOffLine) hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wineryOffLine}`) : `<h2>${L('Hours', 'Heures')}</h2>${wineryOffLine}`;
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
   const pubLines = pubInfoLinesHtml(venue, fr, opts.now || new Date());
   if (pubLines) hoursHtml = hoursHtml ? hoursHtml + pubLines : `<h2>${L('Hours', 'Heures')}</h2>${pubLines}`;
@@ -36535,7 +36558,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Pub test 8: a season or closure notice that does not say the place is closed for the season (an upcoming closure,
   // "open until", "reopening", a closure day the hours already read as closed) keeps the open-now line, as on the cards
   // (foodDrinkOpenNowInfo / seasonNonBlockingIds).
-  const openStatus = venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
+  // Winery test 1 (2026-11-12): a winery that is by appointment today (its own answer, all year or in its off-season)
+  // says so here exactly as its cards do (cardStatusFor / foodDrinkOpenNowInfo), never "Open now"; a closure still wins.
+  const wineryApptToday = venueWineryAppointmentToday(venue, opts.now || new Date());
+  const openStatus = wineryApptToday ? { state: 'appointment', text: WINERY_APPOINTMENT_LINE }
+    : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
   const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');

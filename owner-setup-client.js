@@ -1141,7 +1141,7 @@
       var wr = S.wine, rp = C.restaurantPage;
       x = doneLine('winery') + q(T.wkindQ, T.wkindLead) + msgs()
         + '<div class="su-stack" role="group" id="suKindTiles">' + C.placeTypes.map(function(pt){ var on = S.place === pt; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-place="' + h(pt) + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(C.placeNames[pt] || pt) + ((T.wkindSubs || {})[pt] ? '<small>' + h(T.wkindSubs[pt]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'
-        + '<h2 class="su-h2">' + h(T.foodQ) + '</h2>' + wpicks('food', ['none', 'snacks', 'picnic', 'restaurant'], T.foods)
+        + '<h2 class="su-h2">' + h(T.foodQ) + '</h2>' + (T.foodLead ? '<p class="su-hint">' + h(T.foodLead) + '</p>' : '') + wpicks('food', ['none', 'snacks', 'picnic', 'restaurant'], T.foods)
         + (wr.food === 'restaurant' ? (rp ? '<div class="su-day su-ownpage" id="suOwnPage"><p class="su-q" style="margin-top:0">' + h(fill(T.ownPage, { name: rp.name })) + '</p><p class="su-hint">' + h(T.ownPageSub) + '</p><a class="su-link" href="' + h(rp.url) + '" target="_blank" rel="noopener">' + h(fill(T.ownPageLink, { name: rp.name })) + ' ↗</a></div>'
             : field('suRname', T.rnameLabel, wr.rname, { max: 60 }) + ex(T.rnameEx) + field('suRwhen', T.rwhenLabel, wr.rwhen, { max: 60 }) + ex(T.rwhenEx)) : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'winerySave') + '</div>' + skip('winery');
