@@ -10273,7 +10273,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
   // Approved Build My Trip page copy (2026-10-29, Dayton): tripv3.* strings only (hint, example plan, "What we check for you"; then a shorter lead, four shorter examples and the example card), EN + FR.
-  assert.equal(md5('public/scripts/app.js'), 'cb9a310ae3a0810c33ea837ffc8376bb', 'public/scripts/app.js (Build My Trip page copy 2026-10-29)');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010', 'public/scripts/app.js (Build My Trip page copy 2026-10-29)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12171,10 +12171,10 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 const LYV_FOOTER_ABOUT = `<h2 data-i18n="footer.about">About</h2>
         <ul>
-          <li><a href="/about">About Okanagan Roam</a></li>
+          <li><a href="/about" data-i18n="footer.aboutSite">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
-          <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="/owner/login">Business login</a></li>
+          <li><a href="/list-an-event" data-i18n="footer.listEvent">List an Event</a></li>
+          <li><a href="/owner/login" data-i18n="footer.businessLogin">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
           <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>`;
@@ -12228,7 +12228,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), 'cb9a310ae3a0810c33ea837ffc8376bb');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -12598,7 +12598,7 @@ test('List an Event: the staging table is additive and nothing else was touched'
   assert.ok(!eventCols.includes('submission_id'), 'events schema unchanged');
   const header = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
   assert.doesNotMatch(header, /list-an-event/, 'no navigation link yet');
-  assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event">List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
+  assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event"(?: data-i18n="footer\.listEvent")?>List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
 });
 
 // ---- Golf data (2026-09-26): verified green fees, price sort, course-map links ----
@@ -16499,7 +16499,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86');
-  assert.equal(md5('public/scripts/app.js'), 'cb9a310ae3a0810c33ea837ffc8376bb');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16592,7 +16592,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), 'cb9a310ae3a0810c33ea837ffc8376bb', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -20295,8 +20295,8 @@ test('Footer (2026-10-14): About, Privacy and Terms pages exist, are linked from
   for (const w of ['Google Analytics', 'FormSubmit', 'PIPEDA', 'info@okanaganroam.com']) assert.ok(privacy.includes(w), `privacy mentions ${w}`);
   const footer = app.renderHomeFooterHTML();
   assert.match(footer, /<a href="\/privacy">Privacy<\/a>/);
-  assert.match(footer, /<a href="\/terms">Terms<\/a>/);
-  assert.match(footer, /<a href="\/destinations">See all destinations &rarr;<\/a>/);
+  assert.match(footer, /<a href="\/terms"(?: data-i18n="footer\.terms")?>Terms<\/a>/);
+  assert.match(footer, /<a href="\/destinations"(?: data-i18n="footer\.allDestinations")?>See all destinations &rarr;<\/a>/);
   const sitemap = await (await fetch(base + '/sitemap.xml')).text();
   for (const p of ['/about', '/privacy', '/terms']) assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`));
 }));
@@ -27041,14 +27041,18 @@ test('French portal (2026-10-18): the EN / FR switch round-trips, remembers the 
     assert.ok(en.includes(`location.replace(${JSON.stringify(frPath)}+location.search+location.hash)`), enPath);
     assert.ok(!fr.includes('location.replace('), frPath);
     // Clicking the switch stores the language picked, so the English page doesn't bounce back to French.
-    for (const [page, want] of [[en, 'fr'], [fr, 'en']]) {
-      const code = /<script>\n\(function\(\)\{\n  var t = document\.getElementById\('langToggle'\)[\s\S]*?<\/script>/.exec(page)[0].replace(/<\/?script>/g, '');
+    // Café test 6 (2026-11-12): one capture-phase handler for the header link, the ☰ menu's EN / FR and the visible link;
+    // it stores the choice and goes straight to the other address (the menu's buttons used to press the inert header link).
+    for (const [page, want, other] of [[en, 'fr', frPath], [fr, 'en', enPath]]) {
+      const code = /<script>\n\(function\(\)\{\n  var root = document\.documentElement;[\s\S]*?<\/script>/.exec(page)[0].replace(/<\/?script>/g, '');
       const store = {};
-      let click;
-      const toggle = { getAttribute: () => want, addEventListener: (e, f) => { click = f; } };
-      vm.runInNewContext(code, { document: { getElementById: () => toggle }, localStorage: { setItem: (k, x) => { store[k] = x; } } });
-      click();
+      let click, went = '';
+      const link = { getAttribute: (a) => (a === 'href' ? other : null), classList: { contains: () => false } };
+      const doc = { documentElement: { lang: want === 'fr' ? 'en' : 'fr', getAttribute: () => other }, getElementById: () => link, querySelector: () => link, addEventListener: (e, f) => { click = f; } };
+      vm.runInNewContext(code, { document: doc, window: {}, location: { search: '', hash: '', assign: (h) => { went = h; } }, localStorage: { setItem: (k, x) => { store[k] = x; } } });
+      click({ target: { closest: () => link }, preventDefault() {}, stopPropagation() {} });
       assert.equal(store.okanaganLang, want);
+      assert.equal(went, other);
     }
     // The English page is still English.
     assert.match(en, /<html lang="en"/);
