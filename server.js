@@ -51154,31 +51154,34 @@ const PUB_SETUP_PART2 = ['music', 'specials', 'story', 'groups', 'spend', 'known
 // and events there, and the tester hunted for it under "A few more"). Shown in Part 2's order, so it comes last of the five.
 // Instagram sits next to Facebook in the top tiles (pub test 3, 2026-11-10: the tester hunted for it under "A few more").
 const SETUP_TOP2 = { restaurant: ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], pub: ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'] };
-// Cafés (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md): Part 1 is the spec's 8 screens (basics, hours
-// with closures, what kind of café + what you serve, photos, menu, price per person, what you offer). Part 2 has five
-// café-only steps (staying a while, ordering, dietary details, coffee, "sells out early?") and no booking or takeout
-// question (ordering covers it). Happy hour is a step only once the café ticked Beer & wine (outreach rule).
-const CAFE_SETUP_PART1 = ['basics', 'hours', 'closures', 'cuisine', 'photos', 'menu', 'spend', 'offer'];
-const CAFE_SETUP_PART2 = ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'music', 'story', 'known', 'groups', 'instagram', 'facebook', 'door', 'happy'];
-const CAFE_ONLY_STEPS = ['stay', 'order', 'diet', 'coffee', 'sellout'];
+// Cafés (Dayton, 2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md), cut to 13 screens (Dayton, 2026-11-11: "seems
+// like a lot of questions for a café"). Part 1 is 7 screens: holidays and closures are asked at the end of the Hours step
+// (its 'closures' answer is still recorded, but it is not a numbered step or a row of its own). Part 2 is 6 optional
+// screens; Instagram and Facebook share one screen ('social', which also records 'instagram' and 'facebook'). No longer
+// asked of cafés: staying a while, ordering, sells out early, weekly events, known for, groups and happy hour. What they
+// answered before stays stored and on their page.
+const CAFE_SETUP_PART1 = ['basics', 'hours', 'cuisine', 'photos', 'menu', 'spend', 'offer'];
+const CAFE_SETUP_PART2 = ['specials', 'story', 'diet', 'coffee', 'social', 'door'];
+// Answers a café's screen records beside its own step (never a step or a row of their own).
+const CAFE_SUB_STEPS = ['closures', 'instagram', 'facebook'];
+// Steps only cafés have, now or before (stay, order and sellout: a progress saved before 2026-11-11 may hold them).
+const CAFE_ONLY_STEPS = ['stay', 'order', 'diet', 'coffee', 'sellout', 'social'];
 // Every step any type has (what a stored progress may hold).
 const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS);
-// Café test 1 (2026-11-11): Dietary details, Your coffee and Sells out early lead too (the useful café questions were in the
-// folded "A few more" box). Groups and Weekly events stay folded for cafés.
-SETUP_TOP2.cafe = ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'story', 'instagram', 'facebook'];
+// All six of a café's Part 2 tiles show (no folded "A few more").
+SETUP_TOP2.cafe = CAFE_SETUP_PART2.slice();
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
-// The steps one venue answers, in order (a café's happy hour only with Beer & wine). Restaurants and pubs: SETUP_STEPS.
-function setupStepsFor(type, venueId) {
+// The steps one venue answers, in order. Restaurants and pubs: SETUP_STEPS.
+function setupStepsFor(type) {
   if (type !== 'cafe') return SETUP_STEPS;
-  const all = CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
-  return venueId != null && cafeServesBeerWine(venueId) ? all : all.filter((k) => k !== 'happy');
+  return CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
 }
 function setupTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || 'restaurant'; } catch (e) { return 'restaurant'; } }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
 // 'unsure' (pub test 6, 2026-11-10): "Not sure / someone else runs it" for Instagram and Facebook. It answers the step
 // (no nagging) without saying they have no account, so it is never stored as a "we don't have one" (not_offered).
 const SETUP_STATUSES = ['live', 'day', 'email', 'skip', 'later', 'no', 'unsure'];
-const SETUP_UNSURE_STEPS = ['instagram', 'facebook'];
+const SETUP_UNSURE_STEPS = ['instagram', 'facebook', 'social'];
 const SETUP_RATE_LIMIT = 80;
 const ownerSetupAttempts = new Map();
 function ownerSetupRateLimited(ip, now = Date.now()) {
@@ -51305,7 +51308,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
     const p0 = setupProgress(found.venue.id); p0.done_for_now = true; writeSetupProgress(found.venue.id, p0);
     return send(200, { ok: true, progress: { done: p0.done }, score: setupScore(found) });
   }
-  const typeSteps = found.venue.type === 'cafe' ? CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2) : SETUP_STEPS;
+  const typeSteps = found.venue.type === 'cafe' ? setupStepsFor('cafe').concat(CAFE_SUB_STEPS) : SETUP_STEPS;
   if (!body || !typeSteps.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
   if (body.status === 'unsure' && !SETUP_UNSURE_STEPS.includes(body.step)) return send(400, { ok: false, error: 'Please try again.' });
   let progress = saveSetupProgress(found.venue.id, body.step, body.status);
@@ -51420,8 +51423,9 @@ function renderOwnerSetupPage(found, opts) {
   const offerGroups = cafe ? [
     // Cafés (2026-11-10, SPEC-cafes.md "What you offer"): the reused tiles and the eight new ones. "Laptop friendly" is the
     // three-way laptops answer (venue_cafe_info), not a stored badge. No sports, games, off-sales or happy hour tiles.
+    // 13 screens (2026-11-11): no Laptop friendly tile any more (laptops aren't asked); a saved laptops answer stays.
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free_milk'] },
-    { title: fr ? 'L’endroit' : 'The place', keys: ['wifi', 'laptop', 'patio', 'lake_view', 'washroom', 'free_parking', 'wheelchair_accessible'] },
+    { title: fr ? 'L’endroit' : 'The place', keys: ['wifi', 'patio', 'lake_view', 'washroom', 'free_parking', 'wheelchair_accessible'] },
     { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'stroller', 'dog_friendly', 'dog_treats'] },
     { title: fr ? 'Commander' : 'Ordering', keys: ['drive_thru', 'walk_up'] },
   ] : pub ? [
@@ -51530,24 +51534,32 @@ ${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, comple
 const CAFE_SETUP_HELP_TOPICS = [
   { id: 'cafe-laptops', pages: ['setup', 'edit'], q: 'What does “Laptop friendly” say on my page?', qFr: 'Que dit « Ordinateurs portables bienvenus » sur ma page?',
     keys: ['laptop', 'laptops', 'laptop friendly', 'work from', 'remote work', 'no laptops'], keysFr: ['ordinateur', 'ordinateurs portables', 'portable', 'télétravail'],
-    a: '<p>You pick one of three answers under “Staying a while”: all day, not at busy times, or no laptops. Only “all day” shows the Laptop friendly chip. “Not at busy times” shows as a line, “Laptops welcome, except at busy times”. “No laptops” shows as “No laptops: a place to talk” (with “No Wi-Fi” too, it says “No Wi-Fi or laptops: a place to talk”). You can change it any time.</p>',
-    aFr: '<p>Vous choisissez une de trois réponses sous « Rester un moment » : toute la journée, pas aux heures de pointe, ou pas d’ordinateurs portables. Seul « toute la journée » affiche la mention Ordinateurs portables bienvenus. « Pas aux heures de pointe » s’affiche en une ligne. « Pas d’ordinateurs » s’affiche comme « Pas d’ordinateurs portables : un endroit pour discuter » (avec « Pas de Wi-Fi », la ligne dit « Pas de Wi-Fi ni d’ordinateurs portables : un endroit pour discuter »). Vous pouvez changer d’avis en tout temps.</p>' },
+    // 13 screens (2026-11-11): the setup no longer asks about laptops; an answer given before stays on the page.
+    a: '<p>The setup doesn’t ask about laptops any more, to keep it short. If you told us before, your page still says it: “all day” shows the Laptop friendly chip, “not at busy times” shows as a line, and “no laptops” shows as “No laptops: a place to talk”. Want it changed? Email us at info@okanaganroam.com.</p>',
+    aFr: '<p>La configuration ne pose plus de question sur les ordinateurs portables, pour rester courte. Si vous nous avez répondu avant, votre page l’indique toujours : « toute la journée » affiche la mention Ordinateurs portables bienvenus, « pas aux heures de pointe » s’affiche en une ligne, et « pas d’ordinateurs » s’affiche comme « Pas d’ordinateurs portables : un endroit pour discuter ». Vous voulez le changer? Écrivez-nous à info@okanaganroam.com.</p>' },
   { id: 'cafe-kind', pages: ['setup', 'edit'], q: 'Why is a kind of café already picked?', qFr: 'Pourquoi un genre de café est-il déjà choisi?',
     keys: ['kind of cafe', 'kind of café', 'already picked', 'bakery', 'coffee shop', 'wrong kind', 'gelato'], keysFr: ['genre de café', 'déjà choisi', 'boulangerie'],
     a: '<p>We guessed it from your business name, to save you a tap. Nothing is saved until you tap Save. Pick another one if it’s not right. Chocolatiers and donut shops pick “Dessert & sweets”.</p>',
     aFr: '<p>Nous l’avons deviné à partir du nom de votre entreprise, pour vous faire gagner du temps. Rien n’est enregistré avant que vous touchiez Enregistrer. Choisissez-en un autre s’il ne convient pas. Les chocolatiers et les beigneries choisissent « Desserts et sucreries ».</p>' },
   { id: 'cafe-happy', pages: ['setup'], q: 'Where is happy hour?', qFr: 'Où est le happy hour?',
     keys: ['happy hour', 'happy', 'drink specials', 'beer', 'wine'], keysFr: ['happy hour', 'bière', 'vin'],
-    a: '<p>Happy hour is only for cafés that serve alcohol. Tick “Beer & wine” under “What do you serve?” and the happy hour question appears under “More about your place”.</p>',
-    aFr: '<p>Le happy hour est seulement pour les cafés qui servent de l’alcool. Cochez « Bière et vin » sous « Que servez-vous? » et la question sur le happy hour s’affiche sous « Plus sur votre établissement ».</p>' },
+    a: '<p>The café setup doesn’t ask about happy hour, to keep it short. If you serve beer or wine, tick “Beer & wine” under “What do you serve?”. Your happy hour can then be added on your edit page.</p>',
+    aFr: '<p>La configuration pour les cafés ne pose pas de question sur le happy hour, pour rester courte. Si vous servez de la bière ou du vin, cochez « Bière et vin » sous « Que servez-vous? ». Votre happy hour peut ensuite être ajouté sur votre page de modification.</p>' },
   { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
     keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
     a: '<p>About how much one person pays for a coffee and a pastry. Cents are fine (like $5.50): use the 25¢ buttons. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
     aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
   { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
     keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
-    a: '<p>Like every link, we check a new order or pre-order link first, usually within a day. The drive-thru, walk-up window and “we take pre-orders” answers are on your page right away.</p>',
-    aFr: '<p>Comme tout lien, nous vérifions d’abord un nouveau lien pour commander ou précommander, en général d’ici un jour. Le service au volant, le comptoir extérieur et « nous prenons les précommandes » sont sur votre page tout de suite.</p>' },
+    a: '<p>The setup doesn’t ask for ordering links any more, to keep it short. A link you gave us before stays on your page. A drive-thru or walk-up window is a tile under “What you offer”, on your page right away. To add or change an order link, email us at info@okanaganroam.com.</p>',
+    aFr: '<p>La configuration ne demande plus de liens pour commander, pour rester courte. Un lien que vous nous avez donné avant reste sur votre page. Le service au volant ou le comptoir extérieur est une tuile sous « Ce que vous offrez », sur votre page tout de suite. Pour ajouter ou changer un lien pour commander, écrivez-nous à info@okanaganroam.com.</p>' },
+  // 13 screens (2026-11-11): the café version of "How does Set up your page work?" (it replaces the general one, which
+  // lists the restaurant questions).
+  { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
+    keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'add your photos and menu', 'photos and menu', 'add photos and menu', 'step by step', 'one at a time', 'saved', 'upload my menu', 'take photos of my menu', 'menu pdf', 'pdf menu', 'main photo', 'make main photo', 'how long', 'essentials', 'more about your place', 'carry on'],
+    keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'photos et menu', 'ajouter mes photos et mon menu', 'etape par etape', 'televerser mon menu', 'photographier mon menu', 'menu pdf', 'photo principale', 'combien de temps', 'l essentiel'],
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts. About 15 to 30 minutes. You can stop any time and carry on later.</p><ul><li><strong>The essentials</strong> (7 steps): address and phone, hours (with holidays and closures), kind of café and what you serve, photos, your menu, price per person and what you offer.</li><li><strong>More about your place</strong> (optional, any order): specials, your story, dietary details, your coffee, Instagram and Facebook, and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.</p><ul><li><strong>L’essentiel</strong> (7 étapes) : adresse et téléphone, heures (avec les jours fériés et fermetures), genre de café et ce que vous servez, photos, votre menu, prix par personne et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : spéciaux, votre histoire, détails alimentaires, votre café, Instagram et Facebook, et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
 ];
 // Café test 2 (2026-11-11): the easy setup's "We're closed part of the year" (every type).
 const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We close for part of the year', qFr: 'Nous fermons une partie de l’année',
@@ -53363,7 +53375,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     mode,
     signedIn: !!opts.signedIn,
     start: OWNER_HELP_START[page],
-    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
+    // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
+    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
       a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI,
@@ -64237,7 +64250,7 @@ module.exports = {
   validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
-  CAFE_SETUP_PART1, CAFE_SETUP_PART2, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
+  CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,

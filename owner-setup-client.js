@@ -166,9 +166,13 @@
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
   if (C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount)) S.spend = 9;
+  // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
+  S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
+  S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
   S.cuiTouched = false;
-  // A café's happy hour is a step only while it serves Beer & wine (outreach rule).
-  function cafeHappy(on){ if (!C.cafe) return; C.happyHour = on; var i = STEPS.indexOf('happy'), j = P2.indexOf('happy'); if (on && i < 0) { STEPS.push('happy'); P2.push('happy'); } if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } }
+  // A café's happy hour is allowed only while it serves Beer & wine (outreach rule). 13 screens (2026-11-11): it is no
+  // longer a café setup step (the edit page has it), so nothing is added to the list here.
+  function cafeHappy(on){ if (!C.cafe) return; C.happyHour = on; }
   // Café test 2 (2026-11-11): words for the café's kind (photos, story example) and what fits it. Kinds that don't serve
   // coffee (gelato, bubble tea, juice, tea, dessert) don't get the "Your coffee" tile unless espresso or drip is ticked.
   var KIND_SERVE = { 'Coffee shop': 'espresso', Bakery: 'baked_here', 'Bakery café': 'baked_here', Roastery: 'espresso', 'Tea house': 'tea', 'Bubble tea': 'bubble_tea', 'Ice cream & gelato': 'ice_cream', 'Dessert & sweets': 'desserts', 'Brunch café': 'breakfast', 'Juice & smoothie bar': 'smoothies', 'Deli & sandwiches': 'lunch' };
@@ -448,10 +452,15 @@
   function base(s){ return String(s).split(':')[0]; }
   // Part 1 (the essentials) is asked in order and ends on 'ess'; Part 2 is a menu ('more') of optional questions.
   function inP2(step){ return P2.indexOf(step) >= 0; }
+  // Cafés (13 screens, 2026-11-11): holidays and closures are the second part of the Hours step (no number or row of their
+  // own; the 'closures' answer is still recorded). Instagram and Facebook are one screen, 'social'.
+  function sub(b){ return C.cafe && b === 'closures'; }
+  function isStep(b){ return STEPS.indexOf(b) >= 0 || sub(b); }
+  function stepOf(b){ return sub(b) ? 'hours' : b; }
   function allDone(){ return STEPS.every(function(k){ return S.done[k]; }); }
   function p1Done(){ return P1.every(function(k){ return S.done[k]; }); }
   function p2Count(){ return P2.filter(function(k){ return S.done[k]; }).length; }
-  function nextOf(step){ if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
+  function nextOf(step){ if (C.cafe && step === 'hours') return 'closures'; step = stepOf(step); if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
   function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!S.done[P1[i]]) return P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
   function entry(step){
@@ -477,14 +486,16 @@
     if (step === 'music' && S.done.music === 'live' && S.nights.length) return 'music:yes';
     return step;
   }
-  function mark(){ var b = base(S.step); if (STEPS.indexOf(b) >= 0) S.dirty = b; }
-  function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); } if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
+  function mark(){ var b = base(S.step); if (isStep(b)) S.dirty = b; }
+  function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); }
+    // A café's hours always go on to its holidays and closures (the same step); where to after that is decided there.
+    if (C.cafe && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
   el('suBack').onclick = function(){ if (S.busy) return; var b = S.hist.pop(); while (b && (/^saved:/.test(b) || emptyPicker(b))) b = S.hist.pop(); if (!b) return; if (S.dirty && base(b) !== S.dirty && KEPT.indexOf(S.dirty) < 0) S.dirty = ''; S.step = b; S.error = ''; S.nudge = ''; render(); };
   function bar(){
-    var s = S.step, b = base(s), i = P1.indexOf(b), two = inP2(b) || s === 'more';
+    var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
     el('suProg').hidden = !(i >= 0 || (two && s !== 'more') || s === 'finish' || s === 'ess');
     el('suProgText').textContent = s === 'finish' ? (leftList().length ? T.finishBar : T.allDone) : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
@@ -496,7 +507,7 @@
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (C.cafe && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
@@ -587,10 +598,10 @@
   var TOP2 = C.top2 || ['happy', 'specials', 'music', 'story'];
   // After "What you offer": the follow-up screens, in this order (pubs: sports, dogs, then always "Who's welcome?").
   function offerNext(from){
-    var seq = []; if (C.pub && S.badges.sports_tv) seq.push('offer:sports'); if (C.cafe && S.badges.laptop) seq.push('offer:laptops'); if (S.badges.dog_friendly) seq.push('offer:dogs'); if (C.pub) seq.push('offer:minors');
+    var seq = []; if (C.pub && S.badges.sports_tv) seq.push('offer:sports'); if (S.badges.dog_friendly) seq.push('offer:dogs'); if (C.pub) seq.push('offer:minors');
     return seq[(from === 'offer' ? -1 : seq.indexOf(from)) + 1] || null;
   }
-  var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍' };
+  var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸' };
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
   function scoreBox(raise){
@@ -622,6 +633,8 @@
     // Facebook and Instagram are always named while open (pub test 3, 2026-11-10: they're what owners care about).
     var open = P2.filter(function(k){ return !answered(k) && !(C.pub && (k === 'book' || k === 'takeout')); });
     var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
+    // A café's one Instagram and Facebook screen keeps its capitals too.
+    if (C.cafe && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase(); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
     return T.optional + ': ' + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
@@ -638,7 +651,7 @@
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k]; if (!st || seen[st] || (st === 'spend' && S.spendNotSure)) return; if (st.indexOf(':') < 0 && answered(st)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (C.cafe && (it.k === 'instagram' || it.k === 'facebook')) { st = 'social'; lab = T.labels.social; } if (C.cafe && st === 'closures') st = chk = 'hours'; if (!st || seen[st] || (st === 'spend' && S.spendNotSure)) return; if (chk.indexOf(':') < 0 && answered(chk)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab }); });
     return out;
   }
   // One "To reach 100%" row (pub test 3, 2026-11-10). The front door says it waits for a visit; the average spend, when
@@ -661,7 +674,7 @@
   function exitAction(){
     var st = S.step, b = base(st);
     var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:year': 'hoursSave', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
-      'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook',
+      'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook', social: 'socialBoth',
       'menu:web': 'menuWebSave', 'menu:social': 'menuSocialSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
       'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave', 'hours:open': 'openSave:keep',
       'hours:kitchentime': 'kitchenSave', 'offer:sports': 'sportsSave', 'offer:minors': 'minorsSave',
@@ -700,7 +713,7 @@
   // has changed since (saved from another screen or the edit page), that answer is left as the page has it. Typed
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
-    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
+    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
   var DR = { base: {}, s: {}, at: {}, last: '' };
   function drKey(b){ return 'suDraft:' + C.base + ':' + b; }
   function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
@@ -734,7 +747,7 @@
   // Saves the current step's unsaved answers (or drops them when nothing differs).
   function drSave(){
     if (S.leaving) return;
-    var b = base(S.step); if (STEPS.indexOf(b) < 0 || !DR.base[b]) return;
+    var b = base(S.step); if (!isStep(b) || !DR.base[b]) return;
     // What's typed in the time and deal boxes, as the screen's own Save reads it (so "Are these your hours?" shows them).
     try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); } catch (e) {}
     var d = drGet(b) || { s: {}, boxes: {} };
@@ -748,7 +761,7 @@
   // like with like). Once per page load: its kept answers that the page still matches, then the screen again. Each time
   // the screen is entered: the boxes typed on it but not saved.
   function drAfter(){
-    var b = base(S.step); if (STEPS.indexOf(b) < 0) { DR.last = ''; DR.at = {}; return; }
+    var b = base(S.step); if (!isStep(b)) { DR.last = ''; DR.at = {}; return; }
     if (DR.last !== b) { DR.last = b; if (!DR.base[b] || !drGet(b)) DR.base[b] = drSnap(); }
     if (!DR.s[b]) { DR.s[b] = true; if (drApply(b)) { S.dirty = b; render(); return true; } }
     if (DR.at.step === S.step) return; DR.at = { step: S.step };
@@ -777,6 +790,7 @@
     if (C.cafe && T.spendLabel) T.labels.spend = fill(T.spendLabel, { words: cafeWords() });
     bar();
     var s = S.step, p = s.split(':'), x = '';
+    if (base(s) !== 'closures') S.hoursJust = false;
     if (s === 'start' || s === 'more' || s === 'ess') { S.toList = false; S.toFinish = false; S.toEss = false; } else if (s === 'finish') { S.toList = false; S.toEss = false; }
     if (s === 'start') {
       var any = STEPS.some(function(k){ return S.done[k]; });
@@ -821,7 +835,7 @@
       var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
       var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
-      x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div><details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>'
+      x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div>' + (rest2.length ? '<details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>' : '')
         + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), allDone() ? 'go:finish' : 'doneNow2') + '</div>';
     } else if (s === 'basics') {
       x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div><div><span>' + h(T.website) + '</span><span>' + h(siteShown()) + '</span></div></div>'
@@ -915,7 +929,7 @@
     } else if (s === 'closures') {
       var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0 && !HOL.some(function(o){ return o.key === k && holCovered(o); }); }).length + Math.max(0, S.extra.length - S.savedExtra);
-      x = (changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      x = (C.cafe && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
@@ -1194,6 +1208,9 @@
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
         + big('🤷', T.socialUnsure, T.socialUnsureSub, true, 'socialUnsure:' + s) + '</div>' + skip(s);
+    } else if (s === 'social') {
+      x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
+        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
       x = doneLine('door') + q(T.doorQ, fill(T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
@@ -1387,7 +1404,8 @@
     // Café test 2 (2026-11-11): the open season answered in this step ("We're closed part of the year").
     var listH = [ch];
     if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); }
-    saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : null, function(){
+    saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : C.cafe ? 'closures' : null, function(){
+      if (C.cafe) S.hoursJust = true;
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
       if ('open_months' in ch) CUR.open_months = ch.open_months;
       S.seaTouched = false; S.openTouched = false;
@@ -1536,6 +1554,86 @@
     });
   }
 
+  // ---------- Instagram and Facebook on one screen (cafés, 2026-11-11) ----------
+  // Each part: the box (or "We're not on it" / "Not sure" when tapped). Saved with the same checks as the one-network
+  // screens: a link or @name goes on the page, a plain name is a note for us, "not on it" clears the link and says so.
+  function socialPart(n){
+    var ig = n === 'instagram', ch = S.socNo[n], id = ig ? 'suIg' : 'suFb', d = S.done[n];
+    var now = d === 'live' || d === 'day' ? '<p class="su-sent">' + h(C.socialSent[n] && d === 'day' ? T.socialSent : T.alreadyDone) + '</p>' : '';
+    return '<h2 class="su-h2">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
+      + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '')
+      + (ch ? '' : '<p class="su-hint">' + h(ig ? T.igLead : T.fbWhy) + '</p><label class="su-q" for="' + id + '">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="' + id + '" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">')
+      + '<div class="su-chips" role="group" aria-label="' + h(ig ? 'Instagram' : 'Facebook') + '" style="margin-top:10px">'
+      + [['no', ig ? T.igNo : T.fbNo], ['unsure', T.socialUnsure]].map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ch === o[0] ? 'true' : 'false') + '" data-soc="' + n + ':' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>';
+  }
+  function readSocial(){ var a = el('suIg'), b = el('suFb'); if (a) S.ig = a.value.trim(); if (b) S.fb = b.value.trim(); }
+  // One network's answer. -> Promise of its status ('live', 'day', 'no', 'unsure', a kept answer) or '' (nothing to save),
+  // or null with the reason shown.
+  function socialOne(n){
+    var ig = n === 'instagram', ch = S.socNo[n], val = ig ? S.ig : S.fb;
+    if (ch === 'unsure') return Promise.resolve('unsure');
+    if (ch === 'no' && S.done[n] === 'no' && S.notOffered.indexOf(n) >= 0 && !(ig ? CUR.instagram_url : CUR.facebook_url)) return Promise.resolve('no');
+    if (ch === 'no') {
+      var clr = ig ? (CUR.instagram_url ? { instagram_url: '' } : null) : (CUR.facebook_url ? { facebook_url: '' } : null);
+      return (clr ? change(clr) : Promise.resolve('live')).then(function(r){
+        if (!r) return null;
+        if (ig) { CUR.instagram_url = ''; S.ig = ''; } else { CUR.facebook_url = ''; S.fb = ''; }
+        return change({ not_offered: addNot(n) }).then(function(r2){ return r2 ? 'no' : null; });
+      });
+    }
+    if (!val) return Promise.resolve('');
+    // The same as what's saved: kept as it is.
+    if (val === S.socSaved[n] && answered(n)) return Promise.resolve(S.done[n]);
+    var link = '';
+    if (ig) { if (/^@?[A-Za-z0-9._]{2,30}$/.test(val)) link = val.charAt(0) === '@' ? val : '@' + val; else if (/instagram\.com\//i.test(val) && !/\s/.test(val)) link = val; }
+    else if (/facebook\.com\//i.test(val) && !/\s/.test(val)) link = val;
+    var asName = function(){
+      S.error = '';
+      return post(C.base + '/menu/help', { note: fill(ig ? T.igNote : T.fbNote, { name: val }), sheet: n, contact_email: '', contact_phone: '' }).then(function(j){
+        if (!(j && j.ok)) { S.error = why(j); return null; }
+        S.socLines.push(ig ? T.savedIgName : T.savedFbName); C.socialSent[n] = true; S.socSaved[n] = val; return 'day';
+      });
+    };
+    var drop = S.notOffered.indexOf(n) >= 0 ? change({ not_offered: S.notOffered.filter(function(z){ return z !== n; }) }) : Promise.resolve('live');
+    return drop.then(function(r0){
+      if (!r0) return null;
+      if (!link) return asName();
+      var c2 = {}; c2[n + '_url'] = link;
+      return change(c2).then(function(r){ if (!r) { S.error = ''; return asName(); } S.socSaved[n] = val; return r; });
+    });
+  }
+  function socialBoth(){
+    if (S.busy) return;
+    readSocial();
+    if (!S.socNo.instagram && !S.socNo.facebook && !S.ig && !S.fb) { S.nudge = T.socialNeed; return render(); }
+    S.busy = true; S.error = ''; S.nudge = ''; S.socLines = []; render();
+    var got = {};
+    var fail = function(){ S.busy = false; render(); };
+    socialOne('instagram').then(function(a){
+      if (a === null) return fail();
+      got.instagram = a;
+      return socialOne('facebook').then(function(b){
+        if (b === null) return fail();
+        got.facebook = b;
+        var keys = ['instagram', 'facebook'].filter(function(n){ return got[n]; });
+        var all = keys.map(function(n){ return got[n]; });
+        var st = all.indexOf('day') >= 0 ? 'day' : all.indexOf('live') >= 0 ? 'live' : all.indexOf('unsure') >= 0 ? 'unsure' : 'no';
+        var rec = function(i){
+          if (i >= keys.length) return progress('social', st);
+          // A kept answer is already recorded.
+          if (S.done[keys[i]] === got[keys[i]]) return rec(i + 1);
+          return progress(keys[i], got[keys[i]]).then(function(ok){ return ok ? rec(i + 1) : false; });
+        };
+        return rec(0).then(function(ok){
+          S.busy = false; if (!ok) return render();
+          S.savedLine.social = S.socLines.join(' ') || (st === 'unsure' ? T.savedUnsure : '');
+          S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
+          go('saved:social');
+        });
+      });
+    });
+  }
+
   // Pub test 7 (2026-11-10): new words typed straight after the old description ("…pub food.A beach bar…") get the
   // space they were missing. Only that one join is touched; the rest is exactly as she typed it.
   function storyJoinFix(v){
@@ -1594,7 +1692,7 @@
         if (!CUR.website && !C.website && nlF.indexOf('website') < 0) nlF.push('website');
         var listF = []; if (Object.keys(ch).length) listF.push(ch); listF.push({ facebook_url: fbl });
         if (nlF.slice().sort().join() !== S.notOffered.slice().sort().join()) listF.push({ not_offered: nlF });
-        return saveAll('basics', listF, null, null, function(){ phoneSaved(ch); S.site = null; S.fb = fbl; CUR.facebook_url = fbl; S.savedLine.basics = T.fbFromSite + (S.savedLine.basics ? ' ' + S.savedLine.basics : ''); if (STEPS.indexOf('facebook') >= 0 && !answered('facebook')) progress('facebook', 'live'); });
+        return saveAll('basics', listF, null, null, function(){ phoneSaved(ch); S.site = null; S.fb = fbl; CUR.facebook_url = fbl; S.savedLine.basics = T.fbFromSite + (S.savedLine.basics ? ' ' + S.savedLine.basics : ''); if ((STEPS.indexOf('facebook') >= 0 || C.cafe) && !answered('facebook')) progress('facebook', 'live'); });
       }
       if (site && !siteOk(site)) { S.nudge = T.websiteBad; S.badField = 'suSite'; return render(); }
       if (siteDomain(site) !== siteDomain(CUR.website)) ch.website = site;
@@ -1936,6 +2034,7 @@
       return socialSave(v, val);
     }
     if (k === 'socialNo') return sayNo(v);
+    if (k === 'socialBoth') return socialBoth();
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }
     if (k === 'doorSend') return doorSend();
@@ -2042,6 +2141,8 @@
       if (S.badges[k] && GAMES.indexOf(k) >= 0) { S.noGames = false; press('no_games', false); }
       if (S.badges[k] && (k === 'vegan' || k === 'vegetarian' || k === 'gluten_free')) { S.noDiet = false; press('none_diet', false); }
     }; });
+    // The social screen's "We're not on it" / "Not sure" answers (cafés).
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
       var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim();
       if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
@@ -2115,6 +2216,8 @@
   if (C.cafe && CUR.place_type) { var placeNow = S.place; S.place = CUR.place_type; syncCoffee(); S.place = placeNow; }
   var startAt = String(location.hash || '').slice(1);
   if (startAt === 'season') startAt = 'closures';
+  if (C.cafe && (startAt === 'instagram' || startAt === 'facebook')) startAt = 'social';
+  if (C.cafe && startAt === 'closures') { S.hist = ['start']; S.step = 'closures'; S.toList = true; }
   // Café test 4 (2026-11-11): the checklist's "Open all year, or seasonal?" opens the Hours question that asks it.
   if (startAt === 'hours:year') { S.hist = ['start']; S.step = 'hours:year'; S.toList = true; }
   if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
@@ -2130,7 +2233,7 @@
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   });
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });

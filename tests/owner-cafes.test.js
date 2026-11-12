@@ -52,10 +52,11 @@ test('checklist: café weights sum to 100 in the spec groups; restaurants and pu
   assert.equal(pc.CAFE_ITEMS.reduce((a, i) => a + i.w, 0), 100);
   const g = {};
   for (const it of pc.CAFE_ITEMS) g[it.group] = (g[it.group] || 0) + it.w;
-  assert.deepEqual(g, { basics: 14, hours: 15, photos: 16, serve: 20, yourvisit: 17, about: 8, social: 6, finding: 2, confirmed: 2 });
+  // 13 screens (2026-11-11): staying a while, ordering and Known for are no longer asked, so no longer scored.
+  assert.deepEqual(g, { basics: 14, hours: 15, photos: 17, serve: 26, yourvisit: 10, about: 8, social: 6, finding: 2, confirmed: 2 });
   const w = Object.fromEntries(pc.CAFE_ITEMS.map((i) => [i.key, i.w]));
-  assert.deepEqual(w, { address_pin: 4, phone: 4, website: 3, cafe_kind: 3, hours: 8, hours_fresh: 4, season: 3, photo_main: 9, photo_extra: 7, serves: 6, menu: 6, avg_spend: 4, dietary: 4,
-    stay: 5, wifi: 3, dogs_kids: 4, ordering: 5, description: 5, pyv_known: 3, instagram: 3, facebook: 3, arrival: 2, owner_confirmed: 2 });
+  assert.deepEqual(w, { address_pin: 4, phone: 4, website: 3, cafe_kind: 3, hours: 8, hours_fresh: 4, season: 3, photo_main: 9, photo_extra: 8, serves: 8, menu: 8, avg_spend: 4, dietary: 6,
+    wifi: 4, dogs_kids: 6, description: 8, instagram: 3, facebook: 3, arrival: 2, owner_confirmed: 2 });
   assert.ok(!w.happy_hour && !w.entertainment && !w.specials, 'happy hour, events and specials are optional and unscored for cafés');
   assert.equal(pc.PUB_ITEMS.reduce((a, i) => a + i.w, 0), 100);
   assert.equal(pc.ITEMS.reduce((a, i) => a + i.w, 0), 100);
@@ -90,7 +91,7 @@ test('checklist: the café items score from the owner answers, and a full café 
   assert.deepEqual(r0.groups.map((x) => x.key), ['basics', 'hours', 'photos', 'serve', 'yourvisit', 'about', 'social', 'finding'], 'café groups in spec order');
   const html = pc.renderCompleteness(r0, { setupHref: '/owner/x/setup', canDecline: true });
   assert.match(html, /href="\/owner\/x\/setup#cuisine:serve"/);
-  assert.match(html, /href="\/owner\/x\/setup#stay"/);
+  assert.doesNotMatch(html, /href="\/owner\/x\/setup#(stay|order)"/);
   const full = { ...base0, website: 'w', placeType: 'Coffee shop', imageUrl: '/images/x.jpg', photoCount: 3, menuUrl: 'https://x.ca/menu', avgSpend: 9, avgSpendSource: 'owner', vegan: 1,
     cafeInfo: { year: 'all', serves: ['espresso'], stay: { laptops: 'all_day' }, order: { preorder: true } }, ownerFeatures: ['wifi'], kidFriendly: true, visitLabels: ['Known for'],
     description: 'x'.repeat(130), instagramUrl: 'i', facebookUrl: 'f', hasArrival: true, claimed: true };
@@ -138,10 +139,11 @@ test('café answers: every part saves live from the setup, reads back in the set
   // Clearing one part.
   assert.equal((await change(t, { cafe_info: { coffee: null } })).status, 200);
   assert.equal(app.venueCafeInfo(v.id).coffee, undefined);
-  // The setup progress takes the café-only steps; a restaurant's does not.
-  const p = await postJson(`/owner/${t}/setup/progress`, { step: 'stay', status: 'live' });
-  assert.equal(p.status, 200); assert.equal(p.body.progress.done.stay, 'live');
-  assert.equal((await postJson(`/owner/${tokenFor(mk('restaurant').id)}/setup/progress`, { step: 'stay', status: 'live' })).status, 400);
+  // The setup progress takes the café-only steps; a restaurant's does not. 13 screens (2026-11-11): 'stay' is no longer one.
+  const p = await postJson(`/owner/${t}/setup/progress`, { step: 'diet', status: 'live' });
+  assert.equal(p.status, 200); assert.equal(p.body.progress.done.diet, 'live');
+  assert.equal((await postJson(`/owner/${t}/setup/progress`, { step: 'stay', status: 'live' })).status, 400);
+  assert.equal((await postJson(`/owner/${tokenFor(mk('restaurant').id)}/setup/progress`, { step: 'diet', status: 'live' })).status, 400);
 });
 
 test('café links: online ordering and pre-orders wait for our check like any link; the answers stay live', async () => {
@@ -188,7 +190,8 @@ test('happy hour: hidden for a café unless it ticks Beer & wine', async () => {
   await change(t, { cafe_info: { serves: ['espresso', 'beer_wine'] } });
   cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(cfg.happyHour, true);
-  assert.ok(cfg.steps.includes('happy') && cfg.part2.includes('happy'));
+  // 13 screens (2026-11-11): happy hour is never a café setup step (the edit page has it).
+  assert.ok(!cfg.steps.includes('happy') && !cfg.part2.includes('happy'));
   const ok = await change(t, { happy_hour: week });
   assert.equal(ok.status, 200, `allowed with Beer & wine: ${JSON.stringify(ok.body)}`);
   // Restaurants and pubs: as before.
@@ -272,14 +275,15 @@ test('setup: the café parts, screens and tiles; restaurants and pubs keep their
   assert.equal(s.status, 200);
   const cfg = cfgOf(s.text);
   assert.equal(cfg.cafe, true);
-  assert.deepEqual(cfg.part1, ['basics', 'hours', 'closures', 'cuisine', 'photos', 'menu', 'spend', 'offer']);
-  assert.deepEqual(cfg.part2, ['stay', 'order', 'diet', 'coffee', 'sellout', 'specials', 'music', 'story', 'known', 'groups', 'instagram', 'facebook', 'door']);
+  // 13 screens (2026-11-11).
+  assert.deepEqual(cfg.part1, ['basics', 'hours', 'cuisine', 'photos', 'menu', 'spend', 'offer']);
+  assert.deepEqual(cfg.part2, ['specials', 'story', 'diet', 'coffee', 'social', 'door']);
   assert.deepEqual(cfg.placeTypes, ['Coffee shop', 'Bakery', 'Bakery café', 'Roastery', 'Tea house', 'Bubble tea', 'Ice cream & gelato', 'Dessert & sweets', 'Brunch café', 'Juice & smoothie bar', 'Deli & sandwiches']);
   // Café test 2 (2026-11-11): Made here, Sorbet, Milkshakes, Cones & cups and Affogato added.
   assert.deepEqual(cfg.serves.map((x) => x.k), ['espresso', 'drip', 'tea', 'baked_here', 'made_here', 'pastries', 'breakfast', 'lunch', 'ice_cream', 'sorbet', 'milkshakes', 'cones', 'affogato', 'desserts', 'bubble_tea', 'smoothies', 'beer_wine']);
   const keys = cfg.offerGroups.flatMap((g) => g.keys);
-  for (const k of ['patio', 'dog_friendly', 'kid_friendly', 'wheelchair_accessible', 'free_parking', 'lake_view', 'vegan', 'vegetarian', 'gluten_free', 'wifi', 'laptop', 'dairy_free_milk', 'drive_thru', 'walk_up', 'washroom', 'stroller', 'dog_treats']) assert.ok(keys.includes(k), k);
-  for (const k of ['sports_tv', 'pool', 'darts', 'off_sales', 'happy_hour', 'local_beer_taps']) assert.ok(!keys.includes(k), `${k} is hidden for cafés`);
+  for (const k of ['patio', 'dog_friendly', 'kid_friendly', 'wheelchair_accessible', 'free_parking', 'lake_view', 'vegan', 'vegetarian', 'gluten_free', 'wifi', 'dairy_free_milk', 'drive_thru', 'walk_up', 'washroom', 'stroller', 'dog_treats']) assert.ok(keys.includes(k), k);
+  for (const k of ['sports_tv', 'pool', 'darts', 'off_sales', 'happy_hour', 'local_beer_taps', 'laptop']) assert.ok(!keys.includes(k), `${k} is hidden for cafés`);
   for (const k of keys) assert.ok(cfg.offerLabels[k] && cfg.offerIcons[k], `${k} has a label and an icon`);
   assert.equal(cfg.priceWords['Ice cream & gelato'], 'a single scoop');
   assert.equal(cfg.t.kindQ, 'What kind of café is it?');

@@ -196,8 +196,10 @@ test('6: "Every year" on her own dates saves (one yearly rule since café test 2
 // ---------- 7: café questions brought forward ----------
 test('7: Dietary details, Your coffee and Sells out early are above the fold for cafés; Groups and Weekly events stay folded', async () => {
   const cfg = cfgOf(await setupOf(mk('cafe')));
-  for (const k of ['diet', 'coffee', 'sellout']) assert.ok(cfg.top2.includes(k), k);
-  for (const k of ['groups', 'music']) assert.ok(!cfg.top2.includes(k), k);
+  // 13 screens (2026-11-11): a café's six Part 2 tiles all show (Sells out, Groups and Weekly events aren't asked any more).
+  for (const k of ['diet', 'coffee']) assert.ok(cfg.top2.includes(k), k);
+  for (const k of ['groups', 'music', 'sellout']) assert.ok(!cfg.part2.includes(k), k);
+  assert.deepEqual(cfg.top2, cfg.part2);
   assert.deepEqual(cfgOf(await setupOf(mk('pub'))).top2, ['music', 'specials', 'story', 'groups', 'instagram', 'facebook'], 'pubs unchanged');
   assert.deepEqual(cfgOf(await setupOf(mk('restaurant'))).top2, ['happy', 'specials', 'music', 'story', 'instagram', 'facebook'], 'restaurants unchanged');
 });
