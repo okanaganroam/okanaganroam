@@ -1072,8 +1072,9 @@
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'staySave') + '</div>' + skip('stay');
     } else if (s === 'order') {
       var od = S.cafe.order;
-      x = doneLine('order') + q(T.orderQ, T.orderLead) + msgs() + '<div class="su-tiles">' + ctile('order.online', '🌐', T.orderOnline) + '<button type="button" class="su-tile" aria-pressed="' + (S.badges.drive_thru ? 'true' : 'false') + '" data-cbadge="drive_thru"><span class="su-e" aria-hidden="true">🚗</span>' + h(C.offerLabels.drive_thru) + '</button>'
-        + '<button type="button" class="su-tile" aria-pressed="' + (S.badges.walk_up ? 'true' : 'false') + '" data-cbadge="walk_up"><span class="su-e" aria-hidden="true">🪟</span>' + h(C.offerLabels.walk_up) + '</button>' + (cakesShown() ? ctile('order.preorder', '🎂', T.preorder) : '')
+      // Café test 4 (2026-11-11): Drive-thru and Walk-up window are asked once, on "What you offer" (the badges the page
+      // shows). This screen no longer repeats them, and its save never touches them.
+      x = doneLine('order') + q(T.orderQ, T.orderLead) + msgs() + '<div class="su-tiles">' + ctile('order.online', '🌐', T.orderOnline) + (cakesShown() ? ctile('order.preorder', '🎂', T.preorder) : '')
         + '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (od.counter ? 'true' : 'false') + '" data-ctog="order.counter"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.counterOnly) + '<span class="su-tile-sub">' + h(cakesShown() ? T.counterOnlySub : T.counterOnlySubNoCakes || T.counterOnlySub) + '</span></button></div>'
         + (od.online ? field('suOurl', T.orderUrlLabel, od.url, { mode: 'url', max: 300 }) + ex(T.orderUrlEx) : '')
         + (od.preorder ? field('suOhow', T.preorderHowLabel, od.how, { max: 120 }) + ex(T.preorderHowEx) + field('suOpurl', T.preorderUrlLabel, od.purl, { mode: 'url', max: 300 }) : '')
@@ -1852,8 +1853,7 @@
       readCafe(); var od2 = S.cafe.order;
       if (od2.online && !od2.url) { S.nudge = T.orderUrlNeed; S.badField = 'suOurl'; return render(); }
       if (!od2.counter && !od2.online && !od2.preorder && !S.badges.drive_thru && !S.badges.walk_up) { S.nudge = T.orderNeed; return render(); }
-      var ol = [], ob = { drive_thru: !!S.badges.drive_thru, walk_up: !!S.badges.walk_up }, oi = od2.preorder ? (od2.how ? { preorder: true, preorder_how: od2.how } : { preorder: true }) : null;
-      if (ob.drive_thru !== !!S.savedBadges.drive_thru || ob.walk_up !== !!S.savedBadges.walk_up) ol.push({ badges: ob });
+      var ol = [], oi = od2.preorder ? (od2.how ? { preorder: true, preorder_how: od2.how } : { preorder: true }) : null;
       if (JSON.stringify(oi) !== S.savedOrder) ol.push({ cafe_info: { order: oi } });
       var links = { order_url: od2.online ? od2.url : '', preorder_url: od2.preorder ? od2.purl : '' };
       if (links.order_url !== (CL.order_url || '') || links.preorder_url !== (CL.preorder_url || '')) ol.push({ cafe_links: links });
@@ -1997,7 +1997,7 @@
       if (a.indexOf(':') > 0) { var q5 = a.split(':'), o5 = q5[0] === 'serves' ? S.cafe.serves : S.cafe.diet.milks; o5[q5[1]] = !o5[q5[1]]; return redraw(); }
       var p5 = a.split('.'); S.cafe[p5[0]][p5[1]] = !S.cafe[p5[0]][p5[1]];
       // "Order at the counter only" and the ways to order ahead: picking one turns the other off.
-      if (a === 'order.counter' && S.cafe.order.counter) { S.cafe.order.online = false; S.cafe.order.preorder = false; S.badges.drive_thru = false; S.badges.walk_up = false; }
+      if (a === 'order.counter' && S.cafe.order.counter) { S.cafe.order.online = false; S.cafe.order.preorder = false; }
       else if (p5[0] === 'order' && S.cafe.order[p5[1]]) S.cafe.order.counter = false;
       redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-cpick]'), function(b){ b.onclick = function(){

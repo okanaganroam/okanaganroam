@@ -258,7 +258,8 @@ test('12: the ordering screen no longer re-sends "no drive-thru, no walk-up" (it
   assert.equal(r.status, 400); assert.deepEqual(Object.keys(r.body.errors), ['form']); assert.match(r.body.errors.form, /Nothing has changed yet/);
   // The setup now sends only what differs from what is stored.
   const s = scriptOf(await setupOf(v));
-  assert.match(s, /if \(ob\.drive_thru !== !!S\.savedBadges\.drive_thru \|\| ob\.walk_up !== !!S\.savedBadges\.walk_up\) ol\.push\(\{ badges: ob \}\);/);
+  // Café test 4 (2026-11-11): the ordering screen never sends the drive-thru / walk-up badges ("What you offer" asks them).
+  assert.doesNotMatch(s, /ol\.push\(\{ badges: ob \}\)/);
   assert.match(s, /if \(JSON\.stringify\(oi\) !== S\.savedOrder\) ol\.push\(\{ cafe_info: \{ order: oi \} \}\);/);
   // And a pre-order only (the tester's answer) saves cleanly with nothing refused.
   ok(await change(t, { cafe_info: { order: { preorder: true, preorder_how: 'Call us 48 hours ahead' } } }));
