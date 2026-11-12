@@ -20177,15 +20177,18 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
     .join(' ');
 }
 
-// Bug-check (2026-11-12): a French café page shows the same chips as the English one: the same top four (dietary options
-// first, a gluten-free kitchen said as on the English page), then the café's own tiles. The dog chip, when the page has
-// a dog note, is its own chip (as before) and still counts in the four.
+// Bug-check (2026-11-12): a French café page shows the same chips as the English one: the same top four first (dietary
+// options first, a gluten-free kitchen said as on the English page), then every other chip of the row (Terrasse, Vue sur
+// le lac, Musique, the café's own tiles...), each once. The dog chip, when the page has a dog note, is its own chip (as
+// before) and still counts in the four. The English page's profile for a café is cafePageProfile(venue, {}) too (its
+// Copper and Niche profiles never apply to a café; the deals options only change the tab label).
 const HIGHLIGHT_BADGE_FIELD = { dog: 'dog_friendly', kid: 'kid_friendly', patio: 'patio', lake: 'lake_view', gluten: 'gluten_free', vegan: 'vegan',
   vegetarian: 'vegetarian', music: 'live_music', groups: 'great_groups', tv: 'sports_tv', nonalc: 'nonalcoholic' };
-function cafeFrChipsHtml(venue, dogNote) {
+function cafeFrChipsHtml(venue, dogNote, { skipHappyHour = false } = {}) {
   const keys = foodDrinkHighlights(venue, dogNote, { ...cafePageProfile(venue, {}), returnKeys: true });
   const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
   const feats = venueOwnerFeatures(venue.id);
+  const topFields = keys.map((k) => HIGHLIGHT_BADGE_FIELD[k]).filter(Boolean);
   const chips = keys.map((k) => {
     const f = HIGHLIGHT_BADGE_FIELD[k];
     if (!f || (k === 'dog' && dogNote !== undefined)) return '';
@@ -20194,7 +20197,9 @@ function cafeFrChipsHtml(venue, dogNote) {
     const icon = (CARD_BADGE_SHORT[f] || [])[0];
     return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
   }).filter(Boolean);
-  return chips.concat(cafeOwnerHighlights(venue, true).map(([icon, label]) => `<span class="chip chip-vb chip-vb-place">${icon ? `<span aria-hidden="true">${icon}</span> ` : ''}${escapeHtml(label)}</span>`)).join(' ');
+  // The rest: the usual row without the four already shown (and the café's own tiles, as on the English row).
+  const rest = venueBadgeChipsHtml({ ...venue, ...Object.fromEntries(topFields.map((f) => [f, 0])) }, { fr: true, skipDogFriendly: dogNote !== undefined, skipHappyHour });
+  return chips.concat(rest ? [rest] : []).join(' ');
 }
 
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
@@ -35656,7 +35661,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       if (/patio|terrasse/i.test(dt) && !/inside|indoor|int[ée]rieur/i.test(dt)) dogFriendlyNote = fr ? 'Chiens sur la terrasse' : 'Dogs on the patio';
     } catch (e) { /* no visit info */ }
   }
-  const attributeChipsFor = (skipHappyHour) => (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour }));
+  const attributeChipsFor = (skipHappyHour) => (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote, { skipHappyHour }) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour }));
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);

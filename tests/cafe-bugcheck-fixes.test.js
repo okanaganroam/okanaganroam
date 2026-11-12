@@ -174,9 +174,15 @@ test('L: the French café page shows the same four chips as the English one, die
   const row = chipsRow(page(c, 'fr'));
   const labels = (row.match(/<span class="chip chip-vb[^"]*">[\s\S]*?<\/span>(?=\s|$)/g) || []).map((s) => s.replace(/<[^>]+>/g, '').trim());
   assert.ok(labels.some((l) => /Options sans gluten \(cuisine partagée\)/.test(l)), labels.join(' | '));
-  assert.ok(!labels.some((l) => /musique|lac/i.test(l)), labels.join(' | '));
-  const vg = labels.findIndex((l) => /végan/i.test(l)), gfi = labels.findIndex((l) => /sans gluten/i.test(l));
-  assert.ok(vg >= 0 && vg < gfi, labels.join(' | '));
+  // Review fix (2026-11-12): the four lead (dietary first), then every other chip still shows (music, lake, patio, kids).
+  const vg = labels.findIndex((l) => /végan/i.test(l)), vgt = labels.findIndex((l) => /végétarien/i.test(l)), gfi = labels.findIndex((l) => /sans gluten/i.test(l));
+  assert.deepEqual([vg, vgt, gfi], [0, 1, 2], labels.join(' | '));
+  for (const re of [/musique/i, /lac/i, /terrasse/i, /enfants/i]) assert.equal(labels.filter((l) => re.test(l)).length, 1, `${re} once: ${labels.join(' | ')}`);
+  assert.equal(labels.filter((l) => /sans gluten/i.test(l)).length, 1, labels.join(' | '));
+  // Happy hour: a chip when the page has no happy-hour line, none when it does (skipHappyHour, as on the English page).
+  const hhVenue = { ...app.getVenue(c.id), happy_hour: 1 };
+  assert.match(app.cafeFrChipsHtml(hhVenue, undefined), /Happy hour|5 à 7|Heure/i);
+  assert.equal(app.cafeFrChipsHtml(hhVenue, undefined, { skipHappyHour: true }), app.cafeFrChipsHtml({ ...hhVenue, happy_hour: 0 }, undefined));
   // The same keys as the English page's four.
   const keys = highlightsFor({ vegan: 1, vegetarian: 1, gluten_free: 1, patio: 1, dog_friendly: 1, kid_friendly: 1, live_music: 1, lake_view: 1 }, null, { highlightFirst: ['vegan', 'vegetarian', 'gluten'], returnKeys: true });
   assert.deepEqual(keys, ['vegan', 'vegetarian', 'gluten', 'dog']);
