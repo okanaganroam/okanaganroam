@@ -632,7 +632,9 @@
   function moreSub(){
     // Facebook and Instagram are always named while open (pub test 3, 2026-11-10: they're what owners care about).
     var open = P2.filter(function(k){ return !answered(k) && !(C.pub && (k === 'book' || k === 'takeout')); });
-    var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram' || k === 'social'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
+    var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
+    // A café's one Instagram and Facebook screen keeps its capitals too.
+    if (C.cafe && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase(); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
     return T.optional + ': ' + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
