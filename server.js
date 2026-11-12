@@ -20359,12 +20359,15 @@ function wineryVisitLines(venue, info) {
   const w = info || venueWineryInfo(venue.id);
   const out = {};
   const fee = typeof w.fee === 'number' ? w.fee : null;
-  const rows = (venueVisitInfo(venue.id) || {}).rows || [];
-  const owned = new Set(((venueVisitInfo(venue.id) || {}).owner_labels) || []);
+  const box = venueVisitInfo(venue.id) || {};
+  const rows = box.rows || [];
+  // Does research have this line? A line these answers wrote is not research's: what it replaced (owner_was) says.
+  const managedNow = new Set(box.winery_labels || []), wasNow = box.owner_was || {};
+  const researchHas = (label) => (managedNow.has(label) ? !!(wasNow[label] && wasNow[label].text) : rows.some((r) => r.label === label));
   const book = { walk_in: ['Walk-ins welcome.', 'Sans réservation.'], recommended: ['Booking recommended.', 'Réservation conseillée.'], needed: ['Please book ahead.', 'Réservez à l’avance.'], appointment: ['By appointment only. Please call or book ahead.', 'Sur rendez-vous seulement. Appelez ou réservez à l’avance.'] }[w.visit];
   // Tastings: the price (and whether it is waived), then how to visit. Written once the price is answered, or once how
   // to visit is answered on a page whose box has no Tastings line of research to keep.
-  const researchTastings = rows.some((r) => r.label === 'Tastings') && !owned.has('Tastings');
+  const researchTastings = researchHas('Tastings');
   if (fee != null || (book && !researchTastings)) {
     const waived = fee ? { yes: [', free with a bottle purchase', ', offerte à l’achat d’une bouteille'], two: [', free when you buy 2 bottles or more', ', offerte à l’achat de 2 bouteilles ou plus'] }[w.waived] : null;
     const en = [fee === 0 ? 'Free tastings.' : fee != null ? `From ${wineryMoney(fee, false)} a person${waived ? waived[0] : ''}.` : '', book ? book[0] : ''].filter(Boolean).join(' ');
@@ -20382,7 +20385,7 @@ function wineryVisitLines(venue, info) {
     const page = w.food === 'restaurant' ? wineryRestaurantPage(venue) : null;
     if (w.food === 'restaurant' && page) {
       // Its own page has the hours and menu: the research line (often with its hours) stays; one is added if there is none.
-      if (!rows.some((r) => r.label === 'Restaurant')) out.Restaurant = { en: `${page.name} on site.`, fr: `${page.name} sur place.`, venue_id: page.id };
+      if (!researchHas('Restaurant')) out.Restaurant = { en: `${page.name} on site.`, fr: `${page.name} sur place.`, venue_id: page.id };
       out.Food = '';
     } else if (w.food === 'restaurant' && w.restaurant && w.restaurant.name) {
       const r = w.restaurant;

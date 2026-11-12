@@ -966,7 +966,7 @@ en.winery = {
   visits: { walk_in: 'Walk-ins welcome', recommended: 'Booking recommended', needed: 'Booking needed', appointment: 'By appointment only' },
   visitSubs: { appointment: 'Your card says “By appointment · call ahead”' },
   bookLinkEx: 'Your Tock or Commerce7 page, or your website’s booking page', noBookLink: 'We don’t take bookings online', bookLinkBad: 'Please check the booking link, for example yourwinery.com/book.',
-  groupsSizeQ: 'Biggest group without booking?', groupsSizeLead: 'Your page says “Groups of 8 or more, please book ahead”.',
+  groupsSizeQ: 'Groups: from what size should they book ahead?', groupsSizeLead: 'Your page says “Groups of 8 or more, please book ahead”.',
   busesQ: 'Tour buses and limos?', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
   visitNeed: 'Please tap how people visit, or tap Skip.', visitSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Off-season by appointment (Hours)
@@ -1021,7 +1021,7 @@ fr.winery = {
   visits: { walk_in: 'Sans réservation', recommended: 'Réservation conseillée', needed: 'Réservation obligatoire', appointment: 'Sur rendez-vous seulement' },
   visitSubs: { appointment: 'Votre fiche indique « Sur rendez-vous · appelez avant »' },
   bookLinkEx: 'Votre page Tock ou Commerce7, ou la page de réservation de votre site', noBookLink: 'Nous ne prenons pas de réservations en ligne', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrevignoble.com/reserver.',
-  groupsSizeQ: 'Le plus grand groupe sans réservation?', groupsSizeLead: 'Votre page indique « Groupes de 8 personnes ou plus : réservez à l’avance ».',
+  groupsSizeQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsSizeLead: 'Votre page indique « Groupes de 8 personnes ou plus : réservez à l’avance ».',
   busesQ: 'Autobus et limousines?', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
   visitNeed: 'Touchez comment on vous visite, ou touchez Passer.', visitSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   allYearAppt: 'En basse saison, nous ouvrons sur rendez-vous', allYearApptSub: 'Dégustations sans réservation une partie de l’année, sur rendez-vous le reste',

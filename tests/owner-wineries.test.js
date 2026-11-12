@@ -245,7 +245,7 @@ test('answers update the matching research rows and never wipe the ones not answ
   // Undo the fee: research's Tastings line comes back.
   const feeReq = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%tasting_fee%' ORDER BY id DESC").get(w.id).id;
   assert.equal(app.undoOwnerInstantChange(feeReq, 'test').ok, true);
-  assert.equal(row(w.id, 'Tastings').text, 'Walk-ins welcome.', 'with no fee, the visit answer alone writes the line only where research had none');
+  assert.equal(row(w.id, 'Tastings').text, 'Five wines from $15, about 30 min. Walk-ins welcome.', 'with no fee, research’s line comes back (the visit answer alone never replaces it)');
 });
 
 test('food here: a restaurant with its own page is only pointed to; none removes research food lines', async () => {
@@ -256,6 +256,9 @@ test('food here: a restaurant with its own page is only pointed to; none removes
   assert.equal((await change(t, { winery_info: { food: 'restaurant' } })).status, 200);
   assert.equal(row(w.id, 'Restaurant').text, 'Old Barrel Bistro on site.');
   assert.equal(row(w.id, 'Restaurant').venue_id, resto.id);
+  // A later save keeps the line it wrote (it is not research's).
+  assert.equal((await change(t, { tasting_fee: 12 })).status, 200);
+  assert.equal(row(w.id, 'Restaurant').text, 'Old Barrel Bistro on site.');
   const w2 = mk('winery'); const t2 = tokenFor(w2.id);
   research(w2.id, [{ label: 'Tastings', text: 'From $10.' }, { label: 'Restaurant', text: 'Bistro open daily.' }]);
   assert.equal((await change(t2, { winery_info: { food: 'picnic' } })).status, 200);
