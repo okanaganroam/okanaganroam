@@ -34275,7 +34275,7 @@ function frJsonLd(json) {
   return JSON.stringify(out);
 }
 function twinHeadLinks(enPath, search = '') {
-  const q = search.replace(/&/g, '&amp;');
+  const q = escapeHtml(search);
   const en = `https://okanaganroam.com${enPath}${q}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}${q}`;
   return `<link rel="alternate" hreflang="en-CA" href="${en}">\n<link rel="alternate" hreflang="fr-CA" href="${fr}">\n<link rel="alternate" hreflang="x-default" href="${en}">\n`;
 }
@@ -34305,7 +34305,7 @@ function englishTwinHtml(html, enPath, search = '') {
   let out = (frEventUntranslated(enPath) ? html : addTwinHead(html, enPath, search))
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
-  out = withTwinLangSwitch(out, frHrefPath + search.replace(/&/g, '&amp;'), 'en');
+  out = withTwinLangSwitch(out, escapeHtml(frHrefPath + search), 'en');
   // French readers are sent to the twin, so an English card carries its English blurb only (lighter list pages).
   out = out.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1');
   return out;
@@ -34352,7 +34352,7 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
-  out = withTwinLangSwitch(out, enPath + search.replace(/&/g, '&amp;'), 'fr');
+  out = withTwinLangSwitch(out, escapeHtml(enPath + search), 'fr');
   // Calendar links (2026-10-19): the .ics download is the French one, and Google Calendar gets the French details
   // line and the /fr page address.
   out = out.replace(/href="(\/[a-z-]+\/events\/[a-z0-9-]+\/calendar\.ics)"/g, 'href="/fr$1"')
@@ -53961,13 +53961,13 @@ function ownerLangHtml(html, lang, enPath, search) {
     for (const h of [hdr, frA11yLabels(hdr)]) if (h && out.includes(h)) { out = out.split(h).join(frenchHeaderFragment(hdr)); break; }
     out = frA11yLabels(out).replace(/<html lang="en(?:-CA)?"/, '<html lang="fr"');
     // The menu screen on its English address follows a French browser unless ?lang=en says otherwise.
-    out = withTwinLangSwitch(out, `${enPath}${/\/menu$/.test(enPath) ? '?lang=en' : search ? search.replace(/&/g, '&amp;') : ''}`, 'fr');
+    out = withTwinLangSwitch(out, `${escapeHtml(enPath)}${/\/menu$/.test(enPath) ? '?lang=en' : search ? escapeHtml(search) : ''}`, 'fr');
   } else {
     // An English address showing French (the menu screen's ?lang=fr) keeps its own switch.
     if (pageFr) return out;
     const frPath = frTwinPath(enPath);
     out = out.replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
-    out = withTwinLangSwitch(out, `${frPath}${search ? search.replace(/&/g, '&amp;') : ''}`, 'en');
+    out = withTwinLangSwitch(out, `${escapeHtml(frPath)}${search ? escapeHtml(search) : ''}`, 'en');
   }
   return (out.includes('id="langToggle"') || out.includes('class="owner-lang-link')) && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
 }
