@@ -16848,7 +16848,7 @@ html[lang="fr"] .desc-en { display: none; }
   .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 184px) / 9.3)); }
   .nav #navTripBtn { padding: 0 8px; font-size: 0.76rem; }
 }
-/* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */
+/* French is longer ("Planifier mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */
 @media (max-width: 560px) {
   html[lang="fr"] .nav #navTripBtn { max-width: 92px; padding: 0 10px; white-space: normal; text-align: center; line-height: 1.05; font-size: 0.7rem; }
   html[lang="fr"] .nav #navTripBtn svg { display: none; }
@@ -20031,8 +20031,8 @@ function cafeInfoLinesHtml(venue, fr) {
   const d = info.diet || {};
   const dBits = [];
   if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? ' : ' : ': '));
-  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'pâtisseries sans gluten d’une cuisine réservée'));
-  else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'pâtisseries sans gluten (cuisine partagée)'));
+  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'options sans gluten d’une cuisine réservée'));
+  else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'options sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
   if (d.df_sorbet) dBits.push(L('dairy-free sorbet', 'sorbet sans produits laitiers'));
   if (d.vegan_ice) dBits.push(L('vegan gelato or ice cream', 'gelato ou crème glacée véganes'));
@@ -33324,7 +33324,14 @@ function frBadgeLabel(field) {
   return APP_TRANSLATIONS.fr[key] || (BADGE_LABELS[field] ? BADGE_LABELS[field].title : field);
 }
 // A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
+// Café test 6 (2026-11-12): a cuisine name in French qualifies « cuisine », so it is feminine like the rest (« Française »,
+// « Italienne »); these few fell back to masculine names (« Américain » next to « Française »).
+const FR_CUISINE_FEMININE = { American: 'Américaine', Canadian: 'Canadienne', Taiwanese: 'Taïwanaise', 'Spanish & Tapas': 'Espagnole et tapas',
+  'Contemporary & Global': 'Contemporaine et internationale', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne' };
+const FR_CUISINE_ADJECTIVE = new Set(['American', 'Canadian', 'Chinese', 'Ethiopian', 'Filipino', 'French', 'German', 'Greek', 'Indian', 'Italian', 'Japanese', 'Korean',
+  'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Polish', 'Portuguese', 'Taiwanese', 'Thai', 'Turkish', 'Ukrainian', 'Vietnamese', 'Spanish & Tapas']);
 function frCuisine(cuisine) {
+  if (FR_CUISINE_FEMININE[cuisine]) return FR_CUISINE_FEMININE[cuisine];
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
   if (key && APP_TRANSLATIONS.fr[key]) return APP_TRANSLATIONS.fr[key];
   // French gaps (2026-10-18): cuisines app.js has no key for ("Soup", "Coffee", "West Coast" ...) use french-text.js's list.
@@ -43559,7 +43566,7 @@ ${renderGolfHeaderHtml()}
       <div class="mt-actions" id="mtActions" hidden>
         <button type="button" class="mt-btn primary" id="mtShare" hidden>${L('Share trip', 'Partager le voyage')}</button>
         <button type="button" class="mt-btn primary" id="mtCopy">${L('Copy trip link', 'Copier le lien du voyage')}</button>
-        <a class="mt-btn" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a>
+        <a class="mt-btn" href="/trip">${L('Build My Trip', 'Planifier mon voyage')}</a>
         <button type="button" class="mt-btn" id="mtClear">${T.clearTrip}</button>
       </div>
     </div>
@@ -43573,7 +43580,7 @@ ${renderGolfHeaderHtml()}
     <div class="mt-empty" id="mtEmpty" hidden>
       <h2>${L('Your trip is empty', 'Votre voyage est vide')}</h2>
       <p>${L('Tap <strong>Add to trip</strong> on any place, or let us plan it for you.', 'Touchez <strong>Ajouter au voyage</strong> sur un endroit, ou laissez-nous planifier le voyage pour vous.')}</p>
-      <div class="mt-actions"><a class="mt-btn primary" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
+      <div class="mt-actions"><a class="mt-btn primary" href="/trip">${L('Build My Trip', 'Planifier mon voyage')}</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
     </div>
   </div>
   </main>
@@ -45197,7 +45204,7 @@ const FR_PLACE_TYPES = { 'Casual': 'Décontracté', 'Family': 'Familial', 'Fine 
   'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
   'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house (golf ou ski)',
   'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur', 'Tea house': 'Salon de thé', 'Bubble tea': 'Thé aux perles',
-  'Ice cream & gelato': 'Crème glacée et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
+  'Ice cream & gelato': 'Crème glacée et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Délicatessen et sandwichs' };
 function frPlaceType(p) { return FR_PLACE_TYPES[p] || p; }
 // Public wording for the kind of place (2026-11-10, Dayton: show it). The stored value is the short tile label; pages
 // read a fuller phrase so "Casual" or "Family" make sense on their own after the cuisines. Not in schema.org: there is
@@ -45211,7 +45218,7 @@ const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family
   'Pub or sports bar': 'Pub ou bar sportif', 'Diner': 'Casse-croûte', 'Quick bite': 'Sur le pouce', 'Winery or brewery restaurant': 'Restaurant de vignoble ou de brasserie',
   'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house de golf ou de ski',
   'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur de café', 'Tea house': 'Salon de thé', 'Bubble tea': 'Comptoir de thé aux perles',
-  'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Charcuterie et sandwichs' };
+  'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Délicatessen et sandwichs' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -51564,8 +51571,12 @@ function renderOwnerSetupPage(found, opts) {
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
-    cur, cuisines: OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
+    // Café test 6 (2026-11-12): the full list in French alphabetical order on the French setup (it was sorted by the English
+    // names, so « Philippine » sat by F and « Grilladerie » by S).
+    cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
+    // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
+    cuisineShow: fr ? Object.fromEntries(OWNER_CUISINES.filter((c) => FR_CUISINE_ADJECTIVE.has(c)).map((c) => [c, `Cuisine ${frCuisine(c).toLowerCase()}`])) : {},
     // A café's kind as its page shows it ("Bubble tea shop"), for the preview line (café test 3).
     ...(cafe ? { placeShow: Object.fromEntries(placeTypesFor('cafe').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])) } : {}),
     placeTypes: placeTypesFor(venue.type), placeNames: Object.fromEntries(placeTypesFor(venue.type).map((p) => [p, fr ? frPlaceType(p) : (venue.type === 'pub' ? PLACE_TYPE_DISPLAY[p] : p)])),
@@ -51643,7 +51654,7 @@ const CAFE_SETUP_HELP_TOPICS = [
   { id: 'cafe-price', pages: ['setup', 'edit'], q: 'What price should I give?', qFr: 'Quel prix dois-je donner?',
     keys: ['price', 'price per person', 'how much', 'cost', 'spend'], keysFr: ['prix', 'combien', 'coût', 'par personne'],
     a: '<p>About how much one person pays for a coffee and a pastry. Cents are fine (like $5.50): use the 25¢ buttons. Ice cream shops give a single scoop, bubble tea and juice bars one drink, brunch cafés and delis a breakfast or lunch and a coffee. When prices show on pages, your page says it in those words, so it is never compared with restaurant meals.</p>',
-    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
+    aFr: '<p>Environ ce qu’une personne paie pour un café et une pâtisserie. Les cents sont acceptés (par exemple 5,50 $) : utilisez les boutons 25 ¢. Les bars laitiers donnent une boule, les comptoirs de thé aux perles et de jus une boisson, les cafés-brunchs et les charcuteries un déjeuner ou un dîner et un café. Quand les prix s’affichent sur les pages, votre page l’indique dans ces mots, pour ne jamais le comparer aux repas des restaurants.</p>' },
   { id: 'cafe-order-link', pages: ['setup'], q: 'When does my order link show?', qFr: 'Quand mon lien pour commander s’affiche-t-il?',
     keys: ['order online', 'order link', 'pre-order', 'preorder', 'cake order', 'custom cakes'], keysFr: ['commander en ligne', 'lien pour commander', 'précommande', 'gâteau'],
     a: '<p>The setup doesn’t ask for ordering links any more, to keep it short. A link you gave us before stays on your page. A drive-thru or walk-up window is a tile under “What you offer”, on your page right away. To add or change an order link, email us at info@okanaganroam.com.</p>',
@@ -56398,7 +56409,8 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
           : (fr ? 'Vous avez retiré une réponse « nous n’en avons pas »' : 'You took back a “we don’t have one” answer');
       }
     } catch (e) { /* unreadable */ }
-    const what = fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+    // Café test 6 (2026-11-12): names keep their capitals (« site Web », Instagram, Facebook; it read « Site web »).
+    const what = fields.join(', ').toLowerCase().replace(/\bsite web\b/g, 'site Web').replace(/\binstagram\b/g, 'Instagram').replace(/\bfacebook\b/g, 'Facebook').replace(/\btiktok\b/g, 'TikTok').replace(/^./, (c) => c.toUpperCase());
     const base = fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update';
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.undone_at ? r.undo_reason || null : r.rejection_reason,
       title: none ? (fields.length ? `${base}. ${none}` : none) : base });
@@ -57952,14 +57964,14 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Aucuns frais, jamais.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
+      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id)) : ''}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
         const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
         const hasMenu = portalFields(venue.type).menu;
         const tile = (task, icon, title, sub) => `<button type="button" class="op-task" data-pick="${task}"><span class="op-task-icon" aria-hidden="true">${icon}</span><span class="op-task-text"><strong>${title}</strong><span>${sub}</span></span></button>`;
-        const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(`Please update ${venue.name}`)}`;
+        const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(L(`Please update ${venue.name}`, `Mise à jour de ${venue.name}`))}`;
         return `<section class="op-tasks" id="opTasks" data-task="home" hidden aria-labelledby="opTasksHead">
         <h2 id="opTasksHead">${L('What would you like to do today?', 'Que souhaitez-vous faire aujourd’hui?')}</h2>
         <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : completeOn ? L('Quick answers go live right away. Other changes go live after a quick check, usually within a day.', 'Les réponses rapides sont en ligne tout de suite. Les autres modifications le sont après une courte vérification, habituellement en moins d’une journée.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>

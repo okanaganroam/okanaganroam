@@ -364,7 +364,7 @@ Object.assign(fr, {
   helpYes: 'Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous en ce moment :',
   mapFail: 'Nous n’avons pas pu charger la carte. Envoyez-la avec votre adresse et nous placerons l’épingle pour vous.', mapFailSend: 'Envoyer avec mon adresse', mapFailQ: 'Envoyez la photo de votre devanture',
   sameEvery: 'Pareil tous les jours', sameAsMon: 'Comme lundi', openOn: 'Ouvert ✓', closedOff: 'Fermé',
-  allDay: 'Toute la journée (de l’ouverture à la fermeture)', everyYear: 'Cette année et l’an prochain', everyYearSub: 'Coché : nous indiquons aussi que vous êtes fermé ce jour-là l’an prochain.',
+  allDay: 'Toute la journée (de l’ouverture à la fermeture)', everyYear: 'cette année et l’an prochain', everyYearSub: 'Si coché, nous l’indiquons aussi l’an prochain.',
   moreKinds: 'Autres genres', andMore: 'et plus',
 });
 fr.pub.hiLead = 'Préparons la page de votre pub, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.';
@@ -390,7 +390,7 @@ Object.assign(fr, {
   everyDay: 'Tous les jours', monFri: 'Lun–ven',
   badgeReach: 'Atteignez 100 % pour l’obtenir',
   spendGuess: 'Nous avons estimé {n} $ d’après ce que nous avons trouvé en ligne.',
-  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord, habituellement en moins d’un jour.',
+  sentMeans: 'Envoyé veut dire que nous vérifions d’abord, habituellement en moins d’un jour.',
 });
 en.pub.sportsEx = 'Do you turn the sound on for big games? You can add that later under “Weekly events”.';
 fr.pub.sportsEx = 'Vous mettez le son pour les grands matchs? Vous pourrez l’ajouter plus tard dans « Événements de la semaine ».';
@@ -415,7 +415,7 @@ Object.assign(fr, {
   lateHint: 'Ouvert après minuit? Touchez minuit, 1 h ou 2 h sous cette journée. Vendredi jusqu’à 1 h veut dire 1 h tôt samedi matin.',
   lateLbl: 'Ferme plus tard?', lateQ: '{day} : ferme à minuit ou plus tard',
   essReady: 'L’essentiel est fait', finishBar: 'Vos réponses sont enregistrées',
-  sentMeans: 'Envoyé veut dire que nous le vérifions d’abord. Cela s’affichera sur votre page d’ici un jour.',
+  sentMeans: 'Envoyé veut dire que nous vérifions d’abord. Cela s’affichera sur votre page d’ici un jour.',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour. Instagram s’affiche sur votre page tout de suite.',
   savedFbName: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
   doorNextTime: 'À faire la prochaine fois que vous serez à votre {type}',
@@ -461,7 +461,7 @@ Object.assign(fr, {
   hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven',
   camLeadSome: 'Une autre page? Ajoutez-la d’abord. Quand toutes les pages sont là, touchez Envoyer. Touchez ✕ pour en reprendre une.',
   noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse', noDogsSubInside: 'Pas à l’intérieur',
-  spendSkip: 'Pas certain? Passer',
+  spendSkip: 'Je ne sais pas, passer',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
   kitchenNeed: 'Choisissez l’heure à laquelle votre cuisine ferme.',
 });
@@ -493,7 +493,7 @@ Object.assign(fr, {
   webQEmpty: 'Où est votre menu en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouve votre menu.',
   researchLine: 'Nous avons coché ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.',
   storySportsQ: 'Votre description parle encore de sports', storySportsLead: 'Elle dit « {bit} ». Vous pouvez changer cela dans votre description.', storySportsBtn: 'Corriger ma description',
-  storySportsHint: 'Vous avez indiqué ne pas diffuser de sports, mais votre description dit « {bit} ». Modifiez ou retirez ce passage, puis enregistrez. Nous le vérifions d’abord.',
+  storySportsHint: 'Vous avez indiqué ne pas diffuser de sports, mais votre description dit « {bit} ». Modifiez ou retirez ce passage, puis enregistrez. Nous la vérifions d’abord.',
 });
 
 // Sixth first-time pub test (2026-11-10; drafts/fresh-eyes-pub6-2026-11-10/REPORT.md). Shared with restaurants.
@@ -524,8 +524,8 @@ en.st = Object.assign({}, en.st, { unsure: 'not sure (that’s fine)' });
 delete en.winterQ; delete en.winterHint; delete en.hoursThen;
 Object.assign(fr, {
   hoursNext: 'Suivant',
-  allYearQ: 'Ce sont vos heures toute l’année?', allYearLead: 'Si elles changent une partie de l’année, touchez la saison qui est différente.',
-  allYearYes: 'Oui, toute l’année', allYearSummer: 'Non, différentes l’été', allYearSummerSub: 'Vous ajoutez les heures d’été ensuite', allYearWinter: 'Non, différentes l’hiver', allYearWinterSub: 'Vous ajoutez les heures d’hiver ensuite',
+  allYearQ: 'Ces heures sont-elles les mêmes toute l’année?', allYearLead: 'Si elles changent une partie de l’année, touchez la saison qui est différente.',
+  allYearYes: 'Oui, toute l’année', allYearSummer: 'Non, elles changent en été', allYearSummerSub: 'Vous ajoutez les heures d’été ensuite', allYearWinter: 'Non, elles changent en hiver', allYearWinterSub: 'Vous ajoutez les heures d’hiver ensuite',
   seasonNow: 'Votre page a des heures d’{kind} différentes en ce moment, de {a} à {b}.', seasonWord: { summer: 'été', winter: 'hiver' },
   seasonEditQ: { summer: 'Vos heures d’été', winter: 'Vos heures d’hiver' },
   seasonEditLead: 'Touchez les mois, puis Modifier à côté d’une journée différente. Toute journée peut être ouverte, même une qui est fermée le reste de l’année.',
@@ -535,7 +535,7 @@ Object.assign(fr, {
   noSports: 'Pas de sports / pas de télé', noSportsSub: 'Nous ne diffusons pas de sports à la télé',
   curMainGoogle: 'La photo que nous avons maintenant (de Google Maps)', curMainOther: 'La photo que nous avons maintenant', keepMainOther: 'Garder cette photo pour l’instant',
   reviewLeadKeepOther: 'Touchez ✕ pour en retirer une. La photo que nous avons maintenant reste en haut, sauf si vous choisissez une des vôtres comme photo principale.',
-  socialUnsure: 'Pas certain / quelqu’un d’autre s’en occupe', socialUnsureSub: 'Aucun problème. Nous ne le redemanderons pas.', savedUnsure: 'Aucun problème. Nous ne le redemanderons pas. Vous pouvez l’ajouter à tout moment depuis votre page de modification.',
+  socialUnsure: 'Je ne sais pas / quelqu’un d’autre s’en occupe', socialUnsureSub: 'Aucun problème. Nous ne le redemanderons pas.', savedUnsure: 'Aucun problème. Nous ne le redemanderons pas. Vous pouvez l’ajouter à tout moment depuis votre page de modification.',
   doneNowTitle: 'Beau travail!', doneNowLead: 'Vos réponses sont enregistrées. C’est tout pour l’instant.', addLater: 'Ajouter plus de détails plus tard?', addLaterLead: 'Tout est facultatif. Chacun augmente un peu votre pourcentage.',
 });
 fr.st = Object.assign({}, fr.st, { unsure: 'pas certain (c’est correct)' });
@@ -591,7 +591,7 @@ Object.assign(en, {
   specialTimeQ: 'What time? (optional)', specialTimeEx: '10 AM to 1 PM for Sunday brunch. Leave it empty if it’s on all day.', specialTimeSame: 'The start and end times are the same. Please check them, or clear them.',
 });
 Object.assign(fr, {
-  freeLine: 'Gratuit. Aucuns frais, jamais.',
+  freeLine: 'Gratuit. Sans frais, pour toujours.',
   closeDayBtn: 'Indiquer fermé', openDayBtn: 'Ouvrir ce jour', dayClosedNow: '{day} : fermé', undo: 'Annuler', reopenDay: 'Rouvrir',
   lateLbl: 'Ouvert après minuit?', lateQ: '{day} : ouvert après minuit?',
   serviceDogsSub: 'Votre page indiquera « Pas de chiens (chiens d’assistance bienvenus) »',
@@ -694,7 +694,7 @@ fr.cafe = {
   orderUrlNeed: 'Écrivez votre lien de commande, ou décochez « Commande en ligne ».', badLink: 'Vérifiez le lien, par exemple votrecafe.com/commande.',
   dietQ: 'Détails alimentaires', dietLead: 'Les visiteurs qui ont des allergies ou un régime vérifient ceci avant de venir.',
   milksQ: 'Laits sans produits laitiers?', milkExtraQ: 'Coûtent-ils plus cher?', milkExtra: { no: 'Sans frais', yes: 'Oui, en supplément' },
-  gfQ: 'Pâtisseries sans gluten?', gf: { dedicated: 'Oui, d’une cuisine sans gluten', shared: 'Oui, faites dans une cuisine partagée' },
+  gfQ: 'Options sans gluten?', gf: { dedicated: 'Oui, d’une cuisine sans gluten', shared: 'Oui, faites dans une cuisine partagée' },
   dietMore: 'Aussi vrai?', veganBaking: 'Pâtisseries véganes', nutFree: 'Options sans noix', dietNeed: 'Touchez au moins une réponse, ou touchez Passer.',
   coffeeQ: 'Votre café', coffeeLead: 'Les amateurs de café aiment savoir d’où viennent les grains.', roastOwn: 'Nous torréfions nos propres grains',
   sourceLabel: 'Nos grains viennent de… (facultatif)', sourceEx: 'Le nom d’un torréfacteur local', beansForSale: 'Grains en vente', coffeeNeed: 'Touchez une réponse ou écrivez d’où viennent vos grains, ou touchez Passer.',
@@ -728,15 +728,15 @@ en.st = Object.assign({}, en.st, { day: 'we’ll add it within a day' });
 en.spendLeadOff = en.spendLead;
 Object.assign(fr, {
   savedDay: 'Nous l’ajouterons d’ici un jour.', photosSent: '✓ {n} photos envoyées. Nous les ajouterons d’ici un jour.',
-  sentMeans: 'Nous le vérifions d’abord, puis nous l’ajoutons à votre page d’ici un jour.',
+  sentMeans: 'Nous vérifions d’abord, puis nous l’ajoutons à votre page d’ici un jour.',
   savedFbName: 'Nous trouverons le lien de votre page Facebook et l’ajouterons d’ici un jour.', savedIgName: 'Nous ajouterons votre lien Instagram d’ici un jour.',
   savedMenuSocialName: 'Nous trouverons votre menu sur cette page et l’ajouterons d’ici un jour.',
   phoneRestSite: 'Nous ajouterons votre site Web d’ici un jour, après vérification.', phoneRestAddr: 'Nous ajouterons votre nouvelle adresse d’ici un jour, après vérification.',
   phoneRestBoth: 'Nous ajouterons votre nouvelle adresse et votre site Web d’ici un jour, après vérification.',
   savedSpendOff: 'Merci, c’est enregistré. Les prix ne s’affichent pas encore sur les pages. Votre prix s’affichera à ce moment-là.', stSoon: 'enregistré (les prix ne sont pas encore sur les pages)',
   helpSpend: 'Les prix ne sont pas encore affichés sur les pages. Nous utiliserons le vôtre quand ils le seront.',
-  snapSub: 'Photographiez votre menu (un tableau ou chaque page)',
-  closeYearly: 'Chaque année', closeYearlySub: 'Coché : nous indiquons aussi les mêmes dates l’an prochain, comme pour les jours fériés.', closeEnds: 'Fermé du {a} au {b}', addedYearly: '{x} (cette année et l’an prochain)',
+  snapSub: 'Un tableau ou chaque page',
+  closeYearly: 'Chaque année', closeYearlySub: 'Si coché, nous indiquons aussi les mêmes dates l’an prochain, comme pour les jours fériés.', closeEnds: 'Fermé du {a} au {b}', addedYearly: '{x} (cette année et l’an prochain)',
 });
 fr.st = Object.assign({}, fr.st, { day: 'nous l’ajouterons d’ici un jour' });
 fr.spendLeadOff = fr.spendLead;
@@ -784,7 +784,7 @@ Object.assign(fr, {
   openNow: 'Ouvert du {a} au {b} chaque année', openChange: 'Modifier', partYearBtn: '+ Nous fermons une partie de l’année (choisissez vos dates d’ouverture)',
   mdMonth: 'Mois', mdDay: 'Jour',
   everyYearRow: 'Chaque année : du {a} au {b}', yearlyTooLong: 'Une fermeture annuelle doit durer moins d’un an. Choisissez une fermeture plus courte.',
-  closeYearlySub: 'Coché : enregistré une seule fois comme fermeture annuelle, aux mêmes dates chaque année.', addedYearly: '{x} (chaque année)',
+  closeYearlySub: 'Si coché, ces dates reviennent chaque année.', addedYearly: '{x} (chaque année)',
 });
 
 // Café words by kind (café test 2, 2026-11-11): the photos prompt and the story example for each of the 11 kinds in
@@ -857,8 +857,8 @@ Object.assign(fr, {
 });
 
 // Cents on the café price (café test 2, 2026-11-11).
-Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more' });
-Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus' });
+Object.assign(en, { centsLabel: 'Cents', centsLess: '25 cents less', centsMore: '25 cents more', centsDown: '−25¢', centsUp: '+25¢' });
+Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMore: '25 cents de plus', centsDown: '−\u202f25\u00a0¢', centsUp: '+\u202f25\u00a0¢' });
 
 // Fourth first-time café test (Dayton, 2026-11-11): café words that fit a takeout window or a café with no patio.
 Object.assign(en.cafe, {
@@ -931,4 +931,24 @@ Object.assign(fr, {
   spendWhyOff: 'Cela aide les visiteurs à savoir à quoi s’attendre. Votre prix s’affichera sur votre page quand nous ajouterons les prix.', savedSpendOff: 'Votre prix s’affichera sur votre page quand nous ajouterons les prix.',
 });
 
-module.exports = { en, fr };
+// Café test 6 (2026-11-12): the other season's hours, said on the "Are these still your hours?" screen.
+Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
+Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
+
+// Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
+// no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
+// word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.
+function frSpacing(t) {
+  return String(t)
+    .replace(/([^\s\u00a0\u202f\d/])[ \u00a0\u202f]?:(?=[\s»”)]|$)/g, '$1\u00a0:')
+    .replace(/([^\s\u00a0\u202f?!])[ \u00a0\u202f]?([?!]+)(?=[\s»”)]|$)/g, '$1\u202f$2');
+}
+(function frSpaces(o) {
+  for (const k of Object.keys(o)) {
+    if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
+    else if (Array.isArray(o[k])) o[k] = o[k].map((x) => (typeof x === 'string' ? frSpacing(x) : x));
+    else if (o[k] && typeof o[k] === 'object') frSpaces(o[k]);
+  }
+})(fr);
+
+module.exports = { en, fr, frSpacing };

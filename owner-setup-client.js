@@ -15,6 +15,8 @@
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
   function dayName(d){ return C.dayNames[d]; }
   function monthName(i){ return C.monthNames[i]; }
+  // "Noël : …" in French, "Christmas Day: …" in English (café test 6: the French space before a colon).
+  function cl(a){ return a + (C.lang === 'fr' ? '\u00a0: ' : ': '); }
   // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
@@ -427,7 +429,7 @@
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   function stText(step, d){ return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
-    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(T.labels[k]) + ': ' + h(stText(k, done[k])) + '</li>'; }).join('');
+    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
   window.ohbLive = window.ohbLive || {};
@@ -656,20 +658,43 @@
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸' };
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
+  // "87 %" in French, as the line beside it says (café test 6).
+  function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
     // One number only (two read as a grade): where the page will be once we add what was sent.
-    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + sc.soon + '%</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
+    if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + pct(sc.soon) + '</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
       + h(T.pctAboutSub) + '</span>' + (raise ? '<small>' + h(T.pctRaise) + '</small>' : '') + '</div></div>';
-    return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + sc.pct + '%</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
+    return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + pct(sc.pct) + '</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
       + h(sc.pct >= 100 ? T.pctDone : raise ? T.pctRaise : T.niceWork) + '</span></div></div>';
   }
   function preview(){
     return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       // Café test 3 (2026-11-11): a café's kind comes first, as its page says it ("Bubble tea shop · Korean · Dessert", not
       // "Korean · Dessert · Bubble tea", which read like a Korean restaurant).
-      + h([C.cafe && S.place ? (C.placeShow || {})[S.place] || C.placeNames[S.place] || S.place : '', S.cuis.length ? S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, !C.cafe && S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: money(S.spend), words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([C.cafe && S.place ? (C.placeShow || {})[S.place] || C.placeNames[S.place] || S.place : '', S.cuis.length ? S.cuis.map(function(c){ return (C.cuisineShow || {})[c] || C.cuisineNames[c] || c; }).join(' · ') : C.cafe && S.place ? '' : C.typeLabel, !C.cafe && S.place && C.placeNames[S.place] ? C.placeNames[S.place] : '', C.regionLabel, S.done.spend && S.done.spend !== 'skip' && C.spendPublic ? (C.cafe ? fill(T.aPersonCafe, { n: money(S.spend), words: cafeWords() }) : fill(T.aPerson, { n: S.spend })) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+  }
+  // Café test 6 (2026-11-12): reopening the Hours step showed only the usual week, and an owner with summer hours
+  // feared they were lost. One line per saved season: "Summer (Jun–Sep): 7 AM – 3 PM every day ✓". No new question.
+  function weekShort(w){
+    var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
+    if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
+    var out = [], i = 0;
+    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
+    return out.join(' · ');
+  }
+  function seasonLines(){
+    return (CUR.hours_seasons || []).map(function(sz){
+      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
+      var w = parseWeek(sz.hours); if (!w) return '';
+      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
+      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
+      var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
+      var last = new Date(2025, b, 0).getDate();
+      var range = monthName(a - 1) + (da > 1 ? ' ' + da : '') + '–' + monthName(b - 1) + (db < last ? ' ' + db : '');
+      return '<p class="su-sent su-seasonnow su-seahours">' + h(fill(T.seasonHoursLine, { kind: kw, range: range, hours: weekShort(w) })) + '</p>';
+    }).join('');
   }
   function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
 
@@ -689,7 +714,7 @@
     if (C.cafe && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase(); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
-    return T.optional + ': ' + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
+    return cl(T.optional) + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
   }
   function leftList(){
     var out = [], seen = {};
@@ -904,7 +929,7 @@
         + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + big('✕', T.noWebsiteBtn, '', true, 'basicsNoSite') + '</div>';
     } else if (s === 'hours') {
-      x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
+      x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
         : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + '</div>') + skip('hours');
     } else if (s === 'hours:year') {
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
@@ -1003,7 +1028,7 @@
         // year?"). This screen only shows a saved open season, with Change.
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
-        + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(T.holidays[o.key] + ': ' + T.everyYear) + '</span></label>'; }).join('')
+        + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(cl(T.holidays[o.key]) + T.everyYear) + '</span></label>'; }).join('')
         + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
         // Pub test 6 (2026-11-10): not sticky. On a 375x667 phone the big button sat over the holiday tiles; it now comes
         // after them.
@@ -1028,7 +1053,7 @@
       var sw = C.cafe ? cafeWords() : '';
       x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + ' $' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
         // Café test 2 (2026-11-11): cents for cafés ($5.50 a scoop), in 25-cent steps.
-        + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">−25¢</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">+25¢</button></div>' : '')
+        + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">' + h(T.centsDown || '−25¢') + '</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">' + h(T.centsUp || '+25¢') + '</button></div>' : '')
         + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: money(S.spend) }), '', false, 'spendSave') + '</div>' + skip('spend');
     } else if (s === 'cuisine' && C.cafe) {
       // Cafés (2026-11-10): "What kind of café?" first (one of 11), then "What do you serve?".
