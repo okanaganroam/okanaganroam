@@ -1075,6 +1075,13 @@ function setLanguage(lang){
     window.location.assign(twin.getAttribute('href').replace(/^https:\/\/okanaganroam\.com/, ''));
     return;
   }
+  // A private page with a twin but no hreflang (the business portal: noindex, never in a sitemap) names its other
+  // language's address in data-twin-path (café test 6, 2026-11-12). The query and #step come along.
+  var twinPath = document.documentElement.getAttribute('data-twin-path');
+  if (twinPath && /^\//.test(twinPath) && (document.documentElement.lang || '').slice(0, 2) !== lang) {
+    window.location.assign(twinPath + window.location.search + window.location.hash);
+    return;
+  }
   applyTranslations();
   // Update existing venue cards in place rather than rebuilding them.
   // renderVenueCards() would destroy and recreate every .venue-card, but

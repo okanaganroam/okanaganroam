@@ -584,7 +584,7 @@ Object.assign(fr, {
 // service dogs, a clearer photo tick box and optional times for a special.
 Object.assign(en, {
   freeLine: 'Free. No cost, ever.',
-  closeDayBtn: 'Mark closed', openDayBtn: 'Open this day', dayClosedNow: '{day} closed', undo: 'Undo',
+  closeDayBtn: 'Mark closed', openDayBtn: 'Open this day', dayClosedNow: '{day} closed', undo: 'Undo', reopenDay: 'Reopen',
   lateLbl: 'Open after midnight?', lateQ: '{day}: open after midnight?',
   serviceDogsSub: 'Your page will say “No dogs (service dogs welcome)”',
   rightsStep: 'Tick this, then send',
@@ -592,7 +592,7 @@ Object.assign(en, {
 });
 Object.assign(fr, {
   freeLine: 'Gratuit. Aucuns frais, jamais.',
-  closeDayBtn: 'Indiquer fermé', openDayBtn: 'Ouvrir ce jour', dayClosedNow: '{day} : fermé', undo: 'Annuler',
+  closeDayBtn: 'Indiquer fermé', openDayBtn: 'Ouvrir ce jour', dayClosedNow: '{day} : fermé', undo: 'Annuler', reopenDay: 'Rouvrir',
   lateLbl: 'Ouvert après minuit?', lateQ: '{day} : ouvert après minuit?',
   serviceDogsSub: 'Votre page indiquera « Pas de chiens (chiens d’assistance bienvenus) »',
   rightsStep: 'Cochez ceci, puis envoyez',

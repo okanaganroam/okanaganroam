@@ -769,7 +769,8 @@
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
     'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights'];
   var DR = { base: {}, s: {}, at: {}, last: '' };
-  function drKey(b){ return 'suDraft:' + C.base + ':' + b; }
+  // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
+  function drKey(b){ return 'suDraft:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, '') + ':' + b; }
   function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function drPut(b, d){ try { window.sessionStorage.setItem(drKey(b), JSON.stringify(d)); } catch (e) {} }
   function drDrop(b){ try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
@@ -948,7 +949,9 @@
           // ("Monday closed · Undo").
           + '<span class="su-hbtns"><button type="button" class="su-hchg" data-hopen="' + d + '" aria-label="' + h(fill(T.hoursChangeDay, { day: longDay(d) })) + '"><span aria-hidden="true">✎</span> ' + h(T.hoursChange) + '</button></span>'
           + '<div class="su-hoffrow">' + (w ? '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="false" aria-label="' + h(fill(T.closeDayAria, { day: longDay(d) })) + '">' + h(T.closeDayBtn) + '</button>'
-            : hoffUndo(d) ? '<span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span> <button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.undo) + '</button>'
+            // Café test 6 (2026-11-12): "Reopen" takes the place of "Mark closed" (same spot, same height) and the "Monday
+            // closed" note comes after it, so a quick second tap on the next day's button never lands on another day.
+            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
@@ -2308,6 +2311,16 @@
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
   window.addEventListener('pagehide', drSave);
+  // Café test 6 (2026-11-12): "Français / English" opens the same question in the other language. What she typed is kept
+  // as a draft (above) and there is no "leave this page?" prompt.
+  window.suLangHash = function(){
+    var s0 = S.step, b0 = base(s0);
+    if (b0 === 'closures') return 'closures';
+    if (s0 === 'hours:year') return s0;
+    if (STEPS.indexOf(b0) >= 0) return b0;
+    return s0 === 'more' ? 'more' : '';
+  };
+  window.suBeforeLang = function(){ try { if (S.step === 'hours:edit' || S.step === 'hours:season') readTimes(); } catch (e) {} drSave(); S.leaving = true; };
   render();
   window.addEventListener('beforeunload', function(e){ drSave(); if (S.leaving) return; if (S.busy || S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length) { e.preventDefault(); e.returnValue = ''; } });
 })();

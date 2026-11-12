@@ -51841,7 +51841,12 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-hoffrow { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--su-line); }
   body.owner-setup .su-hoffrow .su-hoff { min-height: 48px; min-width: 0; padding: 0 4px; border: 0; background: none; color: var(--su-warn); font-size: 16px; text-decoration: underline; text-underline-offset: 3px; }
   body.owner-setup .su-hoffrow .su-hoff[aria-pressed="true"] { background: none; color: var(--su-teal); border: 0; }
-  body.owner-setup .su-hoffrow .su-hoff.su-hoff-undo[aria-pressed] { min-height: 48px; padding: 0 14px; border: 2px solid var(--su-teal); border-radius: 14px; background: #fff; text-decoration: none; }
+  body.owner-setup .su-hoffrow .su-hoff.su-hoff-undo[aria-pressed] { box-sizing: border-box; height: 48px; min-height: 48px; padding: 0 14px; border: 2px solid var(--su-teal); border-radius: 14px; background: #fff; text-decoration: none; }
+  /* Café test 6: the row keeps one height whether the day says "Mark closed" or "Reopen · Monday closed". */
+  body.owner-setup .su-hoffrow { min-height: 54px; box-sizing: border-box; }
+  body.owner-setup .su-hoffrow .su-hoff { box-sizing: border-box; height: 48px; }
+  body.owner-setup .su-hoffrow:has(.su-hoff-undo) { flex-wrap: nowrap; }
+  body.owner-setup .su-hoffrow .su-hundo { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.owner-setup .su-hundo { font-weight: 800; color: var(--su-warn); }
   body.owner-setup .su-tick.su-rights { margin: 18px 0 12px; padding: 18px 16px; min-height: 72px; align-items: center; border: 3px solid var(--su-gold); background: #FFF8E6; font-size: 19px; }
   body.owner-setup .su-tick.su-rights input { width: 36px; height: 36px; }
@@ -53028,11 +53033,11 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>{ON}, find <strong>Website</strong> under <strong>Contact</strong>.</li><li>Paste the working address. Copying it from your browser’s address bar, starting with https://, is the surest way.</li><li>Tap {SEND}.</li></ol><p>A new website is <strong>always checked by us first</strong>, usually within a day, even when you’re signed in, so the old link shows until then and the field says <strong>Waiting for review</strong>. A broken booking, menu or social link? Those are in <strong>Name, address &amp; links</strong>, and work the same way.</p>',
     aFr: '<ol><li>{ON}, trouvez <strong>Site Web</strong> sous <strong>Coordonnées</strong>.</li><li>Collez la bonne adresse. Le plus sûr est de la copier dans la barre d’adresse de votre navigateur, en commençant par https://.</li><li>Touchez {SEND}.</li></ol><p>Un nouveau site Web est <strong>toujours vérifié par nous d’abord</strong>, en général d’ici un jour, même avec un compte : l’ancien lien reste affiché d’ici là et le champ indique <strong>En attente de vérification</strong>. Un lien de réservation, de menu ou de réseau social brisé? Ils sont dans <strong>Nom, adresse et liens</strong>, et fonctionnent de la même façon.</p>' },
   // French portal (2026-10-18): every signed-in page is in French now; the bot says so and names the French buttons.
-  { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim'],
+  { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim', 'setup'],
     keys: ['in french', 'french version', 'french page', 'francais', 'language', 'translate', 'translation'],
     keysFr: ['en francais', 'version francaise', 'anglais', 'en anglais', 'langue', 'traduire', 'traduction', 'traduit'],
-    a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>EN / FR</strong> at the top of the page to switch; this device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
-    aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>FR / EN</strong> en haut de la page pour changer de langue; cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
+    a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>Français</strong> at the top of your edit page or of the setup screens to switch (on a French page it says <strong>English</strong>). On a phone it is also in the ☰ menu (<strong>EN / FR</strong>). This device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
+    aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>Français</strong> en haut de votre page de modification ou des écrans de configuration pour changer de langue (sur une page en français, le lien dit <strong>English</strong>). Sur un téléphone, c’est aussi dans le menu ☰ (<strong>EN / FR</strong>). Cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
   // Round 10 (2026-10-19): « ma fiche dit fermé mais on est ouvert » got the Claim answer on My listings; "my photos
   // are blurry" had no photo tips; "who are you" / « qui êtes-vous » got "not sure".
   { id: 'shows-closed', over: ['hours', 'season', 'claim'], q: 'My page says closed but we’re open', qFr: 'Ma fiche dit fermé, mais nous sommes ouverts', pages: ['edit', 'account'],
@@ -53796,24 +53801,63 @@ function ownerPortalLangRequest(method, rawUrl) {
   const m = OWNER_FR_PORTAL_RE.exec(String(rawUrl || ''));
   if (m) {
     if (getLike && /^\/owner\/(?:login|link|forgot)$/.test(m[1])) return null;
-    return { lang: 'fr', enPath: m[1], enUrl: m[1] + (m[2] || '') };
+    return { lang: 'fr', enPath: m[1], enUrl: m[1] + (m[2] || ''), search: m[2] || '' };
   }
   const p = String(rawUrl || '').split('?')[0];
-  if (getLike && OWNER_EN_PORTAL_PAGE_RE.test(p)) return { lang: 'en', enPath: p, enUrl: rawUrl };
+  if (getLike && OWNER_EN_PORTAL_PAGE_RE.test(p)) { const q = String(rawUrl).indexOf('?'); return { lang: 'en', enPath: p, enUrl: rawUrl, search: q >= 0 ? String(rawUrl).slice(q) : '' }; }
   return null;
 }
 // The header switch remembers the language picked, like app.js does on the rest of the site (the portal pages
 // don't load app.js), so an English portal page doesn't send someone straight back to French.
+// Café test 6 (2026-11-12): on a phone the header's EN / FR sits in the ☰ menu, whose buttons pressed the hidden header
+// link; with the menu open that link is inert, so FR did nothing on the owner pages. Every switch on a portal page (the
+// header link, the menu's EN and FR, the "Français / English" link at the top of the edit page and the setup) now goes
+// straight to the other language's address, read from the page (the link's href, else <html data-twin-path>), keeping
+// the query and, in the setup, the question she is on (window.suLangHash). No hreflang: these pages stay noindex.
 const OWNER_LANG_SWITCH_SCRIPT = `<script>
 (function(){
-  var t = document.getElementById('langToggle'); if (!t) return;
-  t.addEventListener('click', function(){ try { localStorage.setItem('okanaganLang', t.getAttribute('hreflang') === 'fr' ? 'fr' : 'en'); } catch (e) {} });
+  var root = document.documentElement;
+  function cur(){ return /^fr/i.test(root.lang || '') ? 'fr' : 'en'; }
+  function target(){
+    var a = document.querySelector('.owner-lang-link') || document.getElementById('langToggle'), h = a && a.getAttribute('href');
+    if (!h || h.charAt(0) === '#') { var p = root.getAttribute('data-twin-path'); if (!p) return ''; h = p + location.search; }
+    h = h.split('#')[0];
+    var st = typeof window.suLangHash === 'function' ? window.suLangHash() : String(location.hash || '').slice(1);
+    return h + (st ? '#' + st : '');
+  }
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('#langToggle, .owner-lang-link, .nav-lang-opt') : null;
+    if (!el || (el.classList.contains('nav-lang-opt') && el.getAttribute('data-lang') === cur())) return;
+    var h = target(); if (!h) return;
+    e.preventDefault(); e.stopPropagation();
+    var to = cur() === 'fr' ? 'en' : 'fr';
+    try { localStorage.setItem('okanaganLang', to); } catch (x) {}
+    try { if (window.trackEvent) window.trackEvent('language_change', { language: to }); } catch (x) {}
+    if (typeof window.suBeforeLang === 'function') window.suBeforeLang();
+    location.assign(h);
+  }, true);
 })();
 </script>`;
+// The small "Français" / "English" link at the top of the owner edit page and the setup screens (café test 6).
+function ownerLangLinkHtml(lang, href, cls) {
+  const to = lang === 'fr' ? 'en' : 'fr';
+  return `<a class="owner-lang-link${cls ? ` ${cls}` : ''}" href="${href}" hreflang="${to}" lang="${to}" rel="nofollow">${to === 'fr' ? 'Français' : 'English'}</a>`;
+}
+const OWNER_LANG_LINK_CSS = '<style>body.owner-page .op-lang{margin:0 0 4px;font-size:.95rem}body.owner-page .op-lang a,body.owner-setup .su-lang{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;font-weight:800;color:#1E4F4C;text-decoration:underline;text-underline-offset:3px}body.owner-setup .su-head .su-lang{margin-left:auto;font-size:16px}</style>';
 function ownerLangHtml(html, lang, enPath, search) {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   let out = html;
   const pageFr = /<html lang="fr/.test(out);
+  // Where the switch goes (the other language's address, no query: the script adds the page's own). A data attribute,
+  // never a hreflang alternate: portal pages are private and noindex.
+  const twinPath = lang === 'fr' ? enPath : frTwinPath(enPath);
+  if (!/\/menu$/.test(enPath) && !(lang === 'en' && pageFr)) {
+    out = out.replace(/<html lang="([^"]*)"(?![^>]*data-twin-path)/, (m, l) => `<html lang="${l}" data-twin-path="${escapeHtml(twinPath)}"`);
+    const linkHref = escapeHtml(twinPath + (search || ''));
+    // The setup screens: beside Exit. The edit page: above its title.
+    if (out.includes('<a class="su-exit"')) out = out.replace('<a class="su-exit"', `${ownerLangLinkHtml(lang, linkHref, 'su-lang')}<a class="su-exit"`).replace('</head>', `${OWNER_LANG_LINK_CSS}\n</head>`);
+    else if (out.includes('<div class="op-head">')) out = out.replace('<div class="op-head">', `<div class="op-head">\n      <p class="op-lang">${ownerLangLinkHtml(lang, linkHref, '')}</p>`).replace('</head>', `${OWNER_LANG_LINK_CSS}\n</head>`);
+  }
   if (lang === 'fr') {
     // The site header in French, as on the French menu screen (ownerSimplePage may already have run frA11yLabels on it).
     const hdr = renderGolfHeaderHtml();
@@ -53828,7 +53872,7 @@ function ownerLangHtml(html, lang, enPath, search) {
     out = out.replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
     out = withTwinLangSwitch(out, `${frPath}${search ? search.replace(/&/g, '&amp;') : ''}`, 'en');
   }
-  return out.includes('id="langToggle"') && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
+  return (out.includes('id="langToggle"') || out.includes('class="owner-lang-link')) && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
 }
 function installOwnerLangResponse(req, res, lang, enPath, search = '') {
   res.ownerLang = lang;
@@ -59443,7 +59487,7 @@ const server = http.createServer(async (req, res) => {
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
   {
     const op = ownerPortalLangRequest(req.method, req.url);
-    if (op) { req.url = op.enUrl; installOwnerLangResponse(req, res, op.lang, op.enPath); }
+    if (op) { req.url = op.enUrl; installOwnerLangResponse(req, res, op.lang, op.enPath, op.search); }
   }
   // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
   // English page of a pair gets its hreflang and EN / FR switch the same way.
