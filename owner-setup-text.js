@@ -935,6 +935,118 @@ Object.assign(fr, {
 Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
 Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
 
+// Wineries (Dayton, 2026-11-12; drafts/winery-portal-2026-11-12/SPEC-wineries.md, "Decided"): winery words and the
+// winery-only screens (Your winery, Tastings, Booking and groups, Experiences, the off-season by appointment), laid over
+// the words above for a winery's setup (server.js renderOwnerSetupPage). Restaurants, pubs and cafés never see these.
+// Like cafés, holidays end the Hours step and Instagram and Facebook are one screen (socialQ...).
+en.winery = {
+  hiLead: 'Let’s get your winery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  timeLine: 'About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { hours: 'Hours and holidays', winery: 'Your winery', tastings: 'Tastings', visit: 'Booking and groups', photos: 'Photos', offer: 'What you offer',
+    story: 'Your story and Known for', experiences: 'Experiences', menu: 'Tasting menu or wine list', social: 'Instagram and Facebook', door: 'Your tasting room door' },
+  noLabels: { experiences: 'no extras', social: 'not on Instagram or Facebook' },
+  photosLead: 'Your tasting room, your view, the vines. Three photos is perfect.', photosNoMore: 'No, next: what you offer',
+  // Your winery
+  wkindQ: 'What kind of winery is it?', wkindLead: 'Pick the one that fits best.', wkindNeed: 'Please tap the kind of winery that fits best.',
+  wkindSubs: { 'Estate winery': 'Your own vineyard and tasting room', 'Boutique winery': 'Small and family run', 'Tasting room in town': 'A tasting room away from the vines',
+    'Fruit or honey wines': 'Like fruit wines, mead or honey wine', 'Winery and cidery': 'Wine and cider made here' },
+  foodQ: 'Food here?', foods: { none: 'None', snacks: 'Snacks or a cheese plate', picnic: 'Picnic area', restaurant: 'A restaurant or bistro' },
+  ownPage: '{name} has its own page.', ownPageSub: 'Update its hours and menu there, with its own link. We won’t ask you for them twice.', ownPageLink: 'See the {name} page',
+  rnameLabel: 'Restaurant name', rnameEx: 'The Vineyard Bistro', rwhenLabel: 'When is it open? (optional)', rwhenEx: 'Thu–Mon from noon', rnameNeed: 'Please type your restaurant’s name, or tap another answer.',
+  // Tastings
+  feeQ: 'What does a tasting cost per person?', feeLead: 'It shows on your page and on your card right away.',
+  feeGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', feeWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
+  feeFree: 'Free', feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.',
+  feeNeed: 'Please tap a price, or tap Other and type it, like 18.',
+  waivedQ: 'Is it free if people buy wine?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
+  feeSavedLive: 'Your tasting price is on your page and your card now.', feeSavedDay: 'We check prices over $75 first. It’ll show within a day.',
+  feeCard: 'tastings from {x}', feeCardFree: 'free tastings',
+  // Booking and groups
+  visitQ: 'How do people visit?', visitLead: 'Pick the one that fits most days.',
+  visits: { walk_in: 'Walk-ins welcome', recommended: 'Booking recommended', needed: 'Booking needed', appointment: 'By appointment only' },
+  visitSubs: { appointment: 'Your card says “By appointment · call ahead”' },
+  bookLinkEx: 'Your Tock or Commerce7 page, or your website’s booking page', noBookLink: 'We don’t take bookings online', bookLinkBad: 'Please check the booking link, for example yourwinery.com/book.',
+  groupsSizeQ: 'Groups: from what size should they book ahead?', groupsSizeLead: 'Your page says “Groups of 8 or more, please book ahead”.',
+  busesQ: 'Tour buses and limos?', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
+  visitNeed: 'Please tap how people visit, or tap Skip.', visitSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
+  // Off-season by appointment (Hours)
+  allYearAppt: 'In the off-season we’re open by appointment', allYearApptSub: 'Walk-in tastings part of the year, by appointment the rest',
+  apptQ: 'When are you open for walk-in tastings?', apptLead: 'Outside these dates your card says “By appointment · call ahead”.',
+  apptFrom: 'Walk-ins from', apptTo: 'Walk-ins until', apptSave: 'Save my hours', apptNeed: 'Please pick the first and last day of walk-in tastings.',
+  apptNow: 'Walk-ins {a} – {b}, by appointment the rest of the year ✓',
+  // Your story and Known for
+  storyQ: 'Tell visitors about your winery', storyEx: 'A family winery on the Naramata Bench. We grow Pinot Noir and Chardonnay, and the patio looks over the lake.',
+  knownQ: 'What are your wines known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
+  storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
+  // Experiences
+  expQ: 'Any experiences to book?', expLead: 'Up to two, like wine and cheese or a vineyard tour. They show in “Plan your visit”.',
+  expN: 'Experience {n}', expNameLabel: 'Name', expTextLabel: 'Details (optional)', expQuick: ['Wine & cheese', 'Vineyard tour', 'Picnic baskets', 'Private tasting'],
+  expEx1: '$45 a person, daily at 1 PM. Book ahead.', expEx2: 'A walk through the vines with the winemaker, about 1 hour.',
+  expNone: 'We don’t offer extras', expNeed: 'Please type an experience, or tap “We don’t offer extras”.', expNameNeed: 'Please give each experience a name, like Wine & cheese.',
+  // Tasting menu or wine list
+  menuQ: 'How should we add your tasting menu or wine list?', menuLead: 'Pick the easiest one for you. It’s optional.', menuSentQ: 'Your wine list is sent ✓', menuNewer: 'Want to send a newer one?',
+  upload: 'Upload my wine list (a file or photos)', snap: 'Take photos of my tasting menu', snapSub: 'Snap each page', web: 'My wine list is on my website',
+  menuSocial: 'My wine list is on Facebook or Instagram', emailQ: 'Email your wine list to us', emailLead: 'Send a photo or a file of your tasting menu or wine list. Put “{name}” in the subject.',
+  mailSubject: 'Wine list for {name}', menuSentEmail: '✓ You said you’ll email your wine list.', menuNote: 'Sent from the easy setup. Please add our tasting menu or wine list to our page.',
+  // Instagram and Facebook on one screen, and the hours line on the holidays screen (as for cafés)
+  socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.',
+  socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
+  hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.',
+  // Your tasting room door
+  doorQ: 'Help people find your tasting room', doorLead: 'On a big estate the map pin can land in the vines. One photo, taken at the tasting room door, walks visitors right to it.',
+  doorPhotoQ: 'Take a photo of your tasting room door', doorPhotoLead: 'Stand outside so the door and your sign are in the picture. Your phone will ask to share your location, so visitors get directions to this spot.',
+  igLead: 'Type your Instagram name, like @yourwinery.',
+};
+fr.winery = {
+  hiLead: 'Préparons la page de votre vignoble, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  labels: { hours: 'Heures et jours fériés', winery: 'Votre vignoble', tastings: 'Dégustations', visit: 'Réservations et groupes', photos: 'Photos', offer: 'Ce que vous offrez',
+    story: 'Votre histoire et ce pour quoi vous êtes connus', experiences: 'Expériences', menu: 'Menu de dégustation ou carte des vins', social: 'Instagram et Facebook', door: 'La porte de votre salle de dégustation' },
+  noLabels: { experiences: 'pas d’extras', social: 'pas sur Instagram ni Facebook' },
+  photosLead: 'Votre salle de dégustation, votre vue, les vignes. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
+  wkindQ: 'Quel genre de vignoble est-ce?', wkindLead: 'Choisissez celui qui convient le mieux.', wkindNeed: 'Touchez le genre de vignoble qui convient le mieux.',
+  wkindSubs: { 'Estate winery': 'Votre propre vignoble et votre salle de dégustation', 'Boutique winery': 'Petit et familial', 'Tasting room in town': 'Une salle de dégustation loin des vignes',
+    'Fruit or honey wines': 'Comme des vins de fruits, de l’hydromel ou du vin de miel', 'Winery and cidery': 'Vin et cidre faits sur place' },
+  foodQ: 'Nourriture sur place?', foods: { none: 'Aucune', snacks: 'Collations ou plateau de fromages', picnic: 'Aire de pique-nique', restaurant: 'Un restaurant ou un bistro' },
+  ownPage: '{name} a sa propre page.', ownPageSub: 'Mettez ses heures et son menu à jour là-bas, avec son propre lien. Nous ne vous les demanderons pas deux fois.', ownPageLink: 'Voir la page de {name}',
+  rnameLabel: 'Nom du restaurant', rnameEx: 'Le Bistro du vignoble', rwhenLabel: 'Quand est-il ouvert? (facultatif)', rwhenEx: 'Du jeudi au lundi dès midi', rnameNeed: 'Écrivez le nom de votre restaurant, ou touchez une autre réponse.',
+  feeQ: 'Combien coûte une dégustation par personne?', feeLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.',
+  feeGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', feeWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
+  feeFree: 'Gratuite', feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.',
+  feeNeed: 'Touchez un prix, ou touchez Autre et écrivez-le, par exemple 18.',
+  waivedQ: 'Est-elle gratuite à l’achat de vin?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
+  feeSavedLive: 'Votre prix de dégustation est sur votre page et votre fiche maintenant.', feeSavedDay: 'Nous vérifions d’abord les prix de plus de 75 $. Il s’affichera d’ici un jour.',
+  feeCard: 'dégustations dès {x}', feeCardFree: 'dégustations gratuites',
+  visitQ: 'Comment vous visite-t-on?', visitLead: 'Choisissez ce qui convient la plupart des jours.',
+  visits: { walk_in: 'Sans réservation', recommended: 'Réservation conseillée', needed: 'Réservation obligatoire', appointment: 'Sur rendez-vous seulement' },
+  visitSubs: { appointment: 'Votre fiche indique « Sur rendez-vous · appelez avant »' },
+  bookLinkEx: 'Votre page Tock ou Commerce7, ou la page de réservation de votre site', noBookLink: 'Nous ne prenons pas de réservations en ligne', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrevignoble.com/reserver.',
+  groupsSizeQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsSizeLead: 'Votre page indique « Groupes de 8 personnes ou plus : réservez à l’avance ».',
+  busesQ: 'Autobus et limousines?', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
+  visitNeed: 'Touchez comment on vous visite, ou touchez Passer.', visitSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
+  allYearAppt: 'En basse saison, nous ouvrons sur rendez-vous', allYearApptSub: 'Dégustations sans réservation une partie de l’année, sur rendez-vous le reste',
+  apptQ: 'Quand accueillez-vous les visiteurs sans réservation?', apptLead: 'En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».',
+  apptFrom: 'Sans réservation à partir du', apptTo: 'Sans réservation jusqu’au', apptSave: 'Enregistrer mes heures', apptNeed: 'Choisissez le premier et le dernier jour des dégustations sans réservation.',
+  apptNow: 'Sans réservation du {a} au {b}, sur rendez-vous le reste de l’année ✓',
+  storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
+  knownQ: 'Pour quoi vos vins sont-ils connus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
+  storyKnownSaved: 'Ce pour quoi vous êtes connus est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  expQ: 'Des expériences à réserver?', expLead: 'Jusqu’à deux, comme vin et fromage ou une visite du vignoble. Elles paraissent dans « Planifiez votre visite ».',
+  expN: 'Expérience {n}', expNameLabel: 'Nom', expTextLabel: 'Détails (facultatif)', expQuick: ['Vin et fromage', 'Visite du vignoble', 'Paniers de pique-nique', 'Dégustation privée'],
+  expEx1: '45 $ par personne, tous les jours à 13 h. Réservez à l’avance.', expEx2: 'Une promenade dans les vignes avec le vigneron, environ 1 heure.',
+  expNone: 'Nous n’offrons pas d’extras', expNeed: 'Écrivez une expérience, ou touchez « Nous n’offrons pas d’extras ».', expNameNeed: 'Donnez un nom à chaque expérience, comme Vin et fromage.',
+  menuQ: 'Comment devrions-nous ajouter votre menu de dégustation ou votre carte des vins?', menuLead: 'Choisissez le plus facile pour vous. C’est facultatif.', menuSentQ: 'Votre carte des vins est envoyée ✓', menuNewer: 'Vous voulez en envoyer une plus récente?',
+  upload: 'Téléverser ma carte des vins (un fichier ou des photos)', snap: 'Photographier mon menu de dégustation', snapSub: 'Photographiez chaque page', web: 'Ma carte des vins est sur mon site Web',
+  menuSocial: 'Ma carte des vins est sur Facebook ou Instagram', emailQ: 'Envoyez-nous votre carte des vins par courriel', emailLead: 'Envoyez une photo ou un fichier de votre menu de dégustation ou de votre carte des vins. Indiquez « {name} » dans l’objet.',
+  mailSubject: 'Carte des vins de {name}', menuSentEmail: '✓ Vous avez dit que vous enverrez votre carte des vins par courriel.', menuNote: 'Envoyé depuis la configuration simple. Veuillez ajouter notre menu de dégustation ou notre carte des vins à notre page.',
+  socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
+  socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
+  hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
+  doorQ: 'Aidez les gens à trouver votre salle de dégustation', doorLead: 'Sur un grand domaine, l’épingle peut tomber dans les vignes. Une photo, prise à la porte de la salle de dégustation, y mène les visiteurs directement.',
+  doorPhotoQ: 'Prenez une photo de la porte de votre salle de dégustation', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre téléphone vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
+  igLead: 'Écrivez votre nom Instagram, comme @votrevignoble.',
+};
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.

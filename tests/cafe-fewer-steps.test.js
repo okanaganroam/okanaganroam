@@ -110,8 +110,10 @@ test('holidays and closures inside Hours: saved through the hours flow, recorded
   assert.equal(cfg.t.labels.hours, 'Hours and holidays');
   assert.equal(cfg.progress.done.closures, 'live', 'the stored closures answer is still sent to the page');
   const js = app.OWNER_SETUP_SCRIPT || fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
-  assert.match(js, /C\.cafe \? 'closures' : null/, 'a café\'s hours save goes straight on to its closures');
-  assert.match(js, /if \(C\.cafe && step === 'hours'\) return go\('closures'\)/);
+  assert.match(js, /COMBO \? 'closures' : null/, 'a café\'s hours save goes straight on to its closures');
+  // Wineries (2026-11-12) share the rule: COMBO is cafés and wineries.
+  assert.match(js, /if \(COMBO && step === 'hours'\) return go\('closures'\)/);
+  assert.match(js, /var COMBO = !!\(C\.combo \|\| C\.cafe\);/);
 });
 
 test('Instagram and Facebook on one screen: both save live through the usual checks, and both answers are recorded', async () => {
@@ -133,7 +135,7 @@ test('Instagram and Facebook on one screen: both save live through the usual che
   // The screen and its words (EN and FR); Facebook from the website box (#841) still records Facebook for a café.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /function socialBoth\(\)/);
-  assert.match(js, /\(STEPS\.indexOf\('facebook'\) >= 0 \|\| C\.cafe\) && !answered\('facebook'\)\) progress\('facebook', 'live'\)/);
+  assert.match(js, /\(STEPS\.indexOf\('facebook'\) >= 0 \|\| COMBO\) && !answered\('facebook'\)\) progress\('facebook', 'live'\)/);
   for (const L of ['en', 'fr']) for (const k of ['socialQ', 'socialLead', 'socialNeed', 'hoursSavedNow', 'hoursSentNow']) assert.ok(TEXT[L].cafe[k], `${L} ${k}`);
   for (const L of ['en', 'fr']) { assert.ok(TEXT[L].cafe.labels.social && TEXT[L].cafe.labels.hours && TEXT[L].cafe.noLabels.social, L); }
 });

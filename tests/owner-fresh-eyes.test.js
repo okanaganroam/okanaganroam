@@ -60,7 +60,7 @@ test('redraw instead of reload: GET .../completeness gives the bar for a restaur
   assert.equal(en.body.html, inPage, 'the redraw is exactly the bar on the page');
   const fr = await bar(token, '/fr');
   assert.match(fr.body.html, /La liste de votre fiche/); // café test 4: no percent on the edit page
-  for (const type of ['distillery', 'brewery', 'winery']) assert.equal((await bar(tokenFor(mk(type).id))).status, 404, type); // cafés have the setup and checklist since 2026-11-10
+  for (const type of ['distillery', 'brewery']) assert.equal((await bar(tokenFor(mk(type).id))).status, 404, type); // cafés have the setup and checklist since 2026-11-10
   assert.equal((await bar('not-a-real-token')).status, 404);
   // After a live save the redraw shows the new score (this is what the page swaps in, with no reload).
   const before = pctOf(en.body.html);
@@ -203,7 +203,7 @@ test('saving is clear: one-line intro, "Saves now and goes live" on live saves, 
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   assert.ok(fr.includes('Enregistré et en ligne tout de suite') && fr.includes('Envoyé pour vérification'));
   // Every other type keeps its send step as it was.
-  for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup and checklist since 2026-11-10
+  for (const type of ['brewery', 'distillery']) { // cafés have the setup and checklist since 2026-11-10
     const o = await get(`/owner/${tokenFor(mk(type).id)}`);
     assert.ok(!o.includes('op-send-extra') && !o.includes('op-dirty') && !o.includes('Saves now and goes live') && !o.includes('/completeness'), type);
   }

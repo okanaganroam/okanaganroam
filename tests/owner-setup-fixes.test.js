@@ -248,7 +248,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
 });
 
 test('other types are untouched: no setup, no new "we don’t" button, the classic rules', async () => {
-  for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup since 2026-11-10
+  for (const type of ['brewery', 'distillery']) { // cafés have the setup since 2026-11-10
     const v = mk(type);
     const t = tokenFor(v.id);
     const r = await get(`/owner/${t}/setup`);
