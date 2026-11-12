@@ -138,7 +138,7 @@ test('Facebook / Instagram by name: a note for us to find the link, never publis
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(db.prepare('SELECT facebook_url FROM venue_links WHERE venue_id = ?').get(v.id).facebook_url, 'https://www.facebook.com/copperpotkitchen');
   // Other types can't use the note kinds (they have no setup): it falls back to a plain menu help request.
-  const cafe = mk('winery'); // cafés have the setup since 2026-11-10
+  const cafe = mk('distillery'); // cafés (2026-11-10) and wineries (2026-11-12) have the setup
   await post(`/owner/${tokenFor(cafe.id)}/menu/help`, { note: 'Our Facebook page is X', sheet: 'facebook', contact_email: '', contact_phone: '' });
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND help_kind = 'facebook'").get(cafe.id).n, 0);
   // The page script: a name is never an error; a link the server refuses falls back to the name path.
@@ -267,7 +267,7 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
 
 test('other types and public pages: nothing new; the portal has no empty box rule for restaurants only', async () => {
   // The setup page still redirects other types, and their edit pages have no setup card.
-  for (const type of ['brewery', 'distillery', 'winery']) { // cafés have the setup since 2026-11-10
+  for (const type of ['brewery', 'distillery']) { // cafés have the setup since 2026-11-10
     const v = mk(type);
     assert.equal((await get(`/owner/${tokenFor(v.id)}/setup`)).status, 302);
     assert.doesNotMatch(await text(`/owner/${tokenFor(v.id)}`), /opSetupCard/);
