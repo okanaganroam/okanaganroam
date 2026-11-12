@@ -288,8 +288,9 @@
   // (the page listed Christmas Day three times). Yearly ranges may wrap over New Year.
   function coveredBy(date){ var md = String(date).slice(5); return S.extra.some(function(c){ var t = c.to || c.from; if (c.yearly) return c.from <= t ? md >= c.from && md <= t : md >= c.from || md <= t; return date >= c.from && date <= t; }); }
   // Bug-check (2026-11-12): a day outside the open season (open Apr 15 – Oct 15: Christmas, New Year's) is covered too.
-  function offSeason(date){ var o = S.openSea; if (!o || !o.from || !o.to) return false; var md = String(date).slice(5); return o.from <= o.to ? md < o.from || md > o.to : md < o.from && md > o.to; }
-  function holCovered(o){ return coveredBy(o.date) || offSeason(o.date); }
+  // saved (review fix 2026-11-12): the season the page has (CUR), never an unsaved draft one, when saving the holidays.
+  function offSeason(date, saved){ var o = saved ? openSeaOf(CUR.open_months) : S.openSea; if (!o || !o.from || !o.to) return false; var md = String(date).slice(5); return o.from <= o.to ? md < o.from || md > o.to : md < o.from && md > o.to; }
+  function holCovered(o, saved){ return coveredBy(o.date) || offSeason(o.date, saved); }
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
@@ -1953,8 +1954,8 @@
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o) && !coveredBy(o.next) && !offSeason(o.next); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
+      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o, true); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
+      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o, true) && !coveredBy(o.next) && !offSeason(o.next, true); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';

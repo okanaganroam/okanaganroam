@@ -138,9 +138,9 @@ test('E, F: picked files are not dropped by a language switch; the switch link e
 
 test('H, I: café hours saved but holidays not done says "Next: Holidays and closures"; off-season holidays are covered', () => {
   assert.match(CLIENT, /if \(half\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\) \+ '<\/div>';/);
-  assert.match(CLIENT, /function holCovered\(o\)\{ return coveredBy\(o\.date\) \|\| offSeason\(o\.date\); \}/);
+  assert.match(CLIENT, /function holCovered\(o, saved\)\{ return coveredBy\(o\.date\) \|\| offSeason\(o\.date, saved\); \}/);
   // Open Apr 15 – Oct 15: Christmas is outside, July 1 inside; a season over New Year wraps.
-  const off = new Function('S', /function offSeason\(date\)\{[^\n]*\}/.exec(CLIENT)[0] + '; return offSeason;');
+  const off = new Function('S', /function offSeason\(date, saved\)\{[^\n]*\}/.exec(CLIENT)[0] + '; return offSeason;');
   const f = off({ openSea: { from: '04-15', to: '10-15' } });
   assert.equal(f('2026-12-25'), true); assert.equal(f('2027-07-01'), false); assert.equal(f('2026-04-14'), true); assert.equal(f('2026-10-15'), false);
   const w = off({ openSea: { from: '11-15', to: '04-15' } });
@@ -285,4 +285,19 @@ test('Review 2, 5: a failed or stopped save-and-switch never later switches lang
 
 test('Review 6: photos sent on the way to the other language land on the next question, not back on Photos', () => {
   assert.match(CLIENT, /if \(S\.exitAfter\) \{ if \(S\.langGo\) S\.step = step; return leave\(\); \}/);
+});
+
+test('Review 7: saving the holidays reads the saved open season only, never an unsaved draft one', () => {
+  const src = /function offSeason\(date, saved\)\{[^\n]*\}/.exec(CLIENT)[0];
+  const openSeaOf = (v) => { const x = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(v || ''); return x ? { from: x[1], to: x[2] } : null; };
+  // A draft season (Apr 15 – Oct 15) not saved; the page is open all year.
+  const off = new Function('S', 'CUR', 'openSeaOf', src + '; return offSeason;')({ openSea: { from: '04-15', to: '10-15' } }, { open_months: '' }, openSeaOf);
+  assert.equal(off('2026-12-25'), true);
+  assert.equal(off('2026-12-25', true), false);
+  const off2 = new Function('S', 'CUR', 'openSeaOf', src + '; return offSeason;')({ openSea: null }, { open_months: '04-15:10-15' }, openSeaOf);
+  assert.equal(off2('2026-12-25', true), true);
+  const save = /if \(k === 'closuresNone' \|\| k === 'closuresSave'\) \{[\s\S]*?\.concat\(S\.extra\);/.exec(CLIENT)[0];
+  assert.doesNotMatch(save, /holCovered\(o\)|offSeason\(o\.next\)/);
+  assert.equal((save.match(/holCovered\(o, true\)/g) || []).length, 2);
+  assert.match(save, /offSeason\(o\.next, true\)/);
 });
