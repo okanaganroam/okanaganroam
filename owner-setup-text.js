@@ -883,6 +883,7 @@ Object.assign(en, {
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
   fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', menuFbKnown: 'Your Facebook: {x}',
+  sendBeforeLeave: 'Tap Send before you leave this screen.',
   // The price question while prices aren't on pages (AVG_SPEND_PUBLIC off): why we ask, and an after-save line that says
   // what it's for ("Prices don't show on pages yet" made it sound pointless).
   spendWhyOff: 'We’ll use this to show your price range once prices go on pages.',
@@ -892,6 +893,7 @@ Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
   fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', menuFbKnown: 'Votre Facebook : {x}',
+  sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',
   spendWhyOff: 'Nous l’utiliserons pour afficher votre gamme de prix quand les prix seront sur les pages.',
   savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
 });
