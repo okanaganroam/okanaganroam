@@ -51182,9 +51182,21 @@ const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS);
 SETUP_TOP2.cafe = CAFE_SETUP_PART2.slice();
 function setupParts(type) { return type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 // The steps one venue answers, in order. Restaurants and pubs: SETUP_STEPS.
-function setupStepsFor(type) {
+// Café test 5 (2026-11-12): with a venue id, only the steps that apply to it. A café whose saved kind serves no coffee
+// (gelato, bubble tea, juice, tea, dessert) has no "Your coffee" step unless it ticked espresso or drip coffee: the same
+// rule as the setup page's syncCoffee, so a gelato shop that answered everything isn't "partly done".
+const CAFE_NO_COFFEE_KINDS = ['Ice cream & gelato', 'Bubble tea', 'Juice & smoothie bar', 'Tea house', 'Dessert & sweets'];
+function cafeCoffeeStepApplies(venueId) {
+  let place = '';
+  try { place = venuePlaceType({ id: venueId, type: 'cafe' }); } catch (e) { place = ''; }
+  if (!place || !CAFE_NO_COFFEE_KINDS.includes(place)) return true;
+  const serves = (venueCafeInfo(venueId) || {}).serves || [];
+  return serves.includes('espresso') || serves.includes('drip');
+}
+function setupStepsFor(type, venueId) {
   if (type !== 'cafe') return SETUP_STEPS;
-  return CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
+  const all = CAFE_SETUP_PART1.concat(CAFE_SETUP_PART2);
+  return venueId != null && !cafeCoffeeStepApplies(venueId) ? all.filter((k) => k !== 'coffee') : all;
 }
 function setupTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || 'restaurant'; } catch (e) { return 'restaurant'; } }
 if (PUB_SETUP_PART1.concat(PUB_SETUP_PART2).sort().join() !== SETUP_STEPS.slice().sort().join()) throw new Error('pub setup steps must be the same steps');
