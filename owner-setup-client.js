@@ -338,10 +338,11 @@
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
   // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
   // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the
-  // 2nd Monday of October, not the same day of the month). The eves (Dec 24, Dec 31) stay one-off.
+  // 2nd Monday of October, not the same day of the month). Café test 5 (2026-11-12): every tile has it, the eves (Dec 24,
+  // Dec 31) too (Christmas Eve was the only December tile without "This year and next").
   function holidays(){
     var today = new Date(); today.setHours(0, 0, 0, 0); var y = today.getFullYear();
-    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, next: ymd(fn(d.getFullYear() + 1)), yearly: key !== 'xmasEve' && key !== 'nye' }; };
+    var make = function(key, fn){ var d = fn(y); if (d < today) d = fn(y + 1); return { key: key, date: ymd(d), d: d, next: ymd(fn(d.getFullYear() + 1)), yearly: true }; };
     var list = [
       make('xmasEve', function(yy){ return new Date(yy, 11, 24); }), make('xmas', function(yy){ return new Date(yy, 11, 25); }), make('boxing', function(yy){ return new Date(yy, 11, 26); }),
       make('nye', function(yy){ return new Date(yy, 11, 31); }), make('nyd', function(yy){ return new Date(yy, 0, 1); }), make('family', function(yy){ return thirdMonday(yy, 1); }),

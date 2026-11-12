@@ -230,7 +230,7 @@ test('6: holiday tiles cover every BC stat holiday with the right dates, next fi
   const by = Object.fromEntries(list.map((o) => [o.key, o]));
   assert.equal(by.thanks.next, '2028-10-09', 'Thanksgiving next year is its own 2nd Monday');
   assert.equal(by.victoria.next, '2028-05-22'); assert.equal(by.goodFri.next, '2028-04-14'); assert.equal(by.remembrance.next, '2027-11-11');
-  assert.equal(by.xmasEve.yearly, false); assert.equal(by.thanks.yearly, true);
+  assert.equal(by.xmasEve.yearly, true); // café test 5: the eves have "This year and next" too assert.equal(by.thanks.yearly, true);
   // Canada Day on a Sunday (2029) is Monday July 2.
   assert.equal(Object.fromEntries(holidaysAt(s, '2029-06-01').map((o) => [o.key, o.date])).canada, '2029-07-02');
   // The screen stays short: the next 6 (and any ticked), then "Show all holidays".
