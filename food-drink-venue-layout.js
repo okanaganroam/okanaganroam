@@ -70,7 +70,8 @@ function highlightsFor(venue, dogNote, profile = {}) {
   const out = [], got = [];
   // profile.highlightFirst: keys that lead (a heated patio, pub test 3 2026-11-10: in November it's the selling point).
   const first = Array.isArray(profile.highlightFirst) ? profile.highlightFirst : [];
-  const order = HIGHLIGHTS.filter(([k]) => first.includes(k)).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
+  // In the order given (café test 6, 2026-11-12: a café's vegan, vegetarian and gluten-free options lead, in that order).
+  const order = first.map((k) => HIGHLIGHTS.find(([h]) => h === k)).filter((x, i, a) => x && a.indexOf(x) === i).concat(HIGHLIGHTS.filter(([k]) => !first.includes(k)));
   for (const [key, icon] of order) {
     if (!keys.includes(key)) continue;
     let label = text[key];

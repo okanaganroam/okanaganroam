@@ -20051,7 +20051,10 @@ function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = 
   if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
   // Café test 5 (2026-11-12): vegan (or else vegetarian) options lead a café's top highlights; the four-chip limit cut
   // them, though they're often what a café is chosen for. The badges themselves are unchanged.
-  if (venue.vegan || venue.vegetarian) out.highlightFirst = [venue.vegan ? 'vegan' : 'vegetarian'].concat(profile.highlightFirst || []);
+  // Café test 6 (2026-11-12): every dietary option leads (vegan, vegetarian, then gluten-free) ahead of dogs, kids and
+  // the patio, so a buckwheat-crêpe café with gluten-free and vegetarian shows both within the four chips.
+  const dietFirst = [venue.vegan && 'vegan', venue.vegetarian && 'vegetarian', venue.gluten_free && 'gluten'].filter(Boolean);
+  if (dietFirst.length) out.highlightFirst = dietFirst.concat((profile.highlightFirst || []).filter((k) => !dietFirst.includes(k)));
   return out;
 }
 // A café's own tiles as page highlights ([icon, label]): Wi-Fi, Laptop friendly (all day only), then the rest it ticked.
