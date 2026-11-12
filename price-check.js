@@ -19,6 +19,9 @@ const FLAGGED = ['changed'];
 const QUIET = ['missing', 'unreachable', 'unclear'];
 const STOP_WORDS = new Set(['with', 'from', 'that', 'this', 'your', 'per', 'person', 'each', 'about', 'only', 'plus', 'gst', 'pst', 'tax', 'and', 'the', 'for', 'min', 'mins', 'hour', 'hours', 'hrs']);
 const words = (t) => new Set(String(t || '').toLowerCase().replace(/[^a-z\s-]/g, ' ').split(/[\s-]+/).filter((w) => w.length >= 4 && !STOP_WORDS.has(w)).map((w) => w.replace(/s$/, '')));
+// Rows of price_overrides an owner set themselves (reviewer 'owner'): never checked, never on the review list, and only
+// replaced by the owner (or by Dayton's own decision on /admin/review).
+const OWNER_REVIEWER = 'owner';
 const STATUS_TEXT = {
   changed: 'The page no longer shows this price',
   missing: 'The page shows no prices (it may load them with JavaScript, or moved)',
@@ -147,6 +150,12 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
     for (const o of db.prepare('SELECT * FROM price_overrides').all()) {
       const id = String(o.venue_id);
       if (o.hidden) { delete prices[id]; continue; }
+      // An owner's own price (wineries' tasting fee, 2026-11-12): it is the card price as they gave it, with no research
+      // page behind it (so the weekly check never reads it). A free tasting reads "Free tasting".
+      if (o.reviewer === OWNER_REVIEWER) {
+        prices[id] = Number(o.from_price) === 0 ? { label: 'Free tasting', conf: 'owner', owner: true } : { from: Number(o.from_price), conf: 'owner', owner: true, ...(o.per ? { per: o.per } : {}), ...(o.basis ? { basis: o.basis } : {}) };
+        continue;
+      }
       const base = prices[id] || original[id] || {};
       const next = { ...base, from: o.from_price, conf: 'site' };
       if (o.per !== null && o.per !== undefined) { if (o.per) next.per = o.per; else delete next.per; }
@@ -186,6 +195,7 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
   // Check one place now. Returns the saved row, or null when it has nothing to check (no price, label only, PDF).
   async function checkOne(id) {
     const e = prices[String(id)];
+    if (isOwnerPrice(id)) return null;
     if (!e || !Number(e.from) || !/^https?:\/\//i.test(String(e.source || '')) || /\.pdf(\?|#|$)/i.test(e.source)) return null;
     let page;
     if (!(await allowed(e.source))) page = { ok: false, detail: 'robots.txt asks us not to read it' };
@@ -207,7 +217,8 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
     if (running) return running;
     running = (async () => {
       const run = db.prepare('INSERT INTO price_check_runs (started_at) VALUES (?)').run(iso()).lastInsertRowid;
-      const ids = Object.keys(prices).filter((k) => /^\d+$/.test(k));
+      // The weekly check skips owners' own prices (Decided 1, 2026-11-12).
+      const ids = Object.keys(prices).filter((k) => /^\d+$/.test(k) && !isOwnerPrice(k));
       let i = 0; let checked = 0;
       const work = async () => {
         while (i < ids.length) {
@@ -244,7 +255,7 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
     return db.prepare(`SELECT * FROM price_checks WHERE status IN (${FLAGGED.map(() => '?').join(',')})
       AND (kept_hash IS NULL OR kept_hash != found_hash) ORDER BY CASE status WHEN 'changed' THEN 0 WHEN 'missing' THEN 1 ELSE 2 END, venue_id`)
       .all(...FLAGGED)
-      .filter((r) => prices[String(r.venue_id)])
+      .filter((r) => prices[String(r.venue_id)] && !isOwnerPrice(r.venue_id))
       .map((r) => ({ ...r, found: JSON.parse(r.found || '[]'), name: venueName(r.venue_id), current: prices[String(r.venue_id)] }));
   }
 
@@ -302,7 +313,27 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
       <p class="rv-result" hidden></p></article>`;
   }
 
-  return { runAll, tick, checkOne, listFlagged, decide, cardHtml, lastRun, quietCount, isRunning: () => !!running, applyOverrides };
+  // Is this place's card price the owner's own? (price_overrides row with reviewer 'owner')
+  function isOwnerPrice(id) {
+    try { const r = db.prepare('SELECT reviewer, hidden FROM price_overrides WHERE venue_id = ?').get(Number(id)); return !!r && r.reviewer === OWNER_REVIEWER && !r.hidden; } catch (e) { return false; }
+  }
+  // An owner sets (fee: dollars, 0 = free) or takes back (fee: null) their own card price. Taken back, the card shows
+  // the researched price again (the file's, as it was before any override).
+  function setOwnerPrice(id, fee, basis = null) {
+    const key = String(Number(id));
+    if (fee === null || fee === undefined) {
+      if (!isOwnerPrice(id)) return;
+      db.prepare('DELETE FROM price_overrides WHERE venue_id = ? AND reviewer = ?').run(Number(id), OWNER_REVIEWER);
+      if (original[key]) prices[key] = JSON.parse(JSON.stringify(original[key])); else delete prices[key];
+      applyOverrides();
+      return;
+    }
+    db.prepare(`INSERT INTO price_overrides (venue_id, from_price, per, basis, hidden, decided_at, reviewer) VALUES (?, ?, ?, ?, 0, ?, ?)
+      ON CONFLICT(venue_id) DO UPDATE SET from_price = excluded.from_price, per = excluded.per, basis = excluded.basis, hidden = 0,
+        decided_at = excluded.decided_at, reviewer = excluded.reviewer`).run(Number(id), Number(fee), null, basis || null, iso(), OWNER_REVIEWER);
+    applyOverrides();
+  }
+  return { runAll, tick, checkOne, listFlagged, decide, cardHtml, lastRun, quietCount, isRunning: () => !!running, applyOverrides, setOwnerPrice, isOwnerPrice };
 }
 
 module.exports = { createPriceCheck, extractPrices, judge, robotsAllows, pageText, USER_AGENT };

@@ -1579,6 +1579,17 @@ CREATE TABLE IF NOT EXISTS venue_cafe_info (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+// Winery answers only the business gives (Dayton, 2026-11-12; never researched): food here (and a restaurant with no page
+// of its own), tasting fee and whether it is waived with a purchase, how people visit, groups and tour buses, the
+// off-season answer (all year / seasonal / by appointment, with the walk-in season) and up to two experiences.
+// info: JSON (keys optional). Additive: a winery with no row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_winery_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
 // Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
 // set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.
 if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name === 'time_tbc')) {

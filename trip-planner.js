@@ -1451,7 +1451,8 @@ function appointmentKept(v, ctx) {
   const q = (ctx && ctx.queryText) || '', own = v && (v.textName || normWords(v.name || ''));
   return namedInRequest(v, ctx) || !!(ctx && ctx.pinnedIds && ctx.pinnedIds.has(v.id)) || APPOINTMENT_ASKED_RE.test(q) || !!(own && own.length >= 4 && q.includes(own));
 }
-function appointmentOnly(v) { return !!appointmentNotice(v) && !/\b(?:walk[- ]?ins? (?:are )?(?:welcome|available)|no appointments? (?:needed|necessary|required)|appointments? (?:are )?not required)\b/i.test(`${v.plannerDescription || v.description || ''}`); }
+// A winery's own answer (2026-11-12, ownerAppointment true / false) decides when it gave one; otherwise its words, as before.
+function appointmentOnly(v) { if (v && typeof v.ownerAppointment === 'boolean') return v.ownerAppointment; return !!appointmentNotice(v) && !/\b(?:walk[- ]?ins? (?:are )?(?:welcome|available)|no appointments? (?:needed|necessary|required)|appointments? (?:are )?not required)\b/i.test(`${v.plannerDescription || v.description || ''}`); }
 // A place named like a region ("Whistler Blackcomb in August") was the region asked for, not the ski resort (2026-10-25).
 function namedInRequest(v, ctx) { return !!(ctx && ctx.requirements && (ctx.requirements.items || []).some((i) => i.kind === 'venue' && i.value === v.id)) && !(ctx.labels && ctx.labels.regions && Object.values(ctx.labels.regions).some((l) => normWords(String(l)) === normWords(v.name || ''))); }
 // Round 12 (2026-10-20): repetition. The same Whistler day (Lost Lake, Frankie We Salute You!, Hidden Vines) was in
@@ -1594,6 +1595,8 @@ function stopFrom(v, scored, extra, ctx) {
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
   if (appt && !(v.advisory && v.advisory.note && APPOINTMENT_RE.test(v.advisory.note))) { const note = `By appointment, from the listing: “${appt}” Book ahead.`; if (!caveats.includes(note)) caveats.push(note); }
+  // The winery said so itself (2026-11-12), with no sentence of its own to quote.
+  else if (!appt && v && v.ownerAppointment === true && appointmentOnly(v)) { const note = 'By appointment only (the winery’s own answer). Book ahead.'; if (!caveats.includes(note)) caveats.push(note); }
   // Step 1 (2026-09-29): a place's current advisory is shown on every stop,
   // in the note's own words (itineraries already did this).
   if (v.advisory && v.advisory.note) {

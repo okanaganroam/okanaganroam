@@ -148,7 +148,49 @@ const CAFE_ITEMS = [
   R('owner_confirmed', { w: 2 }),
 ];
 if (CAFE_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: café weights must sum to 100');
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS };
+// Wineries (Dayton, Nov 12 2026; drafts/winery-portal-2026-11-12/SPEC-wineries.md, "Decided"): the same engine with
+// their own 100 points. New items: the kind of winery, the off-season answer, the tasting price (or Free), how people
+// visit, a booking link (or walk-ins only), groups, food here and wheelchair / parking. Happy hour, specials and events are
+// not asked of wineries, so every winery can reach 100%. Experiences and the wine list are optional and unscored.
+const WINERY_KINDS = ['Estate winery', 'Boutique winery', 'Tasting room in town', 'Fruit or honey wines', 'Winery and cidery'];
+const WINERY_FOOD = ['none', 'snacks', 'picnic', 'restaurant'];
+const WINERY_VISIT = ['walk_in', 'recommended', 'needed', 'appointment'];
+const WINERY_YEAR = ['all', 'seasonal', 'appointment'];
+const WINERY_ITEMS = [
+  R('address_pin', { w: 4 }),
+  R('phone', { w: 4, whyEn: 'The number visitors call to book a tasting or ask a question.', whyFr: 'Le numéro que les visiteurs appellent pour réserver une dégustation ou poser une question.' }),
+  R('website', { w: 3 }),
+  { key: 'winery_kind', group: 'basics', w: 3, fix: true, target: { setup: 'winery' }, fields: ['place_type'],
+    en: 'What kind of winery', fr: 'Quel genre de vignoble', whyEn: 'Estate, small family winery, tasting room in town and so on. Pick one.', whyFr: 'Domaine, petit vignoble familial, salle de dégustation en ville, etc. Choisissez-en un.', btnEn: 'Pick one', btnFr: 'Choisir', icon: '🍇' },
+  R('hours', { w: 8 }),
+  R('hours_fresh', { w: 4 }),
+  { key: 'season', group: 'hours', w: 5, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'winery_info'],
+    en: 'The off-season', fr: 'La basse saison', whyEn: 'Open all year, closed part of the year, or by appointment in the off-season? Say so, so nobody drives out to a closed door.', whyFr: 'Ouvert toute l’année, fermé une partie de l’année, ou sur rendez-vous en basse saison? Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
+  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your tasting room, your view, the vines.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, votre vue, les vignes.' }),
+  R('photo_extra', { w: 7, whyEn: 'Your tasting room, your view, the vines, the patio.', whyFr: 'Votre salle de dégustation, votre vue, les vignes, la terrasse.' }),
+  { key: 'tasting_price', group: 'tastings', w: 8, fix: true, target: { setup: 'tastings' }, fields: ['tasting_fee'],
+    en: 'Tasting price', fr: 'Prix de la dégustation', whyEn: 'What a tasting costs a person, or Free. It shows on your card.', whyFr: 'Le prix d’une dégustation par personne, ou Gratuite. Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍷' },
+  { key: 'visit_how', group: 'tastings', w: 8, fix: true, target: { setup: 'visit' }, fields: ['winery_info'],
+    en: 'How people visit', fr: 'Comment on vous visite', whyEn: 'Walk-ins welcome, booking recommended, booking needed, or by appointment only.', whyFr: 'Sans réservation, réservation conseillée, réservation obligatoire, ou sur rendez-vous seulement.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🚪' },
+  { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'tastings', w: 4, fix: true, target: { setup: 'visit' }, fields: ['booking_url'],
+    en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book a tasting. Not needed for walk-ins only.', whyFr: 'La page où l’on réserve une dégustation. Inutile si c’est sans réservation seulement.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
+  { key: 'winery_groups', group: 'tastings', w: 4, fix: true, target: { setup: 'visit' }, fields: ['winery_info'],
+    en: 'Groups', fr: 'Groupes', whyEn: 'From what size should groups book ahead? Tour buses and limos?', whyFr: 'À partir de quelle taille les groupes doivent-ils réserver? Autobus et limousines?', btnEn: 'Answer', btnFr: 'Répondre', icon: '👥' },
+  { key: 'food_here', group: 'yourvisit', w: 4, fix: true, target: { setup: 'winery' }, fields: ['winery_info'],
+    en: 'Food here', fr: 'Nourriture sur place', whyEn: 'None, snacks or a cheese plate, a picnic area, or a restaurant.', whyFr: 'Rien, des collations ou un plateau de fromages, une aire de pique-nique, ou un restaurant.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🧀' },
+  { key: 'dogs_kids', group: 'yourvisit', w: 4, fix: true, target: { setup: 'offer' }, fields: ['badges', 'owner_features'],
+    en: 'Dogs and kids', fr: 'Chiens et enfants', whyEn: 'Dogs welcome, kids welcome, or no dogs allowed.', whyFr: 'Chiens bienvenus, enfants bienvenus, ou chiens non admis.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🐕' },
+  { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
+    en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible, Free parking or Room for RVs on “What you offer”.', whyFr: 'Cochez Accessible en fauteuil roulant, Stationnement gratuit ou Place pour VR dans « Ce que vous offrez ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
+  R('description', { w: 5 }),
+  R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on your wines, e.g. Pinot Noir and Chardonnay from estate vines.', whyFr: 'Une ligne sur vos vins, p. ex. pinot noir et chardonnay de nos vignes.' }),
+  R('instagram', { w: 3 }),
+  R('facebook', { w: 3 }),
+  R('arrival', { w: 2, en: 'Tasting room photo and exact spot', fr: 'Photo de la salle de dégustation et emplacement exact', whyEn: 'Stand at the tasting room door and take one photo. On a big estate it helps people find you.', whyFr: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Sur un grand domaine, cela aide à vous trouver.' }),
+  R('owner_confirmed', { w: 2 }),
+];
+if (WINERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: winery weights must sum to 100');
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -165,7 +207,7 @@ const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', '
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -186,6 +228,7 @@ const GOT_TEXT = {
   wifi: { en: 'Got it: no Wi-Fi', fr: 'C’est noté : pas de Wi-Fi' },
   ordering: { en: 'Got it: order at the counter only', fr: 'C’est noté : commande au comptoir seulement' },
   washroom: { en: 'Got it: no customer washroom', fr: 'C’est noté : pas de toilettes pour les clients' },
+  booking_link: { en: 'Got it: no online bookings', fr: 'C’est noté : pas de réservations en ligne' },
 };
 if (ALL_NONE_KEYS.some((k) => !GOT_TEXT[k])) throw new Error('portal-completeness: every "we don\u2019t have one" item needs its Got it text');
 const NONE_MAX = NONE_KEYS.length;
@@ -209,8 +252,9 @@ const SECONDS = {
   description: 180, instagram: 30, facebook: 30, arrival: 90, owner_confirmed: 0,
   kitchen: 20, sports: 30, games: 15, minors: 20,
   cafe_kind: 10, season: 15, serves: 20, stay: 20, wifi: 5, dogs_kids: 15, ordering: 40,
+  winery_kind: 10, tasting_price: 15, visit_how: 15, booking_link: 30, winery_groups: 15, food_here: 15, access: 10,
 };
-if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -224,7 +268,8 @@ const isQuick = (it) => !it.waiting && (SECONDS[it.key] || 0) <= QUICK_SECONDS;
 const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', hours_fresh: 'hours_checked', avg_spend: 'avg_spend', dietary: 'badges',
   instagram: 'instagram_url', facebook: 'facebook_url', pyv_known: 'visit_rows', pyv_reservations: 'visit_rows', pyv_takeout: 'visit_rows', pyv_groups: 'visit_rows',
   kitchen: 'pub_info', sports: 'pub_info', minors: 'pub_info', games: 'owner_features',
-  cafe_kind: 'place_type', season: 'cafe_info', serves: 'cafe_info', stay: 'cafe_info', wifi: 'owner_features', dogs_kids: 'badges' };
+  cafe_kind: 'place_type', season: 'cafe_info', serves: 'cafe_info', stay: 'cafe_info', wifi: 'owner_features', dogs_kids: 'badges',
+  winery_kind: 'place_type', tasting_price: 'tasting_fee', visit_how: 'winery_info', booking_link: 'booking_url', winery_groups: 'winery_info', food_here: 'winery_info', access: 'owner_features' };
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
   if (!keys.size) return 0;
@@ -250,6 +295,8 @@ const GROUPS = [
   { key: 'yourvisit', en: 'Your visit', fr: 'Votre visite' },
   // Cafés (2026-11-10).
   { key: 'serve', en: 'What you serve', fr: 'Ce que vous servez' },
+  // Wineries (2026-11-12).
+  { key: 'tastings', en: 'Tastings and booking', fr: 'Dégustations et réservations' },
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
@@ -319,6 +366,23 @@ function doneMap(input, today) {
         wifi: feats.has('wifi'),
         dogs_kids: !!(i.dogFriendly || i.kidFriendly) || feats.has('stroller') || feats.has('dog_treats') || (i.declaredNone || []).includes('dogs'),
         ordering: !!order.preorder || CAFE_ORDER_FEATURES.some((k) => feats.has(k)) || nonBlank((c.links || {}).order_url),
+      };
+    })() : {}),
+    // Wineries (2026-11-12): the kind of winery, venue_winery_info (owner-only, never researched), the owner's tasting price
+    // and the owner features. Wheelchair / parking also counts once "What you offer" was saved in the setup (a winery with
+    // neither can still answer it).
+    ...(i.type === 'winery' ? (() => {
+      const w = i.wineryInfo && typeof i.wineryInfo === 'object' ? i.wineryInfo : {};
+      return {
+        winery_kind: WINERY_KINDS.includes(i.placeType),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || WINERY_YEAR.includes(w.year),
+        tasting_price: typeof i.tastingFee === 'number' && Number.isFinite(i.tastingFee) && i.tastingFee >= 0,
+        visit_how: WINERY_VISIT.includes(w.visit),
+        booking_link: nonBlank(i.bookingUrl) || w.visit === 'walk_in',
+        winery_groups: Number.isInteger(w.groups) || ['welcome', 'book', 'no'].includes(w.buses),
+        food_here: WINERY_FOOD.includes(w.food),
+        dogs_kids: !!(i.dogFriendly || i.kidFriendly) || (i.declaredNone || []).includes('dogs'),
+        access: ['wheelchair_accessible', 'free_parking', 'rv_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),
     ...(i.type === 'pub' ? {
@@ -999,4 +1063,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
