@@ -938,7 +938,9 @@ Object.assign(fr, {
 
 // Café test 6 (2026-11-12): the other season's hours, said on the "Are these still your hours?" screen.
 Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
+Object.assign(en, { recapHours: 'Your hours', recapRest: 'Rest of the year', stSocialIgLive: 'Instagram on your page now, Facebook within a day', stSocialFbLive: 'Facebook on your page now, Instagram within a day' });
 Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
+Object.assign(fr, { recapHours: 'Vos heures', recapRest: 'Le reste de l’année', stSocialIgLive: 'Instagram sur votre page maintenant, Facebook d’ici un jour', stSocialFbLive: 'Facebook sur votre page maintenant, Instagram d’ici un jour' });
 
 // Wineries (Dayton, 2026-11-12; drafts/winery-portal-2026-11-12/SPEC-wineries.md, "Decided"): winery words and the
 // winery-only screens (Your winery, Tastings, Booking and groups, Experiences, the off-season by appointment), laid over
@@ -962,12 +964,12 @@ en.winery = {
   rnameLabel: 'Restaurant name', rnameEx: 'The Vineyard Bistro', rwhenLabel: 'When is it open? (optional)', rwhenEx: 'Thu–Mon from noon', rnameNeed: 'Please type your restaurant’s name, or tap another answer.',
   // Tastings
   feeQ: 'What does a tasting cost per person?', feeLead: 'It shows on your page and on your card right away.',
-  feeGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', feeWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
+  feeGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', feeGuessVisit: 'Your website says {x}, so we picked it. Tap another price if it changed.', feeWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
   feeFree: 'Free', feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.',
   feeNeed: 'Please tap a price, or tap Other and type it, like 18.',
   waivedQ: 'Is it free if people buy wine?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
   feeSavedLive: 'Your tasting price is on your page and your card now.', feeSavedDay: 'We check prices over $75 first. It’ll show within a day.',
-  feeCard: 'tastings from {x}', feeCardFree: 'free tastings',
+  feeCard: 'tastings {x} a person', feeCardFree: 'free tastings',
   // Booking and groups
   visitQ: 'How do people visit?', visitLead: 'Pick the one that fits most days.',
   visits: { walk_in: 'Walk-ins welcome', recommended: 'Booking recommended', needed: 'Booking needed', appointment: 'By appointment only' },
@@ -975,7 +977,7 @@ en.winery = {
   bookLinkLabelWalkIn: 'Booking link (optional, e.g. for groups)',
   bookLinkEx: 'your website’s booking page', noBookLink: 'We don’t take bookings online', bookLinkBad: 'Please check the booking link, for example yourwinery.com/book.',
   groupsSizeQ: 'Groups: from what size should they book ahead?', groupsSizeLead: 'For example: “Groups of 8 or more, please book ahead”.',
-  busesQ: 'Tour buses and limos?', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
+  busesQ: 'Tour buses and limos?', busesLead: 'One answer for both. Take only one of them? Tap “Book ahead” so they contact you first.', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
   visitNeed: 'Please tap how people visit, or tap Skip.', visitSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Off-season by appointment (Hours)
   allYearAppt: 'In the off-season we’re open by appointment', allYearApptSub: 'Walk-in tastings part of the year, by appointment the rest',
@@ -989,7 +991,7 @@ en.winery = {
   apptHoursGone: 'By appointment only: your old weekly hours came off your page, so it only says “By appointment · call ahead”.',
   // Your story and Known for
   storyQ: 'Tell visitors about your winery', storyEx: 'A family winery on the Naramata Bench. We grow Pinot Noir and Chardonnay, and the patio looks over the lake.',
-  knownQ: 'What are your wines known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Experiences
   expQ: 'Any experiences to book?', expLead: 'Up to two, like wine and cheese or a vineyard tour. They show in “Plan your visit”.',
@@ -1037,19 +1039,19 @@ fr.winery = {
   ownPage: '{name} a sa propre page.', ownPageSub: 'Mettez ses heures et son menu à jour là-bas, avec son propre lien. Nous ne vous les demanderons pas deux fois.', ownPageLink: 'Voir sa page : {name}',
   rnameLabel: 'Nom du restaurant', rnameEx: 'Le Bistro du vignoble', rwhenLabel: 'Quand est-il ouvert? (facultatif)', rwhenEx: 'Du jeudi au lundi dès midi', rnameNeed: 'Écrivez le nom de votre restaurant, ou touchez une autre réponse.',
   feeQ: 'Combien coûte une dégustation par personne?', feeLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.',
-  feeGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', feeWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
+  feeGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', feeGuessVisit: 'Votre site Web indique {x}, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', feeWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
   feeFree: 'Gratuite', feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.',
   feeNeed: 'Touchez un prix, ou touchez Autre et écrivez-le, par exemple 18.',
   waivedQ: 'Est-elle gratuite à l’achat de vin?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   feeSavedLive: 'Votre prix de dégustation est sur votre page et votre fiche maintenant.', feeSavedDay: 'Nous vérifions d’abord les prix de plus de 75 $. Il s’affichera d’ici un jour.',
-  feeCard: 'dégustations dès {x}', feeCardFree: 'dégustations gratuites',
+  feeCard: 'dégustations à {x} par personne', feeCardFree: 'dégustations gratuites',
   visitQ: 'Comment les visiteurs viennent-ils?', visitLead: 'Choisissez ce qui convient la plupart des jours.',
   visits: { walk_in: 'Sans réservation', recommended: 'Réservation conseillée', needed: 'Réservation obligatoire', appointment: 'Sur rendez-vous seulement' },
   visitSubs: { appointment: 'Votre fiche indique « Sur rendez-vous · appelez avant »' },
   bookLinkLabelWalkIn: 'Lien de réservation (facultatif, p. ex. pour les groupes)',
   bookLinkEx: 'la page de réservation de votre site', noBookLink: 'Nous ne prenons pas de réservations en ligne', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrevignoble.com/reserver.',
   groupsSizeQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsSizeLead: 'Par exemple : « Groupes de 8 personnes ou plus : réservez à l’avance ».',
-  busesQ: 'Autobus et limousines?', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
+  busesQ: 'Autobus et limousines?', busesLead: 'Une réponse pour les deux. Vous n’acceptez que l’un des deux? Touchez « Réservez à l’avance » pour qu’on vous joigne d’abord.', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
   visitNeed: 'Touchez comment on vous visite, ou touchez Passer.', visitSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   allYearAppt: 'En basse saison, nous ouvrons sur rendez-vous', allYearApptSub: 'Dégustations sans réservation une partie de l’année, sur rendez-vous le reste',
   apptQ: 'Quand accueillez-vous les visiteurs sans réservation?', apptLead: 'En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».',
@@ -1060,7 +1062,7 @@ fr.winery = {
   noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Sur rendez-vous · appelez avant ».',
   apptHoursGone: 'Sur rendez-vous seulement : vos anciennes heures de la semaine sont retirées de votre page, qui indique seulement « Sur rendez-vous · appelez avant ».',
   storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
-  knownQ: 'Votre spécialité?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
+  knownQ: 'Pour quoi êtes-vous reconnu?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   expQ: 'Des expériences à réserver?', expLead: 'Jusqu’à deux, comme vin et fromage ou une visite du vignoble. Elles paraissent dans « Planifiez votre visite ».',
   expN: 'Expérience {n}', expNameLabel: 'Nom', expTextLabel: 'Détails (facultatif)', expQuick: ['Vin et fromage', 'Visite du vignoble', 'Paniers de pique-nique', 'Dégustation privée'],

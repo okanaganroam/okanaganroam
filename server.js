@@ -6802,6 +6802,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Decided 4 (2026-11-12): a winery's own "how people visit" / off-season answer, on the trip's date (true: by
       // appointment, false: walk-ins), so Build My Trip reads it instead of guessing from words. Left out when unanswered.
       ...(v.type === 'winery' && wineryAppointmentOn(v.id, hoursDate) !== null ? { ownerAppointment: wineryAppointmentOn(v.id, hoursDate) } : {}),
+      // Winery test 5 (2026-11-12): the owner's tasting fee (live), so a stop says "$10 per person · Tasting" or "Free tasting".
+      ...(v.type === 'winery' && wineryTastingFee(v.id) != null ? { tastingFee: wineryTastingFee(v.id) } : {}),
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
       trailText: v.type === 'outdoor' ? v.description || '' : undefined,
@@ -6811,7 +6813,10 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Winery test 4 (2026-11-12): a winery by appointment on that date has no hours to plan by (no "Listed hours").
       hours: (v.type === 'winery' && wineryAppointmentOn(v.id, hoursDate) === true) ? null : (weekJsonOn(v, hoursDate) || null),
       openMonths: openMonthsById.get(v.id) || undefined,
-      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from })) : undefined; })(),
+      // Winery test 5 (2026-11-12): with the owner's note ("Boxing Day"), so a left-out place says why in holiday words.
+      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from, ...(x.note ? { note: String(x.note).slice(0, 60) } : {}) })) : undefined; })(),
+      // ...and the owner's season whose week applies on that date ("11-01" to "04-30"), for "closed Wednesdays from Nov to Apr".
+      ...((() => { const ss = weekSeasonOn(v, hoursDate); return ss ? { hoursSeason: { from: ss.from, to: ss.to } } : {}; })()),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
@@ -7600,13 +7605,45 @@ function tripNameRegex(words, tailOk) {
 }
 // One line per reopening date; places with none are named together ("A, B and C are closed for the season and haven't
 // announced when they reopen, so they aren't in this plan.").
-function tripClosedNamedNotes(list, date) {
-  const longDate = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+// Winery test 5 (2026-11-12): the holiday an owner's closure note names, in English (the setup's holiday tiles, English or
+// French), or null.
+function tripHolidayName(note) {
+  const n = String(note || '').trim().toLowerCase();
+  if (!n) return null;
+  const en = OWNER_SETUP_STRINGS.en.holidays, fr = OWNER_SETUP_STRINGS.fr.holidays;
+  const k = Object.keys(en).find((x) => en[x].toLowerCase() === n || String(fr[x] || '').toLowerCase() === n);
+  return k ? en[k] : null;
+}
+const TRIP_WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const TRIP_WEEKDAY_NAMES = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+// Closed all day on that date by its own week (a closed weekday in its listed or seasonal hours) -> the weekday key, or null.
+function tripClosedWeekday(f, date) {
+  if (!f || !f.hours || !parseLocalDate(date) || !hoursModule) return null;
+  const wd = TRIP_WEEKDAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+  let parsed = null;
+  try { parsed = hoursModule.parseHours(f.hours); } catch (e) { return null; }
+  return parsed && parsed.known && parsed.days && parsed.days[wd] && parsed.days[wd].status === 'closed' ? wd : null;
+}
+function tripOwnerClosureOn(f, date) {
+  return parseLocalDate(date) && Array.isArray(f && f.ownerClosures) ? f.ownerClosures.find((c) => date >= c.from && date <= (c.to || c.from)) || null : null;
+}
+function tripClosedNamedNotes(list, date, dayDated = false) {
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const longDate = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+  const monthDay = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+  const shortMonth = (md) => MONTHS[Number(String(md).slice(0, 2)) - 1].slice(0, 3);
   const names = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
   const dated = [], undated = [], now = [];
   for (const f of list) {
     const closedSeason = f.seasonClosed && (date ? date >= f.seasonClosed.from && date <= f.seasonClosed.to : f.seasonClosedToday);
-    if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
+    // Winery test 5: an owner's holiday or one-off closure, and a weekday the place is closed, say so on the plan's own
+    // date ("closed on December 26 for Boxing Day", "closed Wednesdays from Nov to Apr"), not "for the season".
+    const oc = dayDated && !closedSeason ? tripOwnerClosureOn(f, date) : null;
+    const wd = dayDated && !closedSeason && !oc ? tripClosedWeekday(f, date) : null;
+    if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
+    else if (wd && f.hoursSeason) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${shortMonth(f.hoursSeason.from)} to ${shortMonth(f.hoursSeason.to)}, so it isn’t in this plan.`);
+    else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
+    else if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
     else if (closedSeason) undated.push(f.name);
     else now.push(f.name);
   }
@@ -7637,10 +7674,16 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     if (core && core.every((w) => leftover.has(w) && textWords.has(w))) maybe.add(v.id);
   }
   if (!maybe.size) return plan;
-  const date = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : todayLocal(now));
+  const planDate = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null);
+  const date = planDate || todayLocal(now);
   const facts = buildTripPlannerFacts(false, date).filter((f) => maybe.has(f.id));
   const byId = new Map(facts.map((f) => [f.id, f]));
-  const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)));
+  // Winery test 5 (2026-11-12): a named place the plan left out on its own date because its week has that day closed
+  // ("Bluebird Bench on Wednesday January 13", closed Mon–Thu in winter) is a closed place too, with its reason, never
+  // offered back as its own "Another listing". Only when the plan has a date and didn't use the place.
+  const usedIds = new Set([...(plan.days || []).flatMap((d) => d.stops || []), ...((plan.itinerary && plan.itinerary.stops) || []), ...((plan.outing && plan.outing.stops) || []), ...(plan.recommendations || [])].filter((x) => x && x.venue).map((x) => x.venue.id));
+  const dayClosed = (f) => !!planDate && !usedIds.has(f.id) && !!tripClosedWeekday(f, planDate);
+  const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)) || dayClosed(f));
   const hits = [];
   for (const i of named) { const f = byId.get(i.value); if (f) hits.push({ f, item: i, re: tripNameRegex(norm(String(f.name).replace(/['’]/g, ' ')).split(' '), true) }); }
   for (const f of facts) {
@@ -7668,7 +7711,7 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     }
     return plan;
   }
-  const notes = tripClosedNamedNotes(closedHits.map((h) => h.f), date);
+  const notes = tripClosedNamedNotes(closedHits.map((h) => h.f), date, !!planDate);
   // The request again without the closed places' names (and an "at Mission Hill" after a name when those words are
   // the place's own), in their town when the request named none.
   let rewritten = text;
@@ -7709,10 +7752,18 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
       if (!left.length) return null;
       return `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — ${TRIP_SITE.brand} couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
     }).filter(Boolean);
+  // Winery test 5: the planner's own "X matches but is closed for the season …" for a place these notes already explain.
+  out.warnings = out.warnings.filter((w) => !closedHits.some((h) => String(w).startsWith(`${h.f.name} matches but is closed `)));
   out.warnings = notes.concat(out.warnings.filter((w) => !notes.includes(w)));
   out.unsupported = dropWords(out.unsupported);
   if (out.understood) out.understood.notUsed = dropWords(out.understood.notUsed);
   for (const r of out.requirementResults || []) if (Array.isArray(r.optionalAlternatives)) r.optionalAlternatives = r.optionalAlternatives.filter((a) => !closedHits.some((h) => h.f.id === a.id));
+  // Winery test 5: a named place's own request line gives its reason ("closed Wednesdays from Nov to Apr"), not "No selected stop meets …".
+  for (const r of out.requirementResults || []) {
+    const h = r.status === 'unmet' && closedHits.find((x) => x.item && (r.id === x.item.id || (r.kind === 'type' && r.sourceText === x.item.sourceText)));
+    const why = h && notes.find((w) => w.startsWith(`${h.f.name} is closed`));
+    if (why) r.reason = why;
+  }
   return out;
 }
 // 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
@@ -10023,7 +10074,7 @@ function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
   // under "More" at the end, never lost.
-  const parkedOwn = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned && r.label && typeof r.text === 'string' && !info.rows.some((x) => x.label === r.label));
+  const parkedOwn = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && (r.owned || r.kept) && r.label && typeof r.text === 'string' && !info.rows.some((x) => x.label === r.label));
   const parkedSet = new Set(parkedOwn.map((r) => r.label));
   if (parkedOwn.length) info = { ...info, rows: info.rows.concat(parkedOwn.map((r) => ({ label: r.label, text: r.text, ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) }))) };
   // An owner's tap-to-answer lines in the page's language (café test 6): "Patio only" on English pages, never "Terrasse seulement".
@@ -10060,7 +10111,8 @@ function visitInfoHtml(info, fr = false) {
   if (!shown.length && folded.length) shown.push(folded.shift());
   // A single folded row shows open too (2026-10-31): a "More" that hides one line only costs a tap (Geo Cider's
   // "Cans to go" was the one thing a visitor needed).
-  if (folded.length === 1) shown.push(folded.shift());
+  // Winery test 5 (2026-11-12): not a line set aside by a full box (owner_dropped): it stays under "More", after her lines.
+  if (folded.length === 1 && !parkedSet.has(enLabel(folded[0]))) shown.push(folded.shift());
   const rows = shown.map(rowHtml).join('');
   const more = folded.length
     ? `<details class="visit-more"><summary>${fr ? 'Plus\u00a0: ' : 'More: '}${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
@@ -20397,8 +20449,9 @@ function wineryVisitLines(venue, info) {
   if (Number.isInteger(w.groups) || w.buses) {
     const g = Number.isInteger(w.groups) ? [`Groups of ${w.groups} or more, please book ahead.`, `Groupes de ${w.groups} personnes ou plus : réservez à l’avance.`] : null;
     const b = { welcome: ['Tour buses and limos welcome.', 'Autobus et limousines bienvenus.'], book: ['Tour buses and limos: please book ahead.', 'Autobus et limousines : réservez à l’avance.'], no: ['No tour buses or limos at this time.', 'Pas d’autobus ni de limousines pour le moment.'] }[w.buses];
-    // Winery test 2 (2026-11-12): both asking to book ahead read as one sentence, not "book ahead" twice.
-    if (g && w.buses === 'book') out.Groups = { en: `Groups of ${w.groups} or more and tour buses, please book ahead.`, fr: `Groupes de ${w.groups} personnes ou plus et autobus : réservez à l’avance.` };
+    // Winery test 2 (2026-11-12): both asking to book ahead read as one sentence, not "book ahead" twice. Winery test 5:
+    // the one sentence keeps "limos" like the stand-alone line (it said "and tour buses", inviting buses for a limo answer).
+    if (g && w.buses === 'book') out.Groups = { en: `Groups of ${w.groups} or more, and tour buses and limos, please book ahead.`, fr: `Groupes de ${w.groups} personnes ou plus, autobus et limousines : réservez à l’avance.` };
     else out.Groups = { en: [g && g[0], b && b[0]].filter(Boolean).join(' '), fr: [g && g[1], b && b[1]].filter(Boolean).join(' ') };
   }
   // Food here: a restaurant (its own page, or a name and when it's open), snacks, a picnic area, or nothing.
@@ -20448,16 +20501,38 @@ const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Wint
 // that makes room brings it back). A box full of the owner's own rows keeps the cap: the last of hers is set aside with
 // `owned: true`, kept, and shown folded under "More" on the page (visitInfoHtml), never lost.
 // -> the rows set aside (store them as owner_dropped).
-function visitCapRows(rows, isOwn, owned, managed, stash) {
+// Winery test 5 (2026-11-12): research's practical lines backed by a "What you offer" tile the owner herself saved on (Kids
+// welcome, Free parking, step-free access). A full box keeps them folded under "More" on the page (kept), never silently
+// gone; her own lines still come first and stay open (#847). -> Set of row labels.
+const VISIT_BADGE_LABELS = { kid_friendly: /^(?:kids|children|families|ages)$/i, free_parking: /^parking$/i, wheelchair_accessible: /^(?:accessibility|wheelchair access)$/i };
+function visitBadgeConfirmedLabels(venueId, rows) {
+  const out = new Set();
+  let v = null, owned = new Set();
+  try {
+    v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+    owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venueId).map((r) => r.field_name));
+  } catch (e) { return out; }
+  if (!v) return out;
+  for (const [badge, re] of Object.entries(VISIT_BADGE_LABELS)) {
+    const on = Number(v[badge]) === 1 || v[badge] === true || !!venueOwnerFeatures(venueId)[badge];
+    if (!(owned.has(badge) || owned.has(`feature_${badge}`)) || !on) continue;
+    for (const r of rows || []) if (r && re.test(String(r.label || ''))) out.add(r.label);
+  }
+  return out;
+}
+// isKept (winery test 5): research's lines backed by a tile she saved on. When the box is full they are set aside after
+// research's other lines and before any of hers, recorded with kept: true, and shown folded under "More" (never lost).
+function visitCapRows(rows, isOwn, owned, managed, stash, isKept = () => false) {
   for (const r of Array.isArray(stash) ? stash : []) {
     if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) });
   }
   const dropped = [];
-  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : {}) }); rows.splice(j, 1); };
+  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : isKept(r) ? { kept: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
   while (rows.length > VISIT_ROWS_MAX) {
     let j = -1;
     for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k]) && !isKept(rows[k])) { j = k; break; }
     if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
     setAside(j >= 0 ? j : rows.length - 1);
   }
@@ -20537,7 +20612,8 @@ function writeWineryVisitRows(venueId, now = new Date()) {
   // Rows set aside earlier come back, except a line these answers now decide (its row is above, or removed on purpose)
   // and, while the owner manages Experiences, any extra row (hers are above).
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(Array.isArray(info.experiences) && !WINERY_CORE_LABELS.has(r.label)));
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash);
+  const confirmed = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash, (r) => confirmed.has(r.label));
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45821,6 +45897,14 @@ function ownerVisitRows(venueId) {
   }
   return out;
 }
+// Winery test 5 (2026-11-12): the Plan your visit keys whose line is still research's (not one the owner wrote or
+// confirmed). The setup's quick-answer chips replace such a line instead of adding onto it.
+function ownerVisitResearchKeys(venueId) {
+  const info = venueVisitInfo(venueId) || {};
+  const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  const rows = info.rows || [];
+  return OWNER_VISIT_SLOTS.filter((slot) => { const r = slot.labels.map((l) => rows.find((x) => x && x.label === l)).find(Boolean); return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
+}
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
 function writeOwnerVisitRows(venueId, value, now = new Date()) {
@@ -45864,7 +45948,8 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // that repeats one of them goes first (visitCapRows, winery test 1).
   // Her parked lines are back in `rows` above (or cleared on purpose): only the other rows set aside come back here.
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
+  const badgeOk = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label));
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
@@ -45995,11 +46080,15 @@ function hoursWithExtras(v, now = new Date()) {
 // The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
 // (Build My Trip). Closures are handled separately (venueClosedOn).
 function weekJsonOn(v, date) {
-  const x = v && v.hours ? hoursExtrasMap().get(v.id) : null;
-  if (!x || !x.seasons.length) return v ? v.hours : null;
+  const s = weekSeasonOn(v, date);
+  return s ? JSON.stringify(s.hours) : v ? v.hours : null;
+}
+// The owner's seasonal set that applies on a date, or null (the usual hours).
+function weekSeasonOn(v, date) {
+  const x = v && v.hours && date ? hoursExtrasMap().get(v.id) : null;
+  if (!x || !x.seasons.length) return null;
   const md = String(date).slice(5);
-  const s = x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to));
-  return s ? JSON.stringify(s.hours) : v.hours;
+  return x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to)) || null;
 }
 // "Nov 1" / "1er nov." from 'MM-DD' or 'YYYY-MM-DD'.
 function hoursExtraDayText(value, fr = false) {
@@ -46592,6 +46681,9 @@ function wineryVisitTicks(venue, badges) {
   if (/step-?free|wheelchair|accessible|\bramps?\b|no stairs/i.test(acc) && !/\bnot (?:fully |wheelchair )?accessible|inaccessible|\bno (?:wheelchair|ramp)|stairs only|only by stairs/i.test(acc)) out.push('wheelchair_accessible');
   const dogs = line(/^(?:dogs|pets|kids & dogs)$/i);
   if (/\bdogs?\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|leashed dogs|dog[- ]friendly/i.test(dogs) && !/\bno dogs\b|\bdogs? (?:are )?not\b|service (?:dogs|animals) only/i.test(dogs)) out.push('dog_friendly');
+  // Winery test 5 (2026-11-12): research's Kids line ("Kids welcome with an adult") ticks Kids welcome too.
+  const kids = line(/^(?:kids|children|families|ages|kids & dogs)$/i);
+  if (/\b(?:kids?|children|families|family)\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|family[- ]friendly|kid[- ]friendly|all ages/i.test(kids) && !/\b(?:no (?:kids|children|minors)|adults only|19\+|21\+|not (?:suitable|recommended) for (?:kids|children))/i.test(kids)) out.push('kid_friendly');
   if (!out.length) return out;
   let owned = new Set();
   try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
@@ -52203,7 +52295,16 @@ function renderOwnerSetupPage(found, opts) {
     ...(winery ? {
       allSteps: WINERY_SETUP_PART1.concat(WINERY_SETUP_PART2), restaurantPage: wineryRestaurantPage(venue), feeLiveMax: TASTING_FEE_LIVE_MAX,
       // The researched card price ("From $10"), offered as a starting point while the owner hasn't given one.
-      researchFee: (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 ? Number(e.from) : null; })(),
+      // Winery test 5 (2026-11-12): or, with no card price, research's Plan your visit Tastings line ("Tastings $10.").
+      researchFee: (() => {
+        const e = CARD_PRICES[String(venue.id)]; if (e && !e.owner && Number(e.from) > 0) return Number(e.from);
+        const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+        const r = (info.rows || []).find((x) => x && x.label === 'Tastings' && !mine.has(x.label));
+        const m = r && /\$\s?(\d{1,3})(?:\.00)?(?!\d|[.,]\d)/.exec(String(r.text || ''));
+        return m && Number(m[1]) > 0 ? Number(m[1]) : null;
+      })(),
+      // Where it came from: the card's price ("Your card shows $10 now") or only the Tastings line ("Your website says $10").
+      researchFeeFrom: (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 ? 'card' : 'visit'; })(),
       // The Book button research found (when the owner's own link isn't set), and research's extra lines (experiences).
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
       extras: (((venueVisitInfo(venue.id) || {}).rows) || []).filter((r) => !WINERY_CORE_LABELS.has(r.label)).slice(0, WINERY_EXPERIENCES_MAX).map((r) => ({ label: String(r.label).slice(0, 24), text: String(r.text || '').slice(0, 120) })),
@@ -52221,6 +52322,8 @@ function renderOwnerSetupPage(found, opts) {
     image: pendingMain || ownImage, imageSource: setupImageSource(venue, pendingMain), website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : ownerWebsitePending(venue.id) || normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
     researchTicks: setupResearchTicks(venue, offerGroups.flatMap((g) => g.keys)),
+    // Winery test 5: Plan your visit lines that are still research's, so a quick-answer chip replaces them.
+    visitResearch: ownerVisitResearchKeys(venue.id),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
@@ -52347,6 +52450,15 @@ const WINERY_SETUP_HELP_TOPICS = [
     keysFr: ['lien de reservation', 'bouton reserver', 'reserver en ligne', 'reservation en ligne', 'lien pour reserver', 'reservation de groupe'],
     a: '<ul><li>In <strong>Set up your page</strong>, tap <strong>Booking and groups</strong>. The <strong>Booking link</strong> box is under “How do people visit?”. It’s there for walk-ins too, for a group or tasting booking page.</li><li>On your edit page, tap <strong>Phone, website or description</strong>: it’s <strong>Booking or tickets link</strong> in the links box there.</li></ul><p>Both are the same link. A new one is checked first, usually within a day; then your page shows a <strong>Book</strong> button.</p>',
     aFr: '<ul><li>Dans <strong>Configurez votre page</strong>, touchez <strong>Réservations et groupes</strong>. La case <strong>Lien de réservation</strong> est sous « Comment les visiteurs viennent-ils ? ». Elle y est aussi pour les visites sans réservation, pour une page de réservation de groupe ou de dégustation.</li><li>Sur votre page de modification, touchez <strong>Téléphone, site Web ou description</strong> : c’est <strong>Lien de réservation ou de billets</strong>, dans la case des liens.</li></ul><p>C’est le même lien aux deux endroits. Un nouveau lien est vérifié d’abord, en général d’ici un jour; ensuite, votre page affiche un bouton <strong>Réserver</strong>.</p>' },
+  // Winery test 5 (2026-11-12): "how do I change my winter hours later?" got how to make a season, with no word of the two
+  // places to change hours, and "checked first" while the setup had said "on your page now". Both places, each with what
+  // really happens: setup answers go live; the hours form says {LIVE} (live signed in, checked first from the edit link).
+  { id: 'winery-change-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'winery-appointment', 'hours', 'closures'],
+    q: 'How do I change my hours later (winter hours too)?', qFr: 'Comment changer mes heures plus tard (aussi l’hiver)?',
+    keys: ['winter hours', 'change hours later', 'change my hours later', 'change my winter hours', 'change winter hours', 'change our winter hours', 'change the winter hours', 'winter hours later', 'hours later', 'change our hours', 'change my hours', 'update my hours', 'update hours', 'new hours', 'summer hours later', 'change summer hours', 'change my summer hours', 'change seasonal hours', 'change my seasonal hours', 'edit my hours', 'fix my hours'],
+    keysFr: ['heures d hiver', 'horaire d hiver', 'changer mes heures', 'modifier mes heures', 'changer les heures', 'modifier les heures', 'heures plus tard', 'changer mes heures plus tard', 'changer l horaire', 'modifier l horaire', 'heures d ete', 'mettre a jour mes heures'],
+    a: '<p>Any time, in either place:</p><ul><li>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. Change your usual or your winter hours (and their months), then save. Hours saved in the setup are on your page straight away.</li><li>Or tap <strong>Change my hours</strong> on your portal’s main page, for the full form with seasonal hours and special closures. {LIVE}</li></ul><p>Your winter hours come back every year by themselves, so you only change them when they change.</p>',
+    aFr: '<p>En tout temps, à l’un ou l’autre endroit :</p><ul><li>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Changez vos heures habituelles ou vos heures d’hiver (et leurs mois), puis enregistrez. Les heures enregistrées dans la configuration sont sur votre page tout de suite.</li><li>Ou touchez <strong>Modifier mes heures</strong> sur la page principale de votre portail, pour le formulaire complet avec les heures saisonnières et les fermetures spéciales. {LIVE}</li></ul><p>Vos heures d’hiver reviennent chaque année d’elles-mêmes; vous ne les changez que si elles changent.</p>' },
   { id: 'winery-appointment', pages: ['setup', 'edit'], q: 'We’re by appointment in winter', qFr: 'Nous sommes sur rendez-vous l’hiver',
     keys: ['by appointment', 'appointment', 'appointment only', 'off-season', 'off season', 'winter', 'call ahead'], keysFr: ['rendez-vous', 'sur rendez-vous', 'basse saison', 'hiver', 'appelez'],
     a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”.</p><p>By appointment all year, with no set hours? On the Hours step, tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</p>',
@@ -65259,7 +65371,7 @@ module.exports = {
   validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
-  validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
+  validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,

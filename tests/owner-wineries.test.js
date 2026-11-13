@@ -129,7 +129,7 @@ test('each winery step saves live from the setup and reads back in the setup', a
   assert.equal(cfg.progress.done.tastings, 'live');
   // The Plan your visit lines written from the answers (English, with French alongside).
   assert.equal(row(w.id, 'Tastings').text, '$15 a person, free with a bottle purchase. Booking recommended.');
-  assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more and tour buses, please book ahead.');
+  assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more, and tour buses and limos, please book ahead.');
   assert.equal(row(w.id, 'Restaurant').text, 'The Vine Bistro on site, Thu–Mon from noon.');
   assert.equal(row(w.id, 'Winter').text, 'Nov 1 – Mar 31: by appointment. Please call ahead.');
   assert.equal(row(w.id, 'Wine & cheese').text, '$45 a person, daily at 1 PM');
@@ -621,7 +621,7 @@ test('plan your visit cap (winery test 2): a confirmed line is hers, nothing dro
   // Year-round: no "Winter: Open all year." line taking a slot.
   assert.equal((await change(t, { tasting_fee: 15, winery_info: { waived: 'two', visit: 'walk_in', groups: 12, buses: 'book', year: 'all' } })).status, 200);
   assert.ok(!boxLabels(w.id).rows.includes('Winter'), boxLabels(w.id).rows.join());
-  assert.equal(row(w.id, 'Groups').text, 'Groups of 12 or more and tour buses, please book ahead.');
+  assert.equal(row(w.id, 'Groups').text, 'Groups of 12 or more, and tour buses and limos, please book ahead.');
   // Confirming research's Dogs line unchanged (from the setup) makes it hers; from the edit page it's still "nothing changed".
   assert.ok(!boxLabels(w.id).owned.includes('Dogs'));
   assert.equal((await change(t, { visit_rows: { dogs: 'Leashed dogs welcome on the lawn.' } }, false)).status, 400);
@@ -921,7 +921,7 @@ test('winery test 3: a winery’s owner home has no Happy hour or Add an event t
   const f = text.fr, fw = text.fr.winery;
   assert.equal(f.stDayPlural, 'nous les ajouterons d’ici un jour');
   assert.equal(fw.stStoryKnown, 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour');
-  assert.equal(fw.knownQ, 'Votre spécialité ?');
+  assert.equal(fw.knownQ, 'Pour quoi êtes-vous reconnu\u202f?');
   assert.match(f.openQ, /Quand êtes-vous ouverts chaque année \?/);
   assert.equal(f.holidays.victoria, 'Fête de Victoria');
   assert.equal(fw.menuSocialQ, 'Où est votre carte des vins ?');
@@ -1160,4 +1160,170 @@ test('winery test 4: wording: one tasting price without “From” on the page (
   assert.match((await get(`/owner/${t}`)).text, /<strong>The essentials are done<\/strong>/);
   const setup = (await get(`/owner/${t}/setup`)).text;
   assert.match(setup, /@media \(max-width: 330px\) \{ body\.owner-setup \.su-head \{ flex-wrap: wrap; row-gap: 0; \}/);
+});
+
+// ---------- Winery test 5 (Donna, Bluebird Bench, 2026-11-12) ----------
+const CLIENT5 = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+test('winery test 5: a quick chip replaces research’s untouched line, adds to hers, never repeats what it says', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [{ label: 'Tastings', text: 'Tastings $10.' }, { label: 'Dogs', text: 'Dogs welcome on the patio.' }, { label: 'Parking', text: 'Free parking on site.' }]);
+  let cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.visitResearch, ['dogs'], 'research’s Dogs line is still research’s');
+  assert.equal(cfg.cur.visit_rows.dogs, 'Dogs welcome on the patio.');
+  // The rule in the client: has it -> take it out; untouched research line -> replaced; already says it -> left; else added.
+  assert.match(CLIENT5, /else if \(v && pre && v === pre && \(C\.visitResearch \|\| \[\]\)\.indexOf\(qk\) >= 0\) v = t;\n\s*else if \(saysIt\(v, t\)\) return;\n\s*else v = v \? v\.replace/);
+  // saysIt, run as the client runs it.
+  const fn = new Function(CLIENT5.match(/function has\(v, t\)\{[^\n]*\}/)[0] + '\n' + CLIENT5.match(/var QUICK_COMMON = [^\n]*/)[0] + '\n' + CLIENT5.match(/function quickWords\(t\)\{[^\n]*\}/)[0] + '\n' + CLIENT5.match(/function saysIt\(v, t\)\{[^\n]*\}/)[0] + '\nreturn saysIt;')();
+  assert.equal(fn('Dogs welcome on the patio.', 'Patio only'), true);
+  assert.equal(fn('Dogs welcome on the patio.', 'Inside and patio'), false);
+  assert.equal(fn('Chiens bienvenus sur la terrasse.', 'Terrasse seulement'), true);
+  assert.equal(fn('Leashed dogs please.', 'Water bowls at the door'), false);
+  // Once she saves the line (it becomes hers), it is no longer research's.
+  assert.equal((await change(t, { visit_rows: { dogs: 'Patio only' } })).status, 200);
+  cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.visitResearch, []);
+  assert.equal(row(w.id, 'Dogs').text, 'Patio only');
+  // Restaurants get the same rule (one shared screen).
+  const r = mk('restaurant'); research(r.id, [{ label: 'Dogs', text: 'Dogs on the patio.' }]);
+  assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(r.id)}/setup`)).text).visitResearch, ['dogs']);
+});
+
+test('winery test 5: the groups line keeps limos and the buses question says one answer covers both', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { winery_info: { groups: 8, buses: 'book' } })).status, 200);
+  assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more, and tour buses and limos, please book ahead.');
+  assert.equal(app.venueVisitInfo(w.id).owner_fr.Groups.fr, 'Groupes de 8 personnes ou plus, autobus et limousines : réservez à l’avance.');
+  assert.equal((await change(t, { winery_info: { groups: null, buses: 'book' } })).status, 200);
+  assert.equal(row(w.id, 'Groups').text, 'Tour buses and limos: please book ahead.', 'the stand-alone line as before');
+  assert.match(text.en.winery.busesLead, /One answer for both\. Take only one of them\? Tap “Book ahead”/);
+  assert.match(text.fr.winery.busesLead, /Vous n’acceptez que l’un des deux \? Touchez « Réservez à l’avance »/);
+  assert.equal(text.fr.winery.busesQ, 'Autobus et limousines ?');
+  assert.match(CLIENT5, /id="suBusesLead"/);
+  assert.deepEqual(text.en.winery.buses, { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' });
+});
+
+test('winery test 5: Build My Trip says why a named winery is closed that day, never offers it back, and shows its tasting fee', async () => {
+  const was = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    const d11 = [['11:00', '17:00']], g = [['12:00', '16:00']];
+    const w = mk('winery', { name: 'Bluebird Bench Winery', slug: 'bluebird-bench-winery-t5', region: 'lake-country', hours: JSON.stringify({ mon: d11, tue: d11, wed: d11, thu: d11, fri: d11, sat: d11, sun: d11 }) });
+    const t = tokenFor(w.id);
+    const y = Number(today.slice(0, 4)); const jan = `${y + 1}-01`;
+    assert.equal((await change(t, { tasting_fee: 10, hours_seasons: [{ from: '11-01', to: '04-30', label: 'Winter hours', hours: { mon: [], tue: [], wed: [], thu: [], fri: g, sat: g, sun: g } }],
+      closures: [{ from: `${y}-12-26`, to: `${y}-12-26`, note: 'Boxing Day' }, { from: `${y + 1}-01-01`, to: `${y + 1}-01-01`, note: 'Jour de l’An' }, { from: `${y}-12-30`, to: `${y}-12-30`, note: 'Inventory' }] })).status, 200);
+    const plan = async (q) => (await postJson('/api/trip/plan', { text: q })).body;
+    const wedJan = [13, 14, 15, 16, 17, 18, 19].map((n) => `${jan}-${n}`).find((x) => new Date(`${x}T12:00:00Z`).getUTCDay() === 3);
+    const md = (iso) => `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+    let p = await plan(`Visit Bluebird Bench Winery in Lake Country on Wednesday ${md(wedJan)}`);
+    assert.ok(p.warnings.includes('Bluebird Bench Winery is closed Wednesdays from Nov to Apr, so it isn’t in this plan.'), JSON.stringify(p.warnings));
+    const alts = (p.requirementResults || []).flatMap((r) => r.optionalAlternatives || []);
+    assert.ok(!alts.some((a) => a.id === w.id), 'never offered back as “Another listing”');
+    // Planned again without it (other wineries listed), or its own request line says why.
+    assert.ok(p.namedVenueReplanned || (p.requirementResults || []).some((r) => r.kind === 'venue' && r.reason === 'Bluebird Bench Winery is closed Wednesdays from Nov to Apr, so it isn’t in this plan.'));
+    assert.ok(!p.warnings.some((x) => /closed for the season/.test(x)));
+    // Holiday closures: holiday words, not "for the season"; a closure without a holiday name says the date.
+    p = await plan('Visit Bluebird Bench Winery in Lake Country on December 26');
+    assert.ok(p.warnings.includes('Bluebird Bench Winery is closed on December 26 for Boxing Day, so it isn’t in this plan.'), JSON.stringify(p.warnings));
+    assert.ok(!p.warnings.some((x) => /closed for the season|closed right now/.test(x)), JSON.stringify(p.warnings));
+    p = await plan('Visit Bluebird Bench Winery in Lake Country on January 1');
+    assert.ok(p.warnings.includes('Bluebird Bench Winery is closed on January 1 for New Year’s Day, so it isn’t in this plan.'), JSON.stringify(p.warnings));
+    p = await plan('Visit Bluebird Bench Winery in Lake Country on December 30');
+    assert.ok(p.warnings.includes('Bluebird Bench Winery is closed on December 30, so it isn’t in this plan.'), JSON.stringify(p.warnings));
+    // A July Wednesday: open, and the stop shows the owner's tasting fee.
+    p = await plan('Visit Bluebird Bench Winery in Lake Country on Wednesday July 14');
+    const stop = (p.recommendations || []).find((s) => s.venue && s.venue.id === w.id);
+    assert.ok(stop, JSON.stringify(p.warnings));
+    assert.deepEqual(stop.venue.cost, { cents: 1000, label: 'Tasting', labelFr: 'Dégustation', source: null });
+    assert.equal((await change(t, { tasting_fee: 0 })).status, 200);
+    p = await plan('Visit Bluebird Bench Winery in Lake Country on Wednesday July 14');
+    const free = (p.recommendations || []).find((s) => s.venue && s.venue.id === w.id);
+    assert.equal(free.venue.freeTasting, true); assert.equal(free.venue.cost, undefined);
+    const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+    assert.match(v3, /if \(v\.freeTasting\) return '<p class="t3-stop-price" data-cost-cents="0">' \+ esc\(french \? 'Dégustation gratuite' : 'Free tasting'\)/);
+    // French copy of the new lines.
+    const frc = require('../trip-french-copy.js');
+    assert.equal(frc.t3FrenchText('Bluebird Bench Winery is closed Wednesdays from Nov to Apr, so it isn’t in this plan.'), 'Bluebird Bench Winery est fermé le mercredi de novembre à avril; il ne fait donc pas partie de ce plan.');
+    assert.equal(frc.t3FrenchText('Bluebird Bench Winery is closed on December 26 for Boxing Day, so it isn’t in this plan.'), 'Bluebird Bench Winery est fermé le 26 décembre (lendemain de Noël); il ne fait donc pas partie de ce plan.');
+    assert.equal(frc.t3FrenchText('Bluebird Bench Winery is closed on Wednesday, January 13, so it isn’t in this plan.'), 'Bluebird Bench Winery est fermé le mercredi 13 janvier; il ne fait donc pas partie de ce plan.');
+    assert.equal(frc.t3FrenchText('Bluebird Bench Winery matches but is closed on December 26. Ask again with another date to plan it.'), 'Bluebird Bench Winery correspond, mais est fermé le 26 décembre. Essayez une autre date pour le planifier.');
+  } finally { if (was === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = was; }
+});
+
+test('winery test 5: planner alternatives skip a place closed all day on the trip’s date (no time of day asked)', () => {
+  const closedWed = JSON.stringify({ mon: [['11:00', '17:00']], tue: [['11:00', '17:00']], wed: [], thu: [['11:00', '17:00']], fri: [['11:00', '17:00']], sat: [['11:00', '17:00']], sun: [['11:00', '17:00']] });
+  assert.equal(planner.dayClosedAllDay({ hours: closedWed }, '2027-01-13', null), true);
+  assert.equal(planner.dayClosedAllDay({ hours: closedWed }, '2027-01-14', null), false);
+  assert.equal(planner.dayClosedAllDay({ hours: closedWed }, null, 'wed'), true);
+  assert.equal(planner.dayClosedAllDay({ hours: null }, '2027-01-13', null), false, 'unknown hours are never closed');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
+  assert.match(src, /if \(!daypart && dayClosedAllDay\(venue, visitDate, weekday\)\) continue;/);
+});
+
+test('winery test 5: help for changing hours later points to both places, with what goes live', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  const ohb = (html) => JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+  const topic = ohb((await get(`/owner/${t}/setup`)).text).topics.find((x) => x.id === 'winery-change-hours');
+  assert.ok(topic);
+  assert.ok(topic.keys.includes('winter hours') && topic.keys.includes('change hours later'));
+  assert.ok(topic.over.includes('seasonal-hours') && topic.over.includes('setup-season'));
+  assert.match(topic.a, /tap <strong>Change an answer<\/strong>, then <strong>Hours and holidays<\/strong>\..*Hours saved in the setup are on your page straight away\./);
+  assert.match(topic.a, /Or tap <strong>Change my hours<\/strong> on your portal’s main page, for the full form with seasonal hours and special closures\. From the edit link we check changes first, usually within a day\./);
+  assert.match(topic.aFr, /Modifier une réponse<\/strong>, puis <strong>Heures et jours fériés<\/strong>.*Avec le lien de modification, nous vérifions d’abord/);
+  assert.match(topic.aFr, /endroit :/, 'French spacing');
+  // What the answer promises is what happens: the setup puts hours live, the edit link sends them for a check.
+  assert.ok(!app.OWNER_LINK_INSTANT_FIELDS.has('hours') && !app.OWNER_LINK_INSTANT_FIELDS.has('hours_seasons'));
+  const winter = [{ from: '11-01', to: '04-30', label: 'Winter hours', hours: Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['12:00', '16:00']]])) }];
+  const r = await change(t, { hours_seasons: winter });
+  assert.ok((r.body.live || []).includes('hours_seasons'), JSON.stringify(r.body));
+  const r2 = await change(t, { hours_seasons: [] }, false);
+  assert.ok(!(r2.body.live || []).includes('hours_seasons'), 'edit link: checked first ' + JSON.stringify(r2.body));
+});
+
+test('winery test 5: small wording (closed once, hours recap, research price and kids, known for, preview price, IG/FB status)', async () => {
+  // "Mon Closed" over "Reopen · Monday closed": the note is for screen readers only.
+  assert.match(CLIENT5, /h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button> <span class="su-hundo su-sr" role="status">'/);
+  // The recap after saving hours.
+  assert.match(CLIENT5, /T\.hoursSavedNow\) \+ '<\/p>' \+ \(S\.hoursNone \? '' : hoursRecap\(\)\)/);
+  assert.equal(text.en.recapRest, 'Rest of the year'); assert.equal(text.fr.recapHours, 'Vos heures');
+  // Known for, the preview price, the IG/FB status.
+  assert.equal(text.en.winery.knownQ, 'What are you known for?');
+  assert.equal(text.fr.winery.knownQ, 'Pour quoi êtes-vous reconnu ?');
+  assert.equal(text.en.winery.feeCard, 'tastings {x} a person');
+  assert.equal(text.fr.winery.feeCard, 'dégustations à {x} par personne');
+  assert.equal(text.en.stSocialIgLive, 'Instagram on your page now, Facebook within a day');
+  assert.match(CLIENT5, /step === 'social' && S\.done\.instagram === 'live' && S\.done\.facebook === 'day' && T\.stSocialIgLive\) return T\.stSocialIgLive;/);
+  // Research's Tastings "$10" pre-selects $10 (a suggestion: saved only with the screen); research's Kids line ticks Kids welcome.
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [{ label: 'Tastings', text: 'Tastings $10.' }, { label: 'Food', text: 'Charcuterie boards.' }, { label: 'Dogs', text: 'Dogs welcome on the patio.' }, { label: 'Parking', text: 'Free parking on site.' }, { label: 'Kids', text: 'Kids welcome with an adult.' }]);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.researchFee, 10);
+  assert.equal(cfg.researchFeeFrom, 'visit', 'not on the card: “Your website says $10”');
+  assert.match(text.en.winery.feeGuessVisit, /^Your website says \{x\}, so we picked it\./);
+  assert.equal(app.wineryTastingFee(w.id), null, 'not saved until the screen is');
+  assert.ok(cfg.visitTicks.includes('kid_friendly') && cfg.visitTicks.includes('free_parking') && cfg.visitTicks.includes('dog_friendly'), JSON.stringify(cfg.visitTicks));
+  // Donna's answers: Tastings, Food, Groups, What you offer (Kids welcome, Free parking kept on), then Dogs, Known for and an
+  // experience. The box is full: her own lines (Wine & cheese too) come first and stay open (#847); research's Kids line,
+  // backed by her tile, is kept (recorded, not dropped) and folds under "More".
+  assert.equal((await change(t, { tasting_fee: 10, winery_info: { food: 'snacks', groups: 8, buses: 'book' } })).status, 200);
+  assert.equal((await change(t, { badges: { kid_friendly: true, free_parking: true, dog_friendly: true } })).status, 200);
+  assert.equal((await change(t, { visit_rows: { dogs: 'Patio only', known_for: 'Our Viognier and the patio view' } })).status, 200);
+  assert.equal((await change(t, { winery_info: { food: 'snacks', groups: 8, buses: 'book', experiences: [{ label: 'Wine & cheese', text: 'Boards to share on the patio.' }] } })).status, 200);
+  const box = app.venueVisitInfo(w.id);
+  const shown = box.rows.map((r) => r.label), kept = (box.owner_dropped || []).filter((r) => r.kept).map((r) => r.label);
+  assert.equal(box.rows.length, 7);
+  for (const l of ['Tastings', 'Food', 'Groups', 'Dogs', 'Known for', 'Wine & cheese']) assert.ok(shown.includes(l), `${l} hers, in the box: ${shown}`);
+  assert.ok(!(box.owner_dropped || []).some((r) => r.owned), 'none of her lines set aside');
+  assert.ok(kept.includes('Kids'), `Kids kept, folded: ${shown} / ${JSON.stringify(box.owner_dropped)}`);
+  for (const l of ['Kids', 'Parking']) assert.ok(shown.includes(l) || kept.includes(l), `${l} never dropped`);
+  // The page: Wine & cheese open, Kids folded under "More" (still there).
+  const page = vpage(w, 'en');
+  const vbox = page.slice(page.indexOf('id="venueVisit"'), page.indexOf('</section>', page.indexOf('id="venueVisit"')));
+  const [open, more] = vbox.split('visit-more');
+  assert.ok(open.includes('>Wine &amp; cheese<'), 'her experience shown open');
+  assert.ok(more && more.includes('Kids welcome with an adult.'), 'Kids folded under More: ' + vbox.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+  assert.ok(!open.includes('Kids welcome with an adult.'));
+  // Without her tile, research's line is still research's (dropped first when the box is full).
+  const w2 = mk('winery');
+  research(w2.id, [{ label: 'Kids', text: 'Kids welcome.' }]);
+  assert.deepEqual([...app.visitBadgeConfirmedLabels(w2.id, app.venueVisitInfo(w2.id).rows)], []);
 });

@@ -489,6 +489,9 @@
     if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
     if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
     if (d === 'day' && step === 'photos' && T.stDayPlural) return T.stDayPlural;
+    // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
+    if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
+    if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
@@ -663,12 +666,17 @@
   }
   // Tap-first answers: chips that write the line for her (typing stays possible). A chip is "on" while its words are in the box.
   function has(v, t){ return String(v || '').toLowerCase().indexOf(String(t).toLowerCase()) >= 0; }
+  // Winery test 5 (2026-11-12): a chip whose meaning the box already holds ("Patio only" when it says "on the patio")
+  // isn't added again. Its telling words, without the ones every dogs line has.
+  var QUICK_COMMON = { only: 1, and: 1, the: 1, at: 1, on: 1, to: 1, too: 1, our: 1, us: 1, welcome: 1, dogs: 1, dog: 1, et: 1, seulement: 1, a: 1, l: 1, d: 1, la: 1, le: 1, les: 1, aux: 1, au: 1, chiens: 1, chien: 1, bienvenus: 1 };
+  function quickWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(function(w){ return w && !QUICK_COMMON[w] && w !== 'à'; }); }
+  function saysIt(v, t){ if (has(v, t)) return true; var w = quickWords(t), b = ' ' + quickWords(v).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (has(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
   // Café screens (2026-11-10): one-of-a-few answers (data-cpick) and on/off tiles (data-ctog) on S.cafe.
@@ -770,12 +778,34 @@
   }
   // Café test 6 (2026-11-12): reopening the Hours step showed only the usual week, and an owner with summer hours
   // feared they were lost. One line per saved season: "Summer (Jun–Sep): 7 AM – 3 PM every day ✓". No new question.
-  function weekShort(w){
+  function weekShort(w, sep){
     var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
     if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
     var out = [], i = 0;
     while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
-    return out.join(' · ');
+    return out.join(sep || ' · ');
+  }
+  // Winery test 5 (2026-11-12): after saving, one line with every set of hours ("Summer: 11 AM – 5 PM every day · Winter
+  // (Nov–Apr): Mon–Thu closed, Fri–Sun Noon – 4 PM"), so both seasons are checked at a glance.
+  function hoursRecap(){
+    var parts = [], kinds = [];
+    (CUR.hours_seasons || []).forEach(function(sz){ var x = seasonInfo(sz); if (x) { parts.push(x.kw + ' (' + x.range + ')' + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(x.w, ', ')); kinds.push(x.kind); } });
+    var w = S.week; if (!w || !DAYS.some(function(d){ return w[d] && w[d].length; })) return '';
+    var other = kinds.length && kinds.every(function(k){ return k === 'winter'; }) ? 'summer' : kinds.length && kinds.every(function(k){ return k === 'summer'; }) ? 'winter' : '';
+    var ul = other ? String((T.seasonWord || {})[other] || other) : '';
+    var lead = kinds.length ? (ul ? ul.charAt(0).toUpperCase() + ul.slice(1) : T.recapRest) : T.recapHours;
+    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', '));
+    return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
+  }
+  function seasonInfo(sz){
+      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return null;
+      var w = parseWeek(sz.hours); if (!w) return null;
+      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
+      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
+      var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
+      var last = new Date(2025, b, 0).getDate();
+      var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
+      return { kind: kind, kw: kw, w: w, range: md2(a, da, da > 1) + '–' + md2(b, db, db < last) };
   }
   function seasonLines(){
     return (CUR.hours_seasons || []).map(function(sz){
@@ -1094,7 +1124,9 @@
           + '<div class="su-hoffrow">' + (w ? '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="false" aria-label="' + h(fill(T.closeDayAria, { day: longDay(d) })) + '">' + h(T.closeDayBtn) + '</button>'
             // Café test 6 (2026-11-12): "Reopen" takes the place of "Mark closed" (same spot, same height) and the "Monday
             // closed" note comes after it, so a quick second tap on the next day's button never lands on another day.
-            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
+            // Winery test 5 (2026-11-12): the line above already says "Mon Closed", so the note is for screen readers only
+            // ("closed" twice on every winter row).
+            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo su-sr" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
@@ -1133,7 +1165,7 @@
     } else if (s === 'closures') {
       var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0 && !HOL.some(function(o){ return o.key === k && holCovered(o); }); }).length + Math.max(0, S.extra.length - S.savedExtra);
-      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' + (S.hoursNone ? '' : hoursRecap()) : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
@@ -1181,7 +1213,7 @@
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'winerySave') + '</div>' + skip('winery');
     } else if (s === 'tastings') {
       var wf = S.wine, feeOn = function(n){ return !wf.feeOther && wf.fee === n; };
-      x = doneLine('tastings') + q(T.feeQ, T.feeLead) + (wf.feeGuessed && wf.fee != null && !isNaN(wf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(T.feeGuess, { x: feeText(wf.fee) })) + '</p>' : '')
+      x = doneLine('tastings') + q(T.feeQ, T.feeLead) + (wf.feeGuessed && wf.fee != null && !isNaN(wf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' && T.feeGuessVisit ? T.feeGuessVisit : T.feeGuess, { x: feeText(wf.fee) })) + '</p>' : '')
         + (CUR.tasting_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.feeWaiting, { x: feeText(CUR.tasting_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.feeQ) + '" id="suFeeChips">' + QUICK_FEES.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-fee="' + n + '">' + h(feeText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (wf.feeOther ? 'true' : 'false') + '" data-fee="other">' + h(T.feeOther) + '</button></div>'
@@ -1197,7 +1229,7 @@
         + (linkShown ? '<div id="suBookBox" style="margin-top:14px">' + (wv.noBook && !walkIn ? '' : field('suBookUrl', walkIn && T.bookLinkLabelWalkIn ? T.bookLinkLabelWalkIn : T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>')
           + (CUR.booking_url || C.bookingKnown || walkIn ? '' : '<div class="su-chips" role="group" aria-label="' + h(T.bookLinkLabel) + '"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (wv.noBook ? 'true' : 'false') + '" data-wnobook="1">' + h(T.noBookLink) + '</button></div>') + '</div>' : '')
         + '<h2 class="su-h2">' + h(T.groupsSizeQ) + '</h2><p class="su-hint">' + h(T.groupsSizeLead) + '</p>' + wchips('groups', [4, 6, 8, 10, 12], { 4: '4+', 6: '6+', 8: '8+', 10: '10+', 12: '12+' }, T.groupsSizeQ)
-        + '<h2 class="su-h2">' + h(T.busesQ) + '</h2>' + wchips('buses', ['welcome', 'book', 'no'], T.buses, T.busesQ)
+        + '<h2 class="su-h2">' + h(T.busesQ) + '</h2>' + (T.busesLead ? '<p class="su-hint" id="suBusesLead">' + h(T.busesLead) + '</p>' : '') + wchips('buses', ['welcome', 'book', 'no'], T.buses, T.busesQ)
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'visitSave') + '</div>' + skip('visit');
     } else if (s === 'experiences') {
       x = doneLine('experiences') + q(T.expQ, T.expLead) + msgs() + [0, 1].map(function(i){ var e = S.wine.exp[i];
@@ -2305,7 +2337,7 @@
       // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
       // becomes hers and a full Plan your visit box never drops it.
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
-      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
+      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
@@ -2542,11 +2574,16 @@
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
-      var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim();
+      var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim(), qk = b.getAttribute('data-key');
+      // Winery test 5 (2026-11-12): "Dogs welcome on the patio. Patio only" went live. The box still holding research's
+      // line, untouched, is replaced by the tap; a line she typed gets the tap added; one that already says it stays.
+      var pre = String(((CUR.visit_rows || {})[qk]) || '').trim();
       if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = t;
+      else if (saysIt(v, t)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
       box.value = v.slice(0, 180); mark();
-      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', has(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
+      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });

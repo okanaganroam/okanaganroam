@@ -125,8 +125,9 @@ test('3: a café\'s Hours step is done only once its holidays and closures part 
 test('4: "Mark closed" turns into "Reopen" in the same place; the day\'s note comes after it and the row keeps its height', () => {
   assert.equal(TEXT.en.reopenDay, 'Reopen');
   assert.equal(TEXT.fr.reopenDay, 'Rouvrir');
-  // Button first (where "Mark closed" was), then "Monday closed".
-  assert.match(CLIENT, /hoffUndo\(d\) \? '<button type="button" class="su-hoff su-hoff-undo"[^\n]*h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button> <span class="su-hundo" role="status">'/);
+  // Button first (where "Mark closed" was), then "Monday closed" (winery test 5, 2026-11-12: for screen readers only, as
+  // the row above already says "Mon Closed").
+  assert.match(CLIENT, /hoffUndo\(d\) \? '<button type="button" class="su-hoff su-hoff-undo"[^\n]*h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button> <span class="su-hundo su-sr" role="status">'/);
   assert.match(SERVER, /body\.owner-setup \.su-hoffrow \{ min-height: 54px; box-sizing: border-box; \}/);
   assert.match(SERVER, /body\.owner-setup \.su-hoffrow:has\(\.su-hoff-undo\) \{ flex-wrap: nowrap; \}/);
 });

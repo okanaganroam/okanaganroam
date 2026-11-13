@@ -1298,8 +1298,12 @@ function why(reasons) {
 // Collections a stop card may name, and how (Build My Trip V3).
 const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
 function publicVenue(v, ctx) {
-  const cost = tripStopPrice(v.url, v.id);
+  // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
+  // with a $10 owner fee); a free tasting says so.
+  const fee = v.type === 'winery' && typeof v.tastingFee === 'number' && Number.isFinite(v.tastingFee) && v.tastingFee >= 0 ? v.tastingFee : null;
+  const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : tripStopPrice(v.url, v.id);
   return {
+    ...(fee === 0 ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
@@ -2845,7 +2849,8 @@ function buildDays(facts, ctx, days, pinned) {
     // 2026-10-21: when the place for it in town is closed for the season on the trip's dates (Kangaroo Creek Farm after
     // Thanksgiving), say so rather than "nothing is listed".
     const closedHere = ctx.regions.length && ctx.tripDate ? facts.filter((v) => ctx.regions.includes(v.region) && (f.key.startsWith('food:') ? normWords(v.name || '').includes(normWords(f.key.slice(5))) : f.test(v)) && seasonClosedOnTrip(v, { date: ctx.tripDate })).sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))[0] : null;
-    if (closedHere) { warnings.push(`${closedHere.name} is closed for the season on your dates, so ${focusText(ctx, f.key)} is not in this plan.`); continue; }
+    // Winery test 5 (2026-11-12): an owner's holiday closure is "closed on your dates", not "for the season".
+    if (closedHere) { warnings.push(`${closedHere.name} is closed${seasonClosedOnTrip({ ...closedHere, ownerClosures: undefined }, { date: ctx.tripDate }) ? ' for the season' : ''} on your dates, so ${focusText(ctx, f.key)} is not in this plan.`); continue; }
     // 2026-10-14: name the closest place that has it, one or two towns along the corridor, instead of only saying no.
     const near = nearbyFocusVenue(facts, ctx, f);
     if (near) warnings.push(`Nothing matching ${focusText(ctx, f.key)} is listed in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}; the closest is ${near.name} in ${regionLabel(ctx, near.region)}.`);
@@ -6223,6 +6228,14 @@ function requirementWarning(i) {
   return i.reason || null;
 }
 
+// Closed all day on the trip's date (from its date, or the asked weekday): listed as closed that day in its own week.
+function dayClosedAllDay(v, date, weekday) {
+  const wd = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
+  if (!wd || !WEEKDAYS.includes(wd)) return false;
+  const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+  return !!(parsed.known && parsed.days[wd] && parsed.days[wd].status === 'closed');
+}
+
 // Offer grounded ways to adapt an unmet request without marking an option as
 // a match or inserting it into the itinerary.
 function addOptionalRequirementAlternatives(results, plan, requirements, input) {
@@ -6255,6 +6268,9 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // Audit fix (2026-10-27): a place closed for the season or under a closed advisory is never offered under "Not
       // included" (the closed Terrace Restaurant was offered as its own alternative).
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
+      // Winery test 5 (2026-11-12): with no time of day asked, a place whose own week has the trip's day closed (a winery
+      // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
+      if (!daypart && dayClosedAllDay(venue, visitDate, weekday)) continue;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
@@ -6614,10 +6630,17 @@ function planTripCore(input) {
     const names = offSeason.map((s) => s.venue.name);
     const reopen = offSeason.map((s) => facts.find((f) => f.id === s.venue.id)).find((f) => f && f.seasonReopens);
     const when = ctx.tripDate ? `in ${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]}` : 'right now';
+    // Winery test 5 (2026-11-12): closed only by the owner's own closure that day (Boxing Day, New Year's Day) isn't
+    // "closed for the season".
+    const onlyDay = ctx.tripDate && offSeason.every((st) => { const f = facts.find((x) => x.id === st.venue.id); return f && f.ownerClosures && !seasonClosedOnTrip({ ...f, ownerClosures: undefined }, { date: ctx.tripDate }); });
+    const dayText = ctx.tripDate ? `${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]} ${Number(ctx.tripDate.slice(8, 10))}` : '';
+    if (onlyDay) result.warnings.push(names.length === 1 ? `${names[0]} matches but is closed on ${dayText}. Ask again with another date to plan it.` : `These places match but are closed on ${dayText}: ${listText(names)}. Ask again with another date to plan them.`);
+    else {
     const reopens = reopen ? ` ${names.length === 1 ? 'It' : reopen.name} reopens ${MONTH_NAMES[Number(reopen.seasonReopens.slice(5, 7)) - 1]} ${Number(reopen.seasonReopens.slice(8, 10))}.` : '';
     result.warnings.push(names.length === 1
       ? `${names[0]} matches but is closed for the season ${when}.${reopens} Ask again with a date in its season to plan it.`
       : `These places match but are closed for the season ${when}: ${listText(names)}.${reopens} Ask again with a date in their season to plan them.`);
+    }
     result.closedForSeason = offSeason;
   } else if (!rec.items.length) result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
   if (ctx.whenDaypart || ctx.startWeekday) {
@@ -8011,7 +8034,7 @@ module.exports = {
   publicVenue,
   stopFrom,
   parseVenueHours,
-  hoursFit,
+  hoursFit, dayClosedAllDay,
   listedHoursText,
   cafeRole,
   SLOT_WINDOWS,
