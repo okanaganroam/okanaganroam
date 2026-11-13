@@ -45692,7 +45692,7 @@ const PLACE_TYPE_DISPLAY_FR = { 'Casual': 'Restauration décontractée', 'Family
   'Neighbourhood pub': 'Pub de quartier', 'Sports bar': 'Bar sportif', 'Gastropub': 'Gastropub', 'Irish or British pub': 'Pub irlandais ou britannique', 'Brewpub': 'Pub-brasserie', 'Taphouse': 'Taphouse / bar à bières artisanales', 'Beach or patio bar': 'Bar de plage ou terrasse', 'Country pub': 'Pub de campagne', 'Clubhouse': 'Club-house de golf ou de ski',
   'Coffee shop': 'Café', 'Bakery': 'Boulangerie', 'Bakery café': 'Boulangerie-café', 'Roastery': 'Torréfacteur de café', 'Tea house': 'Salon de thé', 'Bubble tea': 'Comptoir de thé aux perles',
   'Ice cream & gelato': 'Bar laitier et gelato', 'Dessert & sweets': 'Desserts et sucreries', 'Brunch café': 'Café-brunch', 'Juice & smoothie bar': 'Bar à jus et smoothies', 'Deli & sandwiches': 'Délicatessen et sandwichs',
-  'Estate winery': 'Domaine viticole', 'Boutique winery': 'Vignoble boutique', 'Tasting room in town': 'Salle de dégustation', 'Fruit or honey wines': 'Vins de fruits et de miel', 'Winery and cidery': 'Vignoble et cidrerie' };
+  'Estate winery': 'Domaine viticole', 'Boutique winery': 'Vignoble boutique', 'Tasting room in town': 'Salle de dégustation', 'Fruit or honey wines': 'Vins de fruits ou de miel', 'Winery and cidery': 'Vignoble et cidrerie' };
 function placeTypeDisplay(venue, fr = false) {
   const p = venuePlaceType(venue);
   if (!p) return '';
@@ -51968,7 +51968,9 @@ function setupScore(found) {
   // `left`: what the portal's own checklist still asks for (not counting what's waiting for our check), so the setup's
   // finish screen and the portal always agree on what is left (fresh-eyes 2026-11-10).
   return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)),
-    left: r.missing.filter((it) => !it.waiting).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
+    // Winery test 3 (2026-11-12): and what will be missing once what she sent is checked (a short story replacing a
+    // long description), so "Nearly there" can name it.
+    left: r.missing.filter((it) => !it.waiting).concat(r.lost || []).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
 }
 // "I'll email it" for the menu (pub test 3, 2026-11-10): it used to live only in the owner's setup progress, so a menu
 // that never arrived went unnoticed. It is now a row in the menu queue on /admin/review (venue_menus, status 'help',
@@ -52125,14 +52127,15 @@ function renderOwnerSetupPage(found, opts) {
     // Wineries (2026-11-12, SPEC-wineries.md "What you offer"): the reused tiles and Picnic area (new). Not here: happy
     // hour, specials, sports, games, off-sales, takeout, Wi-Fi, beach access and the food tiles (the restaurant's own page).
     { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'picnic_area', 'live_music', 'wheelchair_accessible', 'free_parking', 'rv_parking', 'locally_owned'] },
-    { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'nonalcoholic'] },
+    // Winery test 3 (2026-11-12): « Pour qui » over « Enfants bienvenus » (« Idéal pour » read oddly).
+    { title: fr ? 'Pour qui' : 'Good for', keys: ['kid_friendly', 'dog_friendly', 'nonalcoholic'] },
   ] : cafe ? [
     // Cafés (2026-11-10, SPEC-cafes.md "What you offer"): the reused tiles and the eight new ones. "Laptop friendly" is the
     // three-way laptops answer (venue_cafe_info), not a stored badge. No sports, games, off-sales or happy hour tiles.
     // 13 screens (2026-11-11): no Laptop friendly tile any more (laptops aren't asked); a saved laptops answer stays.
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free_milk'] },
     { title: fr ? 'L’endroit' : 'The place', keys: ['wifi', 'patio', 'lake_view', 'washroom', 'free_parking', 'wheelchair_accessible'] },
-    { title: fr ? 'Idéal pour' : 'Good for', keys: ['kid_friendly', 'stroller', 'dog_friendly', 'dog_treats'] },
+    { title: fr ? 'Pour qui' : 'Good for', keys: ['kid_friendly', 'stroller', 'dog_friendly', 'dog_treats'] },
     { title: fr ? 'Commander' : 'Ordering', keys: ['drive_thru', 'walk_up'] },
   ] : pub ? [
     // Pubs (2026-11-10, 22 tiles): no Kids tile ("Who's welcome?" asks it) and no Happy hour tile (Part 1 asks it).
@@ -57853,6 +57856,17 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   const deals = live.happy_hour_deals && Array.isArray(live.happy_hour_deals.deals) ? live.happy_hour_deals.deals : [];
   let pendingPhotos = 0;
   try { pendingPhotos = db.prepare("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'").get(venue.id).n; } catch (e) { pendingPhotos = 0; }
+  // Winery test 3 (2026-11-12): the photos once ours are checked. A sent "main" photo replaces a main photo that isn't one
+  // of hers (research's), which then no longer counts. And the story she sent, which replaces the description.
+  const galleryNow = venueGalleryPhotos(venue);
+  let photoCountAfter = galleryNow.length + pendingPhotos;
+  try {
+    const mainReq = pendingPhotos && db.prepare("SELECT 1 FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 LIMIT 1").get(venue.id);
+    const img = String(venue.image_url || '').split('?')[0];
+    if (mainReq && img && !/^\/images\/owner\//.test(img) && galleryNow.some((p) => String(p.src).split('?')[0] === img)) photoCountAfter -= 1;
+  } catch (e) { /* counted as sent */ }
+  let descriptionAfter;
+  try { const pc0 = pendingOwnerChange(venue.id); const rq = pc0 ? getOwnerChange(pc0.id) : null; if (rq && rq.changes && typeof rq.changes.description === 'string') descriptionAfter = rq.changes.description; } catch (e) { descriptionAfter = undefined; }
   // A storefront spot sent and waiting for our check (fresh-eyes 3, 2026-11-09).
   let pendingArrival = false;
   try { pendingArrival = !hasArrival && !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id); } catch (e) { pendingArrival = false; }
@@ -57863,7 +57877,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
   return {
     pendingHelp,
     address: venue.address, latitude: venue.latitude, longitude: venue.longitude, phone: venue.phone, website: venue.website, cuisine: venue.cuisine,
-    hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: venueGalleryPhotos(venue).length,
+    hasHours: !!venue.hours, hoursCheckedAt, imageUrl: venue.image_url, photoCount: galleryNow.length, photoCountAfter, descriptionAfter,
     avgSpend: live.avg_spend && Number.isInteger(live.avg_spend.amount) ? live.avg_spend.amount : null,
     avgSpendSource: live.avg_spend && live.avg_spend.source ? live.avg_spend.source : null, pendingPhotos,
     menuUrl: links.menu_url, hasPublishedMenu, vegan: venue.vegan, vegetarian: venue.vegetarian, glutenFree: venue.gluten_free,
@@ -58689,14 +58703,16 @@ ${renderGolfHeaderHtml()}
         <h2 id="opTasksHead">${L('What would you like to do today?', 'Que souhaitez-vous faire aujourd’hui?')}</h2>
         <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : completeOn ? L('Quick answers go live right away. Other changes go live after a quick check, usually within a day.', 'Les réponses rapides sont en ligne tout de suite. Les autres modifications le sont après une courte vérification, habituellement en moins d’une journée.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>
         <div class="op-task-grid">
+          ${/* Winery test 3 (2026-11-12): no Happy hour or "Add an event" tile for a winery (spec decision 6; the setup doesn't
+             ask either). The full page keeps the fields. "Happy hour" reads « 5 à 7 » in French. */ ''}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
           ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
-          ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
+          ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${showHappyHour ? tile('happy', '&#127867;', L('Happy hour', 'Happy hour'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${showHappyHour && venue.type !== 'winery' ? tile('happy', '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
           ${tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>

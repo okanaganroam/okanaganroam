@@ -480,7 +480,12 @@ function scoreCompleteness(input, opts) {
       let waiting = (it.fields || []).some((f) => pending.has(f));
       let sent = 0;
       if (it.key === 'photo_main' && photosWaiting > 0) { waiting = true; sent = photosWaiting; }
-      if (it.key === 'photo_extra' && photosWaiting > 0 && Number(input && input.photoCount || 0) + photosWaiting >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
+      // Winery test 3 (2026-11-12): the photos there will be once ours are checked (photoCountAfter: a research main
+      // photo her "main" photo replaces no longer counts), not simply the photos now plus the ones sent.
+      const photosAfter = input && Number.isFinite(input.photoCountAfter) ? input.photoCountAfter : Number(input && input.photoCount || 0) + photosWaiting;
+      if (it.key === 'photo_extra' && photosWaiting > 0 && photosAfter >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
+      // A story waiting for our check counts only when it is long enough for the item.
+      if (it.key === 'description' && waiting && typeof (input && input.descriptionAfter) === 'string' && input.descriptionAfter.trim().length < DESCRIPTION_MIN) waiting = false;
       // A storefront spot the owner sent is waiting for our check (fresh-eyes 3, 2026-11-09), not "left".
       if (it.key === 'arrival' && input && input.pendingArrival) waiting = true;
       // Sent for us to type up or find (the easy setup's menu pages, happy hour or specials sheet, a Facebook or
@@ -489,6 +494,13 @@ function scoreCompleteness(input, opts) {
       if (ph[it.key === 'menu' ? 'menu' : it.key] && ['menu', 'happy_hour', 'specials', 'facebook', 'instagram'].includes(it.key)) waiting = true;
       missing.push({ ...it, waiting, sent });
     }
+  }
+  // Winery test 3 (2026-11-12): done now but not once what was sent is checked: a story under 120 letters that replaces
+  // a longer research description. The projected score (pctWithWaiting) leaves it out, and it is listed in `lost`.
+  const lost = [];
+  if (done.description && typeof (input && input.descriptionAfter) === 'string' && input.descriptionAfter.trim().length < DESCRIPTION_MIN) {
+    const it = list.find((x) => x.key === 'description');
+    if (it && !na.description) lost.push({ ...it });
   }
   const complete = missing.length === 0;
   const pct = complete ? 100 : Math.min(99, Math.floor((got / max) * 100));
@@ -511,8 +523,9 @@ function scoreCompleteness(input, opts) {
   // Hours sent while the page had none: once checked they're fresh too, so the provisional score counts both.
   const hoursFreshW = waitingList.some((it) => it.key === 'hours') && !done.hours ? (list.find((i) => i.key === 'hours_fresh') || { w: 0 }).w : 0;
   const waitingW = waitingList.reduce((a, it) => a + it.w, 0) + hoursFreshW;
-  const pctWithWaiting = waitingW ? Math.min(100, Math.floor(((got + waitingW) / max) * 100)) : pct;
-  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, afterReopen, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds };
+  const lostW = lost.reduce((a, it) => a + it.w, 0);
+  const pctWithWaiting = waitingW || lostW ? Math.min(100, Math.floor(((got + waitingW - lostW) / max) * 100)) : pct;
+  return { pct, pctWithWaiting, got, max, complete, groups, missing, coming, afterReopen, declined, declared: [...declaredAll], minutes: minutesLeft(missing), quick, later, waiting: waitingList, quickSeconds, lost };
 }
 
 // The weekly hours as one short line for "Are your hours still right?" (fresh-eyes 2026-11-08):
