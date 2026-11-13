@@ -83,11 +83,11 @@ test('2: a holiday inside added closed dates is covered (not saved again, not li
   assert.equal(TEXT.en.holCovered, 'Covered by your closed dates'); assert.ok(TEXT.fr.holCovered);
 });
 
-test('3 + 5: the Facebook screen says a link shows right away; the story hint clears at 80 characters', () => {
+test('3 + 5: the Facebook screen says a link shows right away; the story hint clears at 120 characters (winery test 2: the checklist’s full marks)', () => {
   assert.match(TEXT.en.fbWhy, /right away/); assert.doesNotMatch(TEXT.en.fbWhy, /within a day, so|so it shows within a day/);
   assert.match(TEXT.fr.fbWhy, /tout de suite/);
-  assert.match(CLIENT, /var STORY_OK = 80;/);
-  assert.ok('Drive-thru coffee on 97 Street. Fresh espresso from a Penticton roaster. A free biscuit for dogs.'.length >= 80);
+  assert.match(CLIENT, /var STORY_OK = 120;/);
+  assert.ok('Drive-thru coffee on 97 Street. Fresh espresso from a Penticton roaster. A free biscuit for dogs.'.length < 120);
 });
 
 test('4: "Takeout only" gets the takeout icon; the laptop icon only with a laptop answer', async () => {

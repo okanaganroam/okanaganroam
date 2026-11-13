@@ -129,7 +129,7 @@ test('each winery step saves live from the setup and reads back in the setup', a
   assert.equal(cfg.progress.done.tastings, 'live');
   // The Plan your visit lines written from the answers (English, with French alongside).
   assert.equal(row(w.id, 'Tastings').text, 'From $15 a person, free with a bottle purchase. Booking recommended.');
-  assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more, please book ahead. Tour buses and limos: please book ahead.');
+  assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more and tour buses, please book ahead.');
   assert.equal(row(w.id, 'Restaurant').text, 'The Vine Bistro on site, Thu–Mon from noon.');
   assert.equal(row(w.id, 'Winter').text, 'Nov 1 – Mar 31: by appointment. Please call ahead.');
   assert.equal(row(w.id, 'Wine & cheese').text, '$45 a person, daily at 1 PM');
@@ -604,4 +604,145 @@ test('checklist: finished groups open their setup screen; dogs and kids answered
   assert.equal(pc.doneMap(inp, today).dogs_kids, true);
   assert.equal(pc.doneMap({ type: 'winery' }, today).dogs_kids, false);
   assert.equal(pc.doneMap({ type: 'cafe', offerAnswered: true }, today).dogs_kids, false, 'cafés unchanged');
+});
+
+// ---------- Winery test 2 (2026-11-12) ----------
+// Marco's box: six research lines, then his answers filling it past the 7-row cap.
+const MARCO_RESEARCH = [
+  { label: 'Tastings', text: 'Tastings $12 a person, waived with a bottle purchase.' }, { label: 'Groups', text: 'Groups of 8 or more, please book ahead.' },
+  { label: 'Food', text: 'The Terrace restaurant is on site.' }, { label: 'Parking', text: 'Free parking, including bus parking.' },
+  { label: 'Accessibility', text: 'Tasting room and terrace are step-free.' }, { label: 'Dogs', text: 'Leashed dogs welcome on the lawn.' },
+];
+const boxLabels = (id) => { const i = app.venueVisitInfo(id) || {}; return { rows: (i.rows || []).map((r) => r.label), dropped: (i.owner_dropped || []).map((r) => r.label), owned: i.owner_labels || [], info: i }; };
+
+test('plan your visit cap (winery test 2): a confirmed line is hers, nothing drops silently, Undo restores, no Winter row for all year', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, MARCO_RESEARCH);
+  // Year-round: no "Winter: Open all year." line taking a slot.
+  assert.equal((await change(t, { tasting_fee: 15, winery_info: { waived: 'two', visit: 'walk_in', groups: 12, buses: 'book', year: 'all' } })).status, 200);
+  assert.ok(!boxLabels(w.id).rows.includes('Winter'), boxLabels(w.id).rows.join());
+  assert.equal(row(w.id, 'Groups').text, 'Groups of 12 or more and tour buses, please book ahead.');
+  // Confirming research's Dogs line unchanged (from the setup) makes it hers; from the edit page it's still "nothing changed".
+  assert.ok(!boxLabels(w.id).owned.includes('Dogs'));
+  assert.equal((await change(t, { visit_rows: { dogs: 'Leashed dogs welcome on the lawn.' } }, false)).status, 400);
+  assert.ok(!boxLabels(w.id).owned.includes('Dogs'));
+  let r = await change(t, { visit_rows: { dogs: 'Leashed dogs welcome on the lawn.' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(boxLabels(w.id).owned.includes('Dogs'));
+  assert.equal(row(w.id, 'Dogs').text, 'Leashed dogs welcome on the lawn.');
+  // Again: nothing new (already hers).
+  assert.notEqual((await change(t, { visit_rows: { dogs: 'Leashed dogs welcome on the lawn.' } })).status, 500);
+  // Known for, then two experiences: the box is over the cap, research goes (recorded), every line of his stays.
+  assert.equal((await change(t, { visit_rows: { known_for: 'Old-vine Riesling and a lake-view terrace' } })).status, 200);
+  const all = new Set(MARCO_RESEARCH.map((x) => x.label).concat('Known for'));
+  let b = boxLabels(w.id);
+  assert.ok(b.rows.length <= 7);
+  for (const l of all) assert.ok(b.rows.includes(l) || b.dropped.includes(l), `${l} lost: ${b.rows} / ${b.dropped}`);
+  assert.equal((await change(t, { winery_info: { experiences: [{ label: 'Private tasting', text: '$40 a person, book ahead' }, { label: 'Vineyard tour' }] } })).status, 200);
+  b = boxLabels(w.id);
+  assert.equal(b.rows.length, 7);
+  for (const l of ['Tastings', 'Groups', 'Dogs', 'Known for', 'Private tasting', 'Vineyard tour']) assert.ok(b.rows.includes(l), `${l} must stay: ${b.rows}`);
+  for (const l of ['Food', 'Parking', 'Accessibility']) assert.ok(b.rows.includes(l) || b.dropped.includes(l), `${l} recorded: ${b.rows} / ${b.dropped}`);
+  // Accessibility is never an Experience: not offered as one, and kept by "we don't offer extras".
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.ok(!cfg.extras.some((x) => x.label === 'Accessibility'));
+  // The page: his lines first, none folded under "More" while research shows above them.
+  const page = app.renderVenuePage(app.getVenue(w.id), [], [], [], { lang: 'en' });
+  const box = page.slice(page.indexOf('id="venueVisit"'), page.indexOf('</section>', page.indexOf('id="venueVisit"')));
+  const open = box.split('visit-more')[0];
+  for (const l of ['Groups', 'Private tasting', 'Vineyard tour', 'Dogs']) assert.ok(open.includes(`>${l}<`), `${l} shown open`);
+  const iOwn = open.indexOf('>Groups<'), iRes = Math.max(open.indexOf('>Parking<'), open.indexOf('>Food<'));
+  assert.ok(iRes < 0 || iOwn < iRes, 'her rows before research');
+  // Undo the experiences: research's dropped lines come back.
+  const req = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%Private tasting%' ORDER BY id DESC").get(w.id).id;
+  assert.equal(app.undoOwnerInstantChange(req, 'dayton', new Date(), 'test').ok, true);
+  b = boxLabels(w.id);
+  for (const l of ['Parking', 'Accessibility', 'Dogs', 'Known for']) assert.ok(b.rows.includes(l), `${l} back: ${b.rows}`);
+  assert.ok(!b.rows.includes('Private tasting'));
+  // "We don't offer extras" never removes Accessibility.
+  assert.equal((await change(t, { winery_info: { experiences: [] } })).status, 200);
+  assert.ok(boxLabels(w.id).rows.includes('Accessibility') || boxLabels(w.id).dropped.includes('Accessibility'));
+});
+
+test('plan your visit cap (winery test 2): a box full of her own lines keeps the cap and shows the rest folded, never lost', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [{ label: 'Parking', text: 'Free parking.' }]);
+  assert.equal((await change(t, { tasting_fee: 10, winery_info: { visit: 'recommended', groups: 8, food: 'snacks', year: 'appointment', season: { from: '05-01', to: '10-31' },
+    experiences: [{ label: 'Wine & cheese' }, { label: 'Vineyard tour' }] } })).status, 200);
+  assert.equal((await change(t, { visit_rows: { known_for: 'Pinot Noir', dogs: 'Dogs welcome on the patio.' } })).status, 200);
+  const b = boxLabels(w.id);
+  assert.equal(b.rows.length, 7);
+  const own = ['Tastings', 'Groups', 'Food', 'Winter', 'Known for', 'Dogs', 'Wine & cheese', 'Vineyard tour'];
+  for (const l of own) assert.ok(b.rows.includes(l) || (b.info.owner_dropped || []).some((x) => x.label === l && x.owned), `${l} kept`);
+  assert.ok(b.dropped.includes('Parking'));
+  const parked = (b.info.owner_dropped || []).filter((x) => x.owned);
+  assert.equal(parked.length, 1);
+  const page = app.renderVenuePage(app.getVenue(w.id), [], [], [], { lang: 'en' });
+  assert.ok(page.includes(`>${parked[0].label}<`), 'the parked line shows on the page');
+  // Her parked line still reads back in the setup, and clearing it really clears it.
+  const pk = parked[0].label;
+  if (pk === 'Dogs' || pk === 'Known for') {
+    const key = pk === 'Dogs' ? 'dogs' : 'known_for';
+    assert.ok(cfgOf((await get(`/owner/${t}/setup`)).text).cur.visit_rows[key]);
+    assert.equal((await change(t, { visit_rows: { [key]: '' } })).status, 200);
+    const b2 = boxLabels(w.id); assert.ok(!b2.rows.includes(pk) && !b2.dropped.includes(pk));
+  }
+});
+
+test('winery test 2: Tastings never says walk-ins in appointment season; story threshold 120; walk-ins get the booking link box; help and wording', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { tasting_fee: 15, winery_info: { visit: 'walk_in', year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  assert.equal(row(w.id, 'Tastings').text, 'From $15 a person. Walk-ins welcome May 1 – Oct 31.');
+  assert.ok(!/Walk-ins welcome\.$/.test(row(w.id, 'Tastings').text));
+  // Story: "Great length" only at the checklist's 120.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /var STORY_OK = 120;/);
+  assert.equal(pc.ITEMS.find((i) => i.key === 'description').en, 'A description (120+ characters)');
+  assert.equal(text.en.storyCount, 'A bit more would be great (120 letters for full marks).');
+  assert.match(text.fr.storyCount, /120 lettres pour la note complète/);
+  // Below 100% with nothing left to answer: the missing items are named, with a way to fix them; the last screen has the
+  // "Change an answer" link too.
+  assert.match(js, /function gapList\(\)/);
+  assert.match(js, /id="suChangeAnswerEnd" data-act="go:start"/);
+  // Booking link: shown for walk-ins too, worded as optional.
+  assert.match(js, /linkShown = !!wv\.visit, walkIn = wv\.visit === 'walk_in'/);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.t.bookLinkLabelWalkIn, 'Booking link (optional, e.g. for groups)');
+  assert.equal(cfgOf((await get(`/fr/owner/${t}/setup`)).text).t.bookLinkLabelWalkIn, 'Lien de réservation (facultatif, p. ex. pour les groupes)');
+  // The link is sent for a walk-in winery and waits for our check, as before.
+  const r = await change(t, { booking_url: 'https://example.com/book-a-group' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  // Wording.
+  assert.equal(cfg.t.ownPageLink, 'See its page: {name}');
+  assert.equal(text.fr.winery.ownPageLink, 'Voir sa page : {name}');
+  assert.equal(cfg.t.mapFailQ, 'Send your tasting room door photo');
+  assert.match(text.fr.winery.mapFailQ, /porte de votre salle de dégustation/);
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).t.mapFailQ, 'Send your front door photo');
+  // Help: the winery booking link answer points to "Booking and groups", never to the emailed link.
+  const ohb = (html) => JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+  for (const p of [`/owner/${t}/setup`, `/owner/${t}`]) {
+    const topic = ohb((await get(p)).text).topics.find((x) => x.id === 'booking-link');
+    assert.match(topic.a, /<strong>Booking and groups<\/strong>/);
+    assert.ok(!/emailed|How do people book/.test(topic.a), topic.a);
+    assert.match(topic.aFr, /<strong>Réservations et groupes<\/strong>/);
+    assert.ok(!/viennent-ils\?/.test(topic.aFr), 'French spacing');
+  }
+  // A restaurant keeps its own booking answer.
+  const rt = ohb((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).topics.find((x) => x.id === 'booking-link');
+  assert.match(rt.a, /How do people book/);
+});
+
+test('winery test 2: What you offer pre-ticks tiles research supports (free parking, step-free, dogs) as suggestions only', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, MARCO_RESEARCH);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.visitTicks.slice().sort(), ['dog_friendly', 'free_parking', 'wheelchair_accessible']);
+  assert.ok(!cfg.cur.badges.free_parking, 'nothing saved until the screen is saved');
+  const w2 = mk('winery');
+  research(w2.id, [{ label: 'Dogs', text: 'No dogs, sorry.' }, { label: 'Parking', text: 'Paid parking in the lot.' }, { label: 'Accessibility', text: 'The tasting room is not wheelchair accessible.' }]);
+  assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(w2.id)}/setup`)).text).visitTicks, []);
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /C\.visitTicks/);
+  // Restaurants get none.
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).visitTicks, undefined);
 });

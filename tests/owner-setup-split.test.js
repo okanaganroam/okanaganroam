@@ -69,7 +69,7 @@ test('two parts: 8 essentials then 11 optional; seasons are part of closures; an
   assert.equal(cfg.t.fbQ, 'What’s your Facebook page called?');
   assert.match(cfg.t.igLead, /@yourrestaurant/);
   assert.equal(cfg.t.sendMenu, 'Send my menu', 'one tick (the button adds it)');
-  assert.equal(cfg.t.storyCount, 'A bit more would be great.');
+  assert.equal(cfg.t.storyCount, 'A bit more would be great (120 letters for full marks).');
   assert.equal(cfg.t.storyGood, 'Great length ✓');
   assert.doesNotMatch(JSON.stringify([cfg.t.uploadSub, cfg.t.upLead, cfg.t.upSub, cfg.t.sheetLead, cfg.t.emailLead]), /PDF/, 'no PDF jargon on the choices');
   assert.deepEqual(cfg.popular, ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food']);

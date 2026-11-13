@@ -274,7 +274,7 @@ test('7: "We ticked these from what we found online" above pre-ticked research t
   assert.equal(app.getVenue(v.id).live_music, true);
   assert.ok(!cfg.researchTicks.includes('live_music'), JSON.stringify(cfg.researchTicks));
   const s = scriptOf(await text(`/owner/${t}/setup`));
-  assert.match(s, /var resTicked = !S\.done\.offer && \(C\.researchTicks \|\| \[\]\)\.some\(function\(k\)\{ return S\.badgesAtStart\[k\]; \}\);/);
+  assert.match(s, /var resTicked = !S\.done\.offer && \(\(C\.researchTicks \|\| \[\]\)\.some\(function\(k\)\{ return S\.badgesAtStart\[k\]; \}\) \|\| /);
   assert.match(s, /'<p class="su-sent su-research" id="suResearch">' \+ h\(T\.researchLine\) \+ '<\/p>'/);
   const rest = cfgOf(await text(`/owner/${tokenFor(mk('restaurant', { vegan: 1 }).id)}/setup`));
   assert.deepEqual(rest.researchTicks, ['vegan']);

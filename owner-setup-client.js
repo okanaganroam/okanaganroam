@@ -209,9 +209,10 @@
   // "No dogs allowed": no patio named when the place has none (café test 3).
   // Café test 4 (2026-11-11): the "No Wi-Fi" tile says what the page will show. A takeout-only café's page says a plain
   // "No Wi-Fi" (no "a place to talk": there's nowhere to sit), and the line changes as "No seats inside" is tapped.
-  // Café test 4 (2026-11-11): "A bit more would be great" stayed under a 105-character, three-sentence story. Two short
-  // sentences (80 characters) is a good length.
-  var STORY_OK = 80;
+  // Café test 4 (2026-11-11): "A bit more would be great" stayed under a 105-character, three-sentence story.
+  // Winery test 2 (2026-11-12): "Great length" only where the checklist gives full marks (120 letters, portal-completeness
+  // DESCRIPTION_MIN); below it the hint says so, gently ("120 letters for full marks").
+  var STORY_OK = 120;
   // Café test 4: no "your seats" for a takeout window (the coffee shop's photo hint).
   function photosHint(){ var t = kindText('photos') || T.photosLead; return C.cafe && S.cafe.stay.seats === 'takeout' && T.photosTakeout && /seats|room|places assises|salle/i.test(t) ? T.photosTakeout : t; }
   function wifiSubText(){ return S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub; }
@@ -249,6 +250,8 @@
     if ((x = v('suRname')) !== null) S.wine.rname = x.trim(); if ((x = v('suRwhen')) !== null) S.wine.rwhen = x.trim();
     if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; }
     if ((x = v('suKnown')) !== null) S.wine.known = x.trim();
+    // Winery test 2 (2026-11-12): a booking link typed before tapping a group size or bus chip survives the redraw.
+    if ((x = v('suBookUrl')) !== null) S.bookUrl = x;
     [0, 1].forEach(function(i){ if ((x = v('suXl' + i)) !== null) S.wine.exp[i].label = x.trim(); if ((x = v('suXt' + i)) !== null) S.wine.exp[i].text = x.trim(); });
   }
   // "$15" / "15 $" for a fee, "Free" for 0.
@@ -622,7 +625,7 @@
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
     el('suProg').hidden = !(i >= 0 || (two && s !== 'more') || s === 'finish' || s === 'ess');
-    el('suProgText').textContent = s === 'finish' ? (leftList().length ? T.finishBar : T.allDone) : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
+    el('suProgText').textContent = s === 'finish' ? (leftList().length || gapList().length ? T.finishBar : T.allDone) : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
     el('suProgBar').parentNode.hidden = two;
     el('suProgBar').style.width = (s === 'finish' || s === 'ess' ? 100 : Math.round(((i + 1) / (P1.length + 1)) * 100)) + '%';
     el('suBack').hidden = !S.hist.length || s === 'finish' || s === 'ess' || s === 'start' || S.busy;
@@ -649,6 +652,10 @@
     // Winery test 1 (2026-11-12): a screen reached by moving on after a save already shows that save's "Saved" line, so
     // it never stacks a second "Saved. You can change it here." on top.
     if (S.flashOn && S.flashOn === S.step) return '';
+    var yn0 = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
+    // Winery test 2 (2026-11-12): a screen opened from a list ("Tap any line to change it", the "More" tiles, the edit
+    // page) wasn't just saved: no "Saved. You can change it here." on it (a "You said: ..." answer still shows).
+    if ((S.toList || S.hist[S.hist.length - 1] === 'more') && d !== 'no' && d !== 'unsure' && !yn0) return '';
     var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
     if (d === 'unsure') return '<p class="su-sent">' + h(fill(T.youSaid, { a: T.st.unsure })) + '</p>';
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
@@ -812,6 +819,14 @@
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
     ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { st = 'social'; lab = T.labels.social; } if (C.winery && WINERY_ITEM_STEP[it.k]) st = chk = WINERY_ITEM_STEP[it.k]; if (COMBO && st === 'closures') st = chk = 'hours'; if (!st || seen[st] || (st === 'spend' && S.spendNotSure)) return; if (chk.indexOf(':') < 0 && answered(chk)) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab }); });
+    return out;
+  }
+  // Winery test 2 (2026-11-12): setup ended below 100% with nothing left to answer (a story under 120 letters): the items
+  // the score still misses, each with a way to fix it, instead of "Everything is done!" beside 95%.
+  function gapList(){
+    var sc = S.score || {}; if (leftList().length || Math.max(sc.pct || 0, sc.soon || 0) >= 100) return [];
+    var out = [], seen = {};
+    (sc.left || []).forEach(function(it){ var st = (C.winery && WINERY_ITEM_STEP[it.k]) || ITEM_STEP[it.k]; if (!st || seen[st] || STEPS.indexOf(st.split(':')[0]) < 0) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
     return out;
   }
   // One "To reach 100%" row (pub test 3, 2026-11-10). The front door says it waits for a visit; the average spend, when
@@ -1166,12 +1181,13 @@
         + (wf.fee === 0 && !wf.feeOther ? '' : '<h2 class="su-h2">' + h(T.waivedQ) + '</h2>' + wpicks('waived', ['yes', 'two', 'no'], T.waivedOpts))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tastingsSave') + '</div>' + skip('tastings');
     } else if (s === 'visit') {
-      var wv = S.wine, linkShown = wv.visit && wv.visit !== 'walk_in';
+      // Winery test 2 (2026-11-12): the booking link box shows for walk-ins too, as optional (a group or tasting booking page).
+      var wv = S.wine, linkShown = !!wv.visit, walkIn = wv.visit === 'walk_in';
       x = doneLine('visit') + q(T.visitQ, T.visitLead) + msgs() + wpicks('visit', ['walk_in', 'recommended', 'needed', 'appointment'], T.visits, T.visitSubs)
         // The booking link box (the same field as the edit page's), unless walk-ins only. "We don't take bookings online" is
         // offered only while no link is on file (it would contradict the page's Book button).
-        + (linkShown ? '<div id="suBookBox" style="margin-top:14px">' + (wv.noBook ? '' : field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>')
-          + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-label="' + h(T.bookLinkLabel) + '"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (wv.noBook ? 'true' : 'false') + '" data-wnobook="1">' + h(T.noBookLink) + '</button></div>') + '</div>' : '')
+        + (linkShown ? '<div id="suBookBox" style="margin-top:14px">' + (wv.noBook && !walkIn ? '' : field('suBookUrl', walkIn && T.bookLinkLabelWalkIn ? T.bookLinkLabelWalkIn : T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>')
+          + (CUR.booking_url || C.bookingKnown || walkIn ? '' : '<div class="su-chips" role="group" aria-label="' + h(T.bookLinkLabel) + '"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (wv.noBook ? 'true' : 'false') + '" data-wnobook="1">' + h(T.noBookLink) + '</button></div>') + '</div>' : '')
         + '<h2 class="su-h2">' + h(T.groupsSizeQ) + '</h2><p class="su-hint">' + h(T.groupsSizeLead) + '</p>' + wchips('groups', [4, 6, 8, 10, 12], { 4: '4+', 6: '6+', 8: '8+', 10: '10+', 12: '12+' }, T.groupsSizeQ)
         + '<h2 class="su-h2">' + h(T.busesQ) + '</h2>' + wchips('buses', ['welcome', 'book', 'no'], T.buses, T.busesQ)
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'visitSave') + '</div>' + skip('visit');
@@ -1304,8 +1320,11 @@
       // Winery test 1 (2026-11-12): "Food here: Picnic area" pre-ticks the Picnic area tile, as a suggestion only (saved with
       // this screen, like the research ticks), while this screen has never been saved.
       if (C.winery && !S.done.offer && !S.picnicSuggested && S.wine.food === 'picnic' && C.offerLabels.picnic_area && !S.badges.picnic_area) { S.badges.picnic_area = true; S.picnicSuggested = true; }
+      // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
+      // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
+      if (C.winery && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
-      var resTicked = !S.done.offer && (C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; });
+      var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
         + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
@@ -1455,7 +1474,10 @@
         + '<label class="su-tick' + (S.nudge === T.doorRightsNeed ? ' su-need' : '') + '"><input type="checkbox" id="suDoorRights"' + (S.door.rights ? ' checked' : '') + '><span>' + h(T.doorRights) + '</span></label>'
         + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : S.door.mapFail ? T.mapFailSend : T.doorSend, '', false, 'doorSend') + '</div>';
     } else if (s === 'finish') {
-      var sc = S.score || { pct: 0, soon: 0, badge: 'none' }, left = leftList();
+      var sc = S.score || { pct: 0, soon: 0, badge: 'none' }, left = leftList(), gaps = gapList();
+      // Winery test 2 (2026-11-12): the "Change an answer" link on the last screen too (back to the "Tap any line" list).
+      var changeLink = '<div class="su-skip" style="margin-top:14px"><button type="button" class="su-link" id="suChangeAnswerEnd" data-act="go:start">' + h(T.changeAnswer) + '</button></div>';
+      if (!left.length && gaps.length) left = gaps;
       var onlyDoor = left.every(function(o){ return o.step === 'door'; });
       // "I'm done for now" is the end (pub test 6, 2026-11-10): "Nice work" and the number, the page, and the rest folded
       // under a small, optional "Want to add more later?" (it was a "To reach 100%" list that looked like more homework).
@@ -1463,9 +1485,9 @@
         x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview() + (C.statsHtml || '')
           + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
           + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>'
-          + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>';
+          + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>' + changeLink;
       } else
-      x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(!left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
+      x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
         // Greyed until it's earned, with "Reach 100% to earn it" beside it (pub fresh-eyes 2: it looked already won).
         + '<p class="su-badge-line"><span class="su-badge-pill' + (sc.badge === 'earned' ? '' : ' su-badge-off') + '"' + (sc.badge === 'earned' ? '' : ' aria-disabled="true"') + '>' + C.badgeChip + '</span>' + (sc.badge === 'earned' ? '' : ' <span class="su-badge-reach">' + h(T.badgeReach) + '</span>') + '</p>'
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
@@ -1474,7 +1496,7 @@
         // Owner stats (pub test 9, 2026-11-10): the page's own numbers for the last 30 days (made on the server, owner-only).
         + (C.statsHtml || '')
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
-        + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>';
+        + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>' + changeLink;
     }
     if (S.error || S.nudge) { S.exitAfter = false; S.langGo = false; }
     // A failed save always says so, whatever the screen.
@@ -2260,7 +2282,9 @@
     }
     if (k === 'dogSave') {
       S.dogNote = el('suDog').value.trim();
-      if (S.dogNote === ((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
+      // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
+      // becomes hers and a full Plan your visit box never drops it.
+      if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
       return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
@@ -2307,7 +2331,7 @@
       var vl = [], wi2 = {};
       ['visit', 'groups', 'buses'].forEach(function(kk){ if (wv2[kk] && wv2[kk] !== (WI[kk] || '')) wi2[kk] = wv2[kk]; });
       if (Object.keys(wi2).length) vl.push({ winery_info: wi2 });
-      var linkCh = bu !== null && !!bu && !wv2.noBook && wv2.visit !== 'walk_in' && bu !== (CUR.booking_url || C.bookingKnown || '');
+      var linkCh = bu !== null && !!bu && (!wv2.noBook || wv2.visit === 'walk_in') && bu !== (CUR.booking_url || C.bookingKnown || '');
       if (bu && !siteOk(bu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       if (linkCh) vl.push({ booking_url: bu });
       var wantNone = wv2.noBook && wv2.visit !== 'walk_in' && !bu;
@@ -2331,7 +2355,8 @@
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
       if (storyCh) sl.push({ description: S.story });
       var knownCh = S.wine.known !== ((CUR.visit_rows || {}).known_for || '');
-      if (knownCh) sl.push({ visit_rows: { known_for: S.wine.known } });
+      // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
+      if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
       S.savedLine.story = storyCh && knownCh ? T.storyKnownSaved : '';
       return saveAll('story', sl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
