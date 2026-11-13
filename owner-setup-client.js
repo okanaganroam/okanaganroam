@@ -114,9 +114,24 @@
     var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
     return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
-  function warnHtml(key, i, e){ var t = closedWarn(e.days, e.sea); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
+  // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
+  // counts: "you're closed on Mon (in your usual hours)".
+  function warnOf(key, e){ return key === 'happy' ? closedWarnAny(e.days, S.happySea) : closedWarn(e.days, e.sea); }
+  function closedWarnAny(days, sea){
+    if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
+    var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
+    for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
+    var inUsual = DAYS.filter(function(d){ return days[d] && usual && !S.week[d]; }), inSea = DAYS.filter(function(d){ return days[d] && seas && !S.sea.week[d]; });
+    var all = DAYS.filter(function(d){ return inUsual.indexOf(d) >= 0 || inSea.indexOf(d) >= 0; });
+    if (!all.length) return '';
+    var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
+    var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
+    return fill(T.closedWarnHappy, { days: all.map(dayName).join(', '), when: when });
+  }
+  function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
-    ['specials', 'nights'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = closedWarn(e.days, e.sea); n.textContent = t; n.hidden = !t; }); });
+    ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnOf(key, e); n.textContent = t; n.hidden = !t; }); });
   }
 
   // ---------- State ----------
@@ -129,7 +144,7 @@
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
-    happy: [], specials: [], nights: [], story: CUR.description || '', visit: clone(CUR.visit_rows || {}),
+    happy: [], specials: [], nights: [], story: C.storyPending || CUR.description || '', visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
@@ -162,7 +177,9 @@
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
-  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || '21:00', note: BIm.note || '' }; }
+  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || '21:00', note: BIm.note || '' };
+    // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
+    if (!BIm.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; } }
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
   if (C.pub && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
@@ -560,6 +577,8 @@
     return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
+  // Brewery test 4 (2026-11-13): a status on its own line starts with a capital ("On your page").
+  function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   function stText(step, d){
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
@@ -662,6 +681,9 @@
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
   function savedKept(step){ return step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
+  // The text the story box started from: the story she sent (not checked yet), or the page's.
+  function storyBase(){ return String(C.storyPending || CUR.description || '').trim(); }
+  function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
   function savedText(step){
     var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
     var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' || how === 'unsure' ? T.gotIt : how === 'day' ? T.sentTitle : T.savedTitle;
@@ -673,10 +695,13 @@
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);
   // Shown on the screen it was made for, gone on the next one. Set a moment after the screen is drawn, so it is announced.
-  function showToast(t){ toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t; }, 60); }
+  // Brewery test 4 (2026-11-13): after a story is sent, the ✓ line also says "What we'll put on your page:" with her
+  // words, on the next screen (no extra screen to tap through).
+  function showToast(t){ var st = S.flashStory || ''; S.flashStory = ''; toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t;
+    if (st && T.storySentAs) { var sp = document.createElement('span'); sp.className = 'su-toast-story'; sp.id = 'suStorySent'; sp.textContent = T.storySentAs + ' ' + st; toastEl.appendChild(sp); } }, 60); }
   function go(step, replace){
     var sv = /^saved:(.+)$/.exec(step);
-    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
+    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); S.flashStory = sv[1] === 'story' ? S.storySent || '' : ''; return after(sv[1]); }
     var fl = S.flash || ''; S.flash = '';
     step = entry(step); S.fresh = false;
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
@@ -797,6 +822,9 @@
   function siteDomain(u){ return String(u || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, ''); }
   // "https://tapandbarrelkitchen.ca/" from "https://tapandbarrelkitchen.ca/?utm_source=okanaganroam#top" (pub test 9).
   function siteOrigin(u){ var t = String(u || '').trim(); if (!t) return ''; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^([a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+)/i.exec(t); return m ? m[1] + '/' : ''; }
+  // Brewery test 4 (2026-11-13): the website with its path ("https://example.com/lakesidelager/"), so a site under a path
+  // keeps it; never a query or #fragment (tracked links). The origin when there's no path.
+  function siteUrl(u){ var o = siteOrigin(u); if (!o) return ''; var t = String(u || '').trim(); if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^[a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+(\/[^?#\s]*)?/i.exec(t), path = m && m[1] ? m[1].replace(/^\/+/, '') : ''; if (!path) return o; return o + path + (/\/$/.test(path) || /\.[a-z0-9]{2,5}$/i.test(path) ? '' : '/'); }
   function siteHostOf(u){ return siteOrigin(u).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
   // A web address inside a line of text (pub test 9: "Book on OpenTable: opentable.ca/r/tap-and-barrel"): -> { url, rest } | null.
   function linkIn(t){
@@ -1147,7 +1175,7 @@
         + '<div class="su-skip" style="margin-top:14px"><button type="button" class="su-link" id="suChangeAnswer" data-act="go:start">' + h(T.changeAnswer) + '</button></div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
-      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
+      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(capFirst(stText(k, d))) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
       var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div>' + (rest2.length ? '<details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>' : '')
@@ -1461,9 +1489,9 @@
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n && (S.error || S.busy) ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '')
         + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
-      // Pub test 9 (2026-11-10): only the website's origin ("https://tapandbarrelkitchen.ca/"), never its path, query or
-      // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
-      var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
+      // Pub test 9 (2026-11-10): never the website's query or #fragment, so a tracked link (…/?utm_source=okanaganroam) is
+      // never prefilled for "add the page after the /". Brewery test 4: its path is kept (siteUrl).
+      var site = siteUrl(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
       var urlNow = S.webUrl != null ? S.webUrl : site;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
@@ -1558,7 +1586,7 @@
       if (!S.happy.length) S.happy.push({ days: {}, from: '15:00', to: '17:00', what: '' });
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
+          + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + warnHtml('happy', i, e) + '<p class="su-q">' + h(T.whatTime) + '</p>'
           + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' '
           // Until close (pub test 9, 2026-11-10): the end is the place's closing time that day (after midnight too).
           + (e.close ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '">') + '</div>'
@@ -1603,7 +1631,7 @@
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
@@ -2349,7 +2377,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteUrl(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
@@ -2541,7 +2569,7 @@
     }
     if (k === 'storySave' && C.brewery) {
       S.story = storyJoinFix(el('suStory').value); readBrew();
-      var bStoryCh = S.story.trim() !== String(CUR.description || '').trim(), bsl = [];
+      var bStoryCh = S.story.trim() !== storyBase(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
       if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
@@ -2549,7 +2577,7 @@
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
       S.savedLine.story = bStoryCh && bKnownCh ? T.storyKnownSaved : '';
-      return saveAll('story', bsl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.brew.known; S.visit.known_for = S.brew.known; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'known_for'; }); });
+      return saveAll('story', bsl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.brew.known; S.visit.known_for = S.brew.known; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'known_for'; }); });
     }
     // ---------- Wineries (2026-11-12) ----------
     if (k === 'yearAppt') { S.apptDraft = null; return go('hours:appt'); }
@@ -2614,7 +2642,7 @@
     if (k === 'expNone') { S.wine.exp = [{ label: '', text: '' }, { label: '', text: '' }]; return saveAll('experiences', [{ winery_info: { experiences: [] } }], 'no', null, function(){ WI.experiences = []; }); }
     if (k === 'storySave' && C.winery) {
       S.story = storyJoinFix(el('suStory').value); readWine();
-      var storyCh = S.story.trim() !== String(CUR.description || '').trim(), sl = [];
+      var storyCh = S.story.trim() !== storyBase(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
       if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
@@ -2622,9 +2650,12 @@
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
       S.savedLine.story = storyCh && knownCh ? T.storyKnownSaved : '';
-      return saveAll('story', sl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
+      return saveAll('story', sl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
-    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } S.storySent = S.story; return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
+      // Brewery test 4: the story she already sent (not checked yet) isn't sent twice.
+      if (C.storyPending && S.story.trim() === String(C.storyPending).trim()) { S.storySent = ''; return saveAll('story', []); }
+      S.storySent = S.story; return saveAll('story', [{ description: S.story }], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -2664,7 +2695,7 @@
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];
       var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;
       obj[key] = !obj[key]; b.setAttribute('aria-pressed', obj[key] ? 'true' : 'false'); S.nudge = '';
-      if (path[0] === 'specials' || path[0] === 'nights') warnRefresh();
+      if (path[0] === 'specials' || path[0] === 'nights' || path[0] === 'happy') warnRefresh();
       if (path[0] === 'specials') { var spa = el('suSpAll' + path[1]); if (spa) spa.setAttribute('aria-pressed', allDays(obj) ? 'true' : 'false'); }
     }; });
     // The usual week or the other season's week (pub test 6): the same editor, on W().
@@ -2834,7 +2865,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
     var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
-    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
+    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteUrl(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
     if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
@@ -2855,7 +2886,10 @@
     // so pasting replaces it; typing or a second tap places the cursor as usual, and the ✕ still clears it. Story boxes
     // and the menu address (made to be added to after its last /) keep the cursor at the end.
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
-      var pre = inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value, first = true;
+      // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
+      // replaces it (never her own story, sent or on the page).
+      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!CUR.description && inp.value === CUR.description;
+      var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
     });
   }

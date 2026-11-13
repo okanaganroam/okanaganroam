@@ -120,7 +120,7 @@ function t3PlanNextSteps(p) {
     // The category word in French too (2026-10-19: "event — Non inclus").
     var labelsFr={'hockey game':'match de hockey','live music':'musique en direct',festival:'festival',market:'marché','comedy show':'spectacle d’humour',show:'spectacle',concert:'concert',event:'événement','sports event':'événement sportif','pottery class':'atelier de poterie',restaurant:'restaurant',cafe:'café',winery:'vignoble',brewery:'microbrasserie',pub:'pub',cocktail:'bar à cocktails',distillery:'distillerie',beach:'plage',golf:'golf',indoor:'lieu intérieur',outdoor:'lieu de plein air',tour:'visite guidée',sport:'sport','dog friendly':'lieu qui accepte les chiens','kid friendly':'lieu adapté aux enfants',hiking:'randonnée',rainy:'activité par temps de pluie'};
     var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
-    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode,appointment:a.appointment===true};}):[]});
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode,appointment:a.appointment===true,closedDay:a.closedDay&&typeof a.closedDay.day==='string'&&Array.isArray(a.closedDay.open)?{day:a.closedDay.day,from:typeof a.closedDay.from==='string'?a.closedDay.from:null,to:typeof a.closedDay.to==='string'?a.closedDay.to:null,open:a.closedDay.open.filter(function(d){return typeof d==='string';})}:null};}):[]});
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
@@ -153,13 +153,41 @@ function t3PlanNextSteps(p) {
   return steps;
 }
 
+// Brewery test 4 (2026-11-13): why a matching place is left out on that day, from its own week: "Closed Mondays (Oct–Apr)
+// · try Tue–Sun" / « Fermé le lundi (oct.–avr.) · essayez du mardi au dimanche ». Null without the closed-day facts.
+function t3ClosedDayText(c,fr){
+  var K=['mon','tue','wed','thu','fri','sat','sun'];
+  if(!c||K.indexOf(c.day)<0||!Array.isArray(c.open)||!c.open.length)return null;
+  var EN={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'},ENL={mon:'Mondays',tue:'Tuesdays',wed:'Wednesdays',thu:'Thursdays',fri:'Fridays',sat:'Saturdays',sun:'Sundays'};
+  var FRL={mon:'lundi',tue:'mardi',wed:'mercredi',thu:'jeudi',fri:'vendredi',sat:'samedi',sun:'dimanche'},FRS={mon:'lun',tue:'mar',wed:'mer',thu:'jeu',fri:'ven',sat:'sam',sun:'dim'};
+  var MEN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],MFR=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  var open=K.filter(function(d){return c.open.indexOf(d)>=0;});
+  // One run of days, counted around the week from the day after the closed one ("Tue–Sun"), or a list.
+  var start=(K.indexOf(c.day)+1)%7,ring=[];for(var i=0;i<7;i++)ring.push(K[(start+i)%7]);
+  var inOrder=ring.filter(function(d){return open.indexOf(d)>=0;}),first=ring.indexOf(inOrder[0]),run=inOrder.every(function(d,j){return ring[first+j]===d;});
+  var mo=function(md,L){var n=Number(String(md||'').slice(0,2));return n>=1&&n<=12?L[n-1]:null;};
+  var a=mo(c.from,fr?MFR:MEN),b=mo(c.to,fr?MFR:MEN),sea=a&&b?' ('+a+'–'+b+')':'';
+  var days=fr?(run&&inOrder.length>2?'du '+FRL[inOrder[0]]+' au '+FRL[inOrder[inOrder.length-1]]:open.map(function(d){return FRS[d];}).join(', ')):(run&&inOrder.length>2?EN[inOrder[0]]+'–'+EN[inOrder[inOrder.length-1]]:open.map(function(d){return EN[d];}).join(', '));
+  return fr?'Fermé le '+FRL[c.day]+sea+' · essayez '+(run&&inOrder.length>2?'':'le ')+days:'Closed '+ENL[c.day]+sea+' · try '+days;
+}
+
+// Brewery test 4 follow-up: when the only matching places nearby were left out because they're closed all that day,
+// the missing line says so ("Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.") instead of "Try another
+// date or destination". Null otherwise.
+function t3MissingClosedText(step,fr){
+  var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
+  var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
+  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
+  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' est '+t.charAt(0).toLowerCase()+t.slice(1):' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
+}
+
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
  const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',appt:'By appointment · call ahead'};
  const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing};
- return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
+ return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(t3ClosedDayText(a.closedDay,fr)||reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
 }
 
 function t3TimingChecklist(step,fr){
@@ -375,7 +403,7 @@ function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
   return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -1907,7 +1935,7 @@ function renderScript(d) {
         if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(nextFr?t3FrenchHref(step.url,step.urlFr):step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
-        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
+        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(t3MissingClosedText(step,nextFr)?esc((nextFr?'Non inclus : ':'Not included: ')+t3MissingClosedText(step,nextFr)):(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.'))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
     html += requirementSummaryBlock(p);
@@ -2545,4 +2573,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3WhyLines, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

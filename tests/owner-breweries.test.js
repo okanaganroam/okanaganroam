@@ -955,3 +955,173 @@ test('brewery test 3: « 1 vue de la page », "1 page view", and the French "+N"
   const chip = (card.match(/<span class="chip chip-more"[^>]*>/) || [''])[0];
   if (chip) { assert.match(chip, /aria-label="\d+ de plus : /); assert.doesNotMatch(chip, / more: /); }
 });
+
+// ---------- Brewery test 4 (2026-11-13, Carla, Lakeside Lager House, iPhone) ----------
+const planV3 = async (txt) => { const prev = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on'; try { return await planFor(txt); } finally { if (prev === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = prev; } };
+const CLIENT_SRC = () => fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+const dayWeek = (o, c, closed = []) => Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, closed.includes(d) ? [] : [[o, c]]]));
+// Closed Mondays in the usual week (Oct–Apr), open every day in summer (May–Sep); her own kitchen until 8:30 PM; minors until 8 PM.
+const carla = async (o = {}) => {
+  const v = mk('brewery', { region: 'peachland', kid_friendly: 1, patio: 1, dog_friendly: 1, ...o });
+  const t = tokenFor(v.id);
+  assert.equal((await change(t, { hours: dayWeek('12:00', '21:00', ['mon']), hours_checked: true, hours_seasons: [{ from: '05-01', to: '09-30', label: 'Summer hours', hours: dayWeek('11:00', '22:00') }] })).status, 200);
+  return { v, t };
+};
+
+test('brewery test 4: the story box shows her pending story, the Saved panel shows it, and research text is selected on first tap', async () => {
+  const v = mk('brewery'); const t = tokenFor(v.id);
+  let cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.storyPending, '');
+  assert.equal(cfg.storyResearch, true, 'the description is research’s');
+  const mine = 'We are a small family brewery by the lake with lagers, pale ales and a kitchen that serves burgers until 8:30.';
+  assert.equal((await change(t, { description: mine })).status, 200);
+  cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.storyPending, mine, 'the story waiting for our check');
+  const s = CLIENT_SRC();
+  assert.match(s, /story: C\.storyPending \|\| CUR\.description \|\| ''/);
+  assert.match(s, /C\.storyPending && S\.story === C\.storyPending && T\.storyPendingHint/);
+  assert.match(s, /S\.flashStory = sv\[1\] === 'story' \? S\.storySent \|\| '' : ''/, 'the ✓ line after a sent story carries her words');
+  assert.match(s, /sp\.className = 'su-toast-story'; sp\.id = 'suStorySent'; sp\.textContent = T\.storySentAs \+ ' ' \+ st;/);
+  assert.match(s, /var researchStory = inp\.id === 'suStory' && C\.storyResearch && !C\.storyPending/);
+  assert.match(s, /if \(C\.storyPending && S\.story\.trim\(\) === String\(C\.storyPending\)\.trim\(\)\) \{ S\.storySent = ''; return saveAll\('story', \[\]\); \}/, 'not sent twice');
+  assert.equal(text.en.storyPendingHint, 'You sent a new story. We check it within a day.');
+  assert.equal(text.fr.storyPendingHint, 'Vous avez envoyé une nouvelle histoire. Nous la vérifions d’ici un jour.');
+  // Every type gets the same box (café, winery, restaurant).
+  for (const type of ['cafe', 'winery', 'restaurant']) {
+    const x = mk(type); const tx = tokenFor(x.id);
+    assert.equal((await change(tx, { description: `${mine} (${type})` })).status, 200);
+    const c2 = cfgOf((await get(`/owner/${tx}/setup`)).text);
+    assert.equal(c2.storyPending, `${mine} (${type})`, type);
+  }
+});
+
+test('brewery test 4: Build My Trip says which day a left-out place is closed ("Closed Mondays (Oct–Apr) · try Tue–Sun")', async () => {
+  const { v } = await carla({ name: 'Mondayshut Lager House', slug: 'mondayshut-lager-house' });
+  const j = await planV3('A brewery afternoon in Peachland on Monday, January 11, 2027');
+  const alt = (j.requirementResults || []).flatMap((i) => i.optionalAlternatives || []).find((a) => a.id === v.id);
+  assert.ok(alt, JSON.stringify(j).slice(0, 3000));
+  assert.deepEqual(alt.closedDay, { day: 'mon', from: '10-01', to: '04-30', open: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] });
+  const v3 = require('../trip-planner-v3-page.js');
+  const html = v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'Lakeside', url: '/peachland/breweries/x', reasonCode: 'different_time', closedDay: alt.closedDay }] }, false, (x) => String(x));
+  assert.match(html, /Lakeside<\/a> — Closed Mondays \(Oct–Apr\) · try Tue–Sun/);
+  assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'L', url: '/x', reasonCode: 'different_time', closedDay: alt.closedDay }] }, true, (x) => String(x)), /Fermé le lundi \(oct\.–avr\.\) · essayez du mardi au dimanche/);
+  assert.equal(v3.t3ClosedDayText({ day: 'mon', open: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }, false), 'Closed Mondays · try Tue–Sun', 'closed all year: no months');
+  assert.equal(v3.t3ClosedDayText({ day: 'wed', open: ['mon', 'fri'] }, false), 'Closed Wednesdays · try Mon, Fri');
+  // The missing line itself says why when the only matching places were closed that day.
+  const step = { alternatives: [{ name: 'Lakeside Lager House', url: '/x', reasonCode: 'different_time', closedDay: alt.closedDay }] };
+  assert.equal(v3.t3MissingClosedText(step, false), 'Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.');
+  assert.equal(v3.t3MissingClosedText(step, true), 'Lakeside Lager House est fermé le lundi (oct.–avr.) · essayez du mardi au dimanche.');
+  assert.equal(v3.t3MissingClosedText({ alternatives: step.alternatives.concat({ name: 'Open Brewing', url: '/y', reasonCode: 'another_listing' }) }, false), null, 'another place nearby: the usual line');
+  const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(pageSrc, /t3MissingClosedText\(step,nextFr\)\?esc\(\(nextFr\?'Non inclus : ':'Not included: '\)/);
+  assert.match(pageSrc, /t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml\]\.map/);
+  // With no time of day asked, the place closed that day is offered only with its closed day, and the line says why.
+  const plain = await planV3('A brewery in Peachland on Monday, January 11, 2027');
+  const pAlt = (plain.requirementResults || []).flatMap((i) => i.optionalAlternatives || []).find((a) => a.id === v.id);
+  assert.ok(pAlt, JSON.stringify(plain.requirementResults));
+  assert.equal(pAlt.reasonCode, 'different_time');
+  assert.equal(v3.t3MissingClosedText({ alternatives: [pAlt] }, false), 'Mondayshut Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.');
+  // The named request says it too (server note).
+  const named = await planV3('Mondayshut Lager House on Monday, January 11, 2027');
+  assert.ok((named.warnings || []).concat(named.notes || []).some((w) => /Mondayshut Lager House is closed Mondays from Oct to Apr/.test(w)), JSON.stringify(named.warnings));
+  assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'L', url: '/x', reasonCode: 'different_time' }] }, false, (x) => String(x)), /Try another time/, 'no closed-day facts: as before');
+  // The client copy of the page script has the helper.
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8'), /t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml\]\.map/);
+  // A day closed all year isn't called seasonal.
+  assert.deepEqual(planner.closedDayInfo({ hours: JSON.stringify(dayWeek('12:00', '21:00', ['mon'])), hoursSeason: { from: '10-01', to: '04-30', otherOpen: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } }, 'mon'), { day: 'mon', open: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] });
+  // The usual week's months for a place with one season.
+  assert.deepEqual(app.usualWeekSeasonOn(app.getVenue(v.id), '2027-01-11') && { from: app.usualWeekSeasonOn(app.getVenue(v.id), '2027-01-11').from, to: app.usualWeekSeasonOn(app.getVenue(v.id), '2027-01-11').to }, { from: '10-01', to: '04-30' });
+  assert.equal(app.usualWeekSeasonOn(app.getVenue(v.id), '2027-07-09'), null, 'in the season: its own months');
+});
+
+test('brewery test 4: her own kitchen can be the dinner stop within its kitchen hours; restaurants unchanged', async () => {
+  const { v, t } = await carla({ name: 'Kitchenlake Lager House', slug: 'kitchenlake-lager-house', region: 'osoyoos', latitude: 49.032, longitude: -119.468, address: '8000 Main St, Osoyoos' });
+  const q = 'Friday evening July 9, 2027 in Osoyoos with our kids (8 and 11): dinner and a brewery with a patio, from 6 PM';
+  // No kitchen answer: no dinner there.
+  let j = await planV3(q);
+  assert.ok(!planStops(j, v.id).some((s) => (s.why || []).some((w) => /^Dinner at /.test(w))));
+  assert.equal((await change(t, { brewery_info: { food: 'kitchen', kitchen: { mode: 'earlier', closes: '20:30' }, minors: { policy: 'minors_until', until: '20:00' } } })).status, 200);
+  assert.deepEqual(app.plannerOwnKitchen(app.getVenue(v.id)), { closes: '20:30' });
+  j = await planV3(q);
+  const st = planStops(j, v.id)[0];
+  assert.ok(st, JSON.stringify(j).slice(0, 2500));
+  assert.equal(st.why[0], 'Dinner at Kitchenlake Lager House (kitchen until 8:30 PM)');
+  assert.ok(st.caveats.some((c) => /until 8 PM/.test(c)), 'the kids caveat stays');
+  assert.ok(!(j.warnings || []).some((w) => /No dinner matched|No restaurant could be fitted/.test(w)), JSON.stringify(j.warnings));
+  assert.ok(!(j.requirementResults || []).some((i) => i.kind === 'type' && i.value === 'restaurant' && i.status === 'unmet'));
+  assert.equal(require('../trip-french-copy.js').t3FrenchText('Dinner at Kitchenlake Lager House (kitchen until 8:30 PM)'), 'Souper à Kitchenlake Lager House (cuisine jusqu’à 20 h 30)');
+  // The kitchen closing too early for dinner: not the dinner stop.
+  assert.equal(planner.kitchenMealFit({ type: 'brewery', ownKitchen: { closes: '18:30' }, hours: JSON.stringify(dayWeek('11:00', '22:00')) }, planner.SLOT_WINDOWS.evening, 'fri').ok, false);
+  assert.equal(planner.kitchenMealFit({ type: 'brewery', ownKitchen: {}, hours: JSON.stringify(dayWeek('11:00', '22:00')) }, planner.SLOT_WINDOWS.evening, 'fri').ok, true);
+  assert.equal(planner.kitchenMealFit({ type: 'brewery', hours: JSON.stringify(dayWeek('11:00', '22:00')) }, planner.SLOT_WINDOWS.evening, 'fri'), null, 'no kitchen answer');
+  assert.equal(planner.kitchenMealFit({ type: 'restaurant', ownKitchen: {}, hours: JSON.stringify(dayWeek('11:00', '22:00')) }, planner.SLOT_WINDOWS.evening, 'fri'), null, 'restaurants are chosen as before');
+  // A restaurant open for dinner in town is still the dinner.
+  const r = mk('restaurant', { name: 'Osoyoos Supper Room', slug: 'osoyoos-supper-room', region: 'osoyoos', latitude: 49.033, longitude: -119.467, address: '8010 Main St, Osoyoos', kid_friendly: 1, rating: 4.7, price: 3 });
+  j = await planV3('Friday evening July 9, 2027 in Osoyoos: dinner, from 6 PM');
+  assert.ok(planStops(j, r.id).length, 'the restaurant is dinner');
+  assert.ok(!planStops(j, v.id).length);
+});
+
+test('brewery test 4: happy hour warns about closed days, and the page says "(when open)"', async () => {
+  const { v } = await carla({ name: 'Happyshut Brewing', slug: 'happyshut-brewing', region: 'kelowna' });
+  const s = CLIENT_SRC();
+  assert.match(s, /dayChips\(e\.days, 'happy\.' \+ i\) \+ warnHtml\('happy', i, e\)/);
+  assert.match(s, /key === 'happy' \? closedWarnAny\(e\.days, S\.happySea\)/);
+  assert.match(s, /var inUsual = DAYS\.filter\(function\(d\)\{ return days\[d\] && usual && !S\.week\[d\]; \}\)/, 'a day closed in either week counts');
+  assert.match(s, /\['specials', 'nights', 'happy'\]\.forEach/);
+  assert.match(text.en.closedWarnHappy, /^Heads up: you’re closed on \{days\}\{when\}\. Your page will say happy hour is on when you’re open\.$/);
+  assert.ok(text.fr.closedWarnHappy);
+  const hh = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map((d) => [d, [['15:00', '17:00']]])));
+  db.prepare('UPDATE venues SET happy_hour = 1, happy_hour_times = ? WHERE id = ?').run(hh, v.id);
+  assert.equal(app.happyHourOnClosedDay(v.id, app.getVenue(v.id).hours, hh), true);
+  const page = (await get(`/kelowna/breweries/happyshut-brewing`)).text;
+  assert.match(page, /\(when open\)/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8'), /\(fr \? ' \(les jours d’ouverture\)' : ' \(when open\)'\)/);
+  // Open every happy hour day: nothing added.
+  const w = mk('brewery', { name: 'Happyopen Brewing', slug: 'happyopen-brewing' });
+  db.prepare('UPDATE venues SET happy_hour = 1, happy_hour_times = ? WHERE id = ?').run(hh, w.id);
+  assert.equal(app.happyHourOnClosedDay(w.id, app.getVenue(w.id).hours, hh), false);
+  assert.doesNotMatch((await get('/kelowna/breweries/happyopen-brewing')).text, /\(when open\)/);
+});
+
+test('brewery test 4: small fixes (menu path, kids pre-fill, last step, Dogs on patio, capitals, help)', async () => {
+  const s = CLIENT_SRC();
+  // The menu address keeps the website's path (never its query or #fragment).
+  const fns = s.split('\n').filter((l) => /^  function site(Origin|Url)\(/.test(l)).join('\n');
+  const siteUrl = new Function(`${fns}; return siteUrl;`)();
+  assert.equal(siteUrl('https://example.com/lakesidelager'), 'https://example.com/lakesidelager/');
+  assert.equal(siteUrl('https://example.com'), 'https://example.com/');
+  assert.equal(siteUrl('https://example.com/?utm_source=x#top'), 'https://example.com/');
+  assert.equal(siteUrl('https://example.com/a/menu.html?x=1'), 'https://example.com/a/menu.html');
+  assert.match(s, /var site = siteUrl\(C\.website\), siteHost = siteHostOf\(C\.website\);/);
+  // Research "Kids welcome until 8 PM" pre-picks minors until 8 PM.
+  const b = mk('brewery'); research(b.id, [{ label: 'Kids & dogs', text: 'Kids welcome until 8 PM; dogs on patio.' }]);
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(b.id)}/setup`)).text).suggestKidsUntil, '20:00');
+  assert.equal(app.researchKidsUntil([{ label: 'Hours', text: 'Open until 9 PM' }]), '');
+  assert.equal(app.researchKidsUntil([{ label: 'Kids', text: 'Minors welcome until 9:30 p.m.' }]), '21:30');
+  assert.match(s, /if \(!BIm\.policy && C\.suggestKidsUntil\) \{ S\.minors\.policy = 'minors_until'; S\.minors\.until = C\.suggestKidsUntil; \}/);
+  // The checklist names only what's left: photos sent -> the door is the last step.
+  const base0 = { address: '1 Main', latitude: 1, longitude: 1, hasHours: true, hoursCheckedAt: today, imageUrl: '/images/x.jpg', photoCount: 1, description: 'x'.repeat(130), cuisine: 'Italian', phone: '1', website: 'https://a.example' };
+  assert.match(pc.renderCompleteness(pc.scoreCompleteness(base0, { today }), {}), /Photos and your storefront spot are the last steps/);
+  const sent = pc.renderCompleteness(pc.scoreCompleteness(base0, { today }), { pendingPhotos: 3 });
+  assert.match(sent, /Your storefront spot is the last step/);
+  assert.doesNotMatch(sent, /Photos and your storefront spot/);
+  // "Dogs on patio" on the card when her Dogs answer is patio only (every type), French too.
+  const d = mk('brewery', { name: 'Patiodog Brewing', slug: 'patiodog-brewing', region: 'oliver', dog_friendly: 1 });
+  assert.equal(app.dogsPatioOnly(app.getVenue(d.id)), false);
+  assert.ok((await change(tokenFor(d.id), { visit_rows: { dogs: 'Patio only' } })).status < 300);
+  assert.equal(app.dogsPatioOnly(app.getVenue(d.id)), true);
+  assert.match(app.cardBadgeChipsHtml(app.getVenue(d.id)), /Dogs on patio/);
+  assert.doesNotMatch(app.cardBadgeChipsHtml(app.getVenue(d.id)), /Dogs OK/);
+  const frList = (await get('/fr/oliver/breweries')).text; const k = frList.indexOf(`data-venue-id="${d.id}"`);
+  assert.match(frList.slice(k, frList.indexOf('</li>', k)), /Chiens sur la terrasse/);
+  const c = mk('cafe', { name: 'Patiodog Cafe', slug: 'patiodog-cafe', dog_friendly: 1 });
+  assert.ok((await change(tokenFor(c.id), { visit_rows: { dogs: 'Inside and patio' } })).status < 300);
+  assert.equal(app.dogsPatioOnly(app.getVenue(c.id)), false);
+  // "More about your place" status lines start with a capital.
+  assert.match(s, /'<span class="su-tile-sub">' \+ h\(capFirst\(stText\(k, d\)\)\)/);
+  // The help answer starts with "Yes, any time."
+  const tp = app.WINERY_SETUP_HELP_TOPICS.find((x) => x.id === 'winery-change-hours');
+  assert.match(tp.a, /^<p>Yes, any time\. In either place:<\/p>/);
+  assert.match(tp.aFr, /^<p>Oui, en tout temps\. À l’un ou l’autre endroit :<\/p>/);
+});

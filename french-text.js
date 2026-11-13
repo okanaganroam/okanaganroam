@@ -80,6 +80,8 @@ const FR_TEXT = {
   'Dogs welcome': 'Chiens bienvenus',
   // Brewery French check (2026-11-12): the Kids badge's short card label was left in English on French cards.
   'Kids OK': 'Enfants OK',
+  // Brewery test 4 (2026-11-13): the dog chip when the owner says dogs are on the patio only.
+  'Dogs on patio': 'Chiens sur la terrasse',
   'Non-alcoholic': 'Sans alcool',
   'Live music': 'Musique en direct',
   'Groups': 'Groupes',

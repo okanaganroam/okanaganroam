@@ -130,6 +130,26 @@ const NIGHT_ENDS_AT_KIDS = 5 * 60;
 function kidsClock(min) { const h = Math.floor(min / 60) % 24, mi = min % 60; if (h === 0 && mi === 0) return 'midnight'; if (h === 12 && mi === 0) return '12 PM'; return `${h % 12 === 0 ? 12 : h % 12}${mi ? ':' + String(mi).padStart(2, '0') : ''} ${h < 12 ? 'AM' : 'PM'}`; }
 function kidsUntilNote(min, late) { return late ? `Kids welcome with an adult until ${kidsClock(min)}, so plan to leave by then` : `Kids welcome with an adult until ${kidsClock(min)}`; }
 const KIDS_UNTIL_RE = /^Kids welcome with an adult until /;
+// Brewery test 4 (2026-11-13): a brewery (or pub) whose owner says it has its own kitchen can be a meal stop within its
+// kitchen hours: open on that day for an hour of the window before the kitchen closes. { ok, closes } or null when it
+// has no kitchen answer.
+const MEAL_KITCHEN_TYPES = ['brewery', 'pub'];
+function kitchenMealFit(v, win, weekday) {
+  if (!v || !v.ownKitchen || !MEAL_KITCHEN_TYPES.includes(v.type) || !win) return null;
+  const m = /^(\d{2}):(\d{2})$/.exec(String(v.ownKitchen.closes || ''));
+  let closes = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  if (closes != null && closes < NIGHT_ENDS_AT_KIDS) closes += 1440;
+  const to = closes != null ? Math.min(win.to, closes) : win.to;
+  if (to - win.from < 60) return { ok: false };
+  const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+  if (!parsed.known) return { ok: false };
+  const days = weekday ? [weekday] : WEEKDAYS;
+  if (!days.some((d) => parsed.days[d] && parsed.days[d].status === 'open' && windowOverlap(parsed.days[d], { from: win.from, to }) >= 60)) return { ok: false };
+  return { ok: true, closes };
+}
+function kitchenMealText(v, meal, closes) {
+  return `${meal === 'lunch' ? 'Lunch' : 'Dinner'} at ${v.name}${closes != null ? ` (kitchen until ${kidsClock(closes)})` : ' (its own kitchen)'}`;
+}
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
 // ---------- small helpers ----------
@@ -3071,7 +3091,10 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
   for (const v of pool) {
     if (used.has(v.id)) continue;
     const isLunch = daypart === 'midday';
-    if (!(v.type === 'restaurant' || (isLunch && v.type === 'cafe' && !['treat', 'other'].includes(cafeRole(v))) || (!isLunch && opts.apres && ['pub', 'cocktail'].includes(v.type)))) continue;
+    // Brewery test 4 (2026-11-13): a brewery or pub with its own kitchen, within its kitchen hours (dinner is still a
+    // restaurant whenever one is open, below).
+    const kFit = !opts.cafeOnly && !(opts.apres && v.type === 'pub') ? kitchenMealFit(v, SLOT_WINDOWS[daypart], weekdayFor(ctx, d - 1) || null) : null;
+    if (!(v.type === 'restaurant' || (isLunch && v.type === 'cafe' && !['treat', 'other'].includes(cafeRole(v))) || (!isLunch && opts.apres && ['pub', 'cocktail'].includes(v.type)) || (kFit && kFit.ok))) continue;
     if (opts.cafeOnly && v.type !== 'cafe') continue;
     if (!partOk(ctx, d, daypart, v)) continue;
     if (isLunch && dinnerOnly(v)) continue;
@@ -3101,7 +3124,8 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
     if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
     const reasons = [];
     if (km != null) reasons.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from ${opts.nearName || 'the previous stop'}`, weight: 5 });
-    reasons.push({ code: 'meal', text: isLunch ? (opts.wine ? 'Lunch between the wineries' : opts.apres ? 'Lunch at the hill' : 'A lunch stop for the day') : (opts.apres ? 'Après-ski and dinner at the hill' : 'A sit-down dinner to end the day'), weight: 3 });
+    if (kFit && kFit.ok) reasons.push({ code: 'meal', text: kitchenMealText(v, isLunch ? 'lunch' : 'dinner', kFit.closes), weight: 20 });
+    else reasons.push({ code: 'meal', text: isLunch ? (opts.wine ? 'Lunch between the wineries' : opts.apres ? 'Lunch at the hill' : 'A lunch stop for the day') : (opts.apres ? 'Après-ski and dinner at the hill' : 'A sit-down dinner to end the day'), weight: 3 });
     cands.push({ v, score, reasons: base.reasons.concat(reasons), fit });
   }
   // 2026-10-19: dinner is a restaurant whenever one is open; a pub or bar only when asked for or when nothing else is.
@@ -6307,6 +6331,19 @@ function dayClosedAllDay(v, date, weekday) {
   return !!(parsed.known && parsed.days[wd] && parsed.days[wd].status === 'closed');
 }
 
+// The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the
+// trip's date), with that season's months and the days it is open: { day: 'mon', from: '10-01', to: '04-30', open: [...] }.
+function closedDayInfo(v, weekday) {
+  const wd = String(weekday || '').toLowerCase().slice(0, 3);
+  if (!WEEKDAYS.includes(wd) || !dayClosedAllDay(v, null, wd)) return null;
+  const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+  const open = WEEKDAYS.filter((d) => parsed.days[d] && parsed.days[d].status === 'open');
+  if (!open.length) return null;
+  // Seasonal only when that day is open in the rest of the year's week (or that isn't known).
+  const sea = v.hoursSeason && !(Array.isArray(v.hoursSeason.otherOpen) && !v.hoursSeason.otherOpen.includes(wd)) && /^\d{2}-\d{2}$/.test(v.hoursSeason.from || '') && /^\d{2}-\d{2}$/.test(v.hoursSeason.to || '') ? { from: v.hoursSeason.from, to: v.hoursSeason.to } : {};
+  return { day: wd, ...sea, open };
+}
+
 // Offer grounded ways to adapt an unmet request without marking an option as
 // a match or inserting it into the itinerary.
 function addOptionalRequirementAlternatives(results, plan, requirements, input) {
@@ -6341,7 +6378,11 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
       // Winery test 5 (2026-11-12): with no time of day asked, a place whose own week has the trip's day closed (a winery
       // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
-      if (!daypart && dayClosedAllDay(venue, visitDate, weekday)) continue;
+      // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
+      // Tue–Sun"), never as "Another listing"; without that fact it's still left out.
+      const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
+      const closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
+      if (closedWd && !closedAll) continue;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
@@ -6355,9 +6396,14 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // "By appointment · call ahead" instead.
       const byAppointment = appointmentOnly(venue);
       if (byAppointment && ['confirm_hours', 'different_time'].includes(reasonCode)) reasonCode = 'another_listing';
+      // Brewery test 4 (2026-11-13): closed all that day in its own week (a weekly closed day, or one in the owner's
+      // seasonal hours): "Closed Mondays (Oct–Apr) · try Tue–Sun" instead of a bare "Try another time".
+      if (closedAll && !related && local) reasonCode = 'different_time';
+      if (closedAll && reasonCode !== 'different_time') continue;
+      const closedDay = closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
-        reasonCode, ...(byAppointment ? { appointment: true } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
+        reasonCode, ...(byAppointment ? { appointment: true } : {}), ...(closedDay ? { closedDay } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
         _reviews: Number(venue.reviews) || 0,
         _timeRank: daypart ? ({ verified: 0, short: 1, partial: 2, unknown: 3, closed: 4 }[timeFit.status] ?? 3) : 0,
       });
@@ -7700,15 +7746,21 @@ function planItinerary(input) {
     }
     const scored = [];
     const closedByAdvisory = [];
+    // Brewery test 4 (2026-11-13): a dinner or lunch part can be at a brewery (or pub) with its own kitchen, within its
+    // kitchen hours, when no cuisine was asked for. Restaurants are scored as before.
+    const kitchenPart = !c.venueId && ['dinner', 'supper', 'lunch'].includes(c.meal) && (c.types || []).includes('restaurant') && !(c.cuisines || []).length;
+    const kitchenWin = SLOT_WINDOWS[daypart || (c.meal === 'lunch' ? 'midday' : 'evening')], kitchenDay = anchor?.weekday || ctx.startWeekday || null;
     for (const v of facts) {
-      if (used.has(v.id) || (!(c.venueId && c.venueId === v.id) && !regionOk(v, ctx)) || !eligible(v, c.venueId === v.id ? { ...ctx, types: new Set([v.type]), activities: new Set() } : ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue; // a named place counts wherever it is (2026-10-25: Madeley Lake in the Callaghan)
+      const kFit = kitchenPart && !(c.types || []).includes(v.type) ? kitchenMealFit(v, kitchenWin, kitchenDay) : null;
+      if (kFit && !kFit.ok) continue;
+      if (used.has(v.id) || (!(c.venueId && c.venueId === v.id) && !regionOk(v, ctx)) || !eligible(v, c.venueId === v.id ? { ...ctx, types: new Set([v.type]), activities: new Set() } : kFit ? { ...ctx, types: new Set([...ctx.types, v.type]) } : ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue; // a named place counts wherever it is (2026-10-25: Madeley Lake in the Callaghan)
       if (walking && previousVenue && (v.region !== previousVenue.region || kmBetween(previousVenue,v) == null || kmBetween(previousVenue,v) > walkingLimit)) continue;
       if (c.venueId && c.venueId !== v.id) continue;
       if (!c.venueId && mountainLodge(v) && (c.meal === 'dinner' || ['evening', 'night'].includes(daypart))) continue; // lodges close with the lifts
       // A generic rainy-day suggestion should fit the travelling party.
       // Preserve an explicitly requested venue and family playground requests.
       if (input.requirements && c.rainyOption && !c.kids && !c.venueId && /\b(?:indoor playground|young kids|toddlers|ball pit|play structures)\b/i.test(v.plannerDescription || v.textDesc || v.description || '')) continue;
-      if (c.generic && !c.types.includes(v.type)) continue;
+      if (c.generic && !c.types.includes(v.type) && !kFit) continue;
       if ((!daypart || daytimePart(daypart)) && eveningOnlyVenue(v) && !c.venueId && !EVENING_VENUE_RE.test(normWords(c.phrase || ''))) continue; // round 11
       if (c.wineryLunch && !wineryLunchSpot(v, wineryWords || (wineryWords = wineryNameWords(facts)))) continue;
       if (c.meal && !c.venueId && notAMeal(v) && !(c.cuisines || []).length) continue; // round 12: a dessert stand is not dinner
@@ -7771,7 +7823,8 @@ function planItinerary(input) {
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
       const dogCaveat = dogSeasonCaveat(v, c);
       const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : []);
-      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv });
+      if (kFit) { score -= 10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
+      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}) });
     }
     scored.sort(compareScored);
     // A walk by the lake is on the shore when the town has one listed.
@@ -7864,6 +7917,14 @@ function planItinerary(input) {
       // Audit fix (2026-10-27): "pub dinner and drinks in Osoyoos" started at The Sage Pub and still warned "No pubs or
       // cocktail lounges matched in Osoyoos": a part whose kinds an earlier stop already covers is not missing.
       else if (stops.some((s) => s.kind === 'venue' && s.venue && (c.types || []).includes(s.venue.type))) continue;
+      // Brewery test 4: dinner at the brewery already in the plan, when its own kitchen is open for it.
+      else if (kitchenPart && (() => {
+        const st = stops.find((s) => s.kind === 'venue' && s.venue && !s.kitchenMeal && kitchenMealFit(facts.find((f) => f.id === s.venue.id), kitchenWin, kitchenDay)?.ok);
+        if (!st) return false;
+        const f = facts.find((x) => x.id === st.venue.id), kf = kitchenMealFit(f, kitchenWin, kitchenDay), line = kitchenMealText(f, c.meal, kf.closes);
+        st.kitchenMeal = true; st.reasons = [{ code: 'meal', text: line, weight: 20 }].concat(st.reasons || []); st.why = [line].concat(st.why || []).slice(0, 3);
+        return true;
+      })()) continue;
       else result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
       continue;
     }
@@ -7880,7 +7941,7 @@ function planItinerary(input) {
       kind: 'venue', component: c, index: p.i, label: c.wineryLunch ? 'Lunch at a winery' : label.replace(/^./, (x) => x.toUpperCase()), daypart: daypart || (pick.v.type === 'cafe' && cafeRole(pick.v) === 'treat' ? 'afternoon' : ITIN_TYPE_DAYPART[pick.v.type]) || 'afternoon', timed: !!daypart, ...(c.wineryLunch ? { wineryLunch: true } : {}),
       activity: (c.activities || []).find((a) => (pick.v.activities || []).includes(a))
         || (pick.v.type === 'outdoor' ? (pick.v.activities || []).find((a) => ITIN_ACTIVITY_VERB[a]) : null) || null,
-      ...stopFrom(pick.v, pick, extra, ctx),
+      ...stopFrom(pick.v, pick, extra, ctx), ...(pick.kitchenMeal ? { kitchenMeal: true } : {}),
       alternates: alternates.map((a) => stopFrom(a.v, a, [], ctx)),
       seasonFlags: pick.seasonFlags || {}, advisory: pick.advisory, swimPart: partSeasonIntent(c).swim,
     });
@@ -7977,7 +8038,7 @@ function planItinerary(input) {
     }
   }
   const publicStop = (s) => {
-    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}) };
+    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}), ...(s.kitchenMeal ? { kitchenMeal: true } : {}) };
     if (s.kind === 'event') return { ...base, event: s.event, timeKnown: s.timeKnown, caveats: s.caveats, why: eventWhy(s.event, { id: 'part', eventKind: s.component && s.component.event ? s.component.event.kind : null, value: s.component && s.component.event && s.component.event.kind === 'live-music' ? 'live-music' : 'any' }, holidayTheme(input.text || input.requirements?.text || '')) };
     // (timed / start are internal ordering hints and stay server-side.)
     return { ...base, venue: s.venue, reasons: s.reasons, why: s.why, caveats: s.caveats, alternates: s.alternates };
@@ -8105,10 +8166,10 @@ module.exports = {
   publicVenue, breweryIsCidery, ciderAsked,
   stopFrom,
   parseVenueHours,
-  hoursFit, dayClosedAllDay,
+  hoursFit, dayClosedAllDay, closedDayInfo,
   listedHoursText,
   cafeRole,
-  SLOT_WINDOWS,
+  SLOT_WINDOWS, kitchenMealFit,
   PLAN_DAYPARTS,
   PLAN_MAX_HOP_KM,
   SLOT_AFFINITY,

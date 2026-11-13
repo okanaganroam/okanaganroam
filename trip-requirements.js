@@ -983,7 +983,9 @@ function estimateTripTiming({plan,facts,requirements,tripDate=null}){
 }
 function evaluateTripRequirements({requirements,plan,facts,tripDate}){
   const timing=estimateTripTiming({plan,facts,requirements,tripDate});
-  const byId=new Map(facts.map(v=>[v.id,v]));const selected=selectedStops(plan).filter(s=>s.venue&&byId.has(s.venue.id)).map(s=>({day:s.day,v:byId.get(s.venue.id)}));
+  const byId=new Map(facts.map(v=>[v.id,v]));const selected=selectedStops(plan).filter(s=>s.venue&&byId.has(s.venue.id)).map(s=>{const v=byId.get(s.venue.id);
+    // Brewery test 4 (2026-11-13): a meal at a brewery's own kitchen counts as the restaurant asked for.
+    return {day:s.day,v:s.kitchenMeal?{...v,fdTypes:[...new Set([...(v.fdTypes||[]),'restaurant'])]}:v};});
   return (requirements?.items||[]).map(i=>{
     const pool=selected.filter(s=>applicable(i,s.day,tripDate));let status='unmet',reason='';
     if(i.kind==='event'){const events=[...selectedStops(plan),...(plan.kind==='events'?(plan.events||[]).map(event=>({kind:'event',event,day:1})):[])].filter(s=>s.kind==='event'&&s.event&&applicable(i,s.day,tripDate));status=events.some(s=>eventMatches(s.event,i))?'satisfied':'unmet';reason=status==='satisfied'?'Matched a dated event occurrence.':'No matching event was scheduled for the requested dates.';}
