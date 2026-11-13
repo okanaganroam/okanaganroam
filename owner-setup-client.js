@@ -115,7 +115,20 @@
     return fill(tpl || T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
-  function warnOf(key, e){ return key === 'happy' ? closedWarn(e.days, S.happySea, T.closedWarnHappy) : closedWarn(e.days, e.sea); }
+  // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
+  // counts: "you're closed on Mon (in your usual hours)".
+  function warnOf(key, e){ return key === 'happy' ? closedWarnAny(e.days, S.happySea) : closedWarn(e.days, e.sea); }
+  function closedWarnAny(days, sea){
+    if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
+    var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
+    for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
+    var inUsual = DAYS.filter(function(d){ return days[d] && usual && !S.week[d]; }), inSea = DAYS.filter(function(d){ return days[d] && seas && !S.sea.week[d]; });
+    var all = DAYS.filter(function(d){ return inUsual.indexOf(d) >= 0 || inSea.indexOf(d) >= 0; });
+    if (!all.length) return '';
+    var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
+    var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
+    return fill(T.closedWarnHappy, { days: all.map(dayName).join(', '), when: when });
+  }
   function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
     ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnOf(key, e); n.textContent = t; n.hidden = !t; }); });
