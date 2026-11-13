@@ -26,7 +26,7 @@ const STRONG = new Set(('pres chutes grimpeurs grimpeuses ours aigles saumons ty
   + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
-  + 'automne biere bieres microbrasserie microbrasseries degustation terrasse terrasses lac velo raquette raquettes baignade '
+  + 'automne biere bieres cidre cidres microbrasserie microbrasseries degustation terrasse terrasses lac velo raquette raquettes baignade '
   + 'sentier sentiers famille amoureux romantique tranquille relaxe meilleurs meilleures meilleur endroits '
   + 'resto restos bouffe manger dejeuner deux trois quatre cinq huit dix planifie planifiez planifier organisez '
   + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie '
@@ -184,6 +184,8 @@ const PHRASES = [
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
   ['cidrerie', 'cidery'], ['cidreries', 'cideries'],
+  // Brewery test 3 (2026-11-13): « cidre à Summerland » asks for cider (the cideries), not a word in the descriptions.
+  ['cidre', 'cider'], ['cidres', 'ciders'],
   ['bar a cocktails', 'cocktail bar'], ['bar a cocktail', 'cocktail bar'], ['bars a cocktails', 'cocktail bars'],
   ['cinq a sept', 'happy hour'], ['5 a 7', 'happy hour'], ['apero', 'happy hour'], ['aperitif', 'happy hour'],
   ['sans alcool', 'non alcoholic'], ['bar sportif', 'sports bar'], ['bars sportifs', 'sports bars'],

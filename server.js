@@ -7816,7 +7816,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
     .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
-    .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');
+    .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl')
+    // Brewery test 3 (2026-11-13): "cider" (« cidre ») on its own asks for the cideries (not a word in the descriptions);
+    // "cider fest" and the like stay as typed, for What's On.
+    .replace(/\b(?:(?:hard|craft) )?ciders?\b(?! (?:fests?|festivals?|events?|days?|weekends?|crawls?|houses?|mills?|makers?|press(?:ing)?))/gi, 'cideries');
   // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
   // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and
   // lounges, unless wineries are listed or the wine is ruled out.
@@ -9144,8 +9147,9 @@ function seasonTagShortText(st) {
 }
 // Winery test 3 (2026-11-12): a winery card whose status line says "Closed for the season · Reopens …" drops the
 // closed-season pill on its photo ("Closed · reopens April 25"), so it is said once. Other types keep both (as before).
+// Brewery test 3 (2026-11-13): a brewery or cidery card too (« Fermé pour la saison » was on it twice).
 function cardSeasonOnce(chunk, line) {
-  return line && line.state === 'seasonal' && /data-venue-category="winery"/.test(chunk) ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
+  return line && line.state === 'seasonal' && /data-venue-category="(?:winery|brewery)"/.test(chunk) ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
 }
 function seasonTagHtml(st, seasonEndLabel = false) {
   const text = seasonTagShortText(st);
@@ -36774,7 +36778,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
     // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-    venue.type === 'golf' ? golfKindLabel : venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
+    venue.type === 'golf' ? golfKindLabel : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -37092,7 +37096,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
     const atAGlance = [
       // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-      venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      // Brewery test 3 (2026-11-13): a brewery says the kind it picked too (Cidery, Taphouse, Distillery); the URL stays.
+      (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
       venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';

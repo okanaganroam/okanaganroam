@@ -556,8 +556,14 @@ function indoorAskedLabel(text, form) {
   if (/\b(?:spa|spas|nordic spa|sauna|saunas|massage|massages)\b/.test(q)) return form === 'singular' ? 'Spa' : 'Spas';
   return null;
 }
+// Brewery test 3 (2026-11-13): cider asked for, and not beer ("cideries in Summerland", « cidreries »): the breweries are
+// read as cideries (the owner's own kind first, see scoreVenue), and the plan says "Cideries".
+const CIDER_ASKED_RE = /\b(?:cider|ciders|cidery|cideries|craft cider|cider houses?)\b/;
+const BEER_ASKED_RE = /\b(?:beers?|brewery|breweries|brewpubs?|craft beer|ipa|pints?)\b/;
+function ciderAsked(q) { return CIDER_ASKED_RE.test(String(q || '')) && !BEER_ASKED_RE.test(String(q || '')); }
 function typeLabel(ctx, type, form = 'plural') {
   if (type === 'indoor') { const asked = indoorAskedLabel(ctx.queryText, form); if (asked) return asked; }
+  if (type === 'brewery' && ciderAsked(ctx.queryText)) return form === 'singular' ? 'Cidery' : 'Cideries';
   const l = ctx.labels.types && ctx.labels.types[type];
   return l ? l[form] : type;
 }
@@ -992,6 +998,8 @@ function scoreVenue(v, ctx) {
   // Beer asked for (2026-10-25: "mountain biking and beers in Squamish" got a cidery): a brewery before a cidery.
   // Breweries (2026-11-12): the owner's own kind of place ("Cidery", "Brewery") decides when they gave one.
   if (v.type === 'brewery' && /\b(?:beers?|brewery|breweries|brewpubs?|craft beer|ipa|pints?)\b/.test(ctx.queryText || '') && !/\bcider\w*\b/.test(ctx.queryText || '') && breweryIsCidery(v)) add('cider_not_beer', -20, null);
+  // Brewery test 3 (2026-11-13): cider asked for: a cidery (the owner's own kind when they picked one) before a brewery.
+  if (v.type === 'brewery' && ciderAsked(ctx.queryText)) { if (breweryIsCidery(v)) add('cider_asked', 30, 'A cidery, as you asked'); else add('beer_not_cider', -30, null); }
   // Shopping asked for (2026-10-25): shops come before museums and galleries, and gift, book and clothing shops before
   // rental and tuning counters unless rentals were asked for.
   if (v.isShop && SHOP_ASKED_RE.test(ctx.queryText || '')) {
@@ -1320,6 +1328,7 @@ function breweryIsCidery(v) {
   if (v && typeof v.breweryKind === 'string' && v.breweryKind) return v.breweryKind === 'Cidery';
   return /\bcider\w*\b/.test(normWords((v && v.cuisine) || '')) && !/\bbrew\w*\b/.test(normWords((v && v.cuisine) || ''));
 }
+const BREWERY_KIND_LABEL = { Brewery: ['Brewery', 'Microbrasserie'], Cidery: ['Cidery', 'Cidrerie'], 'Taphouse or beer hall': ['Taphouse', 'Bar à bières'], Distillery: ['Distillery', 'Distillerie'] };
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -1332,7 +1341,9 @@ function publicVenue(v, ctx) {
     ...(fee === 0 ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
-    regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
+    regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
+    // Brewery test 3 (2026-11-13): the kind the owner picked (« Cidrerie »), in French too.
+    ...(v.type === 'brewery' && BREWERY_KIND_LABEL[v.breweryKind] ? { typeLabelFr: BREWERY_KIND_LABEL[v.breweryKind][1] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
@@ -8091,7 +8102,7 @@ module.exports = {
   wineTourMeansWineries,
   applyWineTourMeaning,
   fastFood,
-  publicVenue, breweryIsCidery,
+  publicVenue, breweryIsCidery, ciderAsked,
   stopFrom,
   parseVenueHours,
   hoursFit, dayClosedAllDay,
