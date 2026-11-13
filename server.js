@@ -52648,6 +52648,8 @@ function renderOwnerSetupPage(found, opts) {
     nightKinds: venue.type === 'pub' ? ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic', 'comedy', 'bingo', 'games', 'paint', 'run_club', 'other']
       // Cafés (2026-11-10): open mic, live music, art and workshops first.
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
+      // Breweries (2026-11-12): trivia, live music, bingo and run club first.
+      : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -52812,15 +52814,17 @@ function breweryCfg(venue, snap, fr) {
   const ft = foodRow ? foodRow.text : '';
   const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|pub fare|burgers?|pizzas?|wings|bistro|eatery)\b/i.test(ft) ? 'kitchen' : '';
   // The researched card price, only when it is a drink price (not bowling lanes or a beer school), else research's Flights line.
+  const cardFlight = (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 && Number(e.from) <= 30 && !/\b(?:bowl|lane|school|class|tour|course|hour)\b/i.test(`${e.basis || ''} ${e.per || ''} ${e.label || ''}`) ? Number(e.from) : null; })();
   const researchFee = (() => {
-    const e = CARD_PRICES[String(venue.id)];
-    if (e && !e.owner && Number(e.from) > 0 && Number(e.from) <= 30 && !/\b(?:bowl|lane|school|class|tour|course|hour)\b/i.test(`${e.basis || ''} ${e.per || ''} ${e.label || ''}`)) return Number(e.from);
+    if (cardFlight != null) return cardFlight;
     const r = researchRow('Flights');
     const m = r && /\$\s?(\d{1,2}(?:\.\d{2})?)(?!\d)/.exec(r.text);
     return m && Number(m[1]) > 0 && Number(m[1]) <= 30 ? Number(m[1]) : null;
   })();
   return {
     allSteps: BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2), feeLiveMax: FLIGHT_FEE_LIVE_MAX, suggestKind, suggestFood, researchFee,
+    // Where it came from: the card's price ("Your card shows $12 now") or only research's Flights line ("Your page says $10").
+    researchFeeFrom: cardFlight != null ? 'card' : 'visit',
     placeShow: Object.fromEntries(placeTypesFor('brewery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
     // The Book button research found (when the owner's own link isn't set).
     bookingKnown: (!snap.booking_url && info.booking_url) || '',
