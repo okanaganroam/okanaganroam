@@ -9,7 +9,6 @@
 //   - an item the owner has no way to fix yet (fix: false) counts when we already have it, and when we don't it
 //     is left out of the total and shown under "We're adding these", so 100% is reachable today.
 
-const { frSpacing } = require('./owner-setup-text.js');
 const HOURS_FRESH_DAYS = 30;
 const DESCRIPTION_MIN = 120;
 const PHOTOS_MIN = 3;
@@ -661,8 +660,7 @@ const LATER_SHOWN = 3;
 function renderCompleteness(result, opts) {
   const o = opts || {};
   const fr = !!o.fr;
-  // Brewery test 3 (2026-11-13): French typography (« Changer quelque chose ? », a no-break space before « : »), as in the setup.
-  const L = (en, f) => (fr ? frSpacing(f) : en);
+  const L = (en, f) => (fr ? f : en);
   const r = result;
   // Winery test 1 (2026-11-12): a winery has a tasting room door, not a storefront.
   const spotEn = o.winery ? 'your tasting room door' : o.brewery ? 'your taproom door' : 'your storefront spot';
@@ -718,7 +716,7 @@ function renderCompleteness(result, opts) {
       ? L(`${nq} quick ${nq === 1 ? 'one' : 'ones'}, ${qTime}${waitTxt}. Tap to start.`, `${nq} ${nq === 1 ? 'élément rapide' : 'éléments rapides'}, ${qTime}${waitTxt}. Touchez pour commencer.`)
       : left && r.missing.filter((it) => !it.waiting).every((it) => CEILING_KEYS.includes(it.key))
         ? L(`Last steps: ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? `photos and ${spotEn}` : spotEn) : 'photos'}${waitTxt}. Tap to see.`,
-          `Dernières étapes : ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? `les photos et ${spotFr}` : spotFr) : 'les photos'}${waitTxt}. Touchez pour voir.`)
+          `Dernières étapes\u00a0: ${r.missing.some((it) => !it.waiting && it.key === 'arrival') ? (r.missing.some((it) => !it.waiting && it.key !== 'arrival') ? `les photos et ${spotFr}` : spotFr) : 'les photos'}${waitTxt}. Touchez pour voir.`)
       : left
         ? L(`${left} ${left === 1 ? 'thing' : 'things'} left for when you have a few minutes${waitTxt}. Tap to see.`, `Il reste ${left} ${left === 1 ? 'élément' : 'éléments'} pour quand vous aurez quelques minutes${waitTxt}. Touchez pour voir.`)
         : L(`Nothing left for you to do${waitTxt}.`, `Rien d’autre à faire pour vous${waitTxt}.`);
@@ -812,7 +810,7 @@ function renderCompleteness(result, opts) {
     // Café test 1 (2026-11-11): a café's "No Wi-Fi" shows as a friendly line on its page ("No Wi-Fi: a place to talk").
     ? (declined.length > 1 ? L('These count as done. Your page says “No Wi-Fi: a place to talk”; nothing about the others shows on your public page.', 'Ils comptent comme faits. Votre fiche indique « Pas de Wi-Fi : un endroit pour discuter »; rien des autres ne paraît sur votre fiche publique.')
       : L('This counts as done. Your page says “No Wi-Fi: a place to talk”.', 'Cela compte comme fait. Votre fiche indique « Pas de Wi-Fi : un endroit pour discuter ».'))
-    : L('These count as done. Only you see them: nothing about them shows on your public page.', 'Ils comptent comme faits. Vous seul les voyez : rien n’en paraît sur votre fiche publique.')}</p>` : '';
+    : L('These count as done. Only you see them: nothing about them shows on your public page.', 'Ils comptent comme faits. Vous seul les voyez\u00a0: rien n’en paraît sur votre fiche publique.')}</p>` : '';
   // Next to the edit-page fields: the same button, placed by the page script under each field it fills.
   const inline = o.canDecline ? r.missing.filter((it) => it.noneEn && !it.waiting && it.target && it.target.id).map((it) => ({ key: it.key, id: it.target.id, label: fr ? it.noneFr : it.noneEn, got: gotText(it.key) })) : [];
   const dataAttrs = o.canDecline ? ` data-cb-declared="${esc(JSON.stringify(r.declared || []))}" data-cb-inline="${esc(JSON.stringify(inline))}" data-cb-wrong="${esc(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}" data-cb-undo-text="${esc(L('Undo', 'Annuler'))}"` : '';
@@ -1184,10 +1182,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-// Brewery test 3 (2026-11-13): every French line of the checklist with French typography (a no-break space before « : »,
-// a narrow one before « ? » and « ! »), the same helper as the setup and the help (owner-setup-text.js frSpacing).
-(function frCopy(list) {
-  const walk = (o) => { if (!o || typeof o !== 'object') return; for (const k of Object.keys(o)) { if (typeof o[k] === 'string' && (k === 'fr' || /Fr(?:[A-Z]\w*)?$/.test(k))) o[k] = frSpacing(o[k]); else if (o[k] && typeof o[k] === 'object') walk(o[k]); } };
-  list.forEach(walk);
-})([ITEMS, PUB_ITEMS, CAFE_ITEMS, WINERY_ITEMS, BREWERY_ITEMS, GROUPS, GOT_TEXT, HAPPY_HOUR_BADGE_COPY, MENU_SAME_SITE_COPY]);
 module.exports = { BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

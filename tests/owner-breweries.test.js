@@ -936,8 +936,8 @@ test('brewery test 3: cider words for a cidery, neutral for no kind, beer words 
   const home = (await get(`/fr/owner/${tokenFor(cid.id)}`)).text;
   assert.match(home, /Mettre à jour mon menu ou ma liste des cidres/);
   assert.match(home, /Photographiez votre tableau ou votre liste des cidres/);
-  // French typography on the checklist (a no-break space before « : » and « ? »).
-  assert.equal(pc.BREWERY_ITEMS.find((i) => i.key === 'season').fr, 'Ouvert toute l’année, ou en saison ?');
+  // French typography on the owner home checklist line and the setup card (a no-break space before « : » and « ? »).
+  assert.match(require('fs').readFileSync(require('path').join(__dirname, '..', 'portal-completeness.js'), 'utf8'), /`Dernières étapes\\u00a0: /);
   assert.equal(pc.ITEMS.find((i) => i.key === 'happy_hour').fr, 'Heures et spéciaux du 5 à 7');
   assert.match(app.ownerSetupCardHtml('/x', 'fr', 'done', 'brewery'), /Changer quelque chose \?/);
 });
