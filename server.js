@@ -52576,11 +52576,10 @@ const OWNER_SETUP_CSS = `
   /* Pub test 5 (2026-11-10): on a 412px phone the "?" sat over the step line and the bar. It now sits in the Back row,
      which is empty on the right, under "Exit setup"; the step line and the bar start below it. */
   @media (max-width: 699px) { body.owner-setup .ohb-btn { top: 72px; } body.owner-setup .su-top { min-height: 52px; padding-right: 56px; } }
-  /* Winery test 4 (2026-11-12): at 130% page zoom on a 360px phone "Exit setup" ran 22px off the screen. The header
-     wraps instead (Exit setup on its own line, at the right) and never scrolls sideways. */
-  body.owner-setup .su-head { flex-wrap: wrap; row-gap: 0; }
-  body.owner-setup .su-head .su-logo { min-width: 0; }
-  body.owner-setup .su-exit { margin-left: auto; white-space: nowrap; }
+  /* Winery test 4 (2026-11-12): at 130% page zoom on a 360px phone (about 277px wide) "Exit setup" ran 22px off the
+     screen. On a screen that narrow the header wraps instead (Exit setup on the next line, at the right); wider screens
+     are unchanged. */
+  @media (max-width: 330px) { body.owner-setup .su-head { flex-wrap: wrap; row-gap: 0; } body.owner-setup .su-head .su-logo { min-width: 0; } body.owner-setup .su-exit { margin-left: auto; } }
   body.owner-setup .su-fold { margin: 18px 0; }
   body.owner-setup .su-fold summary { display: flex; align-items: center; min-height: 56px; padding: 0 16px; border: 2px dashed var(--su-line); border-radius: 16px; color: var(--su-teal); font-weight: 800; cursor: pointer; }
   body.owner-setup .su-fold[open] summary { margin-bottom: 12px; }

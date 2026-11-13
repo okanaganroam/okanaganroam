@@ -626,7 +626,7 @@
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
     el('suProg').hidden = !(i >= 0 || (two && s !== 'more') || s === 'finish' || s === 'ess');
-    el('suProgText').textContent = s === 'finish' ? (leftList().length || gapList().length ? T.finishBar : T.allDone) : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
+    el('suProgText').textContent = s === 'finish' ? (leftList().length || gapList().length ? T.finishBar : T.allDone) : s === 'ess' ? (P1.some(function(k){ return !answered(k); }) ? T.essBarNearly || T.essBar : T.essBar) : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
     el('suProgBar').parentNode.hidden = two;
     el('suProgBar').style.width = (s === 'finish' || s === 'ess' ? 100 : Math.round(((i + 1) / (P1.length + 1)) * 100)) + '%';
     el('suBack').hidden = !S.hist.length || s === 'finish' || s === 'ess' || s === 'start' || S.busy;
@@ -1995,7 +1995,7 @@
     }
     if (k === 'noSetHours') return noSetHoursSave();
     if (k === 'hoursOk') return go('hours:year');
-    if (k === 'hoursNext') { readTimes(); if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); } return go('hours:year'); }
+    if (k === 'hoursNext') { readTimes(); if (!windowsOk(S.week)) { S.nudge = C.winery && T.needOpenDayAppt ? T.needOpenDayAppt : T.needOpenDay; return render(); } return go('hours:year'); }
     // Café test 3 (2026-11-11): "Yes, all year" also clears a saved open season (open_months), so the page stops saying
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).

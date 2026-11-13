@@ -404,7 +404,7 @@ Object.assign(en, {
   lateHint: 'Open after midnight? Tap Midnight, 1 AM or 2 AM under that day. Friday until 1 AM means 1 AM early Saturday morning.',
   lateLbl: 'Closes later?', lateQ: '{day}: closes at midnight or later',
   // Winery test 4 (2026-11-12): "done" only when every essential is; with one or more left, "Nearly done".
-  essReady: 'The essentials are done', essNearly: 'Nearly done', finishBar: 'Your answers are saved',
+  essReady: 'The essentials are done', essNearly: 'Nearly done', essBarNearly: 'The essentials: nearly done', finishBar: 'Your answers are saved',
   sentMeans: 'Sent means we check it first. It’ll show on your page within a day.',
   fbWhy: 'We find your Facebook link for you, so it shows within a day. Instagram goes on your page right away.',
   savedFbName: 'We find your Facebook link for you, so it shows within a day.',
@@ -417,7 +417,7 @@ Object.assign(fr, {
   clearField: 'Effacer ce champ',
   lateHint: 'Ouvert après minuit? Touchez minuit, 1 h ou 2 h sous cette journée. Vendredi jusqu’à 1 h veut dire 1 h tôt samedi matin.',
   lateLbl: 'Ferme plus tard?', lateQ: '{day} : ferme à minuit ou plus tard',
-  essReady: 'L’essentiel est fait', essNearly: 'Presque terminé', finishBar: 'Vos réponses sont enregistrées',
+  essReady: 'L’essentiel est fait', essNearly: 'Presque terminé', essBarNearly: 'L’essentiel : presque terminé', finishBar: 'Vos réponses sont enregistrées',
   sentMeans: 'Envoyé veut dire que nous vérifions d’abord. Cela s’affichera sur votre page d’ici un jour.',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour. Instagram s’affiche sur votre page tout de suite.',
   savedFbName: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
@@ -983,6 +983,7 @@ en.winery = {
   apptFrom: 'Walk-ins from', apptTo: 'Walk-ins until', apptSave: 'Save my hours', apptNeed: 'Please pick the first and last day of walk-in tastings.',
   apptNow: 'Walk-ins {a} – {b}, by appointment the rest of the year ✓',
   // Winery test 4 (2026-11-12): the one "no set hours" choice (Hours step), and what the page says after it.
+  needOpenDayAppt: 'Please set at least one day you’re open. No set hours? Tap “We don’t have set hours” below.',
   noSetHours: 'We don’t have set hours. Visits are by appointment', noSetHoursNow: 'No set hours. Visits are by appointment ✓',
   noSetHoursSaved: 'Your old weekly hours are off your page. It says “By appointment · call ahead”.',
   apptHoursGone: 'By appointment only: your old weekly hours came off your page, so it only says “By appointment · call ahead”.',
@@ -1054,6 +1055,7 @@ fr.winery = {
   apptQ: 'Quand accueillez-vous les visiteurs sans réservation?', apptLead: 'En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».',
   apptFrom: 'Sans réservation à partir du', apptTo: 'Sans réservation jusqu’au', apptSave: 'Enregistrer mes heures', apptNeed: 'Choisissez le premier et le dernier jour des dégustations sans réservation.',
   apptNow: 'Sans réservation du {a} au {b}, sur rendez-vous le reste de l’année ✓',
+  needOpenDayAppt: 'Indiquez au moins un jour d’ouverture. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
   noSetHours: 'Nous n’avons pas d’heures fixes. Visites sur rendez-vous', noSetHoursNow: 'Pas d’heures fixes. Visites sur rendez-vous ✓',
   noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Sur rendez-vous · appelez avant ».',
   apptHoursGone: 'Sur rendez-vous seulement : vos anciennes heures de la semaine sont retirées de votre page, qui indique seulement « Sur rendez-vous · appelez avant ».',

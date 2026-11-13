@@ -1078,7 +1078,8 @@ test('winery test 4: Build My Trip has no listed hours for an appointment-only w
   assert.match(html, /Plain<\/a> — Another listing</);
   assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'H', url: '/x', reasonCode: 'another_listing', appointment: true }] }, true, (x) => String(x)), /Sur rendez-vous · appelez avant/);
   const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
-  assert.match(src, /reasonCode, \.\.\.\(appointmentOnly\(venue\) \? \{ appointment: true \} : \{\}\)/);
+  assert.match(src, /reasonCode, \.\.\.\(byAppointment \? \{ appointment: true \} : \{\}\)/);
+  assert.match(src, /if \(byAppointment && \['confirm_hours', 'different_time'\]\.includes\(reasonCode\)\) reasonCode = 'another_listing';/);
 });
 
 test('winery test 4: the checklist counts hours done for an appointment-only winery and never asks “Are your hours still right?”', async () => {
@@ -1142,10 +1143,10 @@ test('winery test 4: wording: one tasting price without “From” on the page (
   assert.match(vpage(w, 'fr').replace(/ | /g, ' '), /20 \$ par personne\./);
   assert.ok(!/Dès 20/.test(vpage(w, 'fr')));
   assert.equal(app.cardPriceFor(w.id), 'From $20', 'cards keep the shared “From $X” price style');
-  assert.equal(text.en.essNearly, 'Nearly done'); assert.equal(text.fr.essNearly, 'Presque terminé');
+  assert.equal(text.en.essNearly, 'Nearly done'); assert.equal(text.fr.essNearly, 'Presque terminé'); assert.equal(text.en.essBarNearly, 'The essentials: nearly done');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8'), /T\.essBarNearly \|\| T\.essBar : T\.essBar/);
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /h\(open1\.length \? T\.essNearly \|\| T\.essReady : T\.essReady\)/);
   const setup = (await get(`/owner/${t}/setup`)).text;
-  assert.match(setup, /body\.owner-setup \.su-head \{ flex-wrap: wrap; row-gap: 0; \}/);
-  assert.match(setup, /body\.owner-setup \.su-exit \{ margin-left: auto; white-space: nowrap; \}/);
+  assert.match(setup, /@media \(max-width: 330px\) \{ body\.owner-setup \.su-head \{ flex-wrap: wrap; row-gap: 0; \}/);
 });

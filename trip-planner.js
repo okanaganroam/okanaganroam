@@ -6264,9 +6264,13 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       let reasonCode = related ? 'similar_activity' : !local ? 'different_region' : 'another_listing';
       if (!related && local && timeFit?.status === 'closed') reasonCode = 'different_time';
       else if (!related && local && timeFit && ['unknown', 'partial'].includes(timeFit.status)) reasonCode = 'confirm_hours';
+      // Winery test 4 (2026-11-12): by appointment, there are no hours to confirm or another time to try: it says
+      // "By appointment · call ahead" instead.
+      const byAppointment = appointmentOnly(venue);
+      if (byAppointment && ['confirm_hours', 'different_time'].includes(reasonCode)) reasonCode = 'another_listing';
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
-        reasonCode, ...(appointmentOnly(venue) ? { appointment: true } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
+        reasonCode, ...(byAppointment ? { appointment: true } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
         _reviews: Number(venue.reviews) || 0,
         _timeRank: daypart ? ({ verified: 0, short: 1, partial: 2, unknown: 3, closed: 4 }[timeFit.status] ?? 3) : 0,
       });
