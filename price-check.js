@@ -319,10 +319,21 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
   }
   // An owner sets (fee: dollars, 0 = free) or takes back (fee: null) their own card price. Taken back, the card shows
   // the researched price again (the file's, as it was before any override).
+  // Breweries (2026-11-12): fee 'hidden' is the owner's "We don't do flights": no card price at all (hidden, reviewer
+  // 'owner'), taken back like an owner price.
+  function ownerHidden(id) {
+    try { const r = db.prepare('SELECT reviewer, hidden FROM price_overrides WHERE venue_id = ?').get(Number(id)); return !!r && r.reviewer === OWNER_REVIEWER && !!r.hidden; } catch (e) { return false; }
+  }
   function setOwnerPrice(id, fee, basis = null) {
     const key = String(Number(id));
+    if (fee === 'hidden') {
+      db.prepare(`INSERT INTO price_overrides (venue_id, from_price, per, basis, hidden, decided_at, reviewer) VALUES (?, 0, NULL, NULL, 1, ?, ?)
+        ON CONFLICT(venue_id) DO UPDATE SET from_price = 0, per = NULL, basis = NULL, hidden = 1, decided_at = excluded.decided_at, reviewer = excluded.reviewer`).run(Number(id), iso(), OWNER_REVIEWER);
+      applyOverrides();
+      return;
+    }
     if (fee === null || fee === undefined) {
-      if (!isOwnerPrice(id)) return;
+      if (!isOwnerPrice(id) && !ownerHidden(id)) return;
       db.prepare('DELETE FROM price_overrides WHERE venue_id = ? AND reviewer = ?').run(Number(id), OWNER_REVIEWER);
       if (original[key]) prices[key] = JSON.parse(JSON.stringify(original[key])); else delete prices[key];
       applyOverrides();
