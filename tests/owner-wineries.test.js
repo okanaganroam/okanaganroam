@@ -1256,7 +1256,10 @@ test('winery test 5: planner alternatives skip a place closed all day on the tri
   assert.equal(planner.dayClosedAllDay({ hours: closedWed }, null, 'wed'), true);
   assert.equal(planner.dayClosedAllDay({ hours: null }, '2027-01-13', null), false, 'unknown hours are never closed');
   const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
-  assert.match(src, /if \(!daypart && dayClosedAllDay\(venue, visitDate, weekday\)\) continue;/);
+  // Brewery test 4 follow-up: offered only with its closed day ("Closed Wednesdays · try …"), else left out as before.
+  assert.match(src, /const closedWd = !daypart && dayClosedAllDay\(venue, visitDate, weekday\)/);
+  assert.match(src, /if \(closedWd && !closedAll\) continue;/);
+  assert.match(src, /if \(closedAll && reasonCode !== 'different_time'\) continue;/);
 });
 
 test('winery test 5: help for changing hours later points to both places, with what goes live', async () => {

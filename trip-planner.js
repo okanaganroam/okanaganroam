@@ -6378,7 +6378,11 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
       // Winery test 5 (2026-11-12): with no time of day asked, a place whose own week has the trip's day closed (a winery
       // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
-      if (!daypart && dayClosedAllDay(venue, visitDate, weekday)) continue;
+      // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
+      // Tue–Sun"), never as "Another listing"; without that fact it's still left out.
+      const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
+      const closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
+      if (closedWd && !closedAll) continue;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
@@ -6394,7 +6398,9 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       if (byAppointment && ['confirm_hours', 'different_time'].includes(reasonCode)) reasonCode = 'another_listing';
       // Brewery test 4 (2026-11-13): closed all that day in its own week (a weekly closed day, or one in the owner's
       // seasonal hours): "Closed Mondays (Oct–Apr) · try Tue–Sun" instead of a bare "Try another time".
-      const closedDay = reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null;
+      if (closedAll && !related && local) reasonCode = 'different_time';
+      if (closedAll && reasonCode !== 'different_time') continue;
+      const closedDay = closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
         reasonCode, ...(byAppointment ? { appointment: true } : {}), ...(closedDay ? { closedDay } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,

@@ -1015,6 +1015,12 @@ test('brewery test 4: Build My Trip says which day a left-out place is closed ("
   const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(pageSrc, /t3MissingClosedText\(step,nextFr\)\?esc\(\(nextFr\?'Non inclus : ':'Not included: '\)/);
   assert.match(pageSrc, /t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml\]\.map/);
+  // With no time of day asked, the place closed that day is offered only with its closed day, and the line says why.
+  const plain = await planV3('A brewery in Peachland on Monday, January 11, 2027');
+  const pAlt = (plain.requirementResults || []).flatMap((i) => i.optionalAlternatives || []).find((a) => a.id === v.id);
+  assert.ok(pAlt, JSON.stringify(plain.requirementResults));
+  assert.equal(pAlt.reasonCode, 'different_time');
+  assert.equal(v3.t3MissingClosedText({ alternatives: [pAlt] }, false), 'Mondayshut Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.');
   // The named request says it too (server note).
   const named = await planV3('Mondayshut Lager House on Monday, January 11, 2027');
   assert.ok((named.warnings || []).concat(named.notes || []).some((w) => /Mondayshut Lager House is closed Mondays from Oct to Apr/.test(w)), JSON.stringify(named.warnings));
