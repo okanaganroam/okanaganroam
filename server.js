@@ -9070,6 +9070,11 @@ function seasonTagShortText(st) {
   }
   return st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
 }
+// Winery test 3 (2026-11-12): a card whose status line says "Closed for the season · Reopens …" drops the closed-season
+// pill on its photo ("Closed · reopens April 25"), so it is said once.
+function cardSeasonOnce(chunk, line) {
+  return line && line.state === 'seasonal' ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
+}
 function seasonTagHtml(st, seasonEndLabel = false) {
   const text = seasonTagShortText(st);
   const short = seasonEndLabel && st.kind === 'open_until' ? text.replace(/^Closes /, 'Season ends ') : text;
@@ -20469,7 +20474,13 @@ const WINERY_REPEAT_LABELS = {
 // Winery test 2 (2026-11-12): and the practical lines research writes (Accessibility, Ages, Time needed...), so they are
 // never offered as Experiences, nor removed by clearing Experiences.
 const WINERY_CORE_LABELS = new Set([...WINERY_MANAGED_LABELS, 'Known for', 'Dogs', 'Good to know', 'Booking', 'Reservations', 'Takeout', 'To go', 'Dietary', 'Menu', 'Patio', 'Prices', 'Parking',
-  'Accessibility', 'Wheelchair access', 'Ages', 'Kids', 'Kids & dogs', 'Pets', 'Time needed', 'Season', 'Hours', 'What to bring', 'Getting there', 'Directions', 'Transit', 'Shuttle', 'Location']);
+  'Accessibility', 'Wheelchair access', 'Ages', 'Kids', 'Kids & dogs', 'Pets', 'Time needed', 'Season', 'Hours', 'What to bring', 'Getting there', 'Directions', 'Transit', 'Shuttle', 'Location',
+  // Winery test 3 (2026-11-12): research's practical lines about food, picnics and the place itself are not experiences
+  // either ("We don't offer extras" removed a research "Picnics" line, and Experiences was pre-filled with it).
+  'Picnic', 'Picnics', 'Picnic area', 'Picnic tables', 'Snacks', 'Eats', 'Lunch', 'Kitchen', 'Bistro', 'Dining', 'Cheese plates',
+  'Winter hours', 'Winter Hours', 'Seasons', 'Tasting room', 'Tasting fees', 'Washrooms', 'Restrooms', 'Wi-Fi', 'Wifi', 'Seating', 'Families', 'Kids & families', 'Buses', 'Tour buses', 'Large groups']);
+// The line under an experience the owner named without details (winery test 3; French in french-text.js).
+const WINERY_EXPERIENCE_NO_TEXT = 'Ask when you visit';
 // Writes the answers' lines into the stored Plan your visit box as the owner's rows (owner_labels), keeping what each
 // replaced (owner_was), so an answer taken back (an Undo) puts research's line back. French text rides along in
 // owner_fr, used on French pages while the English line is unchanged. -> { before, after } (JSON or null).
@@ -20512,7 +20523,8 @@ function writeWineryVisitRows(venueId, now = new Date()) {
   if (Array.isArray(info.experiences)) {
     if (!managingExtra) wasExtra = rows.filter((r) => !WINERY_CORE_LABELS.has(r.label)).map((r) => ({ ...r }));
     for (let k = rows.length - 1; k >= 0; k--) if (!WINERY_CORE_LABELS.has(rows[k].label)) { owned.add(rows[k].label); rows.splice(k, 1); }
-    for (const e of info.experiences) { rows.push({ label: e.label, text: e.text || e.label }); owned.add(e.label); }
+    // An experience saved without details reads "Vineyard tour · Ask when you visit", not "Vineyard tour / Vineyard tour".
+    for (const e of info.experiences) { rows.push({ label: e.label, text: e.text || WINERY_EXPERIENCE_NO_TEXT }); owned.add(e.label); }
     extraLabels = info.experiences.map((e) => e.label);
   } else if (managingExtra) {
     for (let k = rows.length - 1; k >= 0; k--) if (extraLabels.includes(rows[k].label)) rows.splice(k, 1);
@@ -20761,7 +20773,10 @@ function venueCardHtml(venue, opts = {}) {
   const cardSeasonTag = isTourCard && seasonTag && seasonTag.kind === 'closed'
     ? { ...seasonTag, text: String(seasonTag.text).replace(/^Closed for the season\. Reopens ([A-Za-z]+ \d+)(?:, \d{4})?\.$/, 'Closed \u00b7 reopens $1') }
     : seasonTag;
-  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
+  // Winery test 3 (2026-11-12): a card whose status line already says "Closed for the season · Reopens …" shows it once
+  // (the pill on the photo said it again).
+  const seasonSaidAlready = !!(cardSeasonTag && cardSeasonTag.kind === 'closed' && opts.statusLine && opts.statusLine.state === 'seasonal');
+  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to && !seasonSaidAlready)
     ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag, opts.seasonEndLabel) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
@@ -28802,7 +28817,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
   if (extra.welcoming) {
@@ -40482,7 +40497,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
   const firstBatch = [], deferred = [];
@@ -46713,6 +46728,13 @@ function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = fal
   return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input, closeGiven: allowSeason && '_close' in input };
 }
 
+// The weekdays a stored hours JSON leaves out (or holds no list for): read as "unknown", never as closed (hours.js).
+function ownerHoursMissingDays(stored) {
+  let o = null;
+  try { o = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch (e) { return []; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return [];
+  return OWNER_DAYS.filter((d) => !(d in o) || (o[d] !== null && !Array.isArray(o[d])));
+}
 function sameJsonWeek(a, b) {
   const norm = (s) => {
     if (!s) return null;
@@ -46760,6 +46782,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     const w = ownerWeekJson(input.hours, 'Hours', { allowEmptyWeek: false });
     if (!w.ok) errors.hours = w.detail;
     else if (!sameJsonWeek(w.json, current.hours)) changes.hours = w.json;
+    // Winery test 3 (2026-11-12): the setup shows a day missing from the stored hours as "Closed". Confirming them there
+    // writes those days as closed (null), so the page says "Closed" and Build My Trip skips them (a missing day is
+    // "unknown"). Only the owner's own save from the setup; nobody else's hours change.
+    else if (body.from_setup === true && ownerHoursMissingDays(current.hours).length) changes.hours = w.json;
   }
   if ('phone' in input && body.from_setup === true) {
     // From the easy setup: a real North American number, written 250-555-0123 (it goes live straight away). The same

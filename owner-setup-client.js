@@ -2507,7 +2507,11 @@
       if (fv === 'other') { S.wine.feeOther = true; if (S.wine.fee != null && QUICK_FEES.indexOf(S.wine.fee) >= 0) S.wine.fee = null; redraw(); var fi = el('suFee'); if (fi) try { fi.focus({ preventScroll: true }); } catch (e) {} return; }
       S.wine.feeOther = false; S.wine.fee = +fv; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wnobook]'), function(b){ b.onclick = function(){ readWine(); var bu0 = el('suBookUrl'); if (bu0) S.bookUrl = bu0.value; S.wine.noBook = !S.wine.noBook; redraw(); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-xq]'), function(b){ b.onclick = function(){ readWine(); var q9 = b.getAttribute('data-xq'), i9 = +q9.split(':')[0], l9 = q9.slice(q9.indexOf(':') + 1); S.wine.exp[i9].label = S.wine.exp[i9].label === l9 ? '' : l9; redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-xq]'), function(b){ b.onclick = function(){ readWine(); var q9 = b.getAttribute('data-xq'), i9 = +q9.split(':')[0], l9 = q9.slice(q9.indexOf(':') + 1), e9 = S.wine.exp[i9], pre9 = Array.isArray(WI.experiences) ? null : (C.extras || [])[i9];
+      // Winery test 3 (2026-11-12): a quick name that replaces a pre-filled one takes its details away too ("Picnic tables…"
+      // stayed under "Vineyard tour"), and the tap is kept as a draft like typed text.
+      if (e9.label !== l9 && pre9 && e9.label === (pre9.label || '') && e9.text === (pre9.text || '')) e9.text = '';
+      e9.label = e9.label === l9 ? '' : l9; mark(); drSave(); redraw(); }; });
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
