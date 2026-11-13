@@ -21901,9 +21901,9 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
 
 test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar and leave warning, Make more changes', async () => {
   const http = require('node:http');
-  // A brewery: cafés have the easy setup's edit page since 2026-11-10; this checks the classic one.
-  seasonInsert.run({ name: 'Unsent Fixture', type: 'brewery', hours: SEASON_WEEK, slug: 'unsent-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'brewery', 'unsent-fixture');
+  // A cocktail bar: cafés (2026-11-10) and breweries (2026-11-12) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Unsent Fixture', type: 'cocktail', hours: SEASON_WEEK, slug: 'unsent-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cocktail', 'unsent-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const handler = app.server.listeners('request')[0];
   const srv = http.createServer(handler);
@@ -26341,9 +26341,9 @@ test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px f
 test('Owner portal photos (2026-10-18): the grid refreshes in place and owners move photos earlier or later; the order sticks', async () => {
   const nodeFs = require('node:fs');
   const nodePath = require('node:path');
-  // A brewery: cafés have the easy setup's edit page since 2026-11-10; this checks the classic one.
-  seasonInsert.run({ name: 'Photo Order Fixture', type: 'brewery', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'brewery', 'photo-order-fixture');
+  // A cocktail bar: cafés (2026-11-10) and breweries (2026-11-12) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Photo Order Fixture', type: 'cocktail', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cocktail', 'photo-order-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
   const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Order Cafe', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
@@ -26379,7 +26379,7 @@ test('Owner portal photos (2026-10-18): the grid refreshes in place and owners m
     assert.deepEqual(db.prepare('SELECT id, sort_order FROM owner_photos WHERE venue_id = ? ORDER BY sort_order').all(v.id).filter((r) => r.sort_order != null).map((r) => r.id), [b, c, a], 'stored');
     assert.deepEqual(await gridOrder(), [main, b, c, a]);
     // The public gallery uses the same order after the main photo.
-    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'brewery', 'photo-order-fixture'));
+    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'cocktail', 'photo-order-fixture'));
     const byFile = Object.fromEntries(db.prepare('SELECT id, file FROM owner_photos WHERE venue_id = ?').all(v.id).map((r) => [`/images/owner/${r.file}`, r.id]));
     assert.deepEqual(gallery.map((g) => byFile[g.src.split('?')[0]]).filter(Boolean), [main, b, c, a]);
     // A new upload goes after the ordered ones.

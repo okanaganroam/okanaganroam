@@ -164,7 +164,7 @@ test('"Your updates" in the owner’s words (restaurants): "What you offer", "Yo
   assert.equal((await change(t, { not_offered: ['instagram', 'pyv_groups', 'specials'] })).status, 201);
   assert.equal(app.ownerVenueActivity(v.id, 12, 'en')[0].title, 'You told us you don’t have: Instagram');
   // Other types keep the old wording.
-  const pub = mk('brewery');
+  const pub = mk('cocktail');
   assert.equal((await change(tokenFor(pub.id), { badges: { patio: true } }, false)).status, 201);
   assert.ok(app.ownerVenueActivity(pub.id, 12, 'en').some((a) => a.title === 'Listing update: Badges'));
 });
@@ -248,7 +248,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
 });
 
 test('other types are untouched: no setup, no new "we don’t" button, the classic rules', async () => {
-  for (const type of ['brewery', 'distillery']) { // cafés have the setup since 2026-11-10
+  for (const type of ['cocktail', 'distillery']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12
     const v = mk(type);
     const t = tokenFor(v.id);
     const r = await get(`/owner/${t}/setup`);

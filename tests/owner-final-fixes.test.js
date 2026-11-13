@@ -108,7 +108,7 @@ test('every block says whether it goes live now or is checked first (restaurants
   assert.ok(at('photos').includes('Sent to us to check, usually within a day.'), 'photos');
   assert.ok(page.includes('Saves now and goes live'), 'cuisine and Plan your visit keep theirs');
   assert.match(page, /<label for="opName">Your name \(optional\)<\/label>/);
-  const pub = await get(`/owner/${tokenFor(mk('brewery', { hours: week }).id)}`);
+  const pub = await get(`/owner/${tokenFor(mk('cocktail', { hours: week }).id)}`);
   assert.ok(!pub.includes('op-save-line'), 'a pub page has none of the new lines');
   assert.match(pub, /<label for="opName">Your name<\/label>/);
   // French.
@@ -163,7 +163,7 @@ test('weekly specials have visible labels and "e.g." examples; Plan your visit b
   assert.match(page, /<textarea id="opVisitKnown" class="op-visit-ta" rows="1" data-visit-key="known_for" maxlength="180"/);
   assert.match(page, /body\.owner-page\.op-submit-seen \.op-unsent \{ display: none; \}/);
   assert.match(page, /new IntersectionObserver\(function\(es\)\{ es\.forEach\(function\(x\)\{ document\.body\.classList\.toggle\('op-submit-seen', x\.isIntersecting\); \}\); \}\)\.observe\(sb\)/);
-  const pub = await get(`/owner/${tokenFor(mk('brewery', { hours: week }).id)}`);
+  const pub = await get(`/owner/${tokenFor(mk('cocktail', { hours: week }).id)}`);
   assert.ok(!pub.includes('op-sp-lab') && !pub.includes('op-visit-ta'), 'pubs keep their boxes as they were');
 });
 
@@ -178,7 +178,7 @@ test('menu page: a restaurant can just add a menu link, and gets "Save this as m
   assert.match(page, /fetch\(C\.back \+ '\/changes'/);
   const fr = await get(`/fr/owner/${token}/menu`);
   assert.match(fr, /Ajouter seulement un lien vers votre menu/);
-  const pub = await get(`/owner/${tokenFor(mk('brewery', { hours: week }).id)}/menu`);
+  const pub = await get(`/owner/${tokenFor(mk('cocktail', { hours: week }).id)}/menu`);
   assert.match(pub, /"linkOk":false/, 'only restaurants get the new link screen');
   // The link goes through the listing's own save: checked first like the one under "Name, address & links".
   const r = await post(token, { menu_url: 'https://final-fixes.example/menu' });

@@ -1807,7 +1807,7 @@
     }
     // Café test 2 (2026-11-11): the open season answered in this step ("We're closed part of the year").
     var listH = [ch];
-    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if ((C.cafe || C.brewery) && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push(yearPart(ov ? 'seasonal' : 'all')); }
+    if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); if (C.brewery && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push(yearPart(ov ? 'seasonal' : 'all')); }
     // Wineries (2026-11-12): the off-season answer (all year, closed part of the year, or by appointment).
     var wyNew = C.winery && S.wYearPick ? (S.wYearPick === 'appointment' ? 'appointment' : openVal(S.openSea) ? 'seasonal' : 'all') : '';
     if (wyNew && (wyNew !== S.savedWYear || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(WI.season || null)))) listH.push({ winery_info: wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew } });
@@ -1820,6 +1820,7 @@
     });
   }
   // The "open all year?" answer: a café's (cafe_info) or a brewery's (brewery_info).
+  var YEAR_ANSWER = !!(C.cafe || C.brewery);
   function yearPart(y){ return C.brewery ? { brewery_info: { year: y } } : { cafe_info: { year: y } }; }
   function readTimes(){ readSeasons(); var w = W(); Array.prototype.forEach.call(screen.querySelectorAll('[data-h]'), function(inp){ var q2 = inp.getAttribute('data-h').split(':'); if (w && w[q2[0]] && w[q2[0]][+q2[1]]) w[q2[0]][+q2[1]][+q2[2]] = inp.value; }); }
   // The room a happy hour's deal has (60 letters, less its days when there are several happy hours).
@@ -2127,7 +2128,7 @@
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
     if (k === 'yearAll' && C.winery) S.wYearPick = 'all';
-    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || ((C.cafe || C.brewery) && S.savedYear !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
+    if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (YEAR_ANSWER && S.savedYear !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
     // Café test 2 (2026-11-11): "We're closed part of the year" and its dates.
     if (k === 'yearClosed') { S.openFrom = 'hours'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
@@ -2156,7 +2157,8 @@
       // From the closures screen (or the checklist): just the dates.
       var ovc = openVal(S.openSea), lc = [];
       if (ovc !== (CUR.open_months || '')) lc.push({ open_months: ovc });
-      if ((C.cafe || C.brewery) && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push(yearPart(ovc ? 'seasonal' : 'all'));
+      if (C.cafe && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
+      if (C.brewery && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push(yearPart(ovc ? 'seasonal' : 'all'));
       if (C.winery && S.savedWYear !== 'appointment' && (ovc ? 'seasonal' : 'all') !== S.savedWYear) { lc.push({ winery_info: { year: ovc ? 'seasonal' : 'all' } }); S.savedWYear = ovc ? 'seasonal' : 'all'; S.wine.year = S.savedWYear; }
       if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
       return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
@@ -2241,7 +2243,8 @@
       // "open all year" answer the Hours step just saved (it came back 400 "nothing new to send").
       var cl = closuresKey() === S.closuresWas ? [] : [{ closures: out }];
       // Cafés (2026-11-10): the answer itself ("open all year" or seasonal) counts on the checklist.
-      if ((C.cafe || C.brewery) && (om ? 'seasonal' : 'all') !== S.savedYear) cl.push(yearPart(om ? 'seasonal' : 'all'));
+      if (C.cafe && (om ? 'seasonal' : 'all') !== S.savedYear) cl.push({ cafe_info: { year: om ? 'seasonal' : 'all' } });
+      if (C.brewery && (om ? 'seasonal' : 'all') !== S.savedYear) cl.push(yearPart(om ? 'seasonal' : 'all'));
       var wyc = C.winery && S.savedWYear !== 'appointment' && (om ? 'seasonal' : 'all') !== S.savedWYear ? (om ? 'seasonal' : 'all') : '';
       if (wyc) cl.push({ winery_info: { year: wyc } });
       return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ if (wyc) { S.savedWYear = wyc; S.wine.year = wyc; } S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });

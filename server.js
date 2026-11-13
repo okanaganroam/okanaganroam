@@ -20854,7 +20854,9 @@ function writeBreweryVisitRows(venueId, now = new Date()) {
       if (!old || !old.owned) owned.delete(label);
       continue;
     }
-    if (!managed.has(label)) { const r0 = i >= 0 ? rows[i] : null; was[label] = r0 ? { text: r0.text, ...(r0.url ? { url: r0.url } : {}), ...(owned.has(label) ? { owned: true } : {}) } : { text: '', ...(owned.has(label) ? { owned: true } : {}) }; managed.add(label); }
+    // A research row a full box set aside earlier (owner_dropped) is what this answer replaces too, so an Undo brings it back.
+    const parkedR = i < 0 && cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped.find((r) => r && r.label === label && !r.owned) : null;
+    if (!managed.has(label)) { const r0 = i >= 0 ? rows[i] : parkedR; was[label] = r0 ? { text: r0.text, ...(r0.url ? { url: r0.url } : {}), ...(owned.has(label) ? { owned: true } : {}) } : { text: '', ...(owned.has(label) ? { owned: true } : {}) }; managed.add(label); }
     owned.add(label);
     if (want === '') { if (i >= 0) rows.splice(i, 1); delete frMap[label]; continue; }
     const row = { label, text: want.en };

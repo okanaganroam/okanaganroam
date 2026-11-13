@@ -284,6 +284,14 @@ test('plan your visit cap: a full box sets research aside before her lines, reco
   const back = visitRows(b.id).map((r) => r.label);
   for (const l of ['Known for', 'Food', 'Groups', 'Tours', 'Winter', 'Parking', 'Games']) assert.ok(back.includes(l), `${l} back: ${back.join()}`);
   assert.ok(!back.includes('Flights') && !back.includes('To go') && !back.includes('Kids & dogs'));
+  // A research Games line a full box set aside, then replaced by the weekly events answer, comes back on Undo.
+  assert.equal((await change(t, { flight_fee: 10, brewery_info: { to_go: ['cans'], minors: { policy: 'all_ages' } } })).status, 200);
+  assert.ok(!visitRows(b.id).some((r) => r.label === 'Games'), 'set aside by the full box');
+  assert.equal((await change(t, { not_offered: ['entertainment'] })).status, 200);
+  assert.equal(app.venueVisitInfo(b.id).owner_was.Games.text, 'Shuffleboard.', 'what it replaced is kept');
+  assert.equal(app.undoOwnerInstantChange(lastReq(b.id, 'entertainment'), 'test').ok, true);
+  assert.equal(app.undoOwnerInstantChange(lastReq(b.id, 'to_go'), 'test').ok, true);
+  assert.ok(visitRows(b.id).some((r) => r.label === 'Games' && r.text === 'Shuffleboard.'), visitRows(b.id).map((r) => r.label).join());
 });
 
 test('owner-verified listings: the brewery answers never change their hours or description', async () => {
