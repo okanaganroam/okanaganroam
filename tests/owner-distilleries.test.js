@@ -82,7 +82,7 @@ test('steps: a distillery gets the brewery setup (7 essentials, 5 optional, menu
   assert.match(s, /x = doneLine\('taproom'\) \+ \(C\.distillery \? q\(T\.tfoodQ, T\.tfoodLead\) \+ msgs\(\) : q\(T\.tkindQ, T\.tkindLead\)/);
   // The owner tiles and the checklist list include it.
   assert.ok(app.ownerExtraBadgesFor('distillery').includes('picnic_area'));
-  assert.ok(app.COMPLETENESS_TYPES.has('distillery'));
+  assert.match((await get(`/owner/${t}`)).text, /id="opCbToggle"/, 'the checklist on the edit page');
   // Every other type keeps its steps.
   assert.deepEqual(app.setupParts('winery').part1, ['basics', 'hours', 'winery', 'tastings', 'visit', 'photos', 'offer']);
   assert.deepEqual(app.setupParts('restaurant').part1, ['basics', 'hours', 'closures', 'spend', 'cuisine', 'photos', 'menu', 'offer']);

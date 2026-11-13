@@ -73,7 +73,7 @@ test('route: a restaurant gets the setup page (edit link, French, signed in); th
 });
 
 test('route: other types go back to their edit page; their edit pages have no setup card', async () => {
-  for (const type of ['cocktail', 'distillery']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12
+  for (const type of ['cocktail']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12; distilleries since 2026-11-13
     const v = mk(type);
     const t = tokenFor(v.id);
     const r = await get(`/owner/${t}/setup`);
@@ -205,6 +205,6 @@ test('help: the easy setup topic is on the setup page and a restaurant edit page
   assert.match(setup, /"id":"easy-setup"/);
   assert.match(setup, /How does “Set up your page” work\?/);
   assert.match(setup, /Comment fonctionne « Configurez votre page »\u202f\?/);
-  const w = mk('distillery'); // wineries have the setup since 2026-11-12
+  const w = mk('cocktail'); // wineries have the setup since 2026-11-12; distilleries since 2026-11-13
   assert.doesNotMatch(await get(`/owner/${tokenFor(w.id)}`).then((x) => x.text()), /"id":"easy-setup"/, 'not on other types');
 });
