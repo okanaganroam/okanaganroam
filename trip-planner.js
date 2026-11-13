@@ -8005,6 +8005,7 @@ module.exports = {
   applyWineTourMeaning,
   fastFood,
   publicVenue,
+  stopFrom,
   parseVenueHours,
   hoursFit,
   listedHoursText,

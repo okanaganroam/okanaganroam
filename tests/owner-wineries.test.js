@@ -128,16 +128,16 @@ test('each winery step saves live from the setup and reads back in the setup', a
   assert.equal(cfg.cur.badges.picnic_area, true);
   assert.equal(cfg.progress.done.tastings, 'live');
   // The Plan your visit lines written from the answers (English, with French alongside).
-  assert.equal(row(w.id, 'Tastings').text, 'From $15 a person, free with a bottle purchase. Booking recommended.');
+  assert.equal(row(w.id, 'Tastings').text, '$15 a person, free with a bottle purchase. Booking recommended.');
   assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more and tour buses, please book ahead.');
   assert.equal(row(w.id, 'Restaurant').text, 'The Vine Bistro on site, Thu–Mon from noon.');
   assert.equal(row(w.id, 'Winter').text, 'Nov 1 – Mar 31: by appointment. Please call ahead.');
   assert.equal(row(w.id, 'Wine & cheese').text, '$45 a person, daily at 1 PM');
   assert.equal(row(w.id, 'Known for').text, 'Pinot Noir and Chardonnay from estate vines');
   const page = app.renderVenuePage(app.getVenue(w.id), [], [], [], { lang: 'en' });
-  assert.match(page, /From \$15 a person, free with a bottle purchase/);
+  assert.match(page, /\$15 a person, free with a bottle purchase/);
   const pageFr = app.renderVenuePage(app.getVenue(w.id), [], [], [], { lang: 'fr' });
-  assert.match(pageFr, /Dès 15 \$ par personne, offerte à l’achat d’une bouteille/);
+  assert.match(pageFr, /15 \$ par personne, offerte à l’achat d’une bouteille/);
   // Logged as the owner's, and the change can be undone.
   assert.ok(db.prepare("SELECT 1 FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'winery_info' AND source = 'venue_owner'").get(w.id));
   await change(t, { winery_info: { buses: 'no' } });
@@ -236,10 +236,10 @@ test('answers update the matching research rows and never wipe the ones not answ
   assert.equal((await change(t, { winery_info: { visit: 'walk_in' } })).status, 200);
   assert.equal(row(w.id, 'Tastings').text, 'Five wines from $15, about 30 min. Walk-ins welcome.');
   assert.equal((await change(t, { tasting_fee: 20 })).status, 200);
-  assert.equal(row(w.id, 'Tastings').text, 'From $20 a person. Walk-ins welcome.');
+  assert.equal(row(w.id, 'Tastings').text, '$20 a person. Walk-ins welcome.');
   // Research can't bring its lines back over the owner's.
   research(w.id, [{ label: 'Tastings', text: 'Research again' }, { label: 'Groups', text: 'Research groups' }, { label: 'Winter', text: 'Research winter' }]);
-  assert.equal(row(w.id, 'Tastings').text, 'From $20 a person. Walk-ins welcome.');
+  assert.equal(row(w.id, 'Tastings').text, '$20 a person. Walk-ins welcome.');
   assert.equal(row(w.id, 'Groups').text, 'Groups of 6 or more, please book ahead.');
   assert.equal(row(w.id, 'Winter').text, 'Research winter', 'not answered: research may update it');
   // Undo the fee: research's Tastings line comes back.
@@ -692,7 +692,7 @@ test('plan your visit cap (winery test 2): a box full of her own lines keeps the
 test('winery test 2: Tastings never says walk-ins in appointment season; story threshold 120; walk-ins get the booking link box; help and wording', async () => {
   const w = mk('winery'); const t = tokenFor(w.id);
   assert.equal((await change(t, { tasting_fee: 15, winery_info: { visit: 'walk_in', year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
-  assert.equal(row(w.id, 'Tastings').text, 'From $15 a person. Walk-ins welcome May 1 – Oct 31.');
+  assert.equal(row(w.id, 'Tastings').text, '$15 a person. Walk-ins welcome May 1 – Oct 31.');
   assert.ok(!/Walk-ins welcome\.$/.test(row(w.id, 'Tastings').text));
   // Story: "Great length" only at the checklist's 120.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
@@ -932,4 +932,220 @@ test('winery test 3: a winery’s owner home has no Happy hour or Add an event t
   const cfg = cfgOf((await get(`/fr/owner/${tokenFor(w.id)}/setup`)).text);
   assert.equal(cfg.placeShow['Fruit or honey wines'], 'Vins de fruits ou de miel');
   assert.ok(/Pour qui/.test(JSON.stringify(cfg)) && !/Idéal pour"/.test(JSON.stringify(cfg.offerGroups || [])));
+});
+
+// ---------- Winery test 4 (2026-11-12): Gord, by appointment all year with old 10-5 hours ----------
+const GORD_WEEK = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['10:00', '17:00']]])));
+const NO_DAYS = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, []]));
+const noOpenDay = (id) => { const h = JSON.parse(app.getVenue(id).hours); return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].every((d) => !(h[d] && h[d].length)); };
+const hoursBox = (html) => (/<section[^>]*id="venueHours"[\s\S]*?<\/section>/.exec(html) || /id="venueHours"[\s\S]{0,3000}/.exec(html) || [''])[0];
+
+test('winery test 4: “no set hours” from the setup saves by appointment and replaces the old week; Undo puts it back', async () => {
+  const w = mk('winery', { hours: GORD_WEEK }); const t = tokenFor(w.id);
+  // Every day closed without saying "by appointment": refused, pointing to the one choice.
+  let r = await change(t, { hours: NO_DAYS, hours_checked: true });
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.match(r.body.errors.hours, /No set hours\? Tap “We don’t have set hours\. Visits are by appointment”/);
+  assert.equal(app.getVenue(w.id).hours, GORD_WEEK);
+  // A restaurant still needs an open day.
+  const rest = mk('restaurant');
+  r = await change(tokenFor(rest.id), { hours: NO_DAYS, hours_checked: true, winery_info: { visit: 'appointment' } });
+  assert.equal(r.status, 400);
+  // The setup's one tap: by appointment and no weekly hours, in one save, live.
+  r = await change(t, { hours: NO_DAYS, hours_checked: true, winery_info: { visit: 'appointment' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(!(r.body.review || []).length, JSON.stringify(r.body));
+  assert.equal(app.wineryInfoAnswers(w.id).visit, 'appointment');
+  assert.ok(noOpenDay(w.id), app.getVenue(w.id).hours);
+  assert.equal((await progress(t, 'hours', 'live')).status, 200);
+  // Logged with the old hours, and Undo puts them back.
+  const log = db.prepare("SELECT old_value FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'hours' ORDER BY id DESC").get(w.id);
+  assert.equal(log.old_value, GORD_WEEK);
+  const req = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%\"hours\"%' ORDER BY id DESC").get(w.id).id;
+  assert.equal(app.undoOwnerInstantChange(req, 'test').ok, true);
+  assert.deepEqual(JSON.parse(app.getVenue(w.id).hours), JSON.parse(GORD_WEEK));
+  assert.notEqual(app.wineryInfoAnswers(w.id).visit, 'appointment', 'the one save is undone as one');
+  // Already by appointment: the week alone is accepted (the portal or a second tap).
+  assert.equal((await change(t, { winery_info: { visit: 'appointment' } })).status, 200);
+  r = await change(t, { hours: NO_DAYS, hours_checked: true });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(noOpenDay(w.id));
+  // Picking "By appointment only" on the booking screen with the old week clears it in the same save.
+  const w2 = mk('winery', { hours: GORD_WEEK });
+  r = await change(tokenFor(w2.id), { winery_info: { visit: 'appointment' }, hours: NO_DAYS, hours_checked: true });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(noOpenDay(w2.id));
+  // The setup page carries the button words (English and French) and the client the one action.
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.t.noSetHours, 'We don’t have set hours. Visits are by appointment');
+  assert.ok(cfg.t.noSetHoursNow && cfg.t.noSetHoursSaved && cfg.t.apptHoursGone);
+  const cfgFr = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(cfgFr.t.noSetHours, 'Nous n’avons pas d’heures fixes. Visites sur rendez-vous');
+  assert.match(cfgFr.t.noSetHoursSaved, /« Sur rendez-vous · appelez avant »/);
+  assert.ok(!cfgOf((await get(`/owner/${tokenFor(rest.id)}/setup`)).text).t.noSetHours, 'wineries only');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /if \(k === 'noSetHours'\) return noSetHoursSave\(\);/);
+  assert.match(js, /var apptClear = wi2\.visit === 'appointment' && S\.week && windowsOk\(S\.week\);/);
+  assert.match(js, /big\('➜', T\.hoursNext, '', false, 'hoursNext'\) \+ noSetBtn\(\)/, 'on the day list too');
+});
+
+test('winery test 4: the portal hours form has the “no set hours” button for wineries; its save is refused nowhere', async () => {
+  const w = mk('winery', { hours: GORD_WEEK }); const t = tokenFor(w.id);
+  const home = (await get(`/owner/${t}`)).text;
+  assert.match(home, /id="opNoSetHoursBtn">We don’t have set hours\. Visits are by appointment</);
+  assert.match((await get(`/fr/owner/${t}`)).text, /id="opNoSetHoursBtn">Nous n’avons pas d’heures fixes\. Visites sur rendez-vous</);
+  assert.ok(!(await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text.includes('id="opNoSetHoursBtn"'), 'wineries only');
+  assert.match(home, /send\(\{ hours: none, winery_info: \{ visit: 'appointment' \} \}/);
+  assert.match(home, /if \(window\.opNoSetHoursSent\) delete changes\.hours;/);
+  // The edit link (no login): by appointment goes live, the hours wait for our check, nothing is refused.
+  const r = await change(t, { hours: NO_DAYS, winery_info: { visit: 'appointment' } }, false);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok((r.body.review || []).includes('hours'), JSON.stringify(r.body));
+  assert.equal(app.wineryInfoAnswers(w.id).visit, 'appointment');
+  // Appointment-only: no "These hours are right" in the form.
+  const after = (await get(`/owner/${t}`)).text;
+  assert.ok(!after.includes('id="opHoursOkBtn"'), 'no hours check for an appointment-only winery');
+});
+
+test('winery test 4: the venue page Hours box says “By appointment · call ahead” instead of the old week, with no “See hours”', async () => {
+  const jul = new Date('2026-07-15T20:00:00Z'), nov = new Date('2026-11-18T20:00:00Z');
+  // By appointment all year, the old 10-5 still stored: never shown.
+  const a = mk('winery', { hours: GORD_WEEK });
+  assert.equal((await change(tokenFor(a.id), { winery_info: { visit: 'appointment' } })).status, 200);
+  for (const now of [jul, nov]) {
+    const page = vpage(a, 'en', now);
+    assert.deepEqual(statusLine(page), ['appointment', 'By appointment · call ahead']);
+    assert.ok(!/See hours/.test(statusLine(page)[1] || '') && !/<p class="venue-open-status"[^>]*>[^\n]*href="#venueHours"/.test(page), 'no See hours link');
+    assert.match(page, /<h2>Hours<\/h2><p class="venue-hours-season venue-hours-appt">By appointment · call ahead<\/p>/);
+    assert.ok(!/10 ?AM|10:00|5 ?PM|17:00/.test(page.replace(/<script(?![^>]*ld\+json)[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '')), 'no 10-5 anywhere, JSON-LD included');
+    assert.ok(!/openingHoursSpecification/.test(page));
+  }
+  const fr = vpage(a, 'fr', jul);
+  assert.match(fr, /<h2>Heures<\/h2><p class="venue-hours-season venue-hours-appt">Sur rendez-vous · appelez avant<\/p>/);
+  assert.ok(!/Voir les heures/.test(fr));
+  // The no-set-hours week: the same.
+  const b = mk('winery', { hours: GORD_WEEK });
+  assert.equal((await change(tokenFor(b.id), { hours: NO_DAYS, hours_checked: true, winery_info: { visit: 'appointment' } })).status, 200);
+  const pb = vpage(b, 'en', jul);
+  assert.match(pb, /venue-hours-appt">By appointment · call ahead</);
+  assert.ok(!/Closed|See hours/.test(hoursBox(pb).replace(/<script[\s\S]*?<\/script>/g, '')), hoursBox(pb).slice(0, 400));
+  // Seasonal: in the off-season the line comes first, then the off-season line and the walk-in hours; in season as before.
+  const s = mk('winery', { hours: GORD_WEEK });
+  assert.equal((await change(tokenFor(s.id), { winery_info: { year: 'appointment', season: { from: '05-01', to: '10-31' } } })).status, 200);
+  const off = vpage(s, 'en', nov);
+  assert.match(off, /<h2>Hours<\/h2><p class="venue-hours-season venue-hours-appt">By appointment · call ahead<\/p><p class="venue-season venue-winery-offseason"[^>]*>Nov 1 – Apr 30: by appointment, call ahead</);
+  assert.match(off, /10 AM|10:00 AM|10 a\.m\./i, 'walk-in hours still shown');
+  const on = vpage(s, 'en', jul);
+  assert.ok(!on.includes('venue-hours-appt'));
+  assert.equal(statusLine(on)[0], 'open');
+  assert.match(on, /See hours/);
+  // A normal winery: unchanged.
+  const n = mk('winery', { hours: GORD_WEEK });
+  assert.equal((await change(tokenFor(n.id), { winery_info: { visit: 'walk_in' } })).status, 200);
+  const pn = vpage(n, 'en', jul);
+  assert.ok(!pn.includes('venue-hours-appt')); assert.match(pn, /See hours/); assert.match(pn, /openingHoursSpecification/);
+});
+
+test('winery test 4: Build My Trip has no listed hours for an appointment-only winery, and notes it on alternatives', async () => {
+  const a = mk('winery', { hours: GORD_WEEK, name: 'Hollow Oak Cellars' });
+  assert.equal((await change(tokenFor(a.id), { winery_info: { visit: 'appointment' } })).status, 200);
+  const s = mk('winery', { hours: GORD_WEEK });
+  const md = (d) => d.slice(5);
+  assert.equal((await change(tokenFor(s.id), { winery_info: { year: 'appointment', season: { from: md(app.addLocalDays(today, 10)), to: md(app.addLocalDays(today, 200)) } } })).status, 200);
+  const n = mk('winery', { hours: GORD_WEEK });
+  const facts = app.buildTripPlannerFacts(true);
+  const f = (id) => facts.find((x) => x.id === id);
+  assert.equal(f(a.id).hours, null, 'no hours to plan by');
+  assert.equal(f(s.id).hours, null, 'off-season on this date');
+  assert.ok(f(n.id).hours, 'a normal winery keeps its hours');
+  assert.ok(app.buildTripPlannerFacts(true, app.addLocalDays(today, 30)).find((x) => x.id === s.id).hours, 'walk-in season keeps its hours');
+  // A stop for it says by appointment, with no "Listed hours" reason or hours caveat (even if hours were passed in).
+  // A stop built for it (a named request) with its old week still passed in: no "Listed hours" reason or hours caveat.
+  const fact = { ...f(a.id), hours: GORD_WEEK, _hours: undefined };
+  const stop = planner.stopFrom(fact, { reasons: [{ code: 'hours', text: 'Listed hours Saturday: 10:00–17:00', weight: 6 }, { code: 'request', text: 'Matches your request for Hollow Oak Cellars', weight: 9 }], caveats: ['No usable hours listed on Okanagan Roam — check before you go'] }, [], { labels: {} });
+  assert.ok((stop.reasons || []).some((x) => /Matches your request/.test(x.text)), JSON.stringify(stop.reasons));
+  {
+    assert.ok(!(stop.reasons || []).some((x) => /Listed hours/.test(x.text)), JSON.stringify(stop.reasons));
+    assert.ok(!(stop.caveats || []).some((x) => /listed hours|No usable hours/i.test(x)), JSON.stringify(stop.caveats));
+    assert.ok((stop.caveats || []).some((x) => /By appointment only/.test(x)), JSON.stringify(stop.caveats));
+    assert.equal(stop.venue.listedHours || null, null);
+  }
+  // Alternatives carry the appointment note; the page shows it.
+  const v3 = require('../trip-planner-v3-page.js');
+  const html = v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'Hollow Oak', url: '/naramata/wineries/hollow-oak', reasonCode: 'another_listing', appointment: true }, { name: 'Far Winery', url: '/oliver/wineries/far', reasonCode: 'different_region', appointment: true }, { name: 'Plain', url: '/naramata/wineries/plain', reasonCode: 'another_listing' }] }, false, (x) => String(x));
+  assert.match(html, /Hollow Oak<\/a> — By appointment · call ahead</);
+  assert.match(html, /Far Winery<\/a> — Another region · By appointment · call ahead</);
+  assert.match(html, /Plain<\/a> — Another listing</);
+  assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'H', url: '/x', reasonCode: 'another_listing', appointment: true }] }, true, (x) => String(x)), /Sur rendez-vous · appelez avant/);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
+  assert.match(src, /reasonCode, \.\.\.\(appointmentOnly\(venue\) \? \{ appointment: true \} : \{\}\)/);
+});
+
+test('winery test 4: the checklist counts hours done for an appointment-only winery and never asks “Are your hours still right?”', async () => {
+  assert.equal(pc.doneMap({ type: 'winery', wineryInfo: { visit: 'appointment' } }, today).hours, true);
+  assert.equal(pc.doneMap({ type: 'winery', wineryInfo: { visit: 'appointment' } }, today).hours_fresh, true);
+  assert.equal(pc.doneMap({ type: 'winery', wineryInfo: { visit: 'appointment' } }, today).season, true);
+  assert.equal(pc.doneMap({ type: 'winery', wineryInfo: { visit: 'walk_in' } }, today).hours, false, 'walk-ins still need hours');
+  assert.equal(pc.doneMap({ type: 'restaurant', wineryInfo: { visit: 'appointment' } }, today).hours, false);
+  const w = mk('winery', { hours: GORD_WEEK }); const t = tokenFor(w.id);
+  db.prepare('UPDATE venues SET hours_checked_at = ? WHERE id = ?').run('2026-01-01', w.id);
+  assert.match((await get(`/owner/${t}`)).text, /Are your hours still right\?/, 'a walk-in winery is asked (stale check)');
+  assert.equal((await change(t, { winery_info: { visit: 'appointment' } })).status, 200);
+  const home = (await get(`/owner/${t}`)).text.replace(/<script[\s\S]*?<\/script>/g, '');
+  assert.ok(!/Are your hours still right\?|Yes, these are right/.test(home), 'not asked once by appointment');
+  // 100% without confirming hours: Gord's answers with the no-set-hours week.
+  const v = app.getVenue(w.id); const live = app.ownerVenueSnapshot(v, null);
+  const r = pc.scoreCompleteness({ type: 'winery', address: v.address, latitude: 1, longitude: 1, phone: v.phone, website: v.website, hasHours: true, hoursCheckedAt: '2026-01-01', imageUrl: '/images/owner/x.jpg', photoCount: 3,
+    placeType: 'Boutique winery', wineryInfo: { ...live.winery_info, groups: 6, buses: 'no', food: 'none' }, tastingFee: 20, bookingUrl: 'https://example.com/book', visitLabels: ['Known for'], description: 'x'.repeat(130),
+    instagramUrl: 'x', facebookUrl: 'x', hasArrival: true, claimed: true, ownerFeatures: ['free_parking'], declaredNone: ['dogs'], offerAnswered: true }, { today });
+  assert.deepEqual(r.missing.map((x) => x.key), []);
+  assert.equal(r.pct, 100);
+});
+
+test('winery test 4: the cost answer leads with free and no card, no upsell; the appointment answer names the new button', () => {
+  const cost = app.OWNER_HELP_TOPICS.find((x) => x.id === 'cost');
+  assert.match(cost.a, /^<p><strong>Free\.<\/strong> You’ll never be charged, and we never ask for a card\./);
+  assert.match(cost.aFr, /^<p><strong>Gratuit\.<\/strong> Vous ne paierez jamais rien, et nous ne demandons jamais de carte\./);
+  for (const s of [cost.a, cost.aFr]) assert.ok(!/featured|vedette|visibility|visibilité/i.test(s), s);
+  assert.ok(!app.OWNER_HELP_TOPICS.some((x) => /featured|paid/.test(x.id)), 'no new paid-features topic');
+  const ap = app.WINERY_SETUP_HELP_TOPICS.find((x) => x.id === 'winery-appointment');
+  assert.match(ap.a, /<strong>We don’t have set hours\. Visits are by appointment<\/strong>/);
+  assert.match(ap.aFr, /<strong>Nous n’avons pas d’heures fixes\. Visites sur rendez-vous<\/strong>/);
+});
+
+test('winery test 4: “No dogs allowed” reads “Not inside or outside” without a patio; research’s Dogs line comes back on Undo', async () => {
+  assert.equal(text.en.noDogsSubInside, 'Not inside or outside');
+  assert.equal(text.fr.noDogsSubInside, 'Ni à l’intérieur ni à l’extérieur');
+  assert.equal(text.en.noDogsSub, 'Not inside or on the patio');
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [{ label: 'Tastings', text: 'Tastings $10.' }, { label: 'Dogs', text: 'Dogs welcome on the patio.' }, { label: 'Parking', text: 'Free parking by the vineyard.' }]);
+  // What you offer with "No dogs allowed": the not-offered answer and research's Dogs line cleared.
+  let r = await change(t, { not_offered: ['dogs'] }); assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await change(t, { visit_rows: { dogs: '' } }); assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(!row(w.id, 'Dogs'));
+  assert.deepEqual(app.venueVisitInfo(w.id).owner_was.Dogs, { text: 'Dogs welcome on the patio.' });
+  const req = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%visit_rows%' ORDER BY id DESC").get(w.id).id;
+  assert.equal(app.undoOwnerInstantChange(req, 'test').ok, true);
+  assert.equal(row(w.id, 'Dogs').text, 'Dogs welcome on the patio.');
+  const box = app.venueVisitInfo(w.id);
+  assert.ok(!(box.owner_labels || []).includes('Dogs'), 'research’s again, not hers');
+  assert.ok(!(box.owner_was && box.owner_was.Dogs));
+  // An owner's own line typed over research's, then cleared: research's original is still what Undo of the first brings back.
+  assert.equal((await change(t, { visit_rows: { dogs: 'Leashed dogs on the lawn.' } })).status, 200);
+  assert.equal(app.venueVisitInfo(w.id).owner_was.Dogs.text, 'Dogs welcome on the patio.');
+});
+
+test('winery test 4: wording: one tasting price without “From” on the page (cards keep “From $X”), “Nearly done”, Exit setup wraps', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { tasting_fee: 20 })).status, 200);
+  assert.equal(row(w.id, 'Tastings').text, '$20 a person.');
+  assert.match(vpage(w, 'fr').replace(/ | /g, ' '), /20 \$ par personne\./);
+  assert.ok(!/Dès 20/.test(vpage(w, 'fr')));
+  assert.equal(app.cardPriceFor(w.id), 'From $20', 'cards keep the shared “From $X” price style');
+  assert.equal(text.en.essNearly, 'Nearly done'); assert.equal(text.fr.essNearly, 'Presque terminé');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /h\(open1\.length \? T\.essNearly \|\| T\.essReady : T\.essReady\)/);
+  const setup = (await get(`/owner/${t}/setup`)).text;
+  assert.match(setup, /body\.owner-setup \.su-head \{ flex-wrap: wrap; row-gap: 0; \}/);
+  assert.match(setup, /body\.owner-setup \.su-exit \{ margin-left: auto; white-space: nowrap; \}/);
 });

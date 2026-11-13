@@ -36172,7 +36172,6 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const wineryApptAllYear = wineryApptBox && venueWineryInfo(venue.id).visit === 'appointment';
   const wineryApptLine = `<p class="venue-hours-season venue-hours-appt">${L('By appointment · call ahead', 'Sur rendez-vous · appelez avant')}</p>`;
   if (wineryApptAllYear) hoursHtml = `<h2>${L('Hours', 'Heures')}</h2>${wineryApptLine}`;
-  else if (wineryApptBox && hoursHtml) hoursHtml = hoursHtml.replace('</h2>', `</h2>${wineryApptLine}`);
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
   if (openMonths) {
@@ -36186,6 +36185,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // ("Nov 1 – Apr 30: by appointment, call ahead").
   const wineryOffLine = wineryOffSeasonLineHtml(venue, fr);
   if (wineryOffLine) hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wineryOffLine}`) : `<h2>${L('Hours', 'Heures')}</h2>${wineryOffLine}`;
+  // In the off-season: "By appointment · call ahead" first, then the off-season line and the walk-in hours.
+  if (wineryApptBox && !wineryApptAllYear && hoursHtml) hoursHtml = hoursHtml.replace('</h2>', `</h2>${wineryApptLine}`);
   // Pubs (2026-11-10): when the kitchen closes and who's welcome, in the business's own words, under the hours.
   const pubLines = pubInfoLinesHtml(venue, fr, opts.now || new Date());
   if (pubLines) hoursHtml = hoursHtml ? hoursHtml + pubLines : `<h2>${L('Hours', 'Heures')}</h2>${pubLines}`;
