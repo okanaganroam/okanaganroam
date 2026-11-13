@@ -19853,7 +19853,7 @@ const pubClock = (t, fr) => {
   if (!m) return '';
   const h = Number(m[1]), mi = m[2];
   if ((h === 0 || h === 24) && mi === '00') return fr ? 'minuit' : 'midnight';
-  if (h === 12 && mi === '00') return fr ? 'midi' : 'noon';
+  // Brewery test 1 (2026-11-12): noon reads "12 PM" (« 12 h »), as the page's hours and open-now line say it.
   if (fr) return mi === '00' ? `${h} h` : `${h} h ${mi}`;
   return `${h % 12 === 0 ? 12 : h % 12}${mi === '00' ? '' : `:${mi}`} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
 };

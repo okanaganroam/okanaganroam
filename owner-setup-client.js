@@ -30,8 +30,9 @@
   function monthName(i){ return C.monthNames[i]; }
   // "Noël : …" in French, "Christmas Day: …" in English (café test 6: the French space before a colon).
   function cl(a){ return a + (C.lang === 'fr' ? '\u00a0: ' : ': '); }
-  // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
-  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // "Midnight", never "12 AM" (pub fresh-eyes, 2026-11-10). Brewery test 1 (2026-11-12): noon is "12 PM" (« 12 h »), as
+  // the public page's hours and open-now line say it; the setup said "Noon" while the page said "12 PM".
+  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
   function happyCloseOf(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; return o && o._close && typeof o._close === 'object' ? o._close : {}; } catch (e) { return {}; } }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
@@ -293,7 +294,7 @@
   function syncMenu(){ if (!C.brewery) return; var on = BI.food === 'kitchen', i = STEPS.indexOf('menu'), j = P2.indexOf('menu'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('menu') >= 0) { STEPS.push('menu'); P2.push('menu'); } }
   // Tiles shown only with their own kitchen (vegan, vegetarian, takeout); a ticked one always shows.
   function tileShown(k){ return !C.brewery || (C.kitchenOnly || []).indexOf(k) < 0 || BI.food === 'kitchen' || S.brew.food === 'kitchen' || !!S.badgesAtStart[k]; }
-  // The quick opening and closing times on a day's card ("Opens: 11 AM · Noon · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
+  // The quick opening and closing times on a day's card ("Opens: 11 AM · 12 PM · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
   function brewQuick(d, j, y, last){
     if (!C.brewery) return '';
     var row = function(idx, list, label){ return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
@@ -1608,7 +1609,7 @@
       x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, fill(T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
+      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
       x = q(T.doorPhotoQ, T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';

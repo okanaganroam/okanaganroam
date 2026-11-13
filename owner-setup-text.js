@@ -1112,8 +1112,8 @@ en.brewery = {
   tkindSubs: { Brewery: 'We brew here', Cidery: 'We make cider here', 'Taphouse or beer hall': 'We pour other brewers’ beer', Distillery: 'We make spirits here' },
   kindGuess: 'We picked this from your name. Tap another if it’s not right.',
   tfoodQ: 'Food here?', tfoodLead: 'Pick the main one.', tfoods: { kitchen: 'Our own kitchen', trucks: 'Food trucks', snacks: 'Snacks only', none: 'No food' },
-  tfoodSubs: { trucks: 'Your page says “Food trucks most days”, never a truck’s name' },
-  foodGuess: 'We picked this from your page now. Tap another if it changed.',
+  tfoodSubs: { trucks: 'We’ll show “Food trucks most days” (truck names change too often)' },
+  foodGuess: 'We picked this from what’s on your page. Tap another if it’s changed.',
   outsideQ: 'Can people bring their own food?', outsideOpts: { yes: 'Yes', no: 'No' },
   tkitchenQ: 'Does your kitchen close before the bar?', tkitchenOpts: { same: 'No, food until we close', earlier: 'Yes, it closes earlier' }, tkitchenAt: 'Kitchen closes at',
   tkitchenNeed: 'Please pick the time your kitchen closes.', tfoodNeed: 'Please tap what food there is here.',
@@ -1156,7 +1156,9 @@ en.brewery = {
   hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.',
   igLead: 'Type your Instagram name, like @yourbrewery.',
   // Your taproom door
-  doorQ: 'Where’s the taproom door?', doorLead: 'At an orchard or a big lot the map pin can land in the wrong spot. One photo, taken at the taproom door, walks visitors right to it.',
+  doorQ: 'Where’s the taproom door?', doorLead: 'If your door is around the side or upstairs, a photo helps people find it. One photo, taken at the taproom door, walks visitors right to it.',
+  // A cidery (the kind she picked): the orchard hint, where the map pin often lands in the wrong spot.
+  doorLeadCidery: 'At an orchard or a big lot the map pin can land in the wrong spot. One photo, taken at the taproom door, walks visitors right to it.',
   mapFailQ: 'Send your taproom door photo',
   doorPhotoQ: 'Take a photo of your taproom door', doorPhotoLead: 'Stand outside so the door and your sign are in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
 };
@@ -1173,8 +1175,8 @@ fr.brewery = {
   tkindSubs: { Brewery: 'Nous brassons ici', Cidery: 'Nous faisons du cidre ici', 'Taphouse or beer hall': 'Nous servons la bière d’autres brasseurs', Distillery: 'Nous distillons ici' },
   kindGuess: 'Nous l’avons choisi d’après votre nom. Touchez-en un autre s’il ne convient pas.',
   tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions de cuisine de rue', snacks: 'Collations seulement', none: 'Pas de nourriture' },
-  tfoodSubs: { trucks: 'Votre page indique « Camions de cuisine de rue la plupart des jours », jamais le nom d’un camion' },
-  foodGuess: 'Nous l’avons choisi d’après votre page actuelle. Touchez-en un autre si ça a changé.',
+  tfoodSubs: { trucks: 'Nous indiquerons « Camions de cuisine de rue la plupart des jours » (les camions changent trop souvent)' },
+  foodGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez-en un autre si ça a changé.',
   outsideQ: 'Peut-on apporter sa propre nourriture?', outsideOpts: { yes: 'Oui', no: 'Non' },
   tkitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', tkitchenOpts: { same: 'Non, on sert à manger jusqu’à la fermeture', earlier: 'Oui, elle ferme plus tôt' }, tkitchenAt: 'La cuisine ferme à',
   tkitchenNeed: 'Choisissez l’heure de fermeture de votre cuisine.', tfoodNeed: 'Touchez la nourriture offerte ici.',
@@ -1209,7 +1211,8 @@ fr.brewery = {
   socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
   igLead: 'Écrivez votre nom Instagram, comme @votrebrasserie.',
-  doorQ: 'Où est la porte de votre salle?', doorLead: 'Dans un verger ou un grand terrain, l’épingle peut tomber au mauvais endroit. Une photo, prise à la porte de la salle, y mène les visiteurs directement.',
+  doorQ: 'Où est la porte de votre salle?', doorLead: 'Si votre porte est sur le côté ou à l’étage, une photo aide les gens à la trouver. Une photo, prise à la porte de la salle, y mène les visiteurs directement.',
+  doorLeadCidery: 'Dans un verger ou un grand terrain, l’épingle peut tomber au mauvais endroit. Une photo, prise à la porte de la salle, y mène les visiteurs directement.',
   mapFailQ: 'Envoyez la photo de la porte de votre salle',
   doorPhotoQ: 'Prenez une photo de la porte de votre salle', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
 };

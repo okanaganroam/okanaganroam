@@ -165,7 +165,8 @@ test('Midnight and Noon: never "12 AM" on owner screens or public clock text; Fr
   assert.equal(hours.formatClockMinutes(1440), 'midnight');
   assert.equal(hours.formatClockMinutes(720), '12 PM', 'noon stays 12 PM in the public status line');
   assert.equal(app.minorsLineText({ policy: 'minors_until', until: '00:00' }, false), 'Minors welcome with an adult until midnight');
-  assert.equal(app.minorsLineText({ policy: 'minors_until', until: '12:00' }, false), 'Minors welcome with an adult until noon');
+  // Brewery test 1 (2026-11-12): noon reads "12 PM" everywhere, as on the page's hours.
+  assert.equal(app.minorsLineText({ policy: 'minors_until', until: '12:00' }, false), 'Minors welcome with an adult until 12 PM');
   assert.equal(app.minorsLineText({ policy: 'minors_until', until: '00:00' }, true), 'Mineurs bienvenus avec un adulte jusqu’à minuit');
   assert.equal(app.frText('Closes midnight'), 'Ferme à minuit');
   assert.equal(app.frText('Opens midnight'), 'Ouvre à minuit');
@@ -187,7 +188,8 @@ test('hours editor, happy hour and closures: Same every day, Same as Monday, Ope
   assert.equal(cfg.t.openOn, 'Open ✓'); assert.equal(cfg.t.closedOff, 'Closed');
   // Pub test 4: the Monday-only copy button became "Copy these hours to: Every day / Mon–Fri" on any open day.
   assert.match(s, /data-copyall="/); assert.match(s, /data-samemon/); assert.match(s, /data-dayopen/); assert.match(s, /data-dayclosed/);
-  assert.match(s, /function t12[\s\S]{0,400}'Midnight'[\s\S]{0,200}'Noon'/);
+  assert.match(s, /function t12[\s\S]{0,400}'Midnight'/);
+  assert.doesNotMatch(s, /function t12[^\n]*'Noon'/);
   // All day (open to close) takes the opening hours of the picked days.
   assert.equal(cfg.t.allDay, 'All day (open to close)');
   assert.match(s, /data-act="allDay:' \+ i \+ '"/);
