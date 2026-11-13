@@ -1387,9 +1387,10 @@ function renderScript(d) {
     var badges = (v.badges || []).slice().sort(function(a, b){ return wanted(a) - wanted(b); });
     var lead = badges.filter(function(b){ return wanted(b) === 0; }), rest = badges.filter(function(b){ return wanted(b) === 1; });
     // Brewery test 1 (2026-11-12): "Kids until 9 PM" (« Enfants jusqu’à 21 h ») where the owner set a time for minors.
-    var kidsUntil = function(){ var p = String(v.kidsUntil || '').split(':'), hh = parseInt(p[0], 10), mm = p[1] || '00'; return lang() === 'fr' ? 'Enfants jusqu’à ' + hh + ' h' + (mm === '00' ? '' : ' ' + mm) : b0(hh, mm); };
-    var b0 = function(hh, mm){ return 'Kids until ' + (hh % 12 === 0 ? 12 : hh % 12) + (mm === '00' ? '' : ':' + mm) + (hh < 12 ? ' AM' : ' PM'); };
-    var badgeLi = function(b){ return '<li>' + esc(b.key === 'kid_friendly' && v.kidsUntil ? kidsUntil() : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    // The label comes from the planner ("Kids until 9 PM"); the page has already written its time in the page's style
+    // ("9 PM" / "21 h"), so French only swaps the words around it.
+    var kidsUntil = function(b){ var t = String(b.label || '').replace(/^Kids until /, ''); return lang() === 'fr' ? 'Enfants jusqu’à ' + t : 'Kids until ' + t; };
+    var badgeLi = function(b){ return '<li>' + esc(b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));

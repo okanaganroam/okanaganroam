@@ -5916,7 +5916,10 @@ function kidsUntilFlags(result, input) {
   if (!result || !((intent.party && intent.party.kids) || intent.occasion === 'family')) return;
   const req = (input && input.requirements) || {};
   const m = /\b(?:to|until|till)\s+(?:about\s+|around\s+|roughly\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(String((input && input.text) || ''));
-  const askedEnd = m ? (Number(m[1]) % 12) * 60 + Number(m[2] || 0) + (m[3].toLowerCase() === 'pm' ? 720 : 0) : null;
+  // French: « de 19 h à environ 22 h », « jusqu’à 22 h ».
+  // (The planner reads French already turned into its own words: « à environ 22 h » arrives as "at environ 22 h".)
+  const mf = m ? null : /(?:^|\s)(?:à|a|at|to|until|jusqu[’']à)\s+(?:environ\s+|vers\s+|about\s+|around\s+)?(\d{1,2})\s*h(?:\s*(\d{2}))?\b/i.exec(String((input && input.text) || ''));
+  const askedEnd = m ? (Number(m[1]) % 12) * 60 + Number(m[2] || 0) + (m[3].toLowerCase() === 'pm' ? 720 : 0) : mf && Number(mf[1]) <= 24 ? Number(mf[1]) * 60 + Number(mf[2] || 0) : null;
   for (const st of planStopsOf(result).concat(result.recommendations || [])) {
     const v = st && st.venue; if (!v || !v.kidsUntil) continue;
     const min = kidsUntilMinutes(v); if (min == null) continue;

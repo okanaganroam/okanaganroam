@@ -519,6 +519,9 @@ test('fix 2: the planner names the time on a kids stop, flags or skips a late on
     assert.ok(s.length, 'listed');
     assert.ok(s[0].caveats.includes('Kids welcome with an adult until 9 PM, so plan to leave by then'), JSON.stringify(s[0].caveats));
     assert.equal(s[0].caveats.filter((c) => /^Kids welcome/.test(c)).length, 1, 'once');
+    // French: « de 19 h à environ 22 h ».
+    s = stopsOf(await plan('Mardi soir à Kelowna avec nos deux enfants. Quiz à Kidsclock Brewing de 19 h à environ 22 h.'));
+    if (s.length) assert.ok(s[0].caveats.includes('Kids welcome with an adult until 9 PM, so plan to leave by then'), JSON.stringify(s[0].caveats));
     s = stopsOf(await plan('Tuesday evening in Kelowna, Kidsclock Brewing from 7 to about 10 PM'));
     assert.ok(!s.length || !s[0].caveats.some((c) => /^Kids welcome/.test(c)), 'not on an adults trip');
     // Until 6 PM: an evening with kids doesn't plan it.
