@@ -461,3 +461,234 @@ test('cafés, restaurants, pubs and wineries are unchanged: no brewery fields, k
   }
   assert.deepEqual(app.ownerExtraBadgesFor('winery'), ['heated_patio', 'picnic_area', 'free_parking', 'rv_parking', 'wheelchair_accessible', 'locally_owned', 'service_dogs']);
 });
+
+// ---------- Brewery test 1 fixes (2026-11-12; drafts/fresh-eyes-brewery1-2026-11-12/REPORT.md) ----------
+const ohbCfg = (html) => JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+const setupScript = (html) => { assert.match(html, /window\.SETUP_CFG/); return fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8'); };
+
+test('fix 1: “how do I update our tap list?” has a brewery answer (EN + FR), on setup, edit and menu pages; tile says menu or tap list', async () => {
+  const b = mk('brewery'); const t = tokenFor(b.id);
+  for (const p of [`/owner/${t}/setup`, `/owner/${t}`, `/owner/${t}/menu`, `/fr/owner/${t}/setup`]) {
+    const r = await get(p); assert.equal(r.status, 200, p);
+    const tp = ohbCfg(r.text).topics.find((x) => x.id === 'brewery-taplist');
+    assert.ok(tp, p);
+    assert.ok(!/emailed you|featured|upgrade/i.test(`${tp.a} ${tp.aFr}`), 'no emailed link, no upsell');
+  }
+  const tp = app.BREWERY_SETUP_HELP_TOPICS.find((x) => x.id === 'brewery-taplist');
+  for (const k of ['tap list', 'taps', 'beer list', 'beers', 'draft', 'on tap']) assert.ok(tp.keys.includes(k), k);
+  for (const k of ['liste des bieres', 'en fut', 'pression']) assert.ok(tp.keysFr.includes(k), k);
+  assert.ok(tp.over.includes('menu-add'));
+  assert.match(tp.a, /no separate tap list/); assert.match(tp.a, /Update my menu or tap list/); assert.match(tp.a, /Take a photo of your menu/); assert.match(tp.a, /Just add a link to your menu/); assert.match(tp.a, /as often as you like/);
+  assert.match(tp.aFr, /Mettre à jour mon menu ou ma liste des bières/);
+  // Other types: the general menu topic knows the words too.
+  const edit = (await get(`/owner/${t}`)).text;
+  assert.match(edit, /Update my menu or tap list/);
+  assert.doesNotMatch((await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text, /Update my menu or tap list/);
+  // The menu step and checklist say "menu or tap list" for a brewery, never "your food menu" only.
+  assert.equal(text.en.brewery.labels.menu, 'Your menu or tap list');
+  assert.match(text.en.brewery.menuQ, /menu or tap list/);
+  const menuItem = pc.BREWERY_ITEMS.find((i) => i.key === 'menu');
+  assert.doesNotMatch(menuItem.whyEn, /food menu/); assert.match(menuItem.whyEn, /tap list/);
+});
+
+test('fix 2: Build My Trip with kids: “Kids welcome with an adult until 9 PM” on the stop; not planned after it; adults only excluded', () => {
+  const W = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['11:00', '23:00']]])));
+  const base = { type: 'brewery', region: 'kelowna', url: '/kelowna/breweries/x', hours: W, collections: [], activities: [] };
+  const v = { ...base, id: 1, kidsUntil: '21:00', features: { kid_friendly: true } };
+  const pv = planner.publicVenue(v, null);
+  assert.equal(pv.kidsUntil, '21:00');
+  assert.equal(pv.badges.find((x) => x.key === 'kid_friendly').label, 'Kids until 9 PM');
+  // No time for minors, or no kids badge: unchanged.
+  assert.equal(planner.publicVenue({ ...base, id: 2, features: { kid_friendly: true } }, null).kidsUntil, undefined);
+  assert.equal(planner.publicVenue({ ...base, id: 3, kidsUntil: '21:00', features: {} }, null).kidsUntil, undefined);
+  // French copy for the caveat.
+  const tr = require('../trip-french-copy.js').t3FrenchText;
+  assert.equal(tr('Kids welcome with an adult until 9 PM'), 'Enfants bienvenus avec un adulte jusqu’à 21 h');
+  assert.match(tr('Kids welcome with an adult until 9 PM, so plan to leave by then'), /prévoyez de partir avant/);
+});
+
+test('fix 2: the planner names the time on a kids stop, flags or skips a late one, and adults trips never see it', async () => {
+  const W = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['11:00', '23:00']]])));
+  const b = mk('brewery', { name: 'Kidsclock Brewing', slug: 'kidsclock-brewing', hours: W, kid_friendly: 1 }); const t = tokenFor(b.id);
+  const plan = async (txt) => (await fetch(base + '/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: txt }) }).then((r) => r.json()));
+  const stopsOf = (j) => (j.recommendations || []).concat(...(j.days || []).map((d) => d.stops), (j.itinerary || {}).stops || [], (j.outing || {}).stops || []).filter((s) => s && s.venue && s.venue.id === b.id);
+  const prev = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    assert.equal((await change(t, { brewery_info: { minors: { policy: 'minors_until', until: '21:00' } } })).status, 200);
+    let s = stopsOf(await plan('Tuesday evening in Kelowna with the kids: Kidsclock Brewing from 7 to about 10 PM'));
+    assert.ok(s.length, 'listed');
+    assert.ok(s[0].caveats.includes('Kids welcome with an adult until 9 PM, so plan to leave by then'), JSON.stringify(s[0].caveats));
+    assert.equal(s[0].caveats.filter((c) => /^Kids welcome/.test(c)).length, 1, 'once');
+    s = stopsOf(await plan('Tuesday evening in Kelowna, Kidsclock Brewing from 7 to about 10 PM'));
+    assert.ok(!s.length || !s[0].caveats.some((c) => /^Kids welcome/.test(c)), 'not on an adults trip');
+    // Until 6 PM: an evening with kids doesn't plan it.
+    assert.equal((await change(t, { brewery_info: { minors: { policy: 'minors_until', until: '18:00' } } })).status, 200);
+    s = stopsOf(await plan('Tuesday evening in Kelowna with the kids, a brewery and dinner'));
+    assert.equal(s.length, 0, 'not planned after the time for minors');
+    // Adults only: never on a kids trip.
+    assert.equal((await change(t, { brewery_info: { minors: { policy: 'adults' } } })).status, 200);
+    s = stopsOf(await plan('Tuesday afternoon in Kelowna with the kids, a brewery'));
+    assert.equal(s.length, 0, 'adults only is left out');
+  } finally { if (prev === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = prev; }
+});
+
+test('fix 3: the flights lead names her current pick and changes with it; no number before a pick', async () => {
+  assert.doesNotMatch(text.en.brewery.flightLead, /\$\d/); assert.doesNotMatch(text.fr.brewery.flightLead, /\d+\s?\$/);
+  assert.match(text.en.brewery.flightLeadPick, /\{x\}/);
+  const b = mk('brewery'); const t = tokenFor(b.id);
+  const html = (await get(`/owner/${t}/setup`)).text;
+  const s = setupScript(html);
+  assert.match(s, /function flightLeadText\(\)/);
+  assert.match(s, /id="suFlightLead"/);
+  assert.match(s, /sfe\.addEventListener\('input', function\(\)\{ readBrew\(\); sfl\.textContent = flightLeadText\(\); \}\)/);
+  assert.equal(text.en.brewery.flightLeadPick.replace('{x}', text.en.brewery.feeCard.replace('{x}', '$14')), 'It shows on your card as “From $14” right away.');
+});
+
+test('fix 4: “Your answers so far” reads “on your page” once nothing for that step waits (all types)', async () => {
+  for (const type of ['brewery', 'cafe', 'winery', 'restaurant']) {
+    const v = mk(type); const t = tokenFor(v.id);
+    assert.equal((await change(t, { description: `A brand new story for this ${type}, long enough to be checked by us first.` })).status, 200);
+    assert.equal((await progress(t, 'story', 'day')).status, 200);
+    let r = await fetch(`${base}/owner/${t}/setup/progress`).then((x) => x.json());
+    assert.ok(r.waiting.includes('story'), `${type}: waiting while the story is pending`);
+    assert.deepEqual(app.setupDoneNow(app.getVenue(v.id), r.progress.done).story, 'day');
+    const pend = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'").get(v.id);
+    assert.equal(app.approveOwnerChange(pend.id, 'dayton').ok, true);
+    r = await fetch(`${base}/owner/${t}/setup/progress`).then((x) => x.json());
+    assert.ok(!r.waiting.includes('story'), type);
+    assert.equal(r.progress.done.story, 'day', 'the stored progress is untouched');
+    assert.equal(app.setupDoneNow(app.getVenue(v.id), r.progress.done).story, 'live', type);
+    const html = (await get(`/owner/${t}/setup`)).text;
+    assert.deepEqual(cfgOf(html).waiting, []);
+    // The help bot's "did it go through?" list says "on your page" too.
+    const st = ohbCfg(html).topics.find((x) => x.id === 'setup-status');
+    if (st) assert.doesNotMatch(st.a, /within a day<\/li>/);
+  }
+  // A pending photo holds the photos step back; a waiting field nobody maps holds every step back.
+  const v = mk('brewery');
+  db.prepare("INSERT INTO owner_photos (venue_id, file, preview_key, credit, rights_confirmed_at, status, main_requested) VALUES (?, ?, ?, 'Jess', ?, 'pending', 0)").run(v.id, `fx-${v.id}.jpg`, `pk-${v.id}`, today);
+  assert.deepEqual(app.setupWaitingSteps(app.getVenue(v.id)), ['photos']);
+  assert.equal(app.setupDoneNow(app.getVenue(v.id), { photos: 'day', hours: 'day' }).photos, 'day');
+  assert.equal(app.setupDoneNow(app.getVenue(v.id), { photos: 'day', hours: 'day' }).hours, 'live');
+});
+
+test('fix 5: minors until a time shows “Kids until 9 PM” on the page and cards; adults only shows no kids chip; unanswered unchanged', async () => {
+  const b = mk('brewery', { kid_friendly: 0 }); const t = tokenFor(b.id);
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'minors_until', until: '21:00' } } })).status, 200);
+  const v = app.getVenue(b.id);
+  assert.equal(app.kidsChipLabel(v, false), 'Kids until 9 PM');
+  assert.equal(app.kidsChipLabel(v, true), 'Enfants jusqu’à 21 h');
+  const row0 = db.prepare('SELECT * FROM venues WHERE id = ?').get(b.id);
+  assert.equal(app.rowToVenue(row0).kids_until, '21:00', 'the API carries it for the cards');
+  const page = await get(`/${v.region}/breweries/${v.slug}`);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Kids until 9 PM/);
+  assert.doesNotMatch(page.text, />Kid-friendly</);
+  const pageFr = await get(`/fr/${v.region}/breweries/${v.slug}`);
+  if (pageFr.status === 200 && /<html lang="fr/.test(pageFr.text)) assert.match(pageFr.text, /Enfants jusqu’à 21 h/);
+  // Adults only: no kids chip at all.
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'adults' } } })).status, 200);
+  const p2 = await get(`/${v.region}/breweries/${v.slug}`);
+  assert.doesNotMatch(p2.text, /Kids until|>Kid-friendly</);
+  assert.equal(app.rowToVenue(db.prepare('SELECT * FROM venues WHERE id = ?').get(b.id)).kids_until, undefined);
+  // An unanswered brewery and a pub keep what they had (Decided 3).
+  const un = mk('brewery', { kid_friendly: 1 });
+  assert.equal(app.kidsChipLabel(app.getVenue(un.id), false), '');
+  const app_js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(app_js, /function badgeLabelFor\(b, v\)/);
+  assert.equal((app_js.match(/escapeAttr\(badgeLabelFor\(b, v\)\)/g) || []).length, 4, 'every card badge row');
+});
+
+test('fix 6: wording: food trucks, the guess line, the door lead, Kids label, dog sentences, Flights from, owner hours, 12 PM', async () => {
+  assert.equal(text.en.brewery.tfoodSubs.trucks, 'We’ll show “Food trucks most days” (truck names change too often)');
+  assert.equal(text.en.brewery.foodGuess, 'We picked this from what’s on your page. Tap another if it’s changed.');
+  assert.doesNotMatch(text.en.brewery.doorLead, /orchard/i); assert.doesNotMatch(text.fr.brewery.doorLead, /verger/i);
+  assert.match(text.en.brewery.doorLeadCidery, /orchard/);
+  // French typography on the new words.
+  for (const k of ['togoGuess', 'dogGuess', 'eventsGuess', 'eventsHint', 'flightLeadPick', 'doorLead', 'tfoodSubs']) {
+    const v = JSON.stringify(text.fr.brewery[k]);
+    assert.ok(!/[^   ]:\s/.test(v.replace(/https?:/g, '')), `${k}: no-break space before :`);
+    assert.ok(!/\S[?!]/.test(v.replace(/ [?!]/g, '')), `${k}: narrow space before ? !`);
+  }
+  assert.equal(text.fr.storySentAs, 'Ce que nous mettrons sur votre page :');
+  // Plan your visit: "Kids" when dogs have their own line, and the dog chips as sentences.
+  const info = { rows: [{ label: 'Kids & dogs', text: 'Minors welcome with an adult until 9 PM.' }, { label: 'Dogs', text: 'Patio only. Water bowls at the door.' }], owner_labels: ['Dogs', 'Kids & dogs'],
+    owner_fr: { 'Kids & dogs': { en: 'Minors welcome with an adult until 9 PM.', fr: 'Mineurs bienvenus avec un adulte jusqu’à 21 h.' } } };
+  const en = app.visitInfoHtml(info, false), frh = app.visitInfoHtml(info, true);
+  assert.match(en, /<span class="visit-label">Kids<\/span>/); assert.doesNotMatch(en, /Kids &amp; dogs/);
+  assert.match(en, /Dogs welcome on the patio only\. Water bowls at the door\./);
+  assert.match(frh, /<span class="visit-label">Enfants<\/span>/);
+  assert.match(frh, /Chiens bienvenus sur la terrasse seulement\./);
+  assert.equal(app.dogsChipSentences('Inside and patio'), 'Dogs welcome inside and on the patio');
+  // A Kids & dogs line that speaks of dogs keeps its label.
+  assert.match(app.visitInfoHtml({ rows: [{ label: 'Kids & dogs', text: 'All ages welcome. Dogs welcome.' }, { label: 'Dogs', text: 'Patio only' }] }, false), /Kids &amp; dogs/);
+  // Build My Trip: "Flights from $14" / "Tastings from $10", and no "check before you go" on hours the business confirmed.
+  const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(v3, /'Flights from '/); assert.match(v3, /'Tastings from '/); assert.match(v3, /v\.hoursByOwner \?/);
+  const W = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['11:00', '23:00']]])));
+  assert.equal(planner.publicVenue({ id: 9, type: 'brewery', url: '/x', hours: W, ownerHours: true, features: {}, collections: [] }, null).hoursByOwner, true);
+  // Noon reads "12 PM" (as the page's hours say it), never "Noon".
+  assert.equal(app.minorsLineText({ policy: 'minors_until', until: '12:00' }, false), 'Minors welcome with an adult until 12 PM');
+  const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
+  assert.doesNotMatch(s, /'Noon'/);
+});
+
+test('fix 6: hours the owner saved go to Build My Trip as confirmed by the business (no “check before you go”)', async () => {
+  const W = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['11:00', '23:00']]])));
+  const b = mk('brewery', { name: 'Hourscheck Brewing', slug: 'hourscheck-brewing', hours: W }); const t = tokenFor(b.id);
+  const plan = async () => (await fetch(base + '/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Hourscheck Brewing in Kelowna on Tuesday afternoon' }) }).then((r) => r.json()));
+  const find = (j) => (j.recommendations || []).concat(...(j.days || []).map((d) => d.stops), (j.itinerary || {}).stops || [], (j.outing || {}).stops || []).find((s) => s && s.venue && s.venue.id === b.id);
+  const prev = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    let st = find(await plan());
+    assert.ok(st, 'listed'); assert.ok(!st.venue.hoursByOwner, 'research hours: still “check before you go”');
+    assert.equal((await change(t, { hours_checked: true })).status, 200);
+    st = find(await plan());
+    assert.equal(st.venue.hoursByOwner, true);
+    assert.ok(!st.caveats.some((c) => /check (?:before|the day) you go/.test(c)), JSON.stringify(st.caveats));
+  } finally { if (prev === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = prev; }
+});
+
+test('fix 7: research To go, dogs and a plain weekly event are offered as suggestions only (nothing saved)', async () => {
+  const b = mk('brewery'); const t = tokenFor(b.id);
+  research(b.id, [{ label: 'To go', text: 'Cans and growler fills.' }, { label: 'Kids & dogs', text: 'Kids welcome. Dogs on the patio.' }, { label: 'Games', text: 'Trivia Tuesdays.' }]);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.suggestToGo, ['cans', 'growler']);
+  assert.equal(cfg.suggestDogNote, 'Patio only');
+  assert.deepEqual(cfg.suggestNights, [{ kind: 'trivia', days: ['tue'] }]);
+  assert.equal(cfg.researchEvents, 'Trivia Tuesdays.');
+  assert.ok(cfg.visitTicks.includes('dog_friendly'), 'Dogs welcome pre-ticked');
+  assert.deepEqual(app.venueBreweryInfo(b.id), {}, 'nothing saved as her answer');
+  assert.ok(!app.venueWeeklyNightsList || !(app.venueWeeklyNightsList(b.id) || []).length);
+  // A line that isn't plainly one event on named days is only a hint.
+  const c = mk('brewery');
+  research(c.id, [{ label: 'Games', text: 'Board games, darts and trivia some nights.' }]);
+  const cfg2 = cfgOf((await get(`/owner/${tokenFor(c.id)}/setup`)).text);
+  assert.equal(cfg2.suggestNights, undefined);
+  assert.equal(cfg2.researchEvents, 'Board games, darts and trivia some nights.');
+  const s = setupScript((await get(`/owner/${t}/setup`)).text);
+  assert.match(s, /S\.togoGuessed = true/); assert.match(s, /S\.dogGuessed = true/); assert.match(s, /S\.nightsGuessed = true/);
+});
+
+test('fix 8: photo source label, photos waiting counts the one she has, happy hour after midnight, the description as sent', async () => {
+  // "(from Google Maps)" only for a photo credited to Google.
+  const g = mk('brewery', { image_url: '/images/venues/barley-mill-brew-pub-2610.jpg' });
+  const o = mk('brewery', { image_url: '/images/venues/not-a-google-photo-x.jpg' });
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(g.id)}/setup`)).text).imageSource, 'google');
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(o.id)}/setup`)).text).imageSource, 'other');
+  // 2 photos sent + the 1 she has = 3.
+  const base0 = { type: 'brewery', address: 'a', latitude: 1, longitude: 1, phone: 'p', hasHours: true, hoursCheckedAt: today, imageUrl: '/images/x.jpg', photoCount: 1, description: 'x'.repeat(128), claimed: true };
+  const r = pc.scoreCompleteness({ ...base0, pendingPhotos: 2, photoCountAfter: 3 }, { today, pending: new Set() });
+  const it = r.missing.find((x) => x.key === 'photo_extra');
+  assert.equal(it.waiting, true); assert.equal(it.after, 3);
+  const html = pc.renderCompleteness(r, { fr: false, brewery: true, canDecline: true, noScore: true, menuHref: '/m', setupHref: '/s' });
+  assert.match(html, /2 photos sent \(3 in all with the one you have\)/);
+  // Happy hour: "today" by day; after midnight the day is named.
+  const h = { state: 'later', from: { weekday: 'fri', minutes: 900 }, to: { weekday: 'fri', minutes: 1020 } };
+  assert.match(app.happyHourLiveText(h, false, { weekday: 'fri', minutes: 30 }), /^Happy hour Friday 3/);
+  assert.match(app.happyHourLiveText(h, false, { weekday: 'fri', minutes: 600 }), /^Happy hour today 3/);
+  assert.match(app.happyHourLiveText(h, true, { weekday: 'fri', minutes: 30 }), /^Happy hour vendredi 15/);
+  // The story screen shows the description as it will be saved.
+  const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
+  assert.match(s, /id="suStorySent"/); assert.match(s, /st\.onblur = function\(\)\{ var fx = storyJoinFix\(st\.value\)/);
+});
