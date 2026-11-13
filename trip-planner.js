@@ -3091,7 +3091,10 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
   for (const v of pool) {
     if (used.has(v.id)) continue;
     const isLunch = daypart === 'midday';
-    if (!(v.type === 'restaurant' || (isLunch && v.type === 'cafe' && !['treat', 'other'].includes(cafeRole(v))) || (!isLunch && opts.apres && ['pub', 'cocktail'].includes(v.type)))) continue;
+    // Brewery test 4 (2026-11-13): a brewery or pub with its own kitchen, within its kitchen hours (dinner is still a
+    // restaurant whenever one is open, below).
+    const kFit = !opts.cafeOnly && !(opts.apres && v.type === 'pub') ? kitchenMealFit(v, SLOT_WINDOWS[daypart], weekdayFor(ctx, d - 1) || null) : null;
+    if (!(v.type === 'restaurant' || (isLunch && v.type === 'cafe' && !['treat', 'other'].includes(cafeRole(v))) || (!isLunch && opts.apres && ['pub', 'cocktail'].includes(v.type)) || (kFit && kFit.ok))) continue;
     if (opts.cafeOnly && v.type !== 'cafe') continue;
     if (!partOk(ctx, d, daypart, v)) continue;
     if (isLunch && dinnerOnly(v)) continue;
@@ -3121,7 +3124,8 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
     if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
     const reasons = [];
     if (km != null) reasons.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from ${opts.nearName || 'the previous stop'}`, weight: 5 });
-    reasons.push({ code: 'meal', text: isLunch ? (opts.wine ? 'Lunch between the wineries' : opts.apres ? 'Lunch at the hill' : 'A lunch stop for the day') : (opts.apres ? 'Après-ski and dinner at the hill' : 'A sit-down dinner to end the day'), weight: 3 });
+    if (kFit && kFit.ok) reasons.push({ code: 'meal', text: kitchenMealText(v, isLunch ? 'lunch' : 'dinner', kFit.closes), weight: 20 });
+    else reasons.push({ code: 'meal', text: isLunch ? (opts.wine ? 'Lunch between the wineries' : opts.apres ? 'Lunch at the hill' : 'A lunch stop for the day') : (opts.apres ? 'Après-ski and dinner at the hill' : 'A sit-down dinner to end the day'), weight: 3 });
     cands.push({ v, score, reasons: base.reasons.concat(reasons), fit });
   }
   // 2026-10-19: dinner is a restaurant whenever one is open; a pub or bar only when asked for or when nothing else is.
