@@ -891,7 +891,7 @@ Object.assign(en, {
   holCovered: 'Covered by your closed dates', holSeason: 'You’re closed for the season',
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
-  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', menuFbKnown: 'Your Facebook: {x}',
+  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', fbFromWebsite: 'Your website is your Facebook page, so we filled it in here. Change it if it’s not right.', menuFbKnown: 'Your Facebook: {x}',
   sendBeforeLeave: 'Tap Send before you leave this screen.',
   // The price question while prices aren't on pages (AVG_SPEND_PUBLIC off): why we ask, and an after-save line that says
   // what it's for ("Prices don't show on pages yet" made it sound pointless).
@@ -901,7 +901,7 @@ Object.assign(en, {
 Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture', holSeason: 'Vous êtes fermé pour la saison',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
-  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', menuFbKnown: 'Votre Facebook : {x}',
+  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', fbFromWebsite: 'Votre site Web est votre page Facebook, alors nous l’avons inscrite ici. Modifiez-la si ce n’est pas la bonne.', menuFbKnown: 'Votre Facebook : {x}',
   sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',
   spendWhyOff: 'Nous l’utiliserons pour afficher votre gamme de prix quand les prix seront sur les pages.',
   savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
@@ -1110,9 +1110,12 @@ en.brewery = {
   // Your taproom
   tkindQ: 'What kind of place is it?', tkindLead: 'Pick the one that fits best.', tkindNeed: 'Please tap the kind of place that fits best.',
   tkindSubs: { Brewery: 'We brew here', Cidery: 'We make cider here', 'Taphouse or beer hall': 'We pour other brewers’ beer', Distillery: 'We make spirits here' },
-  kindGuess: 'We picked this from your name. Tap another if it’s not right.',
+  kindGuess: 'We picked “{kind}”. Tap another if it’s not right.',
   tfoodQ: 'Food here?', tfoodLead: 'Pick the main one.', tfoods: { kitchen: 'Our own kitchen', trucks: 'Food trucks', snacks: 'Snacks only', none: 'No food' },
-  tfoodSubs: { trucks: 'We’ll show “Food trucks most days” (truck names change too often)' },
+  tfoodSubs: { trucks: 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often)' },
+  // Brewery test 2 (2026-11-13): when the trucks are here, the only food-truck detail.
+  ttrucksQ: 'When are the trucks here?', ttrucks: { most_days: 'Most days', weekends: 'Weekends only' }, ttrucksNeed: 'Please tap Most days or Weekends only.',
+  trucksGuess: 'Your page says weekends now, so we picked it.',
   foodGuess: 'We picked this from what’s on your page. Tap another if it’s changed.',
   outsideQ: 'Can people bring their own food?', outsideOpts: { yes: 'Yes', no: 'No' },
   tkitchenQ: 'Does your kitchen close before the bar?', tkitchenOpts: { same: 'No, food until we close', earlier: 'Yes, it closes earlier' }, tkitchenAt: 'Kitchen closes at',
@@ -1175,9 +1178,11 @@ fr.brewery = {
   photosLead: 'Votre salle, vos fûts, votre terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
   tkindQ: 'Quel genre d’endroit est-ce?', tkindLead: 'Choisissez celui qui convient le mieux.', tkindNeed: 'Touchez le genre d’endroit qui convient le mieux.',
   tkindSubs: { Brewery: 'Nous brassons ici', Cidery: 'Nous faisons du cidre ici', 'Taphouse or beer hall': 'Nous servons la bière d’autres brasseurs', Distillery: 'Nous distillons ici' },
-  kindGuess: 'Nous l’avons choisi d’après votre nom. Touchez-en un autre s’il ne convient pas.',
+  kindGuess: 'Nous avons choisi « {kind} ». Touchez-en un autre s’il ne convient pas.',
   tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions de cuisine de rue', snacks: 'Collations seulement', none: 'Pas de nourriture' },
-  tfoodSubs: { trucks: 'Nous indiquerons « Camions de cuisine de rue la plupart des jours » (les camions changent trop souvent)' },
+  tfoodSubs: { trucks: 'Nous indiquerons « Camions de cuisine de rue la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
+  ttrucksQ: 'Quand les camions sont-ils là?', ttrucks: { most_days: 'La plupart des jours', weekends: 'La fin de semaine seulement' }, ttrucksNeed: 'Touchez La plupart des jours ou La fin de semaine seulement.',
+  trucksGuess: 'Votre page indique la fin de semaine, alors nous l’avons choisi.',
   foodGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez-en un autre si ça a changé.',
   outsideQ: 'Peut-on apporter sa propre nourriture?', outsideOpts: { yes: 'Oui', no: 'Non' },
   tkitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', tkitchenOpts: { same: 'Non, on sert à manger jusqu’à la fermeture', earlier: 'Oui, elle ferme plus tôt' }, tkitchenAt: 'La cuisine ferme à',

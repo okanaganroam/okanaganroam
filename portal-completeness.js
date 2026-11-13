@@ -231,7 +231,9 @@ const BREWERY_ITEMS = [
   R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on what you pour, e.g. Hazy IPAs and a blackberry sour.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des IPA troubles et une sure aux mûres.' }),
   R('instagram', { w: 3 }),
   R('facebook', { w: 3 }),
-  R('arrival', { w: 2, en: 'Taproom door photo and exact spot', fr: 'Photo de la porte de la salle et emplacement exact', whyEn: 'Stand at the taproom door and take one photo. At an orchard it helps people find you.', whyFr: 'Placez-vous à la porte de la salle et prenez une photo. Dans un verger, cela aide à vous trouver.' }),
+  // Brewery test 2 (2026-11-13): the orchard line only for a cidery (as the setup's door lead since #852).
+  R('arrival', { w: 2, en: 'Taproom door photo and exact spot', fr: 'Photo de la porte de la salle et emplacement exact', whyEn: 'Stand at the taproom door and take one photo. If your door is around the side or upstairs, it helps people find it.', whyFr: 'Placez-vous à la porte de la salle et prenez une photo. Si votre porte est sur le côté ou à l’étage, cela aide à la trouver.',
+    whyEnCidery: 'Stand at the taproom door and take one photo. At an orchard or a big lot it helps people find you.', whyFrCidery: 'Placez-vous à la porte de la salle et prenez une photo. Dans un verger ou un grand terrain, cela aide à vous trouver.' }),
   R('owner_confirmed', { w: 2 }),
 ];
 if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: brewery weights must sum to 100');
@@ -535,6 +537,7 @@ function scoreCompleteness(input, opts) {
     if (na[base.key]) continue;
     let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
     if (base.key === 'menu' && !done.menu && input && sameAddress(input.menuUrl, input.website)) it = { ...base, ...MENU_SAME_SITE_COPY };
+    if (base.whyEnCidery && input && input.placeType === 'Cidery') it = { ...it, whyEn: base.whyEnCidery, whyFr: base.whyFrCidery };
     const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
