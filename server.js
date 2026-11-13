@@ -6811,7 +6811,10 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Winery test 4 (2026-11-12): a winery by appointment on that date has no hours to plan by (no "Listed hours").
       hours: (v.type === 'winery' && wineryAppointmentOn(v.id, hoursDate) === true) ? null : (weekJsonOn(v, hoursDate) || null),
       openMonths: openMonthsById.get(v.id) || undefined,
-      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from })) : undefined; })(),
+      // Winery test 5 (2026-11-12): with the owner's note ("Boxing Day"), so a left-out place says why in holiday words.
+      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from, ...(x.note ? { note: String(x.note).slice(0, 60) } : {}) })) : undefined; })(),
+      // ...and the owner's season whose week applies on that date ("11-01" to "04-30"), for "closed Wednesdays from Nov to Apr".
+      ...((() => { const ss = weekSeasonOn(v, hoursDate); return ss ? { hoursSeason: { from: ss.from, to: ss.to } } : {}; })()),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
@@ -7600,13 +7603,45 @@ function tripNameRegex(words, tailOk) {
 }
 // One line per reopening date; places with none are named together ("A, B and C are closed for the season and haven't
 // announced when they reopen, so they aren't in this plan.").
-function tripClosedNamedNotes(list, date) {
-  const longDate = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+// Winery test 5 (2026-11-12): the holiday an owner's closure note names, in English (the setup's holiday tiles, English or
+// French), or null.
+function tripHolidayName(note) {
+  const n = String(note || '').trim().toLowerCase();
+  if (!n) return null;
+  const en = OWNER_SETUP_STRINGS.en.holidays, fr = OWNER_SETUP_STRINGS.fr.holidays;
+  const k = Object.keys(en).find((x) => en[x].toLowerCase() === n || String(fr[x] || '').toLowerCase() === n);
+  return k ? en[k] : null;
+}
+const TRIP_WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const TRIP_WEEKDAY_NAMES = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+// Closed all day on that date by its own week (a closed weekday in its listed or seasonal hours) -> the weekday key, or null.
+function tripClosedWeekday(f, date) {
+  if (!f || !f.hours || !parseLocalDate(date) || !hoursModule) return null;
+  const wd = TRIP_WEEKDAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+  let parsed = null;
+  try { parsed = hoursModule.parseHours(f.hours); } catch (e) { return null; }
+  return parsed && parsed.known && parsed.days && parsed.days[wd] && parsed.days[wd].status === 'closed' ? wd : null;
+}
+function tripOwnerClosureOn(f, date) {
+  return parseLocalDate(date) && Array.isArray(f && f.ownerClosures) ? f.ownerClosures.find((c) => date >= c.from && date <= (c.to || c.from)) || null : null;
+}
+function tripClosedNamedNotes(list, date, dayDated = false) {
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const longDate = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+  const monthDay = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+  const shortMonth = (md) => MONTHS[Number(String(md).slice(0, 2)) - 1].slice(0, 3);
   const names = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
   const dated = [], undated = [], now = [];
   for (const f of list) {
     const closedSeason = f.seasonClosed && (date ? date >= f.seasonClosed.from && date <= f.seasonClosed.to : f.seasonClosedToday);
-    if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
+    // Winery test 5: an owner's holiday or one-off closure, and a weekday the place is closed, say so on the plan's own
+    // date ("closed on December 26 for Boxing Day", "closed Wednesdays from Nov to Apr"), not "for the season".
+    const oc = dayDated && !closedSeason ? tripOwnerClosureOn(f, date) : null;
+    const wd = dayDated && !closedSeason && !oc ? tripClosedWeekday(f, date) : null;
+    if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
+    else if (wd && f.hoursSeason) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${shortMonth(f.hoursSeason.from)} to ${shortMonth(f.hoursSeason.to)}, so it isn’t in this plan.`);
+    else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
+    else if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
     else if (closedSeason) undated.push(f.name);
     else now.push(f.name);
   }
@@ -7637,10 +7672,16 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     if (core && core.every((w) => leftover.has(w) && textWords.has(w))) maybe.add(v.id);
   }
   if (!maybe.size) return plan;
-  const date = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : todayLocal(now));
+  const planDate = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null);
+  const date = planDate || todayLocal(now);
   const facts = buildTripPlannerFacts(false, date).filter((f) => maybe.has(f.id));
   const byId = new Map(facts.map((f) => [f.id, f]));
-  const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)));
+  // Winery test 5 (2026-11-12): a named place the plan left out on its own date because its week has that day closed
+  // ("Bluebird Bench on Wednesday January 13", closed Mon–Thu in winter) is a closed place too, with its reason, never
+  // offered back as its own "Another listing". Only when the plan has a date and didn't use the place.
+  const usedIds = new Set([...(plan.days || []).flatMap((d) => d.stops || []), ...((plan.itinerary && plan.itinerary.stops) || []), ...((plan.outing && plan.outing.stops) || []), ...(plan.recommendations || [])].filter((x) => x && x.venue).map((x) => x.venue.id));
+  const dayClosed = (f) => !!planDate && !usedIds.has(f.id) && !!tripClosedWeekday(f, planDate);
+  const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)) || dayClosed(f));
   const hits = [];
   for (const i of named) { const f = byId.get(i.value); if (f) hits.push({ f, item: i, re: tripNameRegex(norm(String(f.name).replace(/['’]/g, ' ')).split(' '), true) }); }
   for (const f of facts) {
@@ -7668,7 +7709,7 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     }
     return plan;
   }
-  const notes = tripClosedNamedNotes(closedHits.map((h) => h.f), date);
+  const notes = tripClosedNamedNotes(closedHits.map((h) => h.f), date, !!planDate);
   // The request again without the closed places' names (and an "at Mission Hill" after a name when those words are
   // the place's own), in their town when the request named none.
   let rewritten = text;
@@ -7709,10 +7750,18 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
       if (!left.length) return null;
       return `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — ${TRIP_SITE.brand} couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
     }).filter(Boolean);
+  // Winery test 5: the planner's own "X matches but is closed for the season …" for a place these notes already explain.
+  out.warnings = out.warnings.filter((w) => !closedHits.some((h) => String(w).startsWith(`${h.f.name} matches but is closed `)));
   out.warnings = notes.concat(out.warnings.filter((w) => !notes.includes(w)));
   out.unsupported = dropWords(out.unsupported);
   if (out.understood) out.understood.notUsed = dropWords(out.understood.notUsed);
   for (const r of out.requirementResults || []) if (Array.isArray(r.optionalAlternatives)) r.optionalAlternatives = r.optionalAlternatives.filter((a) => !closedHits.some((h) => h.f.id === a.id));
+  // Winery test 5: a named place's own request line gives its reason ("closed Wednesdays from Nov to Apr"), not "No selected stop meets …".
+  for (const r of out.requirementResults || []) {
+    const h = r.status === 'unmet' && closedHits.find((x) => x.item && (r.id === x.item.id || (r.kind === 'type' && r.sourceText === x.item.sourceText)));
+    const why = h && notes.find((w) => w.startsWith(`${h.f.name} is closed`));
+    if (why) r.reason = why;
+  }
   return out;
 }
 // 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
@@ -46004,11 +46053,15 @@ function hoursWithExtras(v, now = new Date()) {
 // The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
 // (Build My Trip). Closures are handled separately (venueClosedOn).
 function weekJsonOn(v, date) {
-  const x = v && v.hours ? hoursExtrasMap().get(v.id) : null;
-  if (!x || !x.seasons.length) return v ? v.hours : null;
+  const s = weekSeasonOn(v, date);
+  return s ? JSON.stringify(s.hours) : v ? v.hours : null;
+}
+// The owner's seasonal set that applies on a date, or null (the usual hours).
+function weekSeasonOn(v, date) {
+  const x = v && v.hours && date ? hoursExtrasMap().get(v.id) : null;
+  if (!x || !x.seasons.length) return null;
   const md = String(date).slice(5);
-  const s = x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to));
-  return s ? JSON.stringify(s.hours) : v.hours;
+  return x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to)) || null;
 }
 // "Nov 1" / "1er nov." from 'MM-DD' or 'YYYY-MM-DD'.
 function hoursExtraDayText(value, fr = false) {
