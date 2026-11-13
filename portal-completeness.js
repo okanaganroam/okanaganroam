@@ -219,7 +219,7 @@ const BREWERY_ITEMS = [
   { key: 'to_go', group: 'taproom', w: 3, fix: true, target: { setup: 'flights' }, fields: ['brewery_info'],
     en: 'What people can take home', fr: 'Ce qu’on peut rapporter', whyEn: 'Cans, bottles, growler or crowler fills, or nothing to go.', whyFr: 'Canettes, bouteilles, remplissage de growlers ou de crowlers, ou rien à emporter.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥫' },
   R('happy_hour', { group: 'taproom', w: 4 }),
-  R('menu', { group: 'taproom', w: 4, whyEn: 'Your food menu. Not needed without your own kitchen.', whyFr: 'Votre menu. Inutile sans cuisine sur place.' }),
+  R('menu', { group: 'taproom', w: 4, en: 'Menu or tap list', fr: 'Menu ou liste des bières', whyEn: 'Your menu or tap list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des bières. Une photo du tableau suffit. Inutile sans cuisine sur place.' }),
   { key: 'dogs_kids', group: 'yourvisit', w: 6, fix: true, target: { setup: 'offer:minors' }, fields: ['brewery_info', 'badges', 'owner_features'],
     en: 'Who’s welcome, and dogs', fr: 'Qui est le bienvenu, et les chiens', whyEn: 'Adults only, minors with an adult until a set time, or all ages. And are dogs welcome?', whyFr: 'Adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Et les chiens sont-ils bienvenus?', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   R('entertainment', { group: 'yourvisit', w: 3, fields: ['weekly_nights', 'badge:live_music'], noneEn: 'We don’t host events', noneFr: 'Nous n’organisons pas d’événements',

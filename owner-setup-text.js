@@ -277,6 +277,9 @@ Object.assign(en, {
   quickLead: 'Tap what fits:', quickOr: 'Or type it in your own words:',
   quick: { reservations: ['Call us', 'Book on our website', 'Walk-ins welcome too'], takeout: ['Call to order', 'Order at the counter', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
     dogs: ['Patio only', 'Inside and patio', 'Water bowls at the door'], groups: ['Call ahead for 10 or more', 'Private room available'] },
+  // Brewery test 1 (2026-11-12): how the Dogs chips read on the page, as whole sentences ("Dogs: Patio only" read like a
+  // form). The chips stay short on the setup screen; the page swaps them in (server.js visitInfoHtml).
+  quickDogsFull: ['Dogs welcome on the patio only', 'Dogs welcome inside and on the patio'],
   savedCuisine: 'Your food types and kind of place are on your page now.', stSoon: 'on your page soon',
   helpSpend: 'Your average spend will show on your page soon.',
   tooSmall: 'This photo is too small to look sharp. Try the original from your camera roll.',
@@ -295,6 +298,7 @@ Object.assign(fr, {
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
   quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'Sans réservation aussi'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
     dogs: ['Terrasse seulement', 'Intérieur et terrasse', 'Bols d’eau à l’entrée'], groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible'] },
+  quickDogsFull: ['Chiens bienvenus sur la terrasse seulement', 'Chiens bienvenus à l’intérieur et sur la terrasse'],
   savedCuisine: 'Vos types de cuisine et votre genre d’endroit sont sur votre page maintenant.', stSoon: 'bientôt sur votre page',
   helpSpend: 'Votre dépense moyenne s’affichera bientôt sur votre page.',
   tooSmall: 'Cette photo est trop petite pour être nette. Essayez l’originale de votre pellicule.',
@@ -1097,7 +1101,9 @@ en.brewery = {
   hiLead: 'Let’s get your taproom’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   timeLine: 'About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { hours: 'Hours and holidays', taproom: 'Your taproom', flights: 'Flights and to go', happy: 'Happy hour', photos: 'Photos', offer: 'What you offer',
-    story: 'Your story and Known for', music: 'Weekly events', groups: 'Groups and booking', social: 'Instagram and Facebook', door: 'Your taproom door', menu: 'Your menu' },
+    story: 'Your story and Known for', music: 'Weekly events', groups: 'Groups and booking', social: 'Instagram and Facebook', door: 'Your taproom door', menu: 'Your menu or tap list' },
+  // Brewery test 1 (2026-11-12): the menu step is for the menu or the tap list, never "your food menu" only.
+  menuQ: 'How should we add your menu or tap list?', menuLead: 'Pick the easiest one for you. A photo of your chalkboard works too, as often as your taps change.',
   noLabels: { social: 'not on Instagram or Facebook', groups: 'no big groups', music: 'no weekly events', happy: 'no happy hour' },
   stStoryKnown: 'Known for on your page, story within a day', stGroupsLink: 'on your page, new booking link within a day',
   photosLead: 'Your taproom, your taps, your patio. Three photos is perfect.', photosNoMore: 'No, next: what you offer',
@@ -1158,7 +1164,8 @@ fr.brewery = {
   hiLead: 'Préparons la page de votre salle, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   labels: { hours: 'Heures et jours fériés', taproom: 'Votre salle', flights: 'Plateaux et pour emporter', happy: '5 à 7', photos: 'Photos', offer: 'Ce que vous offrez',
-    story: 'Votre histoire et ce pour quoi vous êtes connus', music: 'Événements de la semaine', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'La porte de votre salle', menu: 'Votre menu' },
+    story: 'Votre histoire et ce pour quoi vous êtes connus', music: 'Événements de la semaine', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'La porte de votre salle', menu: 'Votre menu ou liste des bières' },
+  menuQ: 'Comment ajouter votre menu ou votre liste des bières?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos bières changent.',
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', music: 'pas d’événements', happy: 'pas de 5 à 7' },
   stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
   photosLead: 'Votre salle, vos fûts, votre terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',

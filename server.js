@@ -10076,6 +10076,20 @@ function visitDropRepeatedKnownFor(info, description) {
   });
   return rows.length === info.rows.length ? info : { ...info, rows };
 }
+// "Patio only" -> "Dogs welcome on the patio only" (and "Inside and patio"), part by part, in the line's own language.
+function dogsChipSentences(text) {
+  const full = OWNER_SETUP_STRINGS.en.quickDogsFull, fullFr = OWNER_SETUP_STRINGS.fr.quickDogsFull;
+  const short = OWNER_SETUP_STRINGS.en.quick.dogs, shortFr = OWNER_SETUP_STRINGS.fr.quick.dogs;
+  return presetAnswerParts(text).map((seg, i) => {
+    if (i % 2) return seg;
+    const m = /^(.*?)(\.?)$/.exec(seg), k = presetAnswerNorm(m[1]);
+    for (let j = 0; j < 2; j++) {
+      if (k === presetAnswerNorm(short[j])) return full[j] + m[2];
+      if (k === presetAnswerNorm(shortFr[j])) return fullFr[j] + m[2];
+    }
+    return seg;
+  }).join('');
+}
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
@@ -10087,6 +10101,10 @@ function visitInfoHtml(info, fr = false) {
   // Bug-check (2026-11-12): only an answer that is wholly made of presets is swapped; a line with words of her own
   // ("Takeout available; call to order.") stays as typed on English pages and keeps its French translation (it was
   // half-swapped, and then dropped from the French page).
+  // Brewery test 1 (2026-11-12): the Dogs chips as whole sentences ("Dogs welcome on the patio only", not "Patio only"),
+  // and "Kids" for the Kids & dogs line when dogs have their own line and it doesn't speak of dogs.
+  info = { ...info, rows: info.rows.map((r) => (r && r.label === 'Dogs' && typeof r.text === 'string' ? { ...r, text: dogsChipSentences(r.text) } : r)) };
+  const kidsOnly = info.rows.some((r) => r && r.label === 'Dogs' && r.text) && info.rows.some((r) => r && r.label === 'Kids & dogs' && !/\bdogs?\b|\bchiens?\b/i.test(String(r.text || '')));
   if (fr) {
     // A winery's answers (2026-11-12) carry their own French line (owner_fr), used while the English line is unchanged.
     const ownFr = info.owner_fr && typeof info.owner_fr === 'object' ? info.owner_fr : {};
@@ -10103,9 +10121,10 @@ function visitInfoHtml(info, fr = false) {
       text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
     }
     const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${fr ? 'Plus' : 'More'} ↗</a>` : '';
-    return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
+    return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span>${text}${more}</span></li>`;
   };
   const enLabel = (r) => (fr ? r.__en : r.label);
+  const shownLabel = (r) => (kidsOnly && enLabel(r) === 'Kids & dogs' ? (fr ? 'Enfants' : 'Kids') : r.label);
   // Winery test 2 (2026-11-12): in a winery box with the owner's answers, her lines show first and never fold, research's
   // after them (her Groups and Private tasting were under "More" while research Parking showed).
   const ownFirst = (Array.isArray(info.winery_labels) || Array.isArray(info.winery_extra)) && Array.isArray(info.owner_labels) && info.owner_labels.length;
@@ -10121,7 +10140,7 @@ function visitInfoHtml(info, fr = false) {
   if (folded.length === 1 && !parkedSet.has(enLabel(folded[0]))) shown.push(folded.shift());
   const rows = shown.map(rowHtml).join('');
   const more = folded.length
-    ? `<details class="visit-more"><summary>${fr ? 'Plus\u00a0: ' : 'More: '}${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
+    ? `<details class="visit-more"><summary>${fr ? 'Plus\u00a0: ' : 'More: '}${escapeHtml(folded.map((r) => shownLabel(r).toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
     : '';
   let host = '';
   try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
