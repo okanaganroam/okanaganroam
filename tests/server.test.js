@@ -31647,7 +31647,7 @@ test('Round 9 help bot: a week\'s closure in French, uploading a menu, privacy, 
   const privacy = cfg.topics.find((t) => t.id === 'privacy');
   assert.match(privacy.a, /href="\/privacy"/);
   assert.match(privacy.aFr, /href="\/fr\/privacy"/);
-  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics?');
+  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics\u202f?');
 });
 
 test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no space before a question mark', () => r9Fixtures({

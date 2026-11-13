@@ -493,7 +493,7 @@ test('Owner help bot: "How do I add my weekly specials?" in English and French',
   const t = cfg.topics.find((x) => x.id === 'specials');
   assert.ok(t, 'the topic is there');
   assert.equal(t.q, 'How do I add my weekly specials?');
-  assert.equal(t.qFr, 'Comment ajouter mes spéciaux de la semaine?');
+  assert.equal(t.qFr, 'Comment ajouter mes spéciaux de la semaine\u202f?');
   assert.match(JSON.stringify(t), /Weekly specials/);
   assert.match(JSON.stringify(t), /Spéciaux de la semaine/);
   for (const lang of ['en', 'fr']) {

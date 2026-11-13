@@ -204,7 +204,7 @@ test('help: the easy setup topic is on the setup page and a restaurant edit page
   const setup = await get(`/owner/${t}/setup`).then((x) => x.text());
   assert.match(setup, /"id":"easy-setup"/);
   assert.match(setup, /How does “Set up your page” work\?/);
-  assert.match(setup, /Comment fonctionne « Configurez votre page »\?/);
+  assert.match(setup, /Comment fonctionne « Configurez votre page »\u202f\?/);
   const w = mk('distillery'); // wineries have the setup since 2026-11-12
   assert.doesNotMatch(await get(`/owner/${tokenFor(w.id)}`).then((x) => x.text()), /"id":"easy-setup"/, 'not on other types');
 });

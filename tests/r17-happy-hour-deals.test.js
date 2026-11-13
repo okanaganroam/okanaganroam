@@ -416,7 +416,7 @@ test('Owner help bot: "How do I add my happy hour deals?" in English and French'
   const t = cfg.topics.find((x) => x.id === 'hh-deals');
   assert.ok(t, 'the topic is there');
   assert.equal(t.q, 'How do I add my happy hour deals?');
-  assert.equal(t.qFr, 'Comment ajouter les spéciaux de mon happy hour?');
+  assert.equal(t.qFr, 'Comment ajouter les spéciaux de mon happy hour\u202f?');
   assert.ok(t.keys.includes('happy hour deals') && t.keysFr.includes('speciaux'));
   assert.match(JSON.stringify(t), /Deals/);
   assert.match(JSON.stringify(t), /Spéciaux/);

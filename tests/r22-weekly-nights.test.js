@@ -524,7 +524,7 @@ test('Owner help bot: "How do I add my trivia or karaoke night?" in English and 
   const t = cfg.topics.find((x) => x.id === 'weekly-nights');
   assert.ok(t, 'the topic is there');
   assert.equal(t.q, 'How do I add my trivia or karaoke night?');
-  assert.equal(t.qFr, 'Comment ajouter ma soirée quiz ou karaoké?');
+  assert.equal(t.qFr, 'Comment ajouter ma soirée quiz ou karaoké\u202f?');
   assert.match(JSON.stringify(t), /Weekly nights/);
   assert.match(JSON.stringify(t), /Soirées de la semaine/);
   for (const lang of ['en', 'fr']) {
