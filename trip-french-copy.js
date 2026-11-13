@@ -60,7 +60,16 @@ function frSiteOut(s){
   .split('@AREA@').join(FR_SITE.area).split('@TIME@').join(FR_SITE.timeName).split('@OF_STRETCH@').join(FR_SITE.ofStretch).split('@STRETCH@').join(FR_SITE.stretch)
   .split('@SNOW_FR@').join(FR_SITE.snowRangeFr).split('@SNOW@').join(FR_SITE.snowRange).split('@BIKE_FR@').join(FR_SITE.bikeNoteFr).split('@BIKE@').join(FR_SITE.bikeNote);
 }
-function t3FrenchText(value){return frSiteOut(t3FrenchTextCore(frSiteIn(String(value||''))));}
+function t3FrenchText(value){return frSiteOut(frClosedAgreement(t3FrenchTextCore(frSiteIn(String(value||'')))));}
+// Brewery test 3 (2026-11-13): « Cidrerie du Verger Bleu est fermée » (a place named for a feminine noun: Cidrerie,
+// Distillerie, Brasserie…), and « elle ne fait donc pas partie de ce plan ». Other names keep the masculine.
+const FR_FEMININE_NAME=/^(?:(?:la|une) )?(?:cidrerie|distillerie|brasserie|microbrasserie|boulangerie|p[âa]tisserie|fromagerie|chocolaterie|cr[êe]perie|ferme|cave|maison|cabane|taverne|buvette|cantine|[ée]picerie|rôtisserie|hydromellerie|meadery?)\b/i;
+function frClosedAgreement(text){
+ const m=/^(.+?) (est fermé|a été écarté|correspond, mais est fermé)(?=[\s;.,]|$)/.exec(text);
+ if(!m||!FR_FEMININE_NAME.test(m[1]))return text;
+ return m[1]+' '+m[2].replace(/fermé$/,'fermée').replace(/écarté$/,'écartée')+text.slice(m[0].length)
+  .replace(/^ : il est fermé /,' : elle est fermée ').replace(/; il ne fait donc pas/,'; elle ne fait donc pas').replace(/vérifiez qu’il est ouvert/,'vérifiez qu’elle est ouverte').replace(/ pour le planifier\.$/,' pour la planifier.');
+}
 function t3FrenchTextCore(value){
  let text=String(value||'');
  const heading=t3FrenchHeading(text);if(heading)return heading;
@@ -86,9 +95,9 @@ function t3FrenchTextCore(value){
  text=text.replace(/^There are no wineries in @AREA@, so these are wine bars and lounges instead\.$/,'Il n’y a pas de vignobles @IN_AREA@ : voici plutôt des bars à vin et des lounges.');
  text=text.replace(/^(.+) opens for the season on (\w+) (\d+), so this plan is for then\.$/,(_,n,m,d)=>`${n} ouvre pour la saison le ${d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}; ce plan est donc pour cette date.`);
  text=text.replace(/^Nothing in (.+?) fits “(.+)”, so that stop is in (.+), a few minutes away\.$/,(_,a,w,b)=>`Rien à ${a.replace(/ and /g,' et ')} ne correspond à « ${w} »; cet arrêt est donc à ${b.replace(/ and /g,' et ')}, à quelques minutes.`);
- text=text.replace(/^(.+) was left out: it is closed for the season until (\w+) (\d+)\.$/,(_,n,m,d)=>`${n} a été écarté : il est fermé pour la saison jusqu’au ${d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}.`);
+ text=text.replace(/^(.+) was left out: it is closed for the season until (\w+) (\d+)\.$/,(_,n,m,d)=>`${n} a été écarté : il est fermé pour la saison jusqu’au ${d==='1'?'1er':d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}.`);
  text=text.replace(/^(.+) is out of season in (\w+), so it isn’t in this plan\.$/,(_,n,m)=>`${n} est hors saison en ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}; il ne fait donc pas partie de ce plan.`);
- text=text.replace(/^(.+) is closed for the season until (\w+) (\d+), so it isn’t in this plan\.$/,(_,n,m,d)=>`${n} est fermé pour la saison jusqu’au ${d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}; il ne fait donc pas partie de ce plan.`);
+ text=text.replace(/^(.+) is closed for the season until (\w+) (\d+), so it isn’t in this plan\.$/,(_,n,m,d)=>`${n} est fermé pour la saison jusqu’au ${d==='1'?'1er':d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}; il ne fait donc pas partie de ce plan.`);
  text=text.replace(/^(.+) is closed for the season with no reopening date listed, so it isn’t in this plan\.$/,(_,n)=>`${n} est fermé pour la saison, sans date de réouverture indiquée; il ne fait donc pas partie de ce plan.`);
  text=text.replace(/^Places within about (\d+) km of (.+)\.$/,(_,k,n)=>`Lieux à environ ${k} km de ${n}.`);
  text=text.replace(/^Day (\d+) is your ski day; the other days are off the hill\.$/,(_,d)=>`Le jour ${d} est votre journée de ski; les autres jours sont sans ski.`);

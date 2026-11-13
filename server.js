@@ -20870,11 +20870,11 @@ function breweryVisitLines(venue, info) {
     const k = b.kitchen || {};
     const main = {
       kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
-      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de cuisine de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de cuisine de rue la plupart des jours.'],
+      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de bouffe de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de bouffe de rue la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
-    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Nourriture de l’extérieur bienvenue.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur.'] : null;
+    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Vous pouvez apporter votre pique-nique.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur, s’il vous plaît.'] : null;
     if (main) out.Food = { en: [main[0], own && own[0]].filter(Boolean).join(' '), fr: [main[1], own && own[1]].filter(Boolean).join(' ') };
   }
   if (Array.isArray(b.to_go) && b.to_go.length) {
@@ -35174,6 +35174,11 @@ function frenchTwinHtml(html, enPath, search = '') {
   // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
   // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
   html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml((() => { const d = frDecode(t); const x = presetOrFr(d, frText); return x == null ? d : x; })())}${b}`);
+  // Brewery test 3 (2026-11-13): a card's "+6" chip names the folded badges in French too (title and aria-label).
+  html = html.replace(/<span class="chip chip-more" title="([^"]*)" aria-label="(\d+) more: [^"]*">/g, (m, t, n) => {
+    const names = frDecode(t).split(', ').map((x) => { const f = frText(x); return f == null ? x : f; }).join(', ');
+    return `<span class="chip chip-more" title="${escapeHtml(names)}" aria-label="${n} de plus : ${escapeHtml(names)}">`;
+  });
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -52610,14 +52615,15 @@ function ownerSetupCardHtml(href, lang, state = 'none', type = '') {
   const timeLine = ((OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'][type] || {}).timeLine) || OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'].timeLine;
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
-  const [cardTitle, cardSub] = {
+  // Brewery test 3 (2026-11-13): French typography (« Changer quelque chose ? »), as in the setup.
+  const [cardTitle, cardSub] = ({
     none: fr ? ['Configurez votre page', `Une question à la fois. ${timeLine}`] : ['Set up your page', `One question at a time. ${timeLine}`],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
     // Winery test 4 (2026-11-12): "done" only when every essential is; one skipped (photos) reads "Nearly done".
     nearly: fr ? ['Presque terminé', 'Finir l’essentiel ou ajouter plus de détails?'] : ['Nearly done', 'Finish the essentials, or add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
-  }[state] || [];
+  }[state] || []).map((x) => (fr ? OWNER_SETUP_STRINGS.frSpacing(x) : x));
   return `<style>
     body.owner-page .op-setup-card { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; padding: 16px 18px; min-height: 72px; border-radius: 16px; background: #1E4F4C; color: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(42,32,25,.12); }
     body.owner-page .op-setup-card:focus-visible { outline: 3px solid #C9A34A; outline-offset: 3px; }
@@ -52984,6 +52990,24 @@ function breweryResearchSuggestions(researchRow, info, mine) {
   }
   return out;
 }
+// The kind a brewery's name suggests ('Cidery', 'Distillery', 'Brewery', 'Taphouse or beer hall') or '' (no clue).
+function breweryKindGuess(name) {
+  const n = String(name || '').toLowerCase();
+  return /\b(?:cider|ciders|cidery|ciderie|cidrerie)\b/.test(n) ? 'Cidery' : /\bdistill/.test(n) ? 'Distillery'
+    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(n) ? 'Brewery' : /\b(?:tap ?house|beer (?:hall|market|bar))\b/.test(n) ? 'Taphouse or beer hall' : '';
+}
+// Brewery test 3 (2026-11-13): the kind whose words the owner pages use: the one picked, else the name's clue, else ''
+// (neutral words). 'Cidery' reads cider words, 'Brewery' and 'Taphouse or beer hall' beer words, the rest neutral ones.
+function breweryWordsKind(venue) {
+  return breweryKindOf(venue) || breweryKindGuess(venue && venue.name);
+}
+// The menu tile's words on the owner home, by kind: [title, subtitle] in English and French.
+function breweryListTile(venue) {
+  const k = breweryWordsKind(venue);
+  if (k === 'Cidery') return { en: ['Update my menu or cider list', 'Snap your chalkboard or cider list'], fr: ['Mettre à jour mon menu ou ma liste des cidres', 'Photographiez votre tableau ou votre liste des cidres'] };
+  if (k === 'Brewery' || k === 'Taphouse or beer hall') return { en: ['Update my menu or tap list', 'Snap your chalkboard or tap list'], fr: ['Mettre à jour mon menu ou ma liste des bières', 'Photographiez votre tableau ou votre liste des bières'] };
+  return { en: ['Update my menu or drinks list', 'Snap your chalkboard or drinks list'], fr: ['Mettre à jour mon menu ou ma liste des boissons', 'Photographiez votre tableau ou votre liste des boissons'] };
+}
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -52991,8 +53015,7 @@ function breweryCfg(venue, snap, fr) {
   const name = String(venue.name || '').toLowerCase();
   // Brewery test 2 (2026-11-13): a brewery is a Brewery unless its name clearly says otherwise. "Taproom" is where a
   // brewery pours its own beer, so only "taphouse", "tap house" or "beer hall" suggests a taphouse.
-  const suggestKind = /\b(?:cider|ciders|cidery|ciderie|cidrerie)\b/.test(name) ? 'Cidery' : /\bdistill/.test(name) ? 'Distillery'
-    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(name) ? 'Brewery' : /\b(?:tap ?house|beer (?:hall|market|bar))\b/.test(name) ? 'Taphouse or beer hall' : 'Brewery';
+  const suggestKind = breweryKindGuess(name) || 'Brewery';
   const foodRow = researchRow('Food');
   const ft = foodRow ? foodRow.text : '';
   const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|pub fare|burgers?|pizzas?|wings|bistro|eatery)\b/i.test(ft) ? 'kitchen' : '';
@@ -53045,11 +53068,11 @@ const BREWERY_SETUP_HELP_TOPICS = [
     keysFr: ['liste des bieres', 'liste de bieres', 'nos bieres', 'bieres', 'en fut', 'fut', 'futs', 'pression', 'biere en fut', 'bieres en fut', 'tableau', 'ardoise', 'liste des cidres'],
     a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the menu”, so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
     aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir le menu », pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
-  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de cuisine de rue',
+  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de bouffe de rue',
     keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
-    keysFr: ['camion', 'camions', 'cuisine de rue', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
+    keysFr: ['camion', 'camions', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
     a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
-    aFr: '<p>À <strong>Votre salle</strong>, touchez <strong>Camions de cuisine de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de cuisine de rue la plupart des jours » ou « Camions de cuisine de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
+    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions de bouffe de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de bouffe de rue la plupart des jours » ou « Camions de bouffe de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
     keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
@@ -58740,7 +58763,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     // Breweries (2026-11-12): the kind of place, the season answer, the brewery's own answers and flight price, and whether
     // "What you offer" was saved in the setup (dogs and wheelchair / parking then count as answered).
-    ...(venue.type === 'brewery' ? { placeType: venuePlaceType(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
+    ...(venue.type === 'brewery' ? { placeType: venuePlaceType(venue), wordsKind: breweryWordsKind(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
       breweryInfo: live.brewery_info || breweryInfoAnswers(venue.id), flightFee: 'flight_fee' in live ? live.flight_fee : breweryFlightFee(venue.id),
       dogFriendly: !!venue.dog_friendly,
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
@@ -59565,7 +59588,7 @@ ${renderGolfHeaderHtml()}
              ask either). The full page keeps the fields. "Happy hour" reads « 5 à 7 » in French. */ ''}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
-          ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'brewery' ? L('Update my menu or tap list', 'Mettre à jour mon menu ou ma liste des bières') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'brewery' ? L('Snap your chalkboard or tap list', 'Photographiez votre tableau ou votre liste des bières') : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'brewery' ? L(breweryListTile(venue).en[0], breweryListTile(venue).fr[0]) : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'brewery' ? L(breweryListTile(venue).en[1], breweryListTile(venue).fr[1]) : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
           ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}

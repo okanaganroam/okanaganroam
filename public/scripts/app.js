@@ -854,7 +854,7 @@ var TRANSLATIONS = {
     'tripv3.example1': '3 jours à Kelowna\u00a0: vignobles, promenades faciles et bonne bouffe',
     'tripv3.example2': '2 jours à Penticton avec les enfants',
     'tripv3.example3': 'Une fin de semaine romantique à Naramata',
-    'tripv3.example4': 'Que peut-on faire autour de Penticton s’il pleut?',
+    'tripv3.example4': 'Que peut-on faire autour de Penticton s’il pleut ?',
     'tripv3.howTitle': 'Ce que nous v\u00e9rifions pour vous',
     'tripv3.how1Title': 'Ouvert, et en saison',
     'tripv3.how1Text': 'Chaque arr\u00eat respecte ses heures d\u2019ouverture. Les endroits ferm\u00e9s ce jour-l\u00e0 ou hors saison sont laiss\u00e9s de c\u00f4t\u00e9.',

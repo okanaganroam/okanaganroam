@@ -9,6 +9,7 @@
 //   - an item the owner has no way to fix yet (fix: false) counts when we already have it, and when we don't it
 //     is left out of the total and shown under "We're adding these", so 100% is reachable today.
 
+const { frSpacing } = require('./owner-setup-text.js');
 const HOURS_FRESH_DAYS = 30;
 const DESCRIPTION_MIN = 120;
 const PHOTOS_MIN = 3;
@@ -39,7 +40,7 @@ const ITEMS = [
   { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 6, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
     en: 'Dietary options', fr: 'Options alimentaires', whyEn: 'Tick vegan, vegetarian or gluten-free if you offer them. A dietary note in Plan your visit counts too.', whyFr: 'Cochez végétalien, végétarien ou sans gluten si vous en offrez. Une note alimentaire dans Planifier la visite compte aussi.', btnEn: 'Tick options', btnFr: 'Cocher', icon: '🥗' },
   { key: 'happy_hour', noneEn: 'We don’t have a happy hour', noneFr: 'Nous n’avons pas de happy hour', group: 'offers', w: 4, fix: true, target: { task: 'happy', id: 'happy' }, fields: ['happy_hour', 'happy_hour_deals'],
-    en: 'Happy hour times and deals', fr: 'Heures et spéciaux du happy hour', whyEn: 'When it runs and what’s on special.', whyFr: 'Quand il a lieu et ce qui est en spécial.', btnEn: 'Add happy hour', btnFr: 'Ajouter', icon: '🍹' },
+    en: 'Happy hour times and deals', fr: 'Heures et spéciaux du 5 à 7', whyEn: 'When it runs and what’s on special.', whyFr: 'Quand il a lieu et ce qui est en spécial.', btnEn: 'Add happy hour', btnFr: 'Ajouter', icon: '🍹' },
   { key: 'specials', noneEn: 'We don’t run specials', noneFr: 'Nous n’avons pas de spéciaux', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'specials' }, fields: ['specials'],
     en: 'Weekly specials', fr: 'Spéciaux de la semaine', whyEn: 'Nightly deals or a weekly feature.', whyFr: 'Spéciaux du soir ou de la semaine.', btnEn: 'Add specials', btnFr: 'Ajouter', icon: '⭐' },
   { key: 'entertainment', noneEn: 'We don’t host music or events', noneFr: 'Ni musique ni événements chez nous', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'weekly-nights' }, fields: ['weekly_nights', 'badge:live_music', 'badge:sports_tv'],
@@ -211,16 +212,24 @@ const BREWERY_ITEMS = [
   { key: 'season', group: 'hours', w: 4, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'brewery_info'],
     en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Some taprooms close or cut their hours in winter. Say so, so nobody drives out to a closed door.', whyFr: 'Certaines salles ferment ou réduisent leurs heures l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆',
     whyEnCidery: 'Orchard cideries often close for winter. Say so, so nobody drives out to a closed door.', whyFrCidery: 'Les cidreries de verger ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.' },
-  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your taproom, your taps, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle, vos fûts, votre terrasse.' }),
-  R('photo_extra', { w: 7, whyEn: 'Your taproom, your taps, your patio.', whyFr: 'Votre salle, vos fûts, votre terrasse.' }),
+  // Brewery test 3 (2026-11-13): a cidery reads cider words (`cidery`), a distillery or a place with no kind picked yet
+  // neutral ones (`neutral`); a brewery or taphouse keeps the beer words (scoreCompleteness, kindCopy).
+  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your taproom, your taps, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, vos fûts, votre terrasse.',
+    cidery: { whyEn: 'Real photos only, taken by you. Your orchard, your tasting room, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre verger, votre salle de dégustation, votre terrasse.' },
+    neutral: { whyEn: 'Real photos only, taken by you. Your tasting room, your bar, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, votre bar, votre terrasse.' } }),
+  R('photo_extra', { w: 7, whyEn: 'Your taproom, your taps, your patio.', whyFr: 'Votre salle de dégustation, vos fûts, votre terrasse.',
+    cidery: { whyEn: 'Your orchard, your tasting room, your patio.', whyFr: 'Votre verger, votre salle de dégustation, votre terrasse.' },
+    neutral: { whyEn: 'Your tasting room, your bar, your patio.', whyFr: 'Votre salle de dégustation, votre bar, votre terrasse.' } }),
   { key: 'food_here', group: 'taproom', w: 5, fix: true, target: { setup: 'taproom' }, fields: ['brewery_info'],
-    en: 'Food here', fr: 'Nourriture sur place', whyEn: 'Your own kitchen, food trucks, snacks only, or no food. Can people bring their own?', whyFr: 'Votre cuisine, des camions de cuisine de rue, des collations seulement, ou rien. Peut-on apporter sa nourriture?', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍔' },
+    en: 'Food here', fr: 'Nourriture sur place', whyEn: 'Your own kitchen, food trucks, snacks only, or no food. Can people bring their own?', whyFr: 'Votre cuisine, des camions de bouffe de rue, des collations seulement, ou rien. Peut-on apporter sa nourriture?', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍔' },
   { key: 'flight_price', group: 'taproom', w: 5, fix: true, target: { setup: 'flights' }, fields: ['flight_fee', 'brewery_info'],
     en: 'Flight price', fr: 'Prix de la planche de dégustation', whyEn: 'What a flight costs, or “We don’t do flights”. It shows on your card.', whyFr: 'Le prix d’une planche de dégustation, ou « Nous n’en offrons pas ». Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍻' },
   { key: 'to_go', group: 'taproom', w: 3, fix: true, target: { setup: 'flights' }, fields: ['brewery_info'],
     en: 'What people can take home', fr: 'Ce qu’on peut rapporter', whyEn: 'Cans, bottles, growler or crowler fills, or nothing to go.', whyFr: 'Canettes, bouteilles, remplissage de growlers ou de crowlers, ou rien à emporter.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥫' },
   R('happy_hour', { group: 'taproom', w: 4 }),
-  R('menu', { group: 'taproom', w: 4, en: 'Menu or tap list', fr: 'Menu ou liste des bières', whyEn: 'Your menu or tap list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des bières. Une photo du tableau suffit. Inutile sans cuisine sur place.' }),
+  R('menu', { group: 'taproom', w: 4, en: 'Menu or tap list', fr: 'Menu ou liste des bières', whyEn: 'Your menu or tap list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des bières. Une photo du tableau suffit. Inutile sans cuisine sur place.',
+    cidery: { en: 'Menu or cider list', fr: 'Menu ou liste des cidres', whyEn: 'Your menu or cider list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des cidres. Une photo du tableau suffit. Inutile sans cuisine sur place.' },
+    neutral: { en: 'Menu or drinks list', fr: 'Menu ou liste des boissons', whyEn: 'Your menu or drinks list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des boissons. Une photo du tableau suffit. Inutile sans cuisine sur place.' } }),
   { key: 'dogs_kids', group: 'yourvisit', w: 6, fix: true, target: { setup: 'offer:minors' }, fields: ['brewery_info', 'badges', 'owner_features'],
     en: 'Who’s welcome, and dogs', fr: 'Qui est le bienvenu, et les chiens', whyEn: 'Adults only, minors with an adult until a set time, or all ages. And are dogs welcome?', whyFr: 'Adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Et les chiens sont-ils bienvenus?', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   R('entertainment', { group: 'yourvisit', w: 3, fields: ['weekly_nights', 'badge:live_music'], noneEn: 'We don’t host events', noneFr: 'Nous n’organisons pas d’événements',
@@ -229,12 +238,14 @@ const BREWERY_ITEMS = [
   { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
     en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible, Free parking or Room for RVs on “What you offer”.', whyFr: 'Cochez Accessible en fauteuil roulant, Stationnement gratuit ou Place pour VR dans « Ce que vous offrez ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
   R('description', { w: 5 }),
-  R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on what you pour, e.g. Hazy IPAs and a blackberry sour.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des IPA troubles et une sure aux mûres.' }),
+  R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on what you pour, e.g. Hazy IPAs and a blackberry sour.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des IPA troubles et une sure aux mûres.',
+    cidery: { whyEn: 'One line on what you pour, e.g. Dry ciders from heritage apples.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des cidres secs de pommes anciennes.' },
+    neutral: { whyEn: 'One line on what you pour, e.g. Small batches made right here.', whyFr: 'Une ligne sur ce que vous servez, p. ex. de petites cuvées faites sur place.' } }),
   R('instagram', { w: 3 }),
   R('facebook', { w: 3 }),
   // Brewery test 2 (2026-11-13): the orchard lines (here and the season item) only for a cidery, as the setup's door lead.
-  R('arrival', { w: 2, en: 'Taproom door photo and exact spot', fr: 'Photo de la porte de la salle et emplacement exact', whyEn: 'Stand at the taproom door and take one photo. If your door is around the side or upstairs, it helps people find it.', whyFr: 'Placez-vous à la porte de la salle et prenez une photo. Si votre porte est sur le côté ou à l’étage, cela aide à la trouver.',
-    whyEnCidery: 'Stand at the taproom door and take one photo. At an orchard or a big lot it helps people find you.', whyFrCidery: 'Placez-vous à la porte de la salle et prenez une photo. Dans un verger ou un grand terrain, cela aide à vous trouver.' }),
+  R('arrival', { w: 2, en: 'Taproom door photo and exact spot', fr: 'Photo de la porte de la salle de dégustation et emplacement exact', whyEn: 'Stand at the taproom door and take one photo. If your door is around the side or upstairs, it helps people find it.', whyFr: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Si votre porte est sur le côté ou à l’étage, cela aide à la trouver.',
+    whyEnCidery: 'Stand at the taproom door and take one photo. At an orchard or a big lot it helps people find you.', whyFrCidery: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Dans un verger ou un grand terrain, cela aide à vous trouver.' }),
   R('owner_confirmed', { w: 2 }),
 ];
 if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: brewery weights must sum to 100');
@@ -538,7 +549,12 @@ function scoreCompleteness(input, opts) {
     if (na[base.key]) continue;
     let it = base.key === 'happy_hour' && hhBadgeOnly ? { ...base, ...HAPPY_HOUR_BADGE_COPY, noneEn: undefined, noneFr: undefined } : base;
     if (base.key === 'menu' && !done.menu && input && sameAddress(input.menuUrl, input.website)) it = { ...base, ...MENU_SAME_SITE_COPY };
-    if (base.whyEnCidery && input && input.placeType === 'Cidery') it = { ...it, whyEn: base.whyEnCidery, whyFr: base.whyFrCidery };
+    // Brewery test 3 (2026-11-13): cider words for a cidery, neutral ones for a distillery or no kind yet. The kind picked,
+    // else the one the name suggests (wordsKind, server.js breweryWordsKind).
+    const wk = input ? input.placeType || input.wordsKind || '' : '';
+    if (base.whyEnCidery && wk === 'Cidery') it = { ...it, whyEn: base.whyEnCidery, whyFr: base.whyFrCidery };
+    const kc = base.cidery || base.neutral ? (wk === 'Cidery' ? base.cidery : ['Brewery', 'Taphouse or beer hall'].includes(wk) ? null : base.neutral) : null;
+    if (kc) it = { ...it, ...kc };
     const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
@@ -645,11 +661,12 @@ const LATER_SHOWN = 3;
 function renderCompleteness(result, opts) {
   const o = opts || {};
   const fr = !!o.fr;
-  const L = (en, f) => (fr ? f : en);
+  // Brewery test 3 (2026-11-13): French typography (« Changer quelque chose ? », a no-break space before « : »), as in the setup.
+  const L = (en, f) => (fr ? frSpacing(f) : en);
   const r = result;
   // Winery test 1 (2026-11-12): a winery has a tasting room door, not a storefront.
   const spotEn = o.winery ? 'your tasting room door' : o.brewery ? 'your taproom door' : 'your storefront spot';
-  const spotFr = o.winery ? 'la porte de votre salle de dégustation' : o.brewery ? 'la porte de votre salle' : 'l’emplacement de votre devanture';
+  const spotFr = o.winery ? 'la porte de votre salle de dégustation' : o.brewery ? 'la porte de votre salle de dégustation' : 'l’emplacement de votre devanture';
   const gotText = (k) => (GOT_TEXT[k] ? `${fr ? GOT_TEXT[k].fr : GOT_TEXT[k].en} \u2713` : '');
   const waitingList = r.waiting || r.missing.filter((it) => it.waiting);
   // Ticked badges waiting for our check (final fresh-eyes 2026-11-09): most badges (patio, kid-friendly…) belong to no
@@ -1167,4 +1184,10 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
+// Brewery test 3 (2026-11-13): every French line of the checklist with French typography (a no-break space before « : »,
+// a narrow one before « ? » and « ! »), the same helper as the setup and the help (owner-setup-text.js frSpacing).
+(function frCopy(list) {
+  const walk = (o) => { if (!o || typeof o !== 'object') return; for (const k of Object.keys(o)) { if (typeof o[k] === 'string' && (k === 'fr' || /Fr(?:[A-Z]\w*)?$/.test(k))) o[k] = frSpacing(o[k]); else if (o[k] && typeof o[k] === 'object') walk(o[k]); } };
+  list.forEach(walk);
+})([ITEMS, PUB_ITEMS, CAFE_ITEMS, WINERY_ITEMS, BREWERY_ITEMS, GROUPS, GOT_TEXT, HAPPY_HOUR_BADGE_COPY, MENU_SAME_SITE_COPY]);
 module.exports = { BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
