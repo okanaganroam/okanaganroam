@@ -305,7 +305,7 @@
   // The quick opening and closing times on a day's card ("Opens: 11 AM · 12 PM · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
   function brewQuick(d, j, y, last){
     if (!C.brewery) return '';
-    var row = function(idx, list, label){ return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
+    var row = function(idx, list, label){ return '<div class="su-samerow su-laterow su-bqrow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
     return (j === 0 ? row(0, BQ_OPEN, T.bqOpens) : '') + (j === last ? row(1, BQ_CLOSE, T.bqCloses) : '');
   }
   // Reads the winery screens' text boxes into S.wine (before a redraw or a save).

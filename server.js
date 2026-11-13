@@ -53199,6 +53199,9 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-laterow { align-items: center; margin: 2px 0 8px; }
   body.owner-setup .su-latelbl { flex-basis: 100%; font-size: 16px; font-weight: 700; color: var(--su-soft); }
   body.owner-setup .su-latebtn[aria-pressed="true"] { background: var(--su-teal); color: #fff; border-color: var(--su-teal); }
+  /* Brewery test 2 (2026-11-13): four quick opening and closing times fit one row at 375px. */
+  body.owner-setup .su-bqrow { gap: 6px; }
+  body.owner-setup .su-bqrow .su-latebtn { padding: 0 10px; }
   body.owner-setup .su-spendask { margin-bottom: 0; }
   body.owner-setup .su-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   body.owner-setup .su-num { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 10px 0 24px; }
