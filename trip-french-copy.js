@@ -60,13 +60,13 @@ function frSiteOut(s){
   .split('@AREA@').join(FR_SITE.area).split('@TIME@').join(FR_SITE.timeName).split('@OF_STRETCH@').join(FR_SITE.ofStretch).split('@STRETCH@').join(FR_SITE.stretch)
   .split('@SNOW_FR@').join(FR_SITE.snowRangeFr).split('@SNOW@').join(FR_SITE.snowRange).split('@BIKE_FR@').join(FR_SITE.bikeNoteFr).split('@BIKE@').join(FR_SITE.bikeNote);
 }
-function t3FrenchText(value){return frSiteOut(frClosedAgreement(t3FrenchTextCore(frSiteIn(String(value||'')))));}
 // Brewery test 3 (2026-11-13): « Cidrerie du Verger Bleu est fermée » (a place named for a feminine noun: Cidrerie,
-// Distillerie, Brasserie…), and « elle ne fait donc pas partie de ce plan ». Other names keep the masculine.
-const FR_FEMININE_NAME=/^(?:(?:la|une) )?(?:cidrerie|distillerie|brasserie|microbrasserie|boulangerie|p[âa]tisserie|fromagerie|chocolaterie|cr[êe]perie|ferme|cave|maison|cabane|taverne|buvette|cantine|[ée]picerie|rôtisserie|hydromellerie|meadery?)\b/i;
-function frClosedAgreement(text){
+// Distillerie, Brasserie…), and « elle ne fait donc pas partie de ce plan ». Other names keep the masculine. Kept inside
+// this function: the trip page ships it to the browser with toString().
+function t3FrenchText(value){
+ const text=frSiteOut(t3FrenchTextCore(frSiteIn(String(value||''))));
  const m=/^(.+?) (est fermé|a été écarté|correspond, mais est fermé)(?=[\s;.,]|$)/.exec(text);
- if(!m||!FR_FEMININE_NAME.test(m[1]))return text;
+ if(!m||!/^(?:(?:la|une) )?(?:cidrerie|distillerie|brasserie|microbrasserie|boulangerie|p[âa]tisserie|fromagerie|chocolaterie|cr[êe]perie|ferme|cave|maison|cabane|taverne|buvette|cantine|[ée]picerie|rôtisserie|hydromellerie)(?![a-zà-ÿ])/i.test(m[1]))return text;
  return m[1]+' '+m[2].replace(/fermé$/,'fermée').replace(/écarté$/,'écartée')+text.slice(m[0].length)
   .replace(/^ : il est fermé /,' : elle est fermée ').replace(/; il ne fait donc pas/,'; elle ne fait donc pas').replace(/vérifiez qu’il est ouvert/,'vérifiez qu’elle est ouverte').replace(/ pour le planifier\.$/,' pour la planifier.');
 }
