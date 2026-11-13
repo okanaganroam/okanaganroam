@@ -130,6 +130,26 @@ const NIGHT_ENDS_AT_KIDS = 5 * 60;
 function kidsClock(min) { const h = Math.floor(min / 60) % 24, mi = min % 60; if (h === 0 && mi === 0) return 'midnight'; if (h === 12 && mi === 0) return '12 PM'; return `${h % 12 === 0 ? 12 : h % 12}${mi ? ':' + String(mi).padStart(2, '0') : ''} ${h < 12 ? 'AM' : 'PM'}`; }
 function kidsUntilNote(min, late) { return late ? `Kids welcome with an adult until ${kidsClock(min)}, so plan to leave by then` : `Kids welcome with an adult until ${kidsClock(min)}`; }
 const KIDS_UNTIL_RE = /^Kids welcome with an adult until /;
+// Brewery test 4 (2026-11-13): a brewery (or pub) whose owner says it has its own kitchen can be a meal stop within its
+// kitchen hours: open on that day for an hour of the window before the kitchen closes. { ok, closes } or null when it
+// has no kitchen answer.
+const MEAL_KITCHEN_TYPES = ['brewery', 'pub'];
+function kitchenMealFit(v, win, weekday) {
+  if (!v || !v.ownKitchen || !MEAL_KITCHEN_TYPES.includes(v.type) || !win) return null;
+  const m = /^(\d{2}):(\d{2})$/.exec(String(v.ownKitchen.closes || ''));
+  let closes = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  if (closes != null && closes < NIGHT_ENDS_AT_KIDS) closes += 1440;
+  const to = closes != null ? Math.min(win.to, closes) : win.to;
+  if (to - win.from < 60) return { ok: false };
+  const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+  if (!parsed.known) return { ok: false };
+  const days = weekday ? [weekday] : WEEKDAYS;
+  if (!days.some((d) => parsed.days[d] && parsed.days[d].status === 'open' && windowOverlap(parsed.days[d], { from: win.from, to }) >= 60)) return { ok: false };
+  return { ok: true, closes };
+}
+function kitchenMealText(v, meal, closes) {
+  return `${meal === 'lunch' ? 'Lunch' : 'Dinner'} at ${v.name}${closes != null ? ` (kitchen until ${kidsClock(closes)})` : ' (its own kitchen)'}`;
+}
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
 // ---------- small helpers ----------
@@ -6315,7 +6335,8 @@ function closedDayInfo(v, weekday) {
   const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
   const open = WEEKDAYS.filter((d) => parsed.days[d] && parsed.days[d].status === 'open');
   if (!open.length) return null;
-  const sea = v.hoursSeason && /^\d{2}-\d{2}$/.test(v.hoursSeason.from || '') && /^\d{2}-\d{2}$/.test(v.hoursSeason.to || '') ? { from: v.hoursSeason.from, to: v.hoursSeason.to } : {};
+  // Seasonal only when that day is open in the rest of the year's week (or that isn't known).
+  const sea = v.hoursSeason && !(Array.isArray(v.hoursSeason.otherOpen) && !v.hoursSeason.otherOpen.includes(wd)) && /^\d{2}-\d{2}$/.test(v.hoursSeason.from || '') && /^\d{2}-\d{2}$/.test(v.hoursSeason.to || '') ? { from: v.hoursSeason.from, to: v.hoursSeason.to } : {};
   return { day: wd, ...sea, open };
 }
 
@@ -7715,15 +7736,21 @@ function planItinerary(input) {
     }
     const scored = [];
     const closedByAdvisory = [];
+    // Brewery test 4 (2026-11-13): a dinner or lunch part can be at a brewery (or pub) with its own kitchen, within its
+    // kitchen hours, when no cuisine was asked for. Restaurants are scored as before.
+    const kitchenPart = !c.venueId && ['dinner', 'supper', 'lunch'].includes(c.meal) && (c.types || []).includes('restaurant') && !(c.cuisines || []).length;
+    const kitchenWin = SLOT_WINDOWS[daypart || (c.meal === 'lunch' ? 'midday' : 'evening')], kitchenDay = anchor?.weekday || ctx.startWeekday || null;
     for (const v of facts) {
-      if (used.has(v.id) || (!(c.venueId && c.venueId === v.id) && !regionOk(v, ctx)) || !eligible(v, c.venueId === v.id ? { ...ctx, types: new Set([v.type]), activities: new Set() } : ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue; // a named place counts wherever it is (2026-10-25: Madeley Lake in the Callaghan)
+      const kFit = kitchenPart && !(c.types || []).includes(v.type) ? kitchenMealFit(v, kitchenWin, kitchenDay) : null;
+      if (kFit && !kFit.ok) continue;
+      if (used.has(v.id) || (!(c.venueId && c.venueId === v.id) && !regionOk(v, ctx)) || !eligible(v, c.venueId === v.id ? { ...ctx, types: new Set([v.type]), activities: new Set() } : kFit ? { ...ctx, types: new Set([...ctx.types, v.type]) } : ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue; // a named place counts wherever it is (2026-10-25: Madeley Lake in the Callaghan)
       if (walking && previousVenue && (v.region !== previousVenue.region || kmBetween(previousVenue,v) == null || kmBetween(previousVenue,v) > walkingLimit)) continue;
       if (c.venueId && c.venueId !== v.id) continue;
       if (!c.venueId && mountainLodge(v) && (c.meal === 'dinner' || ['evening', 'night'].includes(daypart))) continue; // lodges close with the lifts
       // A generic rainy-day suggestion should fit the travelling party.
       // Preserve an explicitly requested venue and family playground requests.
       if (input.requirements && c.rainyOption && !c.kids && !c.venueId && /\b(?:indoor playground|young kids|toddlers|ball pit|play structures)\b/i.test(v.plannerDescription || v.textDesc || v.description || '')) continue;
-      if (c.generic && !c.types.includes(v.type)) continue;
+      if (c.generic && !c.types.includes(v.type) && !kFit) continue;
       if ((!daypart || daytimePart(daypart)) && eveningOnlyVenue(v) && !c.venueId && !EVENING_VENUE_RE.test(normWords(c.phrase || ''))) continue; // round 11
       if (c.wineryLunch && !wineryLunchSpot(v, wineryWords || (wineryWords = wineryNameWords(facts)))) continue;
       if (c.meal && !c.venueId && notAMeal(v) && !(c.cuisines || []).length) continue; // round 12: a dessert stand is not dinner
@@ -7786,7 +7813,8 @@ function planItinerary(input) {
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
       const dogCaveat = dogSeasonCaveat(v, c);
       const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : []);
-      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv });
+      if (kFit) { score -= 10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
+      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}) });
     }
     scored.sort(compareScored);
     // A walk by the lake is on the shore when the town has one listed.
@@ -7879,6 +7907,14 @@ function planItinerary(input) {
       // Audit fix (2026-10-27): "pub dinner and drinks in Osoyoos" started at The Sage Pub and still warned "No pubs or
       // cocktail lounges matched in Osoyoos": a part whose kinds an earlier stop already covers is not missing.
       else if (stops.some((s) => s.kind === 'venue' && s.venue && (c.types || []).includes(s.venue.type))) continue;
+      // Brewery test 4: dinner at the brewery already in the plan, when its own kitchen is open for it.
+      else if (kitchenPart && (() => {
+        const st = stops.find((s) => s.kind === 'venue' && s.venue && !s.kitchenMeal && kitchenMealFit(facts.find((f) => f.id === s.venue.id), kitchenWin, kitchenDay)?.ok);
+        if (!st) return false;
+        const f = facts.find((x) => x.id === st.venue.id), kf = kitchenMealFit(f, kitchenWin, kitchenDay), line = kitchenMealText(f, c.meal, kf.closes);
+        st.kitchenMeal = true; st.reasons = [{ code: 'meal', text: line, weight: 20 }].concat(st.reasons || []); st.why = [line].concat(st.why || []).slice(0, 3);
+        return true;
+      })()) continue;
       else result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
       continue;
     }
@@ -7895,7 +7931,7 @@ function planItinerary(input) {
       kind: 'venue', component: c, index: p.i, label: c.wineryLunch ? 'Lunch at a winery' : label.replace(/^./, (x) => x.toUpperCase()), daypart: daypart || (pick.v.type === 'cafe' && cafeRole(pick.v) === 'treat' ? 'afternoon' : ITIN_TYPE_DAYPART[pick.v.type]) || 'afternoon', timed: !!daypart, ...(c.wineryLunch ? { wineryLunch: true } : {}),
       activity: (c.activities || []).find((a) => (pick.v.activities || []).includes(a))
         || (pick.v.type === 'outdoor' ? (pick.v.activities || []).find((a) => ITIN_ACTIVITY_VERB[a]) : null) || null,
-      ...stopFrom(pick.v, pick, extra, ctx),
+      ...stopFrom(pick.v, pick, extra, ctx), ...(pick.kitchenMeal ? { kitchenMeal: true } : {}),
       alternates: alternates.map((a) => stopFrom(a.v, a, [], ctx)),
       seasonFlags: pick.seasonFlags || {}, advisory: pick.advisory, swimPart: partSeasonIntent(c).swim,
     });
@@ -7992,7 +8028,7 @@ function planItinerary(input) {
     }
   }
   const publicStop = (s) => {
-    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}) };
+    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}), ...(s.kitchenMeal ? { kitchenMeal: true } : {}) };
     if (s.kind === 'event') return { ...base, event: s.event, timeKnown: s.timeKnown, caveats: s.caveats, why: eventWhy(s.event, { id: 'part', eventKind: s.component && s.component.event ? s.component.event.kind : null, value: s.component && s.component.event && s.component.event.kind === 'live-music' ? 'live-music' : 'any' }, holidayTheme(input.text || input.requirements?.text || '')) };
     // (timed / start are internal ordering hints and stay server-side.)
     return { ...base, venue: s.venue, reasons: s.reasons, why: s.why, caveats: s.caveats, alternates: s.alternates };

@@ -6814,6 +6814,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // trip names the time and isn't planned there after it; and hours the business saved or confirmed in the last
       // 180 days, so a stop doesn't say "check before you go" about them.
       ...(plannerKidsUntil(v) ? { kidsUntil: plannerKidsUntil(v) } : {}),
+      // Brewery test 4 (2026-11-13): a brewery whose owner answered "Our own kitchen" (or a pub with a kitchen answer), with
+      // its kitchen close time when earlier, so a dinner slot can be there within its kitchen hours.
+      ...(plannerOwnKitchen(v) ? { ownKitchen: plannerOwnKitchen(v) } : {}),
       ...(v.hours && v.hours_source === 'venue_owner' && parseLocalDate(v.hours_checked_at) && localDateToDayNumber(todayLocal()) - localDateToDayNumber(v.hours_checked_at) <= OPEN_NOW_MAX_CHECK_AGE_DAYS.food_drink ? { ownerHours: true } : {}),
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
@@ -6827,7 +6830,16 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Winery test 5 (2026-11-12): with the owner's note ("Boxing Day"), so a left-out place says why in holiday words.
       ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from, ...(x.note ? { note: String(x.note).slice(0, 60) } : {}) })) : undefined; })(),
       // ...and the owner's season whose week applies on that date ("11-01" to "04-30"), for "closed Wednesdays from Nov to Apr".
-      ...((() => { const ss = weekSeasonOn(v, hoursDate); return ss ? { hoursSeason: { from: ss.from, to: ss.to } } : {}; })()),
+      // Brewery test 4 (2026-11-13): or, on a date in the usual week of a place with one season ("Summer hours" May to
+      // Sep), the rest of the year (Oct to Apr), so "Closed Mondays (Oct–Apr)" can be said in January too.
+      // otherOpen: the days open in the rest of the year's week, so a day closed all year isn't said to be seasonal.
+      ...((() => {
+        const sea = weekSeasonOn(v, hoursDate), ss = sea || usualWeekSeasonOn(v, hoursDate);
+        if (!ss) return {};
+        let otherOpen;
+        try { const o = hoursModule.parseHours(sea ? v.hours : JSON.stringify(ss.hours)); if (o && o.known) otherOpen = Object.keys(o.days).filter((d) => o.days[d] && o.days[d].status === 'open'); } catch (e) { otherOpen = undefined; }
+        return { hoursSeason: { from: ss.from, to: ss.to, ...(otherOpen ? { otherOpen } : {}) } };
+      })()),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
@@ -7652,7 +7664,7 @@ function tripClosedNamedNotes(list, date, dayDated = false) {
     const oc = dayDated && !closedSeason ? tripOwnerClosureOn(f, date) : null;
     const wd = dayDated && !closedSeason && !oc ? tripClosedWeekday(f, date) : null;
     if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
-    else if (wd && f.hoursSeason) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${shortMonth(f.hoursSeason.from)} to ${shortMonth(f.hoursSeason.to)}, so it isn’t in this plan.`);
+    else if (wd && f.hoursSeason && !(Array.isArray(f.hoursSeason.otherOpen) && !f.hoursSeason.otherOpen.includes(wd))) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${shortMonth(f.hoursSeason.from)} to ${shortMonth(f.hoursSeason.to)}, so it isn’t in this plan.`);
     else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
     else if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
     else if (closedSeason) undated.push(f.name);
@@ -20843,6 +20855,15 @@ function plannerKidsUntil(v) {
   if (!v || (v.type !== 'brewery' && v.type !== 'pub')) return '';
   const m = (v.type === 'brewery' ? venueBreweryInfo(v.id) : venuePubInfo(v.id)).minors || {};
   return m.policy === 'minors_until' && /^\d{2}:\d{2}$/.test(String(m.until || '')) ? m.until : '';
+}
+// { closes: 'HH:MM' } (kitchen closes before the taproom) or {} (same hours), for a brewery that answered "Our own
+// kitchen" or a pub that answered its kitchen hours; null otherwise.
+function plannerOwnKitchen(v) {
+  if (!v || (v.type !== 'brewery' && v.type !== 'pub')) return null;
+  if (v.type === 'brewery' && venueBreweryInfo(v.id).food !== 'kitchen') return null;
+  const k = (v.type === 'brewery' ? venueBreweryInfo(v.id) : venuePubInfo(v.id)).kitchen || {};
+  if (v.type === 'pub' && !['same', 'earlier'].includes(k.mode)) return null;
+  return k.mode === 'earlier' && /^\d{2}:\d{2}$/.test(String(k.closes || '')) ? { closes: k.closes } : {};
 }
 function breweryKidsWelcome(venueId) {
   const p = (venueBreweryInfo(venueId).minors || {}).policy;
@@ -46443,6 +46464,18 @@ function weekSeasonOn(v, date) {
   if (!x || !x.seasons.length) return null;
   const md = String(date).slice(5);
   return x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to)) || null;
+}
+// The months of the usual week for a place with exactly one season, on a date outside it: { from, to } (the day after the
+// season ends to the day before it starts), or null.
+function usualWeekSeasonOn(v, date) {
+  const x = v && v.hours && date ? hoursExtrasMap().get(v.id) : null;
+  if (!x || x.seasons.length !== 1) return null;
+  const p = x.seasons[0];
+  if (!/^\d{2}-\d{2}$/.test(p.from || '') || !/^\d{2}-\d{2}$/.test(p.to || '')) return null;
+  const md = String(date).slice(5);
+  if (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to) return null;
+  const shift = (m, n) => { const d = new Date(Date.UTC(2001, Number(m.slice(0, 2)) - 1, Number(m.slice(3, 5)) + n)); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+  return { from: shift(p.to, 1), to: shift(p.from, -1), hours: p.hours };
 }
 // "Nov 1" / "1er nov." from 'MM-DD' or 'YYYY-MM-DD'.
 function hoursExtraDayText(value, fr = false) {
