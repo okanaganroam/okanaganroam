@@ -52289,8 +52289,17 @@ const CAFE_SETUP_HELP_TOPICS = [
     a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts. About 15 to 30 minutes. You can stop any time and carry on later.</p><ul><li><strong>The essentials</strong> (7 steps): address and phone, hours (with holidays and closures), kind of café and what you serve, photos, your menu, price per person and what you offer.</li><li><strong>More about your place</strong> (optional, any order): specials, your story, dietary details, your coffee, Instagram and Facebook, and your front door.</li><li>Every question has <strong>Skip this for now</strong>. You can stop at any time and tap <strong>Carry on where you left off</strong> later.</li><li>When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Photos, your menu and anything you send as a file show on your page within a day.</li></ul>',
     aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.</p><ul><li><strong>L’essentiel</strong> (7 étapes) : adresse et téléphone, heures (avec les jours fériés et fermetures), genre de café et ce que vous servez, photos, votre menu, prix par personne et ce que vous offrez.</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : spéciaux, votre histoire, détails alimentaires, votre café, Instagram et Facebook, et votre porte d’entrée.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. Vous pouvez arrêter à tout moment et toucher <strong>Continuez où vous étiez</strong> plus tard.</li><li>Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons reçu. Les photos, votre menu et tout ce que vous envoyez en fichier s’affichent d’ici un jour.</li></ul>' },
 ];
+// Winery test 3 (2026-11-12): "No website, only a Facebook page": that's fine, and the setup's one Instagram and Facebook
+// screen is where it goes (she got the "say you don't have it" answer). Wineries and cafés (both have that screen).
+const SETUP_NO_WEBSITE_HELP_TOPIC = { id: 'no-website-social', pages: ['setup', 'edit'], over: ['none', 'links', 'website-broken'], noRelated: ['none'],
+  q: 'We have no website, only Facebook or Instagram', qFr: 'Pas de site Web, seulement Facebook ou Instagram',
+  keys: ['no website', 'don\u2019t have a website', 'dont have a website', 'do not have a website', 'only facebook', 'only instagram', 'only a facebook page', 'just facebook', 'just instagram', 'just a facebook page', 'facebook page instead', 'instead of a website', 'no web site', 'where do i put my facebook', 'where do i put our facebook', 'where does my facebook go'],
+  keysFr: ['pas de site web', 'pas de site', 'aucun site web', 'seulement facebook', 'seulement instagram', 'seulement une page facebook', 'juste facebook', 'juste une page facebook', 'juste instagram', 'page facebook', 'ou est ce que je la mets', 'ou mettre ma page facebook', 'ou mettre notre facebook', 'au lieu d un site'],
+  a: '<p>That\u2019s fine: you don\u2019t need a website. In <strong>Set up your page</strong>, tap <strong>Instagram and Facebook</strong> (under the extra details) and fill in the ones you have. Your page links to them.</p><p>On the website question, tap that you don\u2019t have one. It still counts as answered.</p>',
+  aFr: '<p>Aucun problème : vous n\u2019avez pas besoin d\u2019un site Web. Dans <strong>Configurez votre page</strong>, touchez <strong>Instagram et Facebook</strong> (dans les détails facultatifs) et remplissez ceux que vous avez. Votre page y mène.</p><p>À la question du site Web, touchez que vous n\u2019en avez pas. Elle compte quand même comme répondue.</p>' };
 // Wineries (2026-11-12): what winery owners ask about the winery questions.
 const WINERY_SETUP_HELP_TOPICS = [
+  SETUP_NO_WEBSITE_HELP_TOPIC,
   // Winery test 1 (2026-11-12): "how do I change it" is answered first, and a tasting-fee question never offers the
   // restaurant "price range" or "average spend" topics as the next thing to read (noRelated).
   { id: 'winery-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend', 'menu-add'], noRelated: ['price-range', 'avg-spend', 'cafe-price'],
@@ -53235,7 +53244,8 @@ const OWNER_HELP_FILL = {
   en: {
     ON: {
       in: 'On your edit page (<a href="/owner/account">My listings</a> \u2192 <strong>Edit listing</strong>)',
-      link: 'On your edit page (the private link we emailed you)',
+      // Winery test 3 (2026-11-12): inside the portal, never "the link we emailed you" (she is already on it).
+      link: 'On your edit page',
       out: 'On your edit page (sign in at <a href="/owner/login">Business login</a>, then <strong>My listings</strong> \u2192 <strong>Edit listing</strong>, or open the edit link we emailed you)',
     },
     SEND: {
@@ -53252,7 +53262,7 @@ const OWNER_HELP_FILL = {
   fr: {
     ON: {
       in: 'Sur votre page de modification (<a href="/fr/owner/account">Mes fiches</a> \u2192 <strong>Modifier la fiche</strong>)',
-      link: 'Sur votre page de modification (le lien privé que nous vous avons envoyé par courriel)',
+      link: 'Sur votre page de modification',
       out: 'Sur votre page de modification (connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis <strong>Mes fiches</strong> \u2192 <strong>Modifier la fiche</strong>, ou ouvrez le lien de modification reçu par courriel)',
     },
     SEND: {
@@ -53518,8 +53528,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'links', q: 'Add a booking, menu or social link', qFr: 'Ajouter un lien de réservation, de menu ou de réseau social', pages: ['edit'],
     keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'change website', 'change our website', 'new website'],
     keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'nouveau site'],
-    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
-    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
+    a: '<p>{ON}, tap <strong>Phone, website or description</strong>, then open the links box under your phone and website. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
+    aFr: '<p>{ON}, touchez <strong>Téléphone, site Web ou description</strong>, puis ouvrez la case des liens sous votre téléphone et votre site Web. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
   // French pass 6 (2026-10-19): a phone number of its own ("changer mon numéro de téléphone" got the links answer).
   { id: 'phone', over: ['links'], q: 'Change our phone number', qFr: 'Changer notre numéro de téléphone', pages: ['edit'],
     keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number',
@@ -53849,6 +53859,25 @@ const OWNER_HELP_START = {
   claim: ['claim', 'noemail', 'staff', 'dispute', 'cost'],
 };
 // The widget's own words. A JSON block on the page, not script literals, so the French twin leaves them alone.
+// Winery test 3 (2026-11-12): French spacing (owner-setup-text.js frSpacing) for French text that holds HTML: only the
+// text between tags changes, never a tag or its attributes. Used for the help bot's French and the owner home page.
+function frSpacingHtml(s) {
+  if (typeof s !== 'string' || !s) return s;
+  return s.replace(/(^|>)([^<]+)(?=<|$)/g, (m, a, t) => a + OWNER_SETUP_STRINGS.frSpacing(t));
+}
+// Winery test 3 (2026-11-12): inside the portal (the setup, edit and menu pages) she is already on her edit link, so the
+// help answers never send her to "the link we emailed you".
+const OWNER_HELP_PORTAL_WORDS = {
+  en: [[/Open the edit link we emailed you, then use/g, 'On your edit page, use'], [/[Ff]rom the emailed edit link/g, (m) => (m[0] === 'F' ? 'From your edit link' : 'from your edit link')],
+    [/ \(<strong>Send changes<\/strong> on the emailed edit link\)/g, ''], [/the (?:private |edit )?link we emailed you/g, 'your edit link'], [/the emailed edit link/g, 'your edit link']],
+  fr: [[/Ouvrez le lien de modification reçu par courriel, puis utilisez/g, 'Sur votre page de modification, utilisez'], [/[Aa]vec le lien de modification reçu par courriel/g, (m) => (m[0] === 'A' ? 'Avec votre lien de modification' : 'avec votre lien de modification')],
+    [/le lien (?:privé|de modification) que nous vous avons envoyé par courriel/g, 'votre lien de modification'], [/le lien de modification reçu par courriel/g, 'votre lien de modification']],
+};
+function ownerHelpPortalWording(html, lang) {
+  let out = String(html || '');
+  for (const [re, to] of OWNER_HELP_PORTAL_WORDS[lang === 'fr' ? 'fr' : 'en']) out = out.replace(re, to);
+  return out;
+}
 const OWNER_HELP_UI = {
   en: {
     button: 'Help', title: 'Help', sub: 'Okanagan Roam business help', close: 'Close help', dialog: 'Help with your listing',
@@ -53888,6 +53917,11 @@ const OWNER_HELP_UI = {
     },
   },
 };
+// The same words with French spacing on the French side (« Bonjour ! », « Autre chose ? »).
+const OWNER_HELP_UI_SPACED = (() => {
+  const sp = (v) => (typeof v === 'string' ? frSpacingHtml(v) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, sp(x)])) : v);
+  return { ...OWNER_HELP_UI, fr: sp(OWNER_HELP_UI.fr) };
+})();
 const OWNER_HELP_CSS = `
   .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
   .ohb-btn:focus-visible, .ohb-panel button:focus-visible, .ohb-panel a:focus-visible, .ohb-panel textarea:focus-visible, .ohb-panel input:focus-visible { outline: 3px solid #F2C14E; outline-offset: 2px; }
@@ -54163,6 +54197,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   if (!OWNER_HELP_START[page]) return '';
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const mode = ownerHelpMode(page, !!opts.signedIn);
+  const inPortal = page === 'setup' || page === 'edit' || page === 'menu';
   const cfg = {
     page,
     lang,
@@ -54171,9 +54206,10 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     start: OWNER_HELP_START[page],
     // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
     topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [],
-      a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
+      a: inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.a, 'en', mode), 'en') : ownerHelpAnswer(t.a, 'en', mode),
+      aFr: frSpacingHtml(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.aFr, 'fr', mode), 'fr') : ownerHelpAnswer(t.aFr, 'fr', mode)) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
-    ui: OWNER_HELP_UI,
+    ui: OWNER_HELP_UI_SPACED,
   };
   const u = OWNER_HELP_UI[lang];
   return `<style>${OWNER_HELP_CSS}</style>
@@ -54599,7 +54635,18 @@ function ownerLangLinkHtml(lang, href, cls) {
   return `<a class="owner-lang-link${cls ? ` ${cls}` : ''}" href="${href}" hreflang="${to}" lang="${to}" rel="nofollow">${to === 'fr' ? 'Français' : 'English'}</a>`;
 }
 const OWNER_LANG_LINK_CSS = '<style>body.owner-page .op-lang{margin:0 0 4px;font-size:.95rem}body.owner-page .op-lang a,body.owner-setup .su-lang{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;font-weight:800;color:#1E4F4C;text-decoration:underline;text-underline-offset:3px}body.owner-setup .su-head .su-lang{margin-left:auto;font-size:16px}</style>';
-function ownerLangHtml(html, lang, enPath, search) {
+// Winery test 3 (2026-11-12): the browser's first language is French (Accept-Language, by its q values).
+function acceptsFrenchFirst(req) {
+  const list = String((req && req.headers && req.headers['accept-language']) || '').split(',').map((x, i) => {
+    const [tag, ...params] = x.trim().split(';');
+    const q = params.map((p) => /^\s*q=([\d.]+)/.exec(p)).find(Boolean);
+    return { tag: tag.trim().toLowerCase(), q: q ? Number(q[1]) : 1, i };
+  }).filter((x) => x.tag && x.tag !== '*' && x.q > 0).sort((a, b) => b.q - a.q || a.i - b.i);
+  return !!list.length && /^fr\b/.test(list[0].tag);
+}
+// prefersFr: an English portal page opened by a browser that asks for French first goes to its French address, unless
+// she chose a language on the site already (okanaganLang, set by the EN / FR switch). Owner pages only.
+function ownerLangHtml(html, lang, enPath, search, prefersFr = false) {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   let out = html;
   const pageFr = /<html lang="fr/.test(out);
@@ -54624,7 +54671,7 @@ function ownerLangHtml(html, lang, enPath, search) {
     // An English address showing French (the menu screen's ?lang=fr) keeps its own switch.
     if (pageFr) return out;
     const frPath = frTwinPath(enPath);
-    out = out.replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
+    out = out.replace(/(<head>\n?)/, `$1<script>try{var ol=localStorage.getItem('okanaganLang');if(ol==='fr'${prefersFr ? "||!ol" : ''})location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
     out = withTwinLangSwitch(out, `${escapeHtml(frPath)}${search ? escapeHtml(search) : ''}`, 'en');
   }
   return (out.includes('id="langToggle"') || out.includes('class="owner-lang-link')) && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
@@ -54638,7 +54685,7 @@ function installOwnerLangResponse(req, res, lang, enPath, search = '') {
     const type = String(headers['Content-Type'] || headers['content-type'] || '');
     if (lang === 'fr' && status >= 300 && status < 400 && typeof headers.Location === 'string' && /^\/owner\//.test(headers.Location)) headers.Location = `/fr${headers.Location}`;
     if (body != null && /text\/html/.test(type) && (status === 200 || status === 404 || status === 410)) {
-      body = ownerLangHtml(String(body), lang, enPath, search);
+      body = ownerLangHtml(String(body), lang, enPath, search, acceptsFrenchFirst(req));
       if (lang === 'fr') headers['Content-Language'] = 'fr-CA';
       // Signed in from before the French pages: the /fr/owner copy of the cookie is added, so the switch keeps them in.
       const session = readCookie(req, OWNER_SESSION_COOKIE);
@@ -58130,7 +58177,8 @@ function renderOwnerPage(found, token, pending, lang = 'en') {
 // on the French addresses. The script's words come from one JSON object (T), so the code is the same in both.
 function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const fr = lang === 'fr';
-  const L = (en, f) => (fr ? f : en);
+  // Winery test 3 (2026-11-12): French spacing on the owner page (« Bonjour ! », « aujourd’hui ? »), text between tags only.
+  const L = (en, f) => (fr ? frSpacingHtml(f) : en);
   const P = (p) => ownerPath(p, lang);
   const { venue, happyHourTimes } = found;
   const live = ownerVenueSnapshot(venue, happyHourTimes);
