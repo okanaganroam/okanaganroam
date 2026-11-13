@@ -16592,7 +16592,8 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010', 'app.js is unchanged by the classic Open Now page');
+    // Brewery test 1 (2026-11-12): app.js changed on purpose (badgeLabelFor: "Kids until 9 PM" on a card's kids badge).
+    assert.equal(md5('public/scripts/app.js'), '1cd1cfd177e12a16857449d23cbaae55', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 

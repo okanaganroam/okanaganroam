@@ -115,7 +115,8 @@ test('3: a café\'s Hours step is done only once its holidays and closures part 
   const c3 = mk('cafe'); for (const k of app.CAFE_SETUP_PART1) app.saveSetupProgress(c3.id, k, k === 'hours' ? 'skip' : 'live');
   assert.equal(app.setupState(c3.id), 'essentials');
   assert.match(CLIENT, /function firstOpen\(\)\{ for \(var i = 0; i < P1\.length; i\+\+\) if \(!fin\(P1\[i\]\)\) return half\(P1\[i\]\) \? 'closures' : P1\[i\];/);
-  assert.match(CLIENT, /var d = half\(s\) \? 'half' : fin\(s\) \|\| 'none'/);
+  // Brewery test 1 (2026-11-12): the row reads its live status (nowSt) once nothing for it is pending.
+  assert.match(CLIENT, /var d = half\(s\) \? 'half' : nowSt\(s, fin\(s\)\) \|\| 'none'/);
   assert.equal(TEXT.en.st.half, 'hours saved, holidays and closures still to do');
   assert.match(TEXT.fr.st.half, /^heures enregistrées, jours fériés et fermetures à faire$/);
   const html = (await get(`/owner/${tokenFor(c.id)}`)).text;
@@ -174,7 +175,8 @@ test('7: tapped answers and holiday names show in the page\'s language; typed wo
   const soon = app.todayLocal(new Date(Date.now() + 5 * 86400000));
   ok(await change(t, { closures: [{ from: soon, to: soon, note: 'Noël' }] }));
   const html = page(c, 'en');
-  assert.match(html, /Patio only/);
+  // Brewery test 1 (2026-11-12): the chip reads as a whole sentence on the page.
+  assert.match(html, /Dogs welcome on the patio only/);
   assert.doesNotMatch(html, /Terrasse seulement/);
   assert.match(html, /\(Christmas Day\)/);
   assert.doesNotMatch(html, /\(Noël\)/);

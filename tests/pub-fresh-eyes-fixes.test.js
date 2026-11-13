@@ -86,7 +86,8 @@ test('B–E: Save and exit records no implicit "not offered"; the spend icon; th
   assert.equal(cfg.typeWord, 'pub');
   assert.equal(cfg.t.doorLead, 'So visitors can walk right to your door. It takes one photo, taken outside your {type}.');
   assert.equal(cfg.t.doorHere, 'Are you at your {type} right now?');
-  assert.match(s, /fill\(T\.doorLead, \{ type: C\.typeWord \}\)/);
+  // Brewery test 1 (2026-11-12): a cidery gets its own orchard lead; everyone else this one.
+  assert.match(s, /\? T\.doorLeadCidery : T\.doorLead, \{ type: C\.typeWord \}\)/);
   for (const k of ['doorLead', 'doorHere', 'mapFail']) assert.doesNotMatch(cfg.t[k], /Roam Now/);
   const fr = cfgOf(await text(`/fr/owner/${tokenFor(v.id)}/setup`));
   assert.equal(fr.typeWord, 'pub'); assert.match(fr.t.doorHere, /\{type\}/);

@@ -554,7 +554,7 @@
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
-  // waiting for our check (C.waiting: the server's list from what's waiting now, refreshed with every save).
+  // pending (C.waiting: the server's list of steps with something pending now, refreshed with every save).
   function nowSt(k, d, waiting){ var w = waiting || C.waiting; return d === 'day' && w && w.indexOf('*') < 0 && w.indexOf(k) < 0 && !(k === 'social' && (w.indexOf('instagram') >= 0 || w.indexOf('facebook') >= 0)) ? 'live' : d; }
   function statusHtml(done, waiting){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, nowSt(k, done[k], waiting))) + '</li>'; }).join('');
@@ -1921,6 +1921,7 @@
     list.push({ specials: out }); saveAll('specials', list);
   }
   function musicSave(){
+    S.nightsGuessed = false;
     readEntries(); var out = [];
     for (var i = 0; i < S.nights.length; i++) {
       var e = S.nights[i], ds = DAYS.filter(function(d){ return e.days[d]; }), title = (e.what || '').trim() || (e.kind && e.kind !== 'other' ? T.kinds[e.kind] : '');
@@ -2458,7 +2459,7 @@
       // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
       // becomes hers and a full Plan your visit box never drops it.
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
-      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
+      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; S.dogGuessed = false; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
@@ -2494,7 +2495,7 @@
       if (Object.keys(bi2).length) fl.push({ brewery_info: bi2 });
       if (!fb2.noFlights && ff !== S.savedFlight) fl.push({ flight_fee: ff });
       S.savedLine.flights = !fb2.noFlights && ff > C.feeLiveMax && ff !== S.savedFlight ? T.flightSavedDay : T.flightSavedLive;
-      return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; });
+      return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? el('suBookUrl').value.trim() : null;
