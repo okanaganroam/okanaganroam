@@ -1007,9 +1007,20 @@ test('brewery test 4: Build My Trip says which day a left-out place is closed ("
   assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'L', url: '/x', reasonCode: 'different_time', closedDay: alt.closedDay }] }, true, (x) => String(x)), /Fermé le lundi \(oct\.–avr\.\) · essayez du mardi au dimanche/);
   assert.equal(v3.t3ClosedDayText({ day: 'mon', open: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }, false), 'Closed Mondays · try Tue–Sun', 'closed all year: no months');
   assert.equal(v3.t3ClosedDayText({ day: 'wed', open: ['mon', 'fri'] }, false), 'Closed Wednesdays · try Mon, Fri');
+  // The missing line itself says why when the only matching places were closed that day.
+  const step = { alternatives: [{ name: 'Lakeside Lager House', url: '/x', reasonCode: 'different_time', closedDay: alt.closedDay }] };
+  assert.equal(v3.t3MissingClosedText(step, false), 'Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.');
+  assert.equal(v3.t3MissingClosedText(step, true), 'Lakeside Lager House est fermé le lundi (oct.–avr.) · essayez du mardi au dimanche.');
+  assert.equal(v3.t3MissingClosedText({ alternatives: step.alternatives.concat({ name: 'Open Brewing', url: '/y', reasonCode: 'another_listing' }) }, false), null, 'another place nearby: the usual line');
+  const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(pageSrc, /t3MissingClosedText\(step,nextFr\)\?esc\(\(nextFr\?'Non inclus : ':'Not included: '\)/);
+  assert.match(pageSrc, /t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml\]\.map/);
+  // The named request says it too (server note).
+  const named = await planV3('Mondayshut Lager House on Monday, January 11, 2027');
+  assert.ok((named.warnings || []).concat(named.notes || []).some((w) => /Mondayshut Lager House is closed Mondays from Oct to Apr/.test(w)), JSON.stringify(named.warnings));
   assert.match(v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'L', url: '/x', reasonCode: 'different_time' }] }, false, (x) => String(x)), /Try another time/, 'no closed-day facts: as before');
   // The client copy of the page script has the helper.
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8'), /t3ListingGapSummaryHtml, t3ClosedDayText, t3OptionalAlternativesHtml\]\.map/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8'), /t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml\]\.map/);
   // A day closed all year isn't called seasonal.
   assert.deepEqual(planner.closedDayInfo({ hours: JSON.stringify(dayWeek('12:00', '21:00', ['mon'])), hoursSeason: { from: '10-01', to: '04-30', otherOpen: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } }, 'mon'), { day: 'mon', open: ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] });
   // The usual week's months for a place with one season.

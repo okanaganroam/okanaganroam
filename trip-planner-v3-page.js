@@ -171,6 +171,16 @@ function t3ClosedDayText(c,fr){
   return fr?'Fermé le '+FRL[c.day]+sea+' · essayez '+(run&&inOrder.length>2?'':'le ')+days:'Closed '+ENL[c.day]+sea+' · try '+days;
 }
 
+// Brewery test 4 follow-up: when the only matching places nearby were left out because they're closed all that day,
+// the missing line says so ("Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.") instead of "Try another
+// date or destination". Null otherwise.
+function t3MissingClosedText(step,fr){
+  var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
+  var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
+  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
+  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' est '+t.charAt(0).toLowerCase()+t.slice(1):' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
+}
+
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
@@ -393,7 +403,7 @@ function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
   return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -1925,7 +1935,7 @@ function renderScript(d) {
         if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(nextFr?t3FrenchHref(step.url,step.urlFr):step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
-        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
+        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(t3MissingClosedText(step,nextFr)?esc((nextFr?'Non inclus : ':'Not included: ')+t3MissingClosedText(step,nextFr)):(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.'))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
     html += requirementSummaryBlock(p);
@@ -2563,4 +2573,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3WhyLines, t3ClosedDayText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
