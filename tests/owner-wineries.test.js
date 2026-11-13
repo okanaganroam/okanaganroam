@@ -1297,6 +1297,8 @@ test('winery test 5: small wording (closed once, hours recap, research price and
   research(w.id, [{ label: 'Tastings', text: 'Tastings $10.' }, { label: 'Food', text: 'Charcuterie boards.' }, { label: 'Dogs', text: 'Dogs welcome on the patio.' }, { label: 'Parking', text: 'Free parking on site.' }, { label: 'Kids', text: 'Kids welcome with an adult.' }]);
   const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(cfg.researchFee, 10);
+  assert.equal(cfg.researchFeeFrom, 'visit', 'not on the card: “Your website says $10”');
+  assert.match(text.en.winery.feeGuessVisit, /^Your website says \{x\}, so we picked it\./);
   assert.equal(app.wineryTastingFee(w.id), null, 'not saved until the screen is');
   assert.ok(cfg.visitTicks.includes('kid_friendly') && cfg.visitTicks.includes('free_parking') && cfg.visitTicks.includes('dog_friendly'), JSON.stringify(cfg.visitTicks));
   // Donna's answers: Tastings, Food, Groups, What you offer (Kids welcome, Free parking kept on), then Dogs, Known for and an

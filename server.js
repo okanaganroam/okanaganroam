@@ -52299,6 +52299,8 @@ function renderOwnerSetupPage(found, opts) {
         const m = r && /\$\s?(\d{1,3})(?:\.00)?(?!\d|[.,]\d)/.exec(String(r.text || ''));
         return m && Number(m[1]) > 0 ? Number(m[1]) : null;
       })(),
+      // Where it came from: the card's price ("Your card shows $10 now") or only the Tastings line ("Your website says $10").
+      researchFeeFrom: (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 ? 'card' : 'visit'; })(),
       // The Book button research found (when the owner's own link isn't set), and research's extra lines (experiences).
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
       extras: (((venueVisitInfo(venue.id) || {}).rows) || []).filter((r) => !WINERY_CORE_LABELS.has(r.label)).slice(0, WINERY_EXPERIENCES_MAX).map((r) => ({ label: String(r.label).slice(0, 24), text: String(r.text || '').slice(0, 120) })),

@@ -964,7 +964,7 @@ en.winery = {
   rnameLabel: 'Restaurant name', rnameEx: 'The Vineyard Bistro', rwhenLabel: 'When is it open? (optional)', rwhenEx: 'Thu–Mon from noon', rnameNeed: 'Please type your restaurant’s name, or tap another answer.',
   // Tastings
   feeQ: 'What does a tasting cost per person?', feeLead: 'It shows on your page and on your card right away.',
-  feeGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', feeWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
+  feeGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', feeGuessVisit: 'Your website says {x}, so we picked it. Tap another price if it changed.', feeWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
   feeFree: 'Free', feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.',
   feeNeed: 'Please tap a price, or tap Other and type it, like 18.',
   waivedQ: 'Is it free if people buy wine?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
@@ -1039,7 +1039,7 @@ fr.winery = {
   ownPage: '{name} a sa propre page.', ownPageSub: 'Mettez ses heures et son menu à jour là-bas, avec son propre lien. Nous ne vous les demanderons pas deux fois.', ownPageLink: 'Voir sa page : {name}',
   rnameLabel: 'Nom du restaurant', rnameEx: 'Le Bistro du vignoble', rwhenLabel: 'Quand est-il ouvert? (facultatif)', rwhenEx: 'Du jeudi au lundi dès midi', rnameNeed: 'Écrivez le nom de votre restaurant, ou touchez une autre réponse.',
   feeQ: 'Combien coûte une dégustation par personne?', feeLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.',
-  feeGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', feeWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
+  feeGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', feeGuessVisit: 'Votre site Web indique {x}, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', feeWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
   feeFree: 'Gratuite', feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.',
   feeNeed: 'Touchez un prix, ou touchez Autre et écrivez-le, par exemple 18.',
   waivedQ: 'Est-elle gratuite à l’achat de vin?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },

@@ -1213,7 +1213,7 @@
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'winerySave') + '</div>' + skip('winery');
     } else if (s === 'tastings') {
       var wf = S.wine, feeOn = function(n){ return !wf.feeOther && wf.fee === n; };
-      x = doneLine('tastings') + q(T.feeQ, T.feeLead) + (wf.feeGuessed && wf.fee != null && !isNaN(wf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(T.feeGuess, { x: feeText(wf.fee) })) + '</p>' : '')
+      x = doneLine('tastings') + q(T.feeQ, T.feeLead) + (wf.feeGuessed && wf.fee != null && !isNaN(wf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' && T.feeGuessVisit ? T.feeGuessVisit : T.feeGuess, { x: feeText(wf.fee) })) + '</p>' : '')
         + (CUR.tasting_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.feeWaiting, { x: feeText(CUR.tasting_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.feeQ) + '" id="suFeeChips">' + QUICK_FEES.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-fee="' + n + '">' + h(feeText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (wf.feeOther ? 'true' : 'false') + '" data-fee="other">' + h(T.feeOther) + '</button></div>'
