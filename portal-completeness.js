@@ -373,9 +373,13 @@ function doneMap(input, today) {
     // neither can still answer it).
     ...(i.type === 'winery' ? (() => {
       const w = i.wineryInfo && typeof i.wineryInfo === 'object' ? i.wineryInfo : {};
+      // Winery test 4 (2026-11-12): by appointment only (no set hours) answers the hours, their check and the season:
+      // there is no weekly schedule to add or confirm ("Are your hours still right?" never asks).
+      const apptOnly = w.visit === 'appointment';
       return {
+        ...(apptOnly ? { hours: true, hours_fresh: true } : {}),
         winery_kind: WINERY_KINDS.includes(i.placeType),
-        season: nonBlank(i.openMonths) || !!i.hasSeasons || WINERY_YEAR.includes(w.year),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || WINERY_YEAR.includes(w.year) || apptOnly,
         tasting_price: typeof i.tastingFee === 'number' && Number.isFinite(i.tastingFee) && i.tastingFee >= 0,
         visit_how: WINERY_VISIT.includes(w.visit),
         booking_link: nonBlank(i.bookingUrl) || w.visit === 'walk_in',

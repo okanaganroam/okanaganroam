@@ -626,7 +626,7 @@
     var s = S.step, b = stepOf(base(s)), i = P1.indexOf(b), two = inP2(b) || s === 'more';
     // Part 2 is optional: no "0 of 11 done" and no bar (it made the optional part feel like homework).
     el('suProg').hidden = !(i >= 0 || (two && s !== 'more') || s === 'finish' || s === 'ess');
-    el('suProgText').textContent = s === 'finish' ? (leftList().length || gapList().length ? T.finishBar : T.allDone) : s === 'ess' ? T.essBar : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
+    el('suProgText').textContent = s === 'finish' ? (leftList().length || gapList().length ? T.finishBar : T.allDone) : s === 'ess' ? (P1.some(function(k){ return !answered(k); }) ? T.essBarNearly || T.essBar : T.essBar) : two ? T.moreQ + ' · ' + T.labels[b] : i >= 0 ? fill(T.step, { n: i + 1, total: P1.length }) + ' · ' + T.labels[b] : '';
     el('suProgBar').parentNode.hidden = two;
     el('suProgBar').style.width = (s === 'finish' || s === 'ess' ? 100 : Math.round(((i + 1) / (P1.length + 1)) * 100)) + '%';
     el('suBack').hidden = !S.hist.length || s === 'finish' || s === 'ess' || s === 'start' || S.busy;
@@ -1015,7 +1015,7 @@
       // Part 1 is done: the score, the page, and one choice.
       // "Your page is ready. 8 of 8 essentials done." first; one number lower down.
       var open1 = P1.filter(function(k){ return !answered(k); }), nd = P1.length - open1.length;
-      x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.essReady) + '</h1><p class="su-lead" id="suEssCount">' + h(fill(T.essCount, { n: nd, total: P1.length })) + '</p></div>'
+      x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(open1.length ? T.essNearly || T.essReady : T.essReady) + '</h1><p class="su-lead" id="suEssCount">' + h(fill(T.essCount, { n: nd, total: P1.length })) + '</p></div>'
         + (open1.length ? '<p class="su-q">' + h(T.essSkipped) + '</p><div class="su-stack" style="margin-bottom:18px">' + open1.map(function(k){ return big('➜', T.labels[k], '', true, 'jumpEss:' + k); }).join('') + '</div>' : '')
         + preview() + scoreBox(true)
         + '<div class="su-stack" style="margin-top:18px">' + big('➜', T.moreOpt, moreSub(), false, 'go:more') + big('✓', T.doneNow, '', true, 'doneNow') + '</div>'
@@ -1037,8 +1037,12 @@
         + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + big('✕', T.noWebsiteBtn, '', true, 'basicsNoSite') + '</div>';
     } else if (s === 'hours') {
-      x = doneLine('hours') + q(T.hoursQ) + msgs() + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + '</div>'
-        : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + '</div>') + skip('hours');
+      // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
+      // day list); once it has, the screen says so and "Yes, that's right" keeps it.
+      var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = C.winery && WI.visit === 'appointment' && !anyOpen && !!CUR.hours;
+      x = doneLine('hours') + q(T.hoursQ) + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit') + noSetBtn() + '</div>'
+        : noneNow ? '<p class="su-sent" id="suNoSetNow">' + h(T.noSetHoursNow) + '</p><div class="su-stack">' + big('✓', T.yesRight, '', false, 'noSetHours') + big('✎', T.addHours, '', true, 'go:hours:edit') + '</div>'
+        : '<p class="su-lead">' + h(T.noHours) + '</p><div class="su-stack">' + big('✎', T.addHours, '', false, 'go:hours:edit') + noSetBtn() + '</div>') + skip('hours');
     } else if (s === 'hours:year') {
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
@@ -1104,7 +1108,7 @@
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
-        + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext')) + '</div>';
+        + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>';
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
       x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big('🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
@@ -1129,7 +1133,7 @@
     } else if (s === 'closures') {
       var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0 && !HOL.some(function(o){ return o.key === k && holCovered(o); }); }).length + Math.max(0, S.extra.length - S.savedExtra);
-      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
@@ -1635,6 +1639,17 @@
     return ca === cb ? fill(T.monthsClosedOne, { a: monthName(ca - 1) }) : fill(T.monthsClosedRow, { a: monthName(ca - 1), b: monthName(cb - 1) });
   }
   function windowsOk(w){ return DAYS.some(function(d){ return w[d] && w[d].length; }); }
+  // Winery test 4 (2026-11-12): the one "no set hours" choice, wineries only.
+  function noSetBtn(){ return C.winery && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }
+  function noSetHoursSave(){
+    var none = {}; DAYS.forEach(function(d){ none[d] = []; });
+    var ch = { hours: none, hours_checked: true }; if (WI.visit !== 'appointment') ch.winery_info = { visit: 'appointment' };
+    saveAll('hours', [ch], null, COMBO ? 'closures' : null, function(){
+      if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
+      WI.visit = 'appointment'; S.wine.visit = 'appointment'; var nw = {}; DAYS.forEach(function(d){ nw[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw : JSON.stringify(nw);
+      S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); S.hoursOpenSet = false; S.sea.on = false; S.seaTouched = false; S.openTouched = false; S.wYearPick = '';
+    });
+  }
   function monthRun(obj){
     var on = []; for (var i = 1; i <= 12; i++) if (obj[i]) on.push(i);
     if (!on.length) return { none: true }; if (on.length === 12) return { all: true };
@@ -1672,7 +1687,7 @@
     var wyNew = C.winery && S.wYearPick ? (S.wYearPick === 'appointment' ? 'appointment' : openVal(S.openSea) ? 'seasonal' : 'all') : '';
     if (wyNew && (wyNew !== S.savedWYear || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(WI.season || null)))) listH.push({ winery_info: wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew } });
     saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
-      if (COMBO) S.hoursJust = true;
+      if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
       if (wyNew) { S.savedWYear = wyNew; S.wine.year = wyNew; WI.year = wyNew; if (wyNew === 'appointment') WI.season = S.wine.season; else { delete WI.season; S.wine.season = null; } S.wYearPick = ''; }
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
       if ('open_months' in ch) CUR.open_months = ch.open_months;
@@ -1978,8 +1993,9 @@
       var listN = [{ not_offered: addNot('website') }]; if (Object.keys(chN).length) listN.push(chN);
       return saveAll('basics', listN, null, null, function(){ phoneSaved(chN); });
     }
+    if (k === 'noSetHours') return noSetHoursSave();
     if (k === 'hoursOk') return go('hours:year');
-    if (k === 'hoursNext') { readTimes(); if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); } return go('hours:year'); }
+    if (k === 'hoursNext') { readTimes(); if (!windowsOk(S.week)) { S.nudge = C.winery && T.needOpenDayAppt ? T.needOpenDayAppt : T.needOpenDay; return render(); } return go('hours:year'); }
     // Café test 3 (2026-11-11): "Yes, all year" also clears a saved open season (open_months), so the page stops saying
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
@@ -2334,15 +2350,20 @@
       var bu = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu !== null) S.bookUrl = bu;
       var vl = [], wi2 = {};
       ['visit', 'groups', 'buses'].forEach(function(kk){ if (wv2[kk] && wv2[kk] !== (WI[kk] || '')) wi2[kk] = wv2[kk]; });
-      if (Object.keys(wi2).length) vl.push({ winery_info: wi2 });
+      // Winery test 4 (2026-11-12): "By appointment only" newly picked takes the old weekly hours off the page in the same
+      // save (Undo in "Your updates" puts them back), so the page never says both.
+      var apptClear = wi2.visit === 'appointment' && S.week && windowsOk(S.week);
+      var none2 = {}; if (apptClear) DAYS.forEach(function(d){ none2[d] = []; });
+      if (Object.keys(wi2).length) vl.push(apptClear ? { winery_info: wi2, hours: none2, hours_checked: true } : { winery_info: wi2 });
       var linkCh = bu !== null && !!bu && (!wv2.noBook || wv2.visit === 'walk_in') && bu !== (CUR.booking_url || C.bookingKnown || '');
       if (bu && !siteOk(bu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       if (linkCh) vl.push({ booking_url: bu });
       var wantNone = wv2.noBook && wv2.visit !== 'walk_in' && !bu;
       if (wantNone && S.notOffered.indexOf('booking_link') < 0) vl.push({ not_offered: { add: ['booking_link'] } });
       if (!wantNone && S.notOffered.indexOf('booking_link') >= 0) vl.push({ not_offered: { remove: ['booking_link'] } });
-      S.savedLine.visit = linkCh ? T.visitSavedLink : '';
-      return saveAll('visit', vl, null, null, function(){ Object.keys(wi2).forEach(function(kk){ WI[kk] = wi2[kk]; }); if (linkCh) CUR.booking_url = bu; });
+      S.savedLine.visit = [apptClear ? T.apptHoursGone : '', linkCh ? T.visitSavedLink : ''].filter(Boolean).join(' ');
+      return saveAll('visit', vl, null, null, function(){ Object.keys(wi2).forEach(function(kk){ WI[kk] = wi2[kk]; }); if (linkCh) CUR.booking_url = bu;
+        if (apptClear) { var nw2 = {}; DAYS.forEach(function(d){ nw2[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw2 : JSON.stringify(nw2); S.week = clone(nw2); S.hoursOpenSet = false; } });
     }
     if (k === 'expSave') {
       readWine();
