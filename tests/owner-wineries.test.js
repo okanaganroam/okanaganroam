@@ -997,6 +997,7 @@ test('winery test 4: the portal hours form has the “no set hours” button for
   assert.ok(!(await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text.includes('id="opNoSetHoursBtn"'), 'wineries only');
   assert.match(home, /send\(\{ hours: none, winery_info: \{ visit: 'appointment' \} \}/);
   assert.match(home, /if \(window\.opNoSetHoursSent\) delete changes\.hours;/);
+  assert.match(home, /var hk = document\.getElementById\('opHoursOk'\); if \(hk\) hk\.hidden = true;/, 'no “These hours are right” after it');
   // The edit link (no login): by appointment goes live, the hours wait for our check, nothing is refused.
   const r = await change(t, { hours: NO_DAYS, winery_info: { visit: 'appointment' } }, false);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -1108,6 +1109,7 @@ test('winery test 4: the cost answer leads with free and no card, no upsell; the
   assert.match(cost.a, /^<p><strong>Free\.<\/strong> You’ll never be charged, and we never ask for a card\./);
   assert.match(cost.aFr, /^<p><strong>Gratuit\.<\/strong> Vous ne paierez jamais rien, et nous ne demandons jamais de carte\./);
   for (const s of [cost.a, cost.aFr]) assert.ok(!/featured|vedette|visibility|visibilité/i.test(s), s);
+  for (const k of ['charged', 'credit card']) assert.ok(cost.keys.includes(k), k);
   assert.ok(!app.OWNER_HELP_TOPICS.some((x) => /featured|paid/.test(x.id)), 'no new paid-features topic');
   const ap = app.WINERY_SETUP_HELP_TOPICS.find((x) => x.id === 'winery-appointment');
   assert.match(ap.a, /<strong>We don’t have set hours\. Visits are by appointment<\/strong>/);

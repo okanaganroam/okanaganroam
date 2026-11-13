@@ -53860,8 +53860,8 @@ const OWNER_HELP_TOPICS = [
     a: '<p>Yes, it\u2019s real. Okanagan Roam is a free guide to the Okanagan run by Dayton, and your business is listed because visitors look for places like yours. Claiming and editing your listing is free, and nothing here asks for a credit card.</p><p>Not sure a message really came from us? Don\u2019t click its links: go to okanaganroam.com yourself, or tap <strong>Message us</strong> and Dayton will reply by email.</p>',
     aFr: '<p>Oui, c\u2019est réel. Okanagan Roam est un guide gratuit de l\u2019Okanagan tenu par Dayton, et votre entreprise y figure parce que les visiteurs cherchent des endroits comme le vôtre. Réclamer et modifier votre fiche est gratuit, et rien ici ne vous demande de carte de crédit.</p><p>Vous doutez qu\u2019un message vienne vraiment de nous? Ne cliquez pas sur ses liens : allez vous-même sur okanaganroam.com, ou touchez <strong>Écrivez-nous</strong> et Dayton vous répondra par courriel.</p>' },
   { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
-    keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
-    keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
+    keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'charged', 'be charged', 'credit card', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
+    keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite', 'carte de credit'],
     // Winery test 4 (2026-11-12): free first, plainly, and no upsell in the same answer.
     a: '<p><strong>Free.</strong> You’ll never be charged, and we never ask for a card. Your listing, photos, menu and events are all free.</p>',
     aFr: '<p><strong>Gratuit.</strong> Vous ne paierez jamais rien, et nous ne demandons jamais de carte. Votre fiche, vos photos, votre menu et vos événements sont tous gratuits.</p>' },
@@ -57833,6 +57833,7 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
       send({ hours: none, winery_info: { visit: 'appointment' } }, nb, 'opNoSetHoursError', nbox, function(j){
         nb.hidden = true; window.opNoSetHoursSent = true;
         var rowsBox = document.getElementById('opHours'); if (rowsBox) rowsBox.hidden = true;
+        var hk = document.getElementById('opHoursOk'); if (hk) hk.hidden = true;
         var d = document.getElementById('opNoSetHoursDone'); if (d) { d.textContent = nbox.getAttribute(((j && j.live) || []).indexOf('hours') >= 0 ? 'data-live' : 'data-sent'); d.hidden = false; }
         var he = document.getElementById('opHoursError'); if (he) { he.hidden = true; he.textContent = ''; }
         if (window.opCbRefresh) window.opCbRefresh('');
