@@ -1590,6 +1590,16 @@ CREATE TABLE IF NOT EXISTS venue_winery_info (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+// Brewery answers only the business gives (Dayton, 2026-11-12; drafts/brewery-portal-2026-11-12/SPEC-breweries.md; never
+// researched): food here, outside food, the kitchen close time, the flight price and "no flights", the to-go chips and
+// who's welcome (the pub answer's shape). info: JSON (keys optional). Additive: a brewery with no row reads as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_brewery_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
 // Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
 // set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.
 if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name === 'time_tbc')) {

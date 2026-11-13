@@ -78,6 +78,8 @@ const FR_TEXT = {
   'Heated patio': 'Terrasse chauffée',
   // Short badge labels on the listing cards (2026-10-28).
   'Dogs welcome': 'Chiens bienvenus',
+  // Brewery French check (2026-11-12): the Kids badge's short card label was left in English on French cards.
+  'Kids OK': 'Enfants OK',
   'Non-alcoholic': 'Sans alcool',
   'Live music': 'Musique en direct',
   'Groups': 'Groupes',

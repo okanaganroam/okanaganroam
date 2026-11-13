@@ -973,7 +973,8 @@ function scoreVenue(v, ctx) {
   // A plain hiking day (2026-10-25) walks the trails; a guiding company is for a request that asks for a guide.
   if (v.type === 'tour' && /\b(?:guided hik\w*|hiking tours?|hiking guide\w*)\b/.test(normWords(v.cuisine || '')) && /\b(?:hike|hikes|hiking|trails?)\b/.test(ctx.queryText || '') && !/\b(?:guided|guide|guides|tour|tours)\b/.test(ctx.queryText || '')) add('self_guided', -30, null);
   // Beer asked for (2026-10-25: "mountain biking and beers in Squamish" got a cidery): a brewery before a cidery.
-  if (v.type === 'brewery' && /\b(?:beers?|brewery|breweries|brewpubs?|craft beer|ipa|pints?)\b/.test(ctx.queryText || '') && !/\bcider\w*\b/.test(ctx.queryText || '') && /\bcider\w*\b/.test(normWords(v.cuisine || '')) && !/\bbrew\w*\b/.test(normWords(v.cuisine || ''))) add('cider_not_beer', -20, null);
+  // Breweries (2026-11-12): the owner's own kind of place ("Cidery", "Brewery") decides when they gave one.
+  if (v.type === 'brewery' && /\b(?:beers?|brewery|breweries|brewpubs?|craft beer|ipa|pints?)\b/.test(ctx.queryText || '') && !/\bcider\w*\b/.test(ctx.queryText || '') && breweryIsCidery(v)) add('cider_not_beer', -20, null);
   // Shopping asked for (2026-10-25): shops come before museums and galleries, and gift, book and clothing shops before
   // rental and tuning counters unless rentals were asked for.
   if (v.isShop && SHOP_ASKED_RE.test(ctx.queryText || '')) {
@@ -1297,11 +1298,19 @@ function why(reasons) {
 
 // Collections a stop card may name, and how (Build My Trip V3).
 const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
+// A cidery for "beer, not cider" (2026-11-12): the owner's own kind when they picked one, else the cuisine words, as before.
+function breweryIsCidery(v) {
+  if (v && typeof v.breweryKind === 'string' && v.breweryKind) return v.breweryKind === 'Cidery';
+  return /\bcider\w*\b/.test(normWords((v && v.cuisine) || '')) && !/\bbrew\w*\b/.test(normWords((v && v.cuisine) || ''));
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
   const fee = v.type === 'winery' && typeof v.tastingFee === 'number' && Number.isFinite(v.tastingFee) && v.tastingFee >= 0 ? v.tastingFee : null;
-  const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : tripStopPrice(v.url, v.id);
+  // Breweries (2026-11-12): the owner's flight price the same way ("$12 per person · Flight").
+  const flight = v.type === 'brewery' && typeof v.flightFee === 'number' && Number.isFinite(v.flightFee) && v.flightFee > 0 ? v.flightFee : null;
+  const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
+    : flight ? { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null } : tripStopPrice(v.url, v.id);
   return {
     ...(fee === 0 ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
@@ -8031,7 +8040,7 @@ module.exports = {
   wineTourMeansWineries,
   applyWineTourMeaning,
   fastFood,
-  publicVenue,
+  publicVenue, breweryIsCidery,
   stopFrom,
   parseVenueHours,
   hoursFit, dayClosedAllDay,

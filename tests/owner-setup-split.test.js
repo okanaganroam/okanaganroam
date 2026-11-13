@@ -106,7 +106,7 @@ test('progress and the portal card: not started, carry on, essentials done, all 
   // The help fallback says it in the owner's words.
   assert.match(html, /Instagram: not on Instagram/);
   // Other types: no card, no progress.
-  const pub = mk('brewery');
+  const pub = mk('cocktail');
   assert.equal(card(await text(`/owner/${tokenFor(pub.id)}`)), '');
   assert.equal((await get(`/owner/${tokenFor(pub.id)}/setup/progress`)).status, 404);
 });
@@ -267,7 +267,7 @@ test('the page script: never "Saved" on a failed save; help reads progress fresh
 
 test('other types and public pages: nothing new; the portal has no empty box rule for restaurants only', async () => {
   // The setup page still redirects other types, and their edit pages have no setup card.
-  for (const type of ['brewery', 'distillery']) { // cafés have the setup since 2026-11-10
+  for (const type of ['cocktail', 'distillery']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12
     const v = mk(type);
     assert.equal((await get(`/owner/${tokenFor(v.id)}/setup`)).status, 302);
     assert.doesNotMatch(await text(`/owner/${tokenFor(v.id)}`), /opSetupCard/);

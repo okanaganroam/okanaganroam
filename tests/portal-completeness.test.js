@@ -239,7 +239,7 @@ test('edit page: French restaurant page has the bar and the French help topic', 
 
 test('edit page: every other type (pubs, cafes, wineries, breweries, beaches, shops...) has no bar, no CSS, no script, no help topic; English and French', async () => {
   // Cafés have their own checklist since 2026-11-10 (tests/owner-cafes.test.js).
-  for (const t of ['brewery', 'distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
+  for (const t of ['distillery', 'cocktail', 'golf', 'beach', 'shop', 'tour', 'outdoor']) {
     const v = mk(t);
     for (const prefix of ['/owner/', '/fr/owner/']) {
       const html = await get(`${prefix}${tokenFor(v.id)}`);
@@ -387,7 +387,7 @@ test('edit page intro: a restaurant on the edit link says which quick answers go
   assert.ok(!en.includes('We review every change'), 'and so is "we review every change"');
   const fr = await get(`/fr/owner/${tokenFor(r.id)}`);
   assert.match(fr, /Les réponses rapides sont en ligne tout de suite\./);
-  for (const type of ['brewery', 'distillery']) { // cafés have the checklist since 2026-11-10
+  for (const type of ['cocktail', 'distillery']) { // cafés have the checklist since 2026-11-10
     const html = await get(`/owner/${tokenFor(mk(type).id)}`);
     assert.ok(html.includes('Nothing changes until you press the Send button'), `${type} keeps its wording`);
     assert.ok(!html.includes('Quick answers go live right away'), `${type} has no checklist line`);
