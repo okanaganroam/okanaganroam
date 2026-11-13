@@ -784,8 +784,7 @@ function renderCompleteness(result, opts) {
   // The last steps (live check 2026-11-08): photos and the storefront spot, said plainly once they are among what's left.
   const leftKeys = r.missing.filter((it) => !it.waiting).map((it) => it.key);
   // Brewery test 4 (2026-11-13): once photos are sent (waiting for our check), the line names only the door.
-  const photosSent = r.missing.some((it) => ['photo_main', 'photo_extra'].includes(it.key) && it.waiting);
-  const ceilPhotos = !photosSent && (leftKeys.includes('photo_main') || leftKeys.includes('photo_extra'));
+  const ceilPhotos = !(photosSent > 0 || r.missing.some((it) => ['photo_main', 'photo_extra'].includes(it.key) && it.waiting)) && (leftKeys.includes('photo_main') || leftKeys.includes('photo_extra'));
   const ceilDoor = leftKeys.includes('arrival');
   const onlyCeiling = leftKeys.length > 0 && leftKeys.every((k) => CEILING_KEYS.includes(k));
   const ceilingText = ceilPhotos && ceilDoor ? L(`Photos and ${spotEn} are the last steps to 100%.`, `Les photos et ${spotFr} sont les dernières étapes vers 100 %.`)

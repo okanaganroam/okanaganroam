@@ -8163,7 +8163,7 @@ module.exports = {
   hoursFit, dayClosedAllDay, closedDayInfo,
   listedHoursText,
   cafeRole,
-  SLOT_WINDOWS,
+  SLOT_WINDOWS, kitchenMealFit,
   PLAN_DAYPARTS,
   PLAN_MAX_HOP_KM,
   SLOT_AFFINITY,
