@@ -9748,9 +9748,7 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   const next = nextJson ? JSON.parse(nextJson) : { rows: [], booking_url: cur.booking_url || null, source_url: cur.source_url || null, checked_at: cur.checked_at };
   const ownerRows = (cur.rows || []).filter((r) => blocked.has(r.label));
   const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
-  // Winery test 5: a winery's Tastings row (its own card) doesn't take one of the box's places (visitCapRows).
-  const all = [...ownerRows, ...researchRows];
-  const rows = all.slice(0, VISIT_ROWS_MAX + (Array.isArray(cur.winery_labels) && all.some((r) => r.label === 'Tastings') ? 1 : 0));
+  const rows = [...ownerRows, ...researchRows].slice(0, VISIT_ROWS_MAX);
   // A winery's own answers (2026-11-12): their French lines and what they replaced ride along.
   const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
   return JSON.stringify({ ...next, rows, owner_labels: [...owned].sort(), ...keep });
@@ -20502,17 +20500,32 @@ const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Wint
 // that makes room brings it back). A box full of the owner's own rows keeps the cap: the last of hers is set aside with
 // `owned: true`, kept, and shown folded under "More" on the page (visitInfoHtml), never lost.
 // -> the rows set aside (store them as owner_dropped).
-// Winery test 5 (2026-11-12): a winery's Tastings row shows in its own card above the box, so it doesn't take one of the
-// box's places (research's Kids line was set aside while the box showed six lines). winery: true for a winery's box.
-function visitCapRows(rows, isOwn, owned, managed, stash, winery = false) {
+// Winery test 5 (2026-11-12): research's practical lines backed by a "What you offer" tile the owner herself saved on (Kids
+// welcome, Free parking, step-free access): she confirmed them, so a full box parks them as hers (folded on the page,
+// never silently gone) instead of dropping them as research's. -> Set of row labels.
+const VISIT_BADGE_LABELS = { kid_friendly: /^(?:kids|children|families|ages)$/i, free_parking: /^parking$/i, wheelchair_accessible: /^(?:accessibility|wheelchair access)$/i };
+function visitBadgeConfirmedLabels(venueId, rows) {
+  const out = new Set();
+  let v = null, owned = new Set();
+  try {
+    v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+    owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venueId).map((r) => r.field_name));
+  } catch (e) { return out; }
+  if (!v) return out;
+  for (const [badge, re] of Object.entries(VISIT_BADGE_LABELS)) {
+    if (!owned.has(badge) || !(Number(v[badge]) === 1 || v[badge] === true)) continue;
+    for (const r of rows || []) if (r && re.test(String(r.label || ''))) out.add(r.label);
+  }
+  return out;
+}
+function visitCapRows(rows, isOwn, owned, managed, stash) {
   for (const r of Array.isArray(stash) ? stash : []) {
     if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) });
   }
   const dropped = [];
   const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
-  const cap = () => VISIT_ROWS_MAX + (winery && rows.some((x) => x.label === 'Tastings') ? 1 : 0);
-  while (rows.length > cap()) {
+  while (rows.length > VISIT_ROWS_MAX) {
     let j = -1;
     for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
     if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
@@ -20594,7 +20607,8 @@ function writeWineryVisitRows(venueId, now = new Date()) {
   // Rows set aside earlier come back, except a line these answers now decide (its row is above, or removed on purpose)
   // and, while the owner manages Experiences, any extra row (hers are above).
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(Array.isArray(info.experiences) && !WINERY_CORE_LABELS.has(r.label)));
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash, true);
+  const confirmed = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label) || confirmed.has(r.label), owned, managed, stash);
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45929,8 +45943,8 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // that repeats one of them goes first (visitCapRows, winery test 1).
   // Her parked lines are back in `rows` above (or cleared on purpose): only the other rows set aside come back here.
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
-  const isWinery = (() => { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type === 'winery'; } catch (e) { return false; } })();
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, isWinery);
+  const badgeOk = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label) || badgeOk.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
@@ -52281,7 +52295,7 @@ function renderOwnerSetupPage(found, opts) {
         const e = CARD_PRICES[String(venue.id)]; if (e && !e.owner && Number(e.from) > 0) return Number(e.from);
         const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
         const r = (info.rows || []).find((x) => x && x.label === 'Tastings' && !mine.has(x.label));
-        const m = r && /\$\s?(\d{1,3})(?:\.00)?(?![\d.])/.exec(String(r.text || ''));
+        const m = r && /\$\s?(\d{1,3})(?:\.00)?(?!\d|[.,]\d)/.exec(String(r.text || ''));
         return m && Number(m[1]) > 0 ? Number(m[1]) : null;
       })(),
       // The Book button research found (when the owner's own link isn't set), and research's extra lines (experiences).
@@ -65350,7 +65364,7 @@ module.exports = {
   validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
-  validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
+  validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,

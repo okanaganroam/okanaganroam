@@ -8034,7 +8034,7 @@ module.exports = {
   publicVenue,
   stopFrom,
   parseVenueHours,
-  hoursFit,
+  hoursFit, dayClosedAllDay,
   listedHoursText,
   cafeRole,
   SLOT_WINDOWS,
