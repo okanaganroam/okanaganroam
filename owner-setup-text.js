@@ -269,7 +269,7 @@ Object.assign(fr, {
 Object.assign(en, {
   dealLong: 'Happy hour {n}: that’s a bit long. Please keep “What’s on special?” to {max} letters.', dealsMany: 'That’s more deals than fit on your page (6 at most). Please remove one.',
   textLong: 'Number {n} is a bit long. Please keep it to {max} letters.',
-  soFarQ: 'Your answers so far', optional: 'Optional', sentTitle: 'Sent',
+  soFarQ: 'Your answers so far', optional: 'Optional', sentTitle: 'Sent', storySentAs: 'What we’ll put on your page:',
   essReady: 'Your page is ready', essCount: '{n} of {total} essentials done.', essSkipped: 'Skipped for now. Tap one to do it:',
   pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.',
   saveClosures1: 'Save these closures ({n} new)', saveClosuresN: 'Save these closures ({n} new)',
@@ -290,7 +290,7 @@ en.offers.dog_friendly = 'Dogs welcome (even just the patio)';
 Object.assign(fr, {
   dealLong: 'Happy hour {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
-  soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé',
+  soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
   pctAbout: 'Complète à environ {n} %', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',

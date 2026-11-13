@@ -1110,6 +1110,8 @@
       // for them: they edit it, and it's checked first like any description.
       var sb = p[1] === 'offer' && !S.badges.sports_tv && !S.storyFixed ? sportsBit() : '';
       x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead"' + (explain ? ' id="suSentMeans"' : '') + '>' + h(line) + '</p></div>'
+        // Brewery test 1 (2026-11-12): the description exactly as it was sent (with any join fixed), so she sees the words.
+        + (p[1] === 'story' && S.storySent && T.storySentAs ? '<div class="su-day" id="suStorySent"><p class="su-q" style="margin:0 0 6px">' + h(T.storySentAs) + '</p><p class="su-hint" style="margin:0;white-space:pre-wrap">' + h(S.storySent) + '</p></div>' : '')
         + (sb ? '<div class="su-day su-sportsfix" id="suSportsFix"><p class="su-q" style="margin:0 0 6px">' + h(T.storySportsQ) + '</p><p class="su-hint" style="margin:0 0 12px">' + h(fill(T.storySportsLead, { bit: sb })) + '</p>' + big('✎', T.storySportsBtn, '', true, 'storyFix') + '</div>' : '')
         + '<div class="su-stack">' + big('➜', nextLabel(p[1]), '', false, 'after:' + p[1]) + '</div>';
     } else if (s === 'ess') {
@@ -2513,7 +2515,7 @@
       var bStoryCh = S.story.trim() !== String(CUR.description || '').trim(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
-      if (bStoryCh) bsl.push({ description: S.story });
+      if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
       // Sent even when unchanged (while it's research's), so the line becomes hers.
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
@@ -2586,14 +2588,14 @@
       var storyCh = S.story.trim() !== String(CUR.description || '').trim(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
-      if (storyCh) sl.push({ description: S.story });
+      if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
       var knownCh = S.wine.known !== ((CUR.visit_rows || {}).known_for || '');
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
       S.savedLine.story = storyCh && knownCh ? T.storyKnownSaved : '';
       return saveAll('story', sl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
-    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } S.storySent = S.story; return saveAll('story', [{ description: S.story }]); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -2805,7 +2807,8 @@
     var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
     var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
-    var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
+    var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
+    if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
     // Pub test 7 (2026-11-10): the story box too (its old text could only be removed with a long backspace).

@@ -35601,6 +35601,12 @@ function happyHourLiveText(h, fr, clock) {
   }
   if (h.state === 'later') {
     const when = h.to ? happyHourRangeText(h.from.minutes, h.to.minutes, fr) : happyHourTimeText(h.from.minutes, fr);
+    // Brewery test 1 (2026-11-12): after midnight "today" read as the evening just over ("Happy hour today 3–5 PM" at
+    // night, under "Closed · Opens 11 AM"). Before 5 AM the line names the day instead.
+    if (clock && Number.isInteger(clock.minutes) && clock.minutes < 5 * 60) {
+      const dn = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
+      return fr ? `Happy hour ${dn} ${when}` : `Happy hour ${dn} ${when}`;
+    }
     return fr ? `Happy hour aujourd’hui ${when}` : `Happy hour today ${when}`;
   }
   const day = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
