@@ -22,12 +22,15 @@ const WORDS = {
     before: '{n} the 30 days before', none: 'No visits counted in the last 30 days yet.', small: 'Early days: these numbers are small, and they grow as more people find your page.',
     since: 'We started counting on {date}, so there’s no earlier month to compare yet.', note: 'Counts from Okanagan Roam only. Visits from search robots and from our own team aren’t counted. Only you can see these numbers.',
     clicksLine: '{n} clicks to your website, phone, directions, booking and menu',
+    // Brewery test 3 (2026-11-13): one of each reads singular (« 1 vue de la page », "1 page view").
+    view1: 'page view', clicksLine1: '1 click to your website, phone, directions, booking and menu',
   },
   fr: {
     title: 'Votre page ces 30 derniers jours', views: 'Vues de la page', website: 'Clics vers le site Web', call: 'Appels (touches sur votre numéro)', directions: 'Itinéraires', book: 'Clics sur Réserver', menu: 'Vues du menu',
     before: '{n} les 30 jours précédents', none: 'Aucune visite comptée ces 30 derniers jours pour l’instant.', small: 'C’est un début : ces chiffres sont petits, et ils grandissent à mesure que plus de gens trouvent votre page.',
     since: 'Nous comptons depuis le {date}; il n’y a donc pas encore de mois précédent à comparer.', note: 'Chiffres d’Okanagan Roam seulement. Les visites des robots de recherche et de notre équipe ne sont pas comptées. Vous seul voyez ces chiffres.',
     clicksLine: '{n} clics vers votre site Web, votre téléphone, l’itinéraire, la réservation et le menu',
+    view1: 'vue de la page', clicksLine1: '1 clic vers votre site Web, votre téléphone, l’itinéraire, la réservation et le menu',
   },
 };
 const MONTHS = { en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], fr: ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] };
@@ -74,11 +77,11 @@ function ownerStatsHtml(st, lang = 'en', opts = {}) {
     .concat(ITEMS.map(([k]) => row(W[k], st.clicks[k], prev ? prev.clicks[k] : null)));
   const sinceLate = !prev && st.counting_since && st.counting_since > st.since;
   const lines = [st.none ? W.none : st.small ? W.small : '', !prev && st.counting_since ? fill(W.since, { date: dateText(st.counting_since, lang) }) : ''].filter(Boolean);
-  if (opts.short) {
-    return `<div class="os-short" id="${esc(opts.id || 'ownerStatsShort')}"><strong>${esc(W.title)}</strong><p>${esc(st.none ? W.none : `${num(st.views)} ${W.views.toLowerCase()} · ${fill(W.clicksLine, { n: num(st.clicks_total) })}`)}</p>${st.small ? `<p>${esc(W.small)}</p>` : ''}</div>`;
-  }
   // Folded on the phone-first edit page: the headline is the summary ("42 page views · 7 clicks"), the rest one tap away.
-  const head = st.none ? W.none : `${num(st.views)} ${W.views.toLowerCase()} · ${fill(W.clicksLine, { n: num(st.clicks_total) })}`;
+  const head = st.none ? W.none : `${num(st.views)} ${st.views === 1 ? W.view1 : W.views.toLowerCase()} · ${st.clicks_total === 1 ? W.clicksLine1 : fill(W.clicksLine, { n: num(st.clicks_total) })}`;
+  if (opts.short) {
+    return `<div class="os-short" id="${esc(opts.id || 'ownerStatsShort')}"><strong>${esc(W.title)}</strong><p>${esc(head)}</p>${st.small ? `<p>${esc(W.small)}</p>` : ''}</div>`;
+  }
   return `<details class="os-panel" id="${esc(opts.id || 'opStats')}" data-since-late="${sinceLate ? '1' : '0'}"${opts.open ? ' open' : ''}>
       <summary><span class="os-title">${esc(W.title)}</span><span class="os-head">${esc(head)}</span></summary>
       <ul class="os-list">${items.join('')}</ul>

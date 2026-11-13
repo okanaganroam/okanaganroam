@@ -1460,7 +1460,7 @@ function renderScript(d) {
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
       + '<div class="t3-card-head">' + photoHtml
-      + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
+      + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : (lang() === 'fr' && v.typeLabelFr ? v.typeLabelFr : frLabel('tripv3.type.' + v.type, v.typeLabel))) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
       + stopPriceHtml(v)

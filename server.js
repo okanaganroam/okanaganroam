@@ -6743,9 +6743,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const hoursDate = parseLocalDate(onDate) ? onDate : seasonToday;
   const seasonStatesNow = getSeasonStates();
   // An owner's yearly season with no dated closure set by hand, judged by the planner on the trip's date (round 7).
-  const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons').all().map((r) => r.venue_id));
+  const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons WHERE superseded_at IS NULL').all().map((r) => r.venue_id));
   // A closure with no reopening date (2026-10-25) still has the place's usual months, so a trip in season can use it.
-  const undatedClosure = new Set(db.prepare("SELECT venue_id FROM venue_seasons WHERE status = 'closed' AND reopens_date IS NULL").all().map((r) => r.venue_id));
+  const undatedClosure = new Set(db.prepare("SELECT venue_id FROM venue_seasons WHERE status = 'closed' AND reopens_date IS NULL AND superseded_at IS NULL").all().map((r) => r.venue_id));
   const openMonthsById = new Map();
   try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id) || undatedClosure.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
@@ -7816,7 +7816,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
     .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
-    .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');
+    .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl')
+    // Brewery test 3 (2026-11-13): "cider" (« cidre ») on its own asks for the cideries (not a word in the descriptions);
+    // "cider fest" and the like stay as typed, for What's On.
+    .replace(/\b(?:(?:hard|craft) )?ciders?\b(?! (?:fests?|festivals?|events?|days?|weekends?|crawls?|houses?|mills?|makers?|press(?:ing)?))/gi, 'cideries');
   // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
   // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and
   // lounges, unless wineries are listed or the wine is ruled out.
@@ -7827,7 +7830,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   let openingText = planTextPlain;
   if (/\bopening (?:day|weekend)\b/i.test(planTextPlain) && (/\b(?:ski|skiing|lifts?|mountain|snowboard\w*)\b/i.test(planTextPlain) || TRIP_SITE.skiHillNameRe.test(planTextPlain.toLowerCase()))) {
     try {
-      const row = db.prepare("SELECT s.reopens_date AS d FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE lower(v.cuisine) = 'ski resort' AND s.reopens_date IS NOT NULL ORDER BY s.reopens_date LIMIT 1").get();
+      const row = db.prepare("SELECT s.reopens_date AS d FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE lower(v.cuisine) = 'ski resort' AND s.reopens_date IS NOT NULL AND s.superseded_at IS NULL ORDER BY s.reopens_date LIMIT 1").get();
       if (row && row.d) { const M = ['January','February','March','April','May','June','July','August','September','October','November','December']; openingText = planTextPlain.replace(/\bopening (day|weekend)\b/i, (m, w) => `skiing ${w === 'weekend' ? 'weekend' : ''} from ${M[Number(row.d.slice(5, 7)) - 1]} ${Number(row.d.slice(8, 10))}`); }
     } catch (e) { /* no season rows */ }
   }
@@ -8228,7 +8231,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   let openingNote = null;
   if (requirements && !requirements.startDate && !overrides?.startDate && !Number.isInteger(intent.month) && !intent.season) {
     const named = requirements.items.filter((i) => i.kind === 'venue' && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery'].includes(i.venueType));
-    const rows = named.map((i) => { try { return db.prepare('SELECT v.name, s.status, s.reopens_date FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE v.id = ?').get(i.value); } catch (e) { return null; } });
+    const rows = named.map((i) => { try { return db.prepare('SELECT v.name, s.status, s.reopens_date FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE v.id = ? AND s.superseded_at IS NULL').get(i.value); } catch (e) { return null; } });
     const today = todayLocal(now);
     const closed = rows.filter((r) => r && r.status === 'closed' && r.reopens_date && r.reopens_date > today);
     if (named.length && closed.length) {
@@ -8854,15 +8857,24 @@ function chainReopening(reopens, closures) {
   }
   return date;
 }
+// Brewery test 3 (2026-11-13): an owner's season save (open_months, from setup or the portal) takes precedence over a
+// researched venue_seasons row: the row is kept (for an Undo, and the audit) but marked superseded, so the page, the
+// card, Open now and Build My Trip all read the owner's dates. An Undo back to no season clears the mark; a fresh POST
+// /admin/set-season later writes the row again (guardedSeasonUpdate) and it shows again.
+function ownerSeasonSupersedes(venueId, openMonths, undo) {
+  if (openMonths) db.prepare('UPDATE venue_seasons SET superseded_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND superseded_at IS NULL').run(venueId);
+  else if (undo) db.prepare('UPDATE venue_seasons SET superseded_at = NULL WHERE venue_id = ? AND superseded_at IS NOT NULL').run(venueId);
+}
 // today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
 function getSeasonRows(today = todayLocal()) {
   const map = new Map();
   for (const r of db.prepare(`
     SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
     FROM venue_seasons s JOIN venues v ON v.id = s.venue_id
-    WHERE v.redirect_to IS NULL
+    WHERE v.redirect_to IS NULL AND s.superseded_at IS NULL
   `).all()) map.set(r.venue_id, r);
-  // Owners' yearly seasons, where no dated closure has been set by hand.
+  // Owners' yearly seasons, where no dated closure has been set by hand since. Brewery test 3 (2026-11-13): the owner's
+  // own save marks an older researched row superseded (ownerSeasonSupersedes), so it is no longer read above.
   for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
     WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
     if (map.has(r.venue_id)) continue;
@@ -9135,8 +9147,9 @@ function seasonTagShortText(st) {
 }
 // Winery test 3 (2026-11-12): a winery card whose status line says "Closed for the season · Reopens …" drops the
 // closed-season pill on its photo ("Closed · reopens April 25"), so it is said once. Other types keep both (as before).
+// Brewery test 3 (2026-11-13): a brewery or cidery card too (« Fermé pour la saison » was on it twice).
 function cardSeasonOnce(chunk, line) {
-  return line && line.state === 'seasonal' && /data-venue-category="winery"/.test(chunk) ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
+  return line && line.state === 'seasonal' && /data-venue-category="(?:winery|brewery)"/.test(chunk) ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
 }
 function seasonTagHtml(st, seasonEndLabel = false) {
   const text = seasonTagShortText(st);
@@ -11051,9 +11064,10 @@ function guardedSeasonUpdate(id, season, meta, now = new Date()) {
   const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
   if (!venue) return { ok: false, reason: 'venue_not_found' };
   if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
-  const prevRow = db.prepare('SELECT status, until_date, reopens_date, source_url, checked_at FROM venue_seasons WHERE venue_id = ?').get(id);
+  const prevRow = db.prepare('SELECT status, until_date, reopens_date, source_url, checked_at, superseded_at FROM venue_seasons WHERE venue_id = ?').get(id);
   const prev = prevRow ? { status: prevRow.status, until_date: prevRow.until_date, reopens_date: prevRow.reopens_date, source_url: prevRow.source_url, checked_at: prevRow.checked_at } : null;
-  if (JSON.stringify(prev) === JSON.stringify(next)) return { ok: true, changed: false, season: next };
+  // A superseded row (the owner saved their own season since) set again by hand is written again, so it shows again.
+  if (JSON.stringify(prev) === JSON.stringify(next) && !(prevRow && prevRow.superseded_at)) return { ok: true, changed: false, season: next };
   let txOpen = false;
   try {
     db.exec('BEGIN');
@@ -11064,7 +11078,7 @@ function guardedSeasonUpdate(id, season, meta, now = new Date()) {
         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(venue_id) DO UPDATE SET status = excluded.status, until_date = excluded.until_date,
           reopens_date = excluded.reopens_date, source_url = excluded.source_url,
-          checked_at = excluded.checked_at, updated_at = CURRENT_TIMESTAMP
+          checked_at = excluded.checked_at, superseded_at = NULL, updated_at = CURRENT_TIMESTAMP
       `).run(id, next.status, next.until_date, next.reopens_date, next.source_url, next.checked_at);
     } else {
       db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
@@ -20856,11 +20870,11 @@ function breweryVisitLines(venue, info) {
     const k = b.kitchen || {};
     const main = {
       kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
-      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de cuisine de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de cuisine de rue la plupart des jours.'],
+      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de bouffe de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de bouffe de rue la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
-    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Nourriture de l’extérieur bienvenue.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur.'] : null;
+    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Vous pouvez apporter votre pique-nique.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur.'] : null;
     if (main) out.Food = { en: [main[0], own && own[0]].filter(Boolean).join(' '), fr: [main[1], own && own[1]].filter(Boolean).join(' ') };
   }
   if (Array.isArray(b.to_go) && b.to_go.length) {
@@ -35160,6 +35174,11 @@ function frenchTwinHtml(html, enPath, search = '') {
   // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
   // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
   html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml((() => { const d = frDecode(t); const x = presetOrFr(d, frText); return x == null ? d : x; })())}${b}`);
+  // Brewery test 3 (2026-11-13): a card's "+6" chip names the folded badges in French too (title and aria-label).
+  html = html.replace(/<span class="chip chip-more" title="([^"]*)" aria-label="(\d+) more: [^"]*">/g, (m, t, n) => {
+    const names = frDecode(t).split(', ').map((x) => { const f = frText(x); return f == null ? x : f; }).join(', ');
+    return `<span class="chip chip-more" title="${escapeHtml(names)}" aria-label="${n} de plus : ${escapeHtml(names)}">`;
+  });
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -36764,7 +36783,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
     // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-    venue.type === 'golf' ? golfKindLabel : venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
+    venue.type === 'golf' ? golfKindLabel : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -37082,7 +37101,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
     const atAGlance = [
       // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-      venue.type === 'cafe' && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      // Brewery test 3 (2026-11-13): a brewery says the kind it picked too (Cidery, Taphouse, Distillery); the URL stays.
+      (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
       venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
@@ -52595,14 +52615,15 @@ function ownerSetupCardHtml(href, lang, state = 'none', type = '') {
   const timeLine = ((OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'][type] || {}).timeLine) || OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'].timeLine;
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
-  const [cardTitle, cardSub] = {
+  // Brewery test 3 (2026-11-13): French typography (« Changer quelque chose ? »), as in the setup.
+  const [cardTitle, cardSub] = ({
     none: fr ? ['Configurez votre page', `Une question à la fois. ${timeLine}`] : ['Set up your page', `One question at a time. ${timeLine}`],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
     // Winery test 4 (2026-11-12): "done" only when every essential is; one skipped (photos) reads "Nearly done".
     nearly: fr ? ['Presque terminé', 'Finir l’essentiel ou ajouter plus de détails?'] : ['Nearly done', 'Finish the essentials, or add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
-  }[state] || [];
+  }[state] || []).map((x) => (fr ? OWNER_SETUP_STRINGS.frSpacing(x) : x));
   return `<style>
     body.owner-page .op-setup-card { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; padding: 16px 18px; min-height: 72px; border-radius: 16px; background: #1E4F4C; color: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(42,32,25,.12); }
     body.owner-page .op-setup-card:focus-visible { outline: 3px solid #C9A34A; outline-offset: 3px; }
@@ -52969,6 +52990,24 @@ function breweryResearchSuggestions(researchRow, info, mine) {
   }
   return out;
 }
+// The kind a brewery's name suggests ('Cidery', 'Distillery', 'Brewery', 'Taphouse or beer hall') or '' (no clue).
+function breweryKindGuess(name) {
+  const n = String(name || '').toLowerCase();
+  return /\b(?:cider|ciders|cidery|ciderie|cidrerie)\b/.test(n) ? 'Cidery' : /\bdistill/.test(n) ? 'Distillery'
+    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(n) ? 'Brewery' : /\b(?:tap ?house|beer (?:hall|market|bar))\b/.test(n) ? 'Taphouse or beer hall' : '';
+}
+// Brewery test 3 (2026-11-13): the kind whose words the owner pages use: the one picked, else the name's clue, else ''
+// (neutral words). 'Cidery' reads cider words, 'Brewery' and 'Taphouse or beer hall' beer words, the rest neutral ones.
+function breweryWordsKind(venue) {
+  return breweryKindOf(venue) || breweryKindGuess(venue && venue.name);
+}
+// The menu tile's words on the owner home, by kind: [title, subtitle] in English and French.
+function breweryListTile(venue) {
+  const k = breweryWordsKind(venue);
+  if (k === 'Cidery') return { en: ['Update my menu or cider list', 'Snap your chalkboard or cider list'], fr: ['Mettre à jour mon menu ou ma liste des cidres', 'Photographiez votre tableau ou votre liste des cidres'] };
+  if (k === 'Brewery' || k === 'Taphouse or beer hall') return { en: ['Update my menu or tap list', 'Snap your chalkboard or tap list'], fr: ['Mettre à jour mon menu ou ma liste des bières', 'Photographiez votre tableau ou votre liste des bières'] };
+  return { en: ['Update my menu or drinks list', 'Snap your chalkboard or drinks list'], fr: ['Mettre à jour mon menu ou ma liste des boissons', 'Photographiez votre tableau ou votre liste des boissons'] };
+}
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -52976,8 +53015,7 @@ function breweryCfg(venue, snap, fr) {
   const name = String(venue.name || '').toLowerCase();
   // Brewery test 2 (2026-11-13): a brewery is a Brewery unless its name clearly says otherwise. "Taproom" is where a
   // brewery pours its own beer, so only "taphouse", "tap house" or "beer hall" suggests a taphouse.
-  const suggestKind = /\b(?:cider|ciders|cidery|ciderie|cidrerie)\b/.test(name) ? 'Cidery' : /\bdistill/.test(name) ? 'Distillery'
-    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(name) ? 'Brewery' : /\b(?:tap ?house|beer (?:hall|market|bar))\b/.test(name) ? 'Taphouse or beer hall' : 'Brewery';
+  const suggestKind = breweryKindGuess(name) || 'Brewery';
   const foodRow = researchRow('Food');
   const ft = foodRow ? foodRow.text : '';
   const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|pub fare|burgers?|pizzas?|wings|bistro|eatery)\b/i.test(ft) ? 'kitchen' : '';
@@ -53030,11 +53068,11 @@ const BREWERY_SETUP_HELP_TOPICS = [
     keysFr: ['liste des bieres', 'liste de bieres', 'nos bieres', 'bieres', 'en fut', 'fut', 'futs', 'pression', 'biere en fut', 'bieres en fut', 'tableau', 'ardoise', 'liste des cidres'],
     a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the menu”, so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
     aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir le menu », pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
-  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de cuisine de rue',
+  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de bouffe de rue',
     keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
-    keysFr: ['camion', 'camions', 'cuisine de rue', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
+    keysFr: ['camion', 'camions', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
     a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
-    aFr: '<p>À <strong>Votre salle</strong>, touchez <strong>Camions de cuisine de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de cuisine de rue la plupart des jours » ou « Camions de cuisine de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
+    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions de bouffe de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de bouffe de rue la plupart des jours » ou « Camions de bouffe de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
     keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
@@ -56613,6 +56651,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
         db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, next);
+        // Brewery test 3 (2026-11-13): the owner's own season wins over a researched closure (kept, marked superseded).
+        if (field === 'open_months') ownerSeasonSupersedes(venue.id, next, !!opts.undo);
         clearVenueSocialCache();
         log.run(venue.id, field, before == null ? null : String(before), next == null ? null : String(next), meta.reason, meta.batch_id, reviewer);
         applied.push(field);
@@ -58706,7 +58746,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     // Café test 2 (2026-11-11): closed for the season today (the storefront photo waits until it reopens).
-    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ?').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
+    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ? AND superseded_at IS NULL').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
     // "Not sure / someone else runs it" in the setup (pub test 6): answered, kept apart from "we don't have one".
     unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
@@ -58723,7 +58763,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     // Breweries (2026-11-12): the kind of place, the season answer, the brewery's own answers and flight price, and whether
     // "What you offer" was saved in the setup (dogs and wheelchair / parking then count as answered).
-    ...(venue.type === 'brewery' ? { placeType: venuePlaceType(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
+    ...(venue.type === 'brewery' ? { placeType: venuePlaceType(venue), wordsKind: breweryWordsKind(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
       breweryInfo: live.brewery_info || breweryInfoAnswers(venue.id), flightFee: 'flight_fee' in live ? live.flight_fee : breweryFlightFee(venue.id),
       dogFriendly: !!venue.dog_friendly,
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
@@ -59548,7 +59588,7 @@ ${renderGolfHeaderHtml()}
              ask either). The full page keeps the fields. "Happy hour" reads « 5 à 7 » in French. */ ''}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
-          ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'brewery' ? L('Update my menu or tap list', 'Mettre à jour mon menu ou ma liste des bières') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'brewery' ? L('Snap your chalkboard or tap list', 'Photographiez votre tableau ou votre liste des bières') : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'brewery' ? L(breweryListTile(venue).en[0], breweryListTile(venue).fr[0]) : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'brewery' ? L(breweryListTile(venue).en[1], breweryListTile(venue).fr[1]) : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
           ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
@@ -65864,7 +65904,7 @@ module.exports = {
   EVENT_PHOTO_SPECIAL,
   HOME_EVENT_IMAGES,
   recurringSeasonRow,
-  chainReopening, getSeasonRows, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
+  chainReopening, getSeasonRows, ownerSetupCardHtml, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
   stripJpegMetadata,

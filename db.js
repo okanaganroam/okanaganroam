@@ -1161,6 +1161,18 @@ CREATE TABLE IF NOT EXISTS venue_links (
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'open_months')) {
   db.exec('ALTER TABLE venue_links ADD COLUMN open_months TEXT');
 }
+// Brewery test 3 (2026-11-13): the owner's own season wins over a researched one. When an owner saves their season
+// (open_months, from setup or the portal), the researched venue_seasons row is kept but marked superseded_at, so it
+// stops showing; an Undo back to no season clears the mark, and a later POST /admin/set-season writes a fresh row.
+// Added once: a row the owner already overrode (their own logged season save, still the one in use, made after the
+// row was last set) is marked the same way. Other researched rows are untouched.
+if (!db.prepare('PRAGMA table_info(venue_seasons)').all().some((c) => c.name === 'superseded_at')) {
+  db.exec('ALTER TABLE venue_seasons ADD COLUMN superseded_at TEXT');
+  db.exec(`UPDATE venue_seasons SET superseded_at = CURRENT_TIMESTAMP WHERE venue_id IN (
+    SELECT l.venue_id FROM venue_links l JOIN venue_enrichment_log e ON e.venue_id = l.venue_id
+    WHERE l.open_months IS NOT NULL AND e.field_name = 'open_months' AND e.source = 'venue_owner' AND e.new_value = l.open_months
+      AND e.created_at >= COALESCE(venue_seasons.updated_at, ''))`);
+}
 // TikTok (pub test 9, 2026-11-10): the owner's TikTok profile, https://www.tiktok.com/@handle. Live straight away like
 // Instagram; NULL = none. Additive: older rows read as no TikTok.
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'tiktok_url')) {

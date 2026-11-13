@@ -563,7 +563,7 @@ Object.assign(en, {
   closeDay: 'Closed', closeDayAria: 'Mark {day} closed', openDayAria: 'Open {day} again',
   kitchenSeasonQ: 'In your {kind} hours ({range}), when does the kitchen close?', kitchenSeasonSame: 'Same time as the rest of the year', kitchenSeasonClose: 'Food until we close',
   kitchenSeasonAt: 'Kitchen closes at', kitchenSeasonNeed: 'Please pick the time, or tap “Same time as the rest of the year”.',
-  storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyClear: 'Clear the text',
+  storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyEnglishHint: '', storyClear: 'Clear the text',
   useSite: 'Use {site}', useSiteSub: 'Your website',
   curMainPending: 'Your new main photo (on your page within a day)', keepMainPending: 'Keep this one',
   hoursDoneDayAria: 'Done with {day}',
@@ -581,7 +581,9 @@ Object.assign(fr, {
   closeDay: 'Fermé', closeDayAria: 'Indiquer {day} fermé', openDayAria: 'Rouvrir {day}',
   kitchenSeasonQ: 'Pendant vos heures d’{kind} ({range}), à quelle heure la cuisine ferme-t-elle?', kitchenSeasonSame: 'Même heure que le reste de l’année', kitchenSeasonClose: 'Nourriture jusqu’à la fermeture',
   kitchenSeasonAt: 'La cuisine ferme à', kitchenSeasonNeed: 'Choisissez l’heure, ou touchez « Même heure que le reste de l’année ».',
-  storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.', storyClear: 'Effacer le texte',
+  storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.',
+  // Brewery test 3 (2026-11-13): the text on the page now is in English (research); said so, kept, never translated.
+  storyEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le, réécrivez-le en français, ou touchez ✕ pour l’effacer.', storyClear: 'Effacer le texte',
   useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
   curMainPending: 'Votre nouvelle photo principale (sur votre page d’ici un jour)', keepMainPending: 'Garder celle-ci',
   hoursDoneDayAria: 'Terminé pour {day}',
@@ -1147,11 +1149,12 @@ en.brewery = {
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Groups and booking
   groupsQ: 'Groups: from what size should they book ahead?', groupsLead: 'Tap a size. You can change the words.',
-  groupsEx: 'Groups of 10 or more: please book ahead', groupsLine: 'Groups of {n} or more: please book ahead.',
+  groupsEx: 'Groups of 10 or more: please book ahead', // Brewery test 3 (2026-11-13): no final period in the editable line, so words added after it read on.
+  groupsLine: 'Groups of {n} or more: please book ahead',
   // The size lines are presets, so the page shows them in its own language.
   quickGroups: ['Groups of 8 or more: please book ahead', 'Groups of 10 or more: please book ahead', 'Groups of 12 or more: please book ahead', 'Groups of 15 or more: please book ahead', 'Groups of 20 or more: please book ahead'], groupsLineLabel: 'Your Groups line', groupsNone: 'We can’t take big groups',
   groupsNeed: 'Please tap a size or type a line, or tap “We can’t take big groups”.',
-  bookLinkLabel: 'Booking link (optional, e.g. for groups)', bookLinkEx: 'your website’s booking page', bookLinkBad: 'Please check the booking link, for example yourbrewery.com/book.',
+  bookLinkLabel: 'Booking link (optional, e.g. for groups)', bookLinkEx: 'your website’s booking page', bookLinkBad: 'Please check the booking link, for example yourbusiness.com/book.',
   groupsNoLink: 'Please leave links out of the Groups line. Your booking link has its own box below.', bqOpens: 'Opens', bqCloses: 'Closes',
   quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
   groupsSavedLink: 'Your Groups line is on your page now. We check a new booking link first, usually within a day.',
@@ -1159,7 +1162,8 @@ en.brewery = {
   socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.',
   socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
   hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.',
-  igLead: 'Type your Instagram name, like @yourbrewery.',
+  // Brewery test 3 (2026-11-13): one example for every kind (a cidery isn't a brewery).
+  igLead: 'Type your Instagram name, like @yourbusiness.',
   // Your taproom door
   doorQ: 'Where’s the taproom door?', doorLead: 'If your door is around the side or upstairs, a photo helps people find it. One photo, taken at the taproom door, walks visitors right to it.',
   // A cidery (the kind she picked): the orchard hint, where the map pin often lands in the wrong spot.
@@ -1168,19 +1172,20 @@ en.brewery = {
   doorPhotoQ: 'Take a photo of your taproom door', doorPhotoLead: 'Stand outside so the door and your sign are in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
 };
 fr.brewery = {
-  hiLead: 'Préparons la page de votre salle, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  // Brewery test 3 (2026-11-13): « votre salle de dégustation » or « votre microbrasserie », never a bare « votre salle ».
+  hiLead: 'Préparons la page de votre microbrasserie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { hours: 'Heures et jours fériés', taproom: 'Votre salle', flights: 'Plateaux et pour emporter', happy: '5 à 7', photos: 'Photos', offer: 'Ce que vous offrez',
-    story: 'Votre histoire et ce pour quoi vous êtes connus', music: 'Événements de la semaine', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'La porte de votre salle', menu: 'Votre menu ou liste des bières' },
+  labels: { hours: 'Heures et jours fériés', taproom: 'Votre salle de dégustation', flights: 'Plateaux et pour emporter', happy: '5 à 7', photos: 'Photos', offer: 'Ce que vous offrez',
+    story: 'Votre histoire et ce pour quoi vous êtes reconnus', music: 'Événements de la semaine', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des bières' },
   menuQ: 'Comment ajouter votre menu ou votre liste des bières?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos bières changent.',
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', music: 'pas d’événements', happy: 'pas de 5 à 7' },
   stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
-  photosLead: 'Votre salle, vos fûts, votre terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
+  photosLead: 'Votre salle de dégustation, vos fûts, votre terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
   tkindQ: 'Quel genre d’endroit est-ce?', tkindLead: 'Choisissez celui qui convient le mieux.', tkindNeed: 'Touchez le genre d’endroit qui convient le mieux.',
   tkindSubs: { Brewery: 'Nous brassons ici', Cidery: 'Nous faisons du cidre ici', 'Taphouse or beer hall': 'Nous servons la bière d’autres brasseurs', Distillery: 'Nous distillons ici' },
   kindGuess: 'Nous avons choisi « {kind} ». Touchez-en un autre s’il ne convient pas.',
-  tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions de cuisine de rue', snacks: 'Collations seulement', none: 'Pas de nourriture' },
-  tfoodSubs: { trucks: 'Nous indiquerons « Camions de cuisine de rue la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
+  tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions de bouffe de rue', snacks: 'Collations seulement', none: 'Pas de nourriture' },
+  tfoodSubs: { trucks: 'Nous indiquerons « Camions de bouffe de rue la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
   ttrucksQ: 'Quand les camions sont-ils là?', ttrucks: { most_days: 'La plupart des jours', weekends: 'La fin de semaine seulement' }, ttrucksNeed: 'Touchez La plupart des jours ou La fin de semaine seulement.',
   trucksGuess: 'Votre page indique la fin de semaine, alors nous l’avons choisi.',
   foodGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez-en un autre si ça a changé.',
@@ -1205,25 +1210,68 @@ fr.brewery = {
   minorsUntil: 'Mineurs bienvenus jusqu’à', minorsNoteLabel: 'Autre chose? (facultatif)', minorsNoteEx: 'Enfants bienvenus à l’intérieur jusqu’à 21 h; terrasse 19 ans et plus.',
   minorsNeed: 'Touchez l’une des trois réponses, pour que les familles le sachent avant de venir.', saveThese: 'Enregistrer', nextPlain: 'Suivant',
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre mention Enfants bienvenus.',
-  storyQ: 'Parlez de votre salle aux visiteurs', storyEx: 'Une petite microbrasserie familiale au centre-ville. Nous brassons à l’arrière, servons 12 fûts à l’avant, et la terrasse a le soleil du soir.',
-  knownQ: 'Pour quoi êtes-vous reconnu?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Des IPA troubles et une sure aux mûres',
+  storyQ: 'Parlez de votre microbrasserie aux visiteurs', storyEx: 'Une petite microbrasserie familiale au centre-ville. Nous brassons à l’arrière, servons 12 fûts à l’avant, et la terrasse a le soleil du soir.',
+  knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Des IPA troubles et une sure aux mûres',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   groupsQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille. Vous pouvez changer les mots.',
-  groupsEx: 'Groupes de 10 personnes ou plus : réservez à l’avance', groupsLine: 'Groupes de {n} personnes ou plus : réservez à l’avance.',
+  groupsEx: 'Groupes de 10 personnes ou plus : réservez à l’avance', groupsLine: 'Groupes de {n} personnes ou plus : réservez à l’avance',
   quickGroups: ['Groupes de 8 personnes ou plus : réservez à l’avance', 'Groupes de 10 personnes ou plus : réservez à l’avance', 'Groupes de 12 personnes ou plus : réservez à l’avance', 'Groupes de 15 personnes ou plus : réservez à l’avance', 'Groupes de 20 personnes ou plus : réservez à l’avance'], groupsLineLabel: 'Votre ligne Groupes', groupsNone: 'Nous ne pouvons pas accueillir de grands groupes',
   groupsNeed: 'Touchez une taille ou écrivez une ligne, ou touchez « Nous ne pouvons pas accueillir de grands groupes ».',
-  bookLinkLabel: 'Lien de réservation (facultatif, p. ex. pour les groupes)', bookLinkEx: 'la page de réservation de votre site', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrebrasserie.com/reserver.',
+  bookLinkLabel: 'Lien de réservation (facultatif, p. ex. pour les groupes)', bookLinkEx: 'la page de réservation de votre site', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrecommerce.com/reserver.',
   groupsNoLink: 'Gardez les liens hors de la ligne Groupes. Votre lien de réservation a sa propre case plus bas.', bqOpens: 'Ouvre', bqCloses: 'Ferme',
   quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
   groupsSavedLink: 'Votre ligne Groupes est sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
   socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
-  igLead: 'Écrivez votre nom Instagram, comme @votrebrasserie.',
-  doorQ: 'Où est la porte de votre salle?', doorLead: 'Si votre porte est sur le côté ou à l’étage, une photo aide les gens à la trouver. Une photo, prise à la porte de la salle, y mène les visiteurs directement.',
-  doorLeadCidery: 'Dans un verger ou un grand terrain, l’épingle peut tomber au mauvais endroit. Une photo, prise à la porte de la salle, y mène les visiteurs directement.',
-  mapFailQ: 'Envoyez la photo de la porte de votre salle',
-  doorPhotoQ: 'Prenez une photo de la porte de votre salle', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
+  igLead: 'Écrivez votre nom Instagram, comme @votrecommerce.',
+  doorQ: 'Où est la porte de votre salle de dégustation?', doorLead: 'Si votre porte est sur le côté ou à l’étage, une photo aide les gens à la trouver. Une photo, prise à la porte de la salle de dégustation, y mène les visiteurs directement.',
+  doorLeadCidery: 'Dans un verger ou un grand terrain, l’épingle peut tomber au mauvais endroit. Une photo, prise à la porte de la salle de dégustation, y mène les visiteurs directement.',
+  // « sur place », not « à votre salle de dégustation ».
+  doorHere: 'Êtes-vous sur place en ce moment?',
+  mapFailQ: 'Envoyez la photo de la porte de votre salle de dégustation',
+  doorPhotoQ: 'Prenez une photo de la porte de votre salle de dégustation', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
+};
+
+// Brewery test 3 (2026-11-13, a French orchard cidery): the brewery words above are beer words. A cidery reads cider
+// words (kindCidery), and a distillery or a place that hasn't picked its kind yet reads neutral ones (kindNeutral); the
+// setup page lays the one for the kind picked over the brewery words (owner-setup-client.js kindWords). A brewery and a
+// taphouse keep the beer words.
+en.brewery.kindCidery = {
+  hiLead: 'Let’s get your cidery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { taproom: 'Your tasting room', door: 'Your tasting room door', menu: 'Your menu or cider list' },
+  menuQ: 'How should we add your menu or cider list?', menuLead: 'Pick the easiest one for you. A photo of your chalkboard works too, as often as your ciders change.',
+  photosLead: 'Your orchard, your tasting room, your patio. Three photos is perfect.', offerLead: 'Visitors use these to find a cidery like yours.',
+  storyQ: 'Tell visitors about your cidery', storyEx: 'A family orchard cidery. We press our own apples, pour in the tasting room, and the patio looks over the trees.',
+  knownEx: 'Dry ciders from heritage apples',
+  doorQ: 'Where’s the tasting room door?', doorHere: 'Are you at the cidery right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
+};
+en.brewery.kindNeutral = {
+  hiLead: 'Let’s get your tasting room’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { taproom: 'Your tasting room', door: 'Your tasting room door', menu: 'Your menu or drinks list' },
+  menuQ: 'How should we add your menu or drinks list?', menuLead: 'Pick the easiest one for you. A photo of your chalkboard works too, as often as your drinks change.',
+  photosLead: 'Your tasting room, your bar, your patio. Three photos is perfect.', offerLead: 'Visitors use these to find a place like yours.',
+  storyQ: 'Tell visitors about your place', storyEx: 'A small family business. We make everything here, pour it in the tasting room, and the patio gets the evening sun.',
+  knownEx: 'Small batches made right here',
+  doorQ: 'Where’s the tasting room door?', doorHere: 'Are you there right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
+};
+fr.brewery.kindCidery = {
+  hiLead: 'Préparons la page de votre cidrerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  menuQ: 'Comment ajouter votre menu ou votre liste des cidres?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos cidres changent.',
+  photosLead: 'Votre verger, votre salle de dégustation, votre terrasse. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une cidrerie comme la vôtre.',
+  storyQ: 'Parlez de votre cidrerie aux visiteurs', storyEx: 'Une cidrerie familiale dans notre verger. Nous pressons nos propres pommes, servons à la salle de dégustation, et la terrasse donne sur les arbres.',
+  knownEx: 'Des cidres secs de pommes anciennes',
+  labels: { taproom: 'Votre salle de dégustation', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des cidres' },
+  doorQ: fr.brewery.doorQ, doorHere: fr.brewery.doorHere, mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
+};
+fr.brewery.kindNeutral = {
+  hiLead: 'Préparons la page de votre salle de dégustation, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  menuQ: 'Comment ajouter votre menu ou votre liste des boissons?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos produits changent.',
+  photosLead: 'Votre salle de dégustation, votre bar, votre terrasse. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver un endroit comme le vôtre.',
+  storyQ: 'Parlez de votre entreprise aux visiteurs', storyEx: 'Une petite entreprise familiale. Nous produisons tout sur place, servons à la salle de dégustation, et la terrasse a le soleil du soir.',
+  knownEx: 'De petites cuvées faites sur place',
+  labels: { taproom: 'Votre salle de dégustation', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des boissons' },
+  doorQ: fr.brewery.doorQ, doorHere: fr.brewery.doorHere, mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
 };
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow

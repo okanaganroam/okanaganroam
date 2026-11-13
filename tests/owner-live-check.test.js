@@ -127,7 +127,7 @@ test('5. the ceiling: photos and the storefront spot are named as the last steps
   assert.match(head, /Last steps: photos and your storefront spot\. Tap to see\./);
   assert.match(en, /<p class="op-cb-note op-cb-ceiling">Photos and your storefront spot are the last steps to 100%\.<\/p>/);
   const fr = pc.renderCompleteness(last, { fr: true });
-  assert.match(fr, /Dernières étapes : les photos et l’emplacement de votre devanture/);
+  assert.match(fr, /Dernières étapes[ \u00a0]: les photos et l’emplacement de votre devanture/);
   assert.match(fr, /sont les dernières étapes vers 100 %/);
   // Only the storefront left.
   const door = pc.renderCompleteness(pc.scoreCompleteness({ ...full, photoCount: 3 }, { today: TODAY }), {});
