@@ -1147,6 +1147,15 @@ test('winery test 4: wording: one tasting price without “From” on the page (
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8'), /T\.essBarNearly \|\| T\.essBar : T\.essBar/);
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /h\(open1\.length \? T\.essNearly \|\| T\.essReady : T\.essReady\)/);
+  // The edit page's card: "Nearly done" while an essential is skipped, "The essentials are done" once all are answered.
+  for (const k of app.WINERY_SETUP_PART1) assert.equal((await progress(t, k, k === 'photos' ? 'skip' : 'live')).status, 200, k);
+  assert.equal((await progress(t, 'closures', 'live')).status, 200);
+  assert.equal(app.setupState(w.id), 'essentials');
+  assert.equal(app.setupState(w.id, { nearly: true }), 'nearly');
+  assert.match((await get(`/owner/${t}`)).text, /<strong>Nearly done<\/strong><span>Finish the essentials, or add more about your place\?<\/span>/);
+  assert.match((await get(`/fr/owner/${t}`)).text, /<strong>Presque terminé<\/strong>/);
+  assert.equal((await progress(t, 'photos', 'live')).status, 200);
+  assert.match((await get(`/owner/${t}`)).text, /<strong>The essentials are done<\/strong>/);
   const setup = (await get(`/owner/${t}/setup`)).text;
   assert.match(setup, /@media \(max-width: 330px\) \{ body\.owner-setup \.su-head \{ flex-wrap: wrap; row-gap: 0; \}/);
 });

@@ -185,7 +185,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /if \(S\.exitAfter && HALF\.indexOf\(step\) >= 0 && !answered\(step\)\) \{ S\.busy = false; if \(onOk\) onOk\(\); return leave\(\); \}/);
   assert.match(s, /var HALF = \['offer', 'cuisine', 'closures'\];/);
   // Essentials finish: "Your page is ready. N of 8 essentials done.", then one number.
-  assert.match(s, /h\(T\.essReady\)/); assert.match(s, /fill\(T\.essCount, \{ n: nd, total: P1\.length \}\)/); assert.match(s, /'jumpEss:' \+ k/);
+  assert.match(s, /h\(open1\.length \? T\.essNearly \|\| T\.essReady : T\.essReady\)/); /* winery test 4: "Nearly done" while one is left */ assert.match(s, /fill\(T\.essCount, \{ n: nd, total: P1\.length \}\)/); assert.match(s, /'jumpEss:' \+ k/);
   assert.doesNotMatch(s, /T\.pctRightNow/);
   assert.equal(cfg.t.essReady, 'The essentials are done'); // pub test 3: never "ready" beside a low number assert.equal(cfg.t.essCount, '{n} of {total} essentials done.');
   assert.equal(cfg.t.pctAbout, 'About {n}% complete'); assert.equal(cfg.t.pctAboutSub, 'once we add what you sent (usually within a day).'); assert.equal(cfg.t.pctRaise, 'Add more about your place to raise it.');

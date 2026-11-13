@@ -51979,11 +51979,12 @@ function setupFinished(venueId) {
   return setupStepsFor(setupTypeOf(venueId), venueId).every((k) => done[k]);
 }
 // Where the owner is: 'none' (not started), 'partial' (some answered), 'essentials' (Part 1 answered), 'done' (all).
-function setupState(venueId) {
+function setupState(venueId, opts = {}) {
   const type = setupTypeOf(venueId), steps = setupStepsFor(type, venueId);
   const done = setupDoneSteps(venueId, type);
   if (steps.every((k) => done[k])) return 'done';
-  if (setupParts(type).part1.every((k) => done[k])) return 'essentials';
+  // opts.nearly (the edit page's card, winery test 4): an essential skipped is "nearly", not "essentials" done.
+  if (setupParts(type).part1.every((k) => done[k])) return opts.nearly && setupParts(type).part1.some((k) => done[k] === 'skip') ? 'nearly' : 'essentials';
   return steps.some((k) => done[k]) ? 'partial' : 'none';
 }
 // The same score the portal shows: % now, % once we check what was sent, and the badge state.
@@ -52077,6 +52078,8 @@ function ownerSetupCardHtml(href, lang, state = 'none', type = '') {
     none: fr ? ['Configurez votre page', `Une question à la fois. ${timeLine}`] : ['Set up your page', `One question at a time. ${timeLine}`],
     partial: fr ? ['Continuez où vous étiez', 'Vos réponses sont enregistrées'] : ['Carry on where you left off', 'Your answers so far are saved'],
     essentials: fr ? ['L’essentiel est fait', 'Ajouter plus de détails sur votre établissement?'] : ['The essentials are done', 'Add more about your place?'],
+    // Winery test 4 (2026-11-12): "done" only when every essential is; one skipped (photos) reads "Nearly done".
+    nearly: fr ? ['Presque terminé', 'Finir l’essentiel ou ajouter plus de détails?'] : ['Nearly done', 'Finish the essentials, or add more about your place?'],
     done: fr ? ['Votre page est configurée', 'Changer quelque chose?'] : ['Your page is set up', 'Change something?'],
   }[state] || [];
   return `<style>
@@ -58802,7 +58805,7 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id), venue.type) : ''}${completeHtml}
+      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id, { nearly: true }), venue.type) : ''}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang); } catch (e) { return ''; } })()}
       ${(() => {
