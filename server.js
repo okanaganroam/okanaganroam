@@ -9070,10 +9070,10 @@ function seasonTagShortText(st) {
   }
   return st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
 }
-// Winery test 3 (2026-11-12): a card whose status line says "Closed for the season · Reopens …" drops the closed-season
-// pill on its photo ("Closed · reopens April 25"), so it is said once.
+// Winery test 3 (2026-11-12): a winery card whose status line says "Closed for the season · Reopens …" drops the
+// closed-season pill on its photo ("Closed · reopens April 25"), so it is said once. Other types keep both (as before).
 function cardSeasonOnce(chunk, line) {
-  return line && line.state === 'seasonal' ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
+  return line && line.state === 'seasonal' && /data-venue-category="winery"/.test(chunk) ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
 }
 function seasonTagHtml(st, seasonEndLabel = false) {
   const text = seasonTagShortText(st);
@@ -20773,10 +20773,7 @@ function venueCardHtml(venue, opts = {}) {
   const cardSeasonTag = isTourCard && seasonTag && seasonTag.kind === 'closed'
     ? { ...seasonTag, text: String(seasonTag.text).replace(/^Closed for the season\. Reopens ([A-Za-z]+ \d+)(?:, \d{4})?\.$/, 'Closed \u00b7 reopens $1') }
     : seasonTag;
-  // Winery test 3 (2026-11-12): a card whose status line already says "Closed for the season · Reopens …" shows it once
-  // (the pill on the photo said it again).
-  const seasonSaidAlready = !!(cardSeasonTag && cardSeasonTag.kind === 'closed' && opts.statusLine && opts.statusLine.state === 'seasonal');
-  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to && !seasonSaidAlready)
+  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag, opts.seasonEndLabel) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),

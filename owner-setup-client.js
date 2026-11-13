@@ -2515,7 +2515,9 @@
       // Winery test 3 (2026-11-12): a quick name that replaces a pre-filled one takes its details away too ("Picnic tables…"
       // stayed under "Vineyard tour"), and the tap is kept as a draft like typed text.
       if (e9.label !== l9 && pre9 && e9.label === (pre9.label || '') && e9.text === (pre9.text || '')) e9.text = '';
-      e9.label = e9.label === l9 ? '' : l9; mark(); drSave(); redraw(); }; });
+      e9.label = e9.label === l9 ? '' : l9;
+      // The boxes first (the draft reads them), then the draft, then the screen.
+      var xl9 = el('suXl' + i9), xt9 = el('suXt' + i9); if (xl9) xl9.value = e9.label; if (xt9) xt9.value = e9.text; mark(); drSave(); redraw(); }; });
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){

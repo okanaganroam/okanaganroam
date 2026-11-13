@@ -143,7 +143,7 @@ test('5: happy hour day chips get "Every day" and "Mon–Fri"', async () => {
 test('6: the Complete & Verified pill is greyed with "Reach 100% to earn it" until it is earned', async () => {
   const s = scriptOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
   assert.match(s, /<span class="su-badge-pill' \+ \(sc\.badge === 'earned' \? '' : ' su-badge-off'\)/);
-  assert.match(s, /' <span class="su-badge-reach">' \+ h\(T\.badgeReach\)/);
+  assert.match(s, /' <span class="su-badge-reach">' \+ h\(Math\.max\(sc\.pct, sc\.soon \|\| 0\) < 100 \|\| sc\.soon < sc\.pct \? T\.badgeReach : T\.badgeSoon\)/);
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`);
   assert.match(html, /\.su-badge-off \{ filter: grayscale\(1\); opacity: \.5; \}/);
   assert.equal(TEXT.en.badgeReach, 'Reach 100% to earn it');

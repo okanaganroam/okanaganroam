@@ -768,7 +768,7 @@ test('winery test 3: Experiences never pre-fills or removes practical research l
   // The quick chip clears a pre-fill's details and is kept as a draft.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /e9\.label === \(pre9\.label \|\| ''\) && e9\.text === \(pre9\.text \|\| ''\)\) e9\.text = '';/);
-  assert.match(js, /e9\.label = e9\.label === l9 \? '' : l9; mark\(\); drSave\(\); redraw\(\);/);
+  assert.match(js, /if \(xl9\) xl9\.value = e9\.label; if \(xt9\) xt9\.value = e9\.text; mark\(\); drSave\(\); redraw\(\);/);
 });
 
 test('winery test 3: an experience saved without details shows its name once (“Ask when you visit”, French too)', async () => {

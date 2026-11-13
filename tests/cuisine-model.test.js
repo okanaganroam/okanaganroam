@@ -116,8 +116,8 @@ test('the picker: popular tiles first, the rest behind Show more with a search b
   assert.ok(!/<select id="opCuisine"/.test(sec), 'no dropdown');
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
   const secFr = fr.slice(fr.indexOf('id="cuisine"'), fr.indexOf('</details>', fr.indexOf('id="cuisine"')));
-  assert.match(secFr, /Quel type de cuisine servez-vous\?/);
-  assert.match(secFr, /Quel genre d’endroit\?/);
+  assert.match(secFr, /Quel type de cuisine servez-vous\u202f\?/);
+  assert.match(secFr, /Quel genre d’endroit\u202f\?/);
   assert.ok(secFr.includes(`>${app.frCuisine('Thai')}<`), 'French cuisine name');
   assert.match(secFr, />Pub ou bar sportif</);
 });
