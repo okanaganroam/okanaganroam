@@ -824,7 +824,7 @@
   // Winery test 2 (2026-11-12): setup ended below 100% with nothing left to answer (a story under 120 letters): the items
   // the score still misses, each with a way to fix it, instead of "Everything is done!" beside 95%.
   function gapList(){
-    var sc = S.score || {}; if (leftList().length || !(sc.pct < 100) || sc.soon > sc.pct) return [];
+    var sc = S.score || {}; if (leftList().length || Math.max(sc.pct || 0, sc.soon || 0) >= 100) return [];
     var out = [], seen = {};
     (sc.left || []).forEach(function(it){ var st = (C.winery && WINERY_ITEM_STEP[it.k]) || ITEM_STEP[it.k]; if (!st || seen[st] || STEPS.indexOf(st.split(':')[0]) < 0) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
     return out;
