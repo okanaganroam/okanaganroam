@@ -1276,6 +1276,56 @@ fr.brewery.kindNeutral = {
   doorQ: fr.brewery.doorQ, doorHere: fr.brewery.doorHere, mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
 };
 
+// Distilleries (Dayton, 2026-11-13; drafts/distillery-portal-2026-11-13/SPEC-distilleries.md, "Decided"): the brewery
+// screens with spirits words, laid over the brewery words for a distillery's setup only (owner-setup-client.js kindWords;
+// a brewery whose kind is Distillery, like The Dubh Glas, keeps the neutral words). Tasting room, not taproom; tastings,
+// not flights; bottles to go; the optional events screen is "Tours, classes and events". The winery's "By appointment"
+// choices on Hours (Decided 5) are reused word for word.
+const APPT_KEYS = ['allYearAppt', 'allYearApptSub', 'apptQ', 'apptLead', 'apptFrom', 'apptTo', 'apptSave', 'apptNeed', 'apptNow', 'needOpenDayAppt', 'noSetHours', 'noSetHoursNow', 'noSetHoursSaved'];
+en.brewery.kindDistillery = {
+  hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { taproom: 'Your tasting room', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
+  noLabels: { music: 'no tours, classes or events' },
+  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, as often as it changes.',
+  photosLead: 'Your tasting room, your still, your bottles. Three photos is perfect.', offerLead: 'Visitors use these to find a distillery like yours.',
+  storyQ: 'Tell visitors about your distillery', storyEx: 'A small family distillery. We distill in the back, pour tastings up front, and the patio gets the evening sun.',
+  knownEx: 'Small-batch gin with Okanagan botanicals',
+  // Tastings and bottles
+  flightQ: 'What does a tasting cost?', noFlights: 'We don’t do tastings', noFlightsSub: 'Your card shows no price',
+  feeFree: 'Free tastings', feeCardFree: 'Free tastings',
+  togo: { cans: 'Canned or bottled cocktails', bottles: 'Bottles', none: 'Nothing to go' },
+  flightNeed: 'Please tap a price, “Free tastings” or “We don’t do tastings”.',
+  flightSavedLive: 'Your tasting price and to-go answer are on your page now.',
+  flightGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', flightGuessVisit: 'Your page says {x} now, from your website, so we picked it. Tap another price if it changed.',
+  minorsNoteEx: 'Kids welcome in the tasting room until 6 PM; the cocktail bar is 19+.',
+  // Tours, classes and events (the weekly events screen, same storage)
+  musicQ: 'Any tours, classes or events?', musicLead: 'Like a distillery tour, a cocktail or whisky class, live music or trivia. Weekly, or on set weeks of the month.',
+  musicTypeQ: 'Your tours, classes and events', eventEx: 'Whisky class, first Saturday',
+  doorQ: 'Where’s the tasting room door?', doorHere: 'Are you at the distillery right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
+  doorLead: 'If your door is around the side or upstairs, a photo helps people find it. One photo, taken at the tasting room door, walks visitors right to it.',
+};
+fr.brewery.kindDistillery = {
+  hiLead: 'Préparons la page de votre distillerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  labels: { taproom: 'Votre salle de dégustation', flights: 'Dégustations et bouteilles', music: 'Visites, ateliers et événements', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou carte des cocktails' },
+  noLabels: { music: 'pas de visites, d’ateliers ni d’événements' },
+  menuQ: 'Comment ajouter votre carte des cocktails ou de dégustation?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte ou de votre tableau fonctionne aussi, aussi souvent qu’elle change.',
+  photosLead: 'Votre salle de dégustation, votre alambic, vos bouteilles. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une distillerie comme la vôtre.',
+  storyQ: 'Parlez de votre distillerie aux visiteurs', storyEx: 'Une petite distillerie familiale. Nous distillons à l’arrière, servons les dégustations à l’avant, et la terrasse a le soleil du soir.',
+  knownEx: 'Du gin en petits lots aux plantes de l’Okanagan',
+  flightQ: 'Combien coûte une dégustation?', noFlights: 'Nous n’offrons pas de dégustations', noFlightsSub: 'Votre fiche n’affiche aucun prix',
+  feeFree: 'Dégustations gratuites', feeCardFree: 'Dégustations gratuites',
+  togo: { cans: 'Cocktails en canette ou en bouteille', bottles: 'Bouteilles', none: 'Rien à emporter' },
+  flightNeed: 'Touchez un prix, « Dégustations gratuites » ou « Nous n’offrons pas de dégustations ».',
+  flightSavedLive: 'Votre prix de dégustation et votre réponse pour emporter sont sur votre page maintenant.',
+  flightGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', flightGuessVisit: 'Votre page indique {x} maintenant, d’après votre site Web, alors nous l’avons choisi. Touchez un autre prix s’il a changé.',
+  minorsNoteEx: 'Enfants bienvenus dans la salle de dégustation jusqu’à 18 h; le bar à cocktails est réservé aux 19 ans et plus.',
+  musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, de la musique en direct ou un quiz. Chaque semaine, ou certaines semaines du mois.',
+  musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky, le premier samedi',
+  doorQ: fr.brewery.doorQ, doorHere: 'Êtes-vous à la distillerie en ce moment?', mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
+  doorLead: fr.brewery.doorLead,
+};
+for (const k of APPT_KEYS) { en.brewery.kindDistillery[k] = en.winery[k]; fr.brewery.kindDistillery[k] = fr.winery[k]; }
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.

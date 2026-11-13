@@ -202,7 +202,8 @@ const BREWERY_YEAR = ['all', 'seasonal'];
 const BREWERY_MINORS = ['adults', 'minors_until', 'all_ages'];
 const BREWERY_ITEMS = [
   R('address_pin', { w: 4 }),
-  R('phone', { w: 4, whyEn: 'The number visitors call to ask what’s on tap or book a group.', whyFr: 'Le numéro que les visiteurs appellent pour savoir ce qui est en fût ou réserver pour un groupe.' }),
+  R('phone', { w: 4, whyEn: 'The number visitors call to ask what’s on tap or book a group.', whyFr: 'Le numéro que les visiteurs appellent pour savoir ce qui est en fût ou réserver pour un groupe.',
+    distillery: { whyEn: 'The number visitors call to book a tasting or a group.', whyFr: 'Le numéro que les visiteurs appellent pour réserver une dégustation ou un groupe.' } }),
   R('website', { w: 3 }),
   { key: 'brewery_kind', group: 'basics', w: 3, fix: true, target: { setup: 'taproom' }, fields: ['place_type'],
     en: 'What kind of place', fr: 'Quel genre d’endroit', whyEn: 'Brewery, cidery, taphouse or distillery. Pick one.', whyFr: 'Microbrasserie, cidrerie, bar à bières ou distillerie. Choisissez-en un.', btnEn: 'Pick one', btnFr: 'Choisir', icon: '🍺' },
@@ -210,45 +211,56 @@ const BREWERY_ITEMS = [
   R('hours_fresh', { w: 4 }),
   { key: 'season', group: 'hours', w: 4, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'brewery_info'],
     en: 'Open all year, or seasonal?', fr: 'Ouvert toute l’année, ou en saison?', whyEn: 'Some taprooms close or cut their hours in winter. Say so, so nobody drives out to a closed door.', whyFr: 'Certaines salles ferment ou réduisent leurs heures l’hiver. Dites-le, pour que personne ne trouve porte close.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆',
-    whyEnCidery: 'Orchard cideries often close for winter. Say so, so nobody drives out to a closed door.', whyFrCidery: 'Les cidreries de verger ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.' },
+    whyEnCidery: 'Orchard cideries often close for winter. Say so, so nobody drives out to a closed door.', whyFrCidery: 'Les cidreries de verger ferment souvent l’hiver. Dites-le, pour que personne ne trouve porte close.',
+    distillery: { whyEn: 'Some tasting rooms close in winter or open by appointment. Say so, so nobody drives out to a closed door.', whyFr: 'Certaines salles de dégustation ferment l’hiver ou ouvrent sur rendez-vous. Dites-le, pour que personne ne trouve porte close.' } },
   // Brewery test 3 (2026-11-13): a cidery reads cider words (`cidery`), a distillery or a place with no kind picked yet
   // neutral ones (`neutral`); a brewery or taphouse keeps the beer words (scoreCompleteness, kindCopy).
   R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you. Your taproom, your taps, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, vos fûts, votre terrasse.',
     cidery: { whyEn: 'Real photos only, taken by you. Your orchard, your tasting room, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre verger, votre salle de dégustation, votre terrasse.' },
-    neutral: { whyEn: 'Real photos only, taken by you. Your tasting room, your bar, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, votre bar, votre terrasse.' } }),
+    neutral: { whyEn: 'Real photos only, taken by you. Your tasting room, your bar, your patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, votre bar, votre terrasse.' },
+    distillery: { whyEn: 'Real photos only, taken by you. Your tasting room, your still, your bottles.', whyFr: 'De vraies photos seulement, prises par vous. Votre salle de dégustation, votre alambic, vos bouteilles.' } }),
   R('photo_extra', { w: 7, whyEn: 'Your taproom, your taps, your patio.', whyFr: 'Votre salle de dégustation, vos fûts, votre terrasse.',
     cidery: { whyEn: 'Your orchard, your tasting room, your patio.', whyFr: 'Votre verger, votre salle de dégustation, votre terrasse.' },
-    neutral: { whyEn: 'Your tasting room, your bar, your patio.', whyFr: 'Votre salle de dégustation, votre bar, votre terrasse.' } }),
+    neutral: { whyEn: 'Your tasting room, your bar, your patio.', whyFr: 'Votre salle de dégustation, votre bar, votre terrasse.' },
+    distillery: { whyEn: 'Your tasting room, your still, your bottles.', whyFr: 'Votre salle de dégustation, votre alambic, vos bouteilles.' } }),
   { key: 'food_here', group: 'taproom', w: 5, fix: true, target: { setup: 'taproom' }, fields: ['brewery_info'],
     en: 'Food here', fr: 'Nourriture sur place', whyEn: 'Your own kitchen, food trucks, snacks only, or no food. Can people bring their own?', whyFr: 'Votre cuisine, des camions de bouffe de rue, des collations seulement, ou rien. Peut-on apporter sa nourriture?', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍔' },
   { key: 'flight_price', group: 'taproom', w: 5, fix: true, target: { setup: 'flights' }, fields: ['flight_fee', 'brewery_info'],
-    en: 'Flight price', fr: 'Prix de la planche de dégustation', whyEn: 'What a flight costs, or “We don’t do flights”. It shows on your card.', whyFr: 'Le prix d’une planche de dégustation, ou « Nous n’en offrons pas ». Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍻' },
+    en: 'Flight price', fr: 'Prix de la planche de dégustation', whyEn: 'What a flight costs, or “We don’t do flights”. It shows on your card.', whyFr: 'Le prix d’une planche de dégustation, ou « Nous n’en offrons pas ». Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍻',
+    distillery: { en: 'Tasting price', fr: 'Prix de la dégustation', whyEn: 'What a tasting costs, “Free tastings” or “We don’t do tastings”. It shows on your card.', whyFr: 'Le prix d’une dégustation, « Dégustations gratuites » ou « Nous n’offrons pas de dégustations ». Il paraît sur votre fiche.', icon: '🥃' } },
   { key: 'to_go', group: 'taproom', w: 3, fix: true, target: { setup: 'flights' }, fields: ['brewery_info'],
-    en: 'What people can take home', fr: 'Ce qu’on peut rapporter', whyEn: 'Cans, bottles, growler or crowler fills, or nothing to go.', whyFr: 'Canettes, bouteilles, remplissage de growlers ou de crowlers, ou rien à emporter.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥫' },
+    en: 'What people can take home', fr: 'Ce qu’on peut rapporter', whyEn: 'Cans, bottles, growler or crowler fills, or nothing to go.', whyFr: 'Canettes, bouteilles, remplissage de growlers ou de crowlers, ou rien à emporter.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥫',
+    distillery: { whyEn: 'Bottles, canned or bottled cocktails, or nothing to go.', whyFr: 'Des bouteilles, des cocktails en canette ou en bouteille, ou rien à emporter.', icon: '🍾' } },
   R('happy_hour', { group: 'taproom', w: 4 }),
   R('menu', { group: 'taproom', w: 4, en: 'Menu or tap list', fr: 'Menu ou liste des bières', whyEn: 'Your menu or tap list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des bières. Une photo du tableau suffit. Inutile sans cuisine sur place.',
     cidery: { en: 'Menu or cider list', fr: 'Menu ou liste des cidres', whyEn: 'Your menu or cider list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des cidres. Une photo du tableau suffit. Inutile sans cuisine sur place.' },
-    neutral: { en: 'Menu or drinks list', fr: 'Menu ou liste des boissons', whyEn: 'Your menu or drinks list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des boissons. Une photo du tableau suffit. Inutile sans cuisine sur place.' } }),
+    neutral: { en: 'Menu or drinks list', fr: 'Menu ou liste des boissons', whyEn: 'Your menu or drinks list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des boissons. Une photo du tableau suffit. Inutile sans cuisine sur place.' },
+    distillery: { en: 'Menu or cocktail list', fr: 'Menu ou carte des cocktails', whyEn: 'Your cocktail or tasting menu. A photo of it is fine. Not needed without your own kitchen.', whyFr: 'Votre carte des cocktails ou de dégustation. Une photo suffit. Inutile sans cuisine sur place.' } }),
   { key: 'dogs_kids', group: 'yourvisit', w: 6, fix: true, target: { setup: 'offer:minors' }, fields: ['brewery_info', 'badges', 'owner_features'],
     en: 'Who’s welcome, and dogs', fr: 'Qui est le bienvenu, et les chiens', whyEn: 'Adults only, minors with an adult until a set time, or all ages. And are dogs welcome?', whyFr: 'Adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Et les chiens sont-ils bienvenus?', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   R('entertainment', { group: 'yourvisit', w: 3, fields: ['weekly_nights', 'badge:live_music'], noneEn: 'We don’t host events', noneFr: 'Nous n’organisons pas d’événements',
-    en: 'Weekly events', fr: 'Événements de la semaine', whyEn: 'Trivia, live music, bingo, run club: what’s on each week.', whyFr: 'Quiz, musique en direct, bingo, club de course : ce qui se passe chaque semaine.' }),
+    en: 'Weekly events', fr: 'Événements de la semaine', whyEn: 'Trivia, live music, bingo, run club: what’s on each week.', whyFr: 'Quiz, musique en direct, bingo, club de course : ce qui se passe chaque semaine.',
+    distillery: { en: 'Tours, classes and events', fr: 'Visites, ateliers et événements', whyEn: 'Distillery tours, cocktail or whisky classes, live music: what’s on and when.', whyFr: 'Visites de la distillerie, ateliers de cocktails ou de whisky, musique en direct : ce qui se passe et quand.', noneEn: 'We don’t host tours or events', noneFr: 'Nous n’organisons pas de visites ni d’événements' } }),
   R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups', fr: 'Groupes', whyEn: 'From what size should groups book ahead?', whyFr: 'À partir de quelle taille les groupes doivent-ils réserver?', target: { setup: 'groups' } }),
   { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
     en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible, Free parking or Room for RVs on “What you offer”.', whyFr: 'Cochez Accessible en fauteuil roulant, Stationnement gratuit ou Place pour VR dans « Ce que vous offrez ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
   R('description', { w: 5 }),
   R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on what you pour, e.g. Hazy IPAs and a blackberry sour.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des IPA troubles et une sure aux mûres.',
     cidery: { whyEn: 'One line on what you pour, e.g. Dry ciders from heritage apples.', whyFr: 'Une ligne sur ce que vous servez, p. ex. des cidres secs de pommes anciennes.' },
-    neutral: { whyEn: 'One line on what you pour, e.g. Small batches made right here.', whyFr: 'Une ligne sur ce que vous servez, p. ex. de petites cuvées faites sur place.' } }),
+    neutral: { whyEn: 'One line on what you pour, e.g. Small batches made right here.', whyFr: 'Une ligne sur ce que vous servez, p. ex. de petites cuvées faites sur place.' },
+    distillery: { whyEn: 'One line on what you pour, e.g. Small-batch gin with Okanagan botanicals.', whyFr: 'Une ligne sur ce que vous servez, p. ex. du gin en petits lots aux plantes de l’Okanagan.' } }),
   R('instagram', { w: 3 }),
   R('facebook', { w: 3 }),
   // Brewery test 2 (2026-11-13): the orchard lines (here and the season item) only for a cidery, as the setup's door lead.
   R('arrival', { w: 2, en: 'Taproom door photo and exact spot', fr: 'Photo de la porte de la salle de dégustation et emplacement exact', whyEn: 'Stand at the taproom door and take one photo. If your door is around the side or upstairs, it helps people find it.', whyFr: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Si votre porte est sur le côté ou à l’étage, cela aide à la trouver.',
-    whyEnCidery: 'Stand at the taproom door and take one photo. At an orchard or a big lot it helps people find you.', whyFrCidery: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Dans un verger ou un grand terrain, cela aide à vous trouver.' }),
+    whyEnCidery: 'Stand at the taproom door and take one photo. At an orchard or a big lot it helps people find you.', whyFrCidery: 'Placez-vous à la porte de la salle de dégustation et prenez une photo. Dans un verger ou un grand terrain, cela aide à vous trouver.',
+    distillery: { en: 'Tasting room door photo and exact spot', whyEn: 'Stand at the tasting room door and take one photo. If your door is around the side or upstairs, it helps people find it.' } }),
   R('owner_confirmed', { w: 2 }),
 ];
 if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: brewery weights must sum to 100');
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS };
+// Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
+// (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -331,6 +343,7 @@ const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', ho
   winery_kind: 'place_type', tasting_price: 'tasting_fee', visit_how: 'winery_info', booking_link: 'booking_url', winery_groups: 'winery_info', food_here: 'winery_info', access: 'owner_features' };
 // Breweries (2026-11-12): the same item keys save other fields for them (food here and the season are brewery answers).
 const QUICK_FIELD_BY_TYPE = { brewery: { brewery_kind: 'place_type', flight_price: 'flight_fee', to_go: 'brewery_info', food_here: 'brewery_info', season: 'brewery_info', dogs_kids: 'brewery_info' } };
+QUICK_FIELD_BY_TYPE.distillery = { ...QUICK_FIELD_BY_TYPE.brewery };
 const quickFieldFor = (type, key) => ((QUICK_FIELD_BY_TYPE[type] || {})[key]) || QUICK_FIELD[key];
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -456,12 +469,16 @@ function doneMap(input, today) {
     })() : {}),
     // Breweries (2026-11-12): the kind of place, venue_brewery_info (owner-only, never researched), the owner's flight
     // price (or "We don't do flights") and the owner features. The menu is done without a kitchen of their own.
-    ...(i.type === 'brewery' ? (() => {
+    ...(i.type === 'brewery' || i.type === 'distillery' ? (() => {
       const b = i.breweryInfo && typeof i.breweryInfo === 'object' ? i.breweryInfo : {};
       const foodSaid = BREWERY_FOOD.includes(b.food);
+      // Distilleries (Decided 5): by appointment only (no set hours) answers the hours, their check and the season, as
+      // for a winery; "by appointment in the off-season" answers the season.
+      const apptOnly = i.type === 'distillery' && b.visit === 'appointment';
       return {
-        brewery_kind: BREWERY_KINDS.includes(i.placeType),
-        season: nonBlank(i.openMonths) || !!i.hasSeasons || BREWERY_YEAR.includes(b.year),
+        ...(apptOnly ? { hours: true, hours_fresh: true } : {}),
+        brewery_kind: i.type === 'distillery' || BREWERY_KINDS.includes(i.placeType),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || BREWERY_YEAR.includes(b.year) || (i.type === 'distillery' && (b.year === 'appointment' || apptOnly)),
         food_here: foodSaid,
         flight_price: (typeof i.flightFee === 'number' && Number.isFinite(i.flightFee) && i.flightFee >= 0) || b.no_flights === true,
         to_go: Array.isArray(b.to_go) && b.to_go.length > 0,
@@ -554,6 +571,8 @@ function scoreCompleteness(input, opts) {
     if (base.whyEnCidery && wk === 'Cidery') it = { ...it, whyEn: base.whyEnCidery, whyFr: base.whyFrCidery };
     const kc = base.cidery || base.neutral ? (wk === 'Cidery' ? base.cidery : ['Brewery', 'Taphouse or beer hall'].includes(wk) ? null : base.neutral) : null;
     if (kc) it = { ...it, ...kc };
+    // Distilleries (2026-11-13): spirits words over the brewery ones.
+    if (base.distillery && input && input.type === 'distillery') it = { ...it, ...base.distillery };
     const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
@@ -663,7 +682,7 @@ function renderCompleteness(result, opts) {
   const L = (en, f) => (fr ? f : en);
   const r = result;
   // Winery test 1 (2026-11-12): a winery has a tasting room door, not a storefront.
-  const spotEn = o.winery ? 'your tasting room door' : o.brewery ? 'your taproom door' : 'your storefront spot';
+  const spotEn = o.winery || o.distillery ? 'your tasting room door' : o.brewery ? 'your taproom door' : 'your storefront spot';
   const spotFr = o.winery ? 'la porte de votre salle de dégustation' : o.brewery ? 'la porte de votre salle de dégustation' : 'l’emplacement de votre devanture';
   const gotText = (k) => (GOT_TEXT[k] ? `${fr ? GOT_TEXT[k].fr : GOT_TEXT[k].en} \u2713` : '');
   const waitingList = r.waiting || r.missing.filter((it) => it.waiting);
@@ -700,7 +719,7 @@ function renderCompleteness(result, opts) {
   const photosSent = Math.max(0, Number(o.pendingPhotos) || 0);
   if (o.plainWaiting && (nw || extraFields.length || photosSent)) {
     const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
-      website: ['website', 'site Web'], arrival: o.winery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : o.brewery ? ['taproom door photo', 'photo de la porte de la salle'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
+      website: ['website', 'site Web'], arrival: o.winery || o.distillery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : o.brewery ? ['taproom door photo', 'photo de la porte de la salle'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     // Every pending item is named, photos included (pub test 6: "Menu, website and address sent" left out the photo).
