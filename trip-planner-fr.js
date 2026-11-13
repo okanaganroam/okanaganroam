@@ -29,7 +29,7 @@ const STRONG = new Set(('pres chutes grimpeurs grimpeuses ours aigles saumons ty
   + 'automne biere bieres cidre cidres microbrasserie microbrasseries degustation terrasse terrasses lac velo raquette raquettes baignade '
   + 'sentier sentiers famille amoureux romantique tranquille relaxe meilleurs meilleures meilleur endroits '
   + 'resto restos bouffe manger dejeuner deux trois quatre cinq huit dix planifie planifiez planifier organisez '
-  + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie '
+  + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie spiritueux '
   + 'nager peche plein exterieur interieur matin soir midi nuits beaucoup quelques sans pas une vue parcs joyaux favoris locaux '
   + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite '
   // 2026-10-18: "un week-end vinicole", "où les chiens sont acceptés" (ouu is the tokenizer's où).
@@ -183,6 +183,9 @@ const PHRASES = [
   ['magasinage', 'shopping'], ['magasiner', 'shopping'], ['faire du magasinage', 'shopping'], ['faire les boutiques', 'shopping'], ['lèche-vitrine', 'shopping'], ['leche vitrine', 'shopping'], ['boutiques', 'shops'], ['souvenirs', 'souvenirs'], ['librairie', 'bookshop'], ['librairies', 'bookshops'],
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
+  // Distilleries (2026-11-13): « spiritueux » and the spirits by name are a distillery (a « dégustation de gin » isn't wine).
+  ['degustation de spiritueux', 'spirits tasting'], ['degustations de spiritueux', 'spirits tasting'], ['degustation de gin', 'gin tasting'], ['degustation de whisky', 'whisky tasting'],
+  ['spiritueux artisanaux', 'craft spirits'], ['spiritueux', 'spirits'], ['rhum', 'rum'], ['eau de vie', 'spirits'], ['eaux de vie', 'spirits'],
   ['cidrerie', 'cidery'], ['cidreries', 'cideries'],
   // Brewery test 3 (2026-11-13): « cidre à Summerland » asks for cider (the cideries), not a word in the descriptions.
   ['cidre', 'cider'], ['cidres', 'ciders'],

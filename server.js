@@ -4926,7 +4926,7 @@ const FR_SEARCH_SYNONYMS = [
   ['cidre', 'cider'], ['cidrerie', 'cidery'], ['cidreries', 'cideries'], ['vignoble', 'winery'], ['vignobles', 'wineries'], ['vinerie', 'winery'], ['vineries', 'wineries'],
   ['cave a vin', 'winery'], ['caves a vin', 'wineries'], ['domaine viticole', 'winery'], ['domaines viticoles', 'wineries'], ['vin de glace', 'ice wine'], ['vins de glace', 'ice wine'],
   ['brasserie', 'brewery'], ['brasseries', 'breweries'], ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['biere', 'beer'], ['biere artisanale', 'craft beer'],
-  ['distillerie', 'distillery'], ['distilleries', 'distilleries'], ['vin', 'wine'], ['vins', 'wine'], ['degustation', 'tasting'], ['degustation de vin', 'wine tasting'],
+  ['distillerie', 'distillery'], ['distilleries', 'distilleries'], ['spiritueux', 'spirits'], ['rhum', 'rum'], ['vin', 'wine'], ['vins', 'wine'], ['degustation', 'tasting'], ['degustation de vin', 'wine tasting'],
   ['bar a cocktails', 'cocktail bar'], ['bar a vin', 'wine bar'], ['bar a vins', 'wine bar'], ['cinq a sept', 'happy hour'], ['5 a 7', 'happy hour'],
   // food (Canadian meals: déjeuner is breakfast, dîner lunch, souper dinner)
   ['creme glacee', 'ice cream'], ['cremes glacees', 'ice cream'], ['bar laitier', 'ice cream'], ['petit dejeuner', 'breakfast'], ['dejeuner', 'breakfast'],
@@ -66212,7 +66212,7 @@ module.exports = {
   validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
-  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
+  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, COMPLETENESS_TYPES, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,

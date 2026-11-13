@@ -8166,7 +8166,7 @@ module.exports = {
   wineTourMeansWineries,
   applyWineTourMeaning,
   fastFood,
-  publicVenue, breweryIsCidery, ciderAsked,
+  publicVenue, breweryIsCidery, ciderAsked, kidsAllowed,
   stopFrom,
   parseVenueHours,
   hoursFit, dayClosedAllDay, closedDayInfo,
