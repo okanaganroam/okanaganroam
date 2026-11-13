@@ -102,7 +102,7 @@
   }
   // "Heads up: you're closed on Tue (in your usual hours)." under a special or event on a weekday the place is closed in
   // the months it runs (pub test 7). Only with hours on file.
-  function closedWarn(days, sea){
+  function closedWarn(days, sea, tpl){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
     for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
@@ -112,11 +112,13 @@
     var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
     var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
-    return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
+    return fill(tpl || T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
-  function warnHtml(key, i, e){ var t = closedWarn(e.days, e.sea); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
+  function warnOf(key, e){ return key === 'happy' ? closedWarn(e.days, S.happySea, T.closedWarnHappy) : closedWarn(e.days, e.sea); }
+  function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
-    ['specials', 'nights'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = closedWarn(e.days, e.sea); n.textContent = t; n.hidden = !t; }); });
+    ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnOf(key, e); n.textContent = t; n.hidden = !t; }); });
   }
 
   // ---------- State ----------
@@ -129,7 +131,7 @@
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
-    happy: [], specials: [], nights: [], story: CUR.description || '', visit: clone(CUR.visit_rows || {}),
+    happy: [], specials: [], nights: [], story: C.storyPending || CUR.description || '', visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
@@ -661,7 +663,11 @@
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
-  function savedKept(step){ return step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
+  // Brewery test 4 (2026-11-13): a story just sent keeps its Saved screen, with "What we'll put on your page:" and her words.
+  function savedKept(step){ return (step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit()) || (step === 'story' && !!S.storySent && !!T.storySentAs); }
+  // The text the story box started from: her story waiting for our check, or the page's.
+  function storyBase(){ return String(C.storyPending || CUR.description || '').trim(); }
+  function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
   function savedText(step){
     var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
     var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' || how === 'unsure' ? T.gotIt : how === 'day' ? T.sentTitle : T.savedTitle;
@@ -1558,7 +1564,7 @@
       if (!S.happy.length) S.happy.push({ days: {}, from: '15:00', to: '17:00', what: '' });
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + '<p class="su-q">' + h(T.whatTime) + '</p>'
+          + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + warnHtml('happy', i, e) + '<p class="su-q">' + h(T.whatTime) + '</p>'
           + (S.week && DAYS.some(function(d){ return S.week[d]; }) ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="allDay:' + i + '">' + h(T.allDay) + '</button></div>' : '') + '<div class="su-times"><label class="su-sr" for="hf' + i + '">' + h(T.starts) + '</label><input type="time" id="hf' + i + '" data-hh="' + i + ':from" value="' + e.from + '"> ' + h(T.to) + ' '
           // Until close (pub test 9, 2026-11-10): the end is the place's closing time that day (after midnight too).
           + (e.close ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="ht' + i + '">' + h(T.ends) + '</label><input type="time" id="ht' + i + '" data-hh="' + i + ':to" value="' + e.to + '">') + '</div>'
@@ -1603,7 +1609,7 @@
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
@@ -2541,7 +2547,7 @@
     }
     if (k === 'storySave' && C.brewery) {
       S.story = storyJoinFix(el('suStory').value); readBrew();
-      var bStoryCh = S.story.trim() !== String(CUR.description || '').trim(), bsl = [];
+      var bStoryCh = S.story.trim() !== storyBase(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
       if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
@@ -2549,7 +2555,7 @@
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
       S.savedLine.story = bStoryCh && bKnownCh ? T.storyKnownSaved : '';
-      return saveAll('story', bsl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.brew.known; S.visit.known_for = S.brew.known; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'known_for'; }); });
+      return saveAll('story', bsl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.brew.known; S.visit.known_for = S.brew.known; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'known_for'; }); });
     }
     // ---------- Wineries (2026-11-12) ----------
     if (k === 'yearAppt') { S.apptDraft = null; return go('hours:appt'); }
@@ -2614,7 +2620,7 @@
     if (k === 'expNone') { S.wine.exp = [{ label: '', text: '' }, { label: '', text: '' }]; return saveAll('experiences', [{ winery_info: { experiences: [] } }], 'no', null, function(){ WI.experiences = []; }); }
     if (k === 'storySave' && C.winery) {
       S.story = storyJoinFix(el('suStory').value); readWine();
-      var storyCh = S.story.trim() !== String(CUR.description || '').trim(), sl = [];
+      var storyCh = S.story.trim() !== storyBase(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
       if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
@@ -2622,9 +2628,12 @@
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
       S.savedLine.story = storyCh && knownCh ? T.storyKnownSaved : '';
-      return saveAll('story', sl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
+      return saveAll('story', sl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
-    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } S.storySent = S.story; return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
+      // Brewery test 4: the story already waiting for our check isn't sent twice.
+      if (C.storyPending && S.story.trim() === String(C.storyPending).trim()) { S.storySent = ''; return saveAll('story', []); }
+      S.storySent = S.story; return saveAll('story', [{ description: S.story }], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -2664,7 +2673,7 @@
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];
       var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;
       obj[key] = !obj[key]; b.setAttribute('aria-pressed', obj[key] ? 'true' : 'false'); S.nudge = '';
-      if (path[0] === 'specials' || path[0] === 'nights') warnRefresh();
+      if (path[0] === 'specials' || path[0] === 'nights' || path[0] === 'happy') warnRefresh();
       if (path[0] === 'specials') { var spa = el('suSpAll' + path[1]); if (spa) spa.setAttribute('aria-pressed', allDays(obj) ? 'true' : 'false'); }
     }; });
     // The usual week or the other season's week (pub test 6): the same editor, on W().
@@ -2855,7 +2864,10 @@
     // so pasting replaces it; typing or a second tap places the cursor as usual, and the ✕ still clears it. Story boxes
     // and the menu address (made to be added to after its last /) keep the cursor at the end.
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
-      var pre = inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value, first = true;
+      // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
+      // replaces it (never her own story, sent or on the page).
+      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!CUR.description && inp.value === CUR.description;
+      var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
     });
   }

@@ -35698,6 +35698,17 @@ function happyHourLiveText(h, fr, clock) {
     : h.nextWeek ? (fr ? `${day} prochain` : `next ${day}`) : day;
   return fr ? `Prochain happy hour : ${dayText} ${happyHourTimeText(h.from.minutes, true)}` : `Next happy hour: ${dayText} ${happyHourTimeText(h.from.minutes, false)}`;
 }
+// True when a happy hour day is a day the place is closed in its usual week or any of its seasonal weeks.
+function happyHourOnClosedDay(venueId, hoursJson, hhJson) {
+  if (!hoursModule || !hoursJson || !hhJson) return false;
+  try {
+    const hh = hoursModule.parseHours(hhJson);
+    if (!hh || !hh.known) return false;
+    const hhDays = Object.keys(hh.days).filter((d) => hh.days[d] && hh.days[d].status === 'open');
+    const weeks = [hoursJson].concat(((hoursExtrasMap().get(venueId) || {}).seasons || []).map((p) => p && p.hours ? JSON.stringify(p.hours) : null).filter(Boolean));
+    return weeks.some((w) => { const p = hoursModule.parseHours(w); return p && p.known && hhDays.some((d) => p.days[d] && p.days[d].status === 'closed'); });
+  } catch (e) { return false; }
+}
 // What a venue page shows: { week, checked, live: { state, text } | null }, or null when the place has no stored times,
 // has an advisory/closure notice, a closure in force, or is closed for the season. `statusHours`: the hours the page's
 // open-now line reads (a place its own hours call closed now never shows happy hour as on, like the map; a place
@@ -35710,7 +35721,8 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   const deals = happyHourDealsShown(row, now);
   if (!row || (!row.happy_hour_times && !deals)) return null;
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
-  const week = happyHourWeekText(row.happy_hour_times, fr);
+  // Brewery test 4 (2026-11-13): happy hour on a day the place is closed (all year or in a season): "(when open)".
+  const week = happyHourWeekText(row.happy_hour_times, fr) + (happyHourOnClosedDay(venue.id, row.hours, row.happy_hour_times) ? (fr ? ' (les jours d’ouverture)' : ' (when open)') : '');
   if (!week && !deals) return null;
   // Verified mark (2026-10-27): deals the owner entered (source 'venue_owner') carry `confirmed`, the "Confirmed by
   // <venue>" line that takes the place of the grey checked date.
@@ -47032,6 +47044,18 @@ function ownerWebsitePending(venueId) {
     return c && typeof c.website === 'string' && c.website.trim() ? normalizeWebsiteUrl(c.website.trim()) || '' : '';
   } catch (e) { return ''; }
 }
+// True when the page's description is one the owner sent (approved).
+function ownerDescriptionWasHers(venue) {
+  const now = String(venue && venue.description || '').trim();
+  if (!now) return false;
+  try {
+    for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'approved' AND changes LIKE '%\"description\"%' ORDER BY id DESC LIMIT 20").all(venue.id)) {
+      const c = JSON.parse(w.changes);
+      if (c && typeof c.description === 'string' && c.description.trim() === now) return true;
+    }
+  } catch (e) { /* no table */ }
+  return false;
+}
 // A link the owner sent that is still waiting for review (pub test 9, 2026-11-10: the setup's booking link box shows
 // it): the newest pending request that names `field` ('booking_url'), or ''.
 function ownerLinkPending(venueId, field) {
@@ -52829,6 +52853,9 @@ function renderOwnerSetupPage(found, opts) {
     pin: venue.latitude != null && venue.longitude != null ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null,
     // Café test 6 (2026-11-12): the full list in French alphabetical order on the French setup (it was sorted by the English
     // names, so « Philippine » sat by F and « Grilladerie » by S).
+    // Brewery test 4 (2026-11-13): the story she sent that is waiting for our check (the box shows it, not the old text),
+    // and whether the page's description is research's (her first tap in the box selects it, so typing replaces it).
+    storyPending: ownerLinkPending(venue.id, 'description') || '', storyResearch: !ownerDescriptionWasHers(venue),
     cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
