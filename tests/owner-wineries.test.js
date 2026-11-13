@@ -921,7 +921,7 @@ test('winery test 3: a winery’s owner home has no Happy hour or Add an event t
   const f = text.fr, fw = text.fr.winery;
   assert.equal(f.stDayPlural, 'nous les ajouterons d’ici un jour');
   assert.equal(fw.stStoryKnown, 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour');
-  assert.equal(fw.knownQ, 'Votre spécialité ?');
+  assert.equal(fw.knownQ, 'Pour quoi êtes-vous reconnu\u202f?');
   assert.match(f.openQ, /Quand êtes-vous ouverts chaque année \?/);
   assert.equal(f.holidays.victoria, 'Fête de Victoria');
   assert.equal(fw.menuSocialQ, 'Où est votre carte des vins ?');
@@ -1193,7 +1193,7 @@ test('winery test 5: the groups line keeps limos and the buses question says one
   assert.equal((await change(t, { winery_info: { groups: 8, buses: 'book' } })).status, 200);
   assert.equal(row(w.id, 'Groups').text, 'Groups of 8 or more, and tour buses and limos, please book ahead.');
   assert.equal(app.venueVisitInfo(w.id).owner_fr.Groups.fr, 'Groupes de 8 personnes ou plus, autobus et limousines : réservez à l’avance.');
-  assert.equal((await change(t, { winery_info: { buses: 'book' } })).status, 200);
+  assert.equal((await change(t, { winery_info: { groups: null, buses: 'book' } })).status, 200);
   assert.equal(row(w.id, 'Groups').text, 'Tour buses and limos: please book ahead.', 'the stand-alone line as before');
   assert.match(text.en.winery.busesLead, /One answer for both\. Take only one of them\? Tap “Book ahead”/);
   assert.match(text.fr.winery.busesLead, /Vous n’acceptez que l’un des deux \? Touchez « Réservez à l’avance »/);

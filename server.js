@@ -20513,7 +20513,8 @@ function visitBadgeConfirmedLabels(venueId, rows) {
   } catch (e) { return out; }
   if (!v) return out;
   for (const [badge, re] of Object.entries(VISIT_BADGE_LABELS)) {
-    if (!owned.has(badge) || !(Number(v[badge]) === 1 || v[badge] === true)) continue;
+    const on = Number(v[badge]) === 1 || v[badge] === true || !!venueOwnerFeatures(venueId)[badge];
+    if (!(owned.has(badge) || owned.has(`feature_${badge}`)) || !on) continue;
     for (const r of rows || []) if (r && re.test(String(r.label || ''))) out.add(r.label);
   }
   return out;
