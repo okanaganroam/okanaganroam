@@ -164,7 +164,9 @@
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || '21:00', note: (S.pubInfo.minors || {}).note || '' };
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
-  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || '21:00', note: BIm.note || '' }; }
+  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || '21:00', note: BIm.note || '' };
+    // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
+    if (!BIm.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; } }
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
   if (C.pub && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
@@ -562,6 +564,8 @@
     return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
+  // Brewery test 4 (2026-11-13): a status on its own line starts with a capital ("On your page").
+  function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   function stText(step, d){
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
@@ -803,6 +807,9 @@
   function siteDomain(u){ return String(u || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, ''); }
   // "https://tapandbarrelkitchen.ca/" from "https://tapandbarrelkitchen.ca/?utm_source=okanaganroam#top" (pub test 9).
   function siteOrigin(u){ var t = String(u || '').trim(); if (!t) return ''; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^([a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+)/i.exec(t); return m ? m[1] + '/' : ''; }
+  // Brewery test 4 (2026-11-13): the website with its path ("https://example.com/lakesidelager/"), so a site under a path
+  // keeps it; never a query or #fragment (tracked links). The origin when there's no path.
+  function siteUrl(u){ var o = siteOrigin(u); if (!o) return ''; var t = String(u || '').trim(); if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t; var m = /^[a-z][a-z0-9+.-]*:\/\/[^\/?#\s]+(\/[^?#\s]*)?/i.exec(t), path = m && m[1] ? m[1].replace(/^\/+/, '') : ''; if (!path) return o; return o + path + (/\/$/.test(path) || /\.[a-z0-9]{2,5}$/i.test(path) ? '' : '/'); }
   function siteHostOf(u){ return siteOrigin(u).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
   // A web address inside a line of text (pub test 9: "Book on OpenTable: opentable.ca/r/tap-and-barrel"): -> { url, rest } | null.
   function linkIn(t){
@@ -1153,7 +1160,7 @@
         + '<div class="su-skip" style="margin-top:14px"><button type="button" class="su-link" id="suChangeAnswer" data-act="go:start">' + h(T.changeAnswer) + '</button></div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
-      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(stText(k, d)) + '</span>' : '') + '</button>'; };
+      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(capFirst(stText(k, d))) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
       var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div>' + (rest2.length ? '<details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>' : '')
@@ -1467,9 +1474,9 @@
         + '<p class="su-note" id="suProgress" role="status"></p><div class="su-stack">' + (n && (S.error || S.busy) ? big('✓', S.error ? T.tryAgain : T.sendMenu, '', false, 'sendMenuPages') : '')
         + (S.busy ? '' : big('📷', n ? T.camMore : T.camTake, '', !!(n && S.error), 'menuCam')) + (n && !S.error && !S.busy ? big('✓', T.sendMenu, '', true, 'sendMenuPages') : '') + '</div>';
     } else if (s === 'menu:web' || s === 'happy:web' || s === 'specials:web') {
-      // Pub test 9 (2026-11-10): only the website's origin ("https://tapandbarrelkitchen.ca/"), never its path, query or
-      // #fragment, so a tracked link (…/?utm_source=okanaganroam) is never prefilled for "add the page after the /".
-      var site = siteOrigin(C.website), siteHost = siteHostOf(C.website);
+      // Pub test 9 (2026-11-10): never the website's query or #fragment, so a tracked link (…/?utm_source=okanaganroam) is
+      // never prefilled for "add the page after the /". Brewery test 4: its path is kept (siteUrl).
+      var site = siteUrl(C.website), siteHost = siteHostOf(C.website);
       var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
       var urlNow = S.webUrl != null ? S.webUrl : site;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
@@ -2355,7 +2362,7 @@
       });
     }
     if (k === 'copy') { var sel = function(){ var rg = document.createRange(); rg.selectNodeContents(el('suEm')); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(rg); say('suCopied', T.selected); }; try { navigator.clipboard.writeText(C.email).then(function(){ say('suCopied', T.copied); }, sel); } catch (e) { sel(); } return; }
-    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteOrigin(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
+    if (k === 'urlBack') { var uu = el('suUrl'); if (uu) { uu.value = siteUrl(C.website); S.webUrl = uu.value; var usr = el('suUseSiteRow'); if (usr) usr.hidden = true; uu.focus(); try { uu.setSelectionRange(uu.value.length, uu.value.length); } catch (e2) {} } return; }
     if (k === 'sheetFile') return el('suSheetFile').click();
     if (k === 'sheetCam') return el('suSheetCam').click();
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
@@ -2843,7 +2850,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
     var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
-    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
+    var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteUrl(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
     if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };

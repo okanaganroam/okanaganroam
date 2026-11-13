@@ -19680,13 +19680,26 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label0] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
-      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || label0;
+      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || (f === 'dog_friendly' && dogsPatioOnly(venue) ? 'Dogs on patio' : '') || label0;
       return `<span class="chip chip-feat${f === 'free_entry' ? ' chip-price' : ''}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, false, () => 'chip chip-feat') || [])
     .join(' ');
 }
 
+// Brewery test 4 (2026-11-13): the owner's own Dogs answer is "Patio only" (any type): the card chip says "Dogs on
+// patio" (« Chiens sur la terrasse »), not "Dogs OK".
+function dogsPatioOnly(venue) {
+  if (!venue || !venue.id || !venue.dog_friendly) return false;
+  const info = venueVisitInfo(venue.id);
+  if (!info || !Array.isArray(info.rows) || !(info.owner_labels || []).includes('Dogs')) return false;
+  const r = info.rows.find((x) => x && x.label === 'Dogs' && typeof x.text === 'string');
+  if (!r) return false;
+  const en = OWNER_SETUP_STRINGS.en, fr = OWNER_SETUP_STRINGS.fr;
+  const patio = new Set([en.quick.dogs[0], en.quickDogsFull[0], fr.quick.dogs[0], fr.quickDogsFull[0]].map(presetAnswerNorm));
+  const segs = presetAnswerParts(r.text).filter((seg, i) => !(i % 2)).map((seg) => presetAnswerNorm(seg.replace(/\.$/, ''))).filter(Boolean);
+  return segs.some((x) => patio.has(x));
+}
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
   return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
     .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
@@ -52986,8 +52999,8 @@ const WINERY_SETUP_HELP_TOPICS = [
     q: 'How do I change my hours later (winter hours too)?', qFr: 'Comment changer mes heures plus tard (aussi l’hiver)?',
     keys: ['winter hours', 'change hours later', 'change my hours later', 'change my winter hours', 'change winter hours', 'change our winter hours', 'change the winter hours', 'winter hours later', 'hours later', 'change our hours', 'change my hours', 'update my hours', 'update hours', 'new hours', 'summer hours later', 'change summer hours', 'change my summer hours', 'change seasonal hours', 'change my seasonal hours', 'edit my hours', 'fix my hours'],
     keysFr: ['heures d hiver', 'horaire d hiver', 'changer mes heures', 'modifier mes heures', 'changer les heures', 'modifier les heures', 'heures plus tard', 'changer mes heures plus tard', 'changer l horaire', 'modifier l horaire', 'heures d ete', 'mettre a jour mes heures'],
-    a: '<p>Any time, in either place:</p><ul><li>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. Change your usual or your winter hours (and their months), then save. Hours saved in the setup are on your page straight away.</li><li>Or tap <strong>Change my hours</strong> on your portal’s main page, for the full form with seasonal hours and special closures. {LIVE}</li></ul><p>Your winter hours come back every year by themselves, so you only change them when they change.</p>',
-    aFr: '<p>En tout temps, à l’un ou l’autre endroit :</p><ul><li>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Changez vos heures habituelles ou vos heures d’hiver (et leurs mois), puis enregistrez. Les heures enregistrées dans la configuration sont sur votre page tout de suite.</li><li>Ou touchez <strong>Modifier mes heures</strong> sur la page principale de votre portail, pour le formulaire complet avec les heures saisonnières et les fermetures spéciales. {LIVE}</li></ul><p>Vos heures d’hiver reviennent chaque année d’elles-mêmes; vous ne les changez que si elles changent.</p>' },
+    a: '<p>Yes, any time. In either place:</p><ul><li>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. Change your usual or your winter hours (and their months), then save. Hours saved in the setup are on your page straight away.</li><li>Or tap <strong>Change my hours</strong> on your portal’s main page, for the full form with seasonal hours and special closures. {LIVE}</li></ul><p>Your winter hours come back every year by themselves, so you only change them when they change.</p>',
+    aFr: '<p>Oui, en tout temps. À l’un ou l’autre endroit :</p><ul><li>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Changez vos heures habituelles ou vos heures d’hiver (et leurs mois), puis enregistrez. Les heures enregistrées dans la configuration sont sur votre page tout de suite.</li><li>Ou touchez <strong>Modifier mes heures</strong> sur la page principale de votre portail, pour le formulaire complet avec les heures saisonnières et les fermetures spéciales. {LIVE}</li></ul><p>Vos heures d’hiver reviennent chaque année d’elles-mêmes; vous ne les changez que si elles changent.</p>' },
   { id: 'winery-appointment', pages: ['setup', 'edit'], q: 'We’re by appointment in winter', qFr: 'Nous sommes sur rendez-vous l’hiver',
     keys: ['by appointment', 'appointment', 'appointment only', 'off-season', 'off season', 'winter', 'call ahead'], keysFr: ['rendez-vous', 'sur rendez-vous', 'basse saison', 'hiver', 'appelez'],
     a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”.</p><p>By appointment all year, with no set hours? On the Hours step, tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</p>',
@@ -53068,6 +53081,18 @@ function breweryListTile(venue) {
   if (k === 'Brewery' || k === 'Taphouse or beer hall') return { en: ['Update my menu or tap list', 'Snap your chalkboard or tap list'], fr: ['Mettre à jour mon menu ou ma liste des bières', 'Photographiez votre tableau ou votre liste des bières'] };
   return { en: ['Update my menu or drinks list', 'Snap your chalkboard or drinks list'], fr: ['Mettre à jour mon menu ou ma liste des boissons', 'Photographiez votre tableau ou votre liste des boissons'] };
 }
+// 'HH:MM' from a research line that clearly says kids are welcome until a time ("Kids welcome until 8 PM", « enfants
+// jusqu’à 20 h »), or ''.
+function researchKidsUntil(rows) {
+  for (const r of rows || []) {
+    if (!r || typeof r.text !== 'string' || !/\b(?:kids?|children|minors|families|enfants|mineurs)\b/i.test(`${r.label || ''} ${r.text}`)) continue;
+    let m = /\b(?:kids?|children|minors|families)\b[^.;]{0,40}?\buntil\s+(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\b/i.exec(r.text);
+    if (m) { let hh = Number(m[1]) % 12; if (/p/i.test(m[3])) hh += 12; const mm = Number(m[2] || 0); if (hh >= 0 && hh < 24 && mm < 60) return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; }
+    m = /\b(?:enfants|mineurs)\b[^.;]{0,40}?jusqu[’']?\s?à\s+(\d{1,2})\s?h\s?(\d{2})?/i.exec(r.text);
+    if (m && Number(m[1]) < 24 && Number(m[2] || 0) < 60) return `${String(Number(m[1])).padStart(2, '0')}:${String(Number(m[2] || 0)).padStart(2, '0')}`;
+  }
+  return '';
+}
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -53092,6 +53117,9 @@ function breweryCfg(venue, snap, fr) {
   })();
   return {
     allSteps: BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2), feeLiveMax: FLIGHT_FEE_LIVE_MAX, suggestKind, suggestFood, suggestTrucks, researchFee,
+    // Brewery test 4 (2026-11-13): research's Kids line "Kids welcome until 8 PM" pre-picks "Minors with an adult until"
+    // 8 PM on Who's welcome (a suggestion, saved only with the screen).
+    suggestKidsUntil: researchKidsUntil((info.rows || []).filter((x) => x && !mine.has(x.label))),
     // Where it came from: the card's price ("Your card shows $12 now") or only research's Flights line ("Your page says $10").
     researchFeeFrom: cardFlight != null ? 'card' : 'visit',
     placeShow: Object.fromEntries(placeTypesFor('brewery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
