@@ -117,6 +117,19 @@ function kidsAllowed(v) {
   if (v.type === 'pub' || v.type === 'brewery') return !!(v.features && v.features.kid_friendly);
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
+// Brewery test 1 (2026-11-12): a brewery or pub whose owner said "minors with an adult until 9 PM" (v.kidsUntil, 'HH:MM').
+// With kids, a slot that starts at or after that time isn't planned there; one that runs past it says to leave by
+// then; every kids stop there names the time once.
+function kidsUntilMinutes(v) {
+  const m = /^(\d{2}):(\d{2})$/.exec(String((v && v.kidsUntil) || ''));
+  if (!m) return null;
+  const n = Number(m[1]) * 60 + Number(m[2]);
+  return n < NIGHT_ENDS_AT_KIDS ? n + 1440 : n;
+}
+const NIGHT_ENDS_AT_KIDS = 5 * 60;
+function kidsClock(min) { const h = Math.floor(min / 60) % 24, mi = min % 60; if (h === 0 && mi === 0) return 'midnight'; if (h === 12 && mi === 0) return '12 PM'; return `${h % 12 === 0 ? 12 : h % 12}${mi ? ':' + String(mi).padStart(2, '0') : ''} ${h < 12 ? 'AM' : 'PM'}`; }
+function kidsUntilNote(min, late) { return late ? `Kids welcome with an adult until ${kidsClock(min)}, so plan to leave by then` : `Kids welcome with an adult until ${kidsClock(min)}`; }
+const KIDS_UNTIL_RE = /^Kids welcome with an adult until /;
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
 // ---------- small helpers ----------
@@ -483,12 +496,16 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
   const fit = hoursFit(v, live ? live.win : windowKey, weekday);
   if (fit.status === 'closed') return { ok: false };
   const label = SLOT_WINDOWS[windowKey].label;
+  const kidsMin = ctx.kids ? kidsUntilMinutes(v) : null, kidsWin = live ? live.win : SLOT_WINDOWS[windowKey];
+  if (kidsMin != null && kidsWin && kidsWin.from >= kidsMin) return { ok: false };
+  const kidsLate = kidsMin != null && kidsWin && kidsWin.to > kidsMin ? kidsUntilNote(kidsMin, true) : null;
+  const withKids = (r) => (kidsLate && r && r.ok ? { ...r, caveats: (r.caveats || []).concat(kidsLate) } : r);
   if (live && fit.status === 'verified') {
     const end = closesWithin(v, weekday, live.win);
     if (end != null) {
       const caveats = [`Its listed hours end at ${clockText(end)} \u2014 check before you go`];
       const text = listedHoursText(v, weekday);
-      return { ok: true, score: 2 + ((daypart === 'evening' || windowKey === 'evening') ? dinnerAdjust(v) : 0), reasons: text ? [{ code: 'hours', text, weight: 2 }] : [], caveats };
+      return withKids({ ok: true, score: 2 + ((daypart === 'evening' || windowKey === 'evening') ? dinnerAdjust(v) : 0), reasons: text ? [{ code: 'hours', text, weight: 2 }] : [], caveats });
     }
   }
   const reasons = [];
@@ -521,7 +538,7 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     if (role === 'treat' && daypart === 'afternoon' && !ctx.kids) adj = 0; // an ice-cream stop is a family-trip bonus
     score += adj;
   }
-  return { ok: true, score, reasons, caveats };
+  return withKids({ ok: true, score, reasons, caveats });
 }
 
 
@@ -1327,12 +1344,15 @@ function publicVenue(v, ctx) {
     // card can show as they are -- the verified badge columns that are set
     // (only on the Food & Drink / winery types, where the badges exist),
     // the curated collections, and the stored weekly hours as listed.
-    badges: BADGE_TYPES.includes(v.type) ? Object.keys(v.features || {}).filter((f) => v.features[f]).map((f) => ({ key: f, label: ctx ? featureLabel(ctx, f) : f })) : [],
+    badges: BADGE_TYPES.includes(v.type) ? Object.keys(v.features || {}).filter((f) => v.features[f]).map((f) => ({ key: f, label: f === 'kid_friendly' && kidsUntilMinutes(v) != null ? `Kids until ${kidsClock(kidsUntilMinutes(v))}` : ctx ? featureLabel(ctx, f) : f })) : [],
     // 'dog_friendly' is the official dog-access list for beaches and outdoor
     // places; on dining venues the Dog-Friendly badge above says it.
     collections: (v.collections || []).filter((c) => PUBLIC_COLLECTION_LABELS[c] && (c !== 'dog_friendly' || OUTSIDE_TYPES.includes(v.type))).map((c) => ({ key: c, label: PUBLIC_COLLECTION_LABELS[c] })),
     // Winery test 4 (2026-11-12): a winery by appointment (its own answer) shows no listed hours.
     listedHours: v.hours && v.ownerAppointment !== true ? listedHoursText(v, null, null) : null,
+    // Brewery test 1 (2026-11-12): hours the business confirmed (no "check before you go"), and its time for minors.
+    ...(v.ownerHours ? { hoursByOwner: true } : {}),
+    ...(kidsUntilMinutes(v) != null && v.features && v.features.kid_friendly ? { kidsUntil: v.kidsUntil } : {}),
     // Round 12 (2026-10-20): the venue's own French notice for its "Advisory on Whistler Roam" caveat, used on /fr/trip.
     ...(v.advisory && v.advisory.note && v.advisory.noteFr ? { advisoryFr: { en: `Advisory on ${SITE.brand}: ${advisoryExcerpt(v.advisory.note)}`, fr: `Avis ${SITE.brandFrOf} : ${advisoryExcerpt(v.advisory.noteFr)}` } } : {}),
   };
@@ -1608,6 +1628,11 @@ function stopFrom(v, scored, extra, ctx) {
     reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
     caveats = caveats.filter((c) => c !== UNKNOWN_HOURS_CAVEAT && !/listed hours/i.test(c));
   }
+  // Brewery test 1 (2026-11-12): with kids, a place whose owner set a time for minors names it once on the stop.
+  const kidsMin = ctx && ctx.kids ? kidsUntilMinutes(v) : null;
+  if (kidsMin != null && !caveats.some((c) => KIDS_UNTIL_RE.test(c))) caveats.push(kidsUntilNote(kidsMin, false));
+  // Hours the business itself saved or confirmed recently (v.ownerHours): no "check before you go" on them.
+  if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
@@ -1662,6 +1687,10 @@ function requestedTimeFit(v, ctx) {
   const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
   let score = 0;
   const reasons = [], caveats = [];
+  // Brewery test 1 (2026-11-12): with kids, not at a place whose time for minors has passed by then (slotFit too).
+  const kidsMin = ctx.kids ? kidsUntilMinutes(v) : null, kidsWin = live ? live.win : part ? SLOT_WINDOWS[part] : null;
+  if (kidsMin != null && kidsWin && kidsWin.from >= kidsMin) return { skip: true };
+  if (kidsMin != null && kidsWin && kidsWin.to > kidsMin) caveats.push(kidsUntilNote(kidsMin, true));
   if (live) {
     // Dropped only when its listing proves it closed for the rest of the
     // time asked about (it already closed, or it does not open again).
@@ -5879,7 +5908,26 @@ function addBeachSeasonNotes(result, input) {
   }
   return result;
 }
-function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(input)); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); return addStory(result, input || {}); }
+// Brewery test 1 (2026-11-12): a kids trip at a place whose owner set a time for minors ("until 9 PM"): every such stop
+// or listed place names the time once; when the plan has them there at or after it, or the visitor's own "to 10 PM"
+// runs past it, the line says to leave by then.
+function kidsUntilFlags(result, input) {
+  const intent = (input && input.intent) || {};
+  if (!result || !((intent.party && intent.party.kids) || intent.occasion === 'family')) return;
+  const req = (input && input.requirements) || {};
+  const m = /\b(?:to|until|till)\s+(?:about\s+|around\s+|roughly\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(String((input && input.text) || ''));
+  const askedEnd = m ? (Number(m[1]) % 12) * 60 + Number(m[2] || 0) + (m[3].toLowerCase() === 'pm' ? 720 : 0) : null;
+  for (const st of planStopsOf(result).concat(result.recommendations || [])) {
+    const v = st && st.venue; if (!v || !v.kidsUntil) continue;
+    const min = kidsUntilMinutes(v); if (min == null) continue;
+    const start = Number.isFinite(st.startMinutes) ? st.startMinutes : req.startMinutes != null ? req.startMinutes : null;
+    const end = Number.isFinite(st.endMinutes) ? st.endMinutes : askedEnd;
+    const late = (start != null && start >= min) || (end != null && end > min);
+    const list = Array.isArray(st.caveats) ? st.caveats.filter((c) => !KIDS_UNTIL_RE.test(c)) : [];
+    st.caveats = list.concat(kidsUntilNote(min, late || (Array.isArray(st.caveats) && st.caveats.some((c) => c === kidsUntilNote(min, true)))));
+  }
+}
+function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(input)); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); kidsUntilFlags(result, input || {}); return addStory(result, input || {}); }
 // Planner (2026-10-27): a short outing's stop is called by the part of the day it is timed in (the audit saw Railside
 // Brewing at 7:45 PM as "afternoon", Barley Mill at 11 AM as "late" and CedarCreek at noon as "morning"). Itineraries and
 // outings only (a day plan's parts are its slots); meal stops keep theirs, and a label that was the old part's name

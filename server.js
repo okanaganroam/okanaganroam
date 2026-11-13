@@ -468,7 +468,7 @@ function rowToVenue(row) {
   // "Who's welcome?" answer decides it (pubKidsWelcome).
   if (row.type === 'pub') v.kid_friendly = pubKidsWelcome(row.id);
   // Breweries (Decided 3, 2026-11-12): their own answer when they gave one; otherwise the researched badge, as before.
-  if (row.type === 'brewery') { const own = breweryKidsWelcome(row.id); if (own !== null) v.kid_friendly = own; }
+  if (row.type === 'brewery') { const own = breweryKidsWelcome(row.id); if (own !== null) v.kid_friendly = own; const ku = own ? breweryKidsUntil(row.id) : ''; if (ku) v.kids_until = ku; }
   // A heated or covered patio the business ticked counts as a patio (pub test 5, 2026-11-10; patioPublic).
   if (!v.patio && ownerHeatedPatio(row.id)) v.patio = true;
   // Seasonal hours and special closures (2026-10-18), only on the few venues that have them (keeps API pages
@@ -6810,6 +6810,11 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // flight price and "beer, not cider" reads the owner's answer instead of the name.
       ...(v.type === 'brewery' && breweryFlightFee(v.id) != null ? { flightFee: breweryFlightFee(v.id) } : {}),
       ...(v.type === 'brewery' && breweryKindOf(v) ? { breweryKind: breweryKindOf(v) } : {}),
+      // Brewery test 1 (2026-11-12): "minors with an adult until 9 PM" (a brewery's or a pub's own answer), so a kids
+      // trip names the time and isn't planned there after it; and hours the business saved or confirmed in the last
+      // 180 days, so a stop doesn't say "check before you go" about them.
+      ...(plannerKidsUntil(v) ? { kidsUntil: plannerKidsUntil(v) } : {}),
+      ...(v.hours && v.hours_source === 'venue_owner' && parseLocalDate(v.hours_checked_at) && localDateToDayNumber(todayLocal()) - localDateToDayNumber(v.hours_checked_at) <= OPEN_NOW_MAX_CHECK_AGE_DAYS.food_drink ? { ownerHours: true } : {}),
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
       trailText: v.type === 'outdoor' ? v.description || '' : undefined,
@@ -19632,7 +19637,8 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
   return [...BOOL_FIELDS, ...(allBadges ? SPORT_ATTR_FIELDS : [])].filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && (allBadges || !cardBadgeExpected(venue, f)))
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
-      const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
+      const [icon, label0] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
+      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || label0;
       return `<span class="chip chip-feat${f === 'free_entry' ? ' chip-price' : ''}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, false, () => 'chip chip-feat') || [])
@@ -19953,6 +19959,8 @@ function heatedPatioHighlight(venue, profile = {}) {
   return [{ ...venue, patio: true }, { ...profile, highlightFirst: ['patio'].concat(profile.highlightFirst || []), highlightLabels: { ...(profile.highlightLabels || {}), patio: 'Heated patio' } }];
 }
 function foodDrinkHighlights(venue, dogNote, profile = {}) {
+  const kl = kidsChipLabel(venue, false);
+  if (kl) profile = { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), kid: kl } };
   const [v, pr] = heatedPatioHighlight(venue, profile);
   return require('./food-drink-venue-layout').highlightsFor(v, dogNote, pr);
 }
@@ -20289,7 +20297,7 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
     .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place'))
     .map((f) => {
       const icon = (CARD_BADGE_SHORT[f] || [])[0];
-      const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
+      const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (f === 'kid_friendly' && kidsChipLabel(venue, fr)) || (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
       return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, fr, (g) => `chip chip-vb chip-vb-${g}`) || [])
@@ -20784,6 +20792,22 @@ function cleanBreweryInfoPart(key, x) {
 }
 // Decided 3 (Dayton, 2026-11-12): the brewery's own "Who's welcome?" answer -> true (all ages, or minors until a time) /
 // false (adults only), or null when it hasn't answered (its researched Kid-friendly badge stands, as today).
+// Brewery test 1 (2026-11-12): "Minors welcome with an adult until 9 PM" -> the kids chip reads "Kids until 9 PM"
+// (« Enfants jusqu’à 21 h ») on the page and on cards, not a plain "Kid-friendly". -> '21:00' or ''.
+function breweryKidsUntil(venueId) {
+  const m = venueBreweryInfo(venueId).minors || {};
+  return m.policy === 'minors_until' && /^\d{2}:\d{2}$/.test(String(m.until || '')) ? m.until : '';
+}
+function kidsChipLabel(venue, fr) {
+  if (!venue || venue.type !== 'brewery') return '';
+  const u = breweryKidsUntil(venue.id);
+  return u ? (fr ? `Enfants jusqu’à ${pubClock(u, true)}` : `Kids until ${pubClock(u)}`) : '';
+}
+function plannerKidsUntil(v) {
+  if (!v || (v.type !== 'brewery' && v.type !== 'pub')) return '';
+  const m = (v.type === 'brewery' ? venueBreweryInfo(v.id) : venuePubInfo(v.id)).minors || {};
+  return m.policy === 'minors_until' && /^\d{2}:\d{2}$/.test(String(m.until || '')) ? m.until : '';
+}
 function breweryKidsWelcome(venueId) {
   const p = (venueBreweryInfo(venueId).minors || {}).policy;
   return PUB_MINORS_POLICIES.includes(p) ? PUB_KIDS_WELCOME_POLICIES.includes(p) : null;
@@ -65870,7 +65894,7 @@ module.exports = {
   validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
-  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, KID_FRIENDLY_SQL,
+  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
