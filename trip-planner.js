@@ -1298,8 +1298,12 @@ function why(reasons) {
 // Collections a stop card may name, and how (Build My Trip V3).
 const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
 function publicVenue(v, ctx) {
-  const cost = tripStopPrice(v.url, v.id);
+  // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
+  // with a $10 owner fee); a free tasting says so.
+  const fee = v.type === 'winery' && typeof v.tastingFee === 'number' && Number.isFinite(v.tastingFee) && v.tastingFee >= 0 ? v.tastingFee : null;
+  const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : tripStopPrice(v.url, v.id);
   return {
+    ...(fee === 0 ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,

@@ -6802,6 +6802,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Decided 4 (2026-11-12): a winery's own "how people visit" / off-season answer, on the trip's date (true: by
       // appointment, false: walk-ins), so Build My Trip reads it instead of guessing from words. Left out when unanswered.
       ...(v.type === 'winery' && wineryAppointmentOn(v.id, hoursDate) !== null ? { ownerAppointment: wineryAppointmentOn(v.id, hoursDate) } : {}),
+      // Winery test 5 (2026-11-12): the owner's tasting fee (live), so a stop says "$10 per person · Tasting" or "Free tasting".
+      ...(v.type === 'winery' && wineryTastingFee(v.id) != null ? { tastingFee: wineryTastingFee(v.id) } : {}),
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
       trailText: v.type === 'outdoor' ? v.description || '' : undefined,
