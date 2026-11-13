@@ -96,7 +96,7 @@ test('3: one number: the setup and the edit page both show the score that counts
   const s = scriptOf(await text(`/owner/${t}/setup`));
   assert.equal(TEXT.en.essReady, 'The essentials are done');
   assert.equal(TEXT.fr.essReady, 'L’essentiel est fait');
-  assert.match(s, /s === 'finish' \? \(leftList\(\)\.length \? T\.finishBar : T\.allDone\)/);
+  assert.match(s, /s === 'finish' \? \(leftList\(\)\.length \|\| gapList\(\)\.length \? T\.finishBar : T\.allDone\)/);
   assert.ok(TEXT.fr.finishBar);
 });
 
