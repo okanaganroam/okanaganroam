@@ -69,7 +69,9 @@ test('progress never goes backwards: Skip or "later" can’t replace an answer, 
   assert.equal((await prog(t, 'story', 'day')).body.progress.done.story, 'day');
   await prog(t, 'photos', 'email');
   assert.equal((await prog(t, 'instagram', 'live')).body.progress.done.instagram, 'live');
-  // Help and Welcome back read the same progress, so the menu is listed as sent.
+  // Help and Welcome back read the same progress, so the menu is listed as sent (brewery test 1, 2026-11-12: while
+  // something for it is really waiting; once nothing is, it reads "on your page").
+  db.prepare("INSERT INTO venue_menus (venue_id, status, submitted_by, submitted_at) VALUES (?, 'pending', 'owner:setup', datetime('now'))").run(v.id);
   const html = await text(`/owner/${t}/setup`);
   // Café test 1 (2026-11-11): one set of success words and honest price wording while prices aren't public.
   assert.match(html, /Menu: we’ll add it within a day/);

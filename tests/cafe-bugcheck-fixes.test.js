@@ -70,8 +70,9 @@ test('A: every translated Plan your visit line still shows on French pages; Engl
   // A line made only of presets is still shown in the page's language.
   assert.equal(app.presetInLang('Terrasse seulement', 'en'), 'Patio only');
   assert.equal(app.presetInLang('Patio only', 'en'), 'Patio only');
-  assert.match(app.visitInfoHtml({ rows: [{ label: 'Dogs', text: 'Terrasse seulement' }] }, false), /Patio only/);
-  assert.match(app.visitInfoHtml({ rows: [{ label: 'Dogs', text: 'Patio only' }] }, true), /Terrasse seulement/);
+  // Brewery test 1 (2026-11-12): the Dogs chip reads as a whole sentence on the page, in the page's language.
+  assert.match(app.visitInfoHtml({ rows: [{ label: 'Dogs', text: 'Terrasse seulement' }] }, false), /Dogs welcome on the patio only/);
+  assert.match(app.visitInfoHtml({ rows: [{ label: 'Dogs', text: 'Patio only' }] }, true), /Chiens bienvenus sur la terrasse seulement/);
   // Closure notes: an English note of her own stays as written; a holiday name follows the page.
   assert.equal(app.closureNoteFor('Staff party, back at 9', false), 'Staff party, back at 9');
   assert.equal(app.closureNoteFor('Noël', false), 'Christmas Day');

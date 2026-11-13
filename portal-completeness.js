@@ -219,7 +219,7 @@ const BREWERY_ITEMS = [
   { key: 'to_go', group: 'taproom', w: 3, fix: true, target: { setup: 'flights' }, fields: ['brewery_info'],
     en: 'What people can take home', fr: 'Ce qu’on peut rapporter', whyEn: 'Cans, bottles, growler or crowler fills, or nothing to go.', whyFr: 'Canettes, bouteilles, remplissage de growlers ou de crowlers, ou rien à emporter.', btnEn: 'Tick them', btnFr: 'Cocher', icon: '🥫' },
   R('happy_hour', { group: 'taproom', w: 4 }),
-  R('menu', { group: 'taproom', w: 4, whyEn: 'Your food menu. Not needed without your own kitchen.', whyFr: 'Votre menu. Inutile sans cuisine sur place.' }),
+  R('menu', { group: 'taproom', w: 4, en: 'Menu or tap list', fr: 'Menu ou liste des bières', whyEn: 'Your menu or tap list. A photo of the chalkboard is fine. Not needed without your own kitchen.', whyFr: 'Votre menu ou votre liste des bières. Une photo du tableau suffit. Inutile sans cuisine sur place.' }),
   { key: 'dogs_kids', group: 'yourvisit', w: 6, fix: true, target: { setup: 'offer:minors' }, fields: ['brewery_info', 'badges', 'owner_features'],
     en: 'Who’s welcome, and dogs', fr: 'Qui est le bienvenu, et les chiens', whyEn: 'Adults only, minors with an adult until a set time, or all ages. And are dogs welcome?', whyFr: 'Adultes seulement, mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Et les chiens sont-ils bienvenus?', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   R('entertainment', { group: 'yourvisit', w: 3, fields: ['weekly_nights', 'badge:live_music'], noneEn: 'We don’t host events', noneFr: 'Nous n’organisons pas d’événements',
@@ -556,7 +556,8 @@ function scoreCompleteness(input, opts) {
       // Winery test 3 (2026-11-12): the photos there will be once ours are checked (photoCountAfter: a research main
       // photo her "main" photo replaces no longer counts), not simply the photos now plus the ones sent.
       const photosAfter = input && Number.isFinite(input.photoCountAfter) ? input.photoCountAfter : Number(input && input.photoCount || 0) + photosWaiting;
-      if (it.key === 'photo_extra' && photosWaiting > 0 && photosAfter >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; }
+      let after = 0;
+      if (it.key === 'photo_extra' && photosWaiting > 0 && photosAfter >= PHOTOS_MIN) { waiting = true; sent = photosWaiting; after = photosAfter; }
       // A story waiting for our check counts only when it is long enough for the item.
       if (it.key === 'description' && waiting && typeof (input && input.descriptionAfter) === 'string' && input.descriptionAfter.trim().length < DESCRIPTION_MIN) waiting = false;
       // A storefront spot the owner sent is waiting for our check (fresh-eyes 3, 2026-11-09), not "left".
@@ -565,7 +566,7 @@ function scoreCompleteness(input, opts) {
       // Instagram name): waiting, not "left" (2026-11-09).
       const ph = (input && input.pendingHelp) || {};
       if (ph[it.key === 'menu' ? 'menu' : it.key] && ['menu', 'happy_hour', 'specials', 'facebook', 'instagram'].includes(it.key)) waiting = true;
-      missing.push({ ...it, waiting, sent });
+      missing.push({ ...it, waiting, sent, ...(after ? { after } : {}) });
     }
   }
   // Winery test 3 (2026-11-12): done now but not once what was sent is checked: a story under 120 letters that replaces
@@ -760,7 +761,7 @@ function renderCompleteness(result, opts) {
   const quickHtml = nq ? `<h3>${L('Quick ones', 'Rapides')}</h3><p class="op-cb-note op-cb-lead">${qMin <= 1 ? L('Under a minute for all of them.', 'Moins d’une minute en tout.') : L(`About ${qMin} minutes for all of them.`, `Environ ${qMin} min en tout.`)}</p><ul class="op-cb-list">${quick.map(row).join('')}</ul>` : '';
   const laterHtml = later.length ? `<h3${nq ? ' class="op-cb-h3"' : ''}>${L('When you have a few minutes', 'Quand vous aurez quelques minutes')}</h3><p class="op-cb-note op-cb-lead">${L('Do them one at a time, whenever suits you. Photos and a description make the biggest difference.', 'Faites-les un à la fois, quand ça vous convient. Les photos et une description font la plus grande différence.')}</p><ul class="op-cb-list">${later.slice(0, LATER_SHOWN).map(row).join('')}</ul>${later.length > LATER_SHOWN ? `<details class="op-cb-all"><summary>${L(`Show all (${later.length - LATER_SHOWN} more)`, `Tout afficher (${later.length - LATER_SHOWN} de plus)`)}</summary><ul class="op-cb-list">${later.slice(LATER_SHOWN).map(row).join('')}</ul></details>` : ''}` : '';
   const badgeRow = badgeNames.length ? `<li><span class="op-cb-ico" aria-hidden="true">🏷️</span><span class="op-cb-dtxt"><strong>${L('Badges you ticked', 'Caractéristiques cochées')}</strong><span class="op-cb-sent">${esc(badgeNames.join(', '))} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>` : '';
-  const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}${badgeRow}</ul>` : '';
+  const waitingHtml = nw ? `<h3 class="op-cb-h3">${L('Waiting for our check', 'En attente de notre vérification')}</h3><p class="op-cb-note op-cb-lead">${L('You sent these. We usually check within a day, and then they count.', 'Vous avez envoyé ceci. Nous vérifions habituellement en moins d’une journée, puis cela compte.')}</p><ul class="op-cb-declined op-cb-waiting">${waitingList.map((it) => `<li><span class="op-cb-ico" aria-hidden="true">${it.icon}</span><span class="op-cb-dtxt"><strong>${esc(fr ? it.fr : it.en)}</strong><span class="op-cb-sent">${it.sent ? L(`${it.sent} photo${it.sent === 1 ? '' : 's'} sent`, `${it.sent} photo${it.sent === 1 ? '' : 's'} envoyée${it.sent === 1 ? '' : 's'}`) + (it.after > it.sent ? L(` (${it.after} in all with the one${it.after - it.sent === 1 ? '' : 's'} you have)`, ` (${it.after} en tout avec ${it.after - it.sent === 1 ? 'celle' : 'celles'} que vous avez)`) : '') : L('Sent', 'Envoyé')} &middot; ${L('waiting for our check', 'en attente de vérification')}</span></span></li>`).join('')}${badgeRow}</ul>` : '';
   // The last steps (live check 2026-11-08): photos and the storefront spot, said plainly once they are among what's left.
   const leftKeys = r.missing.filter((it) => !it.waiting).map((it) => it.key);
   const ceilPhotos = leftKeys.includes('photo_main') || leftKeys.includes('photo_extra');

@@ -1386,7 +1386,11 @@ function renderScript(d) {
     var wanted = function(b){ return (/dog/.test(party) && b.key === 'dog_friendly') || (/kid/.test(party) && b.key === 'kid_friendly') ? 0 : 1; };
     var badges = (v.badges || []).slice().sort(function(a, b){ return wanted(a) - wanted(b); });
     var lead = badges.filter(function(b){ return wanted(b) === 0; }), rest = badges.filter(function(b){ return wanted(b) === 1; });
-    var badgeLi = function(b){ return '<li>' + esc(BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    // Brewery test 1 (2026-11-12): "Kids until 9 PM" (« Enfants jusqu’à 21 h ») where the owner set a time for minors.
+    // The label comes from the planner ("Kids until 9 PM"); the page has already written its time in the page's style
+    // ("9 PM" / "21 h"), so French only swaps the words around it.
+    var kidsUntil = function(b){ var t = String(b.label || '').replace(/^Kids until /, ''); return lang() === 'fr' ? 'Enfants jusqu’à ' + t : 'Kids until ' + t; };
+    var badgeLi = function(b){ return '<li>' + esc(b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));
@@ -1407,6 +1411,9 @@ function renderScript(d) {
   function stopPriceHtml(v){
     var french = lang() === 'fr', cost = v.cost;
     if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
+      // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
+      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux dès ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations dès ' : 'Tastings from ') : '';
+      if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
     }
@@ -1461,7 +1468,7 @@ function renderScript(d) {
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
-      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmées par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
       + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour ' + (stop.happyHourWhenFr ? esc(stop.happyHourWhenFr) + ' ' : '') + ': <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").

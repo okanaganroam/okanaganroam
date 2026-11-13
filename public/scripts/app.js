@@ -1125,7 +1125,7 @@ function setLanguage(lang){
       if (badgeRow) {
         badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }
@@ -1142,7 +1142,7 @@ function setLanguage(lang){
       if (badgeRow) {
         badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }
@@ -1288,6 +1288,16 @@ var CARD_BADGES = [
   { field: 'open_late', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>', label: 'badge.openLate' }
 ];
 
+// Brewery test 1 (2026-11-12): a brewery whose owner said "minors with an adult until 9 PM" shows "Kids until 9 PM"
+// (« Enfants jusqu’à 21 h ») on its kids badge, not a plain "Kid-friendly" (v.kids_until from the API).
+function badgeLabelFor(b, v){
+  if (b.field === 'kid_friendly' && v && /^\d{2}:\d{2}$/.test(v.kids_until || '')) {
+    if (getCurrentLang() === 'fr') { var p = v.kids_until.split(':'); return 'Enfants jusqu\u2019\u00e0 ' + parseInt(p[0], 10) + '\u00a0h' + (p[1] === '00' ? '' : '\u00a0' + p[1]); }
+    return 'Kids until ' + formatTime12h(v.kids_until);
+  }
+  return t(b.label);
+}
+
 function formatTime12h(t){
   var parts = t.split(':');
   var h = parseInt(parts[0]);
@@ -1344,7 +1354,7 @@ function venueCardHtml(v){
 
   var badgesHtml = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
     var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-    var label = escapeAttr(t(b.label));
+    var label = escapeAttr(badgeLabelFor(b, v));
     return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
   }).join('');
 
@@ -4301,7 +4311,7 @@ window.__scrollToVenueCard = function(name){
       if (window.CARD_BADGES) {
         badgesEl.innerHTML = window.CARD_BADGES.filter(function(b){ return v[b.field]; }).slice(0, 4).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }

@@ -30,8 +30,9 @@
   function monthName(i){ return C.monthNames[i]; }
   // "Noël : …" in French, "Christmas Day: …" in English (café test 6: the French space before a colon).
   function cl(a){ return a + (C.lang === 'fr' ? '\u00a0: ' : ': '); }
-  // "Midnight" and "Noon", never "12 AM"/"12 PM" (pub fresh-eyes, 2026-11-10).
-  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (hh === 12 && mi === '00') return C.lang === 'fr' ? 'midi' : 'Noon'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // "Midnight", never "12 AM" (pub fresh-eyes, 2026-11-10). Brewery test 1 (2026-11-12): noon is "12 PM" (« 12 h »), as
+  // the public page's hours and open-now line say it; the setup said "Noon" while the page said "12 PM".
+  function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
   // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
   function happyCloseOf(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; return o && o._close && typeof o._close === 'object' ? o._close : {}; } catch (e) { return {}; } }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
@@ -267,6 +268,8 @@
     if (!S.brew.food && C.suggestFood) { S.brew.food = C.suggestFood; S.foodGuessed = C.suggestFood; }
     if (S.brew.fee == null && !S.brew.noFlights && typeof C.researchFee === 'number') { S.brew.fee = C.researchFee; S.brew.feeGuessed = true; }
     if (S.brew.fee != null && QUICK_FLIGHTS.indexOf(S.brew.fee) < 0) S.brew.feeOther = true;
+    // Brewery test 1 (2026-11-12): research's To go line pre-ticks its chips, as a suggestion saved only with the screen.
+    if (!(BI.to_go || []).length && (C.suggestToGo || []).length) { C.suggestToGo.forEach(function(k){ S.brew.togo[k] = true; }); S.togoGuessed = true; }
   }
   S.savedFlight = CUR.flight_fee == null ? null : CUR.flight_fee;
   function readBrew(){
@@ -282,11 +285,18 @@
   function bchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   // "$12" / "12 $".
   function flightText(n){ return C.lang === 'fr' ? money(n) + ' $' : '$' + money(n); }
+  // Brewery test 1 (2026-11-12): the Flights lead names her current pick ("It shows on your card as 'From $14' right
+  // away"), redrawn as she taps a price or types one in Other; with no pick (or one checked first) it names no number.
+  function flightLeadText(){
+    var bf = S.brew, n = bf.fee;
+    if (bf.noFlights || n == null || isNaN(n) || n < 0 || n > (C.feeLiveMax || 40)) return T.flightLead;
+    return fill(T.flightLeadPick, { x: n === 0 ? T.feeCardFree : fill(T.feeCard, { x: flightText(n) }) });
+  }
   // "Your menu" is a step only for a brewery with its own kitchen (Decided 5): added or taken off with the food answer.
   function syncMenu(){ if (!C.brewery) return; var on = BI.food === 'kitchen', i = STEPS.indexOf('menu'), j = P2.indexOf('menu'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('menu') >= 0) { STEPS.push('menu'); P2.push('menu'); } }
   // Tiles shown only with their own kitchen (vegan, vegetarian, takeout); a ticked one always shows.
   function tileShown(k){ return !C.brewery || (C.kitchenOnly || []).indexOf(k) < 0 || BI.food === 'kitchen' || S.brew.food === 'kitchen' || !!S.badgesAtStart[k]; }
-  // The quick opening and closing times on a day's card ("Opens: 11 AM · Noon · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
+  // The quick opening and closing times on a day's card ("Opens: 11 AM · 12 PM · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
   function brewQuick(d, j, y, last){
     if (!C.brewery) return '';
     var row = function(idx, list, label){ return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
@@ -528,7 +538,7 @@
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
   function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
-    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   function stText(step, d){
@@ -543,13 +553,16 @@
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
-  function statusHtml(done){
-    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
+  // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
+  // pending (C.waiting: the server's list of steps with something pending now, refreshed with every save).
+  function nowSt(k, d, waiting){ var w = waiting || C.waiting; return d === 'day' && w && w.indexOf('*') < 0 && w.indexOf(k) < 0 && !(k === 'social' && (w.indexOf('instagram') >= 0 || w.indexOf('facebook') >= 0)) ? 'live' : d; }
+  function statusHtml(done, waiting){
+    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, nowSt(k, done[k], waiting))) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
   window.ohbLive = window.ohbLive || {};
   window.ohbLive['setup-status'] = function(lang, update){
-    try { fetch(C.base + '/setup/progress', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){ if (j && j.ok && j.progress && j.progress.done) update(statusHtml(j.progress.done)); }).catch(function(){}); } catch (e) {}
+    try { fetch(C.base + '/setup/progress', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){ if (j && j.ok && j.progress && j.progress.done) { if (j.waiting) C.waiting = j.waiting; update(statusHtml(j.progress.done, j.waiting)); } }).catch(function(){}); } catch (e) {}
     return statusHtml(S.done);
   };
   // Runs saves one after another; any error stops and shows it.
@@ -792,7 +805,7 @@
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
     return list(steps.map(function(s){
-      var d = half(s) ? 'half' : fin(s) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
       return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
@@ -1097,6 +1110,8 @@
       // for them: they edit it, and it's checked first like any description.
       var sb = p[1] === 'offer' && !S.badges.sports_tv && !S.storyFixed ? sportsBit() : '';
       x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead"' + (explain ? ' id="suSentMeans"' : '') + '>' + h(line) + '</p></div>'
+        // Brewery test 1 (2026-11-12): the description exactly as it was sent (with any join fixed), so she sees the words.
+        + (p[1] === 'story' && S.storySent && T.storySentAs ? '<div class="su-day" id="suStorySent"><p class="su-q" style="margin:0 0 6px">' + h(T.storySentAs) + '</p><p class="su-hint" style="margin:0;white-space:pre-wrap">' + h(S.storySent) + '</p></div>' : '')
         + (sb ? '<div class="su-day su-sportsfix" id="suSportsFix"><p class="su-q" style="margin:0 0 6px">' + h(T.storySportsQ) + '</p><p class="su-hint" style="margin:0 0 12px">' + h(fill(T.storySportsLead, { bit: sb })) + '</p>' + big('✎', T.storySportsBtn, '', true, 'storyFix') + '</div>' : '')
         + '<div class="su-stack">' + big('➜', nextLabel(p[1]), '', false, 'after:' + p[1]) + '</div>';
     } else if (s === 'ess') {
@@ -1274,13 +1289,13 @@
     } else if (s === 'flights') {
       // Breweries (2026-11-12): the flight price (quick buttons, Other, or "We don't do flights") and the to-go chips.
       var bf = S.brew, feeOn = function(n){ return !bf.feeOther && !bf.noFlights && bf.fee === n; };
-      x = doneLine('flights') + q(T.flightQ, T.flightLead) + (bf.feeGuessed && bf.fee != null && !isNaN(bf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' ? T.flightGuessVisit : T.flightGuess, { x: flightText(bf.fee) })) + '</p>' : '')
+      x = doneLine('flights') + '<h1>' + h(T.flightQ) + '</h1><p class="su-lead" id="suFlightLead">' + h(flightLeadText()) + '</p>' + (bf.feeGuessed && bf.fee != null && !isNaN(bf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' ? T.flightGuessVisit : T.flightGuess, { x: flightText(bf.fee) })) + '</p>' : '')
         + (CUR.flight_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.flightWaiting, { x: flightText(CUR.flight_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.flightQ) + '" id="suFeeChips">' + QUICK_FLIGHTS.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-bfee="' + n + '">' + h(flightText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (bf.feeOther && !bf.noFlights ? 'true' : 'false') + '" data-bfee="other">' + h(T.feeOther) + '</button></div>'
         + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, bf.fee == null || isNaN(bf.fee) ? '' : String(bf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (bf.noFlights ? '' : ' su-alt') + '" aria-pressed="' + (bf.noFlights ? 'true' : 'false') + '" data-bfee="none"><span class="su-ico" aria-hidden="true">' + (bf.noFlights ? '✓' : '○') + '</span><span>' + h(T.noFlights) + '<small>' + h(T.noFlightsSub) + '</small></span></button></div>'
-        + '<h2 class="su-h2">' + h(T.togoQ) + '</h2><p class="su-hint">' + h(T.togoLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.togoQ) + '" id="suToGo">'
+        + '<h2 class="su-h2">' + h(T.togoQ) + '</h2><p class="su-hint">' + h(T.togoLead) + '</p>' + (S.togoGuessed && T.togoGuess ? '<p class="su-sent su-research" id="suToGoGuess">' + h(T.togoGuess) + '</p>' : '') + '<div class="su-chips" role="group" aria-label="' + h(T.togoQ) + '" id="suToGo">'
         + TOGO.concat(['none']).map(function(k){ return '<button type="button" class="su-chip' + (String(T.togo[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (bf.togo[k] ? 'true' : 'false') + '" data-btogo="' + k + '">' + h(T.togo[k]) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'flightsSave') + '</div>' + skip('flights');
     } else if (s === 'winery') {
@@ -1506,7 +1521,9 @@
       x = doneLine('sellout') + q(T.selloutQ, T.selloutLead) + msgs() + '<label class="su-q" for="suSell">' + h(T.selloutLabel) + '</label><textarea class="su-field su-line" id="suSell" maxlength="120" rows="2">' + h(S.cafe.sellout) + '</textarea>' + ex(T.selloutEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'selloutSave') + big('✕', T.selloutNo, '', true, 'no:sellout') + '</div>' + skip('sellout');
     } else if (s === 'offer:dogs') {
-      x = q(T.dogQ, T.dogLead) + msgs() + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
+      // Brewery test 1 (2026-11-12): research's "Dogs on the patio" fills in "Patio only" as a suggestion (saved with the screen).
+      if (C.brewery && C.suggestDogNote && !S.dogGuessSet && !S.dogNote && !((CUR.visit_rows || {}).dogs)) { S.dogGuessSet = true; S.dogNote = C.suggestDogNote; S.dogGuessed = true; }
+      x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:' + (offerNext('offer:dogs') || 'saved:offer') + '">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';
     } else if (s === 'happy:yes' || s === 'specials:yes') {
@@ -1540,9 +1557,13 @@
           + seasonBox('specials.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('specials', i, e) + '</div>';
       }).join('') + (S.specials.length < 7 ? '<button type="button" class="su-more" data-act="add:specials">' + h(T.addSpecial) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveSpecials, '', false, 'specialsSave') + '</div>';
     } else if (s === 'music') { x = yesNo('music', T.musicQ, T.musicLead);
+      // Brewery test 1 (2026-11-12): research's Games line, shown as a hint until the events are answered.
+      if (C.brewery && C.researchEvents && !S.done.music && T.eventsHint) x = x.replace('</h1>', '</h1><p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>');
     } else if (s === 'music:yes') {
+      // A plainly stated weekly event ("Trivia Tuesdays") is filled in as a suggestion; nothing is saved until Save.
+      if (C.brewery && !S.nights.length && !S.done.music && !S.nightsGuessSet && (C.suggestNights || []).length) { S.nightsGuessSet = true; S.nightsGuessed = true; C.suggestNights.forEach(function(g){ var dd = {}; g.days.forEach(function(d){ dd[d] = true; }); S.nights.push({ days: dd, kind: g.kind, what: (T.kinds || {})[g.kind] || '', start: '' }); }); }
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
-      x = q(T.musicTypeQ, T.upTo7) + msgs() + S.nights.map(function(e, i){
+      x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q" id="ntq' + i + '">' + h(T.whatEvent) + '</p>' + (function(){
             // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
@@ -1598,7 +1619,7 @@
       x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, fill(T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
+      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
       x = q(T.doorPhotoQ, T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';
@@ -1900,6 +1921,7 @@
     list.push({ specials: out }); saveAll('specials', list);
   }
   function musicSave(){
+    S.nightsGuessed = false;
     readEntries(); var out = [];
     for (var i = 0; i < S.nights.length; i++) {
       var e = S.nights[i], ds = DAYS.filter(function(d){ return e.days[d]; }), title = (e.what || '').trim() || (e.kind && e.kind !== 'other' ? T.kinds[e.kind] : '');
@@ -2437,7 +2459,7 @@
       // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
       // becomes hers and a full Plan your visit box never drops it.
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
-      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
+      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; S.dogGuessed = false; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
@@ -2473,7 +2495,7 @@
       if (Object.keys(bi2).length) fl.push({ brewery_info: bi2 });
       if (!fb2.noFlights && ff !== S.savedFlight) fl.push({ flight_fee: ff });
       S.savedLine.flights = !fb2.noFlights && ff > C.feeLiveMax && ff !== S.savedFlight ? T.flightSavedDay : T.flightSavedLive;
-      return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; });
+      return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? el('suBookUrl').value.trim() : null;
@@ -2494,7 +2516,7 @@
       var bStoryCh = S.story.trim() !== String(CUR.description || '').trim(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
-      if (bStoryCh) bsl.push({ description: S.story });
+      if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
       // Sent even when unchanged (while it's research's), so the line becomes hers.
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
@@ -2567,14 +2589,14 @@
       var storyCh = S.story.trim() !== String(CUR.description || '').trim(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
-      if (storyCh) sl.push({ description: S.story });
+      if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
       var knownCh = S.wine.known !== ((CUR.visit_rows || {}).known_for || '');
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
       S.savedLine.story = storyCh && knownCh ? T.storyKnownSaved : '';
       return saveAll('story', sl, null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
-    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } return saveAll('story', [{ description: S.story }]); }
+    if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); } S.storySent = S.story; return saveAll('story', [{ description: S.story }]); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -2724,7 +2746,7 @@
       if (fv === 'other') { S.brew.feeOther = true; if (S.brew.fee != null && QUICK_FLIGHTS.indexOf(S.brew.fee) >= 0) S.brew.fee = null; var y1 = window.scrollY; render(); window.scrollTo(0, y1); var fi = el('suFee'); if (fi) try { fi.focus({ preventScroll: true }); } catch (e) {} return; }
       S.brew.feeOther = false; S.brew.fee = +fv; var y2 = window.scrollY; render(); window.scrollTo(0, y2); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-btogo]'), function(b){ b.onclick = function(){
-      readBrew(); var tk = b.getAttribute('data-btogo'); S.brew.togo[tk] = !S.brew.togo[tk];
+      readBrew(); var tk = b.getAttribute('data-btogo'); S.brew.togo[tk] = !S.brew.togo[tk]; S.togoGuessed = false;
       // "Nothing to go" and the rest never both.
       if (S.brew.togo[tk]) { if (tk === 'none') TOGO.forEach(function(z){ S.brew.togo[z] = false; }); else S.brew.togo.none = false; }
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
@@ -2783,9 +2805,11 @@
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
+    var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
     var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
-    var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
+    var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
+    if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
     // Pub test 7 (2026-11-10): the story box too (its old text could only be removed with a long backspace).
