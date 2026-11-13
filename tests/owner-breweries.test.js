@@ -980,7 +980,8 @@ test('brewery test 4: the story box shows her pending story, the Saved panel sho
   const s = CLIENT_SRC();
   assert.match(s, /story: C\.storyPending \|\| CUR\.description \|\| ''/);
   assert.match(s, /C\.storyPending && S\.story === C\.storyPending && T\.storyPendingHint/);
-  assert.match(s, /\(step === 'story' && !!S\.storySent && !!T\.storySentAs\)/, 'the Saved screen with "What we’ll put on your page" is kept for a sent story');
+  assert.match(s, /S\.flashStory = sv\[1\] === 'story' \? S\.storySent \|\| '' : ''/, 'the ✓ line after a sent story carries her words');
+  assert.match(s, /sp\.className = 'su-toast-story'; sp\.id = 'suStorySent'; sp\.textContent = T\.storySentAs \+ ' ' \+ st;/);
   assert.match(s, /var researchStory = inp\.id === 'suStory' && C\.storyResearch && !C\.storyPending/);
   assert.match(s, /if \(C\.storyPending && S\.story\.trim\(\) === String\(C\.storyPending\)\.trim\(\)\) \{ S\.storySent = ''; return saveAll\('story', \[\]\); \}/, 'not sent twice');
   assert.equal(text.en.storyPendingHint, 'You sent a new story. We check it within a day.');

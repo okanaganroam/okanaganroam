@@ -35718,8 +35718,17 @@ function happyHourOnClosedDay(venueId, hoursJson, hhJson) {
     const hh = hoursModule.parseHours(hhJson);
     if (!hh || !hh.known) return false;
     const hhDays = Object.keys(hh.days).filter((d) => hh.days[d] && hh.days[d].status === 'open');
-    const weeks = [hoursJson].concat(((hoursExtrasMap().get(venueId) || {}).seasons || []).map((p) => p && p.hours ? JSON.stringify(p.hours) : null).filter(Boolean));
-    return weeks.some((w) => { const p = hoursModule.parseHours(w); return p && p.known && hhDays.some((d) => p.days[d] && p.days[d].status === 'closed'); });
+    // Only the weeks that apply in the happy hour's own months (mid-month of each): a summer-only happy hour is checked
+    // against the summer week alone.
+    const seasons = ((hoursExtrasMap().get(venueId) || {}).seasons || []).filter((p) => p && p.hours && /^\d{2}-\d{2}$/.test(p.from || '') && /^\d{2}-\d{2}$/.test(p.to || ''));
+    const hs = happyHourSeasonOf(hhJson), weeks = new Set();
+    for (let m = 1; m <= 12; m++) {
+      const md = `${String(m).padStart(2, '0')}-15`;
+      if (hs && !hoursModule.mdInRange(md, hs.from, hs.to)) continue;
+      const sea = seasons.find((p) => hoursModule.mdInRange(md, p.from, p.to));
+      weeks.add(sea ? JSON.stringify(sea.hours) : hoursJson);
+    }
+    return [...weeks].some((w) => { const p = hoursModule.parseHours(w); return p && p.known && hhDays.some((d) => p.days[d] && p.days[d].status === 'closed'); });
   } catch (e) { return false; }
 }
 // What a venue page shows: { week, checked, live: { state, text } | null }, or null when the place has no stored times,
@@ -53471,6 +53480,7 @@ const OWNER_SETUP_CSS = `
      but stays in place, so screen readers announce it when it is filled. */
   body.owner-setup .su-toast { background: var(--su-good-bg); color: var(--su-good); font-weight: 800; font-size: 16px; line-height: 1.35; padding: 10px 14px; border-radius: 14px; margin: 0 0 12px; }
   body.owner-setup .su-toast:empty { padding: 0; margin: 0; }
+  body.owner-setup .su-toast-story { display: block; margin-top: 6px; font-weight: 600; color: var(--su-ink, #1d2b36); white-space: pre-wrap; }
   /* The photo-rights box asked for gently (no red error) when Send is tapped first. */
   body.owner-setup .su-tick.su-rights.su-ask { border-color: #C9A34A; background: #FBF3DE; box-shadow: 0 0 0 3px rgba(201, 163, 74, 0.25); }
   body.owner-setup .su-rightsask { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #7A5A12; }

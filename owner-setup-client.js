@@ -102,7 +102,7 @@
   }
   // "Heads up: you're closed on Tue (in your usual hours)." under a special or event on a weekday the place is closed in
   // the months it runs (pub test 7). Only with hours on file.
-  function closedWarn(days, sea, tpl){
+  function closedWarn(days, sea){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
     for (var i = 1; i <= 12; i++) if (M[i]) { if (hasSea && S.sea.months[i]) seas = true; else usual = true; }
@@ -112,7 +112,7 @@
     var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
     var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
-    return fill(tpl || T.closedWarn, { days: all.map(dayName).join(', '), when: when });
+    return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
   }
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
   // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
@@ -680,9 +680,8 @@
   // Café test 5 (2026-11-12): no "Saved / Sent → Next" screens. A successful save says so in one ✓ line at the top of the
   // next question (role="status", so screen readers hear it) and moves straight on. The only one kept is the pubs'
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
-  // Brewery test 4 (2026-11-13): a story just sent keeps its Saved screen, with "What we'll put on your page:" and her words.
-  function savedKept(step){ return (step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit()) || (step === 'story' && !!S.storySent && !!T.storySentAs); }
-  // The text the story box started from: her story waiting for our check, or the page's.
+  function savedKept(step){ return step === 'offer' && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
+  // The text the story box started from: the story she sent (not checked yet), or the page's.
   function storyBase(){ return String(C.storyPending || CUR.description || '').trim(); }
   function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
   function savedText(step){
@@ -696,10 +695,13 @@
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);
   // Shown on the screen it was made for, gone on the next one. Set a moment after the screen is drawn, so it is announced.
-  function showToast(t){ toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t; }, 60); }
+  // Brewery test 4 (2026-11-13): after a story is sent, the ✓ line also says "What we'll put on your page:" with her
+  // words, on the next screen (no extra screen to tap through).
+  function showToast(t){ var st = S.flashStory || ''; S.flashStory = ''; toastEl.textContent = ''; if (!t) return; setTimeout(function(){ toastEl.textContent = t;
+    if (st && T.storySentAs) { var sp = document.createElement('span'); sp.className = 'su-toast-story'; sp.id = 'suStorySent'; sp.textContent = T.storySentAs + ' ' + st; toastEl.appendChild(sp); } }, 60); }
   function go(step, replace){
     var sv = /^saved:(.+)$/.exec(step);
-    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); return after(sv[1]); }
+    if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); S.flashStory = sv[1] === 'story' ? S.storySent || '' : ''; return after(sv[1]); }
     var fl = S.flash || ''; S.flash = '';
     step = entry(step); S.fresh = false;
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
@@ -2651,7 +2653,7 @@
       return saveAll('story', sl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.wine.known; S.visit.known_for = S.wine.known; });
     }
     if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
-      // Brewery test 4: the story already waiting for our check isn't sent twice.
+      // Brewery test 4: the story she already sent (not checked yet) isn't sent twice.
       if (C.storyPending && S.story.trim() === String(C.storyPending).trim()) { S.storySent = ''; return saveAll('story', []); }
       S.storySent = S.story; return saveAll('story', [{ description: S.story }], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }

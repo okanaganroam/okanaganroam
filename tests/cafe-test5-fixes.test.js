@@ -45,7 +45,7 @@ const topHighlights = (html) => { const m = /<div class="fd-highlights">([\s\S]*
 
 test('1: no "Saved / Sent → Next" screen needs a tap: the ✓ line shows on the next question, announced, and honest', async () => {
   // Every route to a "saved:" screen goes through go(), which moves straight on unless the screen carries a real choice.
-  assert.match(CLIENT, /var sv = \/\^saved:\(\.\+\)\$\/\.exec\(step\);\s*if \(sv && !savedKept\(sv\[1\]\)\) \{ S\.flash = savedText\(sv\[1\]\); return after\(sv\[1\]\); \}/);
+  assert.match(CLIENT, /var sv = \/\^saved:\(\.\+\)\$\/\.exec\(step\);\s*if \(sv && !savedKept\(sv\[1\]\)\) \{ S\.flash = savedText\(sv\[1\]\);(?: S\.flashStory = [^;]+;)? return after\(sv\[1\]\); \}/); // brewery test 4: plus the sent story's words
   // Kept only for the pubs' "your description still mentions sports" choice.
   assert.match(CLIENT, /function savedKept\(step\)\{ return step === 'offer' && !S\.badges\.sports_tv && !S\.storyFixed && !!sportsBit\(\); \}/);
   // Nothing sets S.step to a saved screen directly (that would skip the check).
