@@ -14,7 +14,8 @@
   // Breweries (2026-11-12): the flight price's quick buttons, the to-go chips, the group sizes, the quick opening and
   // closing times, and where each of their checklist items is answered.
   var QUICK_FLIGHTS = [8, 10, 12, 15], TOGO = ['cans', 'bottles', 'growler', 'crowler'], GROUP_SIZES = [8, 10, 12, 15, 20];
-  var BQ_OPEN = ['11:00', '12:00', '14:00'], BQ_CLOSE = ['20:00', '21:00', '22:00'];
+  // Brewery test 2 (2026-11-13): 3 PM opens and 6 PM closes too (a small taproom's afternoon hours).
+  var BQ_OPEN = ['11:00', '12:00', '14:00', '15:00'], BQ_CLOSE = ['18:00', '20:00', '21:00', '22:00'];
   var BREWERY_ITEM_STEP = { brewery_kind: 'taproom', food_here: 'taproom', flight_price: 'flights', to_go: 'flights', happy_hour: 'happy', dogs_kids: 'offer:minors', access: 'offer', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu' };
   // The checklist item -> the screen that answers it, for this type.
   function itemStep(k){ return (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || ''; }
@@ -196,6 +197,8 @@
   // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
   S.socNo = { instagram: S.done.instagram === 'no' ? 'no' : S.done.instagram === 'unsure' ? 'unsure' : '', facebook: S.done.facebook === 'no' ? 'no' : S.done.facebook === 'unsure' ? 'unsure' : '' };
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
+  // Brewery test 2 (2026-11-13): a facebook.com website pre-fills the Facebook box, as a suggestion saved only with the screen.
+  if (!S.fb && !S.socNo.facebook && !S.done.facebook && fbFromSite(CUR.website || C.website || '')) { S.fb = fbFromSite(CUR.website || C.website); S.fbFromWebsite = true; }
   S.cuiTouched = false;
   // A café's happy hour is allowed only while it serves Beer & wine (outreach rule). 13 screens (2026-11-11): it is no
   // longer a café setup step (the edit page has it), so nothing is added to the list here.
@@ -258,7 +261,7 @@
   // The brewery's own answers (venue_brewery_info) and its flight price, as stored. A kind its name suggests, research's
   // food and research's flight price are offered as a starting point only; nothing is saved until she taps Save.
   var BI = clone(CUR.brewery_info || {});
-  S.brew = { food: BI.food || '', outside: BI.outside || '', kmode: (BI.kitchen || {}).mode || '', kcloses: (BI.kitchen || {}).closes || '21:00',
+  S.brew = { food: BI.food || '', trucks: BI.trucks || (BI.food === 'trucks' ? 'most_days' : ''), outside: BI.outside || '', kmode: (BI.kitchen || {}).mode || '', kcloses: (BI.kitchen || {}).closes || '21:00',
     fee: CUR.flight_fee == null ? null : CUR.flight_fee, feeOther: false, noFlights: BI.no_flights === true, togo: {},
     known: (CUR.visit_rows || {}).known_for || '', groups: (CUR.visit_rows || {}).groups || '' };
   (BI.to_go || []).forEach(function(k){ S.brew.togo[k] = true; });
@@ -266,6 +269,8 @@
     S.savedYear = BI.year || '';
     if (!S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
     if (!S.brew.food && C.suggestFood) { S.brew.food = C.suggestFood; S.foodGuessed = C.suggestFood; }
+    // Brewery test 2 (2026-11-13): research's "Food trucks on weekends" pre-picks Weekends only (saved only with the screen).
+    if (!BI.trucks && C.suggestTrucks && (!BI.food || BI.food === 'trucks')) { S.brew.trucks = C.suggestTrucks; S.trucksGuessed = C.suggestTrucks; }
     if (S.brew.fee == null && !S.brew.noFlights && typeof C.researchFee === 'number') { S.brew.fee = C.researchFee; S.brew.feeGuessed = true; }
     if (S.brew.fee != null && QUICK_FLIGHTS.indexOf(S.brew.fee) < 0) S.brew.feeOther = true;
     // Brewery test 1 (2026-11-12): research's To go line pre-ticks its chips, as a suggestion saved only with the screen.
@@ -281,7 +286,8 @@
     if ((x = v('suBookUrl')) !== null && C.brewery) S.bookUrl = x;
   }
   // A brewery's one-of-a-few answers (data-bpick="food:trucks") and on/off chips (data-btogo).
-  function bpicks(key, keys, labels, subs){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'; }
+  // `after`: html shown right under one choice (the food-truck chips under "Food trucks").
+  function bpicks(key, keys, labels, subs, after){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>' + (after && after[k] ? after[k] : ''); }).join('') + '</div>'; }
   function bchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   // "$12" / "12 $".
   function flightText(n){ return C.lang === 'fr' ? money(n) + ' $' : '$' + money(n); }
@@ -299,7 +305,7 @@
   // The quick opening and closing times on a day's card ("Opens: 11 AM · 12 PM · 2 PM", "Closes: 8 PM · 9 PM · 10 PM").
   function brewQuick(d, j, y, last){
     if (!C.brewery) return '';
-    var row = function(idx, list, label){ return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
+    var row = function(idx, list, label){ return '<div class="su-samerow su-laterow su-bqrow" role="group" aria-label="' + h(label) + '"><span class="su-latelbl">' + h(label) + '</span>' + list.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (y[idx] === t ? 'true' : 'false') + '" data-bq="' + d + ':' + j + ':' + idx + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>'; };
     return (j === 0 ? row(0, BQ_OPEN, T.bqOpens) : '') + (j === last ? row(1, BQ_CLOSE, T.bqCloses) : '');
   }
   // Reads the winery screens' text boxes into S.wine (before a redraw or a save).
@@ -1278,10 +1284,13 @@
       // Breweries (2026-11-12): "What kind of place?" (one of four) and "Food here?" (the main one), "Can people bring their
       // own food?" and, with their own kitchen, the pub's "Does your kitchen close before the bar?", all on one screen.
       var bw = S.brew;
-      x = doneLine('taproom') + q(T.tkindQ, T.tkindLead) + (S.kindGuessed && S.place === S.kindGuessed && !CUR.place_type ? '<p class="su-sent su-research" id="suKindGuess">' + h(T.kindGuess) + '</p>' : '') + msgs()
+      // Brewery test 2 (2026-11-13): the guess names the kind ("We picked “Brewery”"), so it reads above the fold on a phone.
+      x = doneLine('taproom') + q(T.tkindQ, T.tkindLead) + (S.kindGuessed && S.place === S.kindGuessed && !CUR.place_type ? '<p class="su-sent su-research" id="suKindGuess">' + h(fill(T.kindGuess, { kind: (C.placeNames || {})[S.place] || (C.placeShow || {})[S.place] || S.place })) + '</p>' : '') + msgs()
         + '<div class="su-stack" role="group" id="suKindTiles">' + C.placeTypes.map(function(pt){ var on = S.place === pt; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-place="' + h(pt) + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(C.placeNames[pt] || pt) + ((T.tkindSubs || {})[pt] ? '<small>' + h(T.tkindSubs[pt]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'
         + '<h2 class="su-h2">' + h(T.tfoodQ) + '</h2><p class="su-hint">' + h(T.tfoodLead) + '</p>' + (S.foodGuessed && bw.food === S.foodGuessed && !BI.food ? '<p class="su-sent su-research" id="suFoodGuess">' + h(T.foodGuess) + '</p>' : '')
-        + bpicks('food', ['kitchen', 'trucks', 'snacks', 'none'], T.tfoods, T.tfoodSubs)
+        // Brewery test 2 (2026-11-13): "Most days" / "Weekends only" right under Food trucks, the only food-truck detail.
+        + bpicks('food', ['kitchen', 'trucks', 'snacks', 'none'], T.tfoods, T.tfoodSubs, bw.food === 'trucks' && T.ttrucks ? { trucks: '<div class="su-day" id="suTrucksQ" style="margin:2px 0 6px"><p class="su-q" style="margin-top:0">' + h(T.ttrucksQ) + '</p>'
+          + (S.trucksGuessed && bw.trucks === S.trucksGuessed && !BI.trucks ? '<p class="su-sent su-research" id="suTrucksGuess">' + h(T.trucksGuess) + '</p>' : '') + bchips('trucks', ['most_days', 'weekends'], T.ttrucks, T.ttrucksQ) + '</div>' } : null)
         + (bw.food === 'kitchen' ? '<div class="su-day" id="suKitchenQ" style="margin-top:12px"><p class="su-q" style="margin-top:0">' + h(T.tkitchenQ) + '</p>' + bchips('kmode', ['same', 'earlier'], T.tkitchenOpts, T.tkitchenQ)
           + (bw.kmode === 'earlier' ? '<div class="su-times" style="margin-top:10px"><label class="su-q" for="suKto" style="margin:0">' + h(T.tkitchenAt) + '</label> <input type="time" id="suKto" value="' + h(bw.kcloses) + '"></div>' : '') + '</div>' : '')
         + '<h2 class="su-h2">' + h(T.outsideQ) + '</h2>' + bchips('outside', ['yes', 'no'], T.outsideOpts, T.outsideQ)
@@ -1602,15 +1611,17 @@
       // "book ahead" is never said twice), the line in her own words, and the booking link box, which always shows (a
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
       var gl = S.brew.groups, gsz = (/\b(\d{1,2})\b/.exec(gl || '') || [])[1];
+      // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
+        + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = gl === fill(T.groupsLine, { n: n }) || (!!gsz && +gsz === n && /book|réserv/i.test(gl)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
         + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
-        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>' + skip('groups');
+        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
-      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + (!ig && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
         // Café test 3 (2026-11-11): no TikTok box (Dayton: keep it easy). A TikTok already saved stays on the page.
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
@@ -1995,6 +2006,7 @@
     var now = d === 'live' || d === 'day' ? '<p class="su-sent">' + h(C.socialSent[n] && d === 'day' ? T.socialSent : T.alreadyDone) + '</p>' : '';
     return '<h2 class="su-h2">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
       + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '')
+      + (!ig && !ch && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '')
       + (ch ? '' : '<p class="su-hint">' + h(ig ? T.igLead : T.fbWhy) + '</p><label class="su-q" for="' + id + '">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="' + id + '" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">')
       + '<div class="su-chips" role="group" aria-label="' + h(ig ? 'Instagram' : 'Facebook') + '" style="margin-top:10px">'
       + [['no', ig ? T.igNo : T.fbNo], ['unsure', T.socialUnsure]].map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ch === o[0] ? 'true' : 'false') + '" data-soc="' + n + ':' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>';
@@ -2471,16 +2483,18 @@
       readBrew(); var tb = S.brew;
       if (!S.place) { S.nudge = T.tkindNeed; return render(); }
       if (!tb.food) { S.nudge = T.tfoodNeed; return render(); }
+      if (tb.food === 'trucks' && !tb.trucks) { S.nudge = T.ttrucksNeed; return render(); }
       if (tb.food === 'kitchen' && tb.kmode === 'earlier' && !/^\d{2}:\d{2}$/.test(tb.kcloses || '')) { S.nudge = T.tkitchenNeed; return render(); }
       var tl = [], bi = {};
       if (S.place !== (CUR.place_type || '')) tl.push({ place_type: S.place });
       if (tb.food !== (BI.food || '')) bi.food = tb.food;
       if (tb.outside && tb.outside !== (BI.outside || '')) bi.outside = tb.outside;
+      if (tb.food === 'trucks' && tb.trucks !== (BI.trucks || '')) bi.trucks = tb.trucks;
       var kv = tb.food === 'kitchen' && tb.kmode ? (tb.kmode === 'earlier' ? { mode: 'earlier', closes: tb.kcloses } : { mode: 'same' }) : null;
       if (kv && JSON.stringify(kv) !== JSON.stringify(BI.kitchen || null)) bi.kitchen = kv;
       if (Object.keys(bi).length) tl.push({ brewery_info: bi });
       S.savedLine.taproom = T.taproomSaved;
-      return saveAll('taproom', tl, null, null, function(){ CUR.place_type = S.place; Object.keys(bi).forEach(function(kk){ BI[kk] = bi[kk]; }); if (BI.food !== 'kitchen') delete BI.kitchen; S.kindGuessed = ''; S.foodGuessed = ''; syncMenu(); });
+      return saveAll('taproom', tl, null, null, function(){ CUR.place_type = S.place; Object.keys(bi).forEach(function(kk){ BI[kk] = bi[kk]; }); if (BI.food !== 'kitchen') delete BI.kitchen; if (BI.food !== 'trucks') delete BI.trucks; S.kindGuessed = ''; S.foodGuessed = ''; S.trucksGuessed = ''; syncMenu(); });
     }
     if (k === 'flightsSave') {
       readBrew(); var fb2 = S.brew, ff = fb2.noFlights ? null : fb2.fee;
@@ -2738,7 +2752,7 @@
     // Brewery screens (2026-11-12): one-of-a-few answers, the flight price buttons, the to-go chips, the group sizes (the
     // size writes the whole line, never adds to it) and the quick opening and closing times.
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bpick]'), function(b){ b.onclick = function(){
-      readBrew(); var q10 = b.getAttribute('data-bpick').split(':'); S.brew[q10[0]] = String(S.brew[q10[0]]) === q10[1] && q10[0] !== 'food' ? '' : q10[1]; if (q10[0] === 'food') S.foodGuessed = ''; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+      readBrew(); var q10 = b.getAttribute('data-bpick').split(':'); S.brew[q10[0]] = String(S.brew[q10[0]]) === q10[1] && q10[0] !== 'food' && q10[0] !== 'trucks' ? '' : q10[1]; if (q10[0] === 'food') S.foodGuessed = ''; if (q10[0] === 'trucks') S.trucksGuessed = ''; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bfee]'), function(b){ b.onclick = function(){
       readBrew(); var fv = b.getAttribute('data-bfee'); S.brew.feeGuessed = false; S.nudge = ''; mark();
       if (fv === 'none') { S.brew.noFlights = !S.brew.noFlights; if (S.brew.noFlights) { S.brew.feeOther = false; S.brew.fee = null; } var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }

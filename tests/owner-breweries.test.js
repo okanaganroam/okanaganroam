@@ -603,7 +603,7 @@ test('fix 5: minors until a time shows “Kids until 9 PM” on the page and car
 });
 
 test('fix 6: wording: food trucks, the guess line, the door lead, Kids label, dog sentences, Flights from, owner hours, 12 PM', async () => {
-  assert.equal(text.en.brewery.tfoodSubs.trucks, 'We’ll show “Food trucks most days” (truck names change too often)');
+  assert.equal(text.en.brewery.tfoodSubs.trucks, 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often)');
   assert.equal(text.en.brewery.foodGuess, 'We picked this from what’s on your page. Tap another if it’s changed.');
   assert.doesNotMatch(text.en.brewery.doorLead, /orchard/i); assert.doesNotMatch(text.fr.brewery.doorLead, /verger/i);
   assert.match(text.en.brewery.doorLeadCidery, /orchard/);
@@ -622,7 +622,7 @@ test('fix 6: wording: food trucks, the guess line, the door lead, Kids label, do
   assert.match(en, /Dogs welcome on the patio only\. Water bowls at the door\./);
   assert.match(frh, /<span class="visit-label">Enfants<\/span>/);
   assert.match(frh, /Chiens bienvenus sur la terrasse seulement\./);
-  assert.equal(app.dogsChipSentences('Inside and patio'), 'Dogs welcome inside and on the patio');
+  assert.equal(app.dogsChipSentences('Inside and patio'), 'Dogs welcome inside and on the patio.', 'brewery test 2: with its period');
   // A Kids & dogs line that speaks of dogs keeps its label.
   assert.match(app.visitInfoHtml({ rows: [{ label: 'Kids & dogs', text: 'All ages welcome. Dogs welcome.' }, { label: 'Dogs', text: 'Patio only' }] }, false), /Kids &amp; dogs/);
   // Build My Trip: "Flights from $14" / "Tastings from $10", and no "check before you go" on hours the business confirmed.
@@ -694,4 +694,124 @@ test('fix 8: photo source label, photos waiting counts the one she has, happy ho
   // The story screen shows the description as it will be saved.
   const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
   assert.match(s, /id="suStorySent"/); assert.match(s, /st\.onblur = function\(\)\{ var fx = storyJoinFix\(st\.value\)/);
+});
+
+// ---------- Brewery test 2 (2026-11-13; drafts/fresh-eyes-brewery2-2026-11-12/REPORT.md) ----------
+test('test 2 fix 1: food trucks “Most days” / “Weekends only”, pre-picked from a research weekends line, never less accurate', async () => {
+  const b = mk('brewery'); const t = tokenFor(b.id);
+  research(b.id, [{ label: 'Food', text: 'Food trucks on weekends.' }, { label: 'To go', text: 'Cans.' }]);
+  let cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.suggestFood, 'trucks'); assert.equal(cfg.suggestTrucks, 'weekends', 'pre-picked from research');
+  assert.deepEqual(app.venueBreweryInfo(b.id), {}, 'a suggestion only: nothing saved');
+  assert.equal(row(b.id, 'Food').text, 'Food trucks on weekends.');
+  // Saved with the screen: the line stays "on weekends", in both languages.
+  assert.equal((await change(t, { brewery_info: { food: 'trucks', trucks: 'weekends', outside: 'yes' } })).status, 200);
+  assert.equal(row(b.id, 'Food').text, 'Food trucks on weekends. Outside food welcome.');
+  assert.equal(app.venueVisitInfo(b.id).owner_fr.Food.fr, 'Camions de cuisine de rue la fin de semaine. Nourriture de l’extérieur bienvenue.');
+  assert.equal(app.venueBreweryInfo(b.id).trucks, 'weekends');
+  // Most days.
+  assert.equal((await change(t, { brewery_info: { trucks: 'most_days' } })).status, 200);
+  assert.equal(row(b.id, 'Food').text, 'Food trucks most days. Outside food welcome.');
+  // Another food answer drops the trucks part; a bad value is refused.
+  assert.equal((await change(t, { brewery_info: { food: 'snacks' } })).status, 200);
+  assert.equal(app.venueBreweryInfo(b.id).trucks, undefined);
+  assert.equal(row(b.id, 'Food').text, 'Snacks only. Outside food welcome.');
+  assert.equal((await change(t, { brewery_info: { food: 'trucks', trucks: 'tuesdays' } })).status, 400);
+  // Weekend words research uses; a line that names other days pre-picks nothing (she picks), "daily" is most days.
+  for (const [line, want] of [['Food trucks Fri–Sun.', 'weekends'], ['Food trucks Friday to Sunday.', 'weekends'], ['Food trucks Saturdays and Sundays.', 'weekends'], ['Camions de cuisine de rue la fin de semaine.', ''], ['Food trucks daily.', 'most_days'], ['Food trucks Thursday to Saturday.', '']]) {
+    const c = mk('brewery'); research(c.id, [{ label: 'Food', text: line }]);
+    const g = cfgOf((await get(`/owner/${tokenFor(c.id)}/setup`)).text);
+    assert.equal(g.suggestTrucks, g.suggestFood === 'trucks' ? want : '', line);
+  }
+  // The screen: chips under Food trucks, required with it, toggled like the food pick, and the suggestion saved only with it.
+  const s = setupScript((await get(`/owner/${t}/setup`)).text);
+  assert.match(s, /bchips\('trucks', \['most_days', 'weekends'\]/);
+  assert.match(s, /tb\.food === 'trucks' && !tb\.trucks\) \{ S\.nudge = T\.ttrucksNeed/);
+  assert.match(s, /S\.brew\.trucks = C\.suggestTrucks; S\.trucksGuessed = C\.suggestTrucks;/);
+  assert.equal(text.en.brewery.ttrucks.weekends, 'Weekends only'); assert.equal(text.fr.brewery.ttrucks.weekends, 'La fin de semaine seulement');
+  assert.equal(text.en.brewery.ttrucks.most_days, 'Most days'); assert.equal(text.fr.brewery.ttrucks.most_days, 'La plupart des jours');
+  assert.match(text.fr.brewery.tfoodSubs.trucks, /la fin de semaine/);
+  // The help answer says both and no longer says the menu "counts as done".
+  const help = app.BREWERY_SETUP_HELP_TOPICS.find((x) => x.id === 'brewery-food-trucks');
+  assert.match(help.a, /Food trucks on weekends/); assert.match(help.a, /Weekends only/); assert.doesNotMatch(help.a, /counts as done/);
+  assert.match(help.aFr, /la fin de semaine/);
+});
+
+test('test 2 fix 2: the kind guess is Brewery for a taproom (taphouse only when the name says so), named at the top', async () => {
+  const kind = async (name) => cfgOf((await get(`/owner/${tokenFor(mk('brewery', { name }).id)}/setup`)).text).suggestKind;
+  assert.equal(await kind('Two Dogs Taproom'), 'Brewery');
+  assert.equal(await kind('Lakeside Tap House'), 'Taphouse or beer hall');
+  assert.equal(await kind('Old Town Taphouse'), 'Taphouse or beer hall');
+  assert.equal(await kind('Main Street Beer Hall'), 'Taphouse or beer hall');
+  assert.equal(await kind('Orchard Hill Cider Co'), 'Cidery');
+  assert.equal(await kind('Okanagan Spirits Distillery'), 'Distillery');
+  assert.equal(await kind('Something Different'), 'Brewery', 'a brewery is a Brewery by default');
+  assert.equal(text.en.brewery.kindGuess, 'We picked “{kind}”. Tap another if it’s not right.');
+  assert.match(text.fr.brewery.kindGuess, /\{kind\}/);
+  const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
+  assert.match(s, /h\(fill\(T\.kindGuess, \{ kind: \(C\.placeNames \|\| \{\}\)\[S\.place\]/);
+});
+
+test('test 2 fix 3: the “Who’s welcome?” note shows in the Kids & dogs line, without repeating the answer', async () => {
+  const b = mk('brewery', { dog_friendly: 1 }); const t = tokenFor(b.id);
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'all_ages', note: 'Kids with an adult' } } })).status, 200);
+  assert.equal(row(b.id, 'Kids & dogs').text, 'All ages welcome. Kids with an adult. Dogs welcome.');
+  assert.equal(app.venueVisitInfo(b.id).owner_fr['Kids & dogs'].fr, 'Tous les âges sont bienvenus. Chiens bienvenus.', 'her words stay off the French line, as on a pub');
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'all_ages', note: 'All ages welcome' } } })).status, 200);
+  assert.equal(row(b.id, 'Kids & dogs').text, 'All ages welcome. Dogs welcome.', 'a note that only repeats it is left out');
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'all_ages', note: 'All ages welcome, kids with an adult.' } } })).status, 200);
+  assert.equal(row(b.id, 'Kids & dogs').text, 'All ages welcome. Kids with an adult. Dogs welcome.');
+  assert.equal(app.breweryVisitLines(app.getVenue(b.id), { minors: { policy: 'minors_until', until: '21:00', note: 'Patio is 19+ after 9.' } })['Kids & dogs'].en, 'Minors welcome with an adult until 9 PM. Patio is 19+ after 9. Dogs welcome.');
+  // No note: as before.
+  assert.equal((await change(t, { brewery_info: { minors: { policy: 'adults' } } })).status, 200);
+  assert.equal(row(b.id, 'Kids & dogs').text, 'Adults only (19+). Dogs welcome.');
+});
+
+test('test 2 fix 4: the checklist door item says “orchard” for a cidery only, in English and French', () => {
+  const base0 = { type: 'brewery', address: 'a', latitude: 1, longitude: 1, phone: 'p', hasHours: true, hoursCheckedAt: today, imageUrl: '/images/x.jpg', photoCount: 1, description: 'x'.repeat(128), claimed: true };
+  const door = (placeType) => { const r = pc.scoreCompleteness({ ...base0, placeType }, { today, pending: new Set() }); return r.missing.concat(r.coming, r.afterReopen).find((x) => x.key === 'arrival'); };
+  for (const k of ['Brewery', 'Taphouse or beer hall', 'Distillery', undefined]) {
+    const it = door(k);
+    assert.doesNotMatch(it.whyEn, /orchard/i, String(k)); assert.doesNotMatch(it.whyFr, /verger/i, String(k));
+    assert.match(it.whyEn, /around the side or upstairs/);
+  }
+  assert.match(door('Cidery').whyEn, /At an orchard/); assert.match(door('Cidery').whyFr, /Dans un verger/);
+  const html = pc.renderCompleteness(pc.scoreCompleteness({ ...base0, placeType: 'Brewery' }, { today, pending: new Set() }), { fr: false, brewery: true, canDecline: true, noScore: true, menuHref: '/m', setupHref: '/s' });
+  assert.doesNotMatch(html, /orchard/i);
+});
+
+test('test 2 fix 5: “We can’t take big groups” comes before the sizes and the form', async () => {
+  const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
+  const i = s.indexOf("id=\"suGroupsNone\""), j = s.indexOf("id=\"suGroupSizes\""), k = s.indexOf("'brewGroupsSave') + '</div>'");
+  assert.ok(i > 0 && j > i && k > j, 'none button, then sizes, then Save');
+  assert.equal((s.match(/T\.groupsNone, '', true, 'no:groups'/g) || []).length, 1, 'shown once');
+});
+
+test('test 2 fix 6: Facebook pre-filled from a facebook.com website, one link on the page, dog lines end with a period, 3 PM and 6 PM', async () => {
+  const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
+  assert.match(s, /fbFromSite\(CUR\.website \|\| C\.website \|\| ''\)\) \{ S\.fb = fbFromSite\(CUR\.website \|\| C\.website\); S\.fbFromWebsite = true; \}/);
+  assert.match(s, /S\.socSaved = \{ instagram: S\.ig, facebook: S\.fb \}; S\.socLines = \[\];\n.*\n  if \(!S\.fb/, 'after the saved value, so it is saved only with the screen');
+  assert.ok(text.en.fbFromWebsite && text.fr.fbFromWebsite);
+  // The page: website and Facebook the same page -> Facebook only.
+  const b = mk('brewery', { website: 'https://www.facebook.com/twodogstaproom' }); const t = tokenFor(b.id);
+  const v = app.getVenue(b.id);
+  let p = (await get(`/${v.region}/breweries/${v.slug}`)).text;
+  assert.match(p, /Website ↗|Visit Website/, 'no Facebook link yet: the website button stays');
+  assert.equal((await change(t, { facebook_url: 'https://www.facebook.com/twodogstaproom' })).status, 200);
+  p = (await get(`/${v.region}/breweries/${v.slug}`)).text;
+  assert.doesNotMatch(p, /Website ↗|Visit Website/);
+  assert.match(p, />Facebook<\/a>/);
+  assert.equal(app.websiteIsFacebookLink('https://m.facebook.com/x/', 'https://www.facebook.com/x'), true);
+  assert.equal(app.websiteIsFacebookLink('https://example.com', 'https://www.facebook.com/x'), false);
+  assert.equal(app.websiteIsFacebookLink('https://www.facebook.com/x', 'https://www.facebook.com/y'), false);
+  // Dog chip lines read as sentences, every type.
+  assert.equal(app.dogsChipSentences('Dogs welcome inside'), 'Dogs welcome inside.');
+  assert.equal(app.dogsChipSentences('Dogs welcome inside. Water bowls at the door'), 'Dogs welcome inside. Water bowls at the door.');
+  assert.equal(app.dogsChipSentences('Dogs welcome at the window'), 'Dogs welcome at the window.');
+  assert.equal(app.dogsChipSentences('Chiens bienvenus à l’intérieur'), 'Chiens bienvenus à l’intérieur.');
+  assert.equal(app.dogsChipSentences('Patio only, on leash'), 'Dogs welcome on the patio only, on leash', 'her own words: as typed');
+  // Hours buttons (breweries only).
+  assert.match(s, /BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00'\]/);
+  assert.match(s, /function brewQuick\(d, j, y, last\)\{\n    if \(!C\.brewery\) return '';/);
+  assert.match(s, /su-laterow su-bqrow/); assert.match(app.OWNER_SETUP_CSS || (await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text, /\.su-bqrow \.su-latebtn \{ padding: 0 10px; \}/, 'four times fit one row at 375px');
 });

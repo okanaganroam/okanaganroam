@@ -10085,7 +10085,7 @@ function visitDropRepeatedKnownFor(info, description) {
 function dogsChipSentences(text) {
   const full = OWNER_SETUP_STRINGS.en.quickDogsFull, fullFr = OWNER_SETUP_STRINGS.fr.quickDogsFull;
   const short = OWNER_SETUP_STRINGS.en.quick.dogs, shortFr = OWNER_SETUP_STRINGS.fr.quick.dogs;
-  return presetAnswerParts(text).map((seg, i) => {
+  const out = presetAnswerParts(text).map((seg, i) => {
     if (i % 2) return seg;
     const m = /^(.*?)(\.?)$/.exec(seg), k = presetAnswerNorm(m[1]);
     for (let j = 0; j < 2; j++) {
@@ -10094,6 +10094,22 @@ function dogsChipSentences(text) {
     }
     return seg;
   }).join('');
+  // Brewery test 2 (2026-11-13): a line of dog chips reads as sentences, with its last period ("Dogs welcome inside.").
+  return dogsChipLine(out) && !/[.!?)]$/.test(out.trim()) ? `${out.trim()}.` : out;
+}
+// Every Dogs chip, in both languages and for every type (normalised): a line made only of them gets its period (a line
+// with her own words stays as typed, so its French translation still matches).
+let DOGS_CHIP_SET = null;
+function dogsChipLine(text) {
+  if (!DOGS_CHIP_SET) {
+    DOGS_CHIP_SET = new Set();
+    for (const lang of ['en', 'fr']) {
+      const T = OWNER_SETUP_STRINGS[lang] || {};
+      for (const l of [T.quick && T.quick.dogs, T.quickDogsFull, T.pub && T.pub.quick && T.pub.quick.dogs, T.cafe && T.cafe.quickDogsWindow, T.cafe && T.cafe.quickDogsNoPatio, T.brewery && T.brewery.quickDogsNoPatio]) for (const x of l || []) DOGS_CHIP_SET.add(presetAnswerNorm(x));
+    }
+  }
+  const segs = presetAnswerParts(text).filter((seg, i) => !(i % 2)).map((seg) => presetAnswerNorm(seg.replace(/\.$/, ''))).filter(Boolean);
+  return segs.length > 0 && segs.every((x) => DOGS_CHIP_SET.has(x));
 }
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
@@ -20718,6 +20734,7 @@ function wineryCardPrice(venueId, fee) {
 // ---------- Brewery answers (Dayton, 2026-11-12; drafts/brewery-portal-2026-11-12/SPEC-breweries.md, "Decided") ----------
 // Owner-only, never researched. Stored in venue_brewery_info as one JSON object; each part optional:
 //   food        'kitchen' | 'trucks' | 'snacks' | 'none'   the main food here (one pick)
+//   trucks      'most_days' | 'weekends'                  food trucks only: when they're here (brewery test 2, 2026-11-13)
 //   outside     'yes' | 'no'                              can people bring their own food?
 //   kitchen     { mode: 'same' | 'earlier', closes: 'HH:MM' (earlier only) }   our own kitchen only (the pub question)
 //   no_flights  true                                      "We don't do flights" (no card price)
@@ -20732,7 +20749,11 @@ function wineryCardPrice(venueId, fee) {
 // Decided 3: "Who's welcome?" decides the Kids badge for a brewery that answered; one that hasn't keeps its researched
 // badge (no bulk change). The kind of place is stored in the existing place-type field (venue_cuisines.place_type).
 const { BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR } = require('./portal-completeness');
-const BREWERY_INFO_PARTS = ['food', 'outside', 'kitchen', 'no_flights', 'to_go', 'minors', 'year'];
+const BREWERY_INFO_PARTS = ['food', 'trucks', 'outside', 'kitchen', 'no_flights', 'to_go', 'minors', 'year'];
+// Brewery test 2 (2026-11-13): "Food trucks most days" or "on weekends", the only food-truck detail (no schedule, no names).
+const BREWERY_TRUCKS = ['most_days', 'weekends'];
+// "weekend(s)", "Fri–Sun", "Sat & Sun", "Friday to Sunday", « fin de semaine », « week-end ».
+const BREWERY_TRUCKS_WEEKENDS_RE = /\bweekends?\b|\bfin(?:s)? de semaine\b|\bweek-?ends?\b|\b(?:fri|sat)(?:day|urday)?s?\s*(?:[-–—&+]|to|through|thru|and)\s*sun(?:day)?s?\b|\b(?:ven(?:dredi)?|sam(?:edi)?)\s*(?:[-–—&+]|au|et)\s*dim(?:anche)?\b/i;
 const BREWERY_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Decided 1 (Dayton, 2026-11-12): a flight price up to $40 goes live at once; a higher one waits "within a day".
 const FLIGHT_FEE_LIVE_MAX = 40;
@@ -20774,6 +20795,7 @@ function cleanBreweryInfoPart(key, x) {
   const time = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   if (key === 'food') return BREWERY_FOOD.includes(x) ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'outside') return x === 'yes' || x === 'no' ? { value: x } : { error: BREWERY_INFO_ERROR };
+  if (key === 'trucks') return BREWERY_TRUCKS.includes(x) ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'year') return BREWERY_YEAR.includes(x) ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'no_flights') return x === true ? { value: true } : x === false ? { value: null } : { error: BREWERY_INFO_ERROR };
   if (key === 'kitchen') {
@@ -20834,7 +20856,7 @@ function breweryVisitLines(venue, info) {
     const k = b.kitchen || {};
     const main = {
       kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
-      trucks: ['Food trucks most days.', 'Camions de cuisine de rue la plupart des jours.'],
+      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de cuisine de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de cuisine de rue la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
@@ -20859,13 +20881,32 @@ function breweryVisitLines(venue, info) {
       if (Number(venue.dog_friendly) === 1 || venue.dog_friendly === true) dogs = ['Dogs welcome.', 'Chiens bienvenus.'];
       else if (venueNotOffered(venue.id).includes('dogs')) dogs = venueOwnerFeatures(venue.id).service_dogs ? ['No dogs (service dogs welcome).', 'Pas de chiens (chiens d’assistance bienvenus).'] : ['No dogs.', 'Pas de chiens.'];
     }
-    out['Kids & dogs'] = { en: [`${minorsLineText(m, false)}.`, dogs && dogs[0]].filter(Boolean).join(' '), fr: [`${minorsLineText(m, true)}.`, dogs && dogs[1]].filter(Boolean).join(' ') };
+    // Brewery test 2 (2026-11-13): her own "Anything else?" note follows, as on a pub's page (in English only, her words),
+    // without repeating what the answer already says.
+    const note = breweryMinorsNote(minorsLineText(m, false), m.note);
+    out['Kids & dogs'] = { en: [`${minorsLineText(m, false)}.`, note, dogs && dogs[0]].filter(Boolean).join(' '), fr: [`${minorsLineText(m, true)}.`, dogs && dogs[1]].filter(Boolean).join(' ') };
   }
   // Weekly events answered: research's "Games" line (mostly events) is set aside; the events say it now.
   let nights = 0;
   try { nights = (venueWeeklyNightsList(venue.id) || []).length; } catch (e) { nights = 0; }
   if (nights > 0 || venueNotOffered(venue.id).includes('entertainment')) out.Games = '';
   return out;
+}
+// The owner's "Who's welcome?" note as a sentence after the answer's line, or '' when it only repeats it: "All ages
+// welcome" + "all ages welcome, kids with an adult" -> "Kids with an adult."
+function breweryMinorsNote(line, note) {
+  let t = String(note || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const ln = norm(line);
+  if (!norm(t) || ln.includes(norm(t))) return '';
+  // A note that starts with the answer's own words keeps only the rest.
+  const words = ln.split(' ');
+  const lead = new RegExp(`^${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^a-z0-9]+')}[^a-z0-9]*`, 'i');
+  if (lead.test(t)) t = t.replace(lead, '').trim();
+  if (!t) return '';
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?)]$/.test(t) ? t : `${t}.`;
 }
 // Writes the answers' lines into the stored Plan your visit box as the owner's rows, the same way as a winery's
 // (writeWineryVisitRows): owner_labels, owner_was (what each replaced, so an Undo puts research's line back), owner_fr
@@ -36748,7 +36789,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // with us afterwards), and Website is a plain button marked as opening elsewhere. With no address, Website stays
     // the main button as before.
     mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
-    venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    // Brewery test 2 (2026-11-13): a website that is the same Facebook page as the Facebook link shows once, as Facebook.
+    venue.website && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
       : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
@@ -46291,6 +46333,13 @@ function ownerMonthDay(value) {
 }
 // Name, address and links (2026-10-15). Links live in venue_links.
 // TikTok (pub test 9, 2026-11-10): an owner link like Instagram (live straight away, strictly a profile).
+// True when the website is the same Facebook page as the Facebook link ("https://www.facebook.com/x/" and
+// "facebook.com/x", "m.facebook.com/x", "fb.com/x" are one page), so the page links to it once.
+function websiteIsFacebookLink(website, facebookUrl) {
+  const norm = (u) => String(u || '').trim().toLowerCase().split(/[?#]/)[0].replace(/^https?:\/\//, '').replace(/^(?:www\.|m\.|web\.)/, '').replace(/^fb\.com\//, 'facebook.com/').replace(/\/+$/, '');
+  const w = norm(website);
+  return !!w && /^facebook\.com\/./.test(w) && w === norm(facebookUrl);
+}
 const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 function venueLinks(venueId) {
   return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, tiktok_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
@@ -47598,6 +47647,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       }
       // The kitchen's close time goes with "Our own kitchen" only.
       if (next.food !== 'kitchen') delete next.kitchen;
+      // "Most days" / "weekends" goes with "Food trucks" only.
+      if (next.food !== 'trucks') delete next.trucks;
       // Stored in BREWERY_INFO_PARTS order, so an Undo compares like with like.
       const ordered = Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => k in next).map((k) => [k, next[k]]));
       if (!errors.brewery_info && JSON.stringify(ordered) !== JSON.stringify(Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => k in cur).map((k) => [k, cur[k]])))) changes.brewery_info = ordered;
@@ -47735,7 +47786,7 @@ function ownerValueText(field, value) {
   if (field === 'brewery_info') {
     const o = value && typeof value === 'object' ? value : {};
     const parts = [];
-    if (o.food) parts.push(`Food: ${o.food}${o.kitchen ? (o.kitchen.mode === 'earlier' ? ` (kitchen closes ${o.kitchen.closes})` : ' (food until close)') : ''}`);
+    if (o.food) parts.push(`Food: ${o.food}${o.kitchen ? (o.kitchen.mode === 'earlier' ? ` (kitchen closes ${o.kitchen.closes})` : ' (food until close)') : ''}${o.trucks ? (o.trucks === 'weekends' ? ' (weekends)' : ' (most days)') : ''}`);
     if (o.outside) parts.push(`Outside food: ${o.outside}`);
     if (o.no_flights) parts.push('No flights');
     if (Array.isArray(o.to_go)) parts.push(`To go: ${o.to_go.join(', ')}`);
@@ -52923,11 +52974,16 @@ function breweryCfg(venue, snap, fr) {
   const mine = new Set(info.owner_labels || []);
   const researchRow = (label) => (info.rows || []).find((x) => x && x.label === label && !mine.has(x.label) && typeof x.text === 'string');
   const name = String(venue.name || '').toLowerCase();
+  // Brewery test 2 (2026-11-13): a brewery is a Brewery unless its name clearly says otherwise. "Taproom" is where a
+  // brewery pours its own beer, so only "taphouse", "tap house" or "beer hall" suggests a taphouse.
   const suggestKind = /\b(?:cider|ciders|cidery|ciderie|cidrerie)\b/.test(name) ? 'Cidery' : /\bdistill/.test(name) ? 'Distillery'
-    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(name) ? 'Brewery' : /\b(?:tap ?house|taproom|beer (?:hall|market|bar))\b/.test(name) ? 'Taphouse or beer hall' : '';
+    : /\b(?:brewing|brewery|brewhouse|brew ?pub|brew co|brewers?|ales?|beer works)\b/.test(name) ? 'Brewery' : /\b(?:tap ?house|beer (?:hall|market|bar))\b/.test(name) ? 'Taphouse or beer hall' : 'Brewery';
   const foodRow = researchRow('Food');
   const ft = foodRow ? foodRow.text : '';
   const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|pub fare|burgers?|pizzas?|wings|bistro|eatery)\b/i.test(ft) ? 'kitchen' : '';
+  // Brewery test 2 (2026-11-13): research's food-truck line pre-picks when the trucks are here, only when it plainly says
+  // weekends (or most days), so a saved answer never makes the line less accurate than research had it.
+  const suggestTrucks = suggestFood !== 'trucks' ? '' : BREWERY_TRUCKS_WEEKENDS_RE.test(ft) ? 'weekends' : /\b(?:most days|daily|every day|7 days)\b|tous les jours|la plupart des jours/i.test(ft) ? 'most_days' : '';
   // The researched card price, only when it is a drink price (not bowling lanes or a beer school), else research's Flights line.
   const cardFlight = (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 && Number(e.from) <= 30 && !/\b(?:bowl|lane|school|class|tour|course|hour)\b/i.test(`${e.basis || ''} ${e.per || ''} ${e.label || ''}`) ? Number(e.from) : null; })();
   const researchFee = (() => {
@@ -52937,7 +52993,7 @@ function breweryCfg(venue, snap, fr) {
     return m && Number(m[1]) > 0 && Number(m[1]) <= 30 ? Number(m[1]) : null;
   })();
   return {
-    allSteps: BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2), feeLiveMax: FLIGHT_FEE_LIVE_MAX, suggestKind, suggestFood, researchFee,
+    allSteps: BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2), feeLiveMax: FLIGHT_FEE_LIVE_MAX, suggestKind, suggestFood, suggestTrucks, researchFee,
     // Where it came from: the card's price ("Your card shows $12 now") or only research's Flights line ("Your page says $10").
     researchFeeFrom: cardFlight != null ? 'card' : 'visit',
     placeShow: Object.fromEntries(placeTypesFor('brewery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
@@ -52977,8 +53033,8 @@ const BREWERY_SETUP_HELP_TOPICS = [
   { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de cuisine de rue',
     keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
     keysFr: ['camion', 'camions', 'cuisine de rue', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
-    a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then say whether people can bring their own food. Your page says “Food trucks most days”, never a truck’s name, because the trucks change every week. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step, and the menu counts as done.</p>',
-    aFr: '<p>À <strong>Votre salle</strong>, touchez <strong>Camions de cuisine de rue</strong>, puis dites si l’on peut apporter sa nourriture. Votre page indique « Camions de cuisine de rue la plupart des jours », jamais le nom d’un camion, parce que les camions changent chaque semaine. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu, et le menu compte comme fait.</p>' },
+    a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
+    aFr: '<p>À <strong>Votre salle</strong>, touchez <strong>Camions de cuisine de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de cuisine de rue la plupart des jours » ou « Camions de cuisine de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
     keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
@@ -53143,6 +53199,9 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-laterow { align-items: center; margin: 2px 0 8px; }
   body.owner-setup .su-latelbl { flex-basis: 100%; font-size: 16px; font-weight: 700; color: var(--su-soft); }
   body.owner-setup .su-latebtn[aria-pressed="true"] { background: var(--su-teal); color: #fff; border-color: var(--su-teal); }
+  /* Brewery test 2 (2026-11-13): four quick opening and closing times fit one row at 375px. */
+  body.owner-setup .su-bqrow { gap: 6px; }
+  body.owner-setup .su-bqrow .su-latebtn { padding: 0 10px; }
   body.owner-setup .su-spendask { margin-bottom: 0; }
   body.owner-setup .su-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   body.owner-setup .su-num { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 10px 0 24px; }
@@ -65929,7 +65988,7 @@ module.exports = {
   validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
-  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL,
+  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
