@@ -46961,7 +46961,7 @@ function wineryVisitTicks(venue, badges) {
   const acc = line(/^(?:accessibility|wheelchair access)$/i);
   if (/step-?free|wheelchair|accessible|\bramps?\b|no stairs/i.test(acc) && !/\bnot (?:fully |wheelchair )?accessible|inaccessible|\bno (?:wheelchair|ramp)|stairs only|only by stairs/i.test(acc)) out.push('wheelchair_accessible');
   const dogs = line(/^(?:dogs|pets|kids & dogs)$/i);
-  if (/\bdogs?\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|leashed dogs|dog[- ]friendly/i.test(dogs) && !/\bno dogs\b|\bdogs? (?:are )?not\b|service (?:dogs|animals) only/i.test(dogs)) out.push('dog_friendly');
+  if (/\bdogs?\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|leashed dogs|dog[- ]friendly|\bdogs?\b[^.]*\b(?:on|at) (?:the|our) patio\b/i.test(dogs) && !/\bno dogs\b|\bdogs? (?:are )?not\b|service (?:dogs|animals) only/i.test(dogs)) out.push('dog_friendly');
   // Winery test 5 (2026-11-12): research's Kids line ("Kids welcome with an adult") ticks Kids welcome too.
   const kids = line(/^(?:kids|children|families|ages|kids & dogs)$/i);
   if (/\b(?:kids?|children|families|family)\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|family[- ]friendly|kid[- ]friendly|all ages/i.test(kids) && !/\b(?:no (?:kids|children|minors)|adults only|19\+|21\+|not (?:suitable|recommended) for (?:kids|children))/i.test(kids)) out.push('kid_friendly');
@@ -52886,6 +52886,32 @@ function ownerFlightFeeWaiting(venueId) {
 // Breweries (2026-11-12): the setup's brewery-only settings. Research may pre-select the kind (from the name), the food
 // (from research's Food line) and the flight price (the card's researched "From $X" when it is a flight price, or
 // research's Flights line) as suggestions: nothing is saved until she taps Save (SPEC "Rules kept").
+const BREWERY_EVENT_KINDS = [['trivia', /\b(?:trivia|quiz)\b/i], ['bingo', /\bbingo\b/i], ['karaoke', /\bkaraoke\b/i], ['live_music', /\blive music\b/i], ['open_mic', /\bopen mic\b/i], ['run_club', /\brun club\b/i], ['comedy', /\bcomedy\b/i]];
+const BREWERY_EVENT_DAYS = { mon: /\bmondays?\b/i, tue: /\btuesdays?\b/i, wed: /\bwednesdays?\b/i, thu: /\bthursdays?\b/i, fri: /\bfridays?\b/i, sat: /\bsaturdays?\b/i, sun: /\bsundays?\b/i };
+function breweryResearchSuggestions(researchRow, info, mine) {
+  const out = {};
+  const tg = researchRow('To go');
+  if (tg) {
+    const t = tg.text, list = [];
+    if (/\bcans?\b/i.test(t)) list.push('cans');
+    if (/\bbottles?\b/i.test(t)) list.push('bottles');
+    if (/\bgrowlers?\b/i.test(t)) list.push('growler');
+    if (/\bcrowlers?\b/i.test(t)) list.push('crowler');
+    if (list.length && !/\b(?:no|nothing)\b[^.]*\bto go\b/i.test(t)) out.suggestToGo = list;
+  }
+  const dogLine = (info.rows || []).filter((r) => r && typeof r.text === 'string' && !mine.has(r.label) && /^(?:dogs|pets|kids & dogs)$/i.test(r.label)).map((r) => r.text).join(' ');
+  if (/\bdogs?\b[^.]*\bpatio\b/i.test(dogLine) && !/\bno dogs\b|\bdogs? (?:are )?not\b/i.test(dogLine)) out.suggestDogNote = OWNER_SETUP_STRINGS.en.quick.dogs[0];
+  // A weekly event only when the line is plainly one kind on named days ("Trivia Tuesdays"); otherwise the line itself is
+  // shown as a hint on the Weekly events screen.
+  const g = (info.rows || []).find((r) => r && /^(?:games|events|weekly events|entertainment)$/i.test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
+  if (g) {
+    const kinds = BREWERY_EVENT_KINDS.filter(([, re]) => re.test(g.text)).map(([k]) => k);
+    const days = Object.keys(BREWERY_EVENT_DAYS).filter((d) => BREWERY_EVENT_DAYS[d].test(g.text));
+    if (kinds.length === 1 && days.length && g.text.split(/[.;]/).filter((x) => x.trim()).length === 1) out.suggestNights = [{ kind: kinds[0], days }];
+    out.researchEvents = String(g.text).slice(0, 140);
+  }
+  return out;
+}
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -52913,6 +52939,9 @@ function breweryCfg(venue, snap, fr) {
     bookingKnown: (!snap.booking_url && info.booking_url) || '',
     // Research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their tiles as suggestions.
     visitTicks: wineryVisitTicks(venue, snap.badges).filter((k) => k !== 'kid_friendly'),
+    // Brewery test 1 (2026-11-12): research's To go, dogs and Games lines, offered the same way (pre-ticked, saved only
+    // with the screen): the to-go chips, "Patio only" for where dogs go, and a weekly event it states plainly.
+    ...breweryResearchSuggestions(researchRow, info, mine),
     // Tiles shown only with their own kitchen (Decided 5).
     kitchenOnly: ['vegan', 'vegetarian', 'takeout'],
   };
