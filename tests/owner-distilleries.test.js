@@ -237,6 +237,15 @@ test('hours: “We don’t have set hours. Visits are by appointment” and walk
   const j = await planV3('A distillery tasting in Kelowna on Tuesday, January 12, 2027');
   const caveats = allStops(j).filter((s) => s.venue.id === d2.id).flatMap((s) => s.caveats || []);
   if (caveats.length) assert.ok(caveats.some((c) => /distillery’s own answer/.test(c)), JSON.stringify(caveats));
+  // Her answer wins over a researched "Closed for the season" (kept, marked superseded; Undo brings it back).
+  const ce = mk('distillery', { name: 'Seasonal Entropy Distilling', slug: 'seasonal-entropy-distilling' });
+  assert.equal(app.guardedSeasonUpdate(ce.id, { status: 'closed', reopens_date: null, source_url: 'https://example.com/season', checked_at: today }, { reason: 'test research', batch_id: 'test' }).ok, true);
+  assert.equal(app.getSeasonStates().get(ce.id).kind, 'closed');
+  assert.equal((await change(tokenFor(ce.id), { brewery_info: { year: 'appointment', season: { from: '05-01', to: '09-30' } } })).status, 200);
+  assert.ok(db.prepare('SELECT superseded_at FROM venue_seasons WHERE venue_id = ?').get(ce.id).superseded_at, 'research kept, superseded');
+  assert.ok(!app.getSeasonStates().get(ce.id) || app.getSeasonStates().get(ce.id).kind !== 'closed');
+  assert.equal(app.undoOwnerInstantChange(lastReq(ce.id, 'appointment'), 'test').ok, true);
+  assert.equal(db.prepare('SELECT superseded_at FROM venue_seasons WHERE venue_id = ?').get(ce.id).superseded_at, null, 'Undo brings it back');
   // A brewery can't send these.
   const b = mk('brewery');
   assert.equal((await change(tokenFor(b.id), { brewery_info: { visit: 'appointment' } })).status, 400);

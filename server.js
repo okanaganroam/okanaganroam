@@ -56787,6 +56787,13 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
           writeVenueBreweryInfo(venue.id, { ...breweryInfoAnswers(venue.id), ...(fee != null ? { fee } : {}) });
         }
         breweryCardPrice(venue.id);
+        // Distilleries (Decided 5, with brewery test 3's rule): her "by appointment" answer is her season, so it wins over a
+        // researched "Closed for the season" (kept, marked superseded; an Undo brings it back).
+        if (field === 'brewery_info' && venue.type === 'distillery') {
+          const nb = venueBreweryInfo(venue.id);
+          if (nb.visit === 'appointment' || nb.year === 'appointment') ownerSeasonSupersedes(venue.id, 'appointment', false);
+          else if (opts.undo && !venueLinks(venue.id).open_months) ownerSeasonSupersedes(venue.id, '', true);
+        }
         const after = field === 'brewery_info' ? breweryInfoAnswers(venue.id) : breweryFlightFee(venue.id);
         if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, field, before == null ? null : JSON.stringify(before), after == null ? null : JSON.stringify(after), meta.reason, meta.batch_id, reviewer);
         const w = writeBreweryVisitRows(venue.id, now);
