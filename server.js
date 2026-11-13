@@ -10074,7 +10074,7 @@ function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
   // under "More" at the end, never lost.
-  const parkedOwn = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned && r.label && typeof r.text === 'string' && !info.rows.some((x) => x.label === r.label));
+  const parkedOwn = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && (r.owned || r.kept) && r.label && typeof r.text === 'string' && !info.rows.some((x) => x.label === r.label));
   const parkedSet = new Set(parkedOwn.map((r) => r.label));
   if (parkedOwn.length) info = { ...info, rows: info.rows.concat(parkedOwn.map((r) => ({ label: r.label, text: r.text, ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) }))) };
   // An owner's tap-to-answer lines in the page's language (café test 6): "Patio only" on English pages, never "Terrasse seulement".
@@ -10111,7 +10111,8 @@ function visitInfoHtml(info, fr = false) {
   if (!shown.length && folded.length) shown.push(folded.shift());
   // A single folded row shows open too (2026-10-31): a "More" that hides one line only costs a tap (Geo Cider's
   // "Cans to go" was the one thing a visitor needed).
-  if (folded.length === 1) shown.push(folded.shift());
+  // Winery test 5 (2026-11-12): not a line set aside by a full box (owner_dropped): it stays under "More", after her lines.
+  if (folded.length === 1 && !parkedSet.has(enLabel(folded[0]))) shown.push(folded.shift());
   const rows = shown.map(rowHtml).join('');
   const more = folded.length
     ? `<details class="visit-more"><summary>${fr ? 'Plus\u00a0: ' : 'More: '}${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
@@ -20501,8 +20502,8 @@ const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Wint
 // `owned: true`, kept, and shown folded under "More" on the page (visitInfoHtml), never lost.
 // -> the rows set aside (store them as owner_dropped).
 // Winery test 5 (2026-11-12): research's practical lines backed by a "What you offer" tile the owner herself saved on (Kids
-// welcome, Free parking, step-free access): she confirmed them, so a full box parks them as hers (folded on the page,
-// never silently gone) instead of dropping them as research's. -> Set of row labels.
+// welcome, Free parking, step-free access). A full box keeps them folded under "More" on the page (kept), never silently
+// gone; her own lines still come first and stay open (#847). -> Set of row labels.
 const VISIT_BADGE_LABELS = { kid_friendly: /^(?:kids|children|families|ages)$/i, free_parking: /^parking$/i, wheelchair_accessible: /^(?:accessibility|wheelchair access)$/i };
 function visitBadgeConfirmedLabels(venueId, rows) {
   const out = new Set();
@@ -20519,16 +20520,19 @@ function visitBadgeConfirmedLabels(venueId, rows) {
   }
   return out;
 }
-function visitCapRows(rows, isOwn, owned, managed, stash) {
+// isKept (winery test 5): research's lines backed by a tile she saved on. When the box is full they are set aside after
+// research's other lines and before any of hers, recorded with kept: true, and shown folded under "More" (never lost).
+function visitCapRows(rows, isOwn, owned, managed, stash, isKept = () => false) {
   for (const r of Array.isArray(stash) ? stash : []) {
     if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) });
   }
   const dropped = [];
-  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : {}) }); rows.splice(j, 1); };
+  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : isKept(r) ? { kept: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
   while (rows.length > VISIT_ROWS_MAX) {
     let j = -1;
     for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k]) && !isKept(rows[k])) { j = k; break; }
     if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
     setAside(j >= 0 ? j : rows.length - 1);
   }
@@ -20609,7 +20613,7 @@ function writeWineryVisitRows(venueId, now = new Date()) {
   // and, while the owner manages Experiences, any extra row (hers are above).
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(Array.isArray(info.experiences) && !WINERY_CORE_LABELS.has(r.label)));
   const confirmed = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label) || confirmed.has(r.label), owned, managed, stash);
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash, (r) => confirmed.has(r.label));
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45945,7 +45949,7 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // Her parked lines are back in `rows` above (or cleared on purpose): only the other rows set aside come back here.
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
   const badgeOk = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label) || badgeOk.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label));
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;

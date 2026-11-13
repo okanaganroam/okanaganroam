@@ -1302,17 +1302,26 @@ test('winery test 5: small wording (closed once, hours recap, research price and
   assert.equal(app.wineryTastingFee(w.id), null, 'not saved until the screen is');
   assert.ok(cfg.visitTicks.includes('kid_friendly') && cfg.visitTicks.includes('free_parking') && cfg.visitTicks.includes('dog_friendly'), JSON.stringify(cfg.visitTicks));
   // Donna's answers: Tastings, Food, Groups, What you offer (Kids welcome, Free parking kept on), then Dogs, Known for and an
-  // experience. The box is full: research's Kids line, confirmed by her tile, is parked as hers and shows on the page.
+  // experience. The box is full: her own lines (Wine & cheese too) come first and stay open (#847); research's Kids line,
+  // backed by her tile, is kept (recorded, not dropped) and folds under "More".
   assert.equal((await change(t, { tasting_fee: 10, winery_info: { food: 'snacks', groups: 8, buses: 'book' } })).status, 200);
   assert.equal((await change(t, { badges: { kid_friendly: true, free_parking: true, dog_friendly: true } })).status, 200);
   assert.equal((await change(t, { visit_rows: { dogs: 'Patio only', known_for: 'Our Viognier and the patio view' } })).status, 200);
   assert.equal((await change(t, { winery_info: { food: 'snacks', groups: 8, buses: 'book', experiences: [{ label: 'Wine & cheese', text: 'Boards to share on the patio.' }] } })).status, 200);
   const box = app.venueVisitInfo(w.id);
-  const shown = box.rows.map((r) => r.label), parked = (box.owner_dropped || []).filter((r) => r.owned).map((r) => r.label);
-  for (const l of ['Kids', 'Parking']) assert.ok(shown.includes(l) || parked.includes(l), `${l}: ${shown} / ${parked}`);
-  assert.ok(!(box.owner_dropped || []).some((r) => !r.owned && ['Kids', 'Parking'].includes(r.label)), 'never dropped as research’s');
-  assert.ok(box.rows.length <= 7);
-  assert.ok(vpage(w, 'en').includes('Kids welcome with an adult.'), 'on the page');
+  const shown = box.rows.map((r) => r.label), kept = (box.owner_dropped || []).filter((r) => r.kept).map((r) => r.label);
+  assert.equal(box.rows.length, 7);
+  for (const l of ['Tastings', 'Food', 'Groups', 'Dogs', 'Known for', 'Wine & cheese']) assert.ok(shown.includes(l), `${l} hers, in the box: ${shown}`);
+  assert.ok(!(box.owner_dropped || []).some((r) => r.owned), 'none of her lines set aside');
+  assert.ok(kept.includes('Kids'), `Kids kept, folded: ${shown} / ${JSON.stringify(box.owner_dropped)}`);
+  for (const l of ['Kids', 'Parking']) assert.ok(shown.includes(l) || kept.includes(l), `${l} never dropped`);
+  // The page: Wine & cheese open, Kids folded under "More" (still there).
+  const page = vpage(w, 'en');
+  const vbox = page.slice(page.indexOf('id="venueVisit"'), page.indexOf('</section>', page.indexOf('id="venueVisit"')));
+  const [open, more] = vbox.split('visit-more');
+  assert.ok(open.includes('>Wine &amp; cheese<'), 'her experience shown open');
+  assert.ok(more && more.includes('Kids welcome with an adult.'), 'Kids folded under More: ' + vbox.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+  assert.ok(!open.includes('Kids welcome with an adult.'));
   // Without her tile, research's line is still research's (dropped first when the box is full).
   const w2 = mk('winery');
   research(w2.id, [{ label: 'Kids', text: 'Kids welcome.' }]);
