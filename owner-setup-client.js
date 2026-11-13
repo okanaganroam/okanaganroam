@@ -250,6 +250,8 @@
     if ((x = v('suRname')) !== null) S.wine.rname = x.trim(); if ((x = v('suRwhen')) !== null) S.wine.rwhen = x.trim();
     if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; }
     if ((x = v('suKnown')) !== null) S.wine.known = x.trim();
+    // Winery test 2 (2026-11-12): a booking link typed before tapping a group size or bus chip survives the redraw.
+    if ((x = v('suBookUrl')) !== null) S.bookUrl = x;
     [0, 1].forEach(function(i){ if ((x = v('suXl' + i)) !== null) S.wine.exp[i].label = x.trim(); if ((x = v('suXt' + i)) !== null) S.wine.exp[i].text = x.trim(); });
   }
   // "$15" / "15 $" for a fee, "Free" for 0.
