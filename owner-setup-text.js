@@ -1051,7 +1051,7 @@ fr.winery = {
   apptNow: 'Sans réservation du {a} au {b}, sur rendez-vous le reste de l’année ✓',
   storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
   knownQ: 'Votre spécialité?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
-  storyKnownSaved: 'Ce pour quoi vous êtes connus est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   expQ: 'Des expériences à réserver?', expLead: 'Jusqu’à deux, comme vin et fromage ou une visite du vignoble. Elles paraissent dans « Planifiez votre visite ».',
   expN: 'Expérience {n}', expNameLabel: 'Nom', expTextLabel: 'Détails (facultatif)', expQuick: ['Vin et fromage', 'Visite du vignoble', 'Paniers de pique-nique', 'Dégustation privée'],
   expEx1: '45 $ par personne, tous les jours à 13 h. Réservez à l’avance.', expEx2: 'Une promenade dans les vignes avec le vigneron, environ 1 heure.',
