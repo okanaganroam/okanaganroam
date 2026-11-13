@@ -813,4 +813,5 @@ test('test 2 fix 6: Facebook pre-filled from a facebook.com website, one link on
   // Hours buttons (breweries only).
   assert.match(s, /BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00'\]/);
   assert.match(s, /function brewQuick\(d, j, y, last\)\{\n    if \(!C\.brewery\) return '';/);
+  assert.match(s, /su-laterow su-bqrow/); assert.match(app.OWNER_SETUP_CSS || (await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text, /\.su-bqrow \.su-latebtn \{ padding: 0 10px; \}/, 'four times fit one row at 375px');
 });
