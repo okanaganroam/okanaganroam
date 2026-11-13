@@ -48,6 +48,10 @@ const FR_CUISINE = {
 const FR_TEXT = {
   // What's On (2026-10-19): the On now heading outside the daytime (the /map wording).
   'Exhibitions & multi-day events': 'Expositions et événements de plusieurs jours',
+  // Winery test 3 (2026-11-12): the owner's free tasting on French cards, and the line under an experience saved without
+  // details.
+  'Free tasting': 'Dégustation gratuite',
+  'Ask when you visit': 'Renseignez-vous sur place',
   ...FR_CUISINE,
   // ---- Cards, chips and filters ----
   'View details →': 'Voir les détails →',
@@ -1108,6 +1112,8 @@ const FR_PATTERNS = [
   [/^Closed for the season$/, () => 'Ferm\u00e9 pour la saison'],
   [/^(Closed for the season|Temporarily closed) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `${m[1] === 'Temporarily closed' ? 'Ferm\u00e9 temporairement' : 'Ferm\u00e9 pour la saison'} \u00b7 R\u00e9ouverture le ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
   [/^Temporarily closed$/, () => 'Ferm\u00e9 temporairement'],
+  // Winery test 3 (2026-11-12): the photo pill on themed cards, "Closed · reopens April 25" (the month in full).
+  [/^Closed \u00b7 reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (\d{1,2})$/, (m) => `Ferm\u00e9 \u00b7 r\u00e9ouverture le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],

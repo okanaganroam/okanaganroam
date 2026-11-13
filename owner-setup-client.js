@@ -488,6 +488,7 @@
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
     if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
     if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
+    if (d === 'day' && step === 'photos' && T.stDayPlural) return T.stDayPlural;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
@@ -748,6 +749,9 @@
   function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
     var sc = S.score || { pct: 0, soon: 0, badge: 'none' };
+    // Winery test 3 (2026-11-12): what was sent can lower the score (a short story replacing a long description): the
+    // lower number is the one shown.
+    if (sc.soon < sc.pct) sc = { pct: sc.soon, soon: sc.soon, badge: sc.badge };
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
     // One number only (two read as a grade): where the page will be once we add what was sent.
     if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + pct(sc.soon) + '</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
@@ -1489,7 +1493,7 @@
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
         // Greyed until it's earned, with "Reach 100% to earn it" beside it (pub fresh-eyes 2: it looked already won).
-        + '<p class="su-badge-line"><span class="su-badge-pill' + (sc.badge === 'earned' ? '' : ' su-badge-off') + '"' + (sc.badge === 'earned' ? '' : ' aria-disabled="true"') + '>' + C.badgeChip + '</span>' + (sc.badge === 'earned' ? '' : ' <span class="su-badge-reach">' + h(T.badgeReach) + '</span>') + '</p>'
+        + '<p class="su-badge-line"><span class="su-badge-pill' + (sc.badge === 'earned' ? '' : ' su-badge-off') + '"' + (sc.badge === 'earned' ? '' : ' aria-disabled="true"') + '>' + C.badgeChip + '</span>' + (sc.badge === 'earned' ? '' : ' <span class="su-badge-reach">' + h(Math.max(sc.pct, sc.soon || 0) < 100 || sc.soon < sc.pct ? T.badgeReach : T.badgeSoon) + '</span>') + '</p>'
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
         + (left.length ? '<h2 class="su-h2">' + h(T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
         + preview()
@@ -2507,7 +2511,13 @@
       if (fv === 'other') { S.wine.feeOther = true; if (S.wine.fee != null && QUICK_FEES.indexOf(S.wine.fee) >= 0) S.wine.fee = null; redraw(); var fi = el('suFee'); if (fi) try { fi.focus({ preventScroll: true }); } catch (e) {} return; }
       S.wine.feeOther = false; S.wine.fee = +fv; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wnobook]'), function(b){ b.onclick = function(){ readWine(); var bu0 = el('suBookUrl'); if (bu0) S.bookUrl = bu0.value; S.wine.noBook = !S.wine.noBook; redraw(); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-xq]'), function(b){ b.onclick = function(){ readWine(); var q9 = b.getAttribute('data-xq'), i9 = +q9.split(':')[0], l9 = q9.slice(q9.indexOf(':') + 1); S.wine.exp[i9].label = S.wine.exp[i9].label === l9 ? '' : l9; redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-xq]'), function(b){ b.onclick = function(){ readWine(); var q9 = b.getAttribute('data-xq'), i9 = +q9.split(':')[0], l9 = q9.slice(q9.indexOf(':') + 1), e9 = S.wine.exp[i9], pre9 = Array.isArray(WI.experiences) ? null : (C.extras || [])[i9];
+      // Winery test 3 (2026-11-12): a quick name that replaces a pre-filled one takes its details away too ("Picnic tables…"
+      // stayed under "Vineyard tour"), and the tap is kept as a draft like typed text.
+      if (e9.label !== l9 && pre9 && e9.label === (pre9.label || '') && e9.text === (pre9.text || '')) e9.text = '';
+      e9.label = e9.label === l9 ? '' : l9;
+      // The boxes first (the draft reads them), then the draft, then the screen.
+      var xl9 = el('suXl' + i9), xt9 = el('suXt' + i9); if (xl9) xl9.value = e9.label; if (xt9) xt9.value = e9.text; mark(); drSave(); redraw(); }; });
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){

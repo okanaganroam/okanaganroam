@@ -184,7 +184,7 @@ test('badges summary names the ticked badges (every type), and the phone time in
   assert.match(one, /<span class="op-fold-hint">1 ticked: Patio[^<]*<\/span>/);
   assert.ok(!one.includes('ticked, like dog friendly or patio'));
   const fr = await get(`/fr/owner/${tokenFor(cafe.id)}`);
-  assert.match(fr, /3 cochés : [^<]+ et plus</);
+  assert.match(fr, /3 cochés\u00a0: [^<]+ et plus</);
   assert.match(html, /\.op-times input \{ min-width: 0; flex: 1 1 96px; padding: 6px 4px 6px 8px; \}/);
   assert.match(html, /\.op-times input::-webkit-calendar-picker-indicator \{ margin: 0; padding: 0; width: 14px; \}/);
 });

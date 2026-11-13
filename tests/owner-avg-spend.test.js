@@ -73,7 +73,7 @@ test('edit page: the box shows for a restaurant (with our estimate) and a pub, i
   const fr = await get(`/fr/owner/${tokenFor(rest.id)}`);
   assert.match(fr, /Dépense moyenne par personne/);
   assert.match(fr, /un plat principal et une boisson sans alcool/);
-  assert.match(fr, /Notre estimation selon votre menu : 25 \$/);
+  assert.match(fr, /Notre estimation selon votre menu\u00a0: 25 \$/);
   assert.match(fr, /id="opAvgConfirm"[^>]*>C’est exact</);
   const pub = mk('pub');
   const pubHtml = await get(`/owner/${tokenFor(pub.id)}`);

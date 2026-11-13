@@ -80,7 +80,7 @@ const en = {
   fbQ: 'Are you on Facebook?', fbLead: 'Paste the link to your Facebook page.', fbLabel: 'Facebook page', fbNo: 'We’re not on Facebook', saveBtn: 'Save', needValue: 'Please type it in, or tap “{no}”.',
   doorQ: 'Help people find your front door', doorLead: 'Visitors using our Roam Now map walk right to your door. It takes one photo, taken outside your place.',
   doorHere: 'Are you at your restaurant right now?', imHere: 'Yes, I’m here', notNow: 'Not right now', notNowSub: 'We’ll remind you next time',
-  doorPhotoQ: 'Take a photo of your front door', doorPhotoLead: 'Stand on the sidewalk so the door and your sign are in the picture. Your phone will ask to share your location, so visitors get directions to this spot.',
+  doorPhotoQ: 'Take a photo of your front door', doorPhotoLead: 'Stand on the sidewalk so the door and your sign are in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
   takeAgain: 'Take it again', checkPin: 'Next: check the pin', pinQ: 'Is the pin on your door?', pinLead: 'If not, drag it to your door.', finding: 'Finding your location…', noGps: 'We couldn’t get your location. Drag the pin to your door.',
   doorRights: 'I took this photo or have permission to share it, and Okanagan Roam may show it to help visitors find this business.', doorRightsNeed: 'Please tick the box first.', doorSend: 'Yes, send it', needPin: 'Please wait for the map, or drag the pin to your door.',
   finishQ: 'You’re all set!', pctNow: 'Your page is {n}% complete', pctSoon: 'About {n}% once we add what you sent, usually within a day.', pctDone: 'Everything is done. Thank you!', niceWork: 'Nice work.',
@@ -225,7 +225,7 @@ Object.assign(fr, {
   emailLead: 'Envoyez une photo ou un fichier de votre menu. Indiquez « {name} » dans l’objet.', upSub: 'Un fichier ou une photo de votre téléphone', sheetLead: 'Un fichier, une photo d’affiche, de chevalet ou de tableau, tout fonctionne. Nous le retranscrirons pour vous.',
   dogLead: 'Une courte ligne, c’est parfait.',
   whatsOnEx: 'Pintes à 6 $ et entrées à moitié prix', specialEx: 'Mardi tacos, 3 tacos', priceEx: '12 $', eventEx: 'Soirée quiz, gratuit', eventTime: 'À quelle heure ça commence? (facultatif)',
-  storyCount: 'Un peu plus, ce serait parfait (120 lettres pour la note complète).', storyGood: 'Belle longueur ✓',
+  storyCount: 'Un peu plus, ce serait parfait (120 caractères pour une page complète).', storyGood: 'Belle longueur ✓',
   bookQ: 'Peut-on réserver une table?', bookYes: 'Oui', bookNo: 'Non, sans réservation', bookNoLink: 'En fait, nous ne prenons pas de réservations', takeoutNoLink: 'En fait, nous ne faisons pas de commandes à emporter', groupsNoLink: 'En fait, nous ne pouvons pas accueillir de grands groupes',
   groupsQ: 'Pouvez-vous accueillir des groupes de 10 personnes ou plus?',
   igLead: 'Écrivez votre nom Instagram, comme @votrerestaurant.', fbQ: 'Comment s’appelle votre page Facebook?', fbLead: 'Écrivez le nom de votre page. Si vous avez son lien, vous pouvez le coller.', fbLabel: 'Nom ou lien de la page Facebook',
@@ -379,7 +379,7 @@ Object.assign(en, {
   reviewLeadKeep: 'Tap ✕ to remove one. Your main photo stays the same unless you pick a new one.',
   curMain: 'Your main photo now', keepMain: 'Keep my current main photo',
   everyDay: 'Every day', monFri: 'Mon–Fri',
-  badgeReach: 'Reach 100% to earn it',
+  badgeReach: 'Reach 100% to earn it', badgeSoon: 'Yours once we’ve checked what you sent',
   spendGuess: 'We guessed ${n} from what we found online.',
   sentMeans: 'Sent means we check it first, usually within a day.',
 });
@@ -390,7 +390,7 @@ Object.assign(fr, {
   reviewLeadKeep: 'Touchez ✕ pour en retirer une. Votre photo principale reste la même, sauf si vous en choisissez une nouvelle.',
   curMain: 'Votre photo principale actuelle', keepMain: 'Garder ma photo principale actuelle',
   everyDay: 'Tous les jours', monFri: 'Lun–ven',
-  badgeReach: 'Atteignez 100 % pour l’obtenir',
+  badgeReach: 'Atteignez 100 % pour l’obtenir', badgeSoon: 'À vous dès que nous aurons vérifié ce que vous avez envoyé',
   spendGuess: 'Nous avons estimé {n} $ d’après ce que nous avons trouvé en ligne.',
   sentMeans: 'Envoyé veut dire que nous vérifions d’abord, habituellement en moins d’un jour.',
 });
@@ -470,7 +470,7 @@ Object.assign(fr, {
 
 // Fifth first-time pub test (2026-11-10; drafts/fresh-eyes-pub5-2026-11-10/REPORT.md). Shared with restaurants.
 Object.assign(en.holidays, { victoria: 'Victoria Day', canada: 'Canada Day', bcDay: 'BC Day', labour: 'Labour Day', truth: 'Truth and Reconciliation Day', thanks: 'Thanksgiving', remembrance: 'Remembrance Day' });
-Object.assign(fr.holidays, { victoria: 'Fête de la Reine', canada: 'Fête du Canada', bcDay: 'Jour de la Colombie-Britannique', labour: 'Fête du Travail', truth: 'Journée de la vérité et de la réconciliation', thanks: 'Action de grâce', remembrance: 'Jour du Souvenir' });
+Object.assign(fr.holidays, { victoria: 'Fête de Victoria', canada: 'Fête du Canada', bcDay: 'Jour de la Colombie-Britannique', labour: 'Fête du Travail', truth: 'Journée de la vérité et de la réconciliation', thanks: 'Action de grâce', remembrance: 'Jour du Souvenir' });
 Object.assign(en, {
   // Hours: copying never reopens a closed day.
   copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.',
@@ -741,6 +741,8 @@ Object.assign(fr, {
   closeYearly: 'Chaque année', closeYearlySub: 'Si coché, nous indiquons aussi les mêmes dates l’an prochain, comme pour les jours fériés.', closeEnds: 'Fermé du {a} au {b}', addedYearly: '{x} (cette année et l’an prochain)',
 });
 fr.st = Object.assign({}, fr.st, { day: 'nous l’ajouterons d’ici un jour' });
+// Winery test 3 (2026-11-12): « Photos · nous les ajouterons d’ici un jour » (plural).
+en.stDayPlural = 'we’ll add them within a day'; fr.stDayPlural = 'nous les ajouterons d’ici un jour';
 fr.spendLeadOff = fr.spendLead;
 Object.assign(en.cafe, {
   // Café test 3 (2026-11-11): the step is named for what it asks ("Price of one drink"), and no "for one person" beside it.
@@ -778,7 +780,7 @@ Object.assign(en, {
 });
 Object.assign(fr, {
   allYearClosed: 'Nous fermons une partie de l’année', allYearClosedSub: 'Par exemple ouvert du printemps à l’automne. Vous choisissez les dates.',
-  openQ: 'Quand êtes-vous ouvert chaque année?', openLead: 'En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture.',
+  openQ: 'Quand êtes-vous ouverts chaque année?', openLead: 'En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture.',
   openFrom: 'Ouvert à partir du', openTo: 'Ouvert jusqu’au (votre dernier jour)', repeatsYearly: 'Ces dates reviennent chaque année. Pas besoin de choisir l’année.',
   openSame: 'Enregistrer : mêmes heures toute la saison', openSameSub: 'Les heures que vous venez d’indiquer', openSummer: 'Enregistrer et ajouter des heures d’été différentes', openSummerSub: 'Comme des heures plus longues en juillet et août',
   openSaveOnly: 'Enregistrer ces dates', openMonthsLink: 'Fermé des mois entiers? Touchez plutôt les mois',
@@ -1004,8 +1006,14 @@ en.winery = {
   // Your tasting room door
   doorQ: 'Help people find your tasting room', doorLead: 'On a big estate the map pin can land in the vines. One photo, taken at the tasting room door, walks visitors right to it.',
   mapFailQ: 'Send your tasting room door photo',
-  doorPhotoQ: 'Take a photo of your tasting room door', doorPhotoLead: 'Stand outside so the door and your sign are in the picture. Your phone will ask to share your location, so visitors get directions to this spot.',
+  doorPhotoQ: 'Take a photo of your tasting room door', doorPhotoLead: 'Stand outside so the door and your sign are in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
   igLead: 'Type your Instagram name, like @yourwinery.',
+  // Winery test 3 (2026-11-12): the upload, photo and Facebook screens of "Tasting menu or wine list" say wine list too.
+  menuSent: '✓ Your wine list is sent.', upQ: 'Upload your wine list', upQSome: 'Your wine list', upLead: 'Pick the file your wine list is in. A file or photos both work.',
+  upPick: 'Choose my wine list file', sendMenu: 'Send my wine list', camLead: 'Hold your device over the wine list so the whole page fits.', page: 'Wine list page {n}',
+  menuSocialQ: 'Where is your wine list?', menuSocialLead: 'Paste the link to your Facebook or Instagram page or post with the wine list. Or type the page name and we’ll find it.',
+  menuSocialNote: 'Our wine list is on our Facebook or Instagram page: “{name}”. Please find it and add it as our menu link.',
+  savedMenuSocialName: 'We’ll find your wine list on that page and add it within a day.', igFromMenu: 'From your wine list answer: {x}. Tap Save if it’s right.',
 };
 fr.winery = {
   hiLead: 'Préparons la page de votre vignoble, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
@@ -1013,9 +1021,9 @@ fr.winery = {
   labels: { hours: 'Heures et jours fériés', winery: 'Votre vignoble', tastings: 'Dégustations', visit: 'Réservations et groupes', photos: 'Photos', offer: 'Ce que vous offrez',
     story: 'Votre histoire et ce pour quoi vous êtes connus', experiences: 'Expériences', menu: 'Menu de dégustation ou carte des vins', social: 'Instagram et Facebook', door: 'La porte de votre salle de dégustation' },
   noLabels: { experiences: 'pas d’extras', social: 'pas sur Instagram ni Facebook' },
-  stStoryKnown: 'ce pour quoi vous êtes connus sur votre page, histoire d’ici un jour', stVisitLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
+  stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stVisitLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
   picnicFromFood: 'Aire de pique-nique est cochée d’après votre réponse « Nourriture sur place ». Touchez-la si c’est faux.',
-  photosLead: 'Votre salle de dégustation, votre vue, les vignes. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
+  photosLead: 'Votre salle de dégustation, votre vue, vos vignes ou vos vergers. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
   wkindQ: 'Quel genre de vignoble est-ce?', wkindLead: 'Choisissez celui que les visiteurs utiliseraient pour vous décrire.', wkindNeed: 'Touchez le genre de vignoble qui convient le mieux.',
   wkindSubs: { 'Estate winery': 'Votre propre vignoble et votre salle de dégustation', 'Boutique winery': 'Une petite équipe, souvent la famille', 'Tasting room in town': 'Une salle de dégustation loin des vignes',
     'Fruit or honey wines': 'Comme des vins de fruits, de l’hydromel ou du vin de miel', 'Winery and cidery': 'Vin et cidre faits sur place' },
@@ -1042,8 +1050,8 @@ fr.winery = {
   apptFrom: 'Sans réservation à partir du', apptTo: 'Sans réservation jusqu’au', apptSave: 'Enregistrer mes heures', apptNeed: 'Choisissez le premier et le dernier jour des dégustations sans réservation.',
   apptNow: 'Sans réservation du {a} au {b}, sur rendez-vous le reste de l’année ✓',
   storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
-  knownQ: 'Pour quoi vos vins sont-ils connus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
-  storyKnownSaved: 'Ce pour quoi vous êtes connus est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  knownQ: 'Votre spécialité?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
+  storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   expQ: 'Des expériences à réserver?', expLead: 'Jusqu’à deux, comme vin et fromage ou une visite du vignoble. Elles paraissent dans « Planifiez votre visite ».',
   expN: 'Expérience {n}', expNameLabel: 'Nom', expTextLabel: 'Détails (facultatif)', expQuick: ['Vin et fromage', 'Visite du vignoble', 'Paniers de pique-nique', 'Dégustation privée'],
   expEx1: '45 $ par personne, tous les jours à 13 h. Réservez à l’avance.', expEx2: 'Une promenade dans les vignes avec le vigneron, environ 1 heure.',
@@ -1058,10 +1066,15 @@ fr.winery = {
   socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
   socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
-  doorQ: 'Aidez les gens à trouver votre salle de dégustation', doorLead: 'Sur un grand domaine, l’épingle peut tomber dans les vignes. Une photo, prise à la porte de la salle de dégustation, y mène les visiteurs directement.',
+  doorQ: 'Aidez les gens à trouver votre salle de dégustation', doorLead: 'Sur un grand domaine, l’épingle peut tomber dans vos vignes ou vos vergers. Une photo, prise à la porte de la salle de dégustation, y mène les visiteurs directement.',
   mapFailQ: 'Envoyez la photo de la porte de votre salle de dégustation',
-  doorPhotoQ: 'Prenez une photo de la porte de votre salle de dégustation', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre téléphone vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
+  doorPhotoQ: 'Prenez une photo de la porte de votre salle de dégustation', doorPhotoLead: 'Placez-vous dehors pour que la porte et votre enseigne soient dans la photo. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
   igLead: 'Écrivez votre nom Instagram, comme @votrevignoble.',
+  menuSent: '✓ Votre carte des vins est envoyée.', upQ: 'Téléversez votre carte des vins', upQSome: 'Votre carte des vins', upLead: 'Choisissez le fichier de votre carte des vins. Un fichier ou des photos, les deux fonctionnent.',
+  upPick: 'Choisir le fichier de ma carte des vins', sendMenu: 'Envoyer ma carte des vins', camLead: 'Tenez votre appareil au-dessus de la carte des vins pour que toute la page soit visible.', page: 'Page {n} de la carte des vins',
+  menuSocialQ: 'Où est votre carte des vins?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec la carte des vins. Ou tapez le nom de la page et nous la trouverons.',
+  menuSocialNote: 'Notre carte des vins est sur notre page Facebook ou Instagram : « {name} ». Merci de la trouver et de l’ajouter comme lien de notre menu.',
+  savedMenuSocialName: 'Nous trouverons votre carte des vins sur cette page et l’ajouterons d’ici un jour.', igFromMenu: 'D’après votre réponse sur la carte des vins : {x}. Touchez Enregistrer si c’est bien ça.',
 };
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow

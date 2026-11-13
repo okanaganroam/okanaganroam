@@ -22316,7 +22316,8 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
     assert.match(signedIn[id].a, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
     assert.doesNotMatch(signedIn[id].a, /edit link we emailed you/, id);
     assert.match(signedIn[id].aFr, /href="\/fr\/owner\/account">Mes fiches<\/a> → <strong>Modifier la fiche<\/strong>/, id);
-    if (id !== 'access') assert.match(link[id].a, /the private link we emailed you/, id);
+    // Winery test 3 (2026-11-12): on her edit link already, never "the link we emailed you".
+    if (id !== 'access') { assert.match(link[id].a, /On your edit page/, id); assert.doesNotMatch(link[id].a, /emailed/, id); }
   }
   // People with access (PR #358): remove people added after you; anyone added before you goes to Dayton.
   for (const t of [signedIn.access, link.access, out.access, signedIn.staff]) {
@@ -25747,7 +25748,8 @@ test('Search gaps: a /search card for a place closed for the season shows the se
     const list = cardOf(await (await fetch(`${base}/kelowna/wineries`)).text());
     for (const [where, card] of [['/search', search], ['/kelowna/wineries', list]]) {
       assert.ok(card, `${where}: the card is there`);
-      assert.match(card, /season-tag season-tag-closed/, `${where}: the season tag`);
+      // Winery test 3 (2026-11-12): the status line says it, so the closed-season pill on the photo no longer repeats it.
+      assert.doesNotMatch(card, /season-tag season-tag-closed/, `${where}: said once, by the status line`);
       assert.doesNotMatch(card, /fd-open-status" data-fd-open="(?:open|closed)"/, `${where}: no live "Closed · Opens" line`);
       assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season/, `${where}: the card says closed for the season`);
     }
@@ -26570,7 +26572,7 @@ test('Pending link changes (2026-10-18): creating a login or adding the listing 
   await post(`/owner/${tokenW}/changes`, { changes: { phone: '250-555-0175' }, contact_email: 'sam@pendingcarry.example', started_at: Date.now() - 10000 });
   const frPage = await get(`/fr/owner/account/venue/${w.id}`, made.cookie);
   assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(w.id).phone, '250-555-0173', 'opening a listing never publishes');
-  assert.match(frPage, /Touchez <strong>Enregistrer les modifications<\/strong> pour mettre en ligne maintenant : téléphone\./);
+  assert.match(frPage, /Touchez <strong>Enregistrer les modifications<\/strong> pour mettre en ligne maintenant\u00a0: téléphone\./);
   assert.doesNotMatch(frPage, /Tout ce que vous envoyez maintenant s’y ajoute/);
   const frSigned = await get(`/fr/owner/account/venue/${v.id}`, made.cookie);
   assert.match(frSigned, /Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour/);
@@ -26621,7 +26623,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     // French: the button, the confirm text and the emailed link are French.
     const fr = await (await s.get(`/fr/owner/account/venue/${v.id}`, owner.cookie)).text();
     assert.match(fr, /id="opResetLink">Réinitialiser le lien de modification<\/button>/);
-    assert.match(fr, /"resetConfirm":"Réinitialiser le lien de modification privé de cette fiche\?/);
+    assert.match(fr, /"resetConfirm":"Réinitialiser le lien de modification privé de cette fiche\u202f\?/);
     assert.match(fr, /"nLogins":"\{n\} comptes peuvent modifier cette fiche"/);
     mail.length = 0;
     const rf = await s.post(`/fr/owner/account/venue/${v.id}/reset-link`, {}, owner.cookie);
@@ -26906,19 +26908,19 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   assert.match(edit, /id="opSubmit"[^>]*>Enregistrer les modifications</);
   assert.match(edit, /<span class="lyv-section-label">Heures d’ouverture/);
   assert.match(edit, /<span class="op-status op-status-wait op-wait-chip">En attente de vérification<\/span>/, 'the waiting chip on the website field');
-  assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche : Site web/i);
+  assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche[ \u00a0]: Site web/i);
   assert.match(edit, /Envoyé le \d{1,2} [a-zéû]+\.?</, 'French short dates ("18 oct.")');
   assert.match(edit, /Personnes ayant accès[\s\S]*Ajouté le \d{1,2} [a-zéû]+\.?/);
   assert.match(edit, /\$\$ &mdash; 15 à 30 \$ par personne/);
-  assert.match(edit, /Copier le lundi sur :/);
+  assert.match(edit, /Copier le lundi sur\u00a0:/);
   assert.match(edit, /<option value="11" selected>novembre<\/option>/, 'French month names');
-  assert.match(edit, /"liveNow":"En ligne maintenant : \{fields\}\. Votre page l’affiche tout de suite\. "/);
-  assert.match(edit, /"review":"Nous vérifierons ceci d’ici un jour : \{fields\}\. "/);
+  assert.match(edit, /"liveNow":"En ligne maintenant[ \u00a0]: \{fields\}\. Votre page l’affiche tout de suite\. "/);
+  assert.match(edit, /"review":"Nous vérifierons ceci d’ici un jour[ \u00a0]: \{fields\}\. "/);
   assert.match(edit, /href="\/fr\/owner\/account\/venue\/\d+\/menu" id="opMenuCard"/);
   assert.match(edit, /<footer class="op-footer"><a href="\/fr\/privacy">Confidentialité<\/a>/);
   assert.doesNotMatch(edit, /href="\/owner\/(account|login|forgot)[^"]*"(?! hreflang)/, 'portal links stay French (the EN switch aside)');
   const account = await (await get(pages.account, cookie)).text();
-  assert.match(account, /En attente de vérification : 1 mise à jour, 1 événement/);
+  assert.match(account, /En attente de vérification[ \u00a0]: 1 mise à jour, 1 événement/);
   assert.match(account, /href="\/fr\/owner\/account\/venue\/\d+">Modifier la fiche/);
   const link = await (await get(pages.link)).text();
   assert.match(link, /<strong>Créer un compte<\/strong> \(30 secondes\)/);
@@ -31645,7 +31647,7 @@ test('Round 9 help bot: a week\'s closure in French, uploading a menu, privacy, 
   const privacy = cfg.topics.find((t) => t.id === 'privacy');
   assert.match(privacy.a, /href="\/privacy"/);
   assert.match(privacy.aFr, /href="\/fr\/privacy"/);
-  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics?');
+  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics\u202f?');
 });
 
 test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no space before a question mark', () => r9Fixtures({

@@ -699,7 +699,7 @@ test('winery test 2: Tastings never says walk-ins in appointment season; story t
   assert.match(js, /var STORY_OK = 120;/);
   assert.equal(pc.ITEMS.find((i) => i.key === 'description').en, 'A description (120+ characters)');
   assert.equal(text.en.storyCount, 'A bit more would be great (120 letters for full marks).');
-  assert.match(text.fr.storyCount, /120 lettres pour la note complète/);
+  assert.match(text.fr.storyCount, /120 caractères pour une page complète/);
   // Below 100% with nothing left to answer: the missing items are named, with a way to fix them; the last screen has the
   // "Change an answer" link too.
   assert.match(js, /function gapList\(\)/);
@@ -745,4 +745,191 @@ test('winery test 2: What you offer pre-ticks tiles research supports (free park
   assert.match(js, /C\.visitTicks/);
   // Restaurants get none.
   assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).visitTicks, undefined);
+});
+
+// ---------- Winery test 3 (Sylvie, iPad, French; drafts/fresh-eyes-winery3-2026-11-12/REPORT.md) ----------
+const ohbOf = (html) => JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+
+test('winery test 3: Experiences never pre-fills or removes practical research lines; what “none” removes comes back on Undo', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  research(w.id, [{ label: 'Tastings', text: 'Free tastings.' }, { label: 'Picnics', text: 'Picnic tables on the lawn by the orchard.' }, { label: 'Dogs', text: 'Leashed dogs welcome outside.' }, { label: 'Vineyard tour', text: 'Tours at 2 PM.' }]);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.extras.map((e) => e.label), ['Vineyard tour'], 'Picnics and Dogs are not experiences');
+  for (const l of ['Picnics', 'Picnic', 'Picnic area', 'Food', 'Dogs', 'Parking']) assert.ok(!cfgOf((await get(`/owner/${t}/setup`)).text).extras.some((e) => e.label === l), l);
+  // "We don't offer extras": research's practical lines stay; its tour is set aside and kept for an Undo.
+  assert.equal((await change(t, { winery_info: { experiences: [] } })).status, 200);
+  assert.deepEqual(visitRows(w.id).map((r) => r.label), ['Tastings', 'Picnics', 'Dogs']);
+  assert.equal(row(w.id, 'Picnics').text, 'Picnic tables on the lawn by the orchard.');
+  assert.deepEqual((app.venueVisitInfo(w.id).owner_was_extra || []).map((r) => r.label), ['Vineyard tour']);
+  const req = db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND changes LIKE '%experiences%' ORDER BY id DESC").get(w.id).id;
+  assert.equal(app.undoOwnerInstantChange(req, 'test').ok, true);
+  assert.deepEqual(visitRows(w.id).map((r) => r.label).sort(), ['Dogs', 'Picnics', 'Tastings', 'Vineyard tour']);
+  assert.equal(row(w.id, 'Vineyard tour').text, 'Tours at 2 PM.');
+  // The quick chip clears a pre-fill's details and is kept as a draft.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /e9\.label === \(pre9\.label \|\| ''\) && e9\.text === \(pre9\.text \|\| ''\)\) e9\.text = '';/);
+  assert.match(js, /if \(xl9\) xl9\.value = e9\.label; if \(xt9\) xt9\.value = e9\.text; mark\(\); drSave\(\); redraw\(\);/);
+});
+
+test('winery test 3: an experience saved without details shows its name once (“Ask when you visit”, French too)', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  assert.equal((await change(t, { winery_info: { experiences: [{ label: 'Vineyard tour' }] } })).status, 200);
+  assert.equal(row(w.id, 'Vineyard tour').text, 'Ask when you visit');
+  const info = app.venueVisitInfo(w.id);
+  assert.ok(!/Vineyard tour<\/span><span>Vineyard tour/.test(app.visitInfoHtml(info, false)));
+  assert.match(app.visitInfoHtml(info, true), /Renseignez-vous sur place/);
+});
+
+test('winery test 3: the finish score projects her pending story and the photos there will be; below 100% names what is missing', async () => {
+  const w = mk('winery', { description: 'Small family fruit winery near Oliver making apple, cherry and apricot wines, with a picnic lawn among the orchard trees.', image_url: '/images/venues/fixture-research.jpg' });
+  const t = tokenFor(w.id);
+  // A story of 66 letters (it replaces the 128-letter research description once checked) and two photos, one as main.
+  const story = 'Un petit verger familial. Nos vins de cerise sont notre fierté!!';
+  const r = await change(t, { description: story });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(app.pendingOwnerChange(w.id), 'the story waits for our check');
+  for (const [i, main] of [[1, 1], [2, 0]]) db.prepare("INSERT INTO owner_photos (venue_id, file, preview_key, credit, rights_confirmed_at, status, main_requested) VALUES (?, ?, ?, 'Sylvie', ?, 'pending', ?)").run(w.id, `fixture-${w.id}-${i}.jpg`, `pk-${w.id}-${i}`, today, main);
+  const sc = app.setupScore(app.venueForOwnerToken(t));
+  assert.ok(sc.soon < 100, `projected ${sc.soon}`);
+  assert.ok(sc.left.some((x) => x.k === 'description'), 'the short story is named');
+  assert.ok(sc.left.some((x) => x.k === 'photo_extra'), 'two photos (the research one is replaced) is not three');
+  // The scoring rules on their own.
+  const base = { type: 'winery', address: 'a', latitude: 1, longitude: 1, phone: 'p', hasHours: true, hoursCheckedAt: today, imageUrl: '/images/x.jpg', photoCount: 1, description: 'x'.repeat(128), claimed: true };
+  const p1 = pc.scoreCompleteness({ ...base, pendingPhotos: 2, photoCountAfter: 2, descriptionAfter: 'short' }, { today, pending: new Set(['description']) });
+  assert.ok(p1.lost.some((x) => x.key === 'description'));
+  assert.ok(!p1.missing.find((x) => x.key === 'photo_extra').waiting);
+  const p2 = pc.scoreCompleteness({ ...base, pendingPhotos: 2, photoCountAfter: 3, descriptionAfter: 'y'.repeat(130) }, { today, pending: new Set(['description']) });
+  assert.equal(p2.lost.length, 0);
+  assert.ok(p2.missing.find((x) => x.key === 'photo_extra').waiting);
+  assert.ok(p2.pctWithWaiting > p1.pctWithWaiting);
+  // The finish screen: "Nearly there" from the gaps, and never "Reach 100% to earn it" beside 100.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
+  assert.match(js, /h\(Math\.max\(sc\.pct, sc\.soon \|\| 0\) < 100 \|\| sc\.soon < sc\.pct \? T\.badgeReach : T\.badgeSoon\)/);
+  assert.match(js, /if \(sc\.soon < sc\.pct\) sc = /);
+  assert.equal(text.fr.badgeSoon, 'À vous dès que nous aurons vérifié ce que vous avez envoyé');
+  assert.ok(text.en.badgeSoon);
+});
+
+test('winery test 3: confirming hours in the setup writes the days shown as Closed as closed; nobody else’s hours change', async () => {
+  const d = [['11:00', '17:00']];
+  const gappy = JSON.stringify({ mon: d, thu: d, fri: d, sat: d, sun: d });
+  for (const type of ['winery', 'cafe', 'restaurant', 'pub']) {
+    const v = mk(type, { hours: gappy }); const other = mk(type, { hours: gappy });
+    const t = tokenFor(v.id);
+    const week = { mon: d, tue: [], wed: [], thu: d, fri: d, sat: d, sun: d };
+    const r = await change(t, { hours: week, hours_checked: true });
+    assert.equal(r.status, 200, `${type}: ${JSON.stringify(r.body)}`);
+    const stored = JSON.parse(app.getVenue(v.id).hours);
+    assert.ok('tue' in stored && 'wed' in stored, `${type}: ${JSON.stringify(stored)}`);
+    assert.equal(stored.tue, null); assert.equal(stored.wed, null);
+    assert.deepEqual(stored.mon, d);
+    assert.equal(app.getVenue(other.id).hours, gappy, 'another listing is untouched');
+    // Hours with every day already listed: confirming them is still only a check.
+    const again = await change(t, { hours: week, hours_checked: true });
+    assert.equal(again.status, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'hours'").get(v.id).n, 1, `${type}: one hours change only`);
+  }
+  // The classic edit page (not the setup) keeps its rule: the same hours are not a change.
+  const e = mk('winery', { hours: gappy });
+  const r2 = await change(tokenFor(e.id), { hours: { mon: d, tue: [], wed: [], thu: d, fri: d, sat: d, sun: d } }, false);
+  assert.equal(app.getVenue(e.id).hours, gappy, JSON.stringify(r2.body));
+  // The page and Build My Trip read them as closed.
+  const hoursLib = require('../hours.js');
+  const v2 = mk('winery', { hours: gappy });
+  await change(tokenFor(v2.id), { hours: { mon: d, tue: [], wed: [], thu: d, fri: d, sat: d, sun: d }, hours_checked: true });
+  const parsed = hoursLib.parseHours(app.getVenue(v2.id).hours);
+  assert.equal(parsed.days.tue.status, 'closed');
+  assert.equal(parsed.days.wed.status, 'closed');
+});
+
+test('winery test 3: the French card says « Dégustation gratuite » and the closed season once', async () => {
+  const w = mk('winery', { region: 'oliver', name: 'Verger Fixture Trois', slug: 'verger-fixture-trois' }); const t = tokenFor(w.id);
+  assert.equal((await change(t, { tasting_fee: 0 })).status, 200);
+  assert.equal((await change(t, { open_months: '04-25:10-31' })).status, 200);
+  const card = (html) => { const i = html.indexOf(`data-venue-id="${w.id}"`); return html.slice(i, html.indexOf('</li>', i)); };
+  const fr = card((await get('/fr/oliver/wineries')).text);
+  assert.match(fr, /Dégustation gratuite/);
+  assert.ok(!/Free tasting/.test(fr));
+  const en = card((await get('/oliver/wineries')).text);
+  assert.match(en, /Free tasting/);
+  // In the off-season here (today is outside Apr 25 – Oct 31) the status line says it, and no pill repeats it.
+  const md = today.slice(5);
+  if (md > '10-31' || md < '04-25') {
+    assert.match(en, /Closed for the season/);
+    assert.ok(!/season-tag-closed/.test(en) && !/season-tag-closed/.test(fr), 'said once');
+    assert.ok(!/reopens April/.test(fr));
+  }
+  // The pill's French where it is shown (tours cards).
+  assert.equal(app.frText('Closed · reopens April 25'), 'Fermé · réouverture le 25 avr.');
+  assert.equal(app.frText('Free tasting'), 'Dégustation gratuite');
+  assert.equal(app.frText('Ask when you visit'), 'Renseignez-vous sur place');
+});
+
+test('winery test 3: help answers no-website / Facebook, names the right tile, never “the link we emailed you” in the portal, French spacing', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  for (const p of [`/owner/${t}/setup`, `/fr/owner/${t}/setup`, `/owner/${t}`, `/fr/owner/${t}`]) {
+    const html = (await get(p)).text;
+    const cfg = ohbOf(html);
+    const nw = cfg.topics.find((x) => x.id === 'no-website-social');
+    assert.ok(nw, p);
+    assert.match(nw.a, /<strong>Instagram and Facebook<\/strong>/);
+    assert.match(nw.aFr, /<strong>Instagram et Facebook<\/strong>/);
+    assert.ok(nw.keysFr.includes('seulement une page facebook') && nw.over.includes('none'));
+    for (const tp of cfg.topics) {
+      assert.ok(!/emailed|we emailed/.test(tp.a), `${p} ${tp.id}: ${tp.a}`);
+      assert.ok(!/reçu par courriel|que nous vous avons envoyé par courriel/.test(tp.aFr), `${p} ${tp.id}: ${tp.aFr}`);
+      assert.ok(!/[^\s  ]\?(?:\s|<|$)/.test(tp.aFr.replace(/<[^>]+>/g, ' ').replace(/https?:\/\/\S+/g, '')), `${p} ${tp.id} French spacing: ${tp.aFr}`);
+    }
+    const links = cfg.topics.find((x) => x.id === 'links');
+    assert.match(links.a, /<strong>Phone, website or description<\/strong>/);
+    assert.match(links.aFr, /<strong>Téléphone, site Web ou description<\/strong>/);
+    assert.equal(cfg.ui.fr.greet.includes('Bonjour !'), true);
+  }
+  // The French owner home: « aujourd’hui ? » with the narrow space.
+  assert.match((await get(`/fr/owner/${t}`)).text, /aujourd’hui \?/);
+  // Outside the portal (the login page), the emailed link is still how to get in.
+  const login = ohbOf((await get('/owner/login')).text);
+  assert.ok(login.topics.some((x) => /emailed/.test(x.a)));
+});
+
+test('winery test 3: an owner link opens in French for a French browser unless she chose a language', async () => {
+  const w = mk('winery'); const t = tokenFor(w.id);
+  const getL = (p, al) => fetch(base + p, { headers: { 'Accept-Language': al } }).then((r) => r.text());
+  for (const p of [`/owner/${t}`, `/owner/${t}/setup`]) {
+    const frB = await getL(p, 'fr-CA,fr;q=0.9,en;q=0.8');
+    assert.match(frB, /var ol=localStorage\.getItem\('okanaganLang'\);if\(ol==='fr'\|\|!ol\)location\.replace\("\/fr\/owner\//);
+    const enB = await getL(p, 'en-CA,en;q=0.9,fr;q=0.5');
+    assert.match(enB, /if\(ol==='fr'\)location\.replace/);
+    assert.ok(!/ol==='fr'\|\|!ol/.test(enB));
+    // q values decide, not the order.
+    assert.match(await getL(p, 'en;q=0.4,fr-CA'), /ol==='fr'\|\|!ol/);
+  }
+  // Public pages are untouched.
+  assert.ok(!/ol==='fr'\|\|!ol/.test(await getL('/oliver/wineries', 'fr-CA,fr;q=0.9')));
+});
+
+test('winery test 3: a winery’s owner home has no Happy hour or Add an event tile; other types keep them; French wording', async () => {
+  const w = mk('winery', { happy_hour: 1 });
+  const home = (await get(`/owner/${tokenFor(w.id)}`)).text;
+  assert.ok(!/data-pick="happy"/.test(home) && !/data-pick="events"/.test(home));
+  const r = mk('restaurant');
+  const rh = (await get(`/owner/${tokenFor(r.id)}`)).text;
+  assert.match(rh, /class="op-task" data-pick="events"/);
+  assert.match(rh, /class="op-task" data-pick="happy"/);
+  assert.match((await get(`/fr/owner/${tokenFor(r.id)}`)).text, /data-pick="happy"><span class="op-task-icon" aria-hidden="true">[^<]*<\/span><span class="op-task-text"><strong>5 à 7<\/strong>/);
+  // The French wording table.
+  const f = text.fr, fw = text.fr.winery;
+  assert.equal(f.stDayPlural, 'nous les ajouterons d’ici un jour');
+  assert.equal(fw.stStoryKnown, 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour');
+  assert.equal(fw.knownQ, 'Votre spécialité ?');
+  assert.match(f.openQ, /Quand êtes-vous ouverts chaque année \?/);
+  assert.equal(f.holidays.victoria, 'Fête de Victoria');
+  assert.equal(fw.menuSocialQ, 'Où est votre carte des vins ?');
+  assert.match(fw.doorPhotoLead, /Votre appareil vous demandera/);
+  assert.match(fw.photosLead, /vos vignes ou vos vergers/);
+  assert.match(fw.doorLead, /vos vignes ou vos vergers/);
+  assert.match(f.storyCount, /120 caractères pour une page complète/);
+  const cfg = cfgOf((await get(`/fr/owner/${tokenFor(w.id)}/setup`)).text);
+  assert.equal(cfg.placeShow['Fruit or honey wines'], 'Vins de fruits ou de miel');
+  assert.ok(/Pour qui/.test(JSON.stringify(cfg)) && !/Idéal pour"/.test(JSON.stringify(cfg.offerGroups || [])));
 });
