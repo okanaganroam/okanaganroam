@@ -142,8 +142,11 @@ test('to go: Bottles and Canned or bottled cocktails (stored as cans); growlers 
   const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.deepEqual(cfg.suggestToGo, ['cans', 'bottles'], 'no growlers for a distillery');
   assert.equal((await change(t, { brewery_info: { to_go: ['bottles', 'cans'] } })).status, 200);
-  assert.equal(row(d.id, 'To go').text, 'Canned or bottled cocktails and bottles to go.');
-  assert.equal(app.breweryVisitLines(app.getVenue(d.id), app.venueBreweryInfo(d.id))['To go'].fr, 'Cocktails en canette ou en bouteille et bouteilles pour emporter.');
+  assert.equal(row(d.id, 'To go').text, 'Bottles and canned or bottled cocktails to go.');
+  assert.equal(app.breweryVisitLines(app.getVenue(d.id), app.venueBreweryInfo(d.id))['To go'].fr, 'Bouteilles et cocktails en canette ou en bouteille pour emporter.');
+  // Research's Tours line is the hint on "Tours, classes and events".
+  research(d.id, [{ label: 'Tours', text: 'Distillery tours on Saturdays; book online.' }]);
+  assert.equal(cfgOf((await get(`/owner/${t}/setup`)).text).researchEvents, 'Distillery tours on Saturdays; book online.');
   assert.equal((await change(t, { brewery_info: { to_go: ['bottles'] } })).status, 200);
   assert.equal(row(d.id, 'To go').text, 'Bottles to go.');
   assert.equal(text.en.brewery.kindDistillery.togo.cans, 'Canned or bottled cocktails');

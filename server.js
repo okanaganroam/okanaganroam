@@ -20943,8 +20943,10 @@ function breweryVisitLines(venue, info) {
   if (Array.isArray(b.to_go) && b.to_go.length) {
     if (b.to_go.includes('none')) out['To go'] = { en: 'Nothing to go.', fr: 'Rien à emporter.' };
     else {
+      // A distillery's bottles come first ("Bottles and canned or bottled cocktails to go").
       const words = spirits ? DISTILLERY_TO_GO_WORDS : BREWERY_TO_GO_WORDS;
-      const en = breweryAnd(b.to_go.map((k) => words[k][0]), false), fr = breweryAnd(b.to_go.map((k) => words[k][1]), true);
+      const keys = spirits ? ['bottles', 'cans'].filter((k) => b.to_go.includes(k)) : b.to_go;
+      const en = breweryAnd(keys.map((k) => words[k][0]), false), fr = breweryAnd(keys.map((k) => words[k][1]), true);
       out['To go'] = { en: `${en.charAt(0).toUpperCase()}${en.slice(1)} to go.`, fr: `${fr.charAt(0).toUpperCase()}${fr.slice(1)} pour emporter.` };
     }
   }
@@ -53106,7 +53108,8 @@ function breweryResearchSuggestions(researchRow, info, mine, spirits = false) {
   if (/\bdogs?\b[^.]*\bpatio\b/i.test(dogLine) && !/\bno dogs\b|\bdogs? (?:are )?not\b/i.test(dogLine)) out.suggestDogNote = OWNER_SETUP_STRINGS.en.quick.dogs[0];
   // A weekly event only when the line is plainly one kind on named days ("Trivia Tuesdays"); otherwise the line itself is
   // shown as a hint on the Weekly events screen.
-  const g = (info.rows || []).find((r) => r && /^(?:games|events|weekly events|entertainment)$/i.test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
+  // Distilleries (2026-11-13): research's Tours line too ("Distillery tours on Saturdays; book online"), as the hint.
+  const g = (info.rows || []).find((r) => r && (spirits ? /^(?:games|events|weekly events|entertainment|tours|classes)$/i : /^(?:games|events|weekly events|entertainment)$/i).test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
   if (g) {
     const kinds = BREWERY_EVENT_KINDS.filter(([, re]) => re.test(g.text)).map(([k]) => k);
     const days = Object.keys(BREWERY_EVENT_DAYS).filter((d) => BREWERY_EVENT_DAYS[d].test(g.text));
@@ -53257,8 +53260,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
   { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
     keys: ['tour', 'tours', 'distillery tour', 'class', 'classes', 'cocktail class', 'whisky class', 'whiskey class', 'workshop', 'masterclass', 'events', 'event', 'book a tour'],
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. It can be every week, or set weeks like the first Saturday. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Ce peut être chaque semaine, ou certaines semaines comme le premier samedi. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Only on set weeks, like the first Saturday? Open <strong>Weekly nights</strong> on your edit page and pick how often.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Seulement certaines semaines, comme le premier samedi? Ouvrez <strong>Soirées de la semaine</strong> sur votre page de modification et choisissez la fréquence.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
   { id: 'distillery-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures', 'brewery-seasonal-hours', 'winery-appointment'],
     q: 'We’re seasonal, or open by appointment', qFr: 'Nous sommes saisonniers, ou ouverts sur rendez-vous',
     keys: ['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'off season', 'off-season', 'change hours', 'change my hours'],
