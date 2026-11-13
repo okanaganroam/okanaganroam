@@ -1113,7 +1113,7 @@ en.brewery = {
   tkitchenNeed: 'Please pick the time your kitchen closes.', tfoodNeed: 'Please tap what food there is here.',
   taproomSaved: 'Your answers are on your page now.',
   // Flights and to go
-  flightQ: 'What does a flight cost?', flightLead: 'It shows on your page and on your card (“From $12”) right away.',
+  flightQ: 'What does a flight cost?', flightLead: 'It shows on your page and on your card right away.', flightLeadPick: 'It shows on your card as “{x}” right away.',
   flightGuess: 'Your card shows {x} now, from your website. Tap another price if it changed.', flightGuessVisit: 'Your page says {x} now, from your website, so we picked it. Tap another price if it changed.', flightWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
   feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.',
   noFlights: 'We don’t do flights', noFlightsSub: 'Your card shows no price',
@@ -1172,7 +1172,7 @@ fr.brewery = {
   tkitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', tkitchenOpts: { same: 'Non, on sert à manger jusqu’à la fermeture', earlier: 'Oui, elle ferme plus tôt' }, tkitchenAt: 'La cuisine ferme à',
   tkitchenNeed: 'Choisissez l’heure de fermeture de votre cuisine.', tfoodNeed: 'Touchez la nourriture offerte ici.',
   taproomSaved: 'Vos réponses sont sur votre page maintenant.',
-  flightQ: 'Combien coûte un plateau de dégustation?', flightLead: 'Le prix paraît sur votre page et sur votre fiche (« Dès 12 $ ») tout de suite.',
+  flightQ: 'Combien coûte un plateau de dégustation?', flightLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.', flightLeadPick: 'Votre fiche indique « {x} » tout de suite.',
   flightGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', flightGuessVisit: 'Votre page indique {x} maintenant, d’après votre site Web, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', flightWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
   feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.',
   noFlights: 'Nous n’offrons pas de plateaux', noFlightsSub: 'Votre fiche n’affiche aucun prix',

@@ -282,6 +282,13 @@
   function bchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   // "$12" / "12 $".
   function flightText(n){ return C.lang === 'fr' ? money(n) + ' $' : '$' + money(n); }
+  // Brewery test 1 (2026-11-12): the Flights lead names her current pick ("It shows on your card as 'From $14' right
+  // away"), redrawn as she taps a price or types one in Other; with no pick (or one checked first) it names no number.
+  function flightLeadText(){
+    var bf = S.brew, n = bf.fee;
+    if (bf.noFlights || n == null || isNaN(n) || n < 0 || n > (C.feeLiveMax || 40)) return T.flightLead;
+    return fill(T.flightLeadPick, { x: n === 0 ? T.feeCardFree : fill(T.feeCard, { x: flightText(n) }) });
+  }
   // "Your menu" is a step only for a brewery with its own kitchen (Decided 5): added or taken off with the food answer.
   function syncMenu(){ if (!C.brewery) return; var on = BI.food === 'kitchen', i = STEPS.indexOf('menu'), j = P2.indexOf('menu'); if (!on && i >= 0) { STEPS.splice(i, 1); if (j >= 0) P2.splice(j, 1); } if (on && i < 0 && (C.allSteps || []).indexOf('menu') >= 0) { STEPS.push('menu'); P2.push('menu'); } }
   // Tiles shown only with their own kitchen (vegan, vegetarian, takeout); a ticked one always shows.
@@ -528,7 +535,7 @@
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
   function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) body.blocks = happyBlocks();
-    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   function stText(step, d){
@@ -543,13 +550,16 @@
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
-  function statusHtml(done){
-    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
+  // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
+  // waiting for our check (C.waiting: the server's list from what's waiting now, refreshed with every save).
+  function nowSt(k, d, waiting){ var w = waiting || C.waiting; return d === 'day' && w && w.indexOf('*') < 0 && w.indexOf(k) < 0 && !(k === 'social' && (w.indexOf('instagram') >= 0 || w.indexOf('facebook') >= 0)) ? 'live' : d; }
+  function statusHtml(done, waiting){
+    var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, nowSt(k, done[k], waiting))) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
   window.ohbLive = window.ohbLive || {};
   window.ohbLive['setup-status'] = function(lang, update){
-    try { fetch(C.base + '/setup/progress', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){ if (j && j.ok && j.progress && j.progress.done) update(statusHtml(j.progress.done)); }).catch(function(){}); } catch (e) {}
+    try { fetch(C.base + '/setup/progress', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){ if (j && j.ok && j.progress && j.progress.done) { if (j.waiting) C.waiting = j.waiting; update(statusHtml(j.progress.done, j.waiting)); } }).catch(function(){}); } catch (e) {}
     return statusHtml(S.done);
   };
   // Runs saves one after another; any error stops and shows it.
@@ -792,7 +802,7 @@
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
     return list(steps.map(function(s){
-      var d = half(s) ? 'half' : fin(s) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
       return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
@@ -1274,7 +1284,7 @@
     } else if (s === 'flights') {
       // Breweries (2026-11-12): the flight price (quick buttons, Other, or "We don't do flights") and the to-go chips.
       var bf = S.brew, feeOn = function(n){ return !bf.feeOther && !bf.noFlights && bf.fee === n; };
-      x = doneLine('flights') + q(T.flightQ, T.flightLead) + (bf.feeGuessed && bf.fee != null && !isNaN(bf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' ? T.flightGuessVisit : T.flightGuess, { x: flightText(bf.fee) })) + '</p>' : '')
+      x = doneLine('flights') + '<h1>' + h(T.flightQ) + '</h1><p class="su-lead" id="suFlightLead">' + h(flightLeadText()) + '</p>' + (bf.feeGuessed && bf.fee != null && !isNaN(bf.fee) ? '<p class="su-sent su-research" id="suFeeGuess">' + h(fill(C.researchFeeFrom === 'visit' ? T.flightGuessVisit : T.flightGuess, { x: flightText(bf.fee) })) + '</p>' : '')
         + (CUR.flight_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.flightWaiting, { x: flightText(CUR.flight_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.flightQ) + '" id="suFeeChips">' + QUICK_FLIGHTS.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-bfee="' + n + '">' + h(flightText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (bf.feeOther && !bf.noFlights ? 'true' : 'false') + '" data-bfee="other">' + h(T.feeOther) + '</button></div>'
@@ -2783,6 +2793,7 @@
     var dr = el('suDoorRights'); if (dr) dr.onchange = function(){ S.door.rights = dr.checked; if (dr.checked && S.nudge === T.doorRightsNeed) { S.nudge = ''; render(); } };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
+    var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
     var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteOrigin(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
     var st = el('suStory'); if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };

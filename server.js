@@ -52386,6 +52386,43 @@ function setupScore(found) {
     // long description), so "Nearly there" can name it.
     left: r.missing.filter((it) => !it.waiting).concat(r.lost || []).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
 }
+// Brewery test 1 (2026-11-12): "Your answers so far" kept saying "within a day" after we'd checked everything. Which
+// setup steps still have something waiting for our check, worked out from what is waiting right now (the pending update,
+// sent photos, menus and "do it for me" sheets, a storefront spot), never from the stored progress. A step answered
+// "within a day" that isn't in this list shows as "on your page". A waiting field we can't place holds every step back.
+const SETUP_WAITING_FIELD_STEPS = {
+  name: ['basics'], address: ['basics'], phone: ['basics'], website: ['basics'], description: ['story'], menu_url: ['menu'],
+  booking_url: ['groups', 'visit', 'book'], instagram_url: ['instagram', 'social'], facebook_url: ['facebook', 'social'], tiktok_url: ['social'],
+  hours: ['hours'], hours_seasons: ['hours'], open_months: ['hours'], hours_checked: ['hours'], closures: ['closures', 'hours'],
+  happy_hour: ['happy'], happy_hour_deals: ['happy'], specials: ['specials'], weekly_nights: ['music'], badges: ['offer'], not_offered: ['offer'],
+  price_range: ['spend'], avg_spend: ['spend'], tasting_fee: ['tastings'], flight_fee: ['flights'], cafe_links: ['order', 'sellout'],
+};
+function setupWaitingSteps(venue) {
+  const out = new Set();
+  try {
+    const pend = pendingOwnerChange(venue.id); const req = pend ? getOwnerChange(pend.id) : null;
+    if (req && req.status === 'pending') {
+      for (const k of Object.keys(req.changes || {})) {
+        const st = SETUP_WAITING_FIELD_STEPS[k];
+        if (!st) return ['*'];
+        st.forEach((x) => out.add(x));
+      }
+    }
+    if (db.prepare("SELECT 1 FROM owner_photos WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id)) out.add('photos');
+    for (const r of db.prepare("SELECT help_kind FROM venue_menus WHERE venue_id = ? AND status IN ('help', 'pending')").all(venue.id)) {
+      const k = !r.help_kind || r.help_kind === 'menu_social' || r.help_kind === MENU_EMAIL_KIND ? 'menu' : r.help_kind;
+      out.add(k); if (k === 'instagram' || k === 'facebook') out.add('social');
+    }
+    if (db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id)) out.add('door');
+  } catch (e) { return ['*']; }
+  return [...out];
+}
+// The stored answers as the owner should read them now: "within a day" becomes "on your page" once nothing is waiting.
+function setupDoneNow(venue, done) {
+  const waiting = setupWaitingSteps(venue);
+  if (waiting.includes('*')) return { ...done };
+  return Object.fromEntries(Object.entries(done || {}).map(([k, v]) => [k, v === 'day' && !waiting.includes(k) ? 'live' : v]));
+}
 // "I'll email it" for the menu (pub test 3, 2026-11-10): it used to live only in the owner's setup progress, so a menu
 // that never arrived went unnoticed. It is now a row in the menu queue on /admin/review (venue_menus, status 'help',
 // help_kind 'menu_email', "Menu expected by email"), with no email to anyone. Saying it again only refreshes the date;
@@ -52408,7 +52445,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   const send = (status, data) => sendSubmissionResponse(res, status, data);
   if (!found) return send(404, { ok: false, error: 'This link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
   if (!COMPLETENESS_TYPES.has(found.venue.type)) return send(404, { ok: false, error: 'Not found.' });
-  if (method === 'GET') return send(200, { ok: true, progress: { done: setupProgress(found.venue.id).done }, score: setupScore(found) });
+  if (method === 'GET') return send(200, { ok: true, progress: { done: setupProgress(found.venue.id).done }, waiting: setupWaitingSteps(found.venue), score: setupScore(found) });
   if (method !== 'POST') return send(405, { ok: false, error: 'Not allowed.' });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: 'Only accepted from the Okanagan Roam website.' });
   if (ownerSetupIpLimited(requestClientIp(req)) || ownerSetupVenueLimited(found.venue.id)) return send(429, { ok: false, error: SETUP_RATE_ERROR, rate_limited: true });
@@ -52417,7 +52454,7 @@ async function handleOwnerSetupProgress(req, res, method, found) {
   // "I'm done for now" after the essentials: the portal's own checklist may speak up again.
   if (body && body.done_for_now === true && !body.step) {
     const p0 = setupProgress(found.venue.id); p0.done_for_now = true; writeSetupProgress(found.venue.id, p0);
-    return send(200, { ok: true, progress: { done: p0.done }, score: setupScore(found) });
+    return send(200, { ok: true, progress: { done: p0.done }, waiting: setupWaitingSteps(found.venue), score: setupScore(found) });
   }
   const typeSteps = SETUP_COMBO_TYPES.has(found.venue.type) ? setupStepsFor(found.venue.type).concat(CAFE_SUB_STEPS) : SETUP_STEPS;
   if (!body || !typeSteps.includes(body.step) || !SETUP_STATUSES.includes(body.status)) return send(400, { ok: false, error: 'Please try again.' });
@@ -52429,14 +52466,14 @@ async function handleOwnerSetupProgress(req, res, method, found) {
     const entries = body.status === 'live' && body.blocks !== undefined ? cleanSetupHappyBlocks(body.blocks) : null;
     const p1 = setupProgress(found.venue.id);
     // A "skip" or "later" never touches them (it never replaces an answer either).
-    if (body.status === 'skip' || body.status === 'later') return send(200, { ok: true, progress: { done: p1.done }, score: setupScore(found) });
+    if (body.status === 'skip' || body.status === 'later') return send(200, { ok: true, progress: { done: p1.done }, waiting: setupWaitingSteps(found.venue), score: setupScore(found) });
     const blocks = { ...(p1.blocks || {}) };
     if (entries) blocks.happy = { entries, sig: setupHappySig(found) }; else delete blocks.happy;
     if (Object.keys(blocks).length) p1.blocks = blocks; else delete p1.blocks;
     writeSetupProgress(found.venue.id, p1);
     progress = p1;
   }
-  return send(200, { ok: true, progress: { done: progress.done }, score: setupScore(found) });
+  return send(200, { ok: true, progress: { done: progress.done }, waiting: setupWaitingSteps(found.venue), score: setupScore(found) });
 }
 
 // Where the photo now on the page came from (pub test 6, 2026-11-10: the Google Maps stand-in was labelled "Your main
@@ -52622,7 +52659,7 @@ function renderOwnerSetupPage(found, opts) {
     // she taps Save), research's flight price as a starting point, and the quick flight prices' live limit.
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
     cafe, pub, winery, brewery, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
-    base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
+    base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, waiting: setupWaitingSteps(venue), holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && venue.type === 'restaurant' ? 'Restaurant' : fr && winery ? 'Vignoble' : fr && brewery ? 'Microbrasserie' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
     typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub', cafe: fr ? 'café' : 'café', winery: fr ? 'vignoble' : 'winery', brewery: fr ? 'salle de dégustation' : 'taproom' })[venue.type] || (fr ? 'établissement' : 'place'),
@@ -52664,7 +52701,8 @@ function renderOwnerSetupPage(found, opts) {
   };
   // Help: "did it go through?" answers with what this business has sent so far. The page script answers it with a
   // fresh read of <base>/setup/progress each time it is asked (window.ohbLive); this is the fallback text.
-  const stWord = (tt, k) => (progress.done[k] === 'no' ? (tt.noLabels[k] || tt.st.no) : k === 'spend' && progress.done[k] === 'live' && !avgSpendPublic() ? tt.stSoon : tt.st[progress.done[k]]);
+  const doneNow = setupDoneNow(venue, progress.done);
+  const stWord = (tt, k) => (doneNow[k] === 'no' ? (tt.noLabels[k] || tt.st.no) : k === 'spend' && doneNow[k] === 'live' && !avgSpendPublic() ? tt.stSoon : tt.st[doneNow[k]]);
   const sent = steps.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml(t.labels[k])}: ${escapeHtml(stWord(t, k))}</li>`).join('');
   const statusTopic = {
     id: 'setup-status', pages: ['setup'], q: 'Did it go through?', qFr: 'Est-ce que c’est passé?',
