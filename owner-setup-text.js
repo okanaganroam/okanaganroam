@@ -403,7 +403,8 @@ Object.assign(en, {
   clearField: 'Clear this box',
   lateHint: 'Open after midnight? Tap Midnight, 1 AM or 2 AM under that day. Friday until 1 AM means 1 AM early Saturday morning.',
   lateLbl: 'Closes later?', lateQ: '{day}: closes at midnight or later',
-  essReady: 'The essentials are done', finishBar: 'Your answers are saved',
+  // Winery test 4 (2026-11-12): "done" only when every essential is; with one or more left, "Nearly done".
+  essReady: 'The essentials are done', essNearly: 'Nearly done', finishBar: 'Your answers are saved',
   sentMeans: 'Sent means we check it first. It’ll show on your page within a day.',
   fbWhy: 'We find your Facebook link for you, so it shows within a day. Instagram goes on your page right away.',
   savedFbName: 'We find your Facebook link for you, so it shows within a day.',
@@ -416,7 +417,7 @@ Object.assign(fr, {
   clearField: 'Effacer ce champ',
   lateHint: 'Ouvert après minuit? Touchez minuit, 1 h ou 2 h sous cette journée. Vendredi jusqu’à 1 h veut dire 1 h tôt samedi matin.',
   lateLbl: 'Ferme plus tard?', lateQ: '{day} : ferme à minuit ou plus tard',
-  essReady: 'L’essentiel est fait', finishBar: 'Vos réponses sont enregistrées',
+  essReady: 'L’essentiel est fait', essNearly: 'Presque terminé', finishBar: 'Vos réponses sont enregistrées',
   sentMeans: 'Envoyé veut dire que nous vérifions d’abord. Cela s’affichera sur votre page d’ici un jour.',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour. Instagram s’affiche sur votre page tout de suite.',
   savedFbName: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
@@ -452,7 +453,7 @@ Object.assign(en, {
   // Menu photos: "Add another page" comes first.
   camLeadSome: 'Got another page? Add it first. When every page is here, tap Send. Tap ✕ to retake one.',
   // No dogs: its own answer on "What you offer".
-  noDogs: 'No dogs allowed', noDogsSub: 'Not inside or on the patio', noDogsSubInside: 'Not inside',
+  noDogs: 'No dogs allowed', noDogsSub: 'Not inside or on the patio', noDogsSubInside: 'Not inside or outside',
   // "About $24 a person?": Not sure? Skip.
   spendSkip: 'Not sure? Skip',
   fbWhy: 'We find your Facebook link for you, so it shows within a day.',
@@ -462,7 +463,7 @@ Object.assign(fr, {
   hoursEditLead: 'Touchez Modifier à côté d’une journée différente. Les autres journées restent telles quelles.',
   hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven',
   camLeadSome: 'Une autre page? Ajoutez-la d’abord. Quand toutes les pages sont là, touchez Envoyer. Touchez ✕ pour en reprendre une.',
-  noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse', noDogsSubInside: 'Pas à l’intérieur',
+  noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse', noDogsSubInside: 'Ni à l’intérieur ni à l’extérieur',
   spendSkip: 'Je ne sais pas, passer',
   fbWhy: 'Nous trouvons le lien de votre page Facebook pour vous, il s’affiche donc d’ici un jour.',
   kitchenNeed: 'Choisissez l’heure à laquelle votre cuisine ferme.',
@@ -981,6 +982,10 @@ en.winery = {
   apptQ: 'When are you open for walk-in tastings?', apptLead: 'Outside these dates your card says “By appointment · call ahead”.',
   apptFrom: 'Walk-ins from', apptTo: 'Walk-ins until', apptSave: 'Save my hours', apptNeed: 'Please pick the first and last day of walk-in tastings.',
   apptNow: 'Walk-ins {a} – {b}, by appointment the rest of the year ✓',
+  // Winery test 4 (2026-11-12): the one "no set hours" choice (Hours step), and what the page says after it.
+  noSetHours: 'We don’t have set hours. Visits are by appointment', noSetHoursNow: 'No set hours. Visits are by appointment ✓',
+  noSetHoursSaved: 'Your old weekly hours are off your page. It says “By appointment · call ahead”.',
+  apptHoursGone: 'By appointment only: your old weekly hours came off your page, so it only says “By appointment · call ahead”.',
   // Your story and Known for
   storyQ: 'Tell visitors about your winery', storyEx: 'A family winery on the Naramata Bench. We grow Pinot Noir and Chardonnay, and the patio looks over the lake.',
   knownQ: 'What are your wines known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
@@ -1049,6 +1054,9 @@ fr.winery = {
   apptQ: 'Quand accueillez-vous les visiteurs sans réservation?', apptLead: 'En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».',
   apptFrom: 'Sans réservation à partir du', apptTo: 'Sans réservation jusqu’au', apptSave: 'Enregistrer mes heures', apptNeed: 'Choisissez le premier et le dernier jour des dégustations sans réservation.',
   apptNow: 'Sans réservation du {a} au {b}, sur rendez-vous le reste de l’année ✓',
+  noSetHours: 'Nous n’avons pas d’heures fixes. Visites sur rendez-vous', noSetHoursNow: 'Pas d’heures fixes. Visites sur rendez-vous ✓',
+  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Sur rendez-vous · appelez avant ».',
+  apptHoursGone: 'Sur rendez-vous seulement : vos anciennes heures de la semaine sont retirées de votre page, qui indique seulement « Sur rendez-vous · appelez avant ».',
   storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
   knownQ: 'Votre spécialité?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',

@@ -6808,7 +6808,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       // The stored JSON, parsed (never modified) by the planner -- or, in an owner's seasonal hours (2026-10-18), that
       // week instead. The owner's special closures are dated, like the season below.
-      hours: weekJsonOn(v, hoursDate) || null,
+      // Winery test 4 (2026-11-12): a winery by appointment on that date has no hours to plan by (no "Listed hours").
+      hours: (v.type === 'winery' && wineryAppointmentOn(v.id, hoursDate) === true) ? null : (weekJsonOn(v, hoursDate) || null),
       openMonths: openMonthsById.get(v.id) || undefined,
       ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from })) : undefined; })(),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
@@ -20388,8 +20389,8 @@ function wineryVisitLines(venue, info) {
   const researchTastings = researchHas('Tastings');
   if (fee != null || (book && !researchTastings)) {
     const waived = fee ? { yes: [', free with a bottle purchase', ', offerte à l’achat d’une bouteille'], two: [', free when you buy 2 bottles or more', ', offerte à l’achat de 2 bouteilles ou plus'] }[w.waived] : null;
-    const en = [fee === 0 ? 'Free tastings.' : fee != null ? `From ${wineryMoney(fee, false)} a person${waived ? waived[0] : ''}.` : '', book ? book[0] : ''].filter(Boolean).join(' ');
-    const fr = [fee === 0 ? 'Dégustations gratuites.' : fee != null ? `Dès ${wineryMoney(fee, true)} par personne${waived ? waived[1] : ''}.` : '', book ? book[1] : ''].filter(Boolean).join(' ');
+    const en = [fee === 0 ? 'Free tastings.' : fee != null ? `${wineryMoney(fee, false)} a person${waived ? waived[0] : ''}.` : '', book ? book[0] : ''].filter(Boolean).join(' ');
+    const fr = [fee === 0 ? 'Dégustations gratuites.' : fee != null ? `${wineryMoney(fee, true)} par personne${waived ? waived[1] : ''}.` : '', book ? book[1] : ''].filter(Boolean).join(' ');
     out.Tastings = { en, fr };
   }
   // Groups: from what size to book ahead, and tour buses and limos.
@@ -36049,6 +36050,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // replaces the undated weekly hours; see venueClosureInForce. Also for a place with no hours stored.
     const closure = venueClosureInForce(venue.id, opts.now || new Date());
     if (closure) localBusiness.openingHoursSpecification = closureAwareOpeningHours(localBusiness.openingHoursSpecification, closure);
+    // Winery test 4 (2026-11-12): a winery by appointment all year has no weekly hours to give search engines.
+    else if (venue.type === 'winery' && venueWineryInfo(venue.id).visit === 'appointment') delete localBusiness.openingHoursSpecification;
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && portalFields(venue.type).menu ? publishedMenu(venue.id) : null;
@@ -36162,6 +36165,14 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
   }
+  // Winery test 4 (2026-11-12): by appointment today, the Hours box says so first. By appointment all year: that line
+  // instead of any stored week (an old 10-5 never shows next to it). In the off-season the walk-in hours stay under it
+  // with the off-season line, as before.
+  const wineryApptBox = venueWineryAppointmentToday(venue, opts.now || new Date());
+  const wineryApptAllYear = wineryApptBox && venueWineryInfo(venue.id).visit === 'appointment';
+  const wineryApptLine = `<p class="venue-hours-season venue-hours-appt">${L('By appointment · call ahead', 'Sur rendez-vous · appelez avant')}</p>`;
+  if (wineryApptAllYear) hoursHtml = `<h2>${L('Hours', 'Heures')}</h2>${wineryApptLine}`;
+  else if (wineryApptBox && hoursHtml) hoursHtml = hoursHtml.replace('</h2>', `</h2>${wineryApptLine}`);
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
   if (openMonths) {
@@ -36627,7 +36638,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const openStatus = wineryApptToday ? { state: 'appointment', text: WINERY_APPOINTMENT_LINE }
     : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
   const openStatusHtml = showStatusHtml || (openStatus
-    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
+    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
   // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
   const happyHourHtml = happyHour && happyHour.live
@@ -45818,6 +45829,10 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
   const slotLabels = new Set(OWNER_VISIT_SLOTS.flatMap((x) => x.labels));
   const confirmed = new Set(Array.isArray((value || {})._confirm) ? value._confirm : []);
+  // Winery test 4 (2026-11-12): research's line that an owner's line replaces or clears is kept (owner_was), so an Undo
+  // puts research's line back as research's (the "No dogs allowed" answer clears research's Dogs line). A winery's
+  // answer lines (Groups...) keep theirs in writeWineryVisitRows.
+  const was = { ...((cur && cur.owner_was) || {}) };
   // A line of hers set aside earlier because the box was full (owner_dropped, owned) is still hers: found there too.
   const parked = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && r.owned);
   for (const slot of OWNER_VISIT_SLOTS) {
@@ -45829,6 +45844,15 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
     // on, so a full box never drops it as research's.
     if (next === old) { if (next && i >= 0 && confirmed.has(slot.key)) owned.add(rows[i].label); continue; }
     const label = i >= 0 ? rows[i].label : slot.def;
+    const wasLabel = slot.labels.find((l) => was[l] && !was[l].owned && !WINERY_MANAGED_LABELS.includes(l));
+    if (wasLabel && next && next === was[wasLabel].text) {
+      // Back to exactly research's line (an Undo): research's again, with its link.
+      const row = { label: wasLabel, text: next, ...(was[wasLabel].url ? { url: was[wasLabel].url } : {}) };
+      if (i >= 0) rows[i] = row; else rows.push(row);
+      owned.delete(wasLabel); if (wasLabel !== label) owned.delete(label); delete was[wasLabel];
+      continue;
+    }
+    if (i >= 0 && !owned.has(label) && !WINERY_MANAGED_LABELS.includes(label) && !was[label]) was[label] = { text: old, ...(rows[i].url ? { url: rows[i].url } : {}) };
     if (next) {
       if (i >= 0) rows[i] = { label, text: next }; else rows.push({ label, text: next });
     } else if (i >= 0) rows.splice(i, 1);
@@ -45842,6 +45866,7 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
+  if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
   if (!rows.length && !info.booking_url && !info.owner_labels.length) {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
     return { before, after: null };
@@ -46766,6 +46791,8 @@ function ownerNanpPhone(raw) {
   return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}${m && m[2] ? ` ext. ${m[2]}` : ''}`;
 }
 const OWNER_SETUP_PHONE_ERROR = 'Please enter a 10-digit phone number with the area code, like 250-555-0123.';
+// Winery test 4 (2026-11-12): a winery with every day closed is pointed to the one "no set hours" choice.
+const OWNER_WINERY_NO_DAY_ERROR = 'Hours: add at least one open day. No set hours? Tap “We don’t have set hours. Visits are by appointment”.';
 function validateOwnerChanges(venue, happyHourTimes, body) {
   const errors = {};
   const changes = {};
@@ -46776,8 +46803,12 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if (unknown.length) return { changes, previous: {}, errors: { form: 'Some of the information could not be read. Please reload the page and try again.' } };
 
   if ('hours' in input) {
-    const w = ownerWeekJson(input.hours, 'Hours', { allowEmptyWeek: false });
-    if (!w.ok) errors.hours = w.detail;
+    // Winery test 4 (2026-11-12): "We don't have set hours. Visits are by appointment": a winery that is (or, in this same
+    // save, says it is) by appointment only may save a week with no open day. Its old hours are kept for Undo as usual.
+    const apptNow = venue.type === 'winery' && (((input.winery_info && typeof input.winery_info === 'object') ? input.winery_info.visit : undefined) === 'appointment'
+      || (!(input.winery_info && typeof input.winery_info === 'object' && 'visit' in input.winery_info) && venueWineryInfo(venue.id).visit === 'appointment'));
+    const w = ownerWeekJson(input.hours, 'Hours', { allowEmptyWeek: apptNow });
+    if (!w.ok) errors.hours = venue.type === 'winery' && /add at least one open day/.test(w.detail) ? OWNER_WINERY_NO_DAY_ERROR : w.detail;
     else if (!sameJsonWeek(w.json, current.hours)) changes.hours = w.json;
     // Winery test 3 (2026-11-12): the setup shows a day missing from the stored hours as "Closed". Confirming them there
     // writes those days as closed (null), so the page says "Closed" and Build My Trip skips them (a missing day is
@@ -52314,8 +52345,8 @@ const WINERY_SETUP_HELP_TOPICS = [
     aFr: '<ul><li>Dans <strong>Configurez votre page</strong>, touchez <strong>Réservations et groupes</strong>. La case <strong>Lien de réservation</strong> est sous « Comment les visiteurs viennent-ils ? ». Elle y est aussi pour les visites sans réservation, pour une page de réservation de groupe ou de dégustation.</li><li>Sur votre page de modification, touchez <strong>Téléphone, site Web ou description</strong> : c’est <strong>Lien de réservation ou de billets</strong>, dans la case des liens.</li></ul><p>C’est le même lien aux deux endroits. Un nouveau lien est vérifié d’abord, en général d’ici un jour; ensuite, votre page affiche un bouton <strong>Réserver</strong>.</p>' },
   { id: 'winery-appointment', pages: ['setup', 'edit'], q: 'We’re by appointment in winter', qFr: 'Nous sommes sur rendez-vous l’hiver',
     keys: ['by appointment', 'appointment', 'appointment only', 'off-season', 'off season', 'winter', 'call ahead'], keysFr: ['rendez-vous', 'sur rendez-vous', 'basse saison', 'hiver', 'appelez'],
-    a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”. By appointment all year? Pick <strong>By appointment only</strong> under “How do people visit?”.</p>',
-    aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez quand vous accueillez les visiteurs sans réservation. En dehors de ces dates, votre fiche et Planifier mon voyage indiquent « Sur rendez-vous · appelez avant ». Sur rendez-vous toute l’année? Choisissez <strong>Sur rendez-vous seulement</strong> sous « Comment les visiteurs viennent-ils? ».</p>' },
+    a: '<p>In the Hours step, after your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick when you’re open for walk-in tastings. Outside those dates your card and Build My Trip say “By appointment · call ahead”.</p><p>By appointment all year, with no set hours? On the Hours step, tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</p>',
+    aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez quand vous accueillez les visiteurs sans réservation. En dehors de ces dates, votre fiche et Planifier mon voyage indiquent « Sur rendez-vous · appelez avant ». </p><p>Sur rendez-vous toute l’année, sans heures fixes? À l’étape des heures, touchez <strong>Nous n’avons pas d’heures fixes. Visites sur rendez-vous</strong>. Vos anciennes heures de la semaine sont retirées de votre fiche, qui indique « Sur rendez-vous · appelez avant ».</p>' },
   { id: 'winery-restaurant', pages: ['setup'], q: 'Our restaurant has its own page', qFr: 'Notre restaurant a sa propre page',
     keys: ['restaurant', 'bistro', 'restaurant hours', 'restaurant menu', 'kitchen'], keysFr: ['restaurant', 'bistro', 'heures du restaurant', 'menu du restaurant'],
     a: '<p>One page, one setup. When your restaurant has its own page with us, update its hours and menu there, with its own link (ask us for it at info@okanaganroam.com). Here, “Food here” only points to it.</p>',
@@ -52544,6 +52575,11 @@ const OWNER_SETUP_CSS = `
   /* Pub test 5 (2026-11-10): on a 412px phone the "?" sat over the step line and the bar. It now sits in the Back row,
      which is empty on the right, under "Exit setup"; the step line and the bar start below it. */
   @media (max-width: 699px) { body.owner-setup .ohb-btn { top: 72px; } body.owner-setup .su-top { min-height: 52px; padding-right: 56px; } }
+  /* Winery test 4 (2026-11-12): at 130% page zoom on a 360px phone "Exit setup" ran 22px off the screen. The header
+     wraps instead (Exit setup on its own line, at the right) and never scrolls sideways. */
+  body.owner-setup .su-head { flex-wrap: wrap; row-gap: 0; }
+  body.owner-setup .su-head .su-logo { min-width: 0; }
+  body.owner-setup .su-exit { margin-left: auto; white-space: nowrap; }
   body.owner-setup .su-fold { margin: 18px 0; }
   body.owner-setup .su-fold summary { display: flex; align-items: center; min-height: 56px; padding: 0 16px; border: 2px dashed var(--su-line); border-radius: 16px; color: var(--su-teal); font-weight: 800; cursor: pointer; }
   body.owner-setup .su-fold[open] summary { margin-bottom: 12px; }
@@ -53823,8 +53859,9 @@ const OWNER_HELP_TOPICS = [
   { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
     keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
     keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
-    a: '<p>Your listing, photos, menu and events are all <strong>free</strong>. Want more visibility? <strong>Message us</strong> and ask about featured spots.</p>',
-    aFr: '<p>Votre fiche, vos photos, votre menu et vos événements sont entièrement <strong>gratuits</strong>. Vous voulez plus de visibilité? <strong>Écrivez-nous</strong> pour en savoir plus sur les places en vedette.</p>' },
+    // Winery test 4 (2026-11-12): free first, plainly, and no upsell in the same answer.
+    a: '<p><strong>Free.</strong> You’ll never be charged, and we never ask for a card. Your listing, photos, menu and events are all free.</p>',
+    aFr: '<p><strong>Gratuit.</strong> Vous ne paierez jamais rien, et nous ne demandons jamais de carte. Votre fiche, vos photos, votre menu et vos événements sont tous gratuits.</p>' },
 ];
 // Portal error messages the bot recognises on the page -> the topic that explains them (English and French pages).
 // The French portal's messages (2026-10-18) are matched too.
@@ -54549,6 +54586,7 @@ const OWNER_PORTAL_PATTERNS_FR = [
   [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) can have at most two time ranges\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : le ${OWNER_DAY_NAME_FR[m[2]]} peut avoir au plus deux plages horaires.`],
   [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) has a time we could not read\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : une heure du ${OWNER_DAY_NAME_FR[m[2]]} est illisible.`],
   [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) opens and closes at the same time\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : le ${OWNER_DAY_NAME_FR[m[2]]} ouvre et ferme à la même heure.`],
+  [/^Hours: add at least one open day\. No set hours\?/, () => 'Heures : ajoutez au moins un jour d’ouverture. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes. Visites sur rendez-vous ».'],
   [/^(Hours|Happy hour|Seasonal hours): add at least one open day\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : ajoutez au moins un jour d’ouverture.`],
   [/^(Hours|Happy hour|Seasonal hours): (.+)$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : les heures sont illisibles. Rechargez la page et réessayez.`],
   [/^You have (\d+) photos waiting for review\. Please wait until we have looked at those\.$/, (m) => `Vous avez ${m[1]} photos qui attendent notre vérification. Attendez que nous les ayons regardées.`],
@@ -57776,7 +57814,7 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
           company_website: val('opHp'), started_at: typeof startedAt !== 'undefined' ? startedAt : Date.now() }) })
         .then(function(r){ return r.json(); })
         .then(function(j){
-          if (j && j.ok) { onOk(); return; }
+          if (j && j.ok) { onOk(j); return; }
           btn.disabled = false;
           var errs = (j && j.errors) || {};
           var m = errs.cuisine || errs.place_type || errs.hours_checked || errs.visit_rows || errs.form || (j && j.error) || box.getAttribute('data-wrong');
@@ -57784,6 +57822,19 @@ const OWNER_CUISINE_HOURS_SCRIPT = `
         })
         .catch(function(){ btn.disabled = false; if (err) { err.textContent = box.getAttribute('data-wrong'); err.hidden = false; } });
     }
+    // Winery test 4 (2026-11-12): "We don't have set hours. Visits are by appointment": saved on its own. The day rows
+    // go (the form's Send no longer sends hours), and the line says what the page shows now.
+    var nb = document.getElementById('opNoSetHoursBtn'), nbox = document.getElementById('opNoSetHours');
+    if (nb && nbox) nb.addEventListener('click', function(){
+      var none = {}; ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].forEach(function(d){ none[d] = []; });
+      send({ hours: none, winery_info: { visit: 'appointment' } }, nb, 'opNoSetHoursError', nbox, function(j){
+        nb.hidden = true; window.opNoSetHoursSent = true;
+        var rowsBox = document.getElementById('opHours'); if (rowsBox) rowsBox.hidden = true;
+        var d = document.getElementById('opNoSetHoursDone'); if (d) { d.textContent = nbox.getAttribute(((j && j.live) || []).indexOf('hours') >= 0 ? 'data-live' : 'data-sent'); d.hidden = false; }
+        var he = document.getElementById('opHoursError'); if (he) { he.hidden = true; he.textContent = ''; }
+        if (window.opCbRefresh) window.opCbRefresh('');
+      });
+    });
     var hb = document.getElementById('opHoursOkBtn'), hbox = document.getElementById('opHoursOk');
     if (hb && hbox) hb.addEventListener('click', function(){
       send({ hours_checked: true }, hb, 'opHoursOkError', hbox, function(){
@@ -58235,8 +58286,23 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
 `;
   // Cuisine picker and "These hours are right" (2026-11-08): restaurants only, inside completeOn like the bar.
   const ymdText = (d) => { const x = new Date(`${d}T12:00:00Z`); return Number.isNaN(x.getTime()) ? '' : x.toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }); };
+  // Winery test 4 (2026-11-12): the one "no set hours" choice for a winery, saved on its own tap (by appointment only, and
+  // the old weekly hours replaced by a week with no open day; Undo in "Your updates" puts them back). An appointment-only
+  // winery is never asked "These hours are right".
+  const wineryApptOnly = venue.type === 'winery' && venueWineryInfo(venue.id).visit === 'appointment';
+  const noSetHoursHtml = () => {
+    if (venue.type !== 'winery' || waitingFields.has('hours')) return '';
+    if (wineryApptOnly && hoursKnown && OWNER_DAYS.every((d) => !(hours[d] && hours[d].length))) return `
+      <p class="op-hint op-no-set-hours-now" id="opNoSetHoursNow">${L('No set hours: visits are by appointment. Your page says “By appointment · call ahead”.', 'Pas d’heures fixes : visites sur rendez-vous. Votre page indique « Sur rendez-vous · appelez avant ».')}</p>`;
+    return `
+      <div class="op-hours-ok op-no-set-hours" id="opNoSetHours" data-live="${escapeHtml(L('Done. Your page says “By appointment · call ahead”, with no weekly hours.', 'C’est fait. Votre page indique « Sur rendez-vous · appelez avant », sans heures de la semaine.'))}" data-sent="${escapeHtml(L('Done. Your page says “By appointment · call ahead”. Your old hours come off within a day, after our check.', 'C’est fait. Votre page indique « Sur rendez-vous · appelez avant ». Vos anciennes heures seront retirées d’ici un jour, après notre vérification.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+        <button type="button" class="op-btn op-hours-ok-btn" id="opNoSetHoursBtn">${L('We don’t have set hours. Visits are by appointment', 'Nous n’avons pas d’heures fixes. Visites sur rendez-vous')}</button>
+        <p class="op-hint op-hours-ok-done" id="opNoSetHoursDone" role="status" hidden></p>
+        <p class="lyv-error" id="opNoSetHoursError" hidden></p>
+      </div>`;
+  };
   const hoursOkHtml = () => {
-    if (!completeOn || !hoursKnown || waitingFields.has('hours')) return '';
+    if (!completeOn || !hoursKnown || waitingFields.has('hours') || wineryApptOnly) return '';
     const last = live.hours_checked || '';
     const today = todayLocal();
     const byOwnerToday = last === today && ownerHoursSource(venue.id) === 'venue_owner';
@@ -58814,7 +58880,7 @@ ${renderGolfHeaderHtml()}
       <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
       ${saveLine('own', '', 'hours open_months hours_seasons closures')}<p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
-      <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}
+      <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}${noSetHoursHtml()}
       ${(() => {
         // Seasonal businesses (tours, golf, patios): the months they open every year.
         // Café test 2 (2026-11-11): with the first and last day too ("04-25:10-12"); whole months stay "4-10".
@@ -59392,6 +59458,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     }
     // Only send what the owner actually touched.
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
+    if (window.opNoSetHoursSent) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
     if (changes.website === initial.website) delete changes.website;
     ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });

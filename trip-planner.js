@@ -1318,7 +1318,8 @@ function publicVenue(v, ctx) {
     // 'dog_friendly' is the official dog-access list for beaches and outdoor
     // places; on dining venues the Dog-Friendly badge above says it.
     collections: (v.collections || []).filter((c) => PUBLIC_COLLECTION_LABELS[c] && (c !== 'dog_friendly' || OUTSIDE_TYPES.includes(v.type))).map((c) => ({ key: c, label: PUBLIC_COLLECTION_LABELS[c] })),
-    listedHours: v.hours ? listedHoursText(v, null, null) : null,
+    // Winery test 4 (2026-11-12): a winery by appointment (its own answer) shows no listed hours.
+    listedHours: v.hours && v.ownerAppointment !== true ? listedHoursText(v, null, null) : null,
     // Round 12 (2026-10-20): the venue's own French notice for its "Advisory on Whistler Roam" caveat, used on /fr/trip.
     ...(v.advisory && v.advisory.note && v.advisory.noteFr ? { advisoryFr: { en: `Advisory on ${SITE.brand}: ${advisoryExcerpt(v.advisory.note)}`, fr: `Avis ${SITE.brandFrOf} : ${advisoryExcerpt(v.advisory.noteFr)}` } } : {}),
   };
@@ -1587,7 +1588,13 @@ function stopFrom(v, scored, extra, ctx) {
     // The filler lines go once there is something real to say.
     if (reasons.filter((r) => r.text && !['daypart', 'region'].includes(r.code)).length >= 2) reasons = reasons.filter((r) => !['daypart', 'region'].includes(r.code));
   }
-  const caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
+  let caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
+  // Winery test 4 (2026-11-12): a winery that said it is by appointment has no hours to go by: no "Listed hours" reason
+  // and no hours caveat next to "By appointment only".
+  if (v && v.ownerAppointment === true) {
+    reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
+    caveats = caveats.filter((c) => c !== UNKNOWN_HOURS_CAVEAT && !/listed hours/i.test(c));
+  }
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
@@ -6259,7 +6266,7 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       else if (!related && local && timeFit && ['unknown', 'partial'].includes(timeFit.status)) reasonCode = 'confirm_hours';
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
-        reasonCode, _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
+        reasonCode, ...(appointmentOnly(venue) ? { appointment: true } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
         _reviews: Number(venue.reviews) || 0,
         _timeRank: daypart ? ({ verified: 0, short: 1, partial: 2, unknown: 3, closed: 4 }[timeFit.status] ?? 3) : 0,
       });
