@@ -663,12 +663,17 @@
   }
   // Tap-first answers: chips that write the line for her (typing stays possible). A chip is "on" while its words are in the box.
   function has(v, t){ return String(v || '').toLowerCase().indexOf(String(t).toLowerCase()) >= 0; }
+  // Winery test 5 (2026-11-12): a chip whose meaning the box already holds ("Patio only" when it says "on the patio")
+  // isn't added again. Its telling words, without the ones every dogs line has.
+  var QUICK_COMMON = { only: 1, and: 1, the: 1, at: 1, on: 1, to: 1, too: 1, our: 1, us: 1, welcome: 1, dogs: 1, dog: 1, et: 1, seulement: 1, a: 1, l: 1, d: 1, la: 1, le: 1, les: 1, aux: 1, au: 1, chiens: 1, chien: 1, bienvenus: 1 };
+  function quickWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(function(w){ return w && !QUICK_COMMON[w] && w !== 'à'; }); }
+  function saysIt(v, t){ if (has(v, t)) return true; var w = quickWords(t), b = ' ' + quickWords(v).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (has(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
   // Café screens (2026-11-10): one-of-a-few answers (data-cpick) and on/off tiles (data-ctog) on S.cafe.
@@ -1197,7 +1202,7 @@
         + (linkShown ? '<div id="suBookBox" style="margin-top:14px">' + (wv.noBook && !walkIn ? '' : field('suBookUrl', walkIn && T.bookLinkLabelWalkIn ? T.bookLinkLabelWalkIn : T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>')
           + (CUR.booking_url || C.bookingKnown || walkIn ? '' : '<div class="su-chips" role="group" aria-label="' + h(T.bookLinkLabel) + '"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (wv.noBook ? 'true' : 'false') + '" data-wnobook="1">' + h(T.noBookLink) + '</button></div>') + '</div>' : '')
         + '<h2 class="su-h2">' + h(T.groupsSizeQ) + '</h2><p class="su-hint">' + h(T.groupsSizeLead) + '</p>' + wchips('groups', [4, 6, 8, 10, 12], { 4: '4+', 6: '6+', 8: '8+', 10: '10+', 12: '12+' }, T.groupsSizeQ)
-        + '<h2 class="su-h2">' + h(T.busesQ) + '</h2>' + wchips('buses', ['welcome', 'book', 'no'], T.buses, T.busesQ)
+        + '<h2 class="su-h2">' + h(T.busesQ) + '</h2>' + (T.busesLead ? '<p class="su-hint" id="suBusesLead">' + h(T.busesLead) + '</p>' : '') + wchips('buses', ['welcome', 'book', 'no'], T.buses, T.busesQ)
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'visitSave') + '</div>' + skip('visit');
     } else if (s === 'experiences') {
       x = doneLine('experiences') + q(T.expQ, T.expLead) + msgs() + [0, 1].map(function(i){ var e = S.wine.exp[i];
@@ -2305,7 +2310,7 @@
       // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
       // becomes hers and a full Plan your visit box never drops it.
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
-      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; });
+      return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
@@ -2542,11 +2547,16 @@
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
-      var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim();
+      var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim(), qk = b.getAttribute('data-key');
+      // Winery test 5 (2026-11-12): "Dogs welcome on the patio. Patio only" went live. The box still holding research's
+      // line, untouched, is replaced by the tap; a line she typed gets the tap added; one that already says it stays.
+      var pre = String(((CUR.visit_rows || {})[qk]) || '').trim();
       if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = t;
+      else if (saysIt(v, t)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
       box.value = v.slice(0, 180); mark();
-      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', has(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
+      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });

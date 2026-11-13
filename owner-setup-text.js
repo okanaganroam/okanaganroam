@@ -975,7 +975,7 @@ en.winery = {
   bookLinkLabelWalkIn: 'Booking link (optional, e.g. for groups)',
   bookLinkEx: 'your website’s booking page', noBookLink: 'We don’t take bookings online', bookLinkBad: 'Please check the booking link, for example yourwinery.com/book.',
   groupsSizeQ: 'Groups: from what size should they book ahead?', groupsSizeLead: 'For example: “Groups of 8 or more, please book ahead”.',
-  busesQ: 'Tour buses and limos?', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
+  busesQ: 'Tour buses and limos?', busesLead: 'One answer for both. Take only one of them? Tap “Book ahead” so they contact you first.', buses: { welcome: 'Welcome', book: 'Book ahead', no: 'Not at this time' },
   visitNeed: 'Please tap how people visit, or tap Skip.', visitSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Off-season by appointment (Hours)
   allYearAppt: 'In the off-season we’re open by appointment', allYearApptSub: 'Walk-in tastings part of the year, by appointment the rest',
@@ -1049,7 +1049,7 @@ fr.winery = {
   bookLinkLabelWalkIn: 'Lien de réservation (facultatif, p. ex. pour les groupes)',
   bookLinkEx: 'la page de réservation de votre site', noBookLink: 'Nous ne prenons pas de réservations en ligne', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrevignoble.com/reserver.',
   groupsSizeQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsSizeLead: 'Par exemple : « Groupes de 8 personnes ou plus : réservez à l’avance ».',
-  busesQ: 'Autobus et limousines?', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
+  busesQ: 'Autobus et limousines?', busesLead: 'Une réponse pour les deux. Vous n’acceptez que l’un des deux? Touchez « Réservez à l’avance » pour qu’on vous joigne d’abord.', buses: { welcome: 'Bienvenus', book: 'Réservez à l’avance', no: 'Pas pour le moment' },
   visitNeed: 'Touchez comment on vous visite, ou touchez Passer.', visitSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   allYearAppt: 'En basse saison, nous ouvrons sur rendez-vous', allYearApptSub: 'Dégustations sans réservation une partie de l’année, sur rendez-vous le reste',
   apptQ: 'Quand accueillez-vous les visiteurs sans réservation?', apptLead: 'En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».',

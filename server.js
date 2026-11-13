@@ -20397,8 +20397,9 @@ function wineryVisitLines(venue, info) {
   if (Number.isInteger(w.groups) || w.buses) {
     const g = Number.isInteger(w.groups) ? [`Groups of ${w.groups} or more, please book ahead.`, `Groupes de ${w.groups} personnes ou plus : réservez à l’avance.`] : null;
     const b = { welcome: ['Tour buses and limos welcome.', 'Autobus et limousines bienvenus.'], book: ['Tour buses and limos: please book ahead.', 'Autobus et limousines : réservez à l’avance.'], no: ['No tour buses or limos at this time.', 'Pas d’autobus ni de limousines pour le moment.'] }[w.buses];
-    // Winery test 2 (2026-11-12): both asking to book ahead read as one sentence, not "book ahead" twice.
-    if (g && w.buses === 'book') out.Groups = { en: `Groups of ${w.groups} or more and tour buses, please book ahead.`, fr: `Groupes de ${w.groups} personnes ou plus et autobus : réservez à l’avance.` };
+    // Winery test 2 (2026-11-12): both asking to book ahead read as one sentence, not "book ahead" twice. Winery test 5:
+    // the one sentence keeps "limos" like the stand-alone line (it said "and tour buses", inviting buses for a limo answer).
+    if (g && w.buses === 'book') out.Groups = { en: `Groups of ${w.groups} or more, and tour buses and limos, please book ahead.`, fr: `Groupes de ${w.groups} personnes ou plus, autobus et limousines : réservez à l’avance.` };
     else out.Groups = { en: [g && g[0], b && b[0]].filter(Boolean).join(' '), fr: [g && g[1], b && b[1]].filter(Boolean).join(' ') };
   }
   // Food here: a restaurant (its own page, or a name and when it's open), snacks, a picnic area, or nothing.
@@ -45821,6 +45822,14 @@ function ownerVisitRows(venueId) {
   }
   return out;
 }
+// Winery test 5 (2026-11-12): the Plan your visit keys whose line is still research's (not one the owner wrote or
+// confirmed). The setup's quick-answer chips replace such a line instead of adding onto it.
+function ownerVisitResearchKeys(venueId) {
+  const info = venueVisitInfo(venueId) || {};
+  const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  const rows = info.rows || [];
+  return OWNER_VISIT_SLOTS.filter((slot) => { const r = slot.labels.map((l) => rows.find((x) => x && x.label === l)).find(Boolean); return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
+}
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
 function writeOwnerVisitRows(venueId, value, now = new Date()) {
@@ -52221,6 +52230,8 @@ function renderOwnerSetupPage(found, opts) {
     image: pendingMain || ownImage, imageSource: setupImageSource(venue, pendingMain), website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : ownerWebsitePending(venue.id) || normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
     researchTicks: setupResearchTicks(venue, offerGroups.flatMap((g) => g.keys)),
+    // Winery test 5: Plan your visit lines that are still research's, so a quick-answer chip replaces them.
+    visitResearch: ownerVisitResearchKeys(venue.id),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
