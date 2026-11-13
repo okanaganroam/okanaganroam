@@ -6743,9 +6743,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const hoursDate = parseLocalDate(onDate) ? onDate : seasonToday;
   const seasonStatesNow = getSeasonStates();
   // An owner's yearly season with no dated closure set by hand, judged by the planner on the trip's date (round 7).
-  const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons').all().map((r) => r.venue_id));
+  const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons WHERE superseded_at IS NULL').all().map((r) => r.venue_id));
   // A closure with no reopening date (2026-10-25) still has the place's usual months, so a trip in season can use it.
-  const undatedClosure = new Set(db.prepare("SELECT venue_id FROM venue_seasons WHERE status = 'closed' AND reopens_date IS NULL").all().map((r) => r.venue_id));
+  const undatedClosure = new Set(db.prepare("SELECT venue_id FROM venue_seasons WHERE status = 'closed' AND reopens_date IS NULL AND superseded_at IS NULL").all().map((r) => r.venue_id));
   const openMonthsById = new Map();
   try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id) || undatedClosure.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
@@ -7827,7 +7827,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   let openingText = planTextPlain;
   if (/\bopening (?:day|weekend)\b/i.test(planTextPlain) && (/\b(?:ski|skiing|lifts?|mountain|snowboard\w*)\b/i.test(planTextPlain) || TRIP_SITE.skiHillNameRe.test(planTextPlain.toLowerCase()))) {
     try {
-      const row = db.prepare("SELECT s.reopens_date AS d FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE lower(v.cuisine) = 'ski resort' AND s.reopens_date IS NOT NULL ORDER BY s.reopens_date LIMIT 1").get();
+      const row = db.prepare("SELECT s.reopens_date AS d FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE lower(v.cuisine) = 'ski resort' AND s.reopens_date IS NOT NULL AND s.superseded_at IS NULL ORDER BY s.reopens_date LIMIT 1").get();
       if (row && row.d) { const M = ['January','February','March','April','May','June','July','August','September','October','November','December']; openingText = planTextPlain.replace(/\bopening (day|weekend)\b/i, (m, w) => `skiing ${w === 'weekend' ? 'weekend' : ''} from ${M[Number(row.d.slice(5, 7)) - 1]} ${Number(row.d.slice(8, 10))}`); }
     } catch (e) { /* no season rows */ }
   }
@@ -8228,7 +8228,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   let openingNote = null;
   if (requirements && !requirements.startDate && !overrides?.startDate && !Number.isInteger(intent.month) && !intent.season) {
     const named = requirements.items.filter((i) => i.kind === 'venue' && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery'].includes(i.venueType));
-    const rows = named.map((i) => { try { return db.prepare('SELECT v.name, s.status, s.reopens_date FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE v.id = ?').get(i.value); } catch (e) { return null; } });
+    const rows = named.map((i) => { try { return db.prepare('SELECT v.name, s.status, s.reopens_date FROM venues v JOIN venue_seasons s ON s.venue_id = v.id WHERE v.id = ? AND s.superseded_at IS NULL').get(i.value); } catch (e) { return null; } });
     const today = todayLocal(now);
     const closed = rows.filter((r) => r && r.status === 'closed' && r.reopens_date && r.reopens_date > today);
     if (named.length && closed.length) {
@@ -8854,15 +8854,24 @@ function chainReopening(reopens, closures) {
   }
   return date;
 }
+// Brewery test 3 (2026-11-13): an owner's season save (open_months, from setup or the portal) takes precedence over a
+// researched venue_seasons row: the row is kept (for an Undo, and the audit) but marked superseded, so the page, the
+// card, Open now and Build My Trip all read the owner's dates. An Undo back to no season clears the mark; a fresh POST
+// /admin/set-season later writes the row again (guardedSeasonUpdate) and it shows again.
+function ownerSeasonSupersedes(venueId, openMonths, undo) {
+  if (openMonths) db.prepare('UPDATE venue_seasons SET superseded_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND superseded_at IS NULL').run(venueId);
+  else if (undo) db.prepare('UPDATE venue_seasons SET superseded_at = NULL WHERE venue_id = ? AND superseded_at IS NOT NULL').run(venueId);
+}
 // today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
 function getSeasonRows(today = todayLocal()) {
   const map = new Map();
   for (const r of db.prepare(`
     SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
     FROM venue_seasons s JOIN venues v ON v.id = s.venue_id
-    WHERE v.redirect_to IS NULL
+    WHERE v.redirect_to IS NULL AND s.superseded_at IS NULL
   `).all()) map.set(r.venue_id, r);
-  // Owners' yearly seasons, where no dated closure has been set by hand.
+  // Owners' yearly seasons, where no dated closure has been set by hand since. Brewery test 3 (2026-11-13): the owner's
+  // own save marks an older researched row superseded (ownerSeasonSupersedes), so it is no longer read above.
   for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
     WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
     if (map.has(r.venue_id)) continue;
@@ -11051,9 +11060,10 @@ function guardedSeasonUpdate(id, season, meta, now = new Date()) {
   const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
   if (!venue) return { ok: false, reason: 'venue_not_found' };
   if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
-  const prevRow = db.prepare('SELECT status, until_date, reopens_date, source_url, checked_at FROM venue_seasons WHERE venue_id = ?').get(id);
+  const prevRow = db.prepare('SELECT status, until_date, reopens_date, source_url, checked_at, superseded_at FROM venue_seasons WHERE venue_id = ?').get(id);
   const prev = prevRow ? { status: prevRow.status, until_date: prevRow.until_date, reopens_date: prevRow.reopens_date, source_url: prevRow.source_url, checked_at: prevRow.checked_at } : null;
-  if (JSON.stringify(prev) === JSON.stringify(next)) return { ok: true, changed: false, season: next };
+  // A superseded row (the owner saved their own season since) set again by hand is written again, so it shows again.
+  if (JSON.stringify(prev) === JSON.stringify(next) && !(prevRow && prevRow.superseded_at)) return { ok: true, changed: false, season: next };
   let txOpen = false;
   try {
     db.exec('BEGIN');
@@ -11064,7 +11074,7 @@ function guardedSeasonUpdate(id, season, meta, now = new Date()) {
         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(venue_id) DO UPDATE SET status = excluded.status, until_date = excluded.until_date,
           reopens_date = excluded.reopens_date, source_url = excluded.source_url,
-          checked_at = excluded.checked_at, updated_at = CURRENT_TIMESTAMP
+          checked_at = excluded.checked_at, superseded_at = NULL, updated_at = CURRENT_TIMESTAMP
       `).run(id, next.status, next.until_date, next.reopens_date, next.source_url, next.checked_at);
     } else {
       db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
@@ -56613,6 +56623,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
         db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, next);
+        // Brewery test 3 (2026-11-13): the owner's own season wins over a researched closure (kept, marked superseded).
+        if (field === 'open_months') ownerSeasonSupersedes(venue.id, next, !!opts.undo);
         clearVenueSocialCache();
         log.run(venue.id, field, before == null ? null : String(before), next == null ? null : String(next), meta.reason, meta.batch_id, reviewer);
         applied.push(field);
@@ -58706,7 +58718,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
     description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     // Café test 2 (2026-11-11): closed for the season today (the storefront photo waits until it reopens).
-    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ?').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
+    closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ? AND superseded_at IS NULL').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),
     // "Not sure / someone else runs it" in the setup (pub test 6): answered, kept apart from "we don't have one".
     unsureKeys: (() => { try { const d = setupProgress(venue.id).done; return SETUP_UNSURE_STEPS.filter((k) => d[k] === 'unsure'); } catch (e) { return []; } })(),
