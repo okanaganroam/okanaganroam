@@ -6307,6 +6307,18 @@ function dayClosedAllDay(v, date, weekday) {
   return !!(parsed.known && parsed.days[wd] && parsed.days[wd].status === 'closed');
 }
 
+// The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the
+// trip's date), with that season's months and the days it is open: { day: 'mon', from: '10-01', to: '04-30', open: [...] }.
+function closedDayInfo(v, weekday) {
+  const wd = String(weekday || '').toLowerCase().slice(0, 3);
+  if (!WEEKDAYS.includes(wd) || !dayClosedAllDay(v, null, wd)) return null;
+  const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+  const open = WEEKDAYS.filter((d) => parsed.days[d] && parsed.days[d].status === 'open');
+  if (!open.length) return null;
+  const sea = v.hoursSeason && /^\d{2}-\d{2}$/.test(v.hoursSeason.from || '') && /^\d{2}-\d{2}$/.test(v.hoursSeason.to || '') ? { from: v.hoursSeason.from, to: v.hoursSeason.to } : {};
+  return { day: wd, ...sea, open };
+}
+
 // Offer grounded ways to adapt an unmet request without marking an option as
 // a match or inserting it into the itinerary.
 function addOptionalRequirementAlternatives(results, plan, requirements, input) {
@@ -6355,9 +6367,12 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // "By appointment · call ahead" instead.
       const byAppointment = appointmentOnly(venue);
       if (byAppointment && ['confirm_hours', 'different_time'].includes(reasonCode)) reasonCode = 'another_listing';
+      // Brewery test 4 (2026-11-13): closed all that day in its own week (a weekly closed day, or one in the owner's
+      // seasonal hours): "Closed Mondays (Oct–Apr) · try Tue–Sun" instead of a bare "Try another time".
+      const closedDay = reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null;
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
-        reasonCode, ...(byAppointment ? { appointment: true } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
+        reasonCode, ...(byAppointment ? { appointment: true } : {}), ...(closedDay ? { closedDay } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
         _reviews: Number(venue.reviews) || 0,
         _timeRank: daypart ? ({ verified: 0, short: 1, partial: 2, unknown: 3, closed: 4 }[timeFit.status] ?? 3) : 0,
       });
@@ -8105,7 +8120,7 @@ module.exports = {
   publicVenue, breweryIsCidery, ciderAsked,
   stopFrom,
   parseVenueHours,
-  hoursFit, dayClosedAllDay,
+  hoursFit, dayClosedAllDay, closedDayInfo,
   listedHoursText,
   cafeRole,
   SLOT_WINDOWS,
