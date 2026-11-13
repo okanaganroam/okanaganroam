@@ -20874,7 +20874,7 @@ function breweryVisitLines(venue, info) {
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
-    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Vous pouvez apporter votre pique-nique.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur, s’il vous plaît.'] : null;
+    const own = b.outside === 'yes' ? ['Outside food welcome.', 'Vous pouvez apporter votre pique-nique.'] : b.outside === 'no' ? ['No outside food, please.', 'Pas de nourriture de l’extérieur.'] : null;
     if (main) out.Food = { en: [main[0], own && own[0]].filter(Boolean).join(' '), fr: [main[1], own && own[1]].filter(Boolean).join(' ') };
   }
   if (Array.isArray(b.to_go) && b.to_go.length) {
@@ -65904,7 +65904,7 @@ module.exports = {
   EVENT_PHOTO_SPECIAL,
   HOME_EVENT_IMAGES,
   recurringSeasonRow,
-  chainReopening, getSeasonRows, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
+  chainReopening, getSeasonRows, ownerSetupCardHtml, venueSeasonHoursHtml, seasonalCheckStale, openMonthsText, ownerClosuresKept,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
   stripJpegMetadata,

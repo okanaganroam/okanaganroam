@@ -235,7 +235,7 @@ test('plan your visit: Flights, Food, To go and Kids & dogs are written from the
   assert.equal(row(b.id, 'Games').text, 'Trivia Tuesdays.', 'events not answered yet');
   // French lines ride along.
   const info = app.venueVisitInfo(b.id);
-  assert.equal(info.owner_fr.Food.fr, 'Camions de cuisine de rue la plupart des jours. Nourriture de l’extérieur bienvenue.');
+  assert.equal(info.owner_fr.Food.fr, 'Camions de bouffe de rue la plupart des jours. Vous pouvez apporter votre pique-nique.');
   assert.equal(info.owner_fr['To go'].fr, 'Canettes, bouteilles et remplissage de growlers pour emporter.');
   // Owner lines first, never folded under "More".
   const html = app.visitInfoHtml(info, false);
@@ -707,7 +707,7 @@ test('test 2 fix 1: food trucks “Most days” / “Weekends only”, pre-picke
   // Saved with the screen: the line stays "on weekends", in both languages.
   assert.equal((await change(t, { brewery_info: { food: 'trucks', trucks: 'weekends', outside: 'yes' } })).status, 200);
   assert.equal(row(b.id, 'Food').text, 'Food trucks on weekends. Outside food welcome.');
-  assert.equal(app.venueVisitInfo(b.id).owner_fr.Food.fr, 'Camions de cuisine de rue la fin de semaine. Nourriture de l’extérieur bienvenue.');
+  assert.equal(app.venueVisitInfo(b.id).owner_fr.Food.fr, 'Camions de bouffe de rue la fin de semaine. Vous pouvez apporter votre pique-nique.');
   assert.equal(app.venueBreweryInfo(b.id).trucks, 'weekends');
   // Most days.
   assert.equal((await change(t, { brewery_info: { trucks: 'most_days' } })).status, 200);
@@ -814,4 +814,144 @@ test('test 2 fix 6: Facebook pre-filled from a facebook.com website, one link on
   assert.match(s, /BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00'\]/);
   assert.match(s, /function brewQuick\(d, j, y, last\)\{\n    if \(!C\.brewery\) return '';/);
   assert.match(s, /su-laterow su-bqrow/); assert.match(app.OWNER_SETUP_CSS || (await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text, /\.su-bqrow \.su-latebtn \{ padding: 0 10px; \}/, 'four times fit one row at 375px');
+});
+
+// ---------- Brewery test 3 (2026-11-13, a French orchard cidery) ----------
+const SEASON_SRC = { source_url: 'https://example.com/season', checked_at: today };
+const seasonMeta = { reason: 'test research', batch_id: 'test-season' };
+const planFor = async (txt) => (await fetch(base + '/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: txt }) }).then((r) => r.json()));
+const planStops = (j, id) => [].concat(j.recommendations || [], ...(j.days || []).map((d) => d.stops || []), (j.itinerary || {}).stops || [], (j.outing || {}).stops || []).filter((s) => s && s.venue && s.venue.id === id);
+const inSeason = (md, a, b) => (a <= b ? md >= a && md <= b : md >= a || md <= b);
+
+test('brewery test 3: the owner’s season wins over a researched closure (cidery, winery, golf); research kept for Undo', async () => {
+  const W = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['11:00', '17:00']]])));
+  const nextYear = Number(today.slice(0, 4)) + 1;
+  const md = today.slice(5);
+  const fixtures = [
+    mk('brewery', { name: 'Seasonwin Orchard Cidery', slug: 'seasonwin-orchard-cidery', region: 'summerland', hours: W }),
+    mk('winery', { name: 'Seasonwin Bench Winery', slug: 'seasonwin-bench-winery', region: 'summerland', hours: W }),
+    mk('golf', { name: 'Seasonwin Golf Club', slug: 'seasonwin-golf-club', region: 'summerland', hours: W }),
+  ];
+  for (const v of fixtures) assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: null, ...SEASON_SRC }, seasonMeta).ok, true);
+  const [cid, win, golf] = fixtures;
+  // Before the owner says anything, the research closure shows ("not announced").
+  assert.equal(app.getSeasonStates().get(cid.id).kind, 'closed');
+  assert.equal(app.getSeasonStates().get(cid.id).reopens, null);
+  assert.equal((await change(tokenFor(cid.id), { place_type: 'Cidery', open_months: '05-01:10-15' })).status, 200);
+  assert.equal((await change(tokenFor(win.id), { open_months: '04-25:10-31' })).status, 200);
+  assert.equal((await change(tokenFor(golf.id), { open_months: '04-01:10-31' }, false)).status, 200);
+  // The research rows are kept, marked superseded; the owner's dates are what every surface reads.
+  for (const v of [cid, win]) assert.ok(db.prepare('SELECT superseded_at FROM venue_seasons WHERE venue_id = ?').get(v.id).superseded_at, v.name);
+  const rows = app.getSeasonRows();
+  if (!inSeason(md, '05-01', '10-15')) {
+    assert.equal(rows.get(cid.id).reopens_date.slice(5), '05-01');
+    const st = app.getSeasonStates().get(cid.id);
+    assert.equal(st.kind, 'closed'); assert.match(st.text, /Reopens May 1/);
+    const page = (await get('/summerland/breweries/seasonwin-orchard-cidery')).text;
+    assert.match(page, /Reopens May 1/);
+    assert.doesNotMatch(page, /has not been announced/);
+    // The card says it once (status line), not again on the photo.
+    const list = (await get('/summerland/breweries')).text;
+    const i = list.indexOf(`data-venue-id="${cid.id}"`); const card = list.slice(i, list.indexOf('</li>', i));
+    assert.match(card, /Closed for the season · Reopens May 1/);
+    assert.doesNotMatch(card, /season-tag-closed/);
+    const frList = (await get('/fr/summerland/breweries')).text;
+    const j = frList.indexOf(`data-venue-id="${cid.id}"`); const frCard = frList.slice(j, frList.indexOf('</li>', j));
+    assert.equal((frCard.match(/Fermé pour la saison/g) || []).length, 1, frCard.slice(0, 2000));
+  }
+  // Build My Trip: July and May 15 are in her season, December is not.
+  const prev = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    assert.ok(planStops(await planFor(`Seasonwin Orchard Cidery in Summerland on July 15, ${nextYear}`), cid.id).length, 'July');
+    assert.ok(planStops(await planFor(`Seasonwin Orchard Cidery in Summerland on May 15, ${nextYear}`), cid.id).length, 'May 15');
+    assert.equal(planStops(await planFor(`Seasonwin Orchard Cidery in Summerland on December 15, ${nextYear}`), cid.id).length, 0, 'December');
+    assert.ok(planStops(await planFor(`Seasonwin Bench Winery in Summerland on July 15, ${nextYear}`), win.id).length, 'winery July');
+    assert.ok(planStops(await planFor(`Seasonwin Golf Club in Summerland on July 15, ${nextYear}`), golf.id).length, 'golf July');
+  } finally { if (prev === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = prev; }
+  // Undo back to no season: the research closure shows again. A fresh research row later wins again.
+  const u = app.undoOwnerInstantChange(lastReq(win.id, 'open_months'), 'dayton', new Date(), 'test');
+  assert.equal(u.ok, true, JSON.stringify(u));
+  assert.equal(db.prepare('SELECT superseded_at FROM venue_seasons WHERE venue_id = ?').get(win.id).superseded_at, null);
+  assert.equal(app.getSeasonStates().get(win.id).kind, 'closed');
+  assert.equal(app.guardedSeasonUpdate(cid.id, { status: 'closed', reopens_date: null, ...SEASON_SRC }, seasonMeta).changed, true, 'set again by hand: shows again');
+  assert.equal(db.prepare('SELECT superseded_at FROM venue_seasons WHERE venue_id = ?').get(cid.id).superseded_at, null);
+});
+
+test('brewery test 3: the picked kind shows on the page and in the planner; cider queries (EN + FR) find the cidery', async () => {
+  const c = mk('brewery', { name: 'Verger Kindtest', slug: 'verger-kindtest', region: 'summerland', description: 'A family business pouring its own drinks.' });
+  const b = mk('brewery', { name: 'Kindtest Brewing', slug: 'kindtest-brewing', region: 'summerland', description: 'A small family brewery.' });
+  assert.equal((await change(tokenFor(c.id), { place_type: 'Cidery' })).status, 200);
+  assert.equal((await change(tokenFor(b.id), { place_type: 'Brewery' })).status, 200);
+  const page = (await get('/summerland/breweries/verger-kindtest')).text;
+  assert.match(page, /Cidery &middot; <a href="\/summerland">/);
+  assert.match((await get('/summerland/breweries/kindtest-brewing')).text, /Brewery &middot; <a href="\/summerland">/);
+  const pv = planner.publicVenue({ id: c.id, type: 'brewery', breweryKind: 'Cidery', url: '/x', features: {}, collections: [] }, null);
+  assert.equal(pv.typeLabel, 'Cidery'); assert.equal(pv.typeLabelFr, 'Cidrerie');
+  assert.ok(planner.ciderAsked('cideries in summerland') && planner.ciderAsked('cider') && !planner.ciderAsked('beer and cider'));
+  const prev = process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    for (const q of ['Cidreries à Summerland', 'cidre à Summerland', 'Cideries in Summerland', 'Cider in Summerland']) {
+      const j = await planFor(q);
+      assert.match(j.summary || '', /^Cideries in Summerland/, q);
+      const ids = [].concat(j.recommendations || [], ...(j.days || []).map((d) => d.stops || [])).filter((s) => s && s.venue).map((s) => s.venue.id);
+      const closed = (j.closedForSeason || []).map((x) => x.id);
+      if (ids.length) assert.ok(ids.includes(c.id) || closed.includes(c.id), q);
+      if (ids.includes(c.id) && ids.includes(b.id)) assert.ok(ids.indexOf(c.id) < ids.indexOf(b.id), `${q}: the cidery first`);
+    }
+  } finally { if (prev === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = prev; }
+  const tr = require('../trip-french-copy.js').t3FrenchText;
+  assert.equal(tr('Cideries in Summerland.'), 'Cidreries à Summerland.');
+  assert.match(tr('Cidrerie du Verger Bleu is closed for the season until May 1, 2027, so it isn’t in this plan.'), /^Cidrerie du Verger Bleu est fermée .*; elle ne fait donc pas/);
+  assert.match(tr('Bluebird Bench Winery is closed right now, so it isn’t in this plan.'), /est fermé en ce moment; il ne fait/);
+});
+
+test('brewery test 3: cider words for a cidery, neutral for no kind, beer words kept for a brewery (EN + FR)', async () => {
+  const fb = text.fr.brewery, eb = text.en.brewery;
+  assert.match(fb.kindCidery.photosLead, /^Votre verger, votre salle de dégustation, votre terrasse/);
+  assert.match(eb.kindCidery.photosLead, /^Your orchard, your tasting room, your patio/);
+  assert.match(fb.kindCidery.knownEx, /cidres secs de pommes anciennes/); assert.match(eb.kindCidery.knownEx, /Dry ciders from heritage apples/);
+  assert.doesNotMatch(fb.kindCidery.storyEx, /microbrasserie|fûts/);
+  assert.match(fb.igLead, /@votrecommerce/); assert.match(eb.igLead, /@yourbusiness/);
+  assert.match(fb.kindCidery.labels.menu, /liste des cidres/); assert.match(fb.kindNeutral.labels.menu, /liste des boissons/);
+  assert.match(fb.labels.menu, /liste des bières/, 'beer words kept for a brewery');
+  assert.doesNotMatch(fb.hiLead + fb.labels.door + fb.doorQ + fb.mapFailQ, /votre salle(?! de dégustation)/);
+  assert.equal(fb.doorHere, 'Êtes-vous sur place en ce moment ?');
+  assert.match(fb.knownQ, /reconnus/); assert.match(fb.labels.story, /reconnus/);
+  assert.match(fb.tfoods.trucks, /bouffe de rue/);
+  assert.doesNotMatch(eb.groupsLine, /\.$/); assert.doesNotMatch(fb.groupsLine, /\.$/);
+  assert.match(text.fr.storyEnglishHint, /anglais/);
+  // The setup page script lays the kind's words over the brewery words.
+  const s = (await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text;
+  assert.match(s, /function kindWords\(\)/);
+  // Checklist and owner home: cider words for a cidery (picked, or by its name), neutral with no clue, beer for a brewery.
+  const item = (k, input) => { const r = pc.scoreCompleteness({ type: 'brewery', ...input }, {}); return r.missing.concat(r.done || []).find((it) => it.key === k) || r.missing.find((it) => it.key === k); };
+  const mi = (input) => item('menu', input);
+  if (mi({ placeType: 'Cidery' })) {
+    assert.equal(mi({ placeType: 'Cidery' }).fr, 'Menu ou liste des cidres');
+    assert.equal(mi({ placeType: 'Brewery' }).fr, 'Menu ou liste des bières');
+    assert.equal(mi({ placeType: '', wordsKind: '' }).fr, 'Menu ou liste des boissons');
+    assert.equal(mi({ placeType: '', wordsKind: 'Cidery' }).fr, 'Menu ou liste des cidres');
+  }
+  const cid = mk('brewery', { name: 'Cidrerie Hometest', slug: 'cidrerie-hometest' });
+  const home = (await get(`/fr/owner/${tokenFor(cid.id)}`)).text;
+  assert.match(home, /Mettre à jour mon menu ou ma liste des cidres/);
+  assert.match(home, /Photographiez votre tableau ou votre liste des cidres/);
+  // French typography on the checklist (a no-break space before « : » and « ? »).
+  assert.equal(pc.BREWERY_ITEMS.find((i) => i.key === 'season').fr, 'Ouvert toute l’année, ou en saison ?');
+  assert.equal(pc.ITEMS.find((i) => i.key === 'happy_hour').fr, 'Heures et spéciaux du 5 à 7');
+  assert.match(app.ownerSetupCardHtml('/x', 'fr', 'done', 'brewery'), /Changer quelque chose \?/);
+});
+
+test('brewery test 3: « 1 vue de la page », "1 page view", and the French "+N" chip', async () => {
+  const os = require('../owner-stats.js');
+  const st = { views: 1, clicks: { website: 1, call: 0, directions: 0, book: 0, menu: 0 }, clicks_total: 1, prev: null, since: today, counting_since: today, none: false, small: true };
+  const fr = os.ownerStatsHtml(st, 'fr'); const en = os.ownerStatsHtml(st, 'en');
+  assert.match(fr, /1 vue de la page · 1 clic vers/); assert.doesNotMatch(fr, /1 vues/);
+  assert.match(en, /1 page view · 1 click to/); assert.doesNotMatch(en, /1 page views/);
+  assert.match(os.ownerStatsHtml({ ...st, views: 3, clicks_total: 2 }, 'fr'), /3 vues de la page · 2 clics/);
+  const v = mk('brewery', { name: 'Chipcount Brewing', slug: 'chipcount-brewing', region: 'summerland', patio: 1, dog_friendly: 1, kid_friendly: 1, live_music: 1, great_groups: 1, nonalcoholic: 1, lake_view: 1 });
+  const html = (await get('/fr/summerland/breweries')).text;
+  const i = html.indexOf(`data-venue-id="${v.id}"`); const card = html.slice(i, html.indexOf('</li>', i));
+  const chip = (card.match(/<span class="chip chip-more"[^>]*>/) || [''])[0];
+  if (chip) { assert.match(chip, /aria-label="\d+ de plus : /); assert.doesNotMatch(chip, / more: /); }
 });

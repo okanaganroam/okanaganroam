@@ -563,7 +563,7 @@ Object.assign(en, {
   closeDay: 'Closed', closeDayAria: 'Mark {day} closed', openDayAria: 'Open {day} again',
   kitchenSeasonQ: 'In your {kind} hours ({range}), when does the kitchen close?', kitchenSeasonSame: 'Same time as the rest of the year', kitchenSeasonClose: 'Food until we close',
   kitchenSeasonAt: 'Kitchen closes at', kitchenSeasonNeed: 'Please pick the time, or tap “Same time as the rest of the year”.',
-  storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyClear: 'Clear the text',
+  storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyEnglishHint: '', storyClear: 'Clear the text',
   useSite: 'Use {site}', useSiteSub: 'Your website',
   curMainPending: 'Your new main photo (on your page within a day)', keepMainPending: 'Keep this one',
   hoursDoneDayAria: 'Done with {day}',
@@ -1257,19 +1257,21 @@ en.brewery.kindNeutral = {
 };
 fr.brewery.kindCidery = {
   hiLead: 'Préparons la page de votre cidrerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { menu: 'Votre menu ou liste des cidres' },
   menuQ: 'Comment ajouter votre menu ou votre liste des cidres?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos cidres changent.',
   photosLead: 'Votre verger, votre salle de dégustation, votre terrasse. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une cidrerie comme la vôtre.',
   storyQ: 'Parlez de votre cidrerie aux visiteurs', storyEx: 'Une cidrerie familiale dans notre verger. Nous pressons nos propres pommes, servons à la salle de dégustation, et la terrasse donne sur les arbres.',
   knownEx: 'Des cidres secs de pommes anciennes',
+  labels: { taproom: 'Votre salle de dégustation', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des cidres' },
+  doorQ: fr.brewery.doorQ, doorHere: fr.brewery.doorHere, mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
 };
 fr.brewery.kindNeutral = {
   hiLead: 'Préparons la page de votre salle de dégustation, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { menu: 'Votre menu ou liste des boissons' },
   menuQ: 'Comment ajouter votre menu ou votre liste des boissons?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos produits changent.',
   photosLead: 'Votre salle de dégustation, votre bar, votre terrasse. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver un endroit comme le vôtre.',
   storyQ: 'Parlez de votre entreprise aux visiteurs', storyEx: 'Une petite entreprise familiale. Nous produisons tout sur place, servons à la salle de dégustation, et la terrasse a le soleil du soir.',
   knownEx: 'De petites cuvées faites sur place',
+  labels: { taproom: 'Votre salle de dégustation', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des boissons' },
+  doorQ: fr.brewery.doorQ, doorHere: fr.brewery.doorHere, mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
 };
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
