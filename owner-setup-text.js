@@ -938,7 +938,9 @@ Object.assign(fr, {
 
 // Café test 6 (2026-11-12): the other season's hours, said on the "Are these still your hours?" screen.
 Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
+Object.assign(en, { recapHours: 'Your hours', recapRest: 'Rest of the year', stSocialIgLive: 'Instagram on your page now, Facebook within a day', stSocialFbLive: 'Facebook on your page now, Instagram within a day' });
 Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
+Object.assign(fr, { recapHours: 'Vos heures', recapRest: 'Le reste de l’année', stSocialIgLive: 'Instagram sur votre page maintenant, Facebook d’ici un jour', stSocialFbLive: 'Facebook sur votre page maintenant, Instagram d’ici un jour' });
 
 // Wineries (Dayton, 2026-11-12; drafts/winery-portal-2026-11-12/SPEC-wineries.md, "Decided"): winery words and the
 // winery-only screens (Your winery, Tastings, Booking and groups, Experiences, the off-season by appointment), laid over
@@ -967,7 +969,7 @@ en.winery = {
   feeNeed: 'Please tap a price, or tap Other and type it, like 18.',
   waivedQ: 'Is it free if people buy wine?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
   feeSavedLive: 'Your tasting price is on your page and your card now.', feeSavedDay: 'We check prices over $75 first. It’ll show within a day.',
-  feeCard: 'tastings from {x}', feeCardFree: 'free tastings',
+  feeCard: 'tastings {x} a person', feeCardFree: 'free tastings',
   // Booking and groups
   visitQ: 'How do people visit?', visitLead: 'Pick the one that fits most days.',
   visits: { walk_in: 'Walk-ins welcome', recommended: 'Booking recommended', needed: 'Booking needed', appointment: 'By appointment only' },
@@ -989,7 +991,7 @@ en.winery = {
   apptHoursGone: 'By appointment only: your old weekly hours came off your page, so it only says “By appointment · call ahead”.',
   // Your story and Known for
   storyQ: 'Tell visitors about your winery', storyEx: 'A family winery on the Naramata Bench. We grow Pinot Noir and Chardonnay, and the patio looks over the lake.',
-  knownQ: 'What are your wines known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Pinot Noir and Chardonnay from estate vines',
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Experiences
   expQ: 'Any experiences to book?', expLead: 'Up to two, like wine and cheese or a vineyard tour. They show in “Plan your visit”.',
@@ -1042,7 +1044,7 @@ fr.winery = {
   feeNeed: 'Touchez un prix, ou touchez Autre et écrivez-le, par exemple 18.',
   waivedQ: 'Est-elle gratuite à l’achat de vin?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   feeSavedLive: 'Votre prix de dégustation est sur votre page et votre fiche maintenant.', feeSavedDay: 'Nous vérifions d’abord les prix de plus de 75 $. Il s’affichera d’ici un jour.',
-  feeCard: 'dégustations dès {x}', feeCardFree: 'dégustations gratuites',
+  feeCard: 'dégustations à {x} par personne', feeCardFree: 'dégustations gratuites',
   visitQ: 'Comment les visiteurs viennent-ils?', visitLead: 'Choisissez ce qui convient la plupart des jours.',
   visits: { walk_in: 'Sans réservation', recommended: 'Réservation conseillée', needed: 'Réservation obligatoire', appointment: 'Sur rendez-vous seulement' },
   visitSubs: { appointment: 'Votre fiche indique « Sur rendez-vous · appelez avant »' },
@@ -1060,7 +1062,7 @@ fr.winery = {
   noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Sur rendez-vous · appelez avant ».',
   apptHoursGone: 'Sur rendez-vous seulement : vos anciennes heures de la semaine sont retirées de votre page, qui indique seulement « Sur rendez-vous · appelez avant ».',
   storyQ: 'Parlez de votre vignoble aux visiteurs', storyEx: 'Un vignoble familial sur le banc de Naramata. Nous cultivons du pinot noir et du chardonnay, et la terrasse donne sur le lac.',
-  knownQ: 'Votre spécialité?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
+  knownQ: 'Pour quoi êtes-vous reconnu?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Pinot noir et chardonnay de nos vignes',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   expQ: 'Des expériences à réserver?', expLead: 'Jusqu’à deux, comme vin et fromage ou une visite du vignoble. Elles paraissent dans « Planifiez votre visite ».',
   expN: 'Expérience {n}', expNameLabel: 'Nom', expTextLabel: 'Détails (facultatif)', expQuick: ['Vin et fromage', 'Visite du vignoble', 'Paniers de pique-nique', 'Dégustation privée'],

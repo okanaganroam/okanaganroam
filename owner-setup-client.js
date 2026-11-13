@@ -489,6 +489,9 @@
     if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
     if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
     if (d === 'day' && step === 'photos' && T.stDayPlural) return T.stDayPlural;
+    // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
+    if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
+    if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic ? T.stSoon : T.st[d]; }
   function statusHtml(done){
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, done[k])) + '</li>'; }).join('');
@@ -775,12 +778,34 @@
   }
   // Café test 6 (2026-11-12): reopening the Hours step showed only the usual week, and an owner with summer hours
   // feared they were lost. One line per saved season: "Summer (Jun–Sep): 7 AM – 3 PM every day ✓". No new question.
-  function weekShort(w){
+  function weekShort(w, sep){
     var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
     if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
     var out = [], i = 0;
     while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
-    return out.join(' · ');
+    return out.join(sep || ' · ');
+  }
+  // Winery test 5 (2026-11-12): after saving, one line with every set of hours ("Summer: 11 AM – 5 PM every day · Winter
+  // (Nov–Apr): Mon–Thu closed, Fri–Sun Noon – 4 PM"), so both seasons are checked at a glance.
+  function hoursRecap(){
+    var parts = [], kinds = [];
+    (CUR.hours_seasons || []).forEach(function(sz){ var x = seasonInfo(sz); if (x) { parts.push(x.kw + ' (' + x.range + ')' + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(x.w, ', ')); kinds.push(x.kind); } });
+    var w = S.week; if (!w || !DAYS.some(function(d){ return w[d] && w[d].length; })) return '';
+    var other = kinds.length && kinds.every(function(k){ return k === 'winter'; }) ? 'summer' : kinds.length && kinds.every(function(k){ return k === 'summer'; }) ? 'winter' : '';
+    var ul = other ? String((T.seasonWord || {})[other] || other) : '';
+    var lead = kinds.length ? (ul ? ul.charAt(0).toUpperCase() + ul.slice(1) : T.recapRest) : T.recapHours;
+    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', '));
+    return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
+  }
+  function seasonInfo(sz){
+      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return null;
+      var w = parseWeek(sz.hours); if (!w) return null;
+      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
+      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
+      var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
+      var last = new Date(2025, b, 0).getDate();
+      var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
+      return { kind: kind, kw: kw, w: w, range: md2(a, da, da > 1) + '–' + md2(b, db, db < last) };
   }
   function seasonLines(){
     return (CUR.hours_seasons || []).map(function(sz){
@@ -1099,7 +1124,9 @@
           + '<div class="su-hoffrow">' + (w ? '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="false" aria-label="' + h(fill(T.closeDayAria, { day: longDay(d) })) + '">' + h(T.closeDayBtn) + '</button>'
             // Café test 6 (2026-11-12): "Reopen" takes the place of "Mark closed" (same spot, same height) and the "Monday
             // closed" note comes after it, so a quick second tap on the next day's button never lands on another day.
-            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
+            // Winery test 5 (2026-11-12): the line above already says "Mon Closed", so the note is for screen readers only
+            // ("closed" twice on every winter row).
+            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo su-sr" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
@@ -1138,7 +1165,7 @@
     } else if (s === 'closures') {
       var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0 && !HOL.some(function(o){ return o.key === k && holCovered(o); }); }).length + Math.max(0, S.extra.length - S.savedExtra);
-      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' + (S.hoursNone ? '' : hoursRecap()) : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')

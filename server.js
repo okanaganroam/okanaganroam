@@ -9748,7 +9748,9 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   const next = nextJson ? JSON.parse(nextJson) : { rows: [], booking_url: cur.booking_url || null, source_url: cur.source_url || null, checked_at: cur.checked_at };
   const ownerRows = (cur.rows || []).filter((r) => blocked.has(r.label));
   const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
-  const rows = [...ownerRows, ...researchRows].slice(0, VISIT_ROWS_MAX);
+  // Winery test 5: a winery's Tastings row (its own card) doesn't take one of the box's places (visitCapRows).
+  const all = [...ownerRows, ...researchRows];
+  const rows = all.slice(0, VISIT_ROWS_MAX + (Array.isArray(cur.winery_labels) && all.some((r) => r.label === 'Tastings') ? 1 : 0));
   // A winery's own answers (2026-11-12): their French lines and what they replaced ride along.
   const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
   return JSON.stringify({ ...next, rows, owner_labels: [...owned].sort(), ...keep });
@@ -20500,14 +20502,17 @@ const WINERY_MANAGED_LABELS = ['Tastings', 'Groups', 'Restaurant', 'Food', 'Wint
 // that makes room brings it back). A box full of the owner's own rows keeps the cap: the last of hers is set aside with
 // `owned: true`, kept, and shown folded under "More" on the page (visitInfoHtml), never lost.
 // -> the rows set aside (store them as owner_dropped).
-function visitCapRows(rows, isOwn, owned, managed, stash) {
+// Winery test 5 (2026-11-12): a winery's Tastings row shows in its own card above the box, so it doesn't take one of the
+// box's places (research's Kids line was set aside while the box showed six lines). winery: true for a winery's box.
+function visitCapRows(rows, isOwn, owned, managed, stash, winery = false) {
   for (const r of Array.isArray(stash) ? stash : []) {
     if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}) });
   }
   const dropped = [];
   const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
-  while (rows.length > VISIT_ROWS_MAX) {
+  const cap = () => VISIT_ROWS_MAX + (winery && rows.some((x) => x.label === 'Tastings') ? 1 : 0);
+  while (rows.length > cap()) {
     let j = -1;
     for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
     if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
@@ -20589,7 +20594,7 @@ function writeWineryVisitRows(venueId, now = new Date()) {
   // Rows set aside earlier come back, except a line these answers now decide (its row is above, or removed on purpose)
   // and, while the owner manages Experiences, any extra row (hers are above).
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(Array.isArray(info.experiences) && !WINERY_CORE_LABELS.has(r.label)));
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash);
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash, true);
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
   if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
@@ -45924,7 +45929,8 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // that repeats one of them goes first (visitCapRows, winery test 1).
   // Her parked lines are back in `rows` above (or cleared on purpose): only the other rows set aside come back here.
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash);
+  const isWinery = (() => { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type === 'winery'; } catch (e) { return false; } })();
+  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, isWinery);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
@@ -46656,6 +46662,9 @@ function wineryVisitTicks(venue, badges) {
   if (/step-?free|wheelchair|accessible|\bramps?\b|no stairs/i.test(acc) && !/\bnot (?:fully |wheelchair )?accessible|inaccessible|\bno (?:wheelchair|ramp)|stairs only|only by stairs/i.test(acc)) out.push('wheelchair_accessible');
   const dogs = line(/^(?:dogs|pets|kids & dogs)$/i);
   if (/\bdogs?\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|leashed dogs|dog[- ]friendly/i.test(dogs) && !/\bno dogs\b|\bdogs? (?:are )?not\b|service (?:dogs|animals) only/i.test(dogs)) out.push('dog_friendly');
+  // Winery test 5 (2026-11-12): research's Kids line ("Kids welcome with an adult") ticks Kids welcome too.
+  const kids = line(/^(?:kids|children|families|ages|kids & dogs)$/i);
+  if (/\b(?:kids?|children|families|family)\b[^.]*\b(?:welcome|allowed|ok|friendly)\b|family[- ]friendly|kid[- ]friendly|all ages/i.test(kids) && !/\b(?:no (?:kids|children|minors)|adults only|19\+|21\+|not (?:suitable|recommended) for (?:kids|children))/i.test(kids)) out.push('kid_friendly');
   if (!out.length) return out;
   let owned = new Set();
   try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
@@ -52267,7 +52276,14 @@ function renderOwnerSetupPage(found, opts) {
     ...(winery ? {
       allSteps: WINERY_SETUP_PART1.concat(WINERY_SETUP_PART2), restaurantPage: wineryRestaurantPage(venue), feeLiveMax: TASTING_FEE_LIVE_MAX,
       // The researched card price ("From $10"), offered as a starting point while the owner hasn't given one.
-      researchFee: (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 ? Number(e.from) : null; })(),
+      // Winery test 5 (2026-11-12): or, with no card price, research's Plan your visit Tastings line ("Tastings $10.").
+      researchFee: (() => {
+        const e = CARD_PRICES[String(venue.id)]; if (e && !e.owner && Number(e.from) > 0) return Number(e.from);
+        const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+        const r = (info.rows || []).find((x) => x && x.label === 'Tastings' && !mine.has(x.label));
+        const m = r && /\$\s?(\d{1,3})(?:\.00)?(?![\d.])/.exec(String(r.text || ''));
+        return m && Number(m[1]) > 0 ? Number(m[1]) : null;
+      })(),
       // The Book button research found (when the owner's own link isn't set), and research's extra lines (experiences).
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
       extras: (((venueVisitInfo(venue.id) || {}).rows) || []).filter((r) => !WINERY_CORE_LABELS.has(r.label)).slice(0, WINERY_EXPERIENCES_MAX).map((r) => ({ label: String(r.label).slice(0, 24), text: String(r.text || '').slice(0, 120) })),
