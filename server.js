@@ -342,7 +342,8 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   pub: portalRow({ happyHour: true, specials: true, nights: true, menu: true, avgSpend: true }),
   brewery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   cocktail: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
-  distillery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
+  // Distillery test 1 (2026-11-13): Sports on TV isn't offered to a distillery (kept if already set).
+  distillery: portalRow({ happyHour: true, specials: true, nights: true, menu: true, hiddenBadges: Object.freeze(['sports_tv']) }),
   winery: portalRow({ happyHour: true, specials: true, nights: true, menu: true }),
   // Things to do
   golf: portalRow({ happyHour: true, specials: true, menu: true, bookingFirst: true, price: false }),
@@ -10833,14 +10834,31 @@ function nightDaysText(s, fr) {
   return `${weeks} ${names}`;
 }
 // Build My Trip (2026-10-27): "Tonight: Trivia at 7 PM" (« Ce soir : Quiz à 19 h »), up to two, "; " between.
-function nightsTripText(list, fr) {
+// Distillery test 1 (2026-11-13): a tour or class the place books ahead says so ("Tour at 2 PM, book ahead").
+function nightsTripText(list, fr, bookAhead = false) {
   const shown = (list || []).slice(0, 2).map((s) => {
-    const l = nightLabel(s, fr), t = nightTimeText(s, fr);
+    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false } : nightLabel(s, fr), t = nightTimeText(s, fr);
     // Audit fix (2026-10-27): a range reads "Trivia 7:30–9:30 PM" (it was "at 7:30–9:30 PM"); a start alone keeps "at 7 PM".
     const ranged = specialMinutes(s.end) !== null;
-    return { text: `${l.text}${t ? (ranged ? ` ${t}` : fr ? ` à ${t}` : ` at ${t}`) : ''}${s.frequency === 'biweekly' ? ` (${nightFrequencyText(s, fr)})` : ''}`, english: l.english };
+    const book = bookAhead && DAYTIME_NIGHT_KINDS.includes(s.kind) ? (fr ? ', réservez à l’avance' : ', book ahead') : '';
+    return { text: `${l.text}${t ? (ranged ? ` ${t}` : fr ? ` à ${t}` : ` at ${t}`) : ''}${s.frequency === 'biweekly' ? ` (${nightFrequencyText(s, fr)})` : ''}${book}`, english: l.english };
   });
   return { text: shown.map((x) => x.text).join('; '), english: shown.some((x) => x.english) };
+}
+// A place's tours and classes are booked ahead when it has a booking link, or its own words say so ("book ahead",
+// "reservations required") in the event or its Plan your visit box.
+function nightsBookAhead(venueId, list) {
+  if (!(list || []).some((s) => DAYTIME_NIGHT_KINDS.includes(s.kind))) return false;
+  const re = /\b(?:book|booking|bookings|reserv\w*|réserv\w*)\b/i;
+  if (list.some((s) => re.test(`${s.title || ''} ${s.detail || ''}`))) return true;
+  try {
+    const v = venueLinks(venueId);
+    if (v && v.booking_url) return true;
+    const box = venueVisitInfo(venueId) || {};
+    if (box.booking_url) return true;
+    return (box.rows || []).some((r) => r && /^(?:tours?|classes|booking|reservations|tastings)$/i.test(r.label || '') && re.test(String(r.text || '')))
+      || (Array.isArray(box.owner_dropped) && box.owner_dropped.some((r) => r && /^(?:tours?|classes)$/i.test(r.label || '') && re.test(String(r.text || ''))));
+  } catch (e) { return false; }
 }
 // Build My Trip (2026-10-27): an evening stop (4 PM or later) on the date of one of the venue's nights says so ("Tonight:
 // Trivia at 7 PM"; French « Ce soir : Quiz à 19 h »). A night already over when the stop starts is left out. Text only:
@@ -10867,8 +10885,10 @@ function withTripWeeklyNights(plan, now = new Date()) {
   const advisory = getCollectionNotes(ADVISORY_COLLECTION_KIND), seasons = getSeasonStates(now); // pub test 8: written advisory only
   for (const item of plan.schedule) {
     if (!item || item.venueId == null || !Number.isFinite(item.startMinutes) || !parseLocalDate(item.date) || !byVenue.has(item.venueId)) continue;
-    // An evening stop on its own date (a stop after midnight belongs to the next day's night, which is over).
-    if (item.startMinutes < 16 * 60 || item.startMinutes >= 1440) continue;
+    // An evening stop on its own date (a stop after midnight belongs to the next day's night, which is over). A tour or
+    // class (distillery test 1, 2026-11-13) shows at any time of day.
+    if (item.startMinutes >= 1440) continue;
+    const evening = item.startMinutes >= 16 * 60;
     const ss = seasons.get(item.venueId);
     if (advisory.has(item.venueId) || (ss && ss.kind === 'closed')) continue;
     let row = null;
@@ -10877,6 +10897,8 @@ function withTripWeeklyNights(plan, now = new Date()) {
     const min = item.startMinutes;
     const list = nightsSorted(nightsShown(byVenue.get(item.venueId), now).filter((s) => {
       if (!nightOnDate(s, item.date)) return false;
+      if (DAYTIME_NIGHT_KINDS.includes(s.kind)) return true;
+      if (!evening) return false;
       const a = specialMinutes(s.start), b = specialMinutes(s.end);
       if (b !== null && a !== null && b > a && min >= b) return false;
       // Audit fix (2026-10-27): a stop that ends before the night starts (18:00-19:30 with trivia at 7:30) never says
@@ -10885,9 +10907,10 @@ function withTripWeeklyNights(plan, now = new Date()) {
       return !(a !== null && b === null && min >= a + 180);
     }));
     if (!list.length) continue;
-    const en = nightsTripText(list, false), frl = nightsTripText(list, true);
+    const book = nightsBookAhead(item.venueId, list);
+    const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
     // Audit fix (2026-10-27): "Tonight:" only on today's date; another day says which ("Sunday: …", « Dimanche : … »).
-    const label = tripLineDayLabel(item.date, now, true);
+    const label = tripLineDayLabel(item.date, now, list.every((s) => !DAYTIME_NIGHT_KINDS.includes(s.kind)));
     for (const s of stops) {
       if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
       s.nights = en.text;
@@ -10907,7 +10930,6 @@ function withTripListNights(plan, now = new Date()) {
   if (!byVenue.size) return plan;
   const q = db.prepare('SELECT id, type FROM venues WHERE id = ? AND redirect_to IS NULL');
   const advisory = getCollectionNotes(ADVISORY_COLLECTION_KIND), seasons = getSeasonStates(now); // pub test 8: written advisory only
-  const label = tripLineDayLabel(plan.listDate, now, true);
   for (const s of plan.recommendations) {
     const id = s && s.venue && s.venue.id;
     if (id == null || !byVenue.has(id) || advisory.has(id)) continue;
@@ -10918,7 +10940,9 @@ function withTripListNights(plan, now = new Date()) {
     if (!row || !NIGHT_TYPES.has(row.type)) continue;
     const list = nightsSorted(nightsShown(byVenue.get(id), now).filter((n) => nightOnDate(n, plan.listDate)));
     if (!list.length) continue;
-    const en = nightsTripText(list, false), frl = nightsTripText(list, true);
+    const book = nightsBookAhead(id, list);
+    const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
+    const label = tripLineDayLabel(plan.listDate, now, list.every((n) => !DAYTIME_NIGHT_KINDS.includes(n.kind)));
     s.nights = en.text;
     s.nightsFr = frl.text;
     s.nightLine = `${label.en}: ${en.text}`;
@@ -19762,6 +19786,8 @@ function ownerExtraBadgesFor(type) {
   if (type === 'winery') return WINERY_OWNER_BADGES.slice();
   // Breweries (2026-11-12, SPEC-breweries.md "What you offer"): the reused tiles that fit a taproom and the pub games.
   // Takeout is offered only with their own kitchen (the setup shows it then). No local beer, off-sales, fireplace or beach.
+  // Distillery test 1 (2026-11-13): no pub games for a distillery (kept if already set).
+  if (type === 'distillery') return BREWERY_OWNER_BADGES.filter((k) => !PUB_GAME_BADGES.includes(k));
   if (brewSetupType(type)) return BREWERY_OWNER_BADGES.slice();
   return OWNER_FEATURE_TYPES.has(type) ? OWNER_EXTRA_BADGES : [];
 }
@@ -20993,6 +21019,10 @@ function breweryMinorsNote(line, note) {
   const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const ln = norm(line);
   if (!norm(t) || ln.includes(norm(t))) return '';
+  // Distillery test 1 (2026-11-13): a note that only repeats the answer ("All ages with an adult" after "All ages
+  // welcome") says nothing new.
+  const lineWords = new Set(ln.split(' ').concat(['with', 'an', 'a', 'adult', 'adults', 'accompanied', 'by', 'are', 'is', 'and', 'the']));
+  if (norm(t).split(' ').every((w) => lineWords.has(w))) return '';
   // A note that starts with the answer's own words keeps only the rest.
   const words = ln.split(' ');
   const lead = new RegExp(`^${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^a-z0-9]+')}[^a-z0-9]*`, 'i');
@@ -52764,7 +52794,8 @@ function setupImageSource(venue, pendingMain) {
 function ownerSetupCardHtml(href, lang, state = 'none', type = '') {
   const fr = lang === 'fr';
   // Wineries (2026-11-12): their own time promise ("About 10 to 20 minutes").
-  const timeLine = ((OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'][type] || {}).timeLine) || OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'].timeLine;
+  // Distillery test 1 (2026-11-13): a distillery's setup is the brewery's, so its card says the same "About 10 to 20 minutes".
+  const timeLine = ((OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'][type === 'distillery' ? 'brewery' : type] || {}).timeLine) || OWNER_SETUP_STRINGS[fr ? 'fr' : 'en'].timeLine;
   if (state === true) state = 'done'; else if (!state) state = 'none';
   const finished = state === 'done';
   // Brewery test 3 (2026-11-13): French typography (« Changer quelque chose ? »), as in the setup.
@@ -52860,8 +52891,9 @@ function renderOwnerSetupPage(found, opts) {
     // tile ("Who's welcome?" asks it next). Vegan, vegetarian and takeout only with their own kitchen (the page script
     // hides them otherwise). Hidden: local beer on tap, off-sales, fireplace, beach access and the café tiles.
     { title: fr ? 'Nourriture et boissons' : 'Food & drink', keys: ['nonalcoholic', 'gluten_free', 'vegan', 'vegetarian'] },
-    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'picnic_area', 'live_music', 'sports_tv', 'wheelchair_accessible', 'free_parking', 'rv_parking', 'locally_owned'] },
-    { title: fr ? 'Jeux' : 'Games', keys: PUB_GAME_BADGES.slice() },
+    // Distillery test 1 (2026-11-13): no Sports on TV or Games tiles for a distillery.
+    { title: fr ? 'L’endroit' : 'The place', keys: ['patio', 'heated_patio', 'lake_view', 'picnic_area', 'live_music', 'sports_tv', 'wheelchair_accessible', 'free_parking', 'rv_parking', 'locally_owned'].filter((k) => !(venue.type === 'distillery' && k === 'sports_tv')) },
+    ...(venue.type === 'distillery' ? [] : [{ title: fr ? 'Jeux' : 'Games', keys: PUB_GAME_BADGES.slice() }]),
     { title: fr ? 'Pour qui' : 'Good for', keys: ['dog_friendly', 'takes_reservations', 'takeout'] },
   ] : winery ? [
     // Wineries (2026-11-12, SPEC-wineries.md "What you offer"): the reused tiles and Picnic area (new). Not here: happy
@@ -53188,6 +53220,13 @@ function researchKidsUntil(rows) {
   }
   return '';
 }
+// True when a research line plainly says kids or minors are welcome with no time limit ("Minors welcome with an adult",
+// "All ages welcome", "Family friendly"), and nothing says adults only.
+function researchKidsAll(rows) {
+  const txt = (rows || []).filter((r) => r && typeof r.text === 'string' && /\b(?:kids?|children|minors|famil(?:y|ies)|all ages|ages)\b/i.test(`${r.label || ''} ${r.text}`)).map((r) => r.text).join(' ');
+  if (!txt || researchKidsUntil(rows) || /\b(?:19\s?\+|adults? only|no (?:kids|minors|children)|19 and over|must be 19)\b/i.test(txt)) return false;
+  return /\b(?:(?:kids?|children|minors|families)\b[^.;]{0,30}\bwelcome|all ages|family[- ]friendly)\b/i.test(txt);
+}
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -53216,6 +53255,8 @@ function breweryCfg(venue, snap, fr) {
     // Brewery test 4 (2026-11-13): research's Kids line "Kids welcome until 8 PM" pre-picks "Minors with an adult until"
     // 8 PM on Who's welcome (a suggestion, saved only with the screen).
     suggestKidsUntil: researchKidsUntil((info.rows || []).filter((x) => x && !mine.has(x.label))),
+    // Distillery test 1 (2026-11-13): "Minors welcome with an adult" (no time) or "all ages" pre-picks All ages.
+    suggestKidsAll: venue.type === 'distillery' && researchKidsAll((info.rows || []).filter((x) => x && !mine.has(x.label))),
     // Where it came from: the card's price ("Your card shows $12 now") or only research's Flights line ("Your page says $10").
     researchFeeFrom: cardFlight != null ? 'card' : 'visit',
     placeShow: Object.fromEntries(placeTypesFor('brewery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),

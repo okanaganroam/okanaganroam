@@ -630,6 +630,9 @@ const NIGHT_ASK_TERMS = [[/^(?:trivia|trivia nights?|quiz|quizzes|quiz nights?|p
   [/^(?:open mic|open mics|open mike|open mic nights?)$/, 'open_mic'], [/^(?:comedy nights?|stand up|standup)$/, 'comedy'], [/^(?:run club|running club|run clubs)$/, 'run_club'],
   [/^(?:games? nights?|board games|cribbage|darts)$/, 'games'], [/^(?:paint nights?|paint and sip)$/, 'paint']];
 const NIGHT_KIND_WORDS = { trivia: 'trivia', karaoke: 'karaoke', bingo: 'bingo', open_mic: 'open mic', comedy: 'comedy', run_club: 'run club', games: 'games night', paint: 'paint night', live_music: 'live music' };
+// Kinds that run at any time of day (server.js DAYTIME_NIGHT_KINDS): a distillery tour or class, about an hour.
+const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
+const TOUR_ALLOWANCE = 60;
 function nightKindOfTerm(term) { const t = normWords(term || ''); const hit = NIGHT_ASK_TERMS.find(([re]) => re.test(t)); return hit ? hit[1] : null; }
 // The plan's own day ('YYYY-MM-DD') when the request named one ("tonight", "Tuesday", "tomorrow"); null otherwise.
 function ctxPlanDate(ctx) {
@@ -1413,6 +1416,11 @@ function unusedPlanRegions(regions, dayRegions) {
   if (!Array.isArray(dayRegions) || !dayRegions.length || regions.length < 2) return [];
   return regions.filter((r) => !dayRegions.includes(r));
 }
+// Distillery test 1 (2026-11-13): "tasting" in a plan for a distillery or a winery is what the stop is (a tasting room),
+// so it is never listed as a word the planner couldn't apply. Other kinds of place are unchanged.
+function tastingWordUsed(w, trip) {
+  return /^tastings?$/.test(String(w || '')) && ((trip && trip.components) || []).some((c) => (c.types || []).some((t) => t === 'distillery' || t === 'winery'));
+}
 function buildUnderstood(intent, trip, labels, extras) {
   const i = intent || {};
   const x = extras || {};
@@ -1425,7 +1433,7 @@ function buildUnderstood(intent, trip, labels, extras) {
   // Stage 3.5: an exclusion the plan applied is no longer "not used".
   const applied = new Set(x.appliedExclusions || []);
   const notUsed = (i.unsupported || []).filter((u) => !applied.has(u));
-  if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w)) notUsed.push(w);
+  if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w) && !tastingWordUsed(w, trip)) notUsed.push(w);
   // Stage 3.5 D6: a named place the day plan did not use.
   for (const r of unusedPlanRegions(ctx.regions, x.dayRegions)) { const l = regionLabel(ctx, r); if (!notUsed.includes(l)) notUsed.push(l); }
   const occasionNotUsed = trip && trip.multi ? unappliedItineraryOccasion(i, trip) : null;
@@ -4151,6 +4159,19 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         if(nextKept&&(SWAP_FLEX_TYPES.includes(candidate.type)||lunchFlex)){const onward=tripRequirements.estimateTransfer(candidate,byId.get(nextKept.venue.id)||{});const room=nextKept.keepStart-start-(onward?onward.maxMinutes:10);if(room<visit&&room>=45)visit=Math.floor(room/15)*15;}
         // Round 9: an outdoor stop swapped in (or a filler) is a shorter visit rather than one that runs past dusk.
         if((stop.swapSlot||stop.gapFill)&&['outdoor','beach'].includes(candidate.type)&&!candidate.indoorGolf){const light=tripRequirements.estimateDaylight(date,candidate);if(light&&start+visit>light.sunsetMinutes-30){const room=Math.floor((light.sunsetMinutes-30-start)/15)*15;if(room>=45)visit=Math.min(visit,room);}}
+        // Distillery test 1 (2026-11-13): the owner's tour or class that day (any time) is timed into the visit when it fits:
+        // a 1-2 PM stop with a 2 PM tour runs to about 3 PM; a stop that would start just after the tour starts before it.
+        if(!stop.gapFill&&!stop.skiDay&&!stop.onHill&&!isLunchStop(stop)&&!isDinnerStop(stop)&&date){
+          const hm=t=>{const m=/^(\d{2}):(\d{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):null;};
+          const tours=(candidate.nights||[]).filter(n=>n&&DAYTIME_NIGHT_KINDS.includes(n.kind)&&nightOnPlanDate(n,date)).map(n=>hm(n.start)).filter(t=>t!=null).sort((x,y)=>x-y);
+          const limit=Math.min(range[1],1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440);
+          for(const t of tours){
+            if(start<=t-10&&start+visit>=t+TOUR_ALLOWANCE)break;
+            if(start<=t-10&&t+TOUR_ALLOWANCE<=limit&&t+TOUR_ALLOWANCE-start<=visit+90){visit=t+TOUR_ALLOWANCE-start;break;}
+            const early=Math.max(range[0],earliest,t-15);
+            if(start>t-10&&start-t<=60&&early<start&&early+Math.max(visit,TOUR_ALLOWANCE+15)<=limit){start=early;visit=Math.max(visit,t+TOUR_ALLOWANCE-start);break;}
+          }
+        }
         return {start,end:start+visit,wait:start-earliest,transfer,unknownHours, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
       };
       let timed=fit(v);
@@ -6238,7 +6259,14 @@ function planTripUnchecked(input) {
     }
     result.requirementResults.push({ ...rainBackupItem, status: backups.length ? 'satisfied' : 'unmet', reason: backups.length ? 'Indoor backups are named for a rainy day.' : 'No indoor backup was found nearby.' });
   }
-  result.warnings = [...new Set([...(result.warnings || []), ...requirements.conflicts, ...result.requirementResults.filter(i => i.status !== 'satisfied').map(requirementWarning).filter(Boolean)])];
+  // Distillery test 1 (2026-11-13): a request whose only matches are closed that day says only that ("Not included: X is
+  // closed Mondays"), not also "No distilleries or wineries matched in Vernon" and "No distillery could be fitted".
+  const closedOnly = result.requirementResults.filter((i) => i.status === 'unmet' && requirementClosedOnly(i));
+  if (closedOnly.length) {
+    const stems = closedOnly.map((i) => String((i.kind === 'type' && REQUIREMENT_TYPE_WORDS[i.value]) || i.value || '').toLowerCase().replace(/(?:ies|y|s)$/, '')).filter((x) => x.length >= 3);
+    result.warnings = (result.warnings || []).filter((w) => !(/^No .+ matched .+, so the rest of the plan is shown\.$/.test(w) && stems.some((st) => w.toLowerCase().includes(st))));
+  }
+  result.warnings = [...new Set([...(result.warnings || []), ...requirements.conflicts, ...result.requirementResults.filter(i => i.status !== 'satisfied' && !closedOnly.includes(i)).map(requirementWarning).filter(Boolean)])];
   // Round 8 (2026-10-19): Swap sends every shown stop as a pin so the rest of the plan stays put, but only the stops the
   // visitor locked must stay. A shown stop that no longer fits after the swap (dinner moved, a day re-timed) gives way
   // to the planner's pick instead of a false "A locked stop cannot be kept" error.
@@ -6304,6 +6332,11 @@ function rainBackups(result, input, intent) {
 const REQUIREMENT_TYPE_WORDS = { beach: 'beach', winery: 'winery', restaurant: 'restaurant', cafe: 'café', breakfast: 'breakfast or brunch spot', golf: 'golf course', outdoor: 'outdoor stop', tour: 'tour', brewery: 'brewery', pub: 'pub', cocktail: 'cocktail lounge', distillery: 'distillery', indoor: 'indoor attraction' };
 const REQUIREMENT_ACTIVITY_WORDS = { hiking: 'hike or walk', skiing: 'ski hill', snowshoeing: 'snowshoe trail', winter: 'winter activity', viewpoints: 'viewpoint' };
 const REQUIREMENT_FEATURE_WORDS = { dog_friendly: 'dog friendly', kid_friendly: 'kid friendly', vegetarian: 'vegetarian friendly', vegan: 'vegan friendly', gluten_free: 'gluten-free friendly' };
+// An unmet request whose offered places are all closed that day (the page's "Not included: … is closed Mondays").
+function requirementClosedOnly(i) {
+  const alts = (i && Array.isArray(i.optionalAlternatives) ? i.optionalAlternatives : i && Array.isArray(i.alternatives) ? i.alternatives : []).filter((a) => a && typeof a.name === 'string');
+  return alts.some((a) => a.closedDay) && !alts.some((a) => !a.closedDay && ['another_listing', 'confirm_hours', 'different_time'].includes(a.reasonCode));
+}
 function requirementWarning(i) {
   if (i.kind === 'event') {
     const label = ({hockey:'hockey game','live-music':'live music',festival:'festival',market:'market',show:'show',comedy:'comedy show'}[i.eventKind] || (i.value === 'sports-recreation' ? 'sports event' : 'event'));
@@ -7645,7 +7678,7 @@ function planItinerary(input) {
   // Step 1 (2026-09-29): the visitor's own words that no part of the plan
   // used are named, never silently dropped ("a lake walk").
   // 2026-10-25: a clock time ("lunch at noon", "at 7pm") is read as the time, never reported as a leftover word.
-  const leftover = (trip.leftoverTerms || []).filter((w) => !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)) && !/^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w)));
+  const leftover = (trip.leftoverTerms || []).filter((w) => !tastingWordUsed(w, trip) && !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)) && !/^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w)));
   if (leftover.length) result.warnings.push(`Not part of this plan: ${listText(leftover.map((w) => `“${w}”`))} — ${SITE.brand} couldn’t match ${leftover.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`);
   if (route && !route.from && route.to) result.notes.push(`No starting point was given, so the stops are in ${regionLabel(baseCtx, route.to)}.`);
   const whereText = route && route.from && route.to
@@ -8071,9 +8104,14 @@ function planItinerary(input) {
   });
   const allDog = trip.components.filter((c) => c.kind === 'venue').every((c) => c.dog) && trip.components.some((c) => c.kind === 'venue' && c.dog);
   // One label once (2026-10-18: "Dog-friendly breweries, breweries and breweries in Squamish").
+  // Distillery test 1 (2026-11-13): a plan with nothing in it (the place asked for is closed that day) still says what was
+  // asked and when: "Distilleries in Vernon on Monday." (it read " in Vernon.").
+  const emptyPlan = !partLabels.length;
+  if (emptyPlan) trip.components.filter((c) => c.kind !== 'event').forEach((c) => { const l = componentLabel(c, baseCtx); if (l) partLabels.push(l); });
   const listed = listText([...new Set(partLabels)]);
   const where = route && route.from && route.to ? ` from ${regionLabel(baseCtx, route.from)} to ${regionLabel(baseCtx, route.to)}` : route && route.to ? ` on the way to ${regionLabel(baseCtx, route.to)}` : regions.length ? ` in ${listText(regions.map((r) => regionLabel(baseCtx, r)))}` : '';
-  const when = trip.when && trip.when.preset === 'this-weekend' ? ' this weekend' : '';
+  const emptyDay = emptyPlan && WEEKDAYS.includes(baseCtx.startWeekday) ? ` on ${WEEKDAY_NAMES[baseCtx.startWeekday]}` : '';
+  const when = trip.when && trip.when.preset === 'this-weekend' ? ' this weekend' : emptyDay;
   const occasionPrefix = trip.outingOccasion === 'date_night' || baseCtx.occasion === 'date_night' ? 'Date night: ' : '';
   result.summary = `${occasionPrefix}${allDog ? 'Dog-friendly ' : ''}${allDog ? listed : listed.replace(/^./, (x) => x.toUpperCase())}${where}${when}.`.replace(/^Dog-friendly (.)/, (m, c) => `Dog-friendly ${c.toLowerCase()}`);
   // Round 11 (2026-10-20): "Saturday evening in Squamish: drinks, dinner and a nightcap."

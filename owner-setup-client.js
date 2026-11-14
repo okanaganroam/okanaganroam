@@ -182,7 +182,9 @@
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
   if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || '21:00', note: BIm.note || '' };
     // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
-    if (!BIm.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; } }
+    if (!BIm.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; }
+    // Distillery test 1 (2026-11-13): research's "Minors welcome with an adult" (no time) picks All ages to start.
+    else if (!BIm.policy && C.suggestKidsAll) S.minors.policy = 'all_ages'; }
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
   if (C.pub && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
@@ -2800,7 +2802,8 @@
       if (k === 'no_wifi') { S.noWifi = !S.noWifi; press('no_wifi', S.noWifi); if (S.noWifi) { S.badges.wifi = false; press('wifi', false); } return; }
       if (k === 'wifi' && !S.badges.wifi) { S.noWifi = false; press('no_wifi', false); }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
-      var sdog = function(){ var n = el('suServiceDogs'); if (n) n.hidden = !S.noDogs; };
+      // Distillery test 1 (2026-11-13): the service-dogs tile shows right under No dogs, scrolled into view.
+      var sdog = function(){ var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
       if (k === 'patio') { var dsub = el('suNoDogsSub'); if (dsub) dsub.textContent = dogSubText(); }
