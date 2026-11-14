@@ -613,7 +613,7 @@ test('fe2 by appointment: a tour or class saves with no day, frequency "appointm
   const page = (await get(pagePath(d))).text;
   const rows = nightsRows(page);
   assert.equal(rows.length, 1, page.slice(page.indexOf('venueNights'), page.indexOf('venueNights') + 900));
-  assert.match(rows[0], /is-appt/); assert.match(rows[0], /Distillery tour|Visite de la distillerie/); assert.match(rows[0], /&middot; By appointment/);
+  assert.match(rows[0], /is-appt/); assert.match(rows[0], /Distillery tour<\/span> <span class="venue-wn-time">&middot; By appointment/, 'her French chip name reads in English on the English page');
   assert.doesNotMatch(rows[0], /venue-wn-today|venue-wn-days/, 'no day and no Today / Tonight tag');
   assert.match(app.venueWeeklyNightsHtml({ rows: [{ s: { kind: 'tour', title: 'Visite de la distillerie', title_fr: 'Visite de la distillerie', frequency: 'appointment', days: [] }, days: 'Sur rendez-vous', today: false, time: '', freq: '' }] }, true, { tours: true }),
     /Visite de la distillerie<\/span> <span class="venue-wn-time">&middot; sur rendez-vous/);

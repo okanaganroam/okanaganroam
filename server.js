@@ -10850,10 +10850,10 @@ function nightDaysText(s, fr) {
 // only its kind (« Visite »): a distillery tour by its words, a plain kind name by the kind, its own title otherwise.
 const GENERIC_DAYTIME_TITLES = new Set(['tour', 'visite', 'class', 'atelier', 'distillery tour', 'visite de la distillerie']);
 function daytimeTripLabel(s, fr) {
-  const words = `${s.title || ''} ${s.title_fr || ''}`;
-  if (s.kind === 'tour' && /distill/i.test(words)) return { text: fr ? 'Visite de la distillerie' : 'Distillery tour', english: false };
-  if (GENERIC_DAYTIME_TITLES.has(String(s.title || '').trim().toLowerCase())) return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
-  return nightLabel({ ...s, kind: 'other' }, fr);
+  const t = String(s.title || '').trim().toLowerCase();
+  if (!GENERIC_DAYTIME_TITLES.has(t)) return nightLabel({ ...s, kind: 'other' }, fr);
+  if (s.kind === 'tour' && /distill/.test(t)) return { text: fr ? 'Visite de la distillerie' : 'Distillery tour', english: false };
+  return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
 }
 // A stop's line for a place whose tours or classes are by appointment only (no day to plan them on).
 function nightsApptTripLine(list, fr) {
@@ -36082,8 +36082,11 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
   if (!wn || !wn.rows.length) return '';
   const row = ({ s, days, today, onNow, time, freq }) => {
     const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
-    const title = titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
-    const tl = fr && !titleFr ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
+    // Distillery test 2 (2026-11-13): a tour or class named by its chip ("Visite de la distillerie" typed by a French
+    // owner) reads in the page's language ("Distillery tour" on the English page).
+    const dl0 = DAYTIME_NIGHT_KINDS.includes(s.kind) && GENERIC_DAYTIME_TITLES.has(String(s.title || '').trim().toLowerCase()) ? daytimeTripLabel(s, fr) : null;
+    const title = dl0 ? dl0.text : titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
+    const tl = fr && !titleFr && !dl0 ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
     // Distillery test 2 (2026-11-13): a row with no start time isn't "evening"; it says "Today".
     const evening = specialMinutes(s.start) !== null && specialMinutes(s.start) >= 16 * 60;
     const appt = nightByAppointment(s);
