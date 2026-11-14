@@ -130,7 +130,7 @@
     var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
     var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
-    return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
+    return fill(T.closedWarn, { days: daysInFull(all), when: when });
   }
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
   // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
@@ -148,14 +148,27 @@
     return { days: {}, from: best[0], to: hmStr(c != null ? Math.min(o + 120, c) : o + 120), what: '' };
   }
   // A happy hour outside the place's hours on a day it's open (a gentle heads-up like the closed-day one).
+  // Cocktail test 2 (2026-11-13): checked against the hours that apply in the months it runs: a summer-only happy hour
+  // against the summer hours only, an all-year one against both weeks (outside either is a heads-up). A day closed in
+  // those months is the closed-day heads-up's (closedWarnAny), not this one's.
   function hoursWarn(e){
     var f = hm(e.from), t = e.close ? null : hm(e.to); if (f == null || !S.week) return '';
+    var M = seaMonths(S.happySea), hasSea = !!(S.sea && S.sea.on && S.sea.week), usual = !hasSea, seas = false;
+    if (hasSea) for (var i = 1; i <= 12; i++) if (M[i]) { if (S.sea.months[i]) seas = true; else usual = true; }
+    var weeks = []; if (usual) weeks.push(S.week); if (seas) weeks.push(S.sea.week);
+    var inside = function(w, d){ return w[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
+      var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; }); };
     var out = DAYS.filter(function(d){
-      if (!e.days[d] || !S.week[d]) return false;
-      return !S.week[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
-        var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; });
+      if (!e.days[d]) return false;
+      return weeks.some(function(w){ return w && w[d] && !inside(w, d); });
     });
-    return out.length && T.happyOutside ? fill(T.happyOutside, { days: out.map(dayName).join(', ') }) : '';
+    return out.length && T.happyOutside ? fill(T.happyOutside, { days: daysInFull(out) }) : '';
+  }
+  // Cocktail test 2 (2026-11-13): warnings name the days in full: "Monday and Tuesday"; French « lundi et le mardi » (the
+  // sentence already says « le {days} »: « fermé le lundi et le mardi »).
+  function daysInFull(list){
+    var n = list.map(longDay); if (n.length < 2) return n.join('');
+    return C.lang === 'fr' ? n.slice(0, -1).join(', le ') + ' et le ' + n[n.length - 1] : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
   }
   function closedWarnAny(days, sea){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
@@ -166,7 +179,7 @@
     if (!all.length) return '';
     var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
     var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
-    return fill(T.closedWarnHappy, { days: all.map(dayName).join(', '), when: when });
+    return fill(T.closedWarnHappy, { days: daysInFull(all), when: when });
   }
   function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
