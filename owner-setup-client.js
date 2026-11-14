@@ -484,7 +484,7 @@
   (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? (longCut(x.title, x.deal) ? ' ' : ', ') + x.deal : '');
     // Pub test 8 (2026-11-10): a special's optional times ("Sunday brunch 10 AM to 1 PM"), the start/end it always had.
     var e = { days: days, text: text, price: x.price || '', start: x.start || '', end: x.end && x.end !== 'close' ? x.end : '', endClose: x.end === 'close', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + e.start + '|' + e.end; S.specials.push(e); });
-  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea); S.nights.push(e); });
+  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to), appt: x.frequency === 'appointment' }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea) + (e.appt ? '|appt' : ''); S.nights.push(e); });
   S.happySea = (function(){ try { var o = typeof CUR.happy_hour === 'string' ? JSON.parse(CUR.happy_hour) : CUR.happy_hour; var z = o && o._season; return seaFrom(z && z.from, z && z.to); } catch (e) { return seaFrom(); } })();
   S.happySeaWas = seaKey(S.happySea);
   S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
@@ -926,7 +926,12 @@
     var other = kinds.length && kinds.every(function(k){ return k === 'winter'; }) ? 'summer' : kinds.length && kinds.every(function(k){ return k === 'summer'; }) ? 'winter' : '';
     var ul = other ? String((T.seasonWord || {})[other] || other) : '';
     var lead = kinds.length ? (ul ? ul.charAt(0).toUpperCase() + ul.slice(1) : T.recapRest) : T.recapHours;
-    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', '));
+    // Distillery test 2 (2026-11-13): the walk-in season and "by appointment the rest of the year" (or the open dates of a
+    // place closed part of the year) go with the hours: « Ven–Dim 12 h – 17 h (1 juin – 30 sept.) · sur rendez-vous le reste de l’année ».
+    var per = '';
+    if (APPT && S.wine && S.wine.year === 'appointment' && S.wine.season && S.wine.season.from && S.wine.season.to) per = ' ' + fill(T.recapAppt, { a: mdLabel(S.wine.season.from), b: mdLabel(S.wine.season.to) });
+    else if (S.openSea && S.openSea.from && S.openSea.to && /^\d{2}-\d{2}$/.test(S.openSea.from) && /^\d{2}-\d{2}$/.test(S.openSea.to)) per = ' ' + fill(T.recapOpen, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) });
+    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', ') + per);
     return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
   }
   function seasonInfo(sz){
@@ -1645,7 +1650,9 @@
               + (rest.length ? '<details class="su-kinds"' + (rest.indexOf(e.kind) >= 0 ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + rest.map(chip).join('') + '</div></details>' : '');
           })()
           + '<input class="su-field" id="nt' + i + '" data-nt="' + i + '" type="text" maxlength="40" aria-labelledby="ntq' + i + '" value="' + h(e.what) + '"' + (e.kind === 'other' ? ' placeholder="' + h(T.otherPh) + '"' : '') + '>' + (i === 0 ? ex(T.eventEx) : '')
-          + '<p class="su-q">' + h(T.whichNights) + '</p>' + dayChips(e.days, 'nights.' + i)
+          // Distillery test 2 (2026-11-13): a tour or class may be "By appointment" (no day): next to the day chips.
+          + '<p class="su-q">' + h(T.whichNights) + '</p>' + (nightAppt(e) ? '' : dayChips(e.days, 'nights.' + i))
+          + (apptKind(e.kind) ? '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" id="suAppt' + i + '" aria-pressed="' + (nightAppt(e) ? 'true' : 'false') + '" data-act="ntAppt:' + i + '">' + h(T.byAppt) + '</button></div>' : '')
           + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div>'
           + seasonBox('nights.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('nights', i, e) + '</div>';
       }).join('') + (T.eventsOften ? '<p class="su-hint" id="suEventsOften">' + h(T.eventsOften) + '</p>' : '') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
@@ -1993,19 +2000,22 @@
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
     list.push({ specials: out }); saveAll('specials', list);
   }
+  function apptKind(k){ return k === 'tour' || k === 'class'; }
+  function nightAppt(e){ return !!(e && e.appt && apptKind(e.kind)); }
   function musicSave(){
     S.nightsGuessed = false;
     readEntries(); var out = [];
     for (var i = 0; i < S.nights.length; i++) {
       var e = S.nights[i], ds = DAYS.filter(function(d){ return e.days[d]; }), title = (e.what || '').trim() || (e.kind && e.kind !== 'other' ? T.kinds[e.kind] : '');
       if (!title && e.kind === 'other') { S.nudge = T.otherNeed; return render(); }
-      if (!ds.length) { S.nudge = T.needDays; return render(); }
+      var appt = nightAppt(e); if (appt) ds = [];
+      if (!ds.length && !appt) { S.nudge = T.needDays; return render(); }
       if (!title) { S.nudge = T.needText; return render(); }
       var ns = seaOut(e.sea); if (!ns.ok) { S.nudge = ns.why; return render(); }
-      if (e.orig && e.was === daysKey(e.days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea)) { out.push(e.orig); continue; }
+      if (e.orig && e.was === daysKey(appt ? {} : e.days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea) + (appt ? '|appt' : '')) { out.push(e.orig); continue; }
       if (title.length > 40) { S.nudge = fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
       var n0 = e.orig || {}, sameTitle = e.orig && n0.title === title;
-      out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: n0.frequency || 'weekly',
+      out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: appt ? 'appointment' : n0.frequency && n0.frequency !== 'appointment' ? n0.frequency : 'weekly',
         title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null, season_from: ns.from, season_to: ns.to });
     }
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
@@ -2298,6 +2308,7 @@
     // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
     if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
     // The same for a weekly special (its end is stored as 'close', the way it always was).
+    if (k === 'ntAppt') { readEntries(); var en0 = S.nights[+v]; if (!en0) return; en0.appt = !nightAppt(en0); if (en0.appt) en0.days = {}; S.nudge = ''; var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
     if (k === 'spClose') { readEntries(); var es = S.specials[+v]; if (!es) return; es.endClose = !es.endClose; if (es.endClose) es.end = ''; render(); return; }
     // "All day (open to close)" (pub fresh-eyes, 2026-11-10): the happy hour runs from the earliest opening to the latest
     // closing of the days picked (or of the whole week when no day is picked yet).

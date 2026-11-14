@@ -1364,7 +1364,9 @@ function publicVenue(v, ctx) {
   const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null }) : tripStopPrice(v.url, v.id);
   return {
-    ...(fee === 0 ? { freeTasting: true } : {}),
+    // Distillery test 2 (2026-11-13): a distillery's or brewery's own "Free tastings" (a price of 0) says "Free tasting"
+    // too; it read « Prix par personne à vérifier ».
+    ...(fee === 0 || ((v.type === 'brewery' || v.type === 'distillery') && v.flightFee === 0) ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
@@ -6435,6 +6437,9 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // Brewery test 4 (2026-11-13): closed all that day in its own week (a weekly closed day, or one in the owner's
       // seasonal hours): "Closed Mondays (Oct–Apr) · try Tue–Sun" instead of a bare "Try another time".
       if (closedAll && !related && local) reasonCode = 'different_time';
+      // Distillery test 2 (2026-11-13): left out of a kids' trip because the owner said Adults only (19+): it says so,
+      // not "Another listing".
+      if (!closedAll && input.intent?.party?.kids && venue.ownerAdultsOnly && !kidsAllowed(venue)) reasonCode = 'adults_only';
       if (closedAll && reasonCode !== 'different_time') continue;
       const closedDay = closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
       candidates.push({

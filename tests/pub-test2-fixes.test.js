@@ -147,7 +147,7 @@ test('6: the Complete & Verified pill is greyed with "Reach 100% to earn it" unt
   const html = await text(`/owner/${tokenFor(mk('pub').id)}/setup`);
   assert.match(html, /\.su-badge-off \{ filter: grayscale\(1\); opacity: \.5; \}/);
   assert.equal(TEXT.en.badgeReach, 'Reach 100% to earn it');
-  assert.equal(TEXT.fr.badgeReach, 'Atteignez 100 % pour l’obtenir');
+  assert.equal(TEXT.fr.badgeReach, 'Atteignez 100\u00a0% pour l’obtenir'); // distillery test 2: no-break space before %
 });
 
 // ---------- Friction 7: wording ----------

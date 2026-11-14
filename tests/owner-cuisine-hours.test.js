@@ -201,7 +201,7 @@ test('panel: cuisine and fresh hours are in "Still to add", not "We\'re adding t
   assert.ok(p.includes('>Yes, these are right<'));
   assert.ok(!soon.includes('What you serve') && !soon.includes('Are your hours still right?'));
   const fr = panel(await get(`/fr/owner/${tokenFor(v.id)}`));
-  assert.ok(fr.includes('>Choisir<') && fr.includes('>Oui, elles sont exactes<') && fr.includes('Vos heures sont-elles toujours exactes?'));
+  assert.ok(fr.includes('>Choisir<') && fr.includes('>Oui, elles sont exactes<') && fr.includes('Vos heures sont-elles toujours exactes\u202f?'));
   for (const k of ['cuisine', 'hours_fresh']) assert.equal(pc.ITEMS.find((i) => i.key === k).fix, true);
 });
 

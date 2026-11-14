@@ -118,6 +118,8 @@ test('French planner copy runs in the browser with a season or month (2026-10-19
  const src='var FR_MONTHS_BY_EN = '+JSON.stringify(fr.FR_MONTHS_BY_EN)+';\nvar FR_SEASON_WORDS = '+JSON.stringify(fr.FR_SEASON_WORDS)+';\n'
   // Round 15c: the French Ideas heading and its lookups ship with t3FrenchText, as on the page.
   +['FR_HEADING_NAMES','FR_HEADING_DAYS','FR_HEADING_PARTS','FR_HEADING_OCCASIONS','FR_HEADING_WHEN_RE'].map(k=>'var '+k+' = '+JSON.stringify(fr[k])+';').join('\n')+'\n'+fr.frHeadingWhen.toString()+'\n'+fr.frHeadingWhere.toString()+'\n'+fr.t3FrenchHeading.toString()+'\n'
+  // Distillery test 2 (2026-11-13): the summary translator ships with the heading.
+  +['t3FrenchHeadingCore','t3FrenchSummary','frSummaryItems','frSummaryList','frSummaryAround','frOccasionNoun'].map(k=>fr[k].toString()).join('\n')+'\n'
   +'var FR_SITE = '+JSON.stringify(fr.FR_SITE)+';\n'+fr.frSiteIn.toString()+'\n'+fr.frSiteOut.toString()+'\n'+fr.t3FrenchTextCore.toString()+'\n'+fr.t3FrenchText.toString()+'\n'+fr.t3FrenchEvent.toString()+'\n'+fr.t3FrenchPlan.toString()+'\nthis.run=t3FrenchPlan;';
  const ctx={};vm.createContext(ctx);vm.runInContext(src,ctx);
  const fall=ctx.run({summary:'3 days in Kelowna',understood:{season:{label:'fall'}},itinerary:{stops:[]}});
@@ -125,4 +127,24 @@ test('French planner copy runs in the browser with a season or month (2026-10-19
  const jan=ctx.run({summary:'3 days in Kelowna',understood:{season:{label:'January'}},contextNotes:['The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this July plan.'],itinerary:{stops:[]}});
  assert.equal(jan.understood.season.label,'Janvier');
  assert.match(JSON.stringify(jan),/juillet/);
+});
+// Distillery test 2 (2026-11-13): the summary sentence in French (it stayed in English with no stop to name), « deux
+// adultes » is a head count (not a romantic outing, not a search for « adultes »), « pique-nique » is one word.
+test('distillery test 2: the plan summary in French; two adults is no occasion; pique-nique is one term',()=>{
+ assert.equal(t3FrenchText('A one-day plan around Naramata, focused on distilleries and cocktail lounges.'),'Une journée autour de Naramata, axée sur les distilleries et bars à cocktails.');
+ assert.equal(t3FrenchText('3 relaxed days around Kelowna and Penticton, focused on wineries — planned as an adults-only trip.'),'3 jours tranquilles autour de Kelowna et Penticton, axés sur les vignobles — pensés pour une sortie entre adultes.');
+ assert.equal(t3FrenchText('A romantic outing in Naramata on Tuesday, focused on distilleries.'),'Une sortie romantique à Naramata mardi, axée sur les distilleries.');
+ assert.equal(t3FrenchText('An outing in Kelowna tonight.'),'Une sortie à Kelowna ce soir.');
+ assert.equal(t3FrenchText('Distilleries, “gin” and kid-friendly spots in Naramata on Saturday.'),'Distilleries, « gin » et endroits adaptés aux enfants à Naramata samedi.');
+ assert.equal(t3FrenchText('Places that mention “poutine” in Kelowna, ranked by how closely they match and by their ratings.'),'Lieux qui mentionnent « poutine » à Kelowna, classés selon leur correspondance et leurs notes.');
+ assert.equal(t3FrenchText('We couldn’t work out a plan from that request yet.'),'Nous n’avons pas encore pu faire un plan à partir de cette demande.');
+ // With no stop, the heading is the French summary (no English sentence in the middle of the French page).
+ assert.equal(t3FrenchPlan({summary:'A one-day plan around Naramata, focused on distilleries.',days:[{stops:[]}]}).headline,'Une journée autour de Naramata, axée sur les distilleries.');
+ const fr=require('../trip-planner-fr.js'),d=require('../discovery-intent.js'),tax={types:[],venues:[]};
+ assert.equal(fr.tripPlannerText('Une journée à Naramata samedi pour deux adultes : distilleries',tax),'a day at naramata saturday for two adults distilleries');
+ assert.match(fr.tripPlannerText('Distilleries et pique-nique à Naramata samedi',tax),/\bpicnic\b/);
+ assert.match(fr.tripPlannerText('souper et porte-monnaie à Kelowna samedi',tax),/\bportemonnaie\b/,'an unknown hyphenated word stays one term');
+ for(const q of ['a day in naramata for two adults','a day at naramata saturday for two adults distilleries']){const i=d.interpretDiscoveryQuery(q,tax);assert.equal(i.occasion,null,q);assert.ok(!i.foodTerms.some(f=>/adult/.test(f.term)),q);}
+ assert.equal(d.interpretDiscoveryQuery('an adults only day in kelowna',tax).occasion,'adults','adults only is still the occasion');
+ assert.equal(d.interpretDiscoveryQuery('a romantic day for two in kelowna',tax).occasion,'romantic');
 });

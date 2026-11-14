@@ -307,7 +307,7 @@ test('Page (round 12): French day tabs use « et », labels wrap, no tiny free i
   const ctx = vm.createContext({});
   // Round 15c: t3FrenchText calls t3FrenchHeading, which ships with its lookups (as the page does).
   const frc = require('../trip-french-copy.js');
-  const headingSrc = ['FR_HEADING_NAMES', 'FR_HEADING_DAYS', 'FR_HEADING_PARTS', 'FR_HEADING_OCCASIONS', 'FR_HEADING_WHEN_RE'].map((k) => `var ${k} = ${JSON.stringify(frc[k])};`).join('\n') + `\n${frc.frHeadingWhen.toString()}\n${frc.frHeadingWhere.toString()}\n${frc.t3FrenchHeading.toString()}\n`;
+  const headingSrc = ['FR_HEADING_NAMES', 'FR_HEADING_DAYS', 'FR_HEADING_PARTS', 'FR_HEADING_OCCASIONS', 'FR_HEADING_WHEN_RE'].map((k) => `var ${k} = ${JSON.stringify(frc[k])};`).join('\n') + `\n${frc.frHeadingWhen.toString()}\n${frc.frHeadingWhere.toString()}\n${frc.t3FrenchHeading.toString()}\n` + ['t3FrenchHeadingCore', 't3FrenchSummary', 'frSummaryItems', 'frSummaryList', 'frSummaryAround', 'frOccasionNoun'].map((k) => frc[k].toString()).join('\n') + '\n'; // distillery test 2: the summary translator ships too
   vm.runInContext(`${headingSrc}var FR_SITE = ${JSON.stringify(frc.FR_SITE)};\n${frc.frSiteIn.toString()}\n${frc.frSiteOut.toString()}\n${frc.t3FrenchTextCore.toString()}\n${t3FrenchText.toString()}; var out = t3FrenchText('wineries, breweries or cocktail lounges');`, ctx);
   assert.equal(ctx.out, 'vignobles, microbrasseries ou bars à cocktails');
 });

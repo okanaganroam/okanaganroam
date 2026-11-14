@@ -27273,7 +27273,7 @@ test('Portal polish (2026-10-18): Undo takes a reason; the owner sees "Changed b
   assert.equal(enMail.subject, 'We changed back an update to X');
   assert.match(enMail.text, /We put back the earlier phone on the X listing[\s\S]*Reason: Wrong number/);
   const fr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
-  assert.match(fr, /<span class="op-why">Rétabli par nous : Ce numéro sonne chez un autre commerce\.<\/span>/);
+  assert.match(fr, /<span class="op-why">Rétabli par nous\u00a0: Ce numéro sonne chez un autre commerce\.<\/span>/);
   const en = await get(`/owner/account/venue/${v.id}`, cookie);
   assert.match(en, /<span class="op-why">Changed back by us: Ce numéro sonne chez un autre commerce\.<\/span>[\s\S]*?Changed back by us<\/span>/);
   // The admin card: a reason box before Undo, and after it no "p.m.." double period.
@@ -27341,7 +27341,7 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
   assert.match(after, /id="opClosuresSummary">2 closures \(next: [A-Z][a-z]{2} \d{1,2}\)</);
   const afterFr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
   assert.match(afterFr, /id="opSeasonalSummary">Winter hours du 1er nov\. au 30 avr\.</);
-  assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine : /);
+  assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine\u00a0: /);
   // Venue page structured data, on a fixed clock.
   db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-12-25', to: '2026-12-26', note: '' }, { from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);
   app.clearHoursExtraCache();

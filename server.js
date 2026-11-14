@@ -6813,6 +6813,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(brewSetupType(v.type) && breweryFlightFee(v.id) != null ? { flightFee: breweryFlightFee(v.id) } : {}),
       // Distilleries (Decided 4, 2026-11-13): planned for a family only when the owner said All ages or "until a set time".
       ...(v.type === 'distillery' && breweryKidsWelcome(v.id) === true ? { ownerKidsWelcome: true } : {}),
+      // Distillery test 2 (2026-11-13): the owner said Adults only (19+), so a kids' trip names that as the reason.
+      ...((v.type === 'distillery' || v.type === 'brewery') && breweryKidsWelcome(v.id) === false ? { ownerAdultsOnly: true } : {}),
       ...(v.type === 'brewery' && breweryKindOf(v) ? { breweryKind: breweryKindOf(v) } : {}),
       // Brewery test 1 (2026-11-12): "minors with an adult until 9 PM" (a brewery's or a pub's own answer), so a kids
       // trip names the time and isn't planned there after it; and hours the business saved or confirmed in the last
@@ -10518,7 +10520,11 @@ const NIGHTS_STALE_DAYS = 120;
 const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'other'];
 // The kinds that run at any time of day (not only evenings), for the trip planner's lines.
 const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
-const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th'];
+const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th', 'appointment'];
+// Distillery test 2 (2026-11-13): a tour or class "By appointment" (« Sur rendez-vous ») is the frequency 'appointment'
+// with no days: it never falls on a date (no Today / Tonight tag, no Build My Trip time slot). Tours and classes only.
+const NIGHT_APPOINTMENT = 'appointment';
+const nightByAppointment = (s) => !!s && s.frequency === NIGHT_APPOINTMENT;
 const NIGHT_TYPES = portalTypesWith('nights');
 // One night as stored and compared: every key, in this order, null when not given.
 const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'source', 'checked_at'];
@@ -10558,9 +10564,13 @@ function validateWeeklyNights(list, opts = {}, now = new Date()) {
     if ((s.season_from != null && s.season_from !== '' && !sFrom) || (s.season_to != null && s.season_to !== '' && !sTo)) return { ok: false, detail: `night ${n}: season dates must be real MM-DD days` };
     if (!sFrom !== !sTo) return { ok: false, detail: `night ${n}: give both season_from and season_to, or neither` };
     if (sFrom && sFrom === sTo) return { ok: false, detail: `night ${n}: season_from and season_to are the same day` };
-    if (!Array.isArray(s.days) || !s.days.length) return { ok: false, detail: `night ${n}: pick at least one day` };
-    if (s.days.some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `night ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
-    const item = { days: SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
+    const appt = s.frequency === NIGHT_APPOINTMENT;
+    if (appt && !DAYTIME_NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: only a tour or a class can be by appointment` };
+    if (!appt && (!Array.isArray(s.days) || !s.days.length)) return { ok: false, detail: `night ${n}: pick at least one day` };
+    if (s.days != null && !Array.isArray(s.days)) return { ok: false, detail: `night ${n}: days must be a list` };
+    if ((s.days || []).some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `night ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
+    // By appointment: any day the visitor calls, so no days are kept.
+    const item = { days: appt ? [] : SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
     if (!NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: kind must be one of ${NIGHT_KINDS.join(', ')}` };
     item.kind = s.kind;
     for (const [k, what, max, required] of [['title', 'title', NIGHT_TITLE_MAX, true], ['detail', 'detail', NIGHT_DETAIL_MAX, false], ['host', 'host', NIGHT_HOST_MAX, false], ['cost', 'cost', NIGHT_COST_MAX, false],
@@ -10828,6 +10838,7 @@ const NIGHT_WEEKS_TEXT = {
   fr: { 'monthly-1st': '1er', 'monthly-last': 'dernier', 'monthly-1st-3rd': '1er et 3e', 'monthly-2nd-4th': '2e et 4e' },
 };
 function nightDaysText(s, fr) {
+  if (nightByAppointment(s)) return fr ? 'Sur rendez-vous' : 'By appointment';
   const weeks = NIGHT_WEEKS_TEXT[fr ? 'fr' : 'en'][s.frequency];
   if (!weeks) return venueSpecialsDaysText(s.days, fr);
   const names = s.days.map((d) => (fr ? `${HH_DAYS_SHORT.fr[d]}.` : HH_DAYS_SHORT.en[d])).join(', ');
@@ -10835,9 +10846,26 @@ function nightDaysText(s, fr) {
 }
 // Build My Trip (2026-10-27): "Tonight: Trivia at 7 PM" (« Ce soir : Quiz à 19 h »), up to two, "; " between.
 // Distillery test 1 (2026-11-13): a tour or class the place books ahead says so ("Tour at 2 PM, book ahead").
+// Distillery test 2 (2026-11-13): a tour or class reads as its event ("Distillery tour", « Visite de la distillerie »), not
+// only its kind (« Visite »): a distillery tour by its words, a plain kind name by the kind, its own title otherwise.
+const GENERIC_DAYTIME_TITLES = new Set(['tour', 'visite', 'class', 'atelier', 'distillery tour', 'visite de la distillerie']);
+function daytimeTripLabel(s, fr) {
+  const t = String(s.title || '').trim().toLowerCase();
+  if (!GENERIC_DAYTIME_TITLES.has(t)) return nightLabel({ ...s, kind: 'other' }, fr);
+  if (s.kind === 'tour' && /distill/.test(t)) return { text: fr ? 'Visite de la distillerie' : 'Distillery tour', english: false };
+  return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
+}
+// A stop's line for a place whose tours or classes are by appointment only (no day to plan them on).
+function nightsApptTripLine(list, fr) {
+  const appt = (list || []).filter((s) => nightByAppointment(s) && DAYTIME_NIGHT_KINDS.includes(s.kind));
+  if (!appt.length) return '';
+  const tour = appt.some((s) => s.kind === 'tour'), cls = appt.some((s) => s.kind === 'class');
+  if (fr) return `${tour && cls ? 'Visites et ateliers' : tour ? 'Visites' : 'Ateliers'} sur rendez-vous, appelez avant`;
+  return `${tour && cls ? 'Tours and classes' : tour ? 'Tours' : 'Classes'} by appointment, call ahead`;
+}
 function nightsTripText(list, fr, bookAhead = false) {
   const shown = (list || []).slice(0, 2).map((s) => {
-    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false } : nightLabel(s, fr), t = nightTimeText(s, fr);
+    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? daytimeTripLabel(s, fr) : nightLabel(s, fr), t = nightTimeText(s, fr);
     // Audit fix (2026-10-27): a range reads "Trivia 7:30–9:30 PM" (it was "at 7:30–9:30 PM"); a start alone keeps "at 7 PM".
     const ranged = specialMinutes(s.end) !== null;
     const book = bookAhead && DAYTIME_NIGHT_KINDS.includes(s.kind) ? (fr ? ', réservez à l’avance' : ', book ahead') : '';
@@ -10906,7 +10934,15 @@ function withTripWeeklyNights(plan, now = new Date()) {
       if (a !== null && Number.isFinite(item.endMinutes) && item.endMinutes < 1440 && a >= item.endMinutes - 15) return false;
       return !(a !== null && b === null && min >= a + 180);
     }));
-    if (!list.length) continue;
+    if (!list.length) {
+      // Distillery test 2: tours by appointment have no slot; the stop says to call ahead.
+      const apEn = nightsApptTripLine(nightsShown(byVenue.get(item.venueId), now), false);
+      if (apEn) for (const s of stops) {
+        if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
+        s.nightLine = apEn; s.nightLineFr = nightsApptTripLine(nightsShown(byVenue.get(item.venueId), now), true);
+      }
+      continue;
+    }
     const book = nightsBookAhead(item.venueId, list);
     const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
     // Audit fix (2026-10-27): "Tonight:" only on today's date; another day says which ("Sunday: …", « Dimanche : … »).
@@ -10939,7 +10975,11 @@ function withTripListNights(plan, now = new Date()) {
     try { row = q.get(id); } catch (e) { row = null; }
     if (!row || !NIGHT_TYPES.has(row.type)) continue;
     const list = nightsSorted(nightsShown(byVenue.get(id), now).filter((n) => nightOnDate(n, plan.listDate)));
-    if (!list.length) continue;
+    if (!list.length) {
+      const apEn = nightsApptTripLine(nightsShown(byVenue.get(id), now), false);
+      if (apEn) { s.nightLine = apEn; s.nightLineFr = nightsApptTripLine(nightsShown(byVenue.get(id), now), true); }
+      continue;
+    }
     const book = nightsBookAhead(id, list);
     const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
     const label = tripLineDayLabel(plan.listDate, now, list.every((n) => !DAYTIME_NIGHT_KINDS.includes(n.kind)));
@@ -20972,7 +21012,7 @@ function breweryVisitLines(venue, info) {
     const k = b.kitchen || {};
     const main = {
       kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
-      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de bouffe de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de bouffe de rue la plupart des jours.'],
+      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions-restaurants la fin de semaine.'] : ['Food trucks most days.', 'Camions-restaurants la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
@@ -36002,6 +36042,9 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const clock = okanaganClock(now);
   let closedToday = false;
   try { const place = statusHours ? venueHoursStatusAt(statusHours, now) : null; closedToday = !!(place && place.closedToday); } catch (e) { closedToday = false; }
+  // Distillery test 2 (2026-11-13): today's row is tagged only when the place is open today: not in its by-appointment
+  // season (a 7-day tour read "Daily … Tonight" on a November Friday) and not closed for the season.
+  if (!closedToday && venueClosedForTagsToday(venue, now)) closedToday = true;
   // Audit fix (2026-10-27): "Tonight" only until the night ends, and last night's late one ("Karaoke to 12:30 AM") reads
   // "On now" after midnight (weeklyRowTag, the Okanagan clock).
   const yesterdayDate = addLocalDays(clock.date, -1);
@@ -36015,6 +36058,19 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const confirmed = shown.every((s) => s.source === 'venue_owner') ? venueConfirmedHtml(venue.name, oldest, fr) : '';
   return { rows, checked: happyHourCheckedText(oldest, fr), confirmed };
 }
+// Is the place shut for walk-ins today by its own answers (by appointment today, all year or in its off-season) or closed
+// for the season (or a temporary closure now)? Then no row of its weekly nights is "Today" / "Tonight".
+function venueClosedForTagsToday(venue, now = new Date()) {
+  if (!venue) return false;
+  try {
+    if (apptType(venue.type) && wineryAppointmentOn(venue.id, todayLocal(now), venue.type) === true) return true;
+    const ss = getSeasonStates(now).get(venue.id);
+    // An owner's by-appointment answer outranks a research "closed" row (that case returned above when it applies today).
+    if (ss && ss.kind === 'temp_closed' && ss.current) return true;
+    if (ss && ss.kind === 'closed' && !(apptType(venue.type) && wineryAppointmentOn(venue.id, todayLocal(now), venue.type) === false)) return true;
+  } catch (e) { return false; }
+  return false;
+}
 // A small line icon per kind (the existing uiIcon set; no emoji).
 const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', tour: 'calendar', class: 'calendar', other: 'calendar' };
 // The "Weekly nights" card (the weekly specials' list style): the days in their own column, the title with its time
@@ -36026,9 +36082,14 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
   if (!wn || !wn.rows.length) return '';
   const row = ({ s, days, today, onNow, time, freq }) => {
     const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
-    const title = titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
-    const tl = fr && !titleFr ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
-    const evening = specialMinutes(s.start) === null || specialMinutes(s.start) >= 16 * 60;
+    // Distillery test 2 (2026-11-13): a tour or class named by its chip ("Visite de la distillerie" typed by a French
+    // owner) reads in the page's language ("Distillery tour" on the English page).
+    const dl0 = DAYTIME_NIGHT_KINDS.includes(s.kind) && GENERIC_DAYTIME_TITLES.has(String(s.title || '').trim().toLowerCase()) ? daytimeTripLabel(s, fr) : null;
+    const title = dl0 ? dl0.text : titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
+    const tl = fr && !titleFr && !dl0 ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
+    // Distillery test 2 (2026-11-13): a row with no start time isn't "evening"; it says "Today".
+    const evening = specialMinutes(s.start) !== null && specialMinutes(s.start) >= 16 * 60;
+    const appt = nightByAppointment(s);
     const tag = today ? ` <span class="venue-wn-today">${onNow ? (fr ? 'En cours' : 'On now') : evening ? (fr ? 'Ce soir' : 'Tonight') : (fr ? 'Aujourd’hui' : 'Today')}</span>` : '';
     // Card polish (2026-10-27): no kind label when the title already says it ("Karaoke Madness" · not "Karaoke"; the
     // icon stays), no detail that only restates the row (nightShownText).
@@ -36041,6 +36102,8 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
     // when the row has nothing else to say.
     const meta = shown.kind ? [kindHtml, rest].filter(Boolean).join(' &middot; ') : rest ? `${kindHtml ? `${kindHtml} ` : ''}${rest}` : '';
     const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
+    // By appointment (distillery test 2): "Distillery tour · By appointment" on one line, no day and no tag.
+    if (appt) return `<span class="venue-wn is-appt" role="listitem"><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span> <span class="venue-wn-time">&middot; ${fr ? 'sur rendez-vous' : 'By appointment'}</span>${seasonTagSpan(s, fr)}${iconInline}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
     return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${seasonTagSpan(s, fr)}${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
   // Distillery test 1 (2026-11-13): a distillery's are tours and classes, not nights.
@@ -36305,6 +36368,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-wn.is-today { margin: 0 -6px; padding: 6px; border-radius: 6px; background: rgba(42,107,103,0.09); }
   body.golf-page .venue-wn-days { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: break-word; }
   body.golf-page .venue-wn-main { min-width: 0; overflow-wrap: break-word; }
+  body.golf-page .venue-wn.is-appt .venue-wn-main { grid-column: 1 / -1; }
   body.golf-page .venue-wn-title { font-weight: 800; color: var(--ink, #2A2019); }
   body.golf-page .venue-wn-time { margin-left: 2px; font-weight: 800; color: var(--teal-deep, #1E4F4C); white-space: nowrap; }
   body.golf-page .venue-wn-today { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--teal-deep, #1E4F4C); color: #fff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; vertical-align: 1px; }
@@ -53293,11 +53357,11 @@ const BREWERY_SETUP_HELP_TOPICS = [
     keysFr: ['liste des bieres', 'liste de bieres', 'nos bieres', 'bieres', 'en fut', 'fut', 'futs', 'pression', 'biere en fut', 'bieres en fut', 'tableau', 'ardoise', 'liste des cidres'],
     a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the menu”, so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
     aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir le menu », pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
-  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de bouffe de rue',
+  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions-restaurants',
     keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
-    keysFr: ['camion', 'camions', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
+    keysFr: ['camion', 'camions', 'camions restaurants', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
     a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
-    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions de bouffe de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de bouffe de rue la plupart des jours » ou « Camions de bouffe de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
+    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions-restaurants</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions-restaurants la plupart des jours » ou « Camions-restaurants la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
     keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
@@ -53341,6 +53405,14 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
     a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Only on set weeks, like the first Saturday? Open <strong>Tours &amp; events</strong> on your edit page and pick how often.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
     aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Seulement certaines semaines, comme le premier samedi? Ouvrez <strong>Visites et événements</strong> sur votre page de modification et choisissez la fréquence.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+  // Distillery test 2 (2026-11-13): "our tours are by appointment" got the hours answer. Tours or visits by appointment
+  // point to the "By appointment" choice on Tours, classes and events, ahead of the hours-by-appointment topic.
+  { id: 'distillery-tours-appointment', pages: ['setup', 'edit'], over: ['distillery-hours', 'distillery-tours', 'winery-appointment', 'nights', 'events', 'weekly-nights', 'hours'], noRelated: ['weekly-nights'],
+    q: 'Our tours are by appointment (no set day)', qFr: 'Nos visites sont sur rendez-vous (pas de jour fixe)',
+    keys: ['tours by appointment', 'tour by appointment', 'tours are by appointment', 'tour is by appointment', 'classes are by appointment', 'tours appointment only', 'tours appointment', 'tour appointment', 'classes by appointment', 'class by appointment', 'visits by appointment', 'tours any day', 'tour any day', 'tour no set day', 'tours no set day', 'private tours', 'private tour', 'tours on request', 'tour on request'],
+    keysFr: ['visites sur rendez vous', 'visite sur rendez vous', 'visites sont sur rendez vous', 'visite est sur rendez vous', 'ateliers sont sur rendez vous', 'visites se font sur rendez vous', 'visites rendez vous', 'visite rendez vous', 'visite de la distillerie sur rendez vous', 'ateliers sur rendez vous', 'atelier sur rendez vous', 'visites n importe quel jour', 'visite n importe quel jour', 'visites pas de jour fixe', 'visite pas de jour', 'visites privees', 'visite privee', 'visites sur demande', 'visite sur demande'],
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>, then <strong>Yes</strong>. Tap <strong>Distillery tour</strong> (or <strong>Class</strong>), then <strong>By appointment</strong> under the days. No day is needed. Tap <strong>Save my events</strong>.</p><p>Your page shows “Distillery tour · By appointment”, with no day and no Today or Tonight tag, and Build My Trip tells visitors to call ahead. It’s on your page right away. On your edit page, it’s “By appointment” under how often in <strong>Tours &amp; events</strong>.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>, puis <strong>Oui</strong>. Touchez <strong>Visite de la distillerie</strong> (ou <strong>Atelier</strong>), puis <strong>Sur rendez-vous</strong> sous les jours. Aucun jour n’est nécessaire. Touchez <strong>Enregistrer mes événements</strong>.</p><p>Votre page indique « Visite de la distillerie · sur rendez-vous », sans jour ni mention Aujourd’hui ou Ce soir, et Planifier mon voyage invite les visiteurs à appeler avant. C’est sur votre page tout de suite. Sur votre page de modification, c’est « Sur rendez-vous » sous la fréquence, dans <strong>Visites et événements</strong>.</p>' },
   { id: 'distillery-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures', 'brewery-seasonal-hours', 'winery-appointment'],
     q: 'We’re seasonal, or open by appointment', qFr: 'Nous sommes saisonniers, ou ouverts sur rendez-vous',
     keys: ['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'off season', 'off-season', 'change hours', 'change my hours'],
@@ -58164,7 +58236,7 @@ const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix du plateau de dégustation' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
-const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
+const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de 5 à 7'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
   pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
   cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'],
@@ -59271,7 +59343,16 @@ function ownerCompletenessJson(found, token, lang) {
 }
 
 function renderOwnerPage(found, token, pending, lang = 'en') {
-  return ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  const html = ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  return lang === 'fr' ? frTypographyPage(html) : html;
+}
+// Distillery test 2 (2026-11-13): the French owner home through the French spacing (a no-break space before « : » and
+// « % », narrow before « ? » « ! »), text between tags only: never inside a script, a style or a text box (her own words).
+function frTypographyPage(html) {
+  if (typeof html !== 'string' || !html) return html;
+  return html.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<textarea\b[\s\S]*?<\/textarea>|<head\b[\s\S]*?<\/head>)/i)
+    // « jusqu’à 6 : » too (frSpacing leaves a digit before « : » alone, for times; a spaced colon is never a time).
+    .map((part, i) => (i % 2 ? part : frSpacingHtml(part).replace(/(>[^<]*?\d) :(?=[\s<])/g, '$1\u00a0:').replace(/^([^<]*?\d) :(?=[\s<])/, '$1\u00a0:'))).join('');
 }
 
 // French (2026-10-18): lang 'fr' writes the whole page in French (L(en, fr)); its links, posts and the help bot stay
@@ -59516,13 +59597,15 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const nightRows = () => {
     const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length + (nightsNow.length < NIGHTS_MAX ? 1 : 0)));
     const freqText = { weekly: L('Every week', 'Chaque semaine'), biweekly: L('Every other week', 'Une semaine sur deux'), 'monthly-1st': L('1st of the month', '1er du mois'),
-      'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois') };
+      'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois'),
+      // Distillery test 2 (2026-11-13): a tour or class by appointment (no day); offered where tours and classes are.
+      appointment: L('By appointment (tours and classes)', 'Sur rendez-vous (visites et ateliers)') };
     return Array.from({ length: NIGHTS_MAX }, (_, i) => {
       const x = nightsNow[i] || { days: [], kind: 'trivia', frequency: 'weekly' };
       const n = i + 1;
       const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
       const kinds = `<select class="op-wn-kind" aria-label="${L(`Night ${n}: kind of night`, `Soirée ${n} : genre de soirée`)}">${NIGHT_KINDS.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
-      const freq = `<select class="op-wn-freq" aria-label="${L(`Night ${n}: how often`, `Soirée ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
+      const freq = `<select class="op-wn-freq" aria-label="${L(`Night ${n}: how often`, `Soirée ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT || venue.type === 'distillery' || x.frequency === f).map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
       return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''}>
           <legend>${L(`Night ${n}`, `Soirée ${n}`)}</legend>
           <div class="op-sp-days" role="group" aria-label="${L(`Night ${n}: days`, `Soirée ${n} : jours`)}">${days}</div>
@@ -59877,7 +59960,7 @@ ${renderGolfHeaderHtml()}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${showHappyHour && venue.type !== 'winery' ? tile('happy', '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${showHappyHour && venue.type !== 'winery' ? tile('happy', fr ? '&#127865;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
           ${tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
@@ -66306,7 +66389,7 @@ module.exports = {
   validateHappyHourDeals, guardedHappyHourDealsUpdate, happyHourDealsShown, happyHourDealsCompact, happyHourDealsStale, happyHourLeftText, happyHourOnNowText,
   withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
   // Weekly nights (2026-10-27).
-  validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
+  validateWeeklyNights, nightsApptTripLine, daytimeTripLabel, nightsTripText, venueClosedForTagsToday, frTypographyPage, NIGHT_FREQUENCIES, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,

@@ -235,7 +235,7 @@ test('plan your visit: Flights, Food, To go and Kids & dogs are written from the
   assert.equal(row(b.id, 'Games').text, 'Trivia Tuesdays.', 'events not answered yet');
   // French lines ride along.
   const info = app.venueVisitInfo(b.id);
-  assert.equal(info.owner_fr.Food.fr, 'Camions de bouffe de rue la plupart des jours. Vous pouvez apporter votre pique-nique.');
+  assert.equal(info.owner_fr.Food.fr, 'Camions-restaurants la plupart des jours. Vous pouvez apporter votre pique-nique.' /* distillery test 2 */);
   assert.equal(info.owner_fr['To go'].fr, 'Canettes, bouteilles et remplissage de growlers pour emporter.');
   // Owner lines first, never folded under "More".
   const html = app.visitInfoHtml(info, false);
@@ -707,7 +707,7 @@ test('test 2 fix 1: food trucks “Most days” / “Weekends only”, pre-picke
   // Saved with the screen: the line stays "on weekends", in both languages.
   assert.equal((await change(t, { brewery_info: { food: 'trucks', trucks: 'weekends', outside: 'yes' } })).status, 200);
   assert.equal(row(b.id, 'Food').text, 'Food trucks on weekends. Outside food welcome.');
-  assert.equal(app.venueVisitInfo(b.id).owner_fr.Food.fr, 'Camions de bouffe de rue la fin de semaine. Vous pouvez apporter votre pique-nique.');
+  assert.equal(app.venueVisitInfo(b.id).owner_fr.Food.fr, 'Camions-restaurants la fin de semaine. Vous pouvez apporter votre pique-nique.');
   assert.equal(app.venueBreweryInfo(b.id).trucks, 'weekends');
   // Most days.
   assert.equal((await change(t, { brewery_info: { trucks: 'most_days' } })).status, 200);
@@ -917,7 +917,7 @@ test('brewery test 3: cider words for a cidery, neutral for no kind, beer words 
   assert.doesNotMatch(fb.hiLead + fb.labels.door + fb.doorQ + fb.mapFailQ, /votre salle(?! de dégustation)/);
   assert.equal(fb.doorHere, 'Êtes-vous sur place en ce moment ?');
   assert.match(fb.knownQ, /reconnus/); assert.match(fb.labels.story, /reconnus/);
-  assert.match(fb.tfoods.trucks, /bouffe de rue/);
+  assert.equal(fb.tfoods.trucks, 'Camions-restaurants'); // distillery test 2
   assert.doesNotMatch(eb.groupsLine, /\.$/); assert.doesNotMatch(fb.groupsLine, /\.$/);
   assert.match(text.fr.storyEnglishHint, /anglais/);
   // The setup page script lays the kind's words over the brewery words.
@@ -1010,7 +1010,7 @@ test('brewery test 4: Build My Trip says which day a left-out place is closed ("
   // The missing line itself says why when the only matching places were closed that day.
   const step = { alternatives: [{ name: 'Lakeside Lager House', url: '/x', reasonCode: 'different_time', closedDay: alt.closedDay }] };
   assert.equal(v3.t3MissingClosedText(step, false), 'Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.');
-  assert.equal(v3.t3MissingClosedText(step, true), 'Lakeside Lager House est fermé le lundi (oct.–avr.) · essayez du mardi au dimanche.');
+  assert.equal(v3.t3MissingClosedText(step, true), 'Lakeside Lager House — Fermé le lundi (oct.–avr.) · essayez du mardi au dimanche.' /* distillery test 2: subject-free */);
   assert.equal(v3.t3MissingClosedText({ alternatives: step.alternatives.concat({ name: 'Open Brewing', url: '/y', reasonCode: 'another_listing' }) }, false), null, 'another place nearby: the usual line');
   const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(pageSrc, /t3MissingClosedText\(step,nextFr\)\?esc\(\(nextFr\?'Non inclus : ':'Not included: '\)/);

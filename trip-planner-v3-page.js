@@ -1,5 +1,5 @@
 'use strict';
-const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
 const SITE_PAGE=require('./trip-site.js').page;
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
@@ -173,20 +173,21 @@ function t3ClosedDayText(c,fr){
 
 // Brewery test 4 follow-up: when the only matching places nearby were left out because they're closed all that day,
 // the missing line says so ("Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.") instead of "Try another
-// date or destination". Null otherwise.
+// date or destination". Null otherwise. Distillery test 2 (2026-11-13): French has no « est fermé » after the name (it
+// read « Distillerie du Ruisseau (test) est fermé »); the subject-free « Fermé le mardi… » follows a dash.
 function t3MissingClosedText(step,fr){
   var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
   var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
   if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
-  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' est '+t.charAt(0).toLowerCase()+t.slice(1):' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
+  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
 }
 
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
- const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',appt:'By appointment · call ahead'};
- const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing};
+ const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',appt:'By appointment · call ahead'};
+ const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults};
  return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(t3ClosedDayText(a.closedDay,fr)||reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
 }
 
@@ -927,6 +928,13 @@ function renderScript(d) {
   ${frHeadingWhen.toString()}
   ${frHeadingWhere.toString()}
   ${t3FrenchHeading.toString()}
+  // Distillery test 2 (2026-11-13): the plan's summary sentence in French (t3FrenchHeading falls back to it).
+  ${t3FrenchHeadingCore.toString()}
+  ${t3FrenchSummary.toString()}
+  ${frSummaryItems.toString()}
+  ${frSummaryList.toString()}
+  ${frSummaryAround.toString()}
+  ${frOccasionNoun.toString()}
   var FR_SITE = ${JSON.stringify(FR_SITE)};
   ${frSiteIn.toString()}
   ${frSiteOut.toString()}
@@ -1502,7 +1510,7 @@ function renderScript(d) {
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
-      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
+      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
       + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
