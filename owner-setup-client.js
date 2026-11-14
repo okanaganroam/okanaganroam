@@ -685,7 +685,7 @@
     if (FOLD && d === 'day' && step === 'groups' && T.stGroupsLink) return T.stGroupsLink;
     if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
     // Cocktail test 3 (2026-11-14): events on the page while a how often sent from the edit page ("every other week") is
-    // still waiting for our check. A setup events save puts it live (Dayton), and the row then says "on your page".
+    // still being checked. A setup events save puts it live (Dayton), and the row then says "on your page".
     if (step === 'music' && (d === 'live' || d === 'day') && T.stMusicOften && musicOftenWaiting()) return T.stMusicOften;
     if (d === 'day' && step === 'photos' && T.stDayPlural) return T.stDayPlural;
     // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
