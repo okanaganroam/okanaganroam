@@ -65,7 +65,8 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   assert.doesNotMatch(html, /sample photos|For this mockup/i);
   const fr = cfgOf(await get(`/fr/owner/${tokenFor(v.id)}/setup`).then((r) => r.text()));
   assert.equal(fr.t.spendLead, 'Un plat principal et une boisson sans alcool, avant taxes et pourboire.');
-  assert.equal(fr.offerLabels.takes_reservations, 'Prend les réservations');
+  // Cocktail test 2 (2026-11-13): « Accepte les réservations ».
+  assert.equal(fr.offerLabels.takes_reservations, 'Accepte les réservations');
   // Other types never get it.
   const pub = mk('golf');
   assert.equal((await get(`/owner/${tokenFor(pub.id)}/setup`)).status, 302);

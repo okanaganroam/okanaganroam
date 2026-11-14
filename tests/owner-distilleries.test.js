@@ -879,7 +879,7 @@ test('fe3 #6 no Today / Tonight on a weekly row without an end once the place ha
 
 test('fe3 #7 small fixes: happy hour example, 🍸, time defaults from closing, research small plates, 1 stop, the Monday missing line', () => {
   assert.equal(text.en.brewery.kindDistillery.whatsOnEx, '$8 cocktails and half-price small plates');
-  assert.equal(text.fr.brewery.kindDistillery.whatsOnEx, 'Cocktails à 8 $ et petites assiettes à moitié prix');
+  assert.equal(text.fr.brewery.kindDistillery.whatsOnEx, 'Cocktails à 8\u00a0$ et petites assiettes à moitié prix'); // no-break space (cocktail test 2)
   assert.equal(text.en.brewery.kindCidery.whatsOnEx, '$6 ciders and half-price snacks');
   assert.match(SRV(), /tile\('happy', fr \? '&#127865;' : venue\.type === 'distillery' \? '&#127864;' : '&#127867;'/);
   // Kitchen-close and kids-until start an hour before the earliest closing time (never after closing), or blank.

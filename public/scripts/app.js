@@ -602,7 +602,7 @@ var TRANSLATIONS = {
     'homeFooter.facebookAria': 'Okanagan Roam sur Facebook',
     'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Con\u00e7u pour toute la bande, chien inclus.',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
-    'search.mainLine': 'Que recherchez-vous?',
+    'search.mainLine': 'Que recherchez-vous\u202f?',
     'search.subLine': 'Vignobles, restaurants, randonn\u00e9es, plages, tr\u00e9sors cach\u00e9s\u2026',
     'search.button': 'Rechercher',
 

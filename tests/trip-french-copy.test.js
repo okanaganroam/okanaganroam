@@ -149,3 +149,14 @@ test('distillery test 2: the plan summary in French; two adults is no occasion; 
  assert.equal(d.interpretDiscoveryQuery('an adults only day in kelowna',tax).occasion,'adults','adults only is still the occasion');
  assert.equal(d.interpretDiscoveryQuery('a romantic day for two in kelowna',tax).occasion,'romantic');
 });
+
+// Cocktail test 2 (2026-11-13): stop labels by kind, meal names in « Aucun lieu (…) », and the date conflicts in French.
+test('French copy: kinds, meals and date conflicts', () => {
+  const fc = require('../trip-french-copy');
+  assert.equal(fc.t3FrenchText('Cocktail lounges'), 'Bars à cocktails');
+  assert.equal(fc.t3FrenchText('Cafes'), 'Cafés');
+  assert.equal(fc.t3FrenchText('No dinner matched in Kelowna, so the rest of the plan is shown.'), 'Aucun lieu (souper) ne correspond à Kelowna; voici le reste du plan.');
+  assert.equal(fc.t3FrenchText('No dog-friendly brunch matched in Kelowna, so the rest of the plan is shown.'), 'Aucun lieu (brunch, qui accepte les chiens) ne correspond à Kelowna; voici le reste du plan.');
+  assert.equal(fc.t3FrenchText('The calendar date range ends before it starts; confirm the travel dates.'), 'Les dates se terminent avant de commencer; vérifiez les dates du voyage.');
+  assert.equal(fc.t3FrenchText('Dinner conflicts with the requested return deadline; choose an earlier meal or a later deadline.'), 'Le souper ne convient pas à l’heure de retour demandée; choisissez un repas plus tôt ou une heure de retour plus tard.');
+});

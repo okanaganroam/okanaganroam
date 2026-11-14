@@ -978,7 +978,9 @@ test('brewery test 4: the story box shows her pending story, the Saved panel sho
   cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(cfg.storyPending, mine, 'the story waiting for our check');
   const s = CLIENT_SRC();
-  assert.match(s, /story: C\.storyPending \|\| CUR\.description \|\| ''/);
+  // Cocktail test 2 (2026-11-13): the page text is storyCur() (the French setup starts from description_fr when there is one).
+  assert.match(s, /story: C\.storyPending \|\| storyCur\(\),/);
+  assert.match(s, /function storyCur\(\)\{ return String\(\(C\.lang === 'fr' && CUR\.description_fr\) \|\| CUR\.description \|\| ''\); \}/);
   assert.match(s, /C\.storyPending && S\.story === C\.storyPending && T\.storyPendingHint/);
   assert.match(s, /S\.flashStory = sv\[1\] === 'story' \? S\.storySent \|\| '' : ''/, 'the ✓ line after a sent story carries her words');
   assert.match(s, /sp\.className = 'su-toast-story'; sp\.id = 'suStorySent'; sp\.textContent = T\.storySentAs \+ ' ' \+ st;/);

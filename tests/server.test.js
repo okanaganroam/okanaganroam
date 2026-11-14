@@ -16605,7 +16605,8 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
     // Brewery test 1 (2026-11-12): app.js changed on purpose (badgeLabelFor: "Kids until 9 PM" on a card's kids badge).
-    assert.equal(md5('public/scripts/app.js'), '5530055c9b930239fb485f675cb9b138', 'app.js is unchanged by the classic Open Now page');
+    // Cocktail test 2 (2026-11-13): app.js changed on purpose (« Que recherchez-vous ? » with its narrow no-break space).
+    assert.equal(md5('public/scripts/app.js'), '01f8a3c739ff8773e8da1943b6bf8115', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -26924,7 +26925,7 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche[ \u00a0]: Site web/i);
   assert.match(edit, /Envoyé le \d{1,2} [a-zéû]+\.?</, 'French short dates ("18 oct.")');
   assert.match(edit, /Personnes ayant accès[\s\S]*Ajouté le \d{1,2} [a-zéû]+\.?/);
-  assert.match(edit, /\$\$ &mdash; 15 à 30 \$ par personne/);
+  assert.match(edit, /\$\$ &mdash; 15 à 30\u00a0\$ par personne/); // no-break space before $ (cocktail test 2)
   assert.match(edit, /Copier le lundi sur\u00a0:/);
   assert.match(edit, /<option value="11" selected>novembre<\/option>/, 'French month names');
   assert.match(edit, /"liveNow":"En ligne maintenant[ \u00a0]: \{fields\}\. Votre page l’affiche tout de suite\. "/);
@@ -27352,7 +27353,7 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
   assert.match(after, /id="opSeasonalSummary">Winter hours Nov 1–Apr 30</);
   assert.match(after, /id="opClosuresSummary">2 closures \(next: [A-Z][a-z]{2} \d{1,2}\)</);
   const afterFr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
-  assert.match(afterFr, /id="opSeasonalSummary">Winter hours du 1er nov\. au 30 avr\.</);
+  assert.match(afterFr, /id="opSeasonalSummary">Heures d’hiver du 1er nov\. au 30 avr\.</); // the setup name in French (cocktail test 2)
   assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine\u00a0: /);
   // Venue page structured data, on a fixed clock.
   db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-12-25', to: '2026-12-26', note: '' }, { from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);

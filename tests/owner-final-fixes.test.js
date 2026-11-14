@@ -98,7 +98,8 @@ test('ticked badges waiting for our check get their own row and count; a dietary
 test('every block says whether it goes live now or is checked first (restaurants on the edit link); other types unchanged', async () => {
   const v = mk('restaurant', { hours: week });
   const page = await get(`/owner/${tokenFor(v.id)}`);
-  const check = 'Sent to us to check, usually within a day. Press Send changes when you’re done.';
+  // Cocktail test 2 (2026-11-13): nothing is sent yet, so "Checked first" (not "Sent to us to check").
+  const check = 'Checked first, usually within a day. Tap Send changes when you’re done.';
   const at = (id) => { const i = page.search(new RegExp(`<details class="op-fold[^"]*" id="${id}"`)); assert.ok(i > 0, id); return page.slice(i, i + 1500); };
   for (const id of ['hours', 'badges', 'specials', 'weekly-nights']) assert.ok(at(id).includes(check), `${id} says it is checked first`);
   if (page.includes('id="happy"')) assert.ok(at('happy').includes(check), 'happy hour too');
@@ -113,7 +114,7 @@ test('every block says whether it goes live now or is checked first (restaurants
   assert.match(pub, /<label for="opName">Your name<\/label>/);
   // French.
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
-  assert.ok(fr.includes('Envoyé pour vérification, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.'));
+  assert.ok(fr.includes('Vérifié d’abord, habituellement en moins d’une journée. Touchez Envoyer les modifications quand vous avez terminé.'));
   assert.match(fr, /Votre nom \(facultatif\)/);
 });
 

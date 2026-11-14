@@ -1012,7 +1012,8 @@ function renderScript(d) {
   function errorText(msg){
     if (lang() !== 'fr') return msg;
     var m = /^A locked stop cannot be kept: (.+) on day ([0-9]+) no longer fits this plan[.] Unlock it, or change the request[.]$/.exec(msg || '');
-    return m ? 'Un arrêt conservé ne peut pas être gardé : ' + m[1] + ' (jour ' + m[2] + ') ne convient plus à ce plan. Libérez-le ou modifiez la demande.' : msg;
+    // Cocktail test 2 (2026-11-13): the date conflicts ("The calendar date conflicts with the named weekday…") too.
+    return m ? 'Un arrêt conservé ne peut pas être gardé : ' + m[1] + ' (jour ' + m[2] + ') ne convient plus à ce plan. Libérez-le ou modifiez la demande.' : t3FrenchText(msg);
   }
   function request(extra, opts){
     opts = opts || {};
@@ -1388,7 +1389,9 @@ function renderScript(d) {
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
   var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening', night: 'Night' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
-  function whenLabel(s, key){ var w = DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; var t = stopTime(s, key); return t ? w + ' · ' + t : w; }
+  // Cocktail test 2 (2026-11-13): a stop named for its kind ("Cocktail lounges · 18 h–19 h") reads in French too
+  // (« Bars à cocktails · 18 h–19 h »).
+  function whenLabel(s, key){ var w = DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : lang() === 'fr' ? t3FrenchText(s.label) : s.label; var t = stopTime(s, key); return t ? w + ' · ' + t : w; }
   // Round 15 (2026-10-20): each stop shows its start and end ("9 AM–10:30 AM", « 9 h–10 h 30 »), from the plan's schedule.
   function stopTime(s, key){
     var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
@@ -1448,8 +1451,9 @@ function renderScript(d) {
     var french = lang() === 'fr', cost = v.cost;
     if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
       // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
-      // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails dès 16 $ ».
-      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux dès ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations dès ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails dès ' : 'Cocktails from ') : '';
+      // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
+      // wording, the card's « À partir de », not « dès »).
+      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : '';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';

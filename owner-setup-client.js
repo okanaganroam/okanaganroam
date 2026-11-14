@@ -130,7 +130,7 @@
     var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
     var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
-    return fill(T.closedWarn, { days: all.map(dayName).join(', '), when: when });
+    return fill(T.closedWarn, { days: daysInFull(all), when: when });
   }
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
   // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
@@ -148,14 +148,27 @@
     return { days: {}, from: best[0], to: hmStr(c != null ? Math.min(o + 120, c) : o + 120), what: '' };
   }
   // A happy hour outside the place's hours on a day it's open (a gentle heads-up like the closed-day one).
+  // Cocktail test 2 (2026-11-13): checked against the hours that apply in the months it runs: a summer-only happy hour
+  // against the summer hours only, an all-year one against both weeks (outside either is a heads-up). A day closed in
+  // those months is the closed-day heads-up's (closedWarnAny), not this one's.
   function hoursWarn(e){
     var f = hm(e.from), t = e.close ? null : hm(e.to); if (f == null || !S.week) return '';
+    var M = seaMonths(S.happySea), hasSea = !!(S.sea && S.sea.on && S.sea.week), usual = !hasSea, seas = false;
+    if (hasSea) for (var i = 1; i <= 12; i++) if (M[i]) { if (S.sea.months[i]) seas = true; else usual = true; }
+    var weeks = []; if (usual) weeks.push(S.week); if (seas) weeks.push(S.sea.week);
+    var inside = function(w, d){ return w[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
+      var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; }); };
     var out = DAYS.filter(function(d){
-      if (!e.days[d] || !S.week[d]) return false;
-      return !S.week[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
-        var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; });
+      if (!e.days[d]) return false;
+      return weeks.some(function(w){ return w && w[d] && !inside(w, d); });
     });
-    return out.length && T.happyOutside ? fill(T.happyOutside, { days: out.map(dayName).join(', ') }) : '';
+    return out.length && T.happyOutside ? fill(T.happyOutside, { days: daysInFull(out) }) : '';
+  }
+  // Cocktail test 2 (2026-11-13): warnings name the days in full: "Monday and Tuesday"; French « lundi et le mardi » (the
+  // sentence already says « le {days} »: « fermé le lundi et le mardi »).
+  function daysInFull(list){
+    var n = list.map(longDay); if (n.length < 2) return n.join('');
+    return C.lang === 'fr' ? n.slice(0, -1).join(', le ') + ' et le ' + n[n.length - 1] : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
   }
   function closedWarnAny(days, sea){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
@@ -166,7 +179,7 @@
     if (!all.length) return '';
     var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
     var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
-    return fill(T.closedWarnHappy, { days: all.map(dayName).join(', '), when: when });
+    return fill(T.closedWarnHappy, { days: daysInFull(all), when: when });
   }
   function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
@@ -175,6 +188,11 @@
 
   // ---------- State ----------
   var GAMES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
+  // Cocktail test 2 (2026-11-13): a story written in the French setup is the French description (description_fr); the
+  // English one is left as it is. The French story box starts from her French text, else the English page text.
+  var STORY_FIELD = C.lang === 'fr' ? 'description_fr' : 'description';
+  function storyCur(){ return String((C.lang === 'fr' && CUR.description_fr) || CUR.description || ''); }
+  function storyOut(t){ var o = {}; o[STORY_FIELD] = t; return o; }
   var S = {
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
@@ -183,7 +201,7 @@
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
-    happy: [], specials: [], nights: [], story: C.storyPending || CUR.description || '', visit: clone(CUR.visit_rows || {}),
+    happy: [], specials: [], nights: [], story: C.storyPending || storyCur(), visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
@@ -369,7 +387,7 @@
   if (CK && S.cp.fee == null && !S.cp.none && typeof C.researchCocktail === 'number') { S.cp.fee = C.researchCocktail; S.cp.guessed = true; }
   if (CK && S.cp.fee != null && CQ.indexOf(S.cp.fee) < 0) S.cp.other = true;
   // "$16" / "16 $".
-  function cpText(n){ return C.lang === 'fr' ? money(n) + ' $' : '$' + money(n); }
+  function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
   function readBrew(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
@@ -386,7 +404,7 @@
   function bpicks(key, keys, labels, subs, after){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>' + (after && after[k] ? after[k] : ''); }).join('') + '</div>'; }
   function bchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   // "$12" / "12 $".
-  function flightText(n){ return C.lang === 'fr' ? money(n) + ' $' : '$' + money(n); }
+  function flightText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   // Brewery test 1 (2026-11-12): the Flights lead names her current pick ("It shows on your card as 'From $14' right
   // away"), redrawn as she taps a price or types one in Other; with no pick (or one checked first) it names no number.
   function flightLeadText(){
@@ -679,6 +697,9 @@
         if (S.exitAfter && HALF.indexOf(step) >= 0 && !answered(step)) { S.busy = false; if (onOk) onOk(); return leave(); }
         // Nothing needed sending (all of it saved already): the step keeps the answer it had ("within a day" stays so).
         var st = forced || (statuses.indexOf('day') >= 0 || (!statuses.length && S.done[step] === 'day') ? 'day' : 'live');
+        // Cocktail test 2 (2026-11-13): a step with something still pending (a new booking link) keeps "within a day" after a
+        // save of something else on it (the Groups line), so its row keeps « nouveau lien de réservation d’ici un jour ».
+        if (st === 'live' && !forced && S.done[step] === 'day' && C.waiting && C.waiting.indexOf(step) >= 0) st = 'day';
         return progress(step, st).then(function(ok){ S.busy = false; if (!ok) return render(); if (onOk) onOk(); go(to || 'saved:' + step); });
       }
       return change(list[i]).then(function(r){ if (!r) { S.busy = false; return render(); } statuses.push(r); return next(i + 1); });
@@ -748,7 +769,7 @@
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
   function savedKept(step){ return step === 'offer' && !CK && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
   // The text the story box started from: the story she sent (not checked yet), or the page's.
-  function storyBase(){ return String(C.storyPending || CUR.description || '').trim(); }
+  function storyBase(){ return String(C.storyPending || storyCur()).trim(); }
   function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
   function savedText(step){
     var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
@@ -844,6 +865,15 @@
   var QUICK_COMMON = { only: 1, and: 1, the: 1, at: 1, on: 1, to: 1, too: 1, our: 1, us: 1, welcome: 1, dogs: 1, dog: 1, et: 1, seulement: 1, a: 1, l: 1, d: 1, la: 1, le: 1, les: 1, aux: 1, au: 1, chiens: 1, chien: 1, bienvenus: 1 };
   function quickWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(function(w){ return w && !QUICK_COMMON[w] && w !== 'à'; }); }
   function saysIt(v, t){ if (has(v, t)) return true; var w = quickWords(t), b = ' ' + quickWords(v).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
+  // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
+  // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
+  function enLineHint(text, id){
+    var t = String(text || '');
+    if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
+    var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
+    if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
+    return '<p class="su-hint su-enhint" id="' + id + '">' + h(T.lineEnglishHint) + '</p>';
+  }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
@@ -1416,7 +1446,7 @@
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';
       // Cafés (Decided 2): "About how much is a coffee and a pastry?" in the words for their kind.
       var sw = C.cafe ? cafeWords() : '';
-      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + ' $' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
+      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + '\u00a0$' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
         // Café test 2 (2026-11-11): cents for cafés ($5.50 a scoop), in 25-cent steps.
         + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">' + h(T.centsDown || '−25¢') + '</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">' + h(T.centsUp || '+25¢') + '</button></div>' : '')
         + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: money(S.spend) }), '', false, 'spendSave') + '</div>' + skip('spend');
@@ -1738,16 +1768,16 @@
       }).join('') + (T.eventsOften ? '<p class="su-hint" id="suEventsOften">' + h(T.eventsOften) + (T.eventsOftenLink && C.back ? ' <a href="' + h(C.back + '#tours-events') + '" id="suEventsOftenLink">' + h(T.eventsOftenLink) + '</a>' : '') + '</p>' : '') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
-        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
-        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + field('suKnown', T.knownQ, S.brew.known, { max: 180 }) + ex(T.knownEx) : '')
+        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
+        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.brew.known, { max: 180 }) + ex(T.knownEx) : '')
         + '<div class="su-stack">' + big('✓', C.winery || FOLD ? T.saveThese : T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn') + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
         // links"), and a link typed into the line above is offered a move into it instead of being refused.
         + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
@@ -1766,8 +1796,8 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = String(gl).replace(/\.$/, '') === fill(T.groupsLine, { n: n }) || (!!gsz && +gsz === n && /book|réserv/i.test(gl)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
-        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn') + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
@@ -2238,7 +2268,7 @@
   // Pub test 7 (2026-11-10): new words typed straight after the old description ("…pub food.A beach bar…") get the
   // space they were missing. Only that one join is touched; the rest is exactly as she typed it.
   function storyJoinFix(v){
-    var old = String(CUR.description || '').replace(/\s+$/, ''); v = String(v || '');
+    var old = storyCur().replace(/\s+$/, ''); v = String(v || '');
     if (old && v.length > old.length && v.indexOf(old) === 0 && /[.!?,;:)]$/.test(old) && /^[^\s.,;:!?)]/.test(v.slice(old.length))) return old + ' ' + v.slice(old.length);
     return v;
   }
@@ -2706,7 +2736,7 @@
       var bStoryCh = S.story.trim() !== storyBase(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
-      if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
+      if (bStoryCh) { bsl.push(storyOut(S.story)); S.storySent = S.story; } else S.storySent = '';
       // Sent even when unchanged (while it's research's), so the line becomes hers.
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
@@ -2779,7 +2809,7 @@
       var storyCh = S.story.trim() !== storyBase(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
-      if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
+      if (storyCh) { sl.push(storyOut(S.story)); S.storySent = S.story; } else S.storySent = '';
       var knownCh = S.wine.known !== ((CUR.visit_rows || {}).known_for || '');
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
@@ -2789,7 +2819,9 @@
     if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       // Brewery test 4: the story she already sent (not checked yet) isn't sent twice.
       if (C.storyPending && S.story.trim() === String(C.storyPending).trim()) { S.storySent = ''; return saveAll('story', []); }
-      S.storySent = S.story; return saveAll('story', [{ description: S.story }], null, null, storyWaiting); }
+      // French setup: the page text kept as it is (the English description stays English) sends nothing.
+      if (C.lang === 'fr' && !C.storyPending && S.story.trim() === storyCur().trim()) { S.storySent = ''; return saveAll('story', []); }
+      S.storySent = S.story; return saveAll('story', [storyOut(S.story)], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -3033,7 +3065,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
       // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
       // replaces it (never her own story, sent or on the page).
-      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!CUR.description && inp.value === CUR.description;
+      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!storyCur() && inp.value === storyCur();
       var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
     });
