@@ -133,7 +133,7 @@ test('progress: answers are remembered for Welcome back; bad steps refused; the 
   // Help: "did it go through?" answers with what was sent.
   assert.match(await get(`/owner/${t}/setup`).then((r) => r.text()), /"id":"setup-status"/);
   // Other types: no progress.
-  assert.equal((await get(`/owner/${tokenFor(mk('distillery').id)}/setup/progress`)).status, 404); // cafés (2026-11-10) and wineries (2026-11-12) have the setup
+  assert.equal((await get(`/owner/${tokenFor(mk('cocktail').id)}/setup/progress`)).status, 404); // cafés (2026-11-10) and wineries (2026-11-12) have the setup; distilleries since 2026-11-13
 });
 
 test('happy hour and specials sent to type up get their own queue rows, never mixed with the menu', async () => {

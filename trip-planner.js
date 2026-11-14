@@ -115,6 +115,9 @@ const KIDS_EXCLUDED_TYPES = ['cocktail', 'pub', 'distillery'];
 function kidsAllowed(v) {
   if (!v) return false;
   if (v.type === 'pub' || v.type === 'brewery') return !!(v.features && v.features.kid_friendly);
+  // Distilleries (Decided 4, 2026-11-13): only when the owner said All ages or "until a set time" (v.ownerKidsWelcome);
+  // a researched kids badge alone never counts, so an unanswered distillery stays out, as before.
+  if (v.type === 'distillery') return v.ownerKidsWelcome === true;
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
 // Brewery test 1 (2026-11-12): a brewery or pub whose owner said "minors with an adult until 9 PM" (v.kidsUntil, 'HH:MM').
@@ -133,7 +136,7 @@ const KIDS_UNTIL_RE = /^Kids welcome with an adult until /;
 // Brewery test 4 (2026-11-13): a brewery (or pub) whose owner says it has its own kitchen can be a meal stop within its
 // kitchen hours: open on that day for an hour of the window before the kitchen closes. { ok, closes } or null when it
 // has no kitchen answer.
-const MEAL_KITCHEN_TYPES = ['brewery', 'pub'];
+const MEAL_KITCHEN_TYPES = ['brewery', 'pub', 'distillery'];
 function kitchenMealFit(v, win, weekday) {
   if (!v || !v.ownKitchen || !MEAL_KITCHEN_TYPES.includes(v.type) || !win) return null;
   const m = /^(\d{2}):(\d{2})$/.exec(String(v.ownKitchen.closes || ''));
@@ -1354,9 +1357,9 @@ function publicVenue(v, ctx) {
   // with a $10 owner fee); a free tasting says so.
   const fee = v.type === 'winery' && typeof v.tastingFee === 'number' && Number.isFinite(v.tastingFee) && v.tastingFee >= 0 ? v.tastingFee : null;
   // Breweries (2026-11-12): the owner's flight price the same way ("$12 per person · Flight").
-  const flight = v.type === 'brewery' && typeof v.flightFee === 'number' && Number.isFinite(v.flightFee) && v.flightFee > 0 ? v.flightFee : null;
+  const flight = (v.type === 'brewery' || v.type === 'distillery') && typeof v.flightFee === 'number' && Number.isFinite(v.flightFee) && v.flightFee > 0 ? v.flightFee : null;
   const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
-    : flight ? { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null } : tripStopPrice(v.url, v.id);
+    : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null }) : tripStopPrice(v.url, v.id);
   return {
     ...(fee === 0 ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
@@ -1672,7 +1675,7 @@ function stopFrom(v, scored, extra, ctx) {
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
   if (appt && !(v.advisory && v.advisory.note && APPOINTMENT_RE.test(v.advisory.note))) { const note = `By appointment, from the listing: “${appt}” Book ahead.`; if (!caveats.includes(note)) caveats.push(note); }
   // The winery said so itself (2026-11-12), with no sentence of its own to quote.
-  else if (!appt && v && v.ownerAppointment === true && appointmentOnly(v)) { const note = 'By appointment only (the winery’s own answer). Book ahead.'; if (!caveats.includes(note)) caveats.push(note); }
+  else if (!appt && v && v.ownerAppointment === true && appointmentOnly(v)) { const note = v.type === 'distillery' ? 'By appointment only (the distillery’s own answer). Book ahead.' : 'By appointment only (the winery’s own answer). Book ahead.'; if (!caveats.includes(note)) caveats.push(note); }
   // Step 1 (2026-09-29): a place's current advisory is shown on every stop,
   // in the note's own words (itineraries already did this).
   if (v.advisory && v.advisory.note) {
@@ -8163,7 +8166,7 @@ module.exports = {
   wineTourMeansWineries,
   applyWineTourMeaning,
   fastFood,
-  publicVenue, breweryIsCidery, ciderAsked,
+  publicVenue, breweryIsCidery, ciderAsked, kidsAllowed,
   stopFrom,
   parseVenueHours,
   hoursFit, dayClosedAllDay, closedDayInfo,
