@@ -4124,7 +4124,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // then (it was planned 7:35-9:05 PM): its hours end at that time for this trip, so the visit is earlier, shorter or
         // another stop. The "Kids welcome with an adult until 9 PM" line still shows.
         const kidsCut=kidsTrip?kidsUntilMinutes(candidate):null;
-        const ranges=(unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges).map(([a,b])=>kidsCut!=null?[a,Math.min(b,kidsCut)]:[a,b]).filter(([a,b])=>b>a);
+        const ranges=(unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges||[]).map(([a,b])=>kidsCut!=null?[a,Math.min(b,kidsCut)]:[a,b]).filter(([a,b])=>b>a);
         if(hours?.status==='closed')return {bad:true};
         let transfer=0,guessedTransfer=false;
         if(previous){
