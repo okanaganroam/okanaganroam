@@ -137,7 +137,8 @@ test('cocktail price: research may suggest one (never saved until Save); the scr
   assert.equal(cfg.t.labels.spend, 'Cocktail price');
   const fr = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
   assert.equal(fr.t.labels.spend, 'Prix d’un cocktail');
-  assert.equal(fr.t.feeCard, 'Dès {x}');
+  // Cocktail test 2 (2026-11-13): one French price wording, the card's « À partir de ».
+  assert.equal(fr.t.feeCard, 'À partir de {x}');
   assert.equal(fr.t.cpriceNone, 'Nous ne servons pas de cocktails');
 });
 
@@ -187,7 +188,7 @@ test('Build My Trip: a lounge joins a kids trip only on All ages or “until a s
   assert.deepEqual(pv.cost, { cents: 1400, label: 'Cocktail', labelFr: 'Cocktail', source: null });
   assert.equal(pv.typeLabel, 'Cocktail lounge'); assert.equal(pv.typeLabelFr, 'Bar à cocktails');
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.match(v3, /cost\.label === 'Cocktail' \? \(french \? 'Cocktails dès ' : 'Cocktails from '\)/);
+  assert.match(v3, /cost\.label === 'Cocktail' \? \(french \? 'Cocktails à partir de ' : 'Cocktails from '\)/);
   // The French card label comes from the planner page's own words (public/scripts/app.js is frozen).
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /'tripv3\.type\.cocktail': 'Bar \\u00e0 cocktails'/);
 });
@@ -236,7 +237,8 @@ test('events: “Live music, DJs and events” (« Musique, DJ et événements �
   assert.ok(en.t.quick.reservations.includes('Walk-ins only'));
   const s = CLIENT();
   assert.match(s, /\} else if \(s === 'groups' && FOLD\) \{/);
-  assert.match(s, /\(CK \? '<h2 class="su-h2" id="suBookQ">' \+ h\(T\.bookQ2\) \+ '<\/h2>' \+ quick\('reservations', 'suBookLine', S\.brew\.book\)/);
+  // Cocktail test 2 (2026-11-13): the French "this text is in English" hint sits above the quick answers.
+  assert.match(s, /\(CK \? '<h2 class="su-h2" id="suBookQ">' \+ h\(T\.bookQ2\) \+ '<\/h2>' \+ enLineHint\(.*?'suBookEn'\) \+ quick\('reservations', 'suBookLine', S\.brew\.book\)/);
   assert.match(s, /if \(gline \|\| bline\) \{ var vr2 = \{\}; if \(gline\) vr2\.groups = gline; if \(bline\) vr2\.reservations = bline;/);
   // Specials stay on the edit page.
   assert.match((await get(`/owner/${t}`)).text, /id="opSpecials"/);
@@ -479,7 +481,9 @@ test('small fixes: happy hour from the opening time, small plates tile and card 
   const s = CLIENT();
   // Happy hour default: opening time to 2 hours later, capped at closing; a heads-up outside the hours.
   const vm = require('node:vm');
-  const ctx = { S: { week: { mon: [['17:00', '01:00']], tue: [['17:00', '01:00']], wed: null, thu: [['17:00', '18:00']], fri: [['17:00', '01:00']], sat: null, sun: null } }, DAYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], T: { happyOutside: 'out {days}' }, dayName: (d) => d, fill: (t, o) => t.replace('{days}', o.days), pad2: (n) => ('0' + n).slice(-2) };
+  const ctx = { S: { week: { mon: [['17:00', '01:00']], tue: [['17:00', '01:00']], wed: null, thu: [['17:00', '18:00']], fri: [['17:00', '01:00']], sat: null, sun: null } }, DAYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], T: { happyOutside: 'out {days}' }, dayName: (d) => d, fill: (t, o) => t.replace('{days}', o.days), pad2: (n) => ('0' + n).slice(-2),
+    // Cocktail test 2 (2026-11-13): the hours of the happy hour's months (all year here) and days named in full.
+    seaMonths: () => Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, true])), longDay: (d) => d, C: { lang: 'en' } };
   vm.runInNewContext(s.slice(s.indexOf('  function hm(v)'), s.indexOf('  function warnHtml')) + 'this.hd = happyDefault; this.hw = hoursWarn;', ctx);
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.hd())), { days: {}, from: '17:00', to: '19:00', what: '' });
   ctx.S.week = { mon: [['17:00', '18:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
@@ -529,4 +533,233 @@ test('Build My Trip list for a closed day says why: “… is closed Mondays · 
   assert.deepEqual(j.warnings, ['Quiet Door Test Lounge is closed Mondays · try Tue–Sun.']);
   assert.ok(!(j.recommendations || []).some((x) => x.venue && x.venue.id === v.id));
   assert.equal(require('../trip-french-copy.js').t3FrenchText('Quiet Door Test Lounge is closed Mondays · try Tue–Sun.'), 'Quiet Door Test Lounge — Fermé le lundi · essayez du mardi au dimanche.');
+});
+
+// ---------- Fresh eyes cocktail test 2 (2026-11-13, Geneviève, French, iPad) ----------
+const DAYS7 = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const weekOf = (a, b) => Object.fromEntries(DAYS7.map((d) => [d, [[a, b]]]));
+const seasonOf = (id) => app.venueWeeklyNightsList(id).map((x) => `${x.title}|${x.frequency}|${x.season_from || ''}>${x.season_to || ''}`);
+const pendingReq = (id) => db.prepare("SELECT id, changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(id);
+// The edit page's nights collector, as its script sends each row (WN_KEYS): every field, the season from data-season-*.
+const asEditPage = (rows) => rows.map((x) => ({ days: x.days, kind: x.kind, title: x.title, start: x.start || null, end: x.end || null, detail: x.detail || null, host: x.host || null, cost: x.cost || null,
+  frequency: x.frequency || 'weekly', title_fr: x.title_fr || null, detail_fr: x.detail_fr || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+for (const type of ['cocktail', 'pub', 'brewery', 'distillery', 'cafe']) {
+  test(`events keep their season (${type}): through an edit-page send, a setup re-save from waiting and from live, and approval`, async () => {
+    const v = mk(type); const t = tokenFor(v.id);
+    const music = { days: ['sat'], kind: 'live_music', title: 'Saturday music', start: '20:00', end: '23:00', detail: 'Local bands', host: 'Marc', cost: 'Free', title_fr: 'Musique du samedi', detail_fr: 'Groupes locaux', season_from: '06-01', season_to: '09-30' };
+    const trivia = { days: ['wed'], kind: 'trivia', title: 'Trivia', start: '19:00' };
+    assert.equal((await change(t, { weekly_nights: [music, trivia] })).status, 200);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|06-01>09-30', 'Trivia|weekly|>'], 'setup events are live with their season');
+    // The edit page carries the season on each row and says it.
+    const page = (await get(`/owner/${t}`)).text;
+    assert.match(page, /<fieldset class="op-sp op-wn" data-wn="1" data-season-from="06-01" data-season-to="09-30">/);
+    assert.match(page, /<p class="op-hint op-wn-season">Only Jun–Sep\. This stays when you send\.<\/p>/);
+    assert.match(page, /var WN_KEYS = \['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'season_from', 'season_to'\];/);
+    assert.match(page, /season_from: r\.getAttribute\('data-season-from'\) \|\| null, season_to: r\.getAttribute\('data-season-to'\) \|\| null \}\);\n    \}\);\n    return out;\n  \}\n  function nightKey/);
+    assert.match((await get(`/fr/owner/${t}`)).text, /Seulement juin–sept\. Cela reste quand vous envoyez\./);
+    // Edit-page send: trivia on the last Wednesday; every field of both rows rides along (waiting for our check).
+    const r = await change(t, { weekly_nights: asEditPage(app.venueWeeklyNightsList(v.id)).map((x) => (x.kind === 'trivia' ? { ...x, frequency: 'monthly-last' } : x)) }, false);
+    assert.equal(r.status, 200); assert.ok((r.body.review || []).includes('weekly_nights'));
+    const waiting = JSON.parse(pendingReq(v.id).changes).weekly_nights;
+    assert.deepEqual({ ...waiting[0] }, { ...music, frequency: 'weekly' }, 'every field of the music row is in the waiting request');
+    // The setup starts from the waiting rows, season and all; re-saved as it came (an untouched row), it goes live with both.
+    let cfg = await setupCfg(t);
+    assert.equal(cfg.cur.weekly_nights[0].season_from, '06-01'); assert.equal(cfg.cur.weekly_nights[1].frequency, 'monthly-last');
+    assert.equal((await change(t, { weekly_nights: cfg.cur.weekly_nights })).status, 200);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|06-01>09-30', 'Trivia|monthly-last|>'], 'from waiting: season and how often kept');
+    assert.equal(app.venueWeeklyNightsList(v.id)[0].detail_fr, 'Groupes locaux');
+    // From live: a setup re-save with a changed start time keeps the season (the screen's season box sends it).
+    cfg = await setupCfg(t);
+    assert.equal(cfg.cur.weekly_nights_waiting, false);
+    assert.equal((await change(t, { weekly_nights: asSetup(cfg.cur.weekly_nights).map((x) => (x.kind === 'live_music' ? { ...x, start: '20:30' } : x)) })).status, 200);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|06-01>09-30', 'Trivia|monthly-last|>'], 'from live: kept');
+    // An older edit page (no season on its rows) never takes it away: the live season stays on the waiting row.
+    assert.equal((await change(t, { weekly_nights: asEditPage(app.venueWeeklyNightsList(v.id)).map((x) => ({ ...x, season_from: null, season_to: null, title: x.kind === 'trivia' ? 'Trivia night' : x.title })) }, false)).status, 200);
+    const p2 = pendingReq(v.id);
+    assert.equal(JSON.parse(p2.changes).weekly_nights[0].season_from, '06-01');
+    // Approving the waiting request locally keeps the summer-only music summer-only.
+    assert.equal(app.approveOwnerChange(p2.id, 'dayton').ok, true);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|06-01>09-30', 'Trivia night|monthly-last|>'], 'approved: still summer only');
+    // A waiting row that lost its season (sent by the old edit page) shows the live season in the setup, and a setup
+    // re-save that sends no season keeps it.
+    assert.equal((await change(t, { weekly_nights: asEditPage(app.venueWeeklyNightsList(v.id)).map((x) => (x.kind === 'trivia' ? { ...x, start: '19:30' } : x)) }, false)).status, 200);
+    const p3 = pendingReq(v.id); const c3 = JSON.parse(p3.changes);
+    c3.weekly_nights = c3.weekly_nights.map((x) => ({ ...x, season_from: null, season_to: null }));
+    db.prepare('UPDATE owner_change_requests SET changes = ? WHERE id = ?').run(JSON.stringify(c3), p3.id);
+    cfg = await setupCfg(t);
+    assert.equal(cfg.cur.weekly_nights[0].season_from, '06-01', 'the setup shows the live season');
+    assert.equal((await change(t, { weekly_nights: asSetup(c3.weekly_nights) })).status, 200);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|06-01>09-30', 'Trivia night|monthly-last|>'], 'a setup re-save from the old waiting rows keeps it');
+    // "All year" picked on the setup screen for an event that showed its months stays all year.
+    assert.equal((await change(t, { weekly_nights: asSetup(app.venueWeeklyNightsList(v.id)).map((x) => (x.kind === 'live_music' ? { ...x, season_from: null, season_to: null } : x)) })).status, 200);
+    assert.deepEqual(seasonOf(v.id), ['Saturday music|weekly|>', 'Trivia night|monthly-last|>'], 'her all-year choice is kept');
+  });
+}
+test('events keep their season: the server helpers (carry only what was lost; a deliberate all year stays)', () => {
+  const live = [{ days: ['sat'], kind: 'live_music', title: 'Music', start: '20:00', frequency: 'weekly', season_from: '06-01', season_to: '09-30' }];
+  const lost = [{ days: ['sat'], kind: 'live_music', title: 'Music', start: '20:00', frequency: 'weekly' }];
+  const kept = [{ ...live[0] }];
+  assert.equal(app.ownerNightsKeepFrequency([{ ...lost[0] }], lost, live)[0].season_from, '06-01', 'the waiting row had lost it: carried from live');
+  assert.equal(app.ownerNightsKeepFrequency([{ ...lost[0] }], kept, live)[0].season_from, undefined, 'the setup showed the waiting season and she cleared it');
+  assert.equal(app.ownerNightsKeepFrequency([{ ...lost[0] }], null, live)[0].season_from, undefined, 'the setup showed the live season and she cleared it');
+  assert.equal(app.ownerNightsKeepSeason([{ ...lost[0] }], live)[0].season_to, '09-30', 'edit page: no season control, the live one stays');
+});
+
+test('a story written in the French setup saves to description_fr, checked first; the English description stays', async () => {
+  const v = mk('cocktail', { description: 'A lakeside restaurant and lounge in Penticton with craft cocktails and a patio.' }); const t = tokenFor(v.id);
+  let fr = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(fr.cur.description_fr, '');
+  const s = CLIENT();
+  assert.match(s, /var STORY_FIELD = C\.lang === 'fr' \? 'description_fr' : 'description';/);
+  assert.match(s, /saveAll\('story', \[storyOut\(S\.story\)\], null, null, storyWaiting\)/);
+  assert.match(s, /if \(bStoryCh\) \{ bsl\.push\(storyOut\(S\.story\)\);/);
+  assert.match(s, /if \(storyCh\) \{ sl\.push\(storyOut\(S\.story\)\);/);
+  // Her French story: waiting for our check, never live at once; the English text is untouched.
+  const story = 'Un restaurant-salon au bord du lac à Penticton : cocktails de saison, souper et une terrasse l’été.';
+  const r = await change(t, { description_fr: story });
+  assert.equal(r.status, 200); assert.ok((r.body.review || []).includes('description_fr'), 'checked first');
+  assert.equal(kidsRow(v.id).description_fr, null); assert.match(kidsRow(v.id).description, /^A lakeside restaurant/);
+  fr = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(fr.storyPending, story, 'the French story box shows her text while it waits');
+  assert.equal(cfgOf((await get(`/owner/${t}/setup`)).text).storyPending, '', 'the English setup is unchanged');
+  // The review card says what approving does (no French page yet).
+  const pend = pendingReq(v.id);
+  const card = app.renderAdminChangeCard({ ...app.getOwnerChange(pend.id), venue_name: v.name, listing_url: '/x' });
+  assert.match(card, /French description: this place has none yet, so approving it gives the place a French page/);
+  assert.equal(app.approveOwnerChange(pend.id, 'dayton').ok, true);
+  assert.equal(kidsRow(v.id).description_fr, story); assert.match(kidsRow(v.id).description, /^A lakeside restaurant/, 'English kept');
+  fr = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(fr.cur.description_fr, story, 'reopened: her French text');
+  assert.equal(fr.storyResearch, false, 'her own words, never selected for replacing');
+  // The checklist counts a 120+ description in either language.
+  assert.equal(pc.doneMap({ description: 'Short.', descriptionFr: 'x'.repeat(130) }, today).description, true);
+  assert.equal(pc.doneMap({ description: 'x'.repeat(130), descriptionFr: '' }, today).description, true);
+  assert.equal(pc.doneMap({ description: 'Short.', descriptionFr: 'Court.' }, today).description, false);
+  // English text kept as it is in the French setup sends nothing (it stays the English description).
+  assert.match(s, /if \(C\.lang === 'fr' && !C\.storyPending && S\.story\.trim\(\) === storyCur\(\)\.trim\(\)\) \{ S\.storySent = ''; return saveAll\('story', \[\]\); \}/);
+  assert.match(text.fr.storyEnglishHint, /il s’ajoute au texte anglais, qui reste pour les visiteurs anglophones/);
+});
+
+test('happy hour heads-up checks the hours of the months it runs (summer hours for a summer-only happy hour)', () => {
+  const s = CLIENT();
+  const vm = require('node:vm');
+  const winter = { mon: null, tue: null, wed: [['16:00', '23:00']], thu: [['16:00', '23:00']], fri: [['16:00', '23:00']], sat: [['16:00', '23:00']], sun: [['16:00', '23:00']] };
+  const summer = Object.fromEntries(DAYS7.map((d) => [d, [['11:30', '00:00']]]));
+  const months = (a, b) => { const o = {}; for (let i = a; i <= b; i++) o[i] = true; return o; };
+  const ctx = { S: { week: winter, sea: { on: true, months: months(6, 9), week: summer }, happySea: { on: true, months: months(6, 9), exact: null } }, DAYS: DAYS7, T: { happyOutside: 'out {days}' },
+    dayName: (d) => d, fill: (t, o) => t.replace('{days}', o.days), pad2: (n) => ('0' + n).slice(-2), C: { lang: 'fr', longDays: { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } } };
+  vm.runInNewContext(s.slice(s.indexOf('  var MLAST = '), s.indexOf('  // The season box on a screen')) + s.slice(s.indexOf('  function monthRun('), s.indexOf('\n  }\n', s.indexOf('  function monthRun(')) + 4) + s.slice(s.indexOf('  function hm(v)'), s.indexOf('  function warnHtml'))
+    + s.slice(s.indexOf('  function longDay(d)'), s.indexOf('\n', s.indexOf('  function longDay(d)'))) + '\nthis.hw = hoursWarn; this.full = daysInFull;', ctx);
+  const every = Object.fromEntries(DAYS7.map((d) => [d, true]));
+  assert.equal(ctx.hw({ days: every, from: '15:00', to: '18:00' }), '', 'summer only, inside summer hours: no heads-up');
+  ctx.S.happySea = { on: false, months: {}, exact: null };
+  assert.equal(ctx.hw({ days: every, from: '15:00', to: '18:00' }), 'out mercredi, le jeudi, le vendredi, le samedi et le dimanche', 'all year: outside the usual (winter) hours, named in full');
+  ctx.S.happySea = { on: true, months: months(6, 9), exact: null };
+  assert.equal(ctx.hw({ days: { sat: true }, from: '10:00', to: '12:00' }), 'out samedi', 'a true heads-up still shows in summer');
+  assert.equal(ctx.full(['mon', 'tue']), 'lundi et le mardi');
+  ctx.C.lang = 'en'; ctx.C.longDays = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday' };
+  assert.equal(ctx.full(['mon', 'tue', 'wed']), 'Monday, Tuesday and Wednesday');
+  assert.equal(text.fr.closedWarn.replace('{days}', 'lundi et le mardi').replace('{when}', '').split('.')[0], 'Attention\u00a0: vous êtes fermé le lundi et le mardi');
+});
+
+test('« 5 à 7 » everywhere in French: setup words for every type, the edit page section with its months, owner words', async () => {
+  const leaks = [];
+  const walk = (o, p) => { for (const k of Object.keys(o)) { const x = o[k]; if (typeof x === 'string') { if (/happy[ -]?hours?/i.test(x)) leaks.push(p + k); } else if (x && typeof x === 'object') walk(x, `${p}${k}.`); } };
+  walk(text.fr, 'fr.');
+  assert.deepEqual(leaks, [], 'no « happy hour » in any French setup string');
+  for (const type of ['cocktail', 'pub', 'brewery', 'distillery', 'restaurant']) {
+    const v = mk(type); const t = tokenFor(v.id);
+    const cfg = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+    if (cfg.steps.includes('happy')) {
+      assert.equal(cfg.t.happyQ, 'Avez-vous un 5 à 7\u202f?', `${type}: the question`);
+      assert.equal(cfg.t.happyTypeQ, 'Vos 5 à 7'); assert.equal(cfg.t.saveHappy, 'Enregistrer mes 5 à 7'); assert.equal(cfg.t.labels.happy, '5 à 7');
+    }
+  }
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const HHW = Object.fromEntries(DAYS7.map((d) => [d, [['15:00', '18:00']]]));
+  assert.equal((await change(t, { happy_hour: { ...HHW, _season: { from: '06-01', to: '09-30' } } })).status, 200);
+  const page = (await get(`/fr/owner/${t}`)).text;
+  assert.match(page, /<span class="lyv-section-label">5 à 7[^<]*(?:<[^>]+>[^<]*<\/[^>]+>)?<\/span> <span class="op-fold-hint">7 jours \(juin–sept\.\)<\/span>/);
+  // The portal's own words (the site's shared header, the public site's navigation, is not the portal's).
+  const visible = page.replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<header\b[\s\S]*?<\/header>/g, '');
+  assert.doesNotMatch(visible, /happy hour/i, 'no « happy hour » on the French edit page');
+  assert.match((await get(`/owner/${t}`)).text, /<span class="op-fold-hint">Set for 7 days \(Jun–Sep\)<\/span>/);
+  assert.equal(app.ownerFieldLabelsFor(null, true).happy_hour, '5 à 7');
+});
+
+test('seasonal-hours help: a place with summer hours is told which are usual and which seasonal, setup first, never another season', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const generic = app.OWNER_HELP_TOPICS.find((x) => x.id === 'seasonal-hours');
+  assert.equal(app.ownerSeasonHelpTopic(v.id), null, 'no season: the general answer');
+  assert.equal((await change(t, { hours_seasons: [{ from: '06-01', to: '09-30', label: 'Summer hours', hours: weekOf('11:30', '00:00') }] })).status, 200);
+  const topic = app.ownerSeasonHelpTopic(v.id);
+  assert.match(topic.a, /your <strong>usual hours<\/strong> \(Oct–May\) and your <strong>seasonal hours<\/strong>, “Summer hours” \(Jun–Sep\)/);
+  assert.match(topic.a, /<strong>Set up your page<\/strong> \u2192 <strong>Change an answer<\/strong> \u2192 <strong>Hours<\/strong>.*Hours you save in the setup go live straight away/);
+  assert.match(topic.a, /Tap \{SEND\}\. \{LIVE\}/, 'the edit page: checked first from the link, live when signed in');
+  assert.match(topic.a, /no need to add another season/);
+  assert.doesNotMatch(topic.a + topic.aFr, /November 1|1er novembre|Winter hours|Heures d’hiver/);
+  assert.match(topic.aFr, /vos <strong>heures habituelles<\/strong> \(oct\.–mai\) et vos <strong>heures saisonnières<\/strong>, « Heures d’été » \(juin–sept\.\)/);
+  assert.match(topic.aFr, /<strong>Configurez votre page<\/strong> \u2192 <strong>Modifier une réponse<\/strong> \u2192 <strong>Heures<\/strong>/);
+  assert.match(topic.aFr, /inutile d’ajouter une autre saison/);
+  const help = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec((await get(`/fr/owner/${t}`)).text)[1]);
+  const seen = help.topics.filter((x) => x.id === 'seasonal-hours');
+  assert.equal(seen.length, 1); assert.match(seen[0].aFr, /Heures d’été/); assert.match(seen[0].aFr, /nous vérifions d’abord/, 'from the edit link: checked first');
+  assert.ok(generic.aFr.includes('« Heures d’hiver »'), 'the general answer is unchanged for places with no season');
+});
+
+test('French Build My Trip: stop labels by kind, meal names, the date conflict, one price wording', () => {
+  const fc = require('../trip-french-copy');
+  assert.equal(fc.t3FrenchText('Cocktail lounges'), 'Bars à cocktails');
+  assert.equal(fc.t3FrenchText('Happy hour'), '5 à 7');
+  assert.equal(fc.t3FrenchText('No dinner matched in Penticton, so the rest of the plan is shown.'), 'Aucun lieu (souper) ne correspond à Penticton; voici le reste du plan.');
+  assert.equal(fc.t3FrenchText('No lunch matched in Penticton, so the rest of the plan is shown.'), 'Aucun lieu (dîner) ne correspond à Penticton; voici le reste du plan.');
+  assert.equal(fc.t3FrenchText('No breakfast matched in Penticton, so the rest of the plan is shown.'), 'Aucun lieu (déjeuner) ne correspond à Penticton; voici le reste du plan.');
+  assert.equal(fc.FR_HEADING_NAMES.dinner, 'souper'); assert.equal(fc.FR_HEADING_NAMES.brunch, 'brunch'); assert.equal(fc.FR_HEADING_NAMES.drinks, 'verres');
+  assert.equal(fc.t3FrenchText('The calendar date conflicts with the named weekday; confirm the travel date.'), 'La date ne correspond pas au jour de la semaine indiqué; vérifiez la date du voyage.');
+  const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(v3, /: lang\(\) === 'fr' \? t3FrenchText\(s\.label\) : s\.label; var t = stopTime\(s, key\);/);
+  assert.match(v3, /Libérez-le ou modifiez la demande\.' : t3FrenchText\(msg\);/, 'the date conflict error reads in French');
+  assert.match(v3, /'Plateaux à partir de '/); assert.match(v3, /'Dégustations à partir de '/);
+  assert.doesNotMatch(v3, /'(?:Cocktails|Plateaux|Dégustations) dès '/);
+});
+
+test('saved text in her language: « Heures d’été » and French holiday names on the French edit page, stored as they were', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const next = app.addLocalDays(today, 20);
+  assert.equal((await change(t, { hours_seasons: [{ from: '06-01', to: '09-30', label: 'Summer hours', hours: weekOf('11:30', '00:00') }], closures: [{ from: next, to: next, note: 'Christmas Day' }] })).status, 200);
+  const fr = (await get(`/fr/owner/${t}`)).text, en = (await get(`/owner/${t}`)).text;
+  assert.match(fr, /id="opSeasonalLabel" maxlength="40" placeholder="Heures d’hiver" value="Heures d’été" data-stored="Summer hours" data-shown="Heures d’été">/);
+  assert.match(fr, /id="opSeasonalSummary">Heures d’été du/);
+  assert.match(en, /id="opSeasonalLabel" maxlength="40" placeholder="Winter hours" value="Summer hours">/, 'English unchanged');
+  assert.match(fr, /class="op-cl-note"[^>]*value="Noël" data-note-stored="Christmas Day" data-note-shown="Noël">/);
+  assert.match(en, /class="op-cl-note"[^>]*value="Christmas Day">/);
+  // Sent back untouched, each goes back as stored (no change sent).
+  assert.match(fr, /if \(labEl\.getAttribute\('data-shown'\) !== null && lab === labEl\.getAttribute\('data-shown'\)\) lab = labEl\.getAttribute\('data-stored'\);/);
+  assert.match(fr, /if \(ni\.getAttribute\('data-note-shown'\) !== null && n === ni\.getAttribute\('data-note-shown'\)\) n = ni\.getAttribute\('data-note-stored'\);/);
+  assert.equal(app.seasonLabelText('Summer hours', true), 'Heures d’été'); assert.equal(app.seasonLabelText('Patio season', true), 'Patio season', 'her own name as typed');
+  // The French setup says an English research line is English (Groups, Reservations, Known for).
+  assert.equal(text.fr.lineEnglishHint, 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le, changez les mots ou touchez une réponse rapide.');
+  const s = CLIENT();
+  assert.match(s, /enLineHint\(gl === \(\(CUR\.visit_rows \|\| \{\}\)\.groups \|\| ''\) \? gl : '', 'suGroupsEn'\)/);
+  assert.match(s, /enLineHint\(S\.brew\.known === \(\(CUR\.visit_rows \|\| \{\}\)\.known_for \|\| ''\) \? S\.brew\.known : '', 'suKnownEn'\)/);
+});
+
+test('small fixes (test 2): check-first wording, Musique en direct, Accepte les réservations, no-break spaces, Groups row, menu lead, search button', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const fr = (await get(`/fr/owner/${t}`)).text, en = (await get(`/owner/${t}`)).text;
+  assert.doesNotMatch(fr, /Envoyé pour vérification, habituellement en moins d’une journée\. Touchez Envoyer/);
+  assert.match(fr, /Vérifié d’abord, habituellement en moins d’une journée\. Touchez Envoyer les modifications quand vous avez terminé\./);
+  assert.match(en, /Checked first, usually within a day\. Tap Send changes when you’re done\./);
+  assert.match(fr, /<option value="live_music"[^>]*>Musique en direct<\/option>/);
+  assert.doesNotMatch(fr, /Musique live/);
+  const cfg = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(cfg.offerLabels.takes_reservations, 'Accepte les réservations');
+  assert.equal(cfg.t.menuLead, 'Choisissez le plus simple pour vous. Une photo de votre carte des cocktails fonctionne aussi, même si elle change souvent.');
+  assert.equal(cfg.t.whatsOnEx, 'Cocktails à 8\u00a0$ et petites assiettes à moitié prix', 'a no-break space before $');
+  const s = CLIENT();
+  assert.match(s, /function cpText\(n\)\{ return C\.lang === 'fr' \? money\(n\) \+ '\\u00a0\$'/);
+  assert.match(s, /function flightText\(n\)\{ return C\.lang === 'fr' \? money\(n\) \+ '\\u00a0\$'/);
+  assert.match(s, /if \(st === 'live' && !forced && S\.done\[step\] === 'day' && C\.waiting && C\.waiting\.indexOf\(step\) >= 0\) st = 'day';/);
+  assert.equal(require('../french-text.js').FR_TEXT['What are you looking for?'], 'Que recherchez-vous\u202f?');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /'search\.mainLine': 'Que recherchez-vous\\u202f\?'/);
 });

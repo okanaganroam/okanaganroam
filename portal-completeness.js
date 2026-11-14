@@ -38,7 +38,7 @@ const ITEMS = [
     en: 'Link to your menu, or snap a photo of it', fr: 'Lien vers votre menu, ou une photo de celui-ci', whyEn: 'Guests want to see the dishes and prices. A “Menu” line in Plan your visit doesn’t count as the menu.', whyFr: 'Les clients veulent voir les plats et les prix. Une ligne « Menu » dans Planifier la visite ne compte pas comme le menu.', btnEn: 'Add menu', btnFr: 'Ajouter le menu', icon: '📖' },
   { key: 'dietary', noneEn: 'No vegan, veggie or gluten-free options', noneFr: 'Pas d’options végé ou sans gluten', group: 'menu', w: 6, fix: true, target: { task: 'more', id: 'badges' }, fields: ['badge:vegan', 'badge:vegetarian', 'badge:gluten_free'],
     en: 'Dietary options', fr: 'Options alimentaires', whyEn: 'Tick vegan, vegetarian or gluten-free if you offer them. A dietary note in Plan your visit counts too.', whyFr: 'Cochez végétalien, végétarien ou sans gluten si vous en offrez. Une note alimentaire dans Planifier la visite compte aussi.', btnEn: 'Tick options', btnFr: 'Cocher', icon: '🥗' },
-  { key: 'happy_hour', noneEn: 'We don’t have a happy hour', noneFr: 'Nous n’avons pas de happy hour', group: 'offers', w: 4, fix: true, target: { task: 'happy', id: 'happy' }, fields: ['happy_hour', 'happy_hour_deals'],
+  { key: 'happy_hour', noneEn: 'We don’t have a happy hour', noneFr: 'Nous n’avons pas de 5 à 7', group: 'offers', w: 4, fix: true, target: { task: 'happy', id: 'happy' }, fields: ['happy_hour', 'happy_hour_deals'],
     en: 'Happy hour times and deals', fr: 'Heures et spéciaux du 5 à 7', whyEn: 'When it runs and what’s on special.', whyFr: 'Quand il a lieu et ce qui est en spécial.', btnEn: 'Add happy hour', btnFr: 'Ajouter', icon: '🍹' },
   { key: 'specials', noneEn: 'We don’t run specials', noneFr: 'Nous n’avons pas de spéciaux', group: 'offers', w: 3, fix: true, target: { task: 'more', id: 'specials' }, fields: ['specials'],
     en: 'Weekly specials', fr: 'Spéciaux de la semaine', whyEn: 'Nightly deals or a weekly feature.', whyFr: 'Spéciaux du soir ou de la semaine.', btnEn: 'Add specials', btnFr: 'Ajouter', icon: '⭐' },
@@ -315,7 +315,7 @@ const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WIN
 const GOT_TEXT = {
   website: { en: 'Got it: no website', fr: 'C’est noté : pas de site Web' },
   dietary: { en: 'Got it: no vegan, veggie or gluten-free options', fr: 'C’est noté : pas d’options végé ou sans gluten' },
-  happy_hour: { en: 'Got it: no happy hour', fr: 'C’est noté : pas de happy hour' },
+  happy_hour: { en: 'Got it: no happy hour', fr: 'C’est noté : pas de 5 à 7' },
   specials: { en: 'Got it: no weekly specials', fr: 'C’est noté : pas de spéciaux' },
   entertainment: { en: 'Got it: no music or events', fr: 'C’est noté : ni musique ni événements' },
   pyv_reservations: { en: 'Got it: no reservations', fr: 'C’est noté : pas de réservations' },
@@ -337,8 +337,8 @@ const NONE_MAX = NONE_KEYS.length;
 // Happy Hour badge on the page but no times or deals (live check 2026-11-08, 21 restaurants): the item asks for the
 // times, and "We don't have a happy hour" is not offered (it would contradict the badge). Still missing, just worded right.
 const HAPPY_HOUR_BADGE_COPY = {
-  en: 'Add your happy hour times', fr: 'Ajoutez les heures de votre happy hour',
-  whyEn: 'Your page shows a Happy Hour badge. Add when it runs and what’s on special.', whyFr: 'Votre fiche affiche un badge Happy hour. Indiquez quand il a lieu et ce qui est en spécial.',
+  en: 'Add your happy hour times', fr: 'Ajoutez les heures de votre 5 à 7',
+  whyEn: 'Your page shows a Happy Hour badge. Add when it runs and what’s on special.', whyFr: 'Votre fiche affiche un badge 5 à 7. Indiquez quand il a lieu et ce qui est en spécial.',
   btnEn: 'Add the times', btnFr: 'Ajouter les heures',
 };
 // The last steps to 100% for almost every restaurant (live check: 546 of 552 have one photo, and the storefront spot is
