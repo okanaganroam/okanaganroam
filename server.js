@@ -47556,14 +47556,34 @@ function sameNightOf(s, list) {
   return rows.find((x) => x.kind === s.kind && name(x) === name(s)) || rows.find((x) => when(x) === when(s)) || rows.find((x) => name(x) && name(x) === name(s)) || null;
 }
 const nightCarriedFrequency = (x) => !!x && !!x.frequency && x.frequency !== 'weekly' && x.frequency !== NIGHT_APPOINTMENT;
+// Cocktail test 2 (2026-11-13): the season too. The edit page has no season control and (before this fix) sent every event
+// without one, so a waiting row with no season where the same live event has one lost it there; such a row takes the live
+// season back. The setup shows each event's season (the waiting one, else the live one: ownerSetupNights) and sends what
+// the owner left or picked, so a setup row with no season keeps the live season only when the waiting row it came from had
+// lost it; "All year" picked on the setup screen for an event that showed its months stays all year.
+const nightSeasonOf = (x) => (x && x.season_from && x.season_to ? { season_from: x.season_from, season_to: x.season_to } : null);
 function ownerNightsKeepFrequency(next, pending, live) {
   for (const s of next) {
-    if ((s.frequency || 'weekly') !== 'weekly') continue;
     const p = sameNightOf(s, pending), l = p ? null : sameNightOf(s, live);
-    if (nightCarriedFrequency(p)) s.frequency = p.frequency;
-    else if (nightCarriedFrequency(l)) s.frequency = l.frequency;
+    if ((s.frequency || 'weekly') === 'weekly') {
+      if (nightCarriedFrequency(p)) s.frequency = p.frequency;
+      else if (nightCarriedFrequency(l)) s.frequency = l.frequency;
+    }
+    if (!nightSeasonOf(s) && p && !nightSeasonOf(p)) { const ls = nightSeasonOf(sameNightOf(s, live)); if (ls) Object.assign(s, ls); }
   }
   return next;
+}
+// An edit-page send (no season control): a row with no season keeps the same live event's season (an older page sent none).
+function ownerNightsKeepSeason(next, live) {
+  for (const s of next) { if (!nightSeasonOf(s)) { const ls = nightSeasonOf(sameNightOf(s, live)); if (ls) Object.assign(s, ls); } }
+  return next;
+}
+// What the setup starts from: the events still waiting for review (an edit-page change), else the live ones. A waiting
+// row that lost its season on an older edit page shows the live season again.
+function ownerSetupNights(venueId, live) {
+  const pending = ownerPendingNights(venueId);
+  if (!pending) return live || [];
+  return pending.map((x) => (nightSeasonOf(x) ? x : { ...x, ...(nightSeasonOf(sameNightOf(x, live)) || {}) }));
 }
 // Same nights? (what visitors see: never the source or date)
 function sameWeeklyNights(a, b) {
@@ -47901,6 +47921,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       else {
         const next = checked.nights.map((s) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, s[k]])));
         if (body && body.from_setup === true) ownerNightsKeepFrequency(next, ownerPendingNights(venue.id), current.weekly_nights);
+        else ownerNightsKeepSeason(next, current.weekly_nights);
         if (!sameWeeklyNights(next, current.weekly_nights)) changes.weekly_nights = next;
       }
     }
@@ -53208,7 +53229,7 @@ function renderOwnerSetupPage(found, opts) {
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     // Cocktail test 1 (2026-11-13): events still waiting for review (an edit-page change, like "1st of the month") are what
     // the setup starts from, so a later setup save carries them (and their how often) instead of the older live ones.
-    weekly_nights: (ownerPendingNights(venue.id) || snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
+    weekly_nights: ownerSetupNights(venue.id, snap.weekly_nights).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights_waiting: !!ownerPendingNights(venue.id),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
@@ -60077,8 +60098,12 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
       const kinds = `<select class="op-wn-kind" aria-label="${L(`${W.en} ${n}: ${W.kindEn}`, `${W.fr} ${n} : ${W.kindFr}`)}">${kindOrder.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
       const freq = `<select class="op-wn-freq" aria-label="${L(`${W.en} ${n}: how often`, `${W.fr} ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT || venue.type === 'distillery' || x.frequency === f).map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
-      return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''}>
-          <legend>${L(`${W.en} ${n}`, `${W.fr} ${n}`)}</legend>
+      // Cocktail test 2 (2026-11-13): the event's season rides along like a special's (it was dropped on send, and a
+      // summer-only night went live all year), and the box says it ("Only Jun–Sep").
+      const wnSeason = x.season_from && x.season_to ? seasonRangeShort(x.season_from, x.season_to, lang === 'fr') : '';
+      return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''} data-season-from="${escapeHtml(x.season_from || '')}" data-season-to="${escapeHtml(x.season_to || '')}">
+          <legend>${L(`${W.en} ${n}`, `${W.fr} ${n}`)}</legend>${wnSeason ? `
+          <p class="op-hint op-wn-season">${escapeHtml(L(`Only ${wnSeason}. This stays when you send.`, `Seulement ${wnSeason}. Cela reste quand vous envoyez.`))}</p>` : ''}
           <div class="op-sp-days" role="group" aria-label="${L(`${W.en} ${n}: days`, `${W.fr} ${n} : jours`)}">${days}</div>
           <span class="op-sp-line">${kinds}${freq}</span>
           <input type="text" class="op-wn-title" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`${W.en} ${n}: name`, `${W.fr} ${n} : nom`)}" placeholder="${i === 0 ? (dist ? L('Saturday distillery tour', 'Visite de la distillerie du samedi') : lounge ? L('DJ Fridays', 'DJ le vendredi') : L('Trivia Tuesday', 'Quiz du mardi')) : ''}">
@@ -60943,8 +60968,9 @@ ${ownerFooterHtml(fr)}
   }
   function specialKey(list){ return JSON.stringify((list || []).map(function(s){ return SP_KEYS.map(function(k){ return k === 'days' ? (s.days || []).join(',') : s[k] == null ? '' : s[k]; }); })); }
   // Weekly nights (2026-10-27): each filled box as { days, kind, title, start, end, detail, host, cost, frequency,
-  // title_fr, detail_fr }; empty boxes are skipped.
-  var WN_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr'];
+  // title_fr, detail_fr, season_from, season_to }; empty boxes are skipped. Cocktail test 2 (2026-11-13): the season comes
+  // back unchanged from the box (data-season-from), like a special's, so a summer-only night stays summer-only.
+  var WN_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'season_from', 'season_to'];
   function nightRowsValue(){
     var box = document.getElementById('opNights'), out = [];
     if (!box) return out;
@@ -60954,7 +60980,8 @@ ${ownerFooterHtml(fr)}
       var title = v('.op-wn-title'), detail = v('.op-wn-detail'), host = v('.op-wn-host'), cost = v('.op-wn-cost'), tf = v('.op-wn-title-fr'), df = v('.op-wn-detail-fr');
       if (!title && !detail && !host && !cost && !tf && !df) return;
       out.push({ days: days, kind: v('.op-wn-kind') || 'other', title: title, start: v('.op-wn-start') || null, end: v('.op-wn-end') || null, detail: detail || null, host: host || null,
-        cost: cost || null, frequency: v('.op-wn-freq') || 'weekly', title_fr: tf || null, detail_fr: df || null });
+        cost: cost || null, frequency: v('.op-wn-freq') || 'weekly', title_fr: tf || null, detail_fr: df || null,
+        season_from: r.getAttribute('data-season-from') || null, season_to: r.getAttribute('data-season-to') || null });
     });
     return out;
   }
