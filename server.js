@@ -10518,7 +10518,11 @@ const NIGHTS_STALE_DAYS = 120;
 const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'other'];
 // The kinds that run at any time of day (not only evenings), for the trip planner's lines.
 const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
-const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th'];
+const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th', 'appointment'];
+// Distillery test 2 (2026-11-13): a tour or class "By appointment" (« Sur rendez-vous ») is the frequency 'appointment'
+// with no days: it never falls on a date (no Today / Tonight tag, no Build My Trip time slot). Tours and classes only.
+const NIGHT_APPOINTMENT = 'appointment';
+const nightByAppointment = (s) => !!s && s.frequency === NIGHT_APPOINTMENT;
 const NIGHT_TYPES = portalTypesWith('nights');
 // One night as stored and compared: every key, in this order, null when not given.
 const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'source', 'checked_at'];
@@ -10558,9 +10562,13 @@ function validateWeeklyNights(list, opts = {}, now = new Date()) {
     if ((s.season_from != null && s.season_from !== '' && !sFrom) || (s.season_to != null && s.season_to !== '' && !sTo)) return { ok: false, detail: `night ${n}: season dates must be real MM-DD days` };
     if (!sFrom !== !sTo) return { ok: false, detail: `night ${n}: give both season_from and season_to, or neither` };
     if (sFrom && sFrom === sTo) return { ok: false, detail: `night ${n}: season_from and season_to are the same day` };
-    if (!Array.isArray(s.days) || !s.days.length) return { ok: false, detail: `night ${n}: pick at least one day` };
-    if (s.days.some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `night ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
-    const item = { days: SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
+    const appt = s.frequency === NIGHT_APPOINTMENT;
+    if (appt && !DAYTIME_NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: only a tour or a class can be by appointment` };
+    if (!appt && (!Array.isArray(s.days) || !s.days.length)) return { ok: false, detail: `night ${n}: pick at least one day` };
+    if (s.days != null && !Array.isArray(s.days)) return { ok: false, detail: `night ${n}: days must be a list` };
+    if ((s.days || []).some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `night ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
+    // By appointment: any day the visitor calls, so no days are kept.
+    const item = { days: appt ? [] : SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
     if (!NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: kind must be one of ${NIGHT_KINDS.join(', ')}` };
     item.kind = s.kind;
     for (const [k, what, max, required] of [['title', 'title', NIGHT_TITLE_MAX, true], ['detail', 'detail', NIGHT_DETAIL_MAX, false], ['host', 'host', NIGHT_HOST_MAX, false], ['cost', 'cost', NIGHT_COST_MAX, false],
@@ -10828,6 +10836,7 @@ const NIGHT_WEEKS_TEXT = {
   fr: { 'monthly-1st': '1er', 'monthly-last': 'dernier', 'monthly-1st-3rd': '1er et 3e', 'monthly-2nd-4th': '2e et 4e' },
 };
 function nightDaysText(s, fr) {
+  if (nightByAppointment(s)) return fr ? 'Sur rendez-vous' : 'By appointment';
   const weeks = NIGHT_WEEKS_TEXT[fr ? 'fr' : 'en'][s.frequency];
   if (!weeks) return venueSpecialsDaysText(s.days, fr);
   const names = s.days.map((d) => (fr ? `${HH_DAYS_SHORT.fr[d]}.` : HH_DAYS_SHORT.en[d])).join(', ');
@@ -10835,9 +10844,26 @@ function nightDaysText(s, fr) {
 }
 // Build My Trip (2026-10-27): "Tonight: Trivia at 7 PM" (« Ce soir : Quiz à 19 h »), up to two, "; " between.
 // Distillery test 1 (2026-11-13): a tour or class the place books ahead says so ("Tour at 2 PM, book ahead").
+// Distillery test 2 (2026-11-13): a tour or class reads as its event ("Distillery tour", « Visite de la distillerie »), not
+// only its kind (« Visite »): a distillery tour by its words, a plain kind name by the kind, its own title otherwise.
+const GENERIC_DAYTIME_TITLES = new Set(['tour', 'visite', 'class', 'atelier', 'distillery tour', 'visite de la distillerie']);
+function daytimeTripLabel(s, fr) {
+  const words = `${s.title || ''} ${s.title_fr || ''}`;
+  if (s.kind === 'tour' && /distill/i.test(words)) return { text: fr ? 'Visite de la distillerie' : 'Distillery tour', english: false };
+  if (GENERIC_DAYTIME_TITLES.has(String(s.title || '').trim().toLowerCase())) return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
+  return nightLabel({ ...s, kind: 'other' }, fr);
+}
+// A stop's line for a place whose tours or classes are by appointment only (no day to plan them on).
+function nightsApptTripLine(list, fr) {
+  const appt = (list || []).filter((s) => nightByAppointment(s) && DAYTIME_NIGHT_KINDS.includes(s.kind));
+  if (!appt.length) return '';
+  const tour = appt.some((s) => s.kind === 'tour'), cls = appt.some((s) => s.kind === 'class');
+  if (fr) return `${tour && cls ? 'Visites et ateliers' : tour ? 'Visites' : 'Ateliers'} sur rendez-vous, appelez avant`;
+  return `${tour && cls ? 'Tours and classes' : tour ? 'Tours' : 'Classes'} by appointment, call ahead`;
+}
 function nightsTripText(list, fr, bookAhead = false) {
   const shown = (list || []).slice(0, 2).map((s) => {
-    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false } : nightLabel(s, fr), t = nightTimeText(s, fr);
+    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? daytimeTripLabel(s, fr) : nightLabel(s, fr), t = nightTimeText(s, fr);
     // Audit fix (2026-10-27): a range reads "Trivia 7:30–9:30 PM" (it was "at 7:30–9:30 PM"); a start alone keeps "at 7 PM".
     const ranged = specialMinutes(s.end) !== null;
     const book = bookAhead && DAYTIME_NIGHT_KINDS.includes(s.kind) ? (fr ? ', réservez à l’avance' : ', book ahead') : '';
@@ -10906,7 +10932,15 @@ function withTripWeeklyNights(plan, now = new Date()) {
       if (a !== null && Number.isFinite(item.endMinutes) && item.endMinutes < 1440 && a >= item.endMinutes - 15) return false;
       return !(a !== null && b === null && min >= a + 180);
     }));
-    if (!list.length) continue;
+    if (!list.length) {
+      // Distillery test 2: tours by appointment have no slot; the stop says to call ahead.
+      const apEn = nightsApptTripLine(nightsShown(byVenue.get(item.venueId), now), false);
+      if (apEn) for (const s of stops) {
+        if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
+        s.nightLine = apEn; s.nightLineFr = nightsApptTripLine(nightsShown(byVenue.get(item.venueId), now), true);
+      }
+      continue;
+    }
     const book = nightsBookAhead(item.venueId, list);
     const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
     // Audit fix (2026-10-27): "Tonight:" only on today's date; another day says which ("Sunday: …", « Dimanche : … »).
@@ -10939,7 +10973,11 @@ function withTripListNights(plan, now = new Date()) {
     try { row = q.get(id); } catch (e) { row = null; }
     if (!row || !NIGHT_TYPES.has(row.type)) continue;
     const list = nightsSorted(nightsShown(byVenue.get(id), now).filter((n) => nightOnDate(n, plan.listDate)));
-    if (!list.length) continue;
+    if (!list.length) {
+      const apEn = nightsApptTripLine(nightsShown(byVenue.get(id), now), false);
+      if (apEn) { s.nightLine = apEn; s.nightLineFr = nightsApptTripLine(nightsShown(byVenue.get(id), now), true); }
+      continue;
+    }
     const book = nightsBookAhead(id, list);
     const en = nightsTripText(list, false, book), frl = nightsTripText(list, true, book);
     const label = tripLineDayLabel(plan.listDate, now, list.every((n) => !DAYTIME_NIGHT_KINDS.includes(n.kind)));
@@ -36002,6 +36040,9 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const clock = okanaganClock(now);
   let closedToday = false;
   try { const place = statusHours ? venueHoursStatusAt(statusHours, now) : null; closedToday = !!(place && place.closedToday); } catch (e) { closedToday = false; }
+  // Distillery test 2 (2026-11-13): today's row is tagged only when the place is open today: not in its by-appointment
+  // season (a 7-day tour read "Daily … Tonight" on a November Friday) and not closed for the season.
+  if (!closedToday && venueClosedForTagsToday(venue, now)) closedToday = true;
   // Audit fix (2026-10-27): "Tonight" only until the night ends, and last night's late one ("Karaoke to 12:30 AM") reads
   // "On now" after midnight (weeklyRowTag, the Okanagan clock).
   const yesterdayDate = addLocalDays(clock.date, -1);
@@ -36014,6 +36055,19 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const oldest = shown.map((s) => s.checked_at).sort()[0];
   const confirmed = shown.every((s) => s.source === 'venue_owner') ? venueConfirmedHtml(venue.name, oldest, fr) : '';
   return { rows, checked: happyHourCheckedText(oldest, fr), confirmed };
+}
+// Is the place shut for walk-ins today by its own answers (by appointment today, all year or in its off-season) or closed
+// for the season (or a temporary closure now)? Then no row of its weekly nights is "Today" / "Tonight".
+function venueClosedForTagsToday(venue, now = new Date()) {
+  if (!venue) return false;
+  try {
+    if (apptType(venue.type) && wineryAppointmentOn(venue.id, todayLocal(now), venue.type) === true) return true;
+    const ss = getSeasonStates(now).get(venue.id);
+    // An owner's by-appointment answer outranks a research "closed" row (that case returned above when it applies today).
+    if (ss && ss.kind === 'temp_closed' && ss.current) return true;
+    if (ss && ss.kind === 'closed' && !(apptType(venue.type) && wineryAppointmentOn(venue.id, todayLocal(now), venue.type) === false)) return true;
+  } catch (e) { return false; }
+  return false;
 }
 // A small line icon per kind (the existing uiIcon set; no emoji).
 const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', tour: 'calendar', class: 'calendar', other: 'calendar' };
@@ -36028,7 +36082,9 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
     const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
     const title = titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
     const tl = fr && !titleFr ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
-    const evening = specialMinutes(s.start) === null || specialMinutes(s.start) >= 16 * 60;
+    // Distillery test 2 (2026-11-13): a row with no start time isn't "evening"; it says "Today".
+    const evening = specialMinutes(s.start) !== null && specialMinutes(s.start) >= 16 * 60;
+    const appt = nightByAppointment(s);
     const tag = today ? ` <span class="venue-wn-today">${onNow ? (fr ? 'En cours' : 'On now') : evening ? (fr ? 'Ce soir' : 'Tonight') : (fr ? 'Aujourd’hui' : 'Today')}</span>` : '';
     // Card polish (2026-10-27): no kind label when the title already says it ("Karaoke Madness" · not "Karaoke"; the
     // icon stays), no detail that only restates the row (nightShownText).
@@ -36041,6 +36097,8 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
     // when the row has nothing else to say.
     const meta = shown.kind ? [kindHtml, rest].filter(Boolean).join(' &middot; ') : rest ? `${kindHtml ? `${kindHtml} ` : ''}${rest}` : '';
     const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
+    // By appointment (distillery test 2): "Distillery tour · By appointment" on one line, no day and no tag.
+    if (appt) return `<span class="venue-wn is-appt" role="listitem"><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span> <span class="venue-wn-time">&middot; ${fr ? 'sur rendez-vous' : 'By appointment'}</span>${seasonTagSpan(s, fr)}${iconInline}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
     return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${seasonTagSpan(s, fr)}${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
   // Distillery test 1 (2026-11-13): a distillery's are tours and classes, not nights.
@@ -36305,6 +36363,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-wn.is-today { margin: 0 -6px; padding: 6px; border-radius: 6px; background: rgba(42,107,103,0.09); }
   body.golf-page .venue-wn-days { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: break-word; }
   body.golf-page .venue-wn-main { min-width: 0; overflow-wrap: break-word; }
+  body.golf-page .venue-wn.is-appt .venue-wn-main { grid-column: 1 / -1; }
   body.golf-page .venue-wn-title { font-weight: 800; color: var(--ink, #2A2019); }
   body.golf-page .venue-wn-time { margin-left: 2px; font-weight: 800; color: var(--teal-deep, #1E4F4C); white-space: nowrap; }
   body.golf-page .venue-wn-today { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--teal-deep, #1E4F4C); color: #fff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; vertical-align: 1px; }

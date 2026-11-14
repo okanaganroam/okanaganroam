@@ -1502,7 +1502,7 @@ function renderScript(d) {
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
-      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
+      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
       + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
