@@ -184,7 +184,8 @@ test('R13 French: « minuit », not « 0 h »', () => {
   assert.equal(t3LocalTimes('Open 17:00–00:00', 'fr'), 'Open 17 h–minuit');
   assert.equal(t3LocalTimes('Until 12 AM', 'fr'), 'Until minuit');
   assert.equal(t3FrenchText('Hours 18:00–00:00 today'), 'Hours 18 h–minuit today');
-  assert.equal(t3LocalTimes('Open 17:00–00:00', 'en'), 'Open 5 PM – 12 AM');
+  // Cocktail test 1 (2026-11-13): English says midnight too (it read "5 PM – 12 AM").
+  assert.equal(t3LocalTimes('Open 17:00–00:00', 'en'), 'Open 5 PM – midnight');
 });
 
 test('R13 French: the season line elides (« Ouvert d’avril à octobre », « Ouvert de mai à octobre »)', () => {

@@ -42,7 +42,7 @@ const FR_CUISINE = {
   'Austrian café and pastry': 'Café et pâtisserie autrichiens',
   // The restaurant cuisine list of 2026-11-09.
   'Chicken & Wings': 'Poulet et ailes', 'Fish & Chips': 'Fish and chips', 'Noodles & Ramen': 'Nouilles et ramen', 'Spanish & Tapas': 'Espagnol et tapas',
-  'Poke & Hawaiian': 'Poké et hawaïen', 'Contemporary & Global': 'Contemporain et international',
+  'Poke & Hawaiian': 'Poké et hawaïen', 'Contemporary & Global': 'Contemporain et international', 'Small plates & bar snacks': 'Petites assiettes et bouchées',
 };
 
 const FR_TEXT = {

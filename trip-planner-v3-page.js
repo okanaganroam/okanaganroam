@@ -42,13 +42,13 @@ function t3TimelineRows(p,removed={}){
 // "19 h 30". The planner API keeps 24-hour clock strings; this changes only the page's text.
 function t3LocalTimes(value,language){
  const fr=language==='fr';
- const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h===0&&!m?'minuit':h+' h'+(m?' '+String(m).padStart(2,'0'):'');return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
+ const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h===0&&!m?'minuit':h+' h'+(m?' '+String(m).padStart(2,'0'):'');if(h===0&&!m)return 'midnight';return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
  // English ISO dates read as dates (2026-10-19): "Trip starts on 2026-10-24" -> "Trip starts on Sat, Oct 24, 2026".
  const iso=s=>fr?s:s.replace(/\b(20\d\d)-(\d\d)-(\d\d)\b/g,(raw,y,m,d)=>{const t=new Date(Date.UTC(+y,+m-1,+d,12));if(t.getUTCMonth()!==+m-1)return raw;return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][t.getUTCDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+(+d)+', '+y;});
  const text=s=>iso(String(s)).replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,ap)=>{const n=Number(h);if(n<1||n>12)return raw;return fmt(n%12+(ap.toLowerCase()==='pm'?12:0),m);})
   .replace(/\b(0\d|1\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|h\b))/g,(_,h,m)=>fmt(h,m))
   .replace(/\b0(\d) h\b/g,'$1 h')
-  .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d)/g,fr?'$1–$2':'$1 – $2');
+  .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d|midnight\b)/g,fr?'$1–$2':'$1 – $2');
  const skip={url:1,photo:1,name:1,address:1,slug:1,query:1,id:1,date:1,startDate:1,endDate:1,startTime:1,endTime:1,region:1,regionLabel:1,venueName:1};
  const walk=(x,key)=>{if(typeof x==='string')return skip[key]?x:text(x);if(Array.isArray(x))return x.map(y=>walk(y,key));if(x&&typeof x==='object'){const o={};for(const k of Object.keys(x))o[k]=walk(x[k],k);return o;}return x;};
  return typeof value==='string'?text(value):walk(value,'');
@@ -1142,7 +1142,7 @@ function renderScript(d) {
   }
   // Round 10 (2026-10-19): a short plan's stops (itinerary or outing), what a Swap sends of them, and their shown starts.
   // Round 10 (2026-10-19): a suggested start as people read it, "11:30 AM" (« 11 h 30 » in French), not "11:30".
-  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h === 12 && !mm ? 'midi' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
+  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h === 12 && !mm ? 'midi' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); if (h === 0 && !mm) return 'midnight'; return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
   function shortStops(){ var p = state.last || {}; return (p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []; }
   function shortShown(list){
     return list.slice(0, 12).map(function(s){

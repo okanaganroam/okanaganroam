@@ -57,7 +57,7 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   assert.deepEqual(cfg.offerGroups.map((g) => g.keys.length).reduce((a, b) => a + b, 0), 20); // + Fireplace (pub test 6), + Beach access (pub test 7), + Free parking and Room for RVs (pub test 8)
   assert.ok(!cfg.offerGroups.some((g) => g.keys.includes('happy_hour') || g.keys.includes('takeout')));
   assert.equal(cfg.offerLabels.wheelchair_accessible, 'Wheelchair accessible');
-  assert.equal(cfg.cuisines.length, 45);
+  assert.equal(cfg.cuisines.length, 46); // + Small plates & bar snacks (cocktail test 1, 2026-11-13)
   assert.match(html, /<header class="su-head">.*Exit setup/s);
   assert.doesNotMatch(html.slice(0, html.indexOf('<main')), /Build My Trip/, 'no visitor header during setup');
   const own = html.slice(0, html.indexOf('class="ohb-btn"'));

@@ -94,6 +94,11 @@ function dealsWording(hasDeals, hasNights, nightKinds, type) {
     if (hasDeals) return { tab: hasNights ? 'Deals & tours' : 'Deals', heading: hasNights ? 'Deals & good times 🍹' : 'Deals 🍹' };
     return hasNights ? { tab: 'Tours & events', heading: '' } : { tab: '', heading: '' };
   }
+  // Cocktail test 1 (2026-11-13): a lounge's are events (DJ, live music), not pub nights or trivia.
+  if (type === 'cocktail') {
+    if (hasDeals) return { tab: hasNights ? 'Deals & events' : 'Deals', heading: hasNights ? 'Deals & good times 🍸' : 'Deals 🍸' };
+    return hasNights ? { tab: 'Events', heading: '' } : { tab: '', heading: '' };
+  }
   const trivia = nightKinds.includes('trivia');
   const onlyTrivia = hasNights && nightKinds.length > 0 && nightKinds.every((k) => k === 'trivia');
   if (hasDeals) return { tab: trivia ? 'Deals & trivia' : hasNights ? 'Deals & nights' : 'Deals', heading: hasNights ? 'Deals & good times 🍻' : 'Deals 🍻' };

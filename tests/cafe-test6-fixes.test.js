@@ -128,7 +128,7 @@ test('4: "Mark closed" turns into "Reopen" in the same place; the day\'s note co
   assert.equal(TEXT.fr.reopenDay, 'Rouvrir');
   // Button first (where "Mark closed" was), then "Monday closed" (winery test 5, 2026-11-12: for screen readers only, as
   // the row above already says "Mon Closed").
-  assert.match(CLIENT, /hoffUndo\(d\) \? '<button type="button" class="su-hoff su-hoff-undo"[^\n]*h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button> <span class="su-hundo su-sr" role="status">'/);
+  assert.match(CLIENT, /hoffUndo\(d\) \? '<button type="button" class="su-hoff su-hoff-undo"[^\n]*h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button>'/); // cocktail test 1: no second "Monday closed" note
   assert.match(SERVER, /body\.owner-setup \.su-hoffrow \{ min-height: 54px; box-sizing: border-box; \}/);
   assert.match(SERVER, /body\.owner-setup \.su-hoffrow:has\(\.su-hoff-undo\) \{ flex-wrap: nowrap; \}/);
 });

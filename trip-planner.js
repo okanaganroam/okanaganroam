@@ -2940,6 +2940,10 @@ function buildDays(facts, ctx, days, pinned) {
     const closedHere = ctx.regions.length && ctx.tripDate ? facts.filter((v) => ctx.regions.includes(v.region) && (f.key.startsWith('food:') ? normWords(v.name || '').includes(normWords(f.key.slice(5))) : f.test(v)) && seasonClosedOnTrip(v, { date: ctx.tripDate })).sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))[0] : null;
     // Winery test 5 (2026-11-12): an owner's holiday closure is "closed on your dates", not "for the season".
     if (closedHere) { warnings.push(`${closedHere.name} is closed${seasonClosedOnTrip({ ...closedHere, ownerClosures: undefined }, { date: ctx.tripDate }) ? ' for the season' : ''} on your dates, so ${focusText(ctx, f.key)} is not in this plan.`); continue; }
+    // Cocktail test 1 (2026-11-13): on a kids' trip, a place in town left out only because its owner said Adults only
+    // (19+) is named with that reason ("The Velvet Door is adults only (19+), so it isn’t in this family plan."), never planned.
+    const adults = ctx.kids && ctx.regions.length ? facts.filter((v) => ctx.regions.includes(v.region) && v.ownerAdultsOnly && !kidsAllowed(v) && !f.key.startsWith('food:') && f.test(v)).sort((x, y) => (Number(y.rating) || 0) - (Number(x.rating) || 0)).slice(0, 2) : [];
+    if (adults.length) { warnings.push(`${listText(adults.map((v) => v.name))} ${adults.length > 1 ? 'are' : 'is'} adults only (19+), so ${adults.length > 1 ? 'they aren’t' : 'it isn’t'} in this family plan.`); continue; }
     // 2026-10-14: name the closest place that has it, one or two towns along the corridor, instead of only saying no.
     const near = nearbyFocusVenue(facts, ctx, f);
     if (near) warnings.push(`Nothing matching ${focusText(ctx, f.key)} is listed in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}; the closest is ${near.name} in ${regionLabel(ctx, near.region)}.`);
@@ -6376,6 +6380,17 @@ function dayClosedAllDay(v, date, weekday) {
   return !!(parsed.known && parsed.days[wd] && parsed.days[wd].status === 'closed');
 }
 
+// "closed Mondays · try Wed–Sun" (with the season's months when it is seasonal), as the Build My Trip page words it.
+function closedDayEnglish(c) {
+  const EN = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, ENL = { mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays', sun: 'Sundays' };
+  const MEN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const start = (WEEKDAYS.indexOf(c.day) + 1) % 7, ring = Array.from({ length: 7 }, (_, i) => WEEKDAYS[(start + i) % 7]);
+  const inOrder = ring.filter((d) => c.open.includes(d)), first = ring.indexOf(inOrder[0]), run = inOrder.every((d, j) => ring[first + j] === d);
+  const mo = (md) => { const n = Number(String(md || '').slice(0, 2)); return n >= 1 && n <= 12 ? MEN[n - 1] : null; };
+  const sea = mo(c.from) && mo(c.to) ? ` (${mo(c.from)}–${mo(c.to)})` : '';
+  const days = run && inOrder.length > 2 ? `${EN[inOrder[0]]}–${EN[inOrder[inOrder.length - 1]]}` : WEEKDAYS.filter((d) => c.open.includes(d)).map((d) => EN[d]).join(', ');
+  return `closed ${ENL[c.day]}${sea} · try ${days}`;
+}
 // The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the
 // trip's date), with that season's months and the days it is open: { day: 'mon', from: '10-01', to: '04-30', open: [...] }.
 function closedDayInfo(v, weekday) {
@@ -6403,6 +6418,11 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
   const requestedRegions = input.intent?.regions?.length ? input.intent.regions : baseRegion ? [baseRegion] : [];
   const daypart = requirements.daypart || input.intent?.daypart || null;
   const visitDate = requirements.startDate || input.tripDate;
+  // Cocktail test 1 (2026-11-13): on a kids' trip the "kid-friendly" must-have kept an adults-only place out before its
+  // reason could be given ("Nothing matching cocktail lounges"). It is checked without that one rule, so the owner's own
+  // Adults only (19+) is named; it is still never planned (only offered here, with that reason).
+  const kidsTrip = !!input.intent?.party?.kids;
+  const noKidRule = kidsTrip ? { ...requirements, items: (requirements.items || []).filter(i => !(i.kind === 'feature' && i.value === 'kid_friendly')) } : null;
   return results.map(item => {
     if (item.status !== 'unmet' || !['type', 'type_count', 'venue_kind', 'venue', 'activity', 'feature', 'rainy'].includes(item.kind)) return item;
     let weekday = input.startWeekday || null;
@@ -6417,7 +6437,8 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
     const candidates = [];
     for (const venue of input.facts || []) {
       if (selected.has(venue.id) || !venue.url || !/^\/(?!\/)/.test(venue.url)) continue;
-      if (!tripRequirements.venueAllowed(venue, requirements, item.dayIndex || 1, visitDate)) continue;
+      const adultsOnlyOut = kidsTrip && venue.ownerAdultsOnly && !kidsAllowed(venue);
+      if (!tripRequirements.venueAllowed(venue, requirements, item.dayIndex || 1, visitDate) && !(adultsOnlyOut && tripRequirements.venueAllowed(venue, noKidRule, item.dayIndex || 1, visitDate))) continue;
       // Audit fix (2026-10-27): a place closed for the season or under a closed advisory is never offered under "Not
       // included" (the closed Terrace Restaurant was offered as its own alternative).
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
@@ -6807,7 +6828,15 @@ function planTripCore(input) {
       : `These places match but are closed for the season ${when}: ${listText(names)}.${reopens} Ask again with a date in their season to plan them.`);
     }
     result.closedForSeason = offSeason;
-  } else if (!rec.items.length) result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
+  } else if (!rec.items.length) {
+    // Cocktail test 1 (2026-11-13): a list for a named day ("cocktails in Kelowna Monday night") where the places that
+    // match are closed all that day says why, like the day plans do: "The Velvet Door is closed Mondays · try Wed–Sun."
+    const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+    const anyDay = WEEKDAYS.includes(wd) ? buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }, 3).items.filter((s) => s.venue) : [];
+    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
+    if (closedLines.length && closedLines.length === anyDay.length) result.warnings.push(`${closedLines.join('; ')}.`);
+    else result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
+  }
   if (ctx.whenDaypart || ctx.startWeekday) {
     const when = whenText(ctx);
     result.notes.push(`Checked against each venue\u2019s listed hours on ${SITE.brand}${when ? ` for ${when.replace(/^on /, '')}` : ''}: places whose listed hours show them closed then are left out, and places without usable hours are marked. Hours can change, so check before you go.`);

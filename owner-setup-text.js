@@ -555,7 +555,7 @@ Object.assign(en, {
   seasonExactLink: 'Starts or ends mid-month? Pick the exact dates', seasonExactMonths: 'Use whole months instead', seasonFrom: 'Starts on', seasonTo: 'Ends on',
   seasonNeedMonths: 'Please tap the months it runs, or tap “All year”.', seasonNeedDates: 'Please pick the first and last day, or use whole months.',
   happySeasonH: 'Is your happy hour all year?',
-  closedWarn: 'Heads up: you’re closed on {days}{when}. It won’t show as on that day.', closedWarnHappy: 'Heads up: you’re closed on {days}{when}. Your page will say happy hour is on when you’re open.', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (in your usual hours)',
+  closedWarn: 'Heads up: you’re closed on {days}{when}. It won’t show as on that day.', oftenNow: 'How often: {x}. It stays when you save.', oftenWaiting: 'How often: {x}. We’re checking it (usually within a day); it stays when you save.', happyOutside: 'Heads up: these times are outside your hours on {days}. Check the start and end.', closedWarnHappy: 'Heads up: you’re closed on {days}{when}. Your page will say happy hour is on when you’re open.', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (in your usual hours)',
   seasonExactLead: 'Or pick the exact first and last day:',
   monthsClosedQ: 'Which months are you closed?', monthsClosedLead: 'Tap each month you’re closed. Your page says “Closed for the season” then, and when you reopen.',
   monthsClosedNeed: 'Please tap the months you’re closed.', monthsClosedInRow: 'Please pick closed months in a row, like November to March.', monthsAllClosed: 'That’s every month. Please leave the months you’re open untapped.',
@@ -574,7 +574,7 @@ Object.assign(fr, {
   seasonExactLink: 'Ça commence ou finit en milieu de mois? Choisissez les dates exactes', seasonExactMonths: 'Utiliser des mois entiers', seasonFrom: 'Commence le', seasonTo: 'Finit le',
   seasonNeedMonths: 'Touchez les mois où c’est offert, ou touchez « Toute l’année ».', seasonNeedDates: 'Choisissez le premier et le dernier jour, ou utilisez des mois entiers.',
   happySeasonH: 'Votre happy hour est-il offert toute l’année?',
-  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le happy hour a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
+  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le happy hour a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
   seasonExactLead: 'Ou choisissez le premier et le dernier jour exacts :',
   monthsClosedQ: 'Quels mois êtes-vous fermé?', monthsClosedLead: 'Touchez chaque mois où vous êtes fermé. Votre page indique alors « Fermé pour la saison » et la date de réouverture.',
   monthsClosedNeed: 'Touchez les mois où vous êtes fermé.', monthsClosedInRow: 'Choisissez des mois de fermeture qui se suivent, comme de novembre à mars.', monthsAllClosed: 'Ce sont tous les mois. Ne touchez pas les mois où vous êtes ouvert.',
@@ -895,7 +895,7 @@ Object.assign(en, {
   holCovered: 'Covered by your closed dates', holSeason: 'You’re closed for the season',
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
-  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', fbFromWebsite: 'Your website is your Facebook page, so we filled it in here. Change it if it’s not right.', menuFbKnown: 'Your Facebook: {x}',
+  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', fbFromWebsite: 'Your website is your Facebook page, so we filled it in here. Change it if it’s not right.', igFromWebsite: 'Your website is your Instagram, so we filled it in here. Change it if it’s not right.', menuFbKnown: 'Your Facebook: {x}',
   sendBeforeLeave: 'Tap Send before you leave this screen.',
   // The price question while prices aren't on pages (AVG_SPEND_PUBLIC off): why we ask, and an after-save line that says
   // what it's for ("Prices don't show on pages yet" made it sound pointless).
@@ -905,7 +905,7 @@ Object.assign(en, {
 Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture', holSeason: 'Vous êtes fermé pour la saison',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
-  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', fbFromWebsite: 'Votre site Web est votre page Facebook, alors nous l’avons inscrite ici. Modifiez-la si ce n’est pas la bonne.', menuFbKnown: 'Votre Facebook : {x}',
+  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', fbFromWebsite: 'Votre site Web est votre page Facebook, alors nous l’avons inscrite ici. Modifiez-la si ce n’est pas la bonne.', igFromWebsite: 'Votre site Web est votre Instagram, alors nous l’avons inscrit ici. Modifiez-le si ce n’est pas le bon.', menuFbKnown: 'Votre Facebook : {x}',
   sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',
   spendWhyOff: 'Nous l’utiliserons pour afficher votre gamme de prix quand les prix seront sur les pages.',
   savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
@@ -1367,7 +1367,7 @@ en.pub.cocktail = {
   // Cocktail price (the café "Price per person" screen, Decided 2)
   cpriceQ: 'About how much is a cocktail?', cpriceLead: 'It shows on your card and in Build My Trip right away.', cpriceLeadPick: 'It shows on your card as “{x}” right away.',
   cpriceGuess: 'Your page says about {x} now, so we picked it. Tap another price if it changed.', cpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
-  cpriceNone: 'We don’t serve cocktails', cpriceNoneSub: 'Your card shows no price', cpriceNeed: 'Please tap a price, or “We don’t serve cocktails”.',
+  cpriceNone: 'We don’t serve cocktails', cpriceNoneSub: 'Your card shows no price', cpriceNeed: 'Please tap a price.',
   cpriceSavedLive: 'Your cocktail price is on your card now.', cpriceSavedDay: 'We check prices over $40 first; it’ll show within a day.', cpriceSavedNone: 'Your card shows no price.',
   feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.', feeNeed: 'Please type the price in dollars, like 16.', feeCard: 'From {x}',
   // Photos and What you offer
@@ -1375,9 +1375,10 @@ en.pub.cocktail = {
   offerLead: 'Visitors use these to find a bar like yours.',
   minorsNoteEx: 'Kids welcome for dinner until 8 PM; the bar is 19+.',
   minorsLive: 'It’s on your page now, and it decides your Kids welcome badge.',
+  minorsGuess: 'Your page says 19+, so we picked Adults only. Tap another answer if that’s not right.',
   // Live music, DJs and events (the weekly events screen, same storage)
   musicQ: 'Any live music, DJs or events?', musicLead: 'Like live music, a DJ, trivia or comedy.', musicTypeQ: 'Your live music, DJs and events', eventEx: 'Friday DJ night',
-  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often in Weekly nights on your edit page.', eventsOftenLink: 'Open Weekly nights',
+  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often on your edit page.', eventsOftenLink: 'Set how often',
   // Your story and Known for
   storyQ: 'Tell visitors about your bar', storyEx: 'A hidden cocktail bar downtown. Seasonal cocktails, small plates, and a DJ on Fridays.',
   knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Smoked old fashioned and a door down the alley',
@@ -1401,7 +1402,7 @@ en.pub.cocktail = {
   igLead: 'Type your Instagram name, like @yourbar.', knownLabel: 'Known for',
   // Your front door
   doorQ: 'Where’s your front door?', doorLead: 'Down an alley or upstairs? One photo, taken at your door, walks visitors right to it.',
-  doorPhotoLead: 'Stand outside so the door (and your sign or light) is in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
+  doorPhotoLead: 'Stand outside so the door (even if it isn’t marked) is in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
   kinds: { dj: 'DJ', live_music: 'Live music', trivia: 'Trivia', comedy: 'Comedy' },
 };
 fr.pub.cocktail = {
@@ -1418,15 +1419,16 @@ fr.pub.cocktail = {
   menuQ: 'Comment ajouter votre menu ou votre carte des cocktails?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte des cocktails fonctionne aussi, aussi souvent qu’elle change.',
   cpriceQ: 'Combien coûte un cocktail environ?', cpriceLead: 'Il s’affiche sur votre fiche et dans Planifier mon voyage tout de suite.', cpriceLeadPick: 'Il s’affiche sur votre fiche comme « {x} » tout de suite.',
   cpriceGuess: 'Votre page indique environ {x} maintenant, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', cpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
-  cpriceNone: 'Nous ne servons pas de cocktails', cpriceNoneSub: 'Votre fiche n’affiche aucun prix', cpriceNeed: 'Touchez un prix, ou « Nous ne servons pas de cocktails ».',
+  cpriceNone: 'Nous ne servons pas de cocktails', cpriceNoneSub: 'Votre fiche n’affiche aucun prix', cpriceNeed: 'Touchez un prix.',
   cpriceSavedLive: 'Le prix de vos cocktails est sur votre fiche maintenant.', cpriceSavedDay: 'Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.', cpriceSavedNone: 'Votre fiche n’affiche aucun prix.',
   feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.', feeNeed: 'Écrivez le prix en dollars, comme 16.', feeCard: 'Dès {x}',
   photosLead: 'Votre bar, vos cocktails, la salle ou la terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
   offerLead: 'Les visiteurs s’en servent pour trouver un bar comme le vôtre.',
   minorsNoteEx: 'Enfants bienvenus pour le souper jusqu’à 20 h; le bar est réservé aux 19 ans et plus.',
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre badge Enfants bienvenus.',
+  minorsGuess: 'Votre page indique 19 ans et plus, alors nous avons choisi Adultes seulement. Touchez une autre réponse si ce n’est pas juste.',
   musicQ: 'De la musique, des DJ ou des événements?', musicLead: 'Comme de la musique en direct, un DJ, un quiz ou de l’humour.', musicTypeQ: 'Votre musique, vos DJ et vos événements', eventEx: 'Soirée DJ du vendredi',
-  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence dans Soirées de la semaine sur votre page de modification.', eventsOftenLink: 'Ouvrir Soirées de la semaine',
+  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence sur votre page de modification.', eventsOftenLink: 'Choisir la fréquence',
   storyQ: 'Parlez de votre bar aux visiteurs', storyEx: 'Un bar à cocktails caché au centre-ville. Cocktails de saison, petites assiettes et un DJ le vendredi.',
   knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle s’affiche en haut de « Planifier la visite ».', knownEx: 'Le old fashioned fumé et la porte au fond de la ruelle',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
@@ -1445,7 +1447,7 @@ fr.pub.cocktail = {
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
   igLead: 'Écrivez votre nom Instagram, comme @votrebar.', knownLabel: 'Connu pour',
   doorQ: 'Où est votre porte d’entrée?', doorLead: 'Dans une ruelle ou à l’étage? Une photo, prise à votre porte, mène les visiteurs droit à elle.',
-  doorPhotoLead: 'Placez-vous dehors pour que la porte (et votre enseigne ou votre lumière) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
+  doorPhotoLead: 'Placez-vous dehors pour que la porte (même sans enseigne) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
   kinds: { dj: 'DJ', live_music: 'Musique en direct', trivia: 'Quiz', comedy: 'Humour' },
 };
 

@@ -13,7 +13,7 @@
   var WINERY_ITEM_STEP = { winery_kind: 'winery', food_here: 'winery', tasting_price: 'tastings', visit_how: 'visit', booking_link: 'visit', winery_groups: 'visit', access: 'offer', dogs_kids: 'offer', pyv_known: 'story', arrival: 'door' };
   // Breweries (2026-11-12): the flight price's quick buttons, the to-go chips, the group sizes, the quick opening and
   // closing times, and where each of their checklist items is answered.
-  var QUICK_FLIGHTS = [8, 10, 12, 15], TOGO = ['cans', 'bottles', 'growler', 'crowler'], GROUP_SIZES = [8, 10, 12, 15, 20];
+  var QUICK_FLIGHTS = [8, 10, 12, 15], TOGO = ['cans', 'bottles', 'growler', 'crowler'], GROUP_SIZES = [6, 8, 10, 12, 15, 20];
   // Distilleries (Decided 2, 2026-11-13): $10 · $15 · $20 · Other · Free tastings, and Bottles · Canned or bottled
   // cocktails (stored as 'cans') · Nothing to go. No growlers or crowlers.
   if (C.distillery) { QUICK_FLIGHTS = [10, 15, 20]; TOGO = ['bottles', 'cans']; }
@@ -135,7 +135,28 @@
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
   // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
   // counts: "you're closed on Mon (in your usual hours)".
-  function warnOf(key, e){ return key === 'happy' ? closedWarnAny(e.days, S.happySea) : closedWarn(e.days, e.sea); }
+  function warnOf(key, e){ return key === 'happy' ? [closedWarnAny(e.days, S.happySea), hoursWarn(e)].filter(Boolean).join(' ') : closedWarn(e.days, e.sea); }
+  // Cocktail test 1 (2026-11-13): a new happy hour starts at the usual opening time and lasts 2 hours, never past closing
+  // (it was 3–5 PM for a bar that opens at 5). With no hours yet it stays 3–5 PM.
+  function hm(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; }
+  function hmStr(n){ n = ((n % 1440) + 1440) % 1440; return pad2(Math.floor(n / 60)) + ':' + pad2(n % 60); }
+  function happyDefault(){
+    var w = S.week, count = {}, best = null;
+    DAYS.forEach(function(d){ var r = w && w[d] && w[d][0]; if (r && hm(r[0]) != null) { count[r[0]] = (count[r[0]] || 0) + 1; if (!best || count[r[0]] > count[best[0]]) best = r; } });
+    if (!best) return { days: {}, from: '15:00', to: '17:00', what: '' };
+    var o = hm(best[0]), c = hm(best[1]); if (c != null && c <= o) c += 1440;
+    return { days: {}, from: best[0], to: hmStr(c != null ? Math.min(o + 120, c) : o + 120), what: '' };
+  }
+  // A happy hour outside the place's hours on a day it's open (a gentle heads-up like the closed-day one).
+  function hoursWarn(e){
+    var f = hm(e.from), t = e.close ? null : hm(e.to); if (f == null || !S.week) return '';
+    var out = DAYS.filter(function(d){
+      if (!e.days[d] || !S.week[d]) return false;
+      return !S.week[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
+        var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; });
+    });
+    return out.length && T.happyOutside ? fill(T.happyOutside, { days: out.map(dayName).join(', ') }) : '';
+  }
   function closedWarnAny(days, sea){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
@@ -194,6 +215,8 @@
   // Seasonal kitchen time (pub test 7): 'same' (as the rest of the year), 'close' (food until close) or 'time'.
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || beforeClose(), note: (S.pubInfo.minors || {}).note || '' };
+  // Cocktail test 1 (2026-11-13): research's "19+" picks Adults only to start (saved only with the screen).
+  if (CK && !S.minors.policy && C.suggestAdults) { S.minors.policy = 'adults'; S.minorsGuessed = true; }
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
   if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || beforeClose(), note: BIm.note || '' };
     // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
@@ -237,6 +260,8 @@
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
   // Brewery test 2 (2026-11-13): a facebook.com website pre-fills the Facebook box, as a suggestion saved only with the screen.
   if (!S.fb && !S.socNo.facebook && !S.done.facebook && fbFromSite(CUR.website || C.website || '')) { S.fb = fbFromSite(CUR.website || C.website); S.fbFromWebsite = true; }
+  // Cocktail test 1 (2026-11-13): an instagram.com website pre-fills the Instagram box the same way (saved only with the screen).
+  if (!S.ig && !S.socNo.instagram && !S.done.instagram && igFromSite(CUR.website || C.website || '')) { S.ig = igFromSite(CUR.website || C.website); S.igFromWebsite = true; }
   S.cuiTouched = false;
   // A café's happy hour is allowed only while it serves Beer & wine (outreach rule). 13 screens (2026-11-11): it is no
   // longer a café setup step (the edit page has it), so nothing is added to the list here.
@@ -886,6 +911,8 @@
     if (rest) S.savedLine.basics = T.phoneLiveNow + ' ' + rest;
     var d = digitsOf(ch.phone); CUR.phone = d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ch.phone; S.phone = null; }
   // "facebook.com/gords", "m.facebook.com/gords", "fb.com/gords" (with or without https://) -> https://www.facebook.com/gords.
+  // "instagram.com/velvetdoor", "https://www.instagram.com/velvetdoor/?hl=en" -> "@velvetdoor" (a profile, never a post or reel).
+  function igFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9._]{2,30})\/?(?:[?#]\S*)?$/i.exec(String(v || '').trim()); return m && !/^(?:p|reel|reels|explore|stories|accounts)$/i.test(m[1]) ? '@' + m[1] : ''; }
   function fbFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com(\/\S*)$/i.exec(String(v || '').trim()); return m && m[1].length > 1 ? 'https://www.facebook.com' + m[1] : ''; }
   function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
@@ -905,7 +932,8 @@
   }
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸', experiences: '🍇', menu: '🍷' };
   // Distillery test 3 (2026-11-13): a cocktail glass for a distillery's happy hour.
-  if (C.distillery) P2_ICONS.happy = '🍸';
+  // Cocktail test 1 (2026-11-13): a lounge's too.
+  if (C.distillery || CK) P2_ICONS.happy = '🍸';
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
   // Distillery test 1 (2026-11-13): cocktails, not pints; tours, not a guitar.
@@ -1302,7 +1330,9 @@
             // closed" note comes after it, so a quick second tap on the next day's button never lands on another day.
             // Winery test 5 (2026-11-12): the line above already says "Mon Closed", so the note is for screen readers only
             // ("closed" twice on every winter row).
-            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button> <span class="su-hundo su-sr" role="status">' + h(fill(T.dayClosedNow, { day: longDay(d) })) + '</span>'
+            // Cocktail test 1 (2026-11-13): one thing only, "Reopen": the "Monday closed" note (read out with the page text
+            // too) went; the button's own name says it ("Monday closed. Open Monday again").
+            : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.dayClosedNow, { day: longDay(d) }) + '. ' + fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
@@ -1319,7 +1349,7 @@
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>';
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
-      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big('🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
+      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big(CK ? '🍽' : '🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:hours">' + h(T.skip) + '</button></div>';
     } else if (s === 'hours:kitchentime') {
       // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
@@ -1334,7 +1364,7 @@
         + '<p class="su-q">' + h(T.tvsQ) + '</p><div class="su-chips" role="group" aria-label="' + h(T.tvsQ) + '">' + C.tvs.map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.sports.tvs === o.k ? 'true' : 'false') + '" data-tv="' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
         + '<p class="su-hint" id="suSportsTip">' + h(T.sportsEx) + '</p><div class="su-stack">' + big('➜', T.nextPlain, '', false, 'sportsSave') + '</div>';
     } else if (s === 'offer:minors') {
-      x = q(T.minorsQ, T.minorsLead) + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
+      x = q(T.minorsQ, T.minorsLead) + (S.minorsGuessed && S.minors.policy === 'adults' && T.minorsGuess ? '<p class="su-sent su-research" id="suMinorsGuess">' + h(T.minorsGuess) + '</p>' : '') + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
         + (S.minors.policy === 'minors_until' ? '<div class="su-day" style="margin-top:14px"><div class="su-times"><label class="su-q" for="suMto" style="margin:0">' + h(T.minorsUntil) + '</label> <input type="time" id="suMto" value="' + h(S.minors.until || beforeClose()) + '"></div></div>' : '')
         + field('suMnote', T.minorsNoteLabel, S.minors.note, { max: 120 }) + ex(T.minorsNoteEx) + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'minorsSave') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
@@ -1379,7 +1409,8 @@
         + '<div class="su-chips" role="group" aria-label="' + h(T.cpriceQ) + '" id="suCpChips">' + CQ.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (cpOn(n) ? 'true' : 'false') + '" data-cfee="' + n + '">' + h(cpText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (cp.other && !cp.none ? 'true' : 'false') + '" data-cfee="other">' + h(T.feeOther) + '</button></div>'
         + (cp.other && !cp.none ? field('suCfee', T.feeLabel, cp.fee == null || isNaN(cp.fee) ? '' : String(cp.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
-        + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (cp.none ? '' : ' su-alt') + '" aria-pressed="' + (cp.none ? 'true' : 'false') + '" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">' + (cp.none ? '✓' : '○') + '</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>'
+        // Cocktail test 1 (2026-11-13): no "We don't serve cocktails" for a lounge (only while it is the stored answer).
+        + (cp.none ? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">✓</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'cpriceSave') + '</div>' + skip('spend');
     } else if (s === 'spend') {
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';
@@ -1582,7 +1613,7 @@
       if (C.winery && !S.done.offer && !S.picnicSuggested && S.wine.food === 'picnic' && C.offerLabels.picnic_area && !S.badges.picnic_area) { S.badges.picnic_area = true; S.picnicSuggested = true; }
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
-      if ((C.winery || C.brewery) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      if ((C.winery || C.brewery || CK) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -1655,7 +1686,7 @@
         // Pub test 8 (2026-11-10): no "It's on my website" when there's no website (she'd just said "We don't have a website").
         + (C.website ? big('🌐', hk === 'happy' ? T.happyWeb : T.specialsWeb, '', true, 'go:' + hk + ':web') : '') + big('✎', hk === 'happy' ? T.happyType : T.specialsType, hk === 'happy' ? T.happyTypeSub : T.specialsTypeSub, true, 'go:' + hk + ':type') + '</div>';
     } else if (s === 'happy:type') {
-      if (!S.happy.length) S.happy.push({ days: {}, from: '15:00', to: '17:00', what: '' });
+      if (!S.happy.length) S.happy.push(happyDefault());
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + warnHtml('happy', i, e) + '<p class="su-q">' + h(T.whatTime) + '</p>'
@@ -1688,6 +1719,8 @@
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
       x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
+          // Cocktail test 1 (2026-11-13): its how often from the edit page ("1st Thu of the month"), kept when this is saved.
+          + (function(){ var k = e.orig ? (CUR.weekly_nights || []).indexOf(e.orig) : -1, o = k >= 0 && (C.nightsOften || [])[k]; return o && T.oftenNow ? '<p class="su-hint su-often" id="suOften' + i + '">' + h(fill(CUR.weekly_nights_waiting ? T.oftenWaiting : T.oftenNow, { x: o })) + '</p>' : ''; })()
           + '<p class="su-q" id="ntq' + i + '">' + h(T.whatEvent) + '</p>' + (function(){
             // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
             // show open; the rest wait under "More kinds" (open when the picked kind is one of them).
@@ -1740,7 +1773,7 @@
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
-      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + (!ig && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + (!ig && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '') + (ig && S.igFromWebsite && S.ig && S.ig !== S.socSaved.instagram && T.igFromWebsite ? '<p class="su-sent su-research" id="suIgFromSite">' + h(T.igFromWebsite) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
         // Café test 3 (2026-11-11): no TikTok box (Dayton: keep it easy). A TikTok already saved stays on the page.
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
@@ -2129,6 +2162,7 @@
     return '<h2 class="su-h2">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
       + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '')
       + (!ig && !ch && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '')
+      + (ig && !ch && S.igFromWebsite && S.ig && S.ig !== S.socSaved.instagram && T.igFromWebsite ? '<p class="su-sent su-research" id="suIgFromSite">' + h(T.igFromWebsite) + '</p>' : '')
       + (ch ? '' : '<p class="su-hint">' + h(ig ? T.igLead : T.fbWhy) + '</p><label class="su-q" for="' + id + '">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="' + id + '" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">')
       + '<div class="su-chips" role="group" aria-label="' + h(ig ? 'Instagram' : 'Facebook') + '" style="margin-top:10px">'
       + [['no', ig ? T.igNo : T.fbNo], ['unsure', T.socialUnsure]].map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ch === o[0] ? 'true' : 'false') + '" data-soc="' + n + ':' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>';
@@ -2609,7 +2643,7 @@
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
       return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; S.dogGuessed = false; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
-    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
+    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
@@ -2791,6 +2825,7 @@
   }
   function wire(){
     Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(){ if (!S.busy) act(b.getAttribute('data-act')); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('input[data-hh]'), function(inp){ inp.addEventListener('change', function(){ var q2 = inp.getAttribute('data-hh').split(':'); if (q2[1] !== 'what' && S.happy[+q2[0]]) { S.happy[+q2[0]][q2[1]] = inp.value; warnRefresh(); } }); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-chip]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];
       var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;

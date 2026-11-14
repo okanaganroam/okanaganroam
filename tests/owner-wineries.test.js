@@ -1284,7 +1284,7 @@ test('winery test 5: help for changing hours later points to both places, with w
 
 test('winery test 5: small wording (closed once, hours recap, research price and kids, known for, preview price, IG/FB status)', async () => {
   // "Mon Closed" over "Reopen · Monday closed": the note is for screen readers only.
-  assert.match(CLIENT5, /h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button> <span class="su-hundo su-sr" role="status">'/);
+  assert.match(CLIENT5, /h\(T\.reopenDay \|\| T\.undo\) \+ '<\/button>'/); // cocktail test 1: the note is in the button's name now
   // The recap after saving hours.
   assert.match(CLIENT5, /T\.hoursSavedNow\) \+ '<\/p>' \+ \(S\.hoursNone \? '' : hoursRecap\(\)\)/);
   assert.equal(text.en.recapRest, 'Rest of the year'); assert.equal(text.fr.recapHours, 'Vos heures');
