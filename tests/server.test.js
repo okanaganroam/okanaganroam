@@ -10285,7 +10285,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
   // Approved Build My Trip page copy (2026-10-29, Dayton): tripv3.* strings only (hint, example plan, "What we check for you"; then a shorter lead, four shorter examples and the example card), EN + FR.
-  assert.equal(md5('public/scripts/app.js'), '083a1eabef349f5237217ed757b8ada7', 'public/scripts/app.js (Build My Trip page copy 2026-10-29)');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010', 'public/scripts/app.js (Build My Trip page copy 2026-10-29)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12240,7 +12240,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '083a1eabef349f5237217ed757b8ada7');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16511,7 +16511,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86');
-  assert.equal(md5('public/scripts/app.js'), '083a1eabef349f5237217ed757b8ada7');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16606,7 +16606,8 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
     // Brewery test 1 (2026-11-12): app.js changed on purpose (badgeLabelFor: "Kids until 9 PM" on a card's kids badge).
     // Cocktail test 2 (2026-11-13): app.js changed on purpose (« Que recherchez-vous ? » with its narrow no-break space).
-    assert.equal(md5('public/scripts/app.js'), '01f8a3c739ff8773e8da1943b6bf8115', 'app.js is unchanged by the classic Open Now page');
+    // French public side (2026-11-14): app.js changed on purpose (French « 5 à 7 » badge, stamp, results note and Build My Trip copy).
+    assert.equal(md5('public/scripts/app.js'), '083a1eabef349f5237217ed757b8ada7', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
