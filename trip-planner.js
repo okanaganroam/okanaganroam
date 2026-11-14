@@ -8107,7 +8107,12 @@ function planItinerary(input) {
   // Distillery test 1 (2026-11-13): a plan with nothing in it (the place asked for is closed that day) still says what was
   // asked and when: "Distilleries in Vernon on Monday." (it read " in Vernon.").
   const emptyPlan = !partLabels.length;
-  if (emptyPlan) trip.components.filter((c) => c.kind !== 'event').forEach((c) => { const l = componentLabel(c, baseCtx); if (l) partLabels.push(l); });
+  if (emptyPlan) {
+    // The one kind of place the request asked for, when it's one ("Distilleries"), else each part's own label.
+    const typeAsked = ((input.requirements && input.requirements.items) || []).filter((i) => i.kind === 'type');
+    if (typeAsked.length === 1) partLabels.push(typeLabel(baseCtx, typeAsked[0].value, 'plural'));
+    else trip.components.filter((c) => c.kind !== 'event').forEach((c) => { const l = componentLabel(c, baseCtx); if (l) partLabels.push(l); });
+  }
   const listed = listText([...new Set(partLabels)]);
   const where = route && route.from && route.to ? ` from ${regionLabel(baseCtx, route.from)} to ${regionLabel(baseCtx, route.to)}` : route && route.to ? ` on the way to ${regionLabel(baseCtx, route.to)}` : regions.length ? ` in ${listText(regions.map((r) => regionLabel(baseCtx, r)))}` : '';
   const emptyDay = emptyPlan && WEEKDAYS.includes(baseCtx.startWeekday) ? ` on ${WEEKDAY_NAMES[baseCtx.startWeekday]}` : '';
