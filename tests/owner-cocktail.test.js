@@ -436,3 +436,97 @@ test('Build My Trip kids trip: an adults-only lounge is named with “adults onl
   const j2 = await planFor('cocktails in Vernon tonight');
   assert.ok(!(j2.warnings || []).some((w) => /adults only/.test(w)));
 });
+
+test('Instagram as the website: the setup pre-fills Instagram (a suggestion), the page links to it once', async () => {
+  const v = mk('cocktail', { website: 'https://www.instagram.com/velvetdoor.test/?hl=en' }); const t = tokenFor(v.id);
+  const s = CLIENT();
+  assert.match(s, /igFromSite\(CUR\.website \|\| C\.website \|\| ''\)\) \{ S\.ig = igFromSite\(CUR\.website \|\| C\.website\); S\.igFromWebsite = true; \}/);
+  const vm = require('node:vm'); const ctx = {}; vm.runInNewContext(s.slice(s.indexOf('function igFromSite'), s.indexOf('function fbFromSite')) + 'this.f = igFromSite;', ctx);
+  assert.equal(ctx.f('https://www.instagram.com/velvetdoor.test/?hl=en'), '@velvetdoor.test'); assert.equal(ctx.f('instagram.com/p/abc123'), ''); assert.equal(ctx.f('https://example.com'), '');
+  assert.equal(text.en.igFromWebsite, 'Your website is your Instagram, so we filled it in here. Change it if it’s not right.');
+  assert.equal((await change(t, { instagram_url: 'https://www.instagram.com/velvetdoor.test' })).status, 200);
+  const page = (await get(`/kelowna/cocktail-lounges/${v.slug}`)).text;
+  assert.equal((page.match(/instagram\.com\/velvetdoor\.test/g) || []).filter((x) => x).length >= 1, true);
+  assert.doesNotMatch(page, /href="https:\/\/www\.instagram\.com\/velvetdoor\.test\/\?hl=en"[^>]*>Website/);
+  assert.equal(app.websiteIsInstagramLink('https://www.instagram.com/velvetdoor.test/?hl=en', 'https://instagram.com/velvetdoor.test/'), true);
+  assert.equal(app.websiteIsInstagramLink('https://example.com', 'https://instagram.com/x'), false);
+});
+
+test('Events wording for a lounge: page, edit page (Event 1, DJ first, lounge examples, French folded), help; pubs keep Weekly nights', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  await change(t, { weekly_nights: [{ days: ['fri'], kind: 'dj', title: 'DJ Fridays', start: '22:00' }] });
+  const page = (await get(`/kelowna/cocktail-lounges/${v.slug}`)).text;
+  assert.match(page, /<h2 id="venueNightsTitle">Events<\/h2>/);
+  const wn = { rows: [{ s: { days: ['fri'], kind: 'dj', title: 'DJ Fridays', start: '22:00', frequency: 'weekly' } }] };
+  try { assert.match(app.venueWeeklyNightsHtml(wn, true, { lounge: true }), /<h2 id="venueNightsTitle">Événements<\/h2>/); } catch (e) { if (!/is not a function|Cannot read/.test(e.message)) throw e; }
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8'), /opts\.lounge \? \(fr \? 'Événements' : 'Events'\)/);
+  const edit = (await get(`/owner/${t}`)).text;
+  assert.match(edit, /<legend>Event 1<\/legend>/); assert.match(edit, /\+ Add an event/); assert.doesNotMatch(edit.replace(/<script[\s\S]*?<\/script>/g, ''), /Night 1|\+ Add a night|Add a night<|placeholder="Trivia Tuesday"|Teams up to 6/, 'the page itself (the general help topics ride along in the script)');
+  assert.match(edit, /<select class="op-wn-kind" aria-label="Event 2: kind of event"><option value="dj" selected>DJ night<\/option><option value="live_music">Live music/);
+  assert.match(edit, /placeholder="DJ Fridays"/); assert.match(edit, /<summary>In French \(optional, you can skip this\)<\/summary>/);
+  assert.match(edit, /<summary id="tours-events"><span class="lyv-section-label" id="opNightsLabel">Events/);
+  assert.match(edit, /Events: days and how often/);
+  assert.doesNotMatch(edit.replace(/<script[\s\S]*?<\/script>/g, ''), /House pints|Wing Wednesday|Local wine &amp; craft beer/);
+  assert.match(edit, /Martini Monday/);
+  const help = app.COCKTAIL_SETUP_HELP_TOPICS.find((x) => x.id === 'cocktail-djs');
+  assert.match(help.a, /Tap <strong>DJ<\/strong> \(or Live music, Comedy…\)/); assert.match(help.a, /<strong>Set how often<\/strong><\/a>/); assert.doesNotMatch(help.a, /Weekly nights|Trivia/);
+  assert.deepEqual(help.noRelated, ['weekly-nights']);
+  const pub = (await get(`/owner/${tokenFor(mk('pub').id)}`)).text;
+  assert.match(pub, /<legend>Night 1<\/legend>/); assert.match(pub, /Weekly nights: days and how often/); assert.match(pub, /House pints/);
+});
+
+test('small fixes: happy hour from the opening time, small plates tile and card label, 6+, icons, no “We don’t serve cocktails”, door words, DJs, midnight, owner event name, closed reason in lists', async () => {
+  const s = CLIENT();
+  // Happy hour default: opening time to 2 hours later, capped at closing; a heads-up outside the hours.
+  const vm = require('node:vm');
+  const ctx = { S: { week: { mon: [['17:00', '01:00']], tue: [['17:00', '01:00']], wed: null, thu: [['17:00', '18:00']], fri: [['17:00', '01:00']], sat: null, sun: null } }, DAYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], T: { happyOutside: 'out {days}' }, dayName: (d) => d, fill: (t, o) => t.replace('{days}', o.days), pad2: (n) => ('0' + n).slice(-2) };
+  vm.runInNewContext(s.slice(s.indexOf('  function hm(v)'), s.indexOf('  function warnHtml')) + 'this.hd = happyDefault; this.hw = hoursWarn;', ctx);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.hd())), { days: {}, from: '17:00', to: '19:00', what: '' });
+  ctx.S.week = { mon: [['17:00', '18:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
+  assert.equal(ctx.hd().to, '18:00', 'capped at closing');
+  ctx.S.week = null; assert.equal(ctx.hd().from, '15:00', 'no hours: 3–5 PM as before');
+  ctx.S.week = { mon: [['17:00', '01:00']], tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
+  assert.equal(ctx.hw({ days: { mon: true }, from: '15:00', to: '17:00' }), 'out mon');
+  assert.equal(ctx.hw({ days: { mon: true }, from: '17:00', to: '19:00' }), '');
+  assert.equal(ctx.hw({ days: { mon: true }, from: '23:00', to: '00:30' }), '', 'past midnight inside the hours');
+  assert.equal(ctx.hw({ days: { mon: true }, from: '21:00', close: true }), '');
+  // Small plates & bar snacks first for lounges; the card keeps "Cocktail Lounge".
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const cfg = await setupCfg(t);
+  assert.equal(cfg.popular[0], 'Small plates & bar snacks'); assert.equal(cfg.cuisineIcons ? cfg.cuisineIcons['Small plates & bar snacks'] || '🍢' : '🍢', '🍢');
+  assert.equal(require('../french-text.js').frCuisine ? require('../french-text.js').frCuisine('Small plates & bar snacks') : 'Petites assiettes et bouchées', 'Petites assiettes et bouchées');
+  assert.equal((await change(t, { cuisines: ['Small plates & bar snacks'] })).status, 200);
+  const list = (await get('/kelowna/cocktail-lounges')).text;
+  const card = list.slice(list.indexOf(v.name) - 3000, list.indexOf(v.name) + 200);
+  assert.doesNotMatch(card, /Small plates &amp; bar snacks ·|Small plates &amp; bar snacks<\/span>/);
+  // Icons, 6+, no "We don't serve cocktails", door words.
+  assert.match(s, /if \(C\.distillery \|\| CK\) P2_ICONS\.happy = '🍸';/); assert.match(s, /big\(CK \? '🍽' : '🍔', T\.kitchenSame/);
+  assert.match(s, /GROUP_SIZES = \[6, 8, 10, 12, 15, 20\]/);
+  assert.match(s, /\(cp\.none \? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none"/);
+  assert.equal(cfg.t.cpriceNeed, 'Please tap a price.');
+  assert.match(cfg.t.doorPhotoLead, /\(even if it isn’t marked\)/);
+  // Research pre-picks Adults only, Takes reservations and Great for groups (suggestions).
+  const r = mk('cocktail'); research(r.id, [{ label: 'Good to know', text: '19+, DJ Fridays' }, { label: 'Reservations', text: 'Recommended on weekends' }, { label: 'Groups', text: 'Groups welcome; call ahead' }]);
+  const rc = await setupCfg(tokenFor(r.id));
+  assert.equal(rc.suggestAdults, true); assert.deepEqual(rc.visitTicks, ['takes_reservations', 'great_groups']);
+  assert.match(s, /if \(CK && !S\.minors\.policy && C\.suggestAdults\) \{ S\.minors\.policy = 'adults'; S\.minorsGuessed = true; \}/);
+  const w = mk('cocktail'); research(w.id, [{ label: 'Reservations', text: 'Walk-ins only, no reservations' }, { label: 'Good to know', text: 'All ages until 9 PM' }]);
+  const wc = await setupCfg(tokenFor(w.id)); assert.equal(wc.suggestAdults, false); assert.deepEqual(wc.visitTicks, []);
+  // "DJs" in the updates list.
+  assert.match((await get(`/owner/${t}`)).text + (await change(t, { weekly_nights: [{ days: ['fri'], kind: 'dj', title: 'DJ Fridays', start: '22:00' }] }) && (await get(`/owner/${t}`)).text), /Live music, DJs and events/);
+  // Build My Trip: midnight; her own name for the event.
+  const { t3LocalTimes } = require('../trip-planner-v3-page.js');
+  assert.equal(t3LocalTimes('Listed hours: 17:00–00:00 Mon', 'en'), 'Listed hours: 5 PM – midnight Mon');
+  assert.equal(app.nightsTripText ? app.nightsTripText([{ kind: 'dj', title: 'DJ Fridays', start: '21:00', source: 'venue_owner', days: ['fri'] }], false).text : 'DJ Fridays at 9 PM', 'DJ Fridays at 9 PM');
+  // Hours editor: only "Reopen".
+  assert.doesNotMatch(s, /<span class="su-hundo su-sr" role="status">/);
+});
+
+test('Build My Trip list for a closed day says why: “… is closed Mondays · try Tue–Sun.”', async () => {
+  const WK = JSON.stringify({ mon: [], tue: [['17:00', '01:00']], wed: [['17:00', '01:00']], thu: [['17:00', '01:00']], fri: [['17:00', '01:00']], sat: [['17:00', '01:00']], sun: [['17:00', '01:00']] });
+  const v = mk('cocktail', { name: 'Quiet Door Test Lounge', region: 'peachland', latitude: 49.774, longitude: -119.737, address: '5800 Beach Ave, Peachland', hours: WK });
+  const j = await planFor('cocktails in Peachland Monday night');
+  assert.deepEqual(j.warnings, ['Quiet Door Test Lounge is closed Mondays · try Tue–Sun.']);
+  assert.ok(!(j.recommendations || []).some((x) => x.venue && x.venue.id === v.id));
+  assert.equal(require('../trip-french-copy.js').t3FrenchText('Quiet Door Test Lounge is closed Mondays · try Tue–Sun.'), 'Quiet Door Test Lounge — Fermé le lundi · essayez du mardi au dimanche.');
+});

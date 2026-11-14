@@ -10876,9 +10876,17 @@ function nightsApptTripLine(list, fr) {
   if (fr) return `${tour && cls ? 'Visites et ateliers' : tour ? 'Visites' : 'Ateliers'} sur rendez-vous, appelez avant`;
   return `${tour && cls ? 'Tours and classes' : tour ? 'Tours' : 'Classes'} by appointment, call ahead`;
 }
+// Cocktail test 1 (2026-11-13): the owner's own name for an event when it says what it is ("DJ Fridays", "Jazz night"),
+// not the generic "DJ night". Research titles keep the kind's name, as before.
+function ownerNightTripLabel(s, fr) {
+  const title = String(s.title || '').trim();
+  if (s.kind === 'other' || s.source !== 'venue_owner' || !title || title.length > 32 || !nightTitleSaysKind(title, s.kind)) return null;
+  const useFr = fr && s.title_fr;
+  return { text: useFr ? s.title_fr : title, english: !!(fr && !useFr) };
+}
 function nightsTripText(list, fr, bookAhead = false) {
   const shown = (list || []).slice(0, 2).map((s) => {
-    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? daytimeTripLabel(s, fr) : nightLabel(s, fr), t = nightTimeText(s, fr);
+    const l = DAYTIME_NIGHT_KINDS.includes(s.kind) ? daytimeTripLabel(s, fr) : ownerNightTripLabel(s, fr) || nightLabel(s, fr), t = nightTimeText(s, fr);
     // Audit fix (2026-10-27): a range reads "Trivia 7:30–9:30 PM" (it was "at 7:30–9:30 PM"); a start alone keeps "at 7 PM".
     const ranged = specialMinutes(s.end) !== null;
     const book = bookAhead && DAYTIME_NIGHT_KINDS.includes(s.kind) ? (fr ? ', réservez à l’avance' : ', book ahead') : '';
@@ -19804,6 +19812,11 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 // Free parking and room for RVs / trucks and trailers (pub test 8, 2026-11-10), restaurants and pubs; off-sales (a liquor
 // store on site) and "service dogs welcome" (the follow-up to "No dogs allowed") for pubs only. Never researched.
 const OWNER_EXTRA_BADGES = ['local_drinks', 'heated_patio', 'fireplace', 'beach_access', 'free_parking', 'rv_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', 'service_dogs'];
+// Cocktail test 1 (2026-11-13): a lounge's "local" tile is wine and spirits, never craft beer (the setup's own word).
+function extraBadgeLabel(k, type, fr) {
+  if (k === 'local_drinks' && type === 'cocktail') return fr ? 'Vins et spiritueux locaux' : 'Local wine and spirits';
+  return OWNER_EXTRA_BADGE_LABELS[k] ? OWNER_EXTRA_BADGE_LABELS[k][fr ? 'fr' : 'en'] : k;
+}
 const OWNER_EXTRA_BADGE_LABELS = {
   local_drinks: { en: 'Local wine & craft beer', fr: 'Vins locaux et bières artisanales', icon: null, group: 'food' },
   heated_patio: { en: 'Heated or covered patio', fr: 'Terrasse chauffée ou couverte', icon: null, group: 'place' },
@@ -19904,7 +19917,7 @@ function ownerFeatureChipsHtml(venue, fr, cls) {
   // "Service dogs welcome" (pub test 8) is never a chip: it rides on the "No dogs" line (noDogsLineHtml).
   // Cafés (2026-11-10): "Laptop friendly" from their laptops answer (all day only), after Wi-Fi.
   const laptop = venue.type === 'cafe' && cafeLaptopFriendly(venue) ? [`<span class="${cls('place')}">${escapeHtml(fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly')}</span>`] : [];
-  const chips = ownerExtraBadgesFor(venue.type).filter((k) => f[k] && !OWNER_FEATURE_NOT_CHIPS.has(k)).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[k].fr : OWNER_EXTRA_BADGE_LABELS[k].en)}</span>`);
+  const chips = ownerExtraBadgesFor(venue.type).filter((k) => f[k] && !OWNER_FEATURE_NOT_CHIPS.has(k)).map((k) => `<span class="${cls(OWNER_EXTRA_BADGE_LABELS[k].group)}">${escapeHtml(extraBadgeLabel(k, venue.type, fr))}</span>`);
   if (laptop.length) chips.splice(f.wifi ? 1 : 0, 0, ...laptop);
   return chips.join(' ');
 }
@@ -46567,7 +46580,7 @@ function ownerVisitResearchKeys(venueId) {
   const info = venueVisitInfo(venueId) || {};
   const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
   const rows = info.rows || [];
-  return visitSlotsFor(venueId).filter((slot) => { const r = slot.labels.map((l) => rows.find((x) => x && x.label === l)).find(Boolean); return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
+  return visitSlotsFor(venueId).filter((slot) => slot.key !== 'menu' && slot.key !== 'good_to_know').filter((slot) => { const r = slot.labels.map((l) => rows.find((x) => x && x.label === l)).find(Boolean); return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
 }
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
@@ -47457,7 +47470,7 @@ function loungeResearchHints(venue, badges) {
   const all = rows.map((r) => r.text).join(' ');
   const res = line(/^reservations?$/i), groups = line(/^groups?$/i);
   const ticks = [];
-  if (!(badges || {}).takes_reservations && /\b(?:reserv|book)/i.test(res) && !/\bno reservations?\b|\bwalk-?ins? only\b|\bdon[’']?t take reservations\b|\bnot? (?:take|accept)\w* reservations?\b/i.test(res)) ticks.push('takes_reservations');
+  if (!(badges || {}).takes_reservations && res && !/\bno reservations?\b|\bwalk-?ins? only\b|\bdon[’']?t take reservations\b|\bnot? (?:take|accept)\w* reservations?\b/i.test(res)) ticks.push('takes_reservations');
   if (!(badges || {}).great_groups && groups && !/\bno (?:large |big )?groups\b|\bnot (?:suitable|good) for groups\b|\bcan[’']?t take (?:large |big )?groups\b/i.test(groups)) ticks.push('great_groups');
   return { suggestAdults: /\b19\s*\+|\b19 (?:and|&) (?:over|older|up)\b|\badults? only\b|\bno minors\b/i.test(all) && !/\ball ages\b|\bminors? (?:welcome|allowed)\b|\bkids? welcome\b/i.test(all), visitTicks: ticks };
 }
@@ -59719,8 +59732,19 @@ function ownerCompletenessJson(found, token, lang) {
   return { ok: true, html: ownerA11y(ownerCompletenessHtmlFor(found.venue, live, found.happyHourTimes, waitingReq, token, lang === 'fr' ? 'fr' : 'en', !!found.account)) };
 }
 
+// Cocktail test 1 (2026-11-13): a lounge's edit page gives lounge examples in its hints, not pub ones (pints, wings).
+const LOUNGE_HINT_SWAPS = [
+  ['&ldquo;House pints (20 oz)&rdquo; &middot; &ldquo;$6&rdquo;', '&ldquo;Signature cocktails&rdquo; &middot; &ldquo;$10&rdquo;'],
+  ['&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;', '&ldquo;Martini Monday&rdquo; &middot; &ldquo;$10 classic martinis&rdquo;'],
+  ['&ldquo;Wing Wednesday&rdquo;', '&ldquo;Martini Monday&rdquo;'],
+  ['« Pintes maison (20 oz) » · « 6 $ »', '« Cocktails signature » · « 10 $ »'],
+  ['« Mercredi des ailes » · « Ailes à 60 ¢ »', '« Lundi martini » · « Martinis classiques à 10 $ »'],
+  ['« Mercredi des ailes »', '« Lundi martini »'],
+];
+function loungeHints(html) { let out = html; for (const [a, b] of LOUNGE_HINT_SWAPS) out = out.split(a).join(b); return out; }
 function renderOwnerPage(found, token, pending, lang = 'en') {
-  const html = ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  const html0 = ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  const html = found && found.venue && found.venue.type === 'cocktail' ? loungeHints(html0) : html0;
   return lang === 'fr' ? frTypographyPage(html) : html;
 }
 // Distillery test 2 (2026-11-13): the French owner home through the French spacing (a no-break space before « : » and
@@ -59984,8 +60008,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const d = list[i] || { text: '', price: '' };
       const n = i + 1;
       return `<div class="op-deal" data-deal="${prefix}"${i >= shown ? ' hidden' : ''}>
-          <input type="text" class="op-deal-text" maxlength="${HH_DEAL_TEXT_MAX}" value="${escapeHtml(d.text || '')}"${fr2 ? ' lang="fr"' : ''} aria-label="${fr2 ? L(`French deal ${n}: what`, `Spécial ${n} en français : quoi`) : L(`Deal ${n}: what`, `Spécial ${n} : quoi`)}" placeholder="${i === 0 ? (fr2 ? 'Pintes maison (20 oz)' : 'House pints (20 oz)') : ''}">
-          <input type="text" class="op-deal-price" maxlength="${HH_DEAL_PRICE_MAX}" value="${escapeHtml(d.price || '')}" aria-label="${fr2 ? L(`French deal ${n}: price`, `Spécial ${n} en français : prix`) : L(`Deal ${n}: price`, `Spécial ${n} : prix`)}" placeholder="${i === 0 ? (fr2 ? '6 $' : '$6') : ''}">
+          <input type="text" class="op-deal-text" maxlength="${HH_DEAL_TEXT_MAX}" value="${escapeHtml(d.text || '')}"${fr2 ? ' lang="fr"' : ''} aria-label="${fr2 ? L(`French deal ${n}: what`, `Spécial ${n} en français : quoi`) : L(`Deal ${n}: what`, `Spécial ${n} : quoi`)}" placeholder="${i === 0 ? (venue.type === 'cocktail' ? (fr2 ? 'Cocktails signature' : 'Signature cocktails') : fr2 ? 'Pintes maison (20 oz)' : 'House pints (20 oz)') : ''}">
+          <input type="text" class="op-deal-price" maxlength="${HH_DEAL_PRICE_MAX}" value="${escapeHtml(d.price || '')}" aria-label="${fr2 ? L(`French deal ${n}: price`, `Spécial ${n} en français : prix`) : L(`Deal ${n}: price`, `Spécial ${n} : prix`)}" placeholder="${i === 0 ? (venue.type === 'cocktail' ? (fr2 ? '10 $' : '$10') : fr2 ? '6 $' : '$6') : ''}">
         </div>`;
     }).join('') + `<button type="button" class="op-add op-deal-add" data-deal-add="${prefix}"${shown >= HH_DEALS_MAX ? ' hidden' : ''}>${L('+ Add a deal', '+ Ajouter un spécial')}</button>`;
   };
@@ -60010,9 +60034,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       return `<fieldset class="op-sp" data-sp="${n}"${i >= shown ? ' hidden' : ''} data-season-from="${escapeHtml(x.season_from || '')}" data-season-to="${escapeHtml(x.season_to || '')}">
           <legend>${L(`Special ${n}`, `Spécial ${n}`)}</legend>${completeOn ? `<span class="op-sp-lab">${L('Days', 'Jours')}</span>` : ''}
           <div class="op-sp-days" role="group" aria-label="${L(`Special ${n}: days`, `Spécial ${n} : jours`)}">${days}</div>
-          ${spLab(L('Name', 'Nom'), `<input type="text" class="op-sp-title" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Special ${n}: name`, `Spécial ${n} : nom`)}" placeholder="${spEx(i === 0 ? L('Wing Wednesday', 'Mercredi des ailes') : '')}">`)}
-          ${spLab(L('What you get', 'Ce qui est offert'), `<input type="text" class="op-sp-deal" maxlength="${SPECIAL_DEAL_MAX}" value="${escapeHtml(x.deal || '')}" aria-label="${L(`Special ${n}: the deal`, `Spécial ${n} : l’offre`)}" placeholder="${spEx(i === 0 ? L('60¢ wings, dine-in only', 'Ailes à 60 ¢, sur place seulement') : '')}">`)}
-          <span class="op-sp-line">${spLab(L('Price (optional)', 'Prix (facultatif)'), `<input type="text" class="op-sp-price" maxlength="${SPECIAL_PRICE_MAX}" value="${escapeHtml(x.price || '')}" aria-label="${L(`Special ${n}: price (optional)`, `Spécial ${n} : prix (facultatif)`)}" placeholder="${spEx(i === 0 ? L('60¢ each', '60 ¢ chacune') : '')}">`)}${specialsAlcohol ? spLab(L('Type', 'Type'), kinds) : kinds}</span>
+          ${spLab(L('Name', 'Nom'), `<input type="text" class="op-sp-title" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Special ${n}: name`, `Spécial ${n} : nom`)}" placeholder="${spEx(i === 0 ? (venue.type === 'cocktail' ? L('Martini Monday', 'Lundi martini') : L('Wing Wednesday', 'Mercredi des ailes')) : '')}">`)}
+          ${spLab(L('What you get', 'Ce qui est offert'), `<input type="text" class="op-sp-deal" maxlength="${SPECIAL_DEAL_MAX}" value="${escapeHtml(x.deal || '')}" aria-label="${L(`Special ${n}: the deal`, `Spécial ${n} : l’offre`)}" placeholder="${spEx(i === 0 ? (venue.type === 'cocktail' ? L('$10 classic martinis', 'Martinis classiques à 10 $') : L('60¢ wings, dine-in only', 'Ailes à 60 ¢, sur place seulement')) : '')}">`)}
+          <span class="op-sp-line">${spLab(L('Price (optional)', 'Prix (facultatif)'), `<input type="text" class="op-sp-price" maxlength="${SPECIAL_PRICE_MAX}" value="${escapeHtml(x.price || '')}" aria-label="${L(`Special ${n}: price (optional)`, `Spécial ${n} : prix (facultatif)`)}" placeholder="${spEx(i === 0 ? (venue.type === 'cocktail' ? L('$10 each', '10 $ chacun') : L('60¢ each', '60 ¢ chacune')) : '')}">`)}${specialsAlcohol ? spLab(L('Type', 'Type'), kinds) : kinds}</span>
           <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-sp-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`Special ${n}: starts at (optional)`, `Spécial ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-sp-end" value="${escapeHtml(x.end && x.end !== 'close' ? x.end : '')}" aria-label="${L(`Special ${n}: ends at (optional)`, `Spécial ${n} : se termine à (facultatif)`)}"> <label class="op-sp-close"><input type="checkbox" class="op-sp-toclose"${x.end === 'close' ? ' checked' : ''}> ${L('until close', 'jusqu’à la fermeture')}</label></span>
           <details class="op-sp-fr"${x.title_fr ? ' open' : ''}><summary>${L('In French (optional)', 'En français (facultatif)')}</summary>
             <input type="text" class="op-sp-title-fr" lang="fr" maxlength="${SPECIAL_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`Special ${n}: name in French`, `Spécial ${n} : nom en français`)}">
@@ -60092,7 +60116,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
           <label class="amenity-check"${(foodOnly.has(f) || activityOnly.has(f)) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
   // Owner-only features (2026-11-09): restaurants get the six extra boxes too (same Save rules as the other badges).
   const featureChecks = COMPLETENESS_TYPES.has(venue.type) ? ownerExtraBadgesFor(venue.type).map((f) => `
-          <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_EXTRA_BADGE_LABELS[f].fr : OWNER_EXTRA_BADGE_LABELS[f].en)}</label>`).join('') : '';
+          <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(extraBadgeLabel(f, venue.type, fr))}</label>`).join('') : '';
   // Signed in (2026-10-18): "Anything else you send now is added to them" isn't true any more (most fields go live on
   // Save), so the line says what Save does with what is still waiting.
   const carryOnSave = instantOn && waitingReq && waitingReq.status === 'pending' && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT

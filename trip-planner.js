@@ -6380,6 +6380,17 @@ function dayClosedAllDay(v, date, weekday) {
   return !!(parsed.known && parsed.days[wd] && parsed.days[wd].status === 'closed');
 }
 
+// "closed Mondays · try Wed–Sun" (with the season's months when it is seasonal), as the Build My Trip page words it.
+function closedDayEnglish(c) {
+  const EN = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, ENL = { mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays', sun: 'Sundays' };
+  const MEN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const start = (WEEKDAYS.indexOf(c.day) + 1) % 7, ring = Array.from({ length: 7 }, (_, i) => WEEKDAYS[(start + i) % 7]);
+  const inOrder = ring.filter((d) => c.open.includes(d)), first = ring.indexOf(inOrder[0]), run = inOrder.every((d, j) => ring[first + j] === d);
+  const mo = (md) => { const n = Number(String(md || '').slice(0, 2)); return n >= 1 && n <= 12 ? MEN[n - 1] : null; };
+  const sea = mo(c.from) && mo(c.to) ? ` (${mo(c.from)}–${mo(c.to)})` : '';
+  const days = run && inOrder.length > 2 ? `${EN[inOrder[0]]}–${EN[inOrder[inOrder.length - 1]]}` : WEEKDAYS.filter((d) => c.open.includes(d)).map((d) => EN[d]).join(', ');
+  return `closed ${ENL[c.day]}${sea} · try ${days}`;
+}
 // The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the
 // trip's date), with that season's months and the days it is open: { day: 'mon', from: '10-01', to: '04-30', open: [...] }.
 function closedDayInfo(v, weekday) {
@@ -6817,7 +6828,15 @@ function planTripCore(input) {
       : `These places match but are closed for the season ${when}: ${listText(names)}.${reopens} Ask again with a date in their season to plan them.`);
     }
     result.closedForSeason = offSeason;
-  } else if (!rec.items.length) result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
+  } else if (!rec.items.length) {
+    // Cocktail test 1 (2026-11-13): a list for a named day ("cocktails in Kelowna Monday night") where the places that
+    // match are closed all that day says why, like the day plans do: "The Velvet Door is closed Mondays · try Wed–Sun."
+    const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+    const anyDay = WEEKDAYS.includes(wd) ? buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }, 3).items.filter((s) => s.venue) : [];
+    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
+    if (closedLines.length && closedLines.length === anyDay.length) result.warnings.push(`${closedLines.join('; ')}.`);
+    else result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
+  }
   if (ctx.whenDaypart || ctx.startWeekday) {
     const when = whenText(ctx);
     result.notes.push(`Checked against each venue\u2019s listed hours on ${SITE.brand}${when ? ` for ${when.replace(/^on /, '')}` : ''}: places whose listed hours show them closed then are left out, and places without usable hours are marked. Hours can change, so check before you go.`);

@@ -127,7 +127,7 @@ const COCKTAIL_ITEMS = [
   { key: 'cocktail_price', group: 'food', w: 5, fix: true, target: { setup: 'spend' }, fields: ['cocktail_price', 'pub_info'],
     en: 'Cocktail price', fr: 'Prix d’un cocktail', whyEn: 'About how much is a cocktail? It shows on your card (“From $16”). “We don’t serve cocktails” counts too.', whyFr: 'Combien coûte un cocktail environ? Il s’affiche sur votre fiche (« Dès 16 $ »). « Nous ne servons pas de cocktails » compte aussi.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍸' },
   PI('dietary'),
-  PI('entertainment', { w: 8, en: 'Live music, DJs and events', fr: 'Musique, DJ et événements', whyEn: 'Live music, DJs, trivia, comedy: what’s on each week.', whyFr: 'Musique en direct, DJ, quiz, humour : ce qui se passe chaque semaine.' }),
+  PI('entertainment', { w: 8, en: 'Live music, DJs and events', fr: 'Musique, DJ et événements', whyEn: 'Live music, DJs, comedy: what’s on and when.', whyFr: 'Musique en direct, DJ, humour : ce qui se passe et quand.', btnEn: 'Add an event', btnFr: 'Ajouter' }),
   PI('minors', { whyEn: 'Adults only (19+), minors with an adult until a set time, or all ages. Families check this before they come.', whyFr: 'Adultes seulement (19 ans et plus), mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Les familles vérifient avant de venir.' }),
   PI('pyv_groups', { whyEn: 'Private room, buyouts, or call ahead for 8 or more.', whyFr: 'Salle privée, privatisation, ou appelez à l’avance pour 8 personnes ou plus.' }),
   PI('pyv_known', { w: 4, whyEn: 'One line on what people come back for, e.g. Smoked old fashioned and a door down the alley.', whyFr: 'Une ligne sur ce pour quoi les gens reviennent, p. ex. le old fashioned fumé et la porte au fond de la ruelle.' }),
