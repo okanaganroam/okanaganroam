@@ -58268,7 +58268,7 @@ function renderAdminChangeCard(r) {
       <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
       ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically).</div>' : ''}
-      ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? '<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…), listed in the sitemap with hreflang links. Untick it to keep the English page only.</div>' : ''}
+      ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? `<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…)${FRENCH_INDEXABLE ? ', listed in the sitemap with hreflang links' : ' (kept out of search like every French page for now: noindex, no hreflang, not in the sitemap)'}. Untick it to keep the English page only.</div>` : ''}
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
       ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
