@@ -5029,6 +5029,18 @@ test('Guide route: a real guide renders, an unknown badge or thin guide is the s
   assert.match(body, /<body class="golf-page not-found-page">/);
   assert.match(body, /<a href="\/kelowna"><span>Everything in Kelowna<\/span>/);
 }));
+test('Guide route: a real badge guide with too few places sends visitors to the town page, not a dead end (2026-11-14)', () => withDiscoveryServer(async (base) => {
+  // Test data has far fewer than 8 dog-friendly places in Penticton's neighbour; any thin region+badge combination works.
+  const thin = await fetch(`${base}/guide/kaleden/open_early`, { redirect: 'manual' });
+  assert.equal(thin.status, 302);
+  assert.equal(thin.headers.get('location'), '/kaleden');
+  const fr = await fetch(`${base}/fr/guide/kaleden/open_early`, { redirect: 'manual' });
+  assert.equal(fr.status, 302);
+  assert.equal(fr.headers.get('location'), '/fr/kaleden');
+  // An unknown badge or town is still a plain 404.
+  assert.equal((await fetch(`${base}/guide/kaleden/not_a_badge`)).status, 404);
+  assert.equal((await fetch(`${base}/guide/nowhere/open_early`)).status, 404);
+}));
 // Stage 5C (2026-10-01): My Trip identifies a stop by its ref (Trip half of
 // W07). Every server-rendered Add to trip button carries "venue:<id>" or
 // "event:<id>" next to its existing name / query / region.
