@@ -36005,7 +36005,8 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
     const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
     return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${seasonTagSpan(s, fr)}${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
-  const label = opts.events ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
+  // Distillery test 1 (2026-11-13): a distillery's are tours and classes, not nights.
+  const label = opts.tours ? (fr ? 'Visites et événements' : 'Tours &amp; events') : opts.events ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
   return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
 }
 // ---------- Happy hour access (2026-10-26) ----------
@@ -37250,7 +37251,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe' }), extraDealsHtml,
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe', tours: venue.type === 'distillery' }), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
@@ -37352,7 +37353,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
        in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
   <div class="venue-extra">
   ${venueDealsCardHtml}
-  ${venueWeeklyNightsHtml(weeklyNights, fr, { events: venue.type === 'cafe' })}
+  ${venueWeeklyNightsHtml(weeklyNights, fr, { events: venue.type === 'cafe', tours: venue.type === 'distillery' })}
   ${fr ? '' : outdoorGoodToKnowHtml(venue)}${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
@@ -53276,11 +53277,11 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
     keysFr: ['enfants', 'mineurs', 'famille', 'tous les ages', 'adultes seulement', '19 ans', 'qui est le bienvenu'],
     a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>What you offer</strong>. Tap <strong>Save these</strong>, and on <strong>Who’s welcome?</strong> pick Adults only (19+), Minors with an adult until a set time, or All ages.</p><p>It’s on your page right away, in “Plan your visit”, and it decides your kids badge. Build My Trip adds your distillery to a family trip only when you pick All ages or a set time; with a set time it shows “Kids until 6 PM” (your time) and tells families to leave by then. We show only your own answer, never a legal claim.</p>',
     aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Ce que vous offrez</strong>. Touchez <strong>Enregistrer</strong>, puis à <strong>Qui est le bienvenu?</strong> choisissez Adultes seulement (19 ans et plus), Mineurs bienvenus avec un adulte jusqu’à une heure donnée, ou Tous les âges.</p><p>C’est sur votre page tout de suite, dans « Planifiez votre visite », et cela décide de votre mention pour les enfants. Planifier mon voyage n’ajoute votre distillerie à un voyage en famille que si vous choisissez Tous les âges ou une heure donnée; avec une heure, la page indique « Enfants jusqu’à 18 h » (votre heure) et invite les familles à partir avant. Nous montrons seulement votre réponse, jamais une affirmation légale.</p>' },
-  { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
+  { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events', 'weekly-nights'], noRelated: ['weekly-nights'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
     keys: ['tour', 'tours', 'distillery tour', 'class', 'classes', 'cocktail class', 'whisky class', 'whiskey class', 'workshop', 'masterclass', 'events', 'event', 'book a tour'],
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Only on set weeks, like the first Saturday? Open <strong>Weekly nights</strong> on your edit page and pick how often.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Seulement certaines semaines, comme le premier samedi? Ouvrez <strong>Soirées de la semaine</strong> sur votre page de modification et choisissez la fréquence.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Only on set weeks, like the first Saturday? Open <strong>Tours &amp; events</strong> on your edit page and pick how often.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Seulement certaines semaines, comme le premier samedi? Ouvrez <strong>Visites et événements</strong> sur votre page de modification et choisissez la fréquence.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
   { id: 'distillery-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures', 'brewery-seasonal-hours', 'winery-appointment'],
     q: 'We’re seasonal, or open by appointment', qFr: 'Nous sommes saisonniers, ou ouverts sur rendez-vous',
     keys: ['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'off season', 'off-season', 'change hours', 'change my hours'],
@@ -58117,8 +58118,17 @@ const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['veg
 const OWNER_PUB_INFO_LABELS = { kitchen: ['Kitchen', 'Heures de la cuisine'], minors: ['Who’s welcome', 'Qui est le bienvenu'], sports: ['Sports on TV', 'Sports à la télé'] };
 // A badge that only follows another field of the same save (the Happy hour badge with the happy hour times).
 const OWNER_BADGE_FOLLOWS = { happy_hour: ['happy_hour', 'happy_hour_deals'], live_music: ['weekly_nights'] };
-function ownerChangeLabels(ch, prev, fr) {
-  const names = fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS;
+// Distillery test 1 (2026-11-13): the field names in a distillery's (or a cidery's) own words: "Your tasting room
+// answers", "Tasting price", "Tours & events" (not "Your taproom answers", "Flight price", "Weekly nights").
+function ownerFieldLabelsFor(venue, fr) {
+  const base = fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS;
+  if (!venue) return base;
+  if (venue.type === 'distillery') return { ...base, ...(fr ? { brewery_info: 'Réponses sur votre salle de dégustation', flight_fee: 'Prix de la dégustation', weekly_nights: 'Visites et événements' } : { brewery_info: 'Your tasting room answers', flight_fee: 'Tasting price', weekly_nights: 'Tours & events' }) };
+  if (venue.type === 'brewery') { let k = ''; try { k = breweryWordsKind(venue); } catch (e) { k = ''; } if (k === 'Cidery') return { ...base, brewery_info: fr ? 'Réponses sur votre cidrerie' : 'Your cidery answers' }; }
+  return base;
+}
+function ownerChangeLabels(ch, prev, fr, venue) {
+  const names = ownerFieldLabelsFor(venue, fr);
   const out = [];
   const add = (x) => { if (x && !out.includes(x)) out.push(x); };
   for (const f of Object.keys(ch || {})) {
@@ -58154,7 +58164,8 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
   let plain = false;
-  try { const vt = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId); plain = !!vt && COMPLETENESS_TYPES.has(vt.type); } catch (e) { plain = false; }
+  let vrow = null;
+  try { vrow = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId) || null; plain = !!vrow && COMPLETENESS_TYPES.has(vrow.type); } catch (e) { plain = false; }
   for (const r of db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT ?").all(venueId, Math.max(10, limit))) {
     let fields = [];
     let none = null;
@@ -58164,7 +58175,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       // one" answer reads "You told us you don't have: …" (not "Things you don't offer").
       let prev = {};
       try { prev = JSON.parse(r.previous || '{}') || {}; } catch (e) { prev = {}; }
-      fields = plain ? ownerChangeLabels(ch, prev, fr) : Object.keys(ch).map((f) => (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f);
+      fields = plain ? ownerChangeLabels(ch, prev, fr, vrow) : Object.keys(ch).map((f) => ownerFieldLabelsFor(vrow, fr)[f] || f);
       if (plain && Array.isArray(ch.not_offered)) {
         let before = [];
         try { before = (JSON.parse(r.previous || '{}').not_offered) || []; } catch (e) { before = []; }
@@ -59544,7 +59555,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'].includes(k) || completeOn))),
+    fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'].includes(k) || completeOn))
+      .map(([k, w]) => [k, ['brewery_info', 'flight_fee', 'weekly_nights'].includes(k) && ownerFieldLabelsFor(venue, fr)[k] !== (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[k] ? ownerFieldLabelsFor(venue, fr)[k].toLowerCase() : w])),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -59974,8 +59986,8 @@ ${priceFieldHtml}      </details>` : ''}
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
-      ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
+      <summary><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'distillery' ? L('Tours &amp; events', 'Visites et événements') : venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' || venue.type === 'distillery' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, like a distillery tour on Saturdays. Tick the days, pick how often, and fill in each box.`, `Vos visites, ateliers et événements réguliers, comme une visite de la distillerie le samedi. Cochez les jours, choisissez la fréquence et remplissez chaque case.`) : L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
