@@ -195,7 +195,7 @@ const FR_TEXT = {
   'Choose venue types': 'Choisir des types de lieux',
   'Choose what you are looking for': 'Choisir ce que vous recherchez',
   'Choose what matters to you': 'Choisir ce qui compte pour vous',
-  'What are you looking for?': 'Que recherchez-vous?',
+  'What are you looking for?': 'Que recherchez-vous\u202f?',
   'What matters to you?': 'Qu’est-ce qui compte pour vous?',
   'Choose an activity': 'Choisir une activité',
   'Choose an indoor experience': 'Choisir une activité intérieure',
