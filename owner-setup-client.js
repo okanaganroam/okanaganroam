@@ -135,7 +135,28 @@
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
   // Unlike a special (shown only on days it's open), a happy hour's days show all year, so a day closed in either week
   // counts: "you're closed on Mon (in your usual hours)".
-  function warnOf(key, e){ return key === 'happy' ? closedWarnAny(e.days, S.happySea) : closedWarn(e.days, e.sea); }
+  function warnOf(key, e){ return key === 'happy' ? [closedWarnAny(e.days, S.happySea), hoursWarn(e)].filter(Boolean).join(' ') : closedWarn(e.days, e.sea); }
+  // Cocktail test 1 (2026-11-13): a new happy hour starts at the usual opening time and lasts 2 hours, never past closing
+  // (it was 3–5 PM for a bar that opens at 5). With no hours yet it stays 3–5 PM.
+  function hm(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; }
+  function hmStr(n){ n = ((n % 1440) + 1440) % 1440; return pad2(Math.floor(n / 60)) + ':' + pad2(n % 60); }
+  function happyDefault(){
+    var w = S.week, count = {}, best = null;
+    DAYS.forEach(function(d){ var r = w && w[d] && w[d][0]; if (r && hm(r[0]) != null) { count[r[0]] = (count[r[0]] || 0) + 1; if (!best || count[r[0]] > count[best[0]]) best = r; } });
+    if (!best) return { days: {}, from: '15:00', to: '17:00', what: '' };
+    var o = hm(best[0]), c = hm(best[1]); if (c != null && c <= o) c += 1440;
+    return { days: {}, from: best[0], to: hmStr(c != null ? Math.min(o + 120, c) : o + 120), what: '' };
+  }
+  // A happy hour outside the place's hours on a day it's open (a gentle heads-up like the closed-day one).
+  function hoursWarn(e){
+    var f = hm(e.from), t = e.close ? null : hm(e.to); if (f == null || !S.week) return '';
+    var out = DAYS.filter(function(d){
+      if (!e.days[d] || !S.week[d]) return false;
+      return !S.week[d].some(function(r){ var o = hm(r[0]), c = hm(r[1]); if (o == null || c == null) return true; if (c <= o) c += 1440;
+        var ff = f < o && f + 1440 <= c ? f + 1440 : f, tt = t == null ? ff : t <= ff ? t + 1440 : t; return ff >= o && tt <= c; });
+    });
+    return out.length && T.happyOutside ? fill(T.happyOutside, { days: out.map(dayName).join(', ') }) : '';
+  }
   function closedWarnAny(days, sea){
     if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
     var M = seaMonths(sea), hasSea = !!(S.sea.on && S.sea.week), usual = false, seas = false;
@@ -1657,7 +1678,7 @@
         // Pub test 8 (2026-11-10): no "It's on my website" when there's no website (she'd just said "We don't have a website").
         + (C.website ? big('🌐', hk === 'happy' ? T.happyWeb : T.specialsWeb, '', true, 'go:' + hk + ':web') : '') + big('✎', hk === 'happy' ? T.happyType : T.specialsType, hk === 'happy' ? T.happyTypeSub : T.specialsTypeSub, true, 'go:' + hk + ':type') + '</div>';
     } else if (s === 'happy:type') {
-      if (!S.happy.length) S.happy.push({ days: {}, from: '15:00', to: '17:00', what: '' });
+      if (!S.happy.length) S.happy.push(happyDefault());
       x = q(T.happyTypeQ, T.happyTypeLead) + msgs() + S.happy.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.happyN, { n: i + 1 })) + '</span>' + (S.happy.length > 1 ? '<button type="button" class="su-toggle" data-rm="happy:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           + '<p class="su-q">' + h(T.whichDays) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" data-act="hhDays:' + i + ',all">' + h(T.everyDay) + '</button><button type="button" class="su-toggle" data-act="hhDays:' + i + ',wk">' + h(T.monFri) + '</button></div>' + dayChips(e.days, 'happy.' + i) + warnHtml('happy', i, e) + '<p class="su-q">' + h(T.whatTime) + '</p>'
@@ -2611,7 +2632,7 @@
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
       return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; S.dogGuessed = false; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
-    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? { days: {}, from: '15:00', to: '17:00', what: '' } : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
+    if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
@@ -2793,6 +2814,7 @@
   }
   function wire(){
     Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(){ if (!S.busy) act(b.getAttribute('data-act')); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('input[data-hh]'), function(inp){ inp.addEventListener('change', function(){ var q2 = inp.getAttribute('data-hh').split(':'); if (q2[1] !== 'what' && S.happy[+q2[0]]) { S.happy[+q2[0]][q2[1]] = inp.value; warnRefresh(); } }); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-chip]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];
       var obj = path[0] === 'months' ? S.months : path[0] === 'closedm' ? S.closedM : path[0] === 'sea' ? S.sea.months : S[path[0]][+path[1]].days;

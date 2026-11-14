@@ -225,8 +225,9 @@ test('events: “Live music, DJs and events” (« Musique, DJ et événements �
   assert.equal(en.t.labels.music, 'Live music, DJs and events');
   assert.equal(fr.t.labels.music, 'Musique, DJ et événements');
   assert.deepEqual(en.nightKinds.slice(0, 4), ['live_music', 'dj', 'trivia', 'comedy']);
-  assert.match(en.t.eventsOften, /Weekly nights on your edit page/); assert.equal(en.t.eventsOftenLink, 'Open Weekly nights');
-  assert.match(fr.t.eventsOften, /Soirées de la semaine/);
+  // Cocktail test 1 (2026-11-13): "set how often on your edit page. Set how often" (never "Weekly nights").
+  assert.match(en.t.eventsOften, /set how often on your edit page\./); assert.equal(en.t.eventsOftenLink, 'Set how often');
+  assert.doesNotMatch(en.t.eventsOften, /Weekly nights/); assert.doesNotMatch(fr.t.eventsOften, /Soirées de la semaine/); assert.equal(fr.t.eventsOftenLink, 'Choisir la fréquence');
   assert.match(CLIENT(), /C\.back \+ '#tours-events'/);
   assert.match((await get(`/owner/${t}`)).text, /<summary id="tours-events">/, 'the anchor on the edit page');
   // Groups and booking: one screen, the booking box always shown, quick answers for groups and walk-ins.

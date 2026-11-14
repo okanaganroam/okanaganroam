@@ -235,7 +235,9 @@ test('specials: a bare number price gets its dollar sign; events keep their star
   const html = await text(`/owner/${t}/setup`);
   assert.equal(cfgOf(html).cur.weekly_nights[0].start, '19:00', 'the setup shows the time again');
   const script = scriptOf(html);
-  assert.match(script, /if \(!S\.happy\.length\) S\.happy\.push\(\{ days: \{\}, from: '15:00', to: '17:00', what: '' \}\);/);
+  // Cocktail test 1 (2026-11-13): the first happy hour starts at the opening time (3–5 PM only with no hours).
+  assert.match(script, /if \(!S\.happy\.length\) S\.happy\.push\(happyDefault\(\)\);/);
+  assert.match(script, /if \(!best\) return \{ days: \{\}, from: '15:00', to: '17:00', what: '' \};/);
   assert.doesNotMatch(script, /placeholder="' \+ h\(T\.(whatsOnEx|specialEx|priceEx|eventEx)\)/, 'examples sit under the box, never inside it');
 });
 
