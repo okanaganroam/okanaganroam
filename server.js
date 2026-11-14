@@ -9784,6 +9784,8 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   if (!owned.size) return nextJson;
   const blocked = new Set(owned);
   for (const slot of OWNER_VISIT_SLOTS) if (slot.labels.some((l) => owned.has(l))) slot.labels.forEach((l) => blocked.add(l));
+  // A brewery's or distillery's own tasting line also stands for research's "Tastings" (distillery test 1, 2026-11-13).
+  for (const [l, alts] of Object.entries(BREWERY_LABEL_ALIASES)) if (owned.has(l) && (cur.winery_labels || []).includes(l)) alts.forEach((a) => { if (!owned.has(a)) blocked.add(a); });
   const next = nextJson ? JSON.parse(nextJson) : { rows: [], booking_url: cur.booking_url || null, source_url: cur.source_url || null, checked_at: cur.checked_at };
   const ownerRows = (cur.rows || []).filter((r) => blocked.has(r.label));
   const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
@@ -20919,6 +20921,9 @@ function breweryAnd(list, fr) { return list.length > 1 ? `${list.slice(0, -1).jo
 // The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
 // answered, and its row is left as research has it.
 const BREWERY_MANAGED_LABELS = ['Flights', 'Food', 'To go', 'Kids & dogs', 'Games'];
+// Research's labels for the same line (Distillery test 1, 2026-11-13): a distillery's (or a cidery's) "Tastings" row is
+// what the owner's tasting price replaces.
+const BREWERY_LABEL_ALIASES = { Flights: ['Tastings'] };
 function breweryVisitLines(venue, info) {
   const b = info || venueBreweryInfo(venue.id);
   const out = {};
@@ -21007,27 +21012,41 @@ function writeBreweryVisitRows(venueId, now = new Date()) {
   // A line of hers set aside earlier by a full box comes back into the rows first (it is still hers).
   const parked = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && r.owned && BREWERY_MANAGED_LABELS.includes(r.label));
   for (const pk of parked) if (!rows.some((r) => r.label === pk.label)) rows.push({ label: pk.label, text: pk.text });
+  // Distillery test 1 (2026-11-13): research's "Tastings" line is the same thing as the owner's tasting (or flight)
+  // line, so her answer replaces it (recorded for an Undo) instead of showing both ("$12 a tasting" and "$10 for 4 samples").
+  const aliasOf = (label) => BREWERY_LABEL_ALIASES[label] || [];
   for (const label of BREWERY_MANAGED_LABELS) {
     const want = label in lines ? lines[label] : undefined;
-    const i = rows.findIndex((r) => r.label === label);
+    let i = rows.findIndex((r) => r.label === label);
     if (want === undefined) {
       if (!managed.has(label)) continue;
       const old = was[label];
-      if (old && old.text) { const row = { label, text: old.text, ...(old.url ? { url: old.url } : {}) }; if (i >= 0) rows[i] = row; else rows.push(row); } else if (i >= 0) rows.splice(i, 1);
+      if (old && old.text) { const row = { label: old.label || label, text: old.text, ...(old.url ? { url: old.url } : {}) }; if (i >= 0) rows[i] = row; else rows.push(row); } else if (i >= 0) rows.splice(i, 1);
+      for (const x of (old && Array.isArray(old.extra) ? old.extra : [])) if (x && x.text && !rows.some((r) => r.label === x.label)) rows.push({ label: x.label, text: x.text, ...(x.url ? { url: x.url } : {}) });
       delete was[label]; delete frMap[label]; managed.delete(label);
       if (!old || !old.owned) owned.delete(label);
       continue;
     }
+    // Research's own row under another name for the same thing (Tastings for Flights), when hers isn't there yet.
+    if (i < 0) i = rows.findIndex((r) => aliasOf(label).includes(r.label) && !owned.has(r.label));
     // A research row a full box set aside earlier (owner_dropped) is what this answer replaces too, so an Undo brings it back.
-    const parkedR = i < 0 && cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped.find((r) => r && r.label === label && !r.owned) : null;
-    if (!managed.has(label)) { const r0 = i >= 0 ? rows[i] : parkedR; was[label] = r0 ? { text: r0.text, ...(r0.url ? { url: r0.url } : {}), ...(owned.has(label) ? { owned: true } : {}) } : { text: '', ...(owned.has(label) ? { owned: true } : {}) }; managed.add(label); }
+    const parkedR = i < 0 && cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped.find((r) => r && (r.label === label || aliasOf(label).includes(r.label)) && !r.owned) : null;
+    if (!managed.has(label)) { const r0 = i >= 0 ? rows[i] : parkedR; was[label] = r0 ? { text: r0.text, ...(r0.url ? { url: r0.url } : {}), ...(r0.label && r0.label !== label ? { label: r0.label } : {}), ...(owned.has(label) ? { owned: true } : {}) } : { text: '', ...(owned.has(label) ? { owned: true } : {}) }; managed.add(label); }
+    // Any other research row under the alias is set aside too (recorded with the replaced one), so it never shows twice.
+    for (let k = rows.length - 1; k >= 0; k--) {
+      if (k === i || !aliasOf(label).includes(rows[k].label) || owned.has(rows[k].label)) continue;
+      const x = rows[k];
+      was[label] = { ...was[label], extra: [...((was[label] && was[label].extra) || []), { label: x.label, text: x.text, ...(x.url ? { url: x.url } : {}) }] };
+      rows.splice(k, 1); if (k < i) i -= 1;
+    }
     owned.add(label);
     if (want === '') { if (i >= 0) rows.splice(i, 1); delete frMap[label]; continue; }
     const row = { label, text: want.en };
     if (i >= 0) rows[i] = row; else rows.push(row);
     if (want.fr) frMap[label] = { en: want.en, fr: want.fr }; else delete frMap[label];
   }
-  const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label) && !(r.owned && rows.some((x) => x.label === r.label)));
+  const replaced = (l) => managed.has(l) || [...managed].some((m) => aliasOf(m).includes(l) && !owned.has(l));
+  const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !replaced(r.label) && !(r.owned && rows.some((x) => x.label === r.label)));
   const confirmed = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
   const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, managed, stash, (r) => confirmed.has(r.label));
   const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
@@ -53169,7 +53188,7 @@ function breweryCfg(venue, snap, fr) {
   const cardFlight = (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 && Number(e.from) <= 30 && !/\b(?:bowl|lane|school|class|tour|course|hour)\b/i.test(`${e.basis || ''} ${e.per || ''} ${e.label || ''}`) ? Number(e.from) : null; })();
   const researchFee = (() => {
     if (cardFlight != null) return cardFlight;
-    const r = researchRow('Flights');
+    const r = researchRow('Flights') || researchRow('Tastings');
     const m = r && /\$\s?(\d{1,2}(?:\.\d{2})?)(?!\d)/.exec(r.text);
     return m && Number(m[1]) > 0 && Number(m[1]) <= 30 ? Number(m[1]) : null;
   })();
