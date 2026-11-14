@@ -457,7 +457,7 @@ var TRANSLATIONS = {
     'tripv3.type.cafe': 'Cafe',
     'tripv3.type.brewery': 'Brewery',
     'tripv3.type.pub': 'Pub',
-    'tripv3.type.cocktail': 'Cocktail Lounge',
+    'tripv3.type.cocktail': 'Cocktail lounge',
     'tripv3.type.distillery': 'Distillery',
     'tripv3.type.golf': 'Golf Course',
     'tripv3.type.beach': 'Beach',

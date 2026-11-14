@@ -1448,7 +1448,8 @@ function renderScript(d) {
     var french = lang() === 'fr', cost = v.cost;
     if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
       // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
-      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux dès ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations dès ' : 'Tastings from ') : '';
+      // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails dès 16 $ ».
+      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux dès ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations dès ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails dès ' : 'Cocktails from ') : '';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';

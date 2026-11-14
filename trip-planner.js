@@ -118,6 +118,9 @@ function kidsAllowed(v) {
   // Distilleries (Decided 4, 2026-11-13): only when the owner said All ages or "until a set time" (v.ownerKidsWelcome);
   // a researched kids badge alone never counts, so an unanswered distillery stays out, as before.
   if (v.type === 'distillery') return v.ownerKidsWelcome === true;
+  // Cocktail lounges (Decided 4, 2026-11-13): the same rule; a lounge whose owner said Adults only (19+), or hasn't
+  // answered, is never planned for a family (a researched kids badge alone never counts).
+  if (v.type === 'cocktail') return v.ownerKidsWelcome === true;
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
 // Brewery test 1 (2026-11-12): a brewery or pub whose owner said "minors with an adult until 9 PM" (v.kidsUntil, 'HH:MM').
@@ -1361,7 +1364,10 @@ function publicVenue(v, ctx) {
   const fee = v.type === 'winery' && typeof v.tastingFee === 'number' && Number.isFinite(v.tastingFee) && v.tastingFee >= 0 ? v.tastingFee : null;
   // Breweries (2026-11-12): the owner's flight price the same way ("$12 per person · Flight").
   const flight = (v.type === 'brewery' || v.type === 'distillery') && typeof v.flightFee === 'number' && Number.isFinite(v.flightFee) && v.flightFee > 0 ? v.flightFee : null;
-  const cost = fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
+  // Cocktail lounges (Decided 2, 2026-11-13): the owner's cocktail price ("Cocktails from $16").
+  const cocktail = v.type === 'cocktail' && typeof v.cocktailPrice === 'number' && Number.isFinite(v.cocktailPrice) && v.cocktailPrice > 0 ? v.cocktailPrice : null;
+  const cost = cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
+    : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null }) : tripStopPrice(v.url, v.id);
   return {
     // Distillery test 2 (2026-11-13): a distillery's or brewery's own "Free tastings" (a price of 0) says "Free tasting"
@@ -1369,9 +1375,10 @@ function publicVenue(v, ctx) {
     ...(fee === 0 || ((v.type === 'brewery' || v.type === 'distillery') && v.flightFee === 0) ? { freeTasting: true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
-    regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
+    regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     // Brewery test 3 (2026-11-13): the kind the owner picked (« Cidrerie »), in French too.
     ...(v.type === 'brewery' && BREWERY_KIND_LABEL[v.breweryKind] ? { typeLabelFr: BREWERY_KIND_LABEL[v.breweryKind][1] } : {}),
+    ...(v.type === 'cocktail' ? { typeLabelFr: 'Bar à cocktails' } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
