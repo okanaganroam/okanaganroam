@@ -697,6 +697,9 @@
         if (S.exitAfter && HALF.indexOf(step) >= 0 && !answered(step)) { S.busy = false; if (onOk) onOk(); return leave(); }
         // Nothing needed sending (all of it saved already): the step keeps the answer it had ("within a day" stays so).
         var st = forced || (statuses.indexOf('day') >= 0 || (!statuses.length && S.done[step] === 'day') ? 'day' : 'live');
+        // Cocktail test 2 (2026-11-13): a step still waiting for our check (a new booking link) keeps "within a day" after a
+        // save of something else on it (the Groups line), so its row keeps « nouveau lien de réservation d’ici un jour ».
+        if (st === 'live' && !forced && S.done[step] === 'day' && C.waiting && C.waiting.indexOf(step) >= 0) st = 'day';
         return progress(step, st).then(function(ok){ S.busy = false; if (!ok) return render(); if (onOk) onOk(); go(to || 'saved:' + step); });
       }
       return change(list[i]).then(function(r){ if (!r) { S.busy = false; return render(); } statuses.push(r); return next(i + 1); });
