@@ -223,7 +223,9 @@ test('two ways of saying "when", the honest time, the greeting, event kinds open
   // Event kinds: the 6 most common show open (pubs lead with sports), the rest under "More kinds".
   assert.deepEqual(cfg.nightKinds.slice(0, 6), ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic']);
   assert.equal(cfg.t.moreKinds, 'More kinds');
-  assert.match(s, /C\.nightKinds\.slice\(0, 6\)/);
+  // Distillery test 1 (2026-11-13): the open count comes from the page (6 for pubs, 4 for distilleries).
+  assert.match(s, /nTop = C\.nightKindsTop \|\| 6, top = C\.nightKinds\.slice\(0, nTop\)/);
+  assert.equal(cfg.nightKindsTop, 6);
   const restCfg = cfgOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
   assert.equal(restCfg.nightKinds.length, 12);
   assert.match(restCfg.t.hiLead, /About 15 to 30 minutes\. You can stop any time and carry on later\./); // pub test 6

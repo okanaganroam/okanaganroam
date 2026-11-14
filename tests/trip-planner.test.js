@@ -1283,3 +1283,18 @@ test('stop cards use the venue\'s own photo when it has one, and no photo otherw
   const bad = tp.publicVenue({ id: 3, name: 'Bad Url', region: 'kelowna', type: 'cafe', url: '/z', imageUrl: 'javascript:alert(1)', features: {}, collections: [], activities: [], textName: 'bad url', textDesc: '' }, null);
   assert.equal(bad.ownPhoto, false);
 });
+
+// Distillery test 1 (2026-11-13): "tasting" is what a distillery or winery stop is (never "couldn't apply"); a request
+// whose only places are closed that day says only that; tours and classes are the kinds shown at any time of day.
+test('distillery test 1: tasting word used by distillery and winery parts only; closed-only requests; daytime kinds', () => {
+  const trip = (types) => ({ components: [{ kind: 'venue', types }] });
+  assert.equal(tp.tastingWordUsed('tasting', trip(['distillery', 'winery'])), true);
+  assert.equal(tp.tastingWordUsed('tastings', trip(['winery'])), true);
+  assert.equal(tp.tastingWordUsed('tasting', trip(['brewery'])), false, 'other kinds unchanged');
+  assert.equal(tp.tastingWordUsed('lake', trip(['distillery'])), false);
+  const closed = { kind: 'type', value: 'distillery', status: 'unmet', optionalAlternatives: [{ name: 'A', reasonCode: 'different_time', closedDay: { day: 'mon', open: ['tue'] } }] };
+  assert.equal(tp.requirementClosedOnly(closed), true);
+  assert.equal(tp.requirementClosedOnly({ ...closed, optionalAlternatives: [...closed.optionalAlternatives, { name: 'B', reasonCode: 'another_listing' }] }), false);
+  assert.equal(tp.requirementClosedOnly({ kind: 'type', value: 'distillery', status: 'unmet' }), false);
+  assert.deepEqual(tp.DAYTIME_NIGHT_KINDS, ['tour', 'class']);
+});

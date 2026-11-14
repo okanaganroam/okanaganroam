@@ -88,7 +88,12 @@ function highlightsFor(venue, dogNote, profile = {}) {
 }
 
 // The label of the deals tab and card, from what the venue really has.
-function dealsWording(hasDeals, hasNights, nightKinds) {
+function dealsWording(hasDeals, hasNights, nightKinds, type) {
+  // Distillery test 1 (2026-11-13): a distillery's are tours and events, not nights; cocktails, not pints.
+  if (type === 'distillery') {
+    if (hasDeals) return { tab: hasNights ? 'Deals & tours' : 'Deals', heading: hasNights ? 'Deals & good times 🍹' : 'Deals 🍹' };
+    return hasNights ? { tab: 'Tours & events', heading: '' } : { tab: '', heading: '' };
+  }
   const trivia = nightKinds.includes('trivia');
   const onlyTrivia = hasNights && nightKinds.length > 0 && nightKinds.every((k) => k === 'trivia');
   if (hasDeals) return { tab: trivia ? 'Deals & trivia' : hasNights ? 'Deals & nights' : 'Deals', heading: hasNights ? 'Deals & good times 🍻' : 'Deals 🍻' };
@@ -136,7 +141,7 @@ function renderFoodDrinkVenueLayout(parts) {
   const useCard = typeof parts.dealsCardHtml === 'string';
   const hasDeals = useCard ? !!parts.dealsCardHtml : !!(parts.happyDealsHtml || parts.weeklySpecialsHtml);
   const hasNights = !!parts.weeklyNightsHtml;
-  const dealsText = dealsWording(hasDeals, hasNights, parts.nightKinds || []);
+  const dealsText = dealsWording(hasDeals, hasNights, parts.nightKinds || [], venue && venue.type);
   const dealsLabel = profile.dealsLabel || dealsText.tab;
   let deals = '';
   if ((hasDeals || hasNights) && useCard) {

@@ -198,7 +198,8 @@ test('kids: the owner’s answer sets the badge; a distillery joins a kids’ tr
 test('events screen: “Tours, classes and events” (« Visites, ateliers et événements ») for distilleries only', () => {
   assert.equal(text.en.brewery.kindDistillery.labels.music, 'Tours, classes and events');
   assert.equal(text.fr.brewery.kindDistillery.labels.music, 'Visites, ateliers et événements');
-  assert.equal(text.en.brewery.kindDistillery.eventEx, 'Whisky class, first Saturday');
+  // Distillery test 1 (2026-11-13): no "first Saturday" in the example (the setup can't say it; the edit page can).
+  assert.equal(text.en.brewery.kindDistillery.eventEx, 'Whisky class');
   assert.equal(text.en.brewery.labels.music, 'Weekly events', 'breweries keep Weekly events');
   assert.equal(text.en.brewery.kindCidery.labels.music, undefined, 'cideries too');
   const it = pc.scoreCompleteness({ type: 'distillery', address: 'a' }, { today }).missing.find((x) => x.key === 'entertainment');
@@ -411,4 +412,181 @@ test('other types: a brewery’s wording, kids rule and cards are unchanged; The
   if (pv) assert.equal(pv.cost.label, 'Flight');
   const pd = planner.publicVenue ? planner.publicVenue({ id: 1, type: 'distillery', flightFee: 15, features: {}, url: '/y' }) : null;
   if (pd) { assert.equal(pd.cost.label, 'Tasting'); assert.equal(pd.cost.labelFr, 'Dégustation'); }
+});
+
+// ---------- Fresh eyes distillery test 1 (2026-11-13) ----------
+const RAJ_ROWS = [
+  { label: 'Known for', text: 'Fruit brandies and gin' }, { label: 'Tastings', text: '$10 for 4 samples' },
+  { label: 'To go', text: 'Bottles' }, { label: 'Tours', text: 'Distillery tours Saturdays at 2 PM, book ahead' },
+  { label: 'Kids & dogs', text: 'Minors welcome with an adult' },
+];
+test('fe1 tastings: her tasting line replaces research’s Tastings row (one line on the page), the Tours line stays, Undo brings it back', async () => {
+  const d = mk('distillery'); const t = tokenFor(d.id);
+  research(d.id, RAJ_ROWS);
+  assert.equal((await change(t, { flight_fee: 12 })).status, 200);
+  const labels = visitRows(d.id).map((r) => r.label);
+  assert.ok(!labels.includes('Tastings'), JSON.stringify(visitRows(d.id)));
+  assert.equal(row(d.id, 'Flights').text, '$12 a tasting.');
+  assert.equal(labels.indexOf('Flights'), 1, 'in research’s place');
+  assert.equal(row(d.id, 'Tours').text, 'Distillery tours Saturdays at 2 PM, book ahead', 'the Tours line is not set aside');
+  assert.equal(app.venueVisitInfo(d.id).owner_was.Flights.text, '$10 for 4 samples');
+  const page = (await get(pagePath(d))).text;
+  assert.equal((page.match(/<span class="visit-label">Tastings<\/span>/g) || []).length, 1);
+  assert.doesNotMatch(page, /\$10 for 4 samples/);
+  assert.match(page, /book ahead/);
+  // A later research write keeps her line, never a second Tastings row.
+  const cur = app.venueVisitInfo(d.id);
+  research(d.id, RAJ_ROWS);
+  assert.ok(!visitRows(d.id).some((r) => r.label === 'Tastings'), JSON.stringify(visitRows(d.id)));
+  assert.equal(row(d.id, 'Flights').text, '$12 a tasting.');
+  assert.ok(cur);
+  // Taking the price back (no answer) brings research's Tastings line back where it was.
+  assert.equal((await change(t, { flight_fee: null })).status, 200);
+  assert.equal(row(d.id, 'Tastings').text, '$10 for 4 samples');
+  assert.ok(!row(d.id, 'Flights'));
+  // A brewery (or cidery) whose research says "Tastings" is handled the same way.
+  const b = mk('brewery', { name: 'Orchard Cider Test House', slug: 'orchard-cider-test-house' }); research(b.id, [{ label: 'Tastings', text: '$8 for a flight of 4' }, { label: 'Known for', text: 'Dry cider' }]);
+  await change(tokenFor(b.id), { flight_fee: 9 });
+  assert.ok(!row(b.id, 'Tastings')); assert.equal(row(b.id, 'Flights').text, '$9 a flight.');
+  // Both labels in research: one line, both recorded for an Undo.
+  const d2 = mk('distillery'); research(d2.id, [{ label: 'Flights', text: 'Flights $14' }, { label: 'Tastings', text: '$10 for 4 samples' }]);
+  await change(tokenFor(d2.id), { flight_fee: 11 });
+  assert.deepEqual(visitRows(d2.id).map((r) => r.label), ['Flights']);
+  await change(tokenFor(d2.id), { flight_fee: null });
+  assert.deepEqual(visitRows(d2.id).map((r) => r.text).sort(), ['$10 for 4 samples', 'Flights $14']);
+});
+
+test('fe1 wording: “Tours & events” on a distillery’s page, edit page and updates list; help points there; breweries keep theirs', async () => {
+  const d = mk('distillery'); const t = tokenFor(d.id);
+  assert.equal((await change(t, { brewery_info: { to_go: ['bottles'] }, flight_fee: 12 })).status, 200);
+  assert.equal((await change(t, { weekly_nights: [{ days: ['sat'], kind: 'tour', title: 'Distillery tour', start: '14:00' }] })).status, 200);
+  const page = (await get(pagePath(d))).text;
+  assert.match(page, /<h2 id="venueNightsTitle">Tours &amp; events<\/h2>/);
+  assert.doesNotMatch(page, />Weekly nights</);
+  assert.match(page, /href="#fdDeals">Tours &amp; events</, 'the section tab');
+  const edit = (await get(`/owner/${t}`)).text;
+  assert.match(edit, /id="opNightsLabel">Tours &amp; events/);
+  const act = app.ownerVenueActivity(d.id, 12, 'en').map((x) => x.title).join(' | ');
+  assert.match(act, /your tasting room answers/i); assert.match(act, /tasting price/i); assert.match(act, /tours & events/i);
+  assert.doesNotMatch(act, /taproom|flight price|weekly nights/i);
+  assert.match(app.ownerVenueActivity(d.id, 12, 'fr').map((x) => x.title).join(' | '), /salle de dégustation/);
+  const tours = app.DISTILLERY_SETUP_HELP_TOPICS.find((x) => x.id === 'distillery-tours');
+  assert.match(tours.a, /Tours &amp; events/); assert.doesNotMatch(tours.a, /Weekly nights/);
+  assert.match(tours.aFr, /Visites et événements/); assert.doesNotMatch(tours.aFr, /Soirées de la semaine/);
+  // A brewery's page and list keep "Weekly nights" and "Your taproom answers".
+  const b = mk('brewery'); const tb = tokenFor(b.id);
+  await change(tb, { brewery_info: { to_go: ['cans'] }, flight_fee: 10 });
+  await change(tb, { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', start: '19:00' }] });
+  assert.match((await get(`/kelowna/breweries/${b.slug}`)).text, /<h2 id="venueNightsTitle">Weekly nights<\/h2>/);
+  assert.match(app.ownerVenueActivity(b.id, 12, 'en').map((x) => x.title).join(' | '), /your taproom answers.*flight price|flight price.*your taproom answers/i);
+});
+
+test('fe1 tours screen: Distillery tour and Class first, research’s tour pre-filled (Tour · Saturday · 2 PM), how-often note; tour/class kinds', async () => {
+  const d = mk('distillery'); const t = tokenFor(d.id);
+  research(d.id, RAJ_ROWS);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.deepEqual(cfg.nightKinds.slice(0, 4), ['tour', 'class', 'live_music', 'other']);
+  assert.equal(cfg.nightKindsTop, 4);
+  assert.ok(cfg.nightKinds.includes('trivia') && cfg.nightKinds.indexOf('trivia') >= 4, 'pub kinds under More');
+  assert.deepEqual(cfg.suggestNights, [{ kind: 'tour', days: ['sat'], start: '14:00' }]);
+  assert.equal(text.en.brewery.kindDistillery.kinds.tour, 'Distillery tour');
+  assert.equal(text.fr.brewery.kindDistillery.kinds.tour, 'Visite de la distillerie');
+  assert.equal(text.fr.brewery.kindDistillery.kinds.class, 'Atelier');
+  assert.match(text.en.brewery.kindDistillery.eventsOften, /^Monthly or every other week\? Set how often under Tours & events on your edit page\.$/);
+  const s = CLIENT();
+  assert.match(s, /start: g\.start \|\| ''/);
+  assert.match(s, /nTop = C\.nightKindsTop \|\| 6/);
+  assert.match(s, /if \(C\.distillery\) \{ P2_ICONS\.happy = '🍹'; P2_ICONS\.music = '🥃'; \}/);
+  // A brewery: the pub chips, six on top; research isn't read as a tour.
+  const b = mk('brewery'); research(b.id, [{ label: 'Events', text: 'Brewery tours Saturdays at 2 PM' }]);
+  const cb = cfgOf((await get(`/owner/${tokenFor(b.id)}/setup`)).text);
+  assert.equal(cb.nightKindsTop, 6); assert.ok(!cb.nightKinds.includes('tour'));
+  assert.equal(cb.suggestNights, undefined);
+  // Two kinds or two times: shown as a hint only.
+  const d2 = mk('distillery'); research(d2.id, [{ label: 'Tours', text: 'Tours and gin classes Saturdays at 2 PM' }]);
+  const c2 = cfgOf((await get(`/owner/${tokenFor(d2.id)}/setup`)).text);
+  assert.equal(c2.suggestNights, undefined); assert.match(c2.researchEvents, /gin classes/);
+  // The kinds are stored values (no new field); the edit page offers them to a distillery only.
+  assert.ok(app.NIGHT_KINDS.includes('tour') && app.NIGHT_KINDS.includes('class'));
+  assert.equal((await change(t, { weekly_nights: [{ days: ['sun'], kind: 'class', title: 'Gin class', start: '13:00', frequency: 'monthly-1st' }] })).status, 200);
+  assert.equal(app.venueWeeklyNightsList(d.id)[0].kind, 'class');
+  assert.match((await get(`/owner/${t}`)).text, /<option value="tour"/);
+  assert.doesNotMatch((await get(`/owner/${tokenFor(b.id)}`)).text, /<option value="tour"/);
+});
+
+test('fe1 Build My Trip: her Saturday 2 PM tour shows on the stop (“Tour at 2 PM, book ahead”), the visit includes it; “tasting” is used; Monday says only why', async () => {
+  const sat = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((x) => [x, x === 'mon' ? [] : [['11:00', '18:00']]]));
+  const d = mk('distillery', { name: 'Fe Spirits Test Distillery', slug: 'fe-spirits-test-distillery', region: 'vernon', latitude: 50.2671, longitude: -119.272, address: '3000 30 Ave, Vernon', hours: JSON.stringify(sat), kid_friendly: 1 });
+  research(d.id, RAJ_ROWS);
+  const t = tokenFor(d.id);
+  await change(t, { flight_fee: 12, brewery_info: { to_go: ['bottles'], minors: { policy: 'all_ages' } } });
+  await change(t, { weekly_nights: [{ days: ['sat'], kind: 'tour', title: 'Distillery tour', start: '14:00' }] });
+  for (const q of ['Saturday in Vernon with the kids, 1 PM to 5 PM. Distillery tour.', 'Saturday in Vernon, distillery tasting in the afternoon.']) {
+    const j = await planV3(q);
+    const st = allStops(j).find((s) => s.venue.id === d.id);
+    assert.ok(st, `${q}: ${JSON.stringify(allStops(j).map((s) => s.venue.name))}`);
+    assert.match(st.nightLine || '', /: Tour at 2 PM, book ahead$/, q);
+    assert.match(st.nightLineFr || '', /: Visite à 14 h, réservez à l’avance$/, q);
+    const item = (j.schedule || []).find((x) => x.venueId === d.id);
+    assert.ok(item && item.startMinutes <= 830 && item.endMinutes >= 900, `${q}: ${JSON.stringify(item)}`);
+    assert.ok(!(j.warnings || []).some((w) => /“tasting”/.test(w)), JSON.stringify(j.warnings));
+    assert.ok(!((j.understood || {}).notUsed || []).includes('tasting'));
+  }
+  // Monday (closed): a real title, and only the closed reason (no "No distilleries … matched").
+  const m = await planV3('Monday afternoon in Vernon. A distillery tasting.');
+  assert.match(m.summary, /^Distilleries in Vernon on Monday\.$/, m.summary);
+  assert.ok(!(m.warnings || []).some((w) => /^No distiller/.test(w) || /No distillery could be fitted/.test(w)), JSON.stringify(m.warnings));
+});
+
+test('fe1 free with a bottle: the winery’s question on a distillery’s Tastings screen; the page line says it, the card stays “From $12”', async () => {
+  const d = mk('distillery'); const t = tokenFor(d.id);
+  let r = await change(t, { flight_fee: 12, brewery_info: { waived: 'yes' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(row(d.id, 'Flights').text, '$12 a tasting, free with a bottle purchase.');
+  assert.equal(app.venueVisitInfo(d.id).owner_fr.Flights.fr, '12 $ la dégustation, offerte à l’achat d’une bouteille.');
+  assert.equal(app.cardPriceFor(d.id), 'From $12');
+  assert.equal(app.venueBreweryInfo(d.id).waived, 'yes', 'stored with her other answers (venue_brewery_info)');
+  await change(t, { brewery_info: { waived: 'two' } });
+  assert.equal(row(d.id, 'Flights').text, '$12 a tasting, free when you buy 2 bottles or more.');
+  await change(t, { brewery_info: { waived: 'no' } });
+  assert.equal(row(d.id, 'Flights').text, '$12 a tasting.');
+  await change(t, { flight_fee: 0, brewery_info: { waived: 'yes' } });
+  assert.equal(row(d.id, 'Flights').text, 'Free tastings.');
+  await change(t, { flight_fee: null, brewery_info: { no_flights: true } });
+  assert.equal(app.venueBreweryInfo(d.id).waived, undefined, 'no tastings takes it back');
+  // Breweries don't get it.
+  const b = mk('brewery');
+  r = await change(tokenFor(b.id), { brewery_info: { waived: 'yes' } });
+  assert.notEqual(r.status, 200);
+  assert.match(text.en.brewery.kindDistillery.waivedQ, /free if people buy a bottle/);
+  assert.equal(text.fr.brewery.kindDistillery.waivedOpts.yes, 'Oui, avec une bouteille');
+  assert.match(CLIENT(), /C\.distillery && T\.waivedQ && !bf\.noFlights/);
+});
+
+test('fe1 small fixes: Who’s welcome pre-picked from research, no repeated kids note, home card time, no Games or Sports tiles', async () => {
+  const d = mk('distillery'); const t = tokenFor(d.id);
+  research(d.id, RAJ_ROWS);
+  const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
+  assert.equal(cfg.suggestKidsAll, true);
+  assert.match(CLIENT(), /else if \(!BIm\.policy && C\.suggestKidsAll\) S\.minors\.policy = 'all_ages';/);
+  const d2 = mk('distillery'); research(d2.id, [{ label: 'Kids & dogs', text: 'Adults only (19+). Dogs on the patio.' }]);
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(d2.id)}/setup`)).text).suggestKidsAll, false);
+  // "All ages welcome. All ages with an adult." -> one sentence; a note that adds something stays.
+  assert.equal(app.breweryMinorsNote('All ages welcome', 'All ages with an adult'), '');
+  assert.equal(app.breweryMinorsNote('All ages welcome', 'all ages welcome, kids with an adult'), 'Kids with an adult.');
+  await change(t, { brewery_info: { minors: { policy: 'all_ages', note: 'All ages with an adult' } } });
+  assert.equal(row(d.id, 'Kids & dogs').text, 'All ages welcome.');
+  // The home card says what setup says.
+  assert.match(app.ownerSetupCardHtml('/x', 'en', 'none', 'distillery'), /About 10 to 20 minutes/);
+  assert.match(app.ownerSetupCardHtml('/x', 'fr', 'none', 'distillery'), /Environ 10 à 20 minutes/);
+  assert.match(text.en.brewery.kindDistillery.hiLead, /About 10 to 20 minutes/);
+  // No pub games or Sports on TV offered to a distillery; a brewery keeps them.
+  assert.ok(!app.ownerExtraBadgesFor('distillery').includes('pool'));
+  assert.ok(app.ownerExtraBadgesFor('brewery').includes('pool'));
+  const keys = cfg.offerGroups.flatMap((g) => g.keys);
+  assert.ok(!keys.includes('sports_tv') && !keys.includes('darts'), JSON.stringify(keys));
+  const bk = cfgOf((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text).offerGroups.flatMap((g) => g.keys);
+  assert.ok(bk.includes('sports_tv') && bk.includes('darts'));
+  // Service dogs: shown as soon as No dogs is tapped (scrolled into view).
+  assert.match(CLIENT(), /n\.hidden = !S\.noDogs; if \(S\.noDogs && n\.scrollIntoView\)/);
 });
