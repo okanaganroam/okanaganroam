@@ -153,7 +153,7 @@ test('"I’m done for now": the portal’s own card asks to be tapped again only
   await prog(t, { step: 'basics', status: 'live' });
   assert.equal(app.setupProgress(v.id).done_for_now, true);
   // Other types have no setup card and keep their own line.
-  const pub = mk('cocktail');
+  const pub = mk('golf');
   assert.doesNotMatch(await text(`/owner/${tokenFor(pub.id)}`), /opSetupCard/);
 });
 
@@ -208,7 +208,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Menu after sending; honest words; names.
   assert.equal(cfg.t.menuSentQ, 'Your menu is sent ✓'); assert.equal(cfg.t.menuNewer, 'Want to send a newer menu?');
   assert.match(s, /S\.savedLine\.cuisine = T\.savedCuisine/); assert.equal(cfg.t.savedCuisine, 'Your food types and kind of place are on your page now.');
-  assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'saved (prices aren’t on pages yet)'); // café test 1: no "soon" while prices aren't public
+  assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic && !CK \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'saved (prices aren’t on pages yet)'); // café test 1: no "soon" while prices aren't public
   assert.equal(cfg.t.sentTitle, 'Sent');
   assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just the patio)');
   assert.equal(cfg.t.tooSmall, 'This one would look blurry. Pick a different one.');
@@ -229,7 +229,7 @@ test('help: average spend says "soon" while it isn’t shown publicly; other typ
   const html = await text(`/owner/${t}/setup`);
   assert.match(html, /Price per person: saved \(prices aren’t on pages yet\)/); // pub test 8: the label says what it asks
   assert.match(html, /Prices aren’t shown on pages yet\. We’ll use yours when they are\./);
-  for (const type of ['cocktail']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12; distilleries since 2026-11-13
+  for (const type of ['golf']) { // cafés have the setup since 2026-11-10; breweries since 2026-11-12; distilleries since 2026-11-13
     const o = mk(type);
     const r = await fetch(`${base}/owner/${tokenFor(o.id)}/setup`, { redirect: 'manual' });
     assert.equal(r.status, 302, `${type} goes back to its edit page`);

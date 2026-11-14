@@ -82,7 +82,7 @@ test('edit page: the box shows for a restaurant (with our estimate) and a pub, i
 });
 
 test('edit page: cafes, breweries, wineries, beaches and shops do not get the box (or any of its code)', async () => {
-  for (const t of ['cocktail', 'beach', 'shop', 'golf', 'tour']) { // cafés have Price per person since 2026-11-10; distilleries since 2026-11-13
+  for (const t of ['indoor', 'beach', 'shop', 'golf', 'tour']) { // cafés have Price per person since 2026-11-10; distilleries since 2026-11-13
     const v = mk(t);
     const html = await get(`/owner/${tokenFor(v.id)}`);
     for (const word of ['opAvg', 'avg_spend', 'avgspend', 'Average spend', 'op-money', 'That\'s right', 'avgThanks', 'dépense moyenne']) {
@@ -94,7 +94,7 @@ test('edit page: cafes, breweries, wineries, beaches and shops do not get the bo
   }
   // An average spend row for a distillery (research could have written one) still does not show on its edit page.
   // (Cafés have Price per person since 2026-11-10.)
-  const cafe = mk('cocktail'); // distilleries have the setup since 2026-11-13
+  const cafe = mk('golf'); // distilleries have the setup since 2026-11-13
   setResearch(cafe.id, 14);
   assert.ok(!(await get(`/owner/${tokenFor(cafe.id)}`)).includes('opAvg'));
 });
@@ -221,7 +221,7 @@ test('validation: whole dollars 5 to 300, a friendly error, nothing written', as
 });
 
 test('only restaurants and pubs can send it: a cafe or a beach is refused and nothing is written', async () => {
-  for (const t of ['cocktail', 'beach', 'shop']) { // cafés can since 2026-11-10; distilleries since 2026-11-13
+  for (const t of ['golf', 'beach', 'shop']) { // cafés can since 2026-11-10; distilleries since 2026-11-13
     const v = mk(t);
     const r = await post(tokenFor(v.id), { avg_spend: '25' });
     assert.equal(r.status, 400, t);

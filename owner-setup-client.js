@@ -1722,19 +1722,9 @@
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'lineSave:' + base(s) + ':' + cfg[0]) + '</div>'
         + (s === 'known' ? skip('known') : '<div class="su-skip"><button type="button" class="su-link" data-act="no:' + base(s) + '">' + h({ book: T.bookNoLink, takeout: T.takeoutNoLink, groups: T.groupsNoLink }[base(s)]) + '</button></div>');
     } else if (s === 'takeout') { x = yesNo('takeout', T.takeoutQ);
-    } else if (s === 'groups' && CK) {
-      // Cocktail lounges (Decided 5, 2026-11-13): Groups and booking on one screen, like breweries. "We can't take big
-      // groups" first, the sizes and quick answers (Private room, Buyouts, Call ahead for 8 or more), then "Do people need
-      // to book a table?" (Walk-ins only is one tap) and the booking link box, which always shows.
-      var glc = S.brew.groups, gszc = (/\b(\d{1,2})\b/.exec(glc || '') || [])[1];
-      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
-        + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
-        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = String(glc).replace(/\.$/, '') === fill(T.groupsLine, { n: n }) || (!!gszc && +gszc === n && /book|réserv/i.test(glc)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + quick('groups', 'suGroupsLine', glc) + field('suGroupsLine', T.groupsLineLabel, glc, { max: 180 }) + ex(T.groupsEx)
-        + '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 })
-        + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
-        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
-    } else if (s === 'groups' && C.brewery) {
+    } else if (s === 'groups' && FOLD) {
+      // Cocktail lounges (Decided 5, 2026-11-13): the same screen, with quick answers (Private room, Buyouts, Call ahead for 8
+      // or more) and "Do people need to book a table?" (Walk-ins only is one tap) above the booking link box.
       // Breweries (2026-11-12): "Groups of __ or more, please book ahead" in one tap (the size replaces the whole line, so
       // "book ahead" is never said twice), the line in her own words, and the booking link box, which always shows (a
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
@@ -1743,7 +1733,8 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = String(gl).replace(/\.$/, '') === fill(T.groupsLine, { n: n }) || (!!gsz && +gsz === n && /book|réserv/i.test(gl)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
