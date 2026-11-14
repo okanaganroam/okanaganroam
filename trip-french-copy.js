@@ -65,6 +65,8 @@ function t3FrenchSummary(text){
  // "<interests> in X[ when][ for an occasion]." with an interest the heading table doesn't know (a typed word in quotes).
  if((m=new RegExp('^(.+?) in ((?:@AREA@|'+FR_SITE.area+')|(?:[A-Z][^.]*?))'+FR_HEADING_WHEN_RE+'(?: for ('+Object.keys(FR_HEADING_OCCASIONS).join('|')+'))?\\.$').exec(s))){
   const where=frHeadingWhere(m[2]),when=frHeadingWhen(m[3]);if(!where||when===null)return null;
+  // Only a list of known interests and quoted typed words ("Date night: Dinner in Kelowna." has its own line below).
+  if(!m[1].split(/, | and /).every(x=>Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES,x.trim().toLowerCase())||/^“.+”$/.test(x.trim())))return null;
   const list=frSummaryItems(m[1]);
   return list.charAt(0).toUpperCase()+list.slice(1)+' '+where+when+(m[4]?' '+FR_HEADING_OCCASIONS[m[4]]:'')+'.';
  }

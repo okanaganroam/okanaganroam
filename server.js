@@ -59348,7 +59348,8 @@ function renderOwnerPage(found, token, pending, lang = 'en') {
 function frTypographyPage(html) {
   if (typeof html !== 'string' || !html) return html;
   return html.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<textarea\b[\s\S]*?<\/textarea>|<head\b[\s\S]*?<\/head>)/i)
-    .map((part, i) => (i % 2 ? part : frSpacingHtml(part))).join('');
+    // « jusqu’à 6 : » too (frSpacing leaves a digit before « : » alone, for times; a spaced colon is never a time).
+    .map((part, i) => (i % 2 ? part : frSpacingHtml(part).replace(/(>[^<]*?\d) :(?=[\s<])/g, '$1\u00a0:').replace(/^([^<]*?\d) :(?=[\s<])/, '$1\u00a0:'))).join('');
 }
 
 // French (2026-10-18): lang 'fr' writes the whole page in French (L(en, fr)); its links, posts and the help bot stay
@@ -66385,7 +66386,7 @@ module.exports = {
   validateHappyHourDeals, guardedHappyHourDealsUpdate, happyHourDealsShown, happyHourDealsCompact, happyHourDealsStale, happyHourLeftText, happyHourOnNowText,
   withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
   // Weekly nights (2026-10-27).
-  validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
+  validateWeeklyNights, nightsApptTripLine, daytimeTripLabel, nightsTripText, venueClosedForTagsToday, frTypographyPage, NIGHT_FREQUENCIES, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateVisitInfo, visitBadgeConfirmedLabels, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
