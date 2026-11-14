@@ -47,7 +47,7 @@ const OVERLAP_TEXT = {
     free_entry: 'are free to visit' },
   fr: { lake_view: 'ont une vue sur le lac', dog_friendly: 'acceptent les chiens', live_music: 'présentent de la musique live', patio: 'ont une terrasse',
     kid_friendly: 'accueillent bien les enfants', great_groups: 'conviennent aux groupes', gluten_free: 'offrent des options sans gluten', vegan: 'offrent des options véganes',
-    sports_tv: 'diffusent les matchs', happy_hour: 'ont un happy hour', free_entry: 'sont gratuites' },
+    sports_tv: 'diffusent les matchs', happy_hour: 'ont un 5 à 7', free_entry: 'sont gratuites' },
 };
 
 // One place and this page's badge, for a favourite already the standout of another guide in town.
@@ -57,7 +57,7 @@ const BADGE_PRED = {
     great_groups: 'works well for groups', happy_hour: 'has a happy hour', free_entry: 'is free to visit', arts_culture: 'is an arts and culture stop', open_early: 'opens early', open_late: 'stays open late' },
   fr: { patio: 'a une terrasse', dog_friendly: 'accepte les chiens', vegan: 'offre des options véganes', vegetarian: 'offre des options végétariennes', gluten_free: 'offre des options sans gluten',
     kid_friendly: 'accueille bien les enfants', lake_view: 'a une vue sur le lac', nonalcoholic: 'sert des boissons sans alcool', sports_tv: 'diffuse les matchs', live_music: 'présente de la musique live',
-    great_groups: 'convient aux groupes', happy_hour: 'a un happy hour', free_entry: 'est gratuit', arts_culture: 'est un lieu d’art et de culture', open_early: 'ouvre tôt', open_late: 'ferme tard' },
+    great_groups: 'convient aux groupes', happy_hour: 'a un 5 à 7', free_entry: 'est gratuit', arts_culture: 'est un lieu d’art et de culture', open_early: 'ouvre tôt', open_late: 'ferme tard' },
 };
 
 // ---------- small helpers ----------
@@ -382,12 +382,12 @@ function candidates(f, o) {
       if (win) {
         const we = rt(win.from, win.to, false), wf = rt(win.from, win.to, true);
         V('hh-times', 3, [
-          [`Of the ${e(N)}, ${e(t)} publish their happy hour times, and the most common window is ${we} (${e(win.count)} places).`, `Sur ${r(N)} adresses, ${r(t)} publient leurs heures de happy hour; la plage la plus courante est ${wf} (${r(win.count)} adresses).`],
+          [`Of the ${e(N)}, ${e(t)} publish their happy hour times, and the most common window is ${we} (${e(win.count)} places).`, `Sur ${r(N)} adresses, ${r(t)} publient leurs heures de 5 à 7; la plage la plus courante est ${wf} (${r(win.count)} adresses).`],
           [`The usual window in ${T} is ${we}, shared by ${e(win.count)} of the ${e(t)} places with times on file.`, `À ${T}, la plage habituelle est ${wf}, commune à ${r(win.count)} des ${r(t)} adresses dont nous avons les heures.`],
-          [`We have times for ${e(t)} of these ${T} happy hours, and ${e(win.count)} of them cover ${we}.`, `Nous avons les heures de ${r(t)} de ces happy hours à ${T}, et ${r(win.count)} d’entre eux couvrent la plage ${wf}.`],
+          [`We have times for ${e(t)} of these ${T} happy hours, and ${e(win.count)} of them cover ${we}.`, `Nous avons les heures de ${r(t)} de ces 5 à 7 à ${T}, et ${r(win.count)} d’entre eux couvrent la plage ${wf}.`],
         ]);
       } else {
-        V('hh-times', 2.6, [[`We have happy hour times for ${e(t)} of them, and no two share the same window.`, `Nous avons les heures de happy hour de ${r(t)} adresses, et aucune plage ne revient deux fois.`]]);
+        V('hh-times', 2.6, [[`We have happy hour times for ${e(t)} of them, and no two share the same window.`, `Nous avons les heures de 5 à 7 de ${r(t)} adresses, et aucune plage ne revient deux fois.`]]);
       }
       if (sp.earliest != null && sp.latest != null && (sp.earliest <= 14 * 60 || sp.latest >= 21 * 60)) {
         const ea = sp.earliestBy && sp.earliestBy.length === 1 ? sp.earliestBy[0] : null, la = sp.latestBy && sp.latestBy.length === 1 ? sp.latestBy[0] : null;
@@ -395,8 +395,8 @@ function candidates(f, o) {
         const fr = `${ea ? `${ea} commence le plus tôt, à ${tt(sp.earliest, true)}` : `Le plus hâtif commence à ${tt(sp.earliest, true)}`}; ${la ? `${la} finit le plus tard, à ${tt(sp.latest, true)}` : `le plus tardif finit à ${tt(sp.latest, true)}`}.`;
         V('hh-span', 2.2, [[en, fr], [`In ${T}, ${en.charAt(0).toLowerCase() === en.charAt(0) ? en : (ea ? en : en.charAt(0).toLowerCase() + en.slice(1))}`, `À ${T}, ${ea ? fr : fr.charAt(0).toLowerCase() + fr.slice(1)}`]]);
       }
-      if (sp.late >= 2) V('hh-late', 1.9, [[`A late happy hour, from 8 PM or later, runs at ${e(sp.late)} places.`, `Un happy hour en soirée, à partir de 20 h, a lieu à ${r(sp.late)} adresses.`]]);
-      if (sp.everyDay >= 2 && sp.everyDay < t) V('hh-every', 1.4, [[`Happy hour runs seven days a week at ${e(sp.everyDay)} of them.`, `Le happy hour a lieu sept jours sur sept à ${r(sp.everyDay)} d’entre elles.`]]);
+      if (sp.late >= 2) V('hh-late', 1.9, [[`A late happy hour, from 8 PM or later, runs at ${e(sp.late)} places.`, `Un 5 à 7 en soirée, à partir de 20 h, a lieu à ${r(sp.late)} adresses.`]]);
+      if (sp.everyDay >= 2 && sp.everyDay < t) V('hh-every', 1.4, [[`Happy hour runs seven days a week at ${e(sp.everyDay)} of them.`, `Le 5 à 7 a lieu sept jours sur sept à ${r(sp.everyDay)} d’entre elles.`]]);
     }
     const pe = [], pf = [];
     if (sp.pintFrom) { pe.push(`pints from ${money(sp.pintFrom, 'en')}`); pf.push(`la bière à partir de ${money(sp.pintFrom, 'fr')}`); }

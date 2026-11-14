@@ -108,21 +108,21 @@ test('Happy hour crawl: a timed outing through the day\'s happy hours, each stop
   // Each stop is timed inside its happy hour and says it.
   for (const s of stops) {
     assert.match(s.happyHourLine, /^Happy hour \d.*(?:AM|PM|midnight): \$/, JSON.stringify(s.happyHourLine));
-    assert.match(s.happyHourLineFr, /^Happy hour \d+ h.* : \$/);
+    assert.match(s.happyHourLineFr, /^5 à 7 \(\d+ h.*\)\u00a0: \$/);
     assert.ok(s.reasons.some((r) => r.code === 'happy_hour'), JSON.stringify(s.reasons));
   }
   const taps = stops.find((s) => s.venue.id === TAPS.id);
   if (taps) assert.equal(taps.happyHourLine, 'Happy hour 2–5 PM: $5 Crown Lager (0.5 L), $5 Well highballs');
   assert.equal(p.summary, 'A happy hour crawl in Kelowna tonight.');
   assert.ok(p.notes[0].startsWith('Each stop is timed inside its happy hour on Tuesday'));
-  assert.equal(t3FrenchText(p.notes[0]), 'Chaque arrêt est prévu pendant son happy hour le mardi, selon les heures de sa fiche Okanagan Roam. Les happy hours et les offres changent; vérifiez avant de partir.');
+  assert.equal(t3FrenchText(p.notes[0]), 'Chaque arrêt est prévu pendant son 5 à 7 le mardi, selon les heures de sa fiche Okanagan Roam. Les 5 à 7 et les offres changent; vérifiez avant de partir.');
   assert.ok(p.story.textFr.startsWith('Commencez à '));
   // The same request at 5:30 PM: only one happy hour is still ahead, so the list stays, with a note that says it is late
   // and when tomorrow's crawl can start (2026-10-28: "fewer than two places line up" read as if Kelowna had none).
   const late = full('happy hour crawl in Kelowna tonight', TUE_530PM);
   assert.notEqual(late.kind, 'itinerary');
   assert.equal(late.notes[0], 'It’s too late today for a happy hour crawl in Kelowna: the happy hours that line up are over. Tomorrow (Wednesday) one can start at 2 PM. Here are the places with happy hour instead.');
-  assert.equal(t3FrenchText(late.notes[0]), 'Il est trop tard aujourd’hui pour une tournée des happy hours à Kelowna : les happy hours qui se suivent sont terminés. Demain (mercredi), elle peut commencer à 14 h. Voici donc plutôt les lieux avec un happy hour.');
+  assert.equal(t3FrenchText(late.notes[0]), 'Il est trop tard aujourd’hui pour une tournée des 5 à 7 à Kelowna\u00a0: les 5 à 7 qui se suivent sont terminés. Demain (mercredi), elle peut commencer à 14 h. Voici donc plutôt les lieux avec un 5 à 7.');
 });
 
 test('Happy hour and dinner on Friday: happy hour stops, then dinner; a weekday is honoured', () => {
@@ -242,5 +242,5 @@ test('Happy hour crawl tomorrow: planned for tomorrow and said so (EN + FR)', ()
   assert.equal(p.kind, 'itinerary', JSON.stringify([p.kind, p.notes]));
   assert.ok(p.schedule.every((r) => r.date === WED), JSON.stringify(p.schedule.map((r) => r.date)));
   assert.equal(p.summary, 'A happy hour crawl in Kelowna tomorrow.');
-  assert.equal(t3FrenchText(p.summary), 'Une tournée des happy hours à Kelowna demain.');
+  assert.equal(t3FrenchText(p.summary), 'Une tournée des 5 à 7 à Kelowna demain.');
 });

@@ -225,7 +225,7 @@ function icon(name) {
 }
 // The emoji a Food & Drink venue page uses for its highlights, and the fact labels in its sidebar (English and French).
 const HIGHLIGHT_ICONS = { '🐾': 'paw', '🧸': 'child', '🌿': 'sun', '🌅': 'waves', '🌾': 'wheat', '🌱': 'sprout', '🥗': 'leaf', '🎶': 'music', '👥': 'group', '📺': 'tv', '🥤': 'juice' };
-const LABEL_ICONS = { Address: 'pin', Adresse: 'pin', Phone: 'phone', 'Téléphone': 'phone', Menu: 'menu', Social: 'social', 'Réseaux': 'social', Price: 'price', Prix: 'price', Cuisine: 'cuisine', 'Happy hour': 'glass' };
+const LABEL_ICONS = { Address: 'pin', Adresse: 'pin', Phone: 'phone', 'Téléphone': 'phone', Menu: 'menu', Social: 'social', 'Réseaux': 'social', Price: 'price', Prix: 'price', Cuisine: 'cuisine', 'Happy hour': 'glass', '5 à 7': 'glass' };
 function venueIcons(html) {
   let out = html.replace(/(<div class="fd-highlights">)([\s\S]*?)(<\/div>)/, (m, a, body, z) => a + body.replace(/<span>(\S+) /g, (s, e) => (HIGHLIGHT_ICONS[e] ? `<span>${icon(HIGHLIGHT_ICONS[e])}` : s)) + z);
   out = out.replace(/(<div class="venue-section venue-key-info">)([\s\S]*?)(\n<\/div>)/, (m, a, body, z) => a + body.replace(/<span class="label">([^<]+)<\/span>/g, (s, label) => (LABEL_ICONS[label] ? `<span class="label">${icon(LABEL_ICONS[label])}${label}</span>` : s)) + z);

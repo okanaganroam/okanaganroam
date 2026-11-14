@@ -131,7 +131,7 @@ test('2: "Next happy hour" skips a closure day, and a multi-day closure (server,
   assert.equal(line(false), 'Next happy hour: tomorrow 3 PM', 'no closure yet');
   ok(await change(t, { closures: [{ from: wed, to: wed, note: 'Remembrance Day' }] }));
   assert.equal(line(false), 'Next happy hour: Thursday 3 PM');
-  assert.match(line(true), /^Prochain happy hour\s:\sjeudi 15\sh$/);
+  assert.match(line(true), /^Prochain 5 à 7\s:\sjeudi 15\sh$/);
   // Two or more days in a row: the page shows the closure notice instead (no happy hour line, as before); the rule
   // itself steps over the whole range (Wed and Thu closed: Friday).
   const hhJson = JSON.stringify(hh), clock = app.okanaganClock(now);
@@ -141,7 +141,7 @@ test('2: "Next happy hour" skips a closure day, and a multi-day closure (server,
   // More than a week ahead (after a long closure), the line names the date too.
   const h = { state: 'next', from: { weekday: 'wed', minutes: 900, date: '2026-11-18', daysAhead: 8 }, daysAhead: 8, nextWeek: true };
   assert.equal(app.happyHourLiveText(h, false, { weekday: 'tue', minutes: 720, date: '2026-11-10' }), 'Next happy hour: Wednesday, Nov 18 3 PM');
-  assert.match(app.happyHourLiveText(h, true, { weekday: 'tue', minutes: 720, date: '2026-11-10' }), /^Prochain happy hour\s:\smercredi 18 nov/);
+  assert.match(app.happyHourLiveText(h, true, { weekday: 'tue', minutes: 720, date: '2026-11-10' }), /^Prochain 5 à 7\s:\smercredi 18 nov/);
   // On the closure day itself there is no happy hour "later today".
   const onWed = app.venueHappyHour(app.getVenue(v.id), app.getVenue(v.id).hours, false, new Date(`${wed}T18:00:00Z`));
   assert.ok(!(onWed && onWed.live && ['later', 'now'].includes(onWed.live.state)), 'nothing on the closure day');
