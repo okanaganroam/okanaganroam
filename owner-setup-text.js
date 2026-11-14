@@ -1290,7 +1290,7 @@ en.brewery.kindDistillery = {
   hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { taproom: 'Food here', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
   noLabels: { music: 'no tours, classes or events' },
-  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, as often as it changes.',
+  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, even if it changes often.',
   photosLead: 'Your tasting room, your still, your bottles. Three photos is perfect.', offerLead: 'Visitors use these to find a distillery like yours.',
   storyQ: 'Tell visitors about your distillery', storyEx: 'A small family distillery. We distill in the back, pour tastings up front, and the patio gets the evening sun.',
   knownEx: 'Small-batch gin with Okanagan botanicals',
@@ -1363,7 +1363,7 @@ en.pub.cocktail = {
   cuisineQ: 'Your food', cuisineLead: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineLeadEmpty: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineNext: 'Save my food',
   noFood: 'We don’t serve food', savedCuisine: 'Your food is on your page now.',
   // Menu or cocktail list
-  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your cocktail list works too, as often as it changes.',
+  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your cocktail list works too, even if it changes often.',
   // Cocktail price (the café "Price per person" screen, Decided 2)
   cpriceQ: 'About how much is a cocktail?', cpriceLead: 'It shows on your card and in Build My Trip right away.', cpriceLeadPick: 'It shows on your card as “{x}” right away.',
   cpriceGuess: 'Your page says about {x} now, so we picked it. Tap another price if it changed.', cpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',

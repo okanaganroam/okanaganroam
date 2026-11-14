@@ -864,7 +864,34 @@
   // isn't added again. Its telling words, without the ones every dogs line has.
   var QUICK_COMMON = { only: 1, and: 1, the: 1, at: 1, on: 1, to: 1, too: 1, our: 1, us: 1, welcome: 1, dogs: 1, dog: 1, et: 1, seulement: 1, a: 1, l: 1, d: 1, la: 1, le: 1, les: 1, aux: 1, au: 1, chiens: 1, chien: 1, bienvenus: 1 };
   function quickWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(function(w){ return w && !QUICK_COMMON[w] && w !== 'à'; }); }
-  function saysIt(v, t){ if (has(v, t)) return true; var w = quickWords(t), b = ' ' + quickWords(v).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
+  function allIn(w, s){ var b = ' ' + quickWords(s).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
+  function rawWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(Boolean); }
+  // Cocktail test 3 (2026-11-14): sibs are the other chips of the same box. "Walk-ins only" and "Walk-ins welcome" share
+  // their telling words, so for a sentence both could stand for, a chip counts only when the sentence has its own
+  // difference word ("only", "welcome", « seulement »…). "Patio only" still counts for "Dogs welcome on the patio",
+  // which no other dogs chip could stand for.
+  function saysIt(v, t, sibs){
+    if (has(v, t)) return true;
+    var w = quickWords(t); if (!w.length) return false;
+    var twins = (sibs || []).filter(function(o){ if (o === t) return false; var ow = quickWords(o); return w.every(function(x){ return ow.indexOf(x) >= 0; }) || ow.every(function(x){ return w.indexOf(x) >= 0; }); });
+    if (twins.some(function(o){ return has(v, o); })) return false;
+    return String(v || '').split(/[.;!?]+/).some(function(sn){
+      if (!allIn(w, sn)) return false;
+      var rs = rawWords(sn);
+      return twins.every(function(o){
+        if (!allIn(quickWords(o), sn)) return true;
+        var ro = rawWords(o), diff = rawWords(t).filter(function(x){ return ro.indexOf(x) < 0; });
+        return diff.every(function(x){ return rs.indexOf(x) >= 0; });
+      });
+    });
+  }
+  // Cocktail test 3 (2026-11-14): a Groups line in sentences. A "book ahead from N" sentence (a size), and the sentences
+  // that carry a fact a size chip doesn't ("Private room for 20": a room, a capacity) and so are never dropped by a tap.
+  function sentencesOf(v){ return String(v || '').split(/[.;!?]+(?:\s+|$)/).map(function(x){ return x.replace(/[\s.;]+$/, '').trim(); }).filter(Boolean); }
+  function isSizeLine(x){ return /^(?:groups? of \d+|call ahead for \d+|book ahead for \d+|groupes de \d+|appelez à l’avance pour \d+)/i.test(String(x || '').trim()) || (!!T.groupsLine && new RegExp('^' + T.groupsLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '\\d+')).test(String(x || '').trim())); }
+  function groupsFact(x){ return !isSizeLine(x) && (/\d/.test(x) || /\b(?:private|room|rooms|buyouts?|patio|semi|lounge|section|salle|privée?s?|privatis\w*|terrasse|mezzanine|loft)/i.test(x)); }
+  // The facts of a line to keep under a new size line or quick answer, without what the chip itself says.
+  function groupsKeep(v, t, sibs){ return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(t && (has(x, t) || saysIt(x, t, sibs))); }); }
   // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
   // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
   function enLineHint(text, id){
@@ -881,7 +908,7 @@
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
     // Breweries (2026-11-12): no "Patio only" for a taproom with no patio ticked.
     if (key === 'dogs' && C.brewery && !S.badges.patio && !S.badges.heated_patio && T.quickDogsNoPatio) l = T.quickDogsNoPatio;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t, l) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
   // Café screens (2026-11-10): one-of-a-few answers (data-cpick) and on/off tiles (data-ctog) on S.cafe.
@@ -946,7 +973,8 @@
   function fbFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com(\/\S*)$/i.exec(String(v || '').trim()); return m && m[1].length > 1 ? 'https://www.facebook.com' + m[1] : ''; }
   function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
-  function field(id, label, value, opts){ opts = opts || {}; return '<label class="su-q" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
+  // Cocktail test 3 (2026-11-14): opts.sr keeps the label for screen readers only, when the heading just above says the same.
+  function field(id, label, value, opts){ opts = opts || {}; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   function statusRows(steps){
     return list(steps.map(function(s){
@@ -1771,8 +1799,8 @@
       x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
-        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
-        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.brew.known, { max: 180 }) + ex(T.knownEx) : '')
+        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
+        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
         + '<div class="su-stack">' + big('✓', C.winery || FOLD ? T.saveThese : T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
@@ -1791,11 +1819,12 @@
       // Breweries (2026-11-12): "Groups of __ or more, please book ahead" in one tap (the size replaces the whole line, so
       // "book ahead" is never said twice), the line in her own words, and the booking link box, which always shows (a
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
-      var gl = S.brew.groups, gsz = (/\b(\d{1,2})\b/.exec(gl || '') || [])[1];
+      // Cocktail test 3 (2026-11-14): the pressed size is the one in the "book ahead" sentence, not "for 20" of a room.
+      var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1];
       // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
-        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = String(gl).replace(/\.$/, '') === fill(T.groupsLine, { n: n }) || (!!gsz && +gsz === n && /book|réserv/i.test(gl)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
         + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn') + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
@@ -2949,7 +2978,9 @@
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
       // Distillery test 1 (2026-11-13): the service-dogs tile shows right under No dogs, scrolled into view.
       var sdog = function(){ var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
-      if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
+      // Cocktail test 3 (2026-11-14): "Service dogs welcome" starts ticked under "No dogs allowed" (she can untick it; it
+      // is saved only with the screen).
+      if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); if (C.offerLabels.service_dogs) { S.badges.service_dogs = true; press('service_dogs', true); } } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
       if (k === 'patio') { var dsub = el('suNoDogsSub'); if (dsub) dsub.textContent = dogSubText(); }
       if (k === 'dog_friendly' && S.badges[k]) { S.noDogs = false; press('no_dogs', false); S.badges.service_dogs = false; press('service_dogs', false); sdog(); }
@@ -2986,7 +3017,9 @@
       if (S.brew.togo[tk]) { if (tk === 'none') TOGO.forEach(function(z){ S.brew.togo[z] = false; }); else S.brew.togo.none = false; }
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bgroup]'), function(b){ b.onclick = function(){
-      readBrew(); S.brew.groups = fill(T.groupsLine, { n: +b.getAttribute('data-bgroup') }); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+      // Cocktail test 3 (2026-11-14): the size replaces only the "book ahead" sentence; a room or a capacity stays
+      // ("Private room for 20. Groups of 10 or more: please book ahead").
+      readBrew(); S.brew.groups = groupsKeep(S.brew.groups).concat([fill(T.groupsLine, { n: +b.getAttribute('data-bgroup') })]).join('. '); S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
@@ -3007,15 +3040,23 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
       var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim(), qk = b.getAttribute('data-key');
+      // Cocktail test 3 (2026-11-14): only this box's chips (a Groups tap never re-lit the Reservations chips).
+      var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === b.getAttribute('data-box'); }), sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
       // Winery test 5 (2026-11-12): "Dogs welcome on the patio. Patio only" went live. The box still holding research's
       // line, untouched, is replaced by the tap; a line she typed gets the tap added; one that already says it stays.
       var pre = String(((CUR.visit_rows || {})[qk]) || '').trim();
-      if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
-      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = t;
-      else if (saysIt(v, t)) return;
+      // Cocktail test 3 (2026-11-14): un-pressing a chip inside a longer Groups sentence ("Private room for 20") takes
+      // that whole sentence away, never leaving "for 20" behind.
+      var inLonger = qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
+      if (inLonger) v = sentencesOf(v).filter(function(x){ return !has(x, t); }).join(sep);
+      else if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      // Research's untouched line is replaced by the tap, except a Groups fact the chip doesn't carry ("Private room for
+      // 20" stays when Buyouts is tapped).
+      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
+      else if (saysIt(v, t, sibs)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
       box.value = v.slice(0, 180); mark();
-      Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick')) ? 'true' : 'false'); });
+      mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });
