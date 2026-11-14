@@ -72,7 +72,7 @@ test('2. Happy Hour badge with no times: "Add your happy hour times", no "We don
   const en = pc.renderCompleteness(r, { canDecline: true });
   assert.match(en, /Your page shows a Happy Hour badge\. Add when it runs and what’s on special\./);
   assert.ok(!en.includes('data-cb-none="happy_hour"'));
-  assert.match(pc.renderCompleteness(r, { fr: true, canDecline: true }), /Ajoutez les heures de votre happy hour/);
+  assert.match(pc.renderCompleteness(r, { fr: true, canDecline: true }), /Ajoutez les heures de votre 5 à 7/); // « 5 à 7 » in French (cocktail test 2)
   // Without the badge, nothing changes.
   const plain = pc.scoreCompleteness({ ...base0 }, { today: TODAY }).missing.find((i) => i.key === 'happy_hour');
   assert.equal(plain.en, 'Happy hour times and deals');

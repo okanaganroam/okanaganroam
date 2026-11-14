@@ -84,7 +84,8 @@ test('edit page (restaurant): the buttons show in English and French, never on p
   assert.match(p, /data-cb-declared="\[\]"/);
   assert.match(p, /data-cb-inline="\[/);
   const fr = panel(await get(`/fr/owner/${tokenFor(v.id)}`));
-  assert.match(fr, /data-cb-none="happy_hour"[^>]*>Nous n’avons pas de happy hour</);
+  // « 5 à 7 » in French (cocktail test 2, 2026-11-13).
+  assert.match(fr, /data-cb-none="happy_hour"[^>]*>Nous n’avons pas de 5 à 7</);
   assert.match(fr, /data-cb-none="instagram"[^>]*>Nous ne sommes pas sur Instagram</);
   assert.match(fr, /data-cb-none="pyv_takeout"[^>]*>Ni plats à emporter ni livraison</);
   // Reservations and Takeout sit in "Still to add" with their own boxes (2026-11-08), never under "We're adding these"

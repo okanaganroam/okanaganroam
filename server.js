@@ -53842,12 +53842,9 @@ function mdShift(md, days) {
   return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function ownerSeasonHelpTopic(venueId) {
+  // Only asked for where there is a setup to point to (the setup page, and the edit page of a type with one).
   let s0 = null;
-  try {
-    // Only where there is a setup to point to (the types with "Set up your page").
-    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId);
-    if (v && COMPLETENESS_TYPES.has(v.type)) s0 = (venueHoursExtras(venueId).seasons || [])[0] || null;
-  } catch (e) { s0 = null; }
+  try { s0 = (venueHoursExtras(venueId).seasons || [])[0] || null; } catch (e) { s0 = null; }
   const base = OWNER_HELP_TOPICS.find((t) => t.id === 'seasonal-hours');
   if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '') || !base) return null;
   const sea = (fr) => seasonRangeShort(s0.from, s0.to, fr), rest = (fr) => seasonRangeShort(mdShift(s0.to, 1), mdShift(s0.from, -1), fr);
@@ -61750,7 +61747,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: venue.id, ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }

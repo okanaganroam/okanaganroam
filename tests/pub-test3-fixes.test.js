@@ -196,7 +196,7 @@ test('8: the front door waits for a visit; a researched spend asks "About $24 a 
   assert.equal(TEXT.en.doorNextTime.replace('{type}', 'pub'), 'Do this next time you’re at your pub');
   assert.ok(TEXT.fr.doorNextTime.includes('{type}'));
   assert.equal(TEXT.en.spendAsk.replace('{n}', 24), 'About $24 a person?');
-  assert.equal(TEXT.fr.spendAsk.replace('{n}', 24), 'Environ 24 $ par personne\u202f?');
+  assert.equal(TEXT.fr.spendAsk.replace('{n}', 24), 'Environ 24\u00a0$ par personne\u202f?'); // no-break space before $ (cocktail test 2)
   assert.match(s, /big\('✓', fill\(T\.spendAskYes, \{ n: n \}\), '', false, 'spendConfirm'\) \+ big\('✎', T\.spendAskNo, '', true, 'jump:spend'\)/);
   // Yes saves her number through the usual avg_spend save (shown publicly only when AVG_SPEND_PUBLIC is on).
   assert.match(s, /if \(k === 'spendConfirm'\) \{ S\.spend = spendGuess\(\) \|\| S\.spend; S\.toFinish = true; if \(!C\.spendPublic\) S\.savedLine\.spend = T\.savedSpendOff; return saveAll\('spend', \[\{ avg_spend: S\.spend \}\]/);

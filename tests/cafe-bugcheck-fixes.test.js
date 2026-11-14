@@ -195,10 +195,11 @@ test('L: the French café page shows the same four chips as the English one, die
 test('M: the specials "closed on" warning counts a day open in any of the special\'s seasons as open', () => {
   const src = /function closedWarn\(days, sea\)\{[\s\S]*?\n  \}/.exec(CLIENT)[0];
   const DAYS2 = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const mkFn = (S) => new Function('S', 'DAYS', 'T', 'seaMonths', 'fill', 'dayName', src + '; return closedWarn;')(S, DAYS2,
+  // Cocktail test 2 (2026-11-13): the days are named in full (daysInFull); here they read as their keys.
+  const mkFn = (S) => new Function('S', 'DAYS', 'T', 'seaMonths', 'fill', 'dayName', 'daysInFull', src + '; return closedWarn;')(S, DAYS2,
     { closedWarn: 'closed on {days}{when}', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (usual)', seasonWord: { summer: 'summer' } },
     () => Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => [m, true])),
-    (s, o) => s.replace(/\{(\w+)\}/g, (m, k) => (o[k] != null ? o[k] : m)), (d) => d);
+    (s, o) => s.replace(/\{(\w+)\}/g, (m, k) => (o[k] != null ? o[k] : m)), (d) => d, (l) => l.join(', '));
   const usual = { mon: [['8', '3']], tue: [['8', '3']], wed: [['8', '3']], thu: [['8', '3']], fri: [['8', '3']], sat: [['8', '3']], sun: null };
   const summer = { mon: null, tue: [['8', '3']], wed: [['8', '3']], thu: [['8', '3']], fri: [['8', '3']], sat: [['8', '3']], sun: [['8', '3']] };
   const S = { week: usual, sea: { on: true, week: summer, months: { 6: true, 7: true, 8: true }, kind: 'summer' } };

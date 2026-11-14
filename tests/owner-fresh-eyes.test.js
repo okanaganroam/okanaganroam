@@ -195,13 +195,14 @@ test('saving is clear: one-line intro, "Saves now and goes live" on live saves, 
   assert.equal(html.split('Saves now and goes live').length - 1, 2, 'cuisine and Plan your visit');
   // Fresh-eyes 3 (2026-11-09): while average spend is hidden publicly (AVG_SPEND_PUBLIC off), the portal doesn't claim it's live.
   assert.ok(html.includes(process.env.AVG_SPEND_PUBLIC === '1' ? 'Goes live as soon as you save it.' : 'Saved as soon as you tap Save. It’ll show on your page soon.'), 'average spend');
-  assert.match(html, /<p class="op-hint op-send-extra op-check-note"[^>]*>Sent to us to check, usually within a day\.<\/p><button type="submit" class="venue-form-submit op-send-extra" id="opSubmit"/);
+  // Cocktail test 2 (2026-11-13): "Checked first" before anything is sent.
+  assert.match(html, /<p class="op-hint op-send-extra op-check-note"[^>]*>Checked first, usually within a day\.<\/p><button type="submit" class="venue-form-submit op-send-extra" id="opSubmit"/);
   assert.match(html, /<div class="form-row op-send-extra" data-task="hours contact happy more all">\s*<div class="form-field"><label for="opName">/);
   assert.ok(html.includes('body.owner-page:not(.op-dirty) .op-send-extra { display: none; }'));
   assert.ok(html.includes("document.body.classList.toggle('op-dirty', !!v);"));
   assert.ok(html.includes('aren&rsquo;t sent yet. We check them first, usually within a day.'));
   const fr = await get(`/fr/owner/${tokenFor(v.id)}`);
-  assert.ok(fr.includes('Enregistré et en ligne tout de suite') && fr.includes('Envoyé pour vérification'));
+  assert.ok(fr.includes('Enregistré et en ligne tout de suite') && fr.includes('Vérifié d’abord'));
   // Every other type keeps its send step as it was.
   for (const type of ['golf', 'tour']) { // cafés have the setup and checklist since 2026-11-10; distilleries since 2026-11-13
     const o = await get(`/owner/${tokenFor(mk(type).id)}`);

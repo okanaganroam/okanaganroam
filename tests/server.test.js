@@ -26925,7 +26925,7 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche[ \u00a0]: Site web/i);
   assert.match(edit, /Envoyé le \d{1,2} [a-zéû]+\.?</, 'French short dates ("18 oct.")');
   assert.match(edit, /Personnes ayant accès[\s\S]*Ajouté le \d{1,2} [a-zéû]+\.?/);
-  assert.match(edit, /\$\$ &mdash; 15 à 30 \$ par personne/);
+  assert.match(edit, /\$\$ &mdash; 15 à 30\u00a0\$ par personne/); // no-break space before $ (cocktail test 2)
   assert.match(edit, /Copier le lundi sur\u00a0:/);
   assert.match(edit, /<option value="11" selected>novembre<\/option>/, 'French month names');
   assert.match(edit, /"liveNow":"En ligne maintenant[ \u00a0]: \{fields\}\. Votre page l’affiche tout de suite\. "/);
@@ -27353,7 +27353,7 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
   assert.match(after, /id="opSeasonalSummary">Winter hours Nov 1–Apr 30</);
   assert.match(after, /id="opClosuresSummary">2 closures \(next: [A-Z][a-z]{2} \d{1,2}\)</);
   const afterFr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
-  assert.match(afterFr, /id="opSeasonalSummary">Winter hours du 1er nov\. au 30 avr\.</);
+  assert.match(afterFr, /id="opSeasonalSummary">Heures d’hiver du 1er nov\. au 30 avr\.</); // the setup name in French (cocktail test 2)
   assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine\u00a0: /);
   // Venue page structured data, on a fixed clock.
   db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-12-25', to: '2026-12-26', note: '' }, { from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);
