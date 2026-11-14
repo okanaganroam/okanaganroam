@@ -55,7 +55,7 @@ const ITEMS = [
   // dietary twice). It still counts toward "Dietary options" above, and its box stays optional in Plan your visit.
   { key: 'pyv_groups', noneEn: 'We can’t take big groups', noneFr: 'Nous n’accueillons pas de grands groupes', group: 'visit', w: 3, fix: true, target: { task: 'more', id: 'opVisitGroups' }, fields: ['visit_rows'],
     en: 'Groups and good to know', fr: 'Groupes et bon à savoir', whyEn: 'Large parties, parking, kids, anything that helps.', whyFr: 'Grands groupes, stationnement, enfants, tout ce qui aide.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '👥' },
-  { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescription' }, fields: ['description'],
+  { key: 'description', group: 'about', w: 6, fix: true, target: { task: 'contact', id: 'opDescription' }, fields: ['description', 'description_fr'],
     en: 'A description (120+ characters)', fr: 'Une description (120 caractères ou plus)', whyEn: 'A few sentences about your place, in your words.', whyFr: 'Quelques phrases sur votre établissement, dans vos mots.', btnEn: 'Write it', btnFr: 'Écrire', icon: '✍️' },
   { key: 'instagram', noneEn: 'We’re not on Instagram', noneFr: 'Nous ne sommes pas sur Instagram', group: 'social', w: 3, fix: true, target: { task: 'contact', id: 'opInstagram' }, fields: ['instagram_url'],
     en: 'Instagram link', fr: 'Lien Instagram', whyEn: 'Paste your @name or the link to your profile.', whyFr: 'Collez votre @nom ou le lien de votre profil.', btnEn: 'Add Instagram', btnFr: 'Ajouter', icon: '📸' },
@@ -451,7 +451,8 @@ function doneMap(input, today) {
     pyv_reservations: labels.has('reservations') || nonBlank(i.bookingUrl),
     pyv_takeout: labels.has('takeout') || labels.has('to go'),
     pyv_groups: labels.has('groups') || labels.has('good to know'),
-    description: String(i.description || '').trim().length >= DESCRIPTION_MIN,
+    // Cocktail test 2 (2026-11-13): a French description counts too (a story written in the French setup).
+    description: Math.max(String(i.description || '').trim().length, String(i.descriptionFr || '').trim().length) >= DESCRIPTION_MIN,
     instagram: nonBlank(i.instagramUrl),
     facebook: nonBlank(i.facebookUrl),
     arrival: !!i.hasArrival,

@@ -46374,7 +46374,9 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
+// Cocktail test 2 (2026-11-13): 'description_fr', a story written in the French setup (always checked first; it never
+// replaces the English description).
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'description_fr', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
   // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
   'pub_info',
@@ -47364,6 +47366,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     phone: venue.phone || '',
     website: venue.website || '',
     description: venue.description || '',
+    description_fr: venue.description_fr || '',
     badges,
     happy_hour: happyHourTimes || null,
     name: venue.name || '',
@@ -47426,13 +47429,13 @@ function ownerWebsitePending(venueId) {
   } catch (e) { return ''; }
 }
 // True when the page's description is one the owner sent (approved).
-function ownerDescriptionWasHers(venue) {
-  const now = String(venue && venue.description || '').trim();
+function ownerDescriptionWasHers(venue, field = 'description') {
+  const now = String(venue && venue[field] || '').trim();
   if (!now) return false;
   try {
-    for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'approved' AND changes LIKE '%\"description\"%' ORDER BY id DESC LIMIT 20").all(venue.id)) {
+    for (const w of db.prepare(`SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'approved' AND changes LIKE '%"${field}"%' ORDER BY id DESC LIMIT 20`).all(venue.id)) {
       const c = JSON.parse(w.changes);
-      if (c && typeof c.description === 'string' && c.description.trim() === now) return true;
+      if (c && typeof c[field] === 'string' && c[field].trim() === now) return true;
     }
   } catch (e) { /* no table */ }
   return false;
@@ -47792,13 +47795,15 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     if (!ok) errors.website = 'Please check the web address, for example yourbusiness.com';
     else if (site !== current.website) changes.website = site || null;
   }
-  if ('description' in input) {
-    const text = typeof input.description === 'string' ? input.description.replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
+  // Cocktail test 2 (2026-11-13): the French setup's story is the French description, checked the same way.
+  for (const dk of ['description', 'description_fr']) {
+    if (!(dk in input)) continue;
+    const text = typeof input[dk] === 'string' ? input[dk].replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
     if (text.length < OWNER_DESCRIPTION_MIN || text.length > OWNER_DESCRIPTION_MAX) {
-      errors.description = `Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`;
+      errors[dk] = `Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`;
     } else if (/[<>]/.test(text)) {
-      errors.description = 'Please leave out < and > characters.';
-    } else if (text !== current.description) changes.description = text;
+      errors[dk] = 'Please leave out < and > characters.';
+    } else if (text !== (current[dk] || '')) changes[dk] = text;
   }
   if ('name' in input) {
     const name = typeof input.name === 'string' ? input.name.trim().replace(/\s+/g, ' ') : '';
@@ -48267,17 +48272,17 @@ function listOwnerChanges(status = 'pending') {
   });
 }
 
-const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
+const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', description_fr: 'French description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
   pub_info: 'Kitchen, who’s welcome and sports', cafe_info: 'Your café answers', cafe_links: 'Ordering links', winery_info: 'Your winery answers', tasting_fee: 'Tasting price', brewery_info: 'Your taproom answers', flight_fee: 'Flight price', cocktail_price: 'Cocktail price' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
-  fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
+  fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', description_fr: 'description en français', badges: 'caractéristiques', happy_hour: '5 à 7',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix du plateau de dégustation', cocktail_price: 'prix d’un cocktail' },
-  en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du 5 à 7', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix du plateau de dégustation', cocktail_price: 'prix d’un cocktail' },
+  en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', description_fr: 'French description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
     price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links', winery_info: 'your winery answers', tasting_fee: 'tasting price', brewery_info: 'your taproom answers', flight_fee: 'flight price', cocktail_price: 'cocktail price' },
 };
@@ -53046,7 +53051,7 @@ function setupScore(found) {
 // sent photos, menus and "do it for me" sheets, a storefront spot), never from the stored progress. A step answered
 // "within a day" that isn't in this list shows as "on your page". A waiting field we can't place holds every step back.
 const SETUP_WAITING_FIELD_STEPS = {
-  name: ['basics'], address: ['basics'], phone: ['basics'], website: ['basics'], description: ['story'], menu_url: ['menu'],
+  name: ['basics'], address: ['basics'], phone: ['basics'], website: ['basics'], description: ['story'], description_fr: ['story'], menu_url: ['menu'],
   booking_url: ['groups', 'visit', 'book'], instagram_url: ['instagram', 'social'], facebook_url: ['facebook', 'social'], tiktok_url: ['social'],
   hours: ['hours'], hours_seasons: ['hours'], open_months: ['hours'], hours_checked: ['hours'], closures: ['closures', 'hours'],
   happy_hour: ['happy'], happy_hour_deals: ['happy'], specials: ['specials'], weekly_nights: ['music'], badges: ['offer'], not_offered: ['offer'],
@@ -53220,7 +53225,7 @@ function renderOwnerSetupPage(found, opts) {
   let pendingMain = '';
   try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
-    address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, hours: snap.hours, open_months: snap.open_months || '',
+    address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, description_fr: snap.description_fr || '', hours: snap.hours, open_months: snap.open_months || '',
     hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
@@ -53355,7 +53360,8 @@ function renderOwnerSetupPage(found, opts) {
     // names, so « Philippine » sat by F and « Grilladerie » by S).
     // Brewery test 4 (2026-11-13): the story she sent that is waiting for our check (the box shows it, not the old text),
     // and whether the page's description is research's (her first tap in the box selects it, so typing replaces it).
-    storyPending: ownerLinkPending(venue.id, 'description') || '', storyResearch: !ownerDescriptionWasHers(venue),
+    // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
+    storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: cocktail ? COCKTAIL_CUISINES_POPULAR : pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
@@ -57994,7 +58000,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
 
 // --- review actions ---------------------------------------------------------
 
-const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
+const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'description_fr', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 
 // Applies the reviewer's edits to a pending update's text fields, checked
 // exactly like the owner's own input. The owner's original is kept in
@@ -58219,7 +58225,7 @@ function adminEditBox(key, value, opts = {}) {
 function renderAdminChangeCard(r) {
   const rows = Object.keys(r.changes).map((f) => {
     const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
-    const after = OWNER_EDITABLE_FIELDS.includes(f) ? adminEditBox(f, r.changes[f], { multiline: f === 'description', rows: 5, max: OWNER_DESCRIPTION_MAX + 50 })
+    const after = OWNER_EDITABLE_FIELDS.includes(f) ? adminEditBox(f, r.changes[f], { multiline: f === 'description' || f === 'description_fr', rows: 5, max: OWNER_DESCRIPTION_MAX + 50 })
       : adminReviewEsc(ownerValueText(f, r.changes[f]));
     return `<tr><th><label class="rv-opt"><input type="checkbox" name="field" value="${adminReviewEsc(f)}" checked>${adminReviewEsc(OWNER_FIELD_LABELS[f] || f)}</label></th>
         <td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${after}</td></tr>`;
@@ -58230,6 +58236,7 @@ function renderAdminChangeCard(r) {
       <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
       ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically).</div>' : ''}
+      ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? '<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…), listed in the sitemap with hreflang links. Untick it to keep the English page only.</div>' : ''}
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
       ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
@@ -58640,9 +58647,9 @@ function venuePhotoPosY(venueId, imageUrl) {
 const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Végane', vegetarian: 'Options végétariennes', patio: 'Terrasse', kid_friendly: 'Adapté aux enfants',
   gluten_free: 'Options sans gluten', lake_view: 'Vue sur le lac ou le vignoble', nonalcoholic: 'Options sans alcool', sports_tv: 'Sports à la télé', live_music: 'Musique en direct',
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
-const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
+const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', description_fr: 'Description en français', badges: 'Caractéristiques', happy_hour: '5 à 7',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du 5 à 7', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix du plateau de dégustation', cocktail_price: 'Prix d’un cocktail' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de 5 à 7'],
@@ -59492,7 +59499,14 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     if (mainReq && img && !/^\/images\/owner\//.test(img) && galleryNow.some((p) => String(p.src).split('?')[0] === img)) photoCountAfter -= 1;
   } catch (e) { /* counted as sent */ }
   let descriptionAfter;
-  try { const pc0 = pendingOwnerChange(venue.id); const rq = pc0 ? getOwnerChange(pc0.id) : null; if (rq && rq.changes && typeof rq.changes.description === 'string') descriptionAfter = rq.changes.description; } catch (e) { descriptionAfter = undefined; }
+  // Cocktail test 2 (2026-11-13): the longer of the two languages once a waiting story (English or French) is checked.
+  try {
+    const pc0 = pendingOwnerChange(venue.id); const rq = pc0 ? getOwnerChange(pc0.id) : null; const c0 = rq && rq.changes;
+    if (c0 && (typeof c0.description === 'string' || typeof c0.description_fr === 'string')) {
+      const en = typeof c0.description === 'string' ? c0.description : venue.description || '', frd = typeof c0.description_fr === 'string' ? c0.description_fr : venue.description_fr || '';
+      descriptionAfter = String(en).trim().length >= String(frd).trim().length ? en : frd;
+    }
+  } catch (e) { descriptionAfter = undefined; }
   // A storefront spot sent and waiting for our check (fresh-eyes 3, 2026-11-09).
   let pendingArrival = false;
   try { pendingArrival = !hasArrival && !!db.prepare("SELECT 1 FROM venue_arrival_points WHERE venue_id = ? AND status = 'pending' LIMIT 1").get(venue.id); } catch (e) { pendingArrival = false; }
@@ -59511,7 +59525,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     specialsCount: Array.isArray(live.specials) ? live.specials.length : 0, liveMusic: venue.live_music, sportsTv: venue.sports_tv,
     nightsCount: Array.isArray(live.weekly_nights) ? live.weekly_nights.length : 0,
     visitLabels: visit && Array.isArray(visit.rows) ? visit.rows.map((r) => r.label) : [], bookingUrl: links.booking_url || (visit && visit.booking_url) || '',
-    description: venue.description, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
+    description: venue.description, descriptionFr: venue.description_fr, instagramUrl: links.instagram_url, facebookUrl: links.facebook_url, hasArrival, pendingArrival, claimed: venueIsClaimed(venue.id),
     // Café test 2 (2026-11-11): closed for the season today (the storefront photo waits until it reopens).
     closedForSeason: (() => { try { return (!!links.open_months || !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ? AND superseded_at IS NULL').get(venue.id)) && (getSeasonStates().get(venue.id) || {}).kind === 'closed'; } catch (e) { return false; } })(),
     declaredNone: Array.isArray(live.not_offered) ? live.not_offered : venueNotOffered(venue.id),

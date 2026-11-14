@@ -585,7 +585,7 @@ Object.assign(fr, {
   storyPendingHint: 'Vous avez envoyé une nouvelle histoire. Nous la vérifions d’ici un jour.',
   storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.',
   // Brewery test 3 (2026-11-13): the text on the page now is in English (research); said so, kept, never translated.
-  storyEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le, réécrivez-le en français, ou touchez ✕ pour l’effacer.', storyClear: 'Effacer le texte',
+  storyEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le tel quel, ou écrivez votre texte en français\u00a0: il s’ajoute au texte anglais, qui reste pour les visiteurs anglophones.', storyClear: 'Effacer le texte',
   useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
   curMainPending: 'Votre nouvelle photo principale (sur votre page d’ici un jour)', keepMainPending: 'Garder celle-ci',
   hoursDoneDayAria: 'Terminé pour {day}',

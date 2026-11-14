@@ -175,6 +175,11 @@
 
   // ---------- State ----------
   var GAMES = ['pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
+  // Cocktail test 2 (2026-11-13): a story written in the French setup is the French description (description_fr); the
+  // English one is left as it is. The French story box starts from her French text, else the English page text.
+  var STORY_FIELD = C.lang === 'fr' ? 'description_fr' : 'description';
+  function storyCur(){ return String((C.lang === 'fr' && CUR.description_fr) || CUR.description || ''); }
+  function storyOut(t){ var o = {}; o[STORY_FIELD] = t; return o; }
   var S = {
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
@@ -183,7 +188,7 @@
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
-    happy: [], specials: [], nights: [], story: C.storyPending || CUR.description || '', visit: clone(CUR.visit_rows || {}),
+    happy: [], specials: [], nights: [], story: C.storyPending || storyCur(), visit: clone(CUR.visit_rows || {}),
     ig: (CUR.instagram_url || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '@').replace(/\/$/, ''), fb: CUR.facebook_url || '',
     door: { photo: null, best: null, spot: null, noLoc: false, rights: false }, score: C.progress.score || null,
     fresh: true, dirty: '', exitAfter: false, doneNowSaid: !!C.doneForNow, leaving: false, toList: false, added: '', noDiet: (CUR.not_offered || []).indexOf('dietary') >= 0,
@@ -748,7 +753,7 @@
   // "your description still talks about sports" screen after "What you offer": it carries a real choice.
   function savedKept(step){ return step === 'offer' && !CK && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
   // The text the story box started from: the story she sent (not checked yet), or the page's.
-  function storyBase(){ return String(C.storyPending || CUR.description || '').trim(); }
+  function storyBase(){ return String(C.storyPending || storyCur()).trim(); }
   function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
   function savedText(step){
     var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
@@ -1738,7 +1743,7 @@
       }).join('') + (T.eventsOften ? '<p class="su-hint" id="suEventsOften">' + h(T.eventsOften) + (T.eventsOftenLink && C.back ? ' <a href="' + h(C.back + '#tours-events') + '" id="suEventsOftenLink">' + h(T.eventsOftenLink) + '</a>' : '') + '</p>' : '') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + field('suKnown', T.knownQ, S.wine.known, { max: 180 }) + ex(T.knownEx) : '')
@@ -2238,7 +2243,7 @@
   // Pub test 7 (2026-11-10): new words typed straight after the old description ("…pub food.A beach bar…") get the
   // space they were missing. Only that one join is touched; the rest is exactly as she typed it.
   function storyJoinFix(v){
-    var old = String(CUR.description || '').replace(/\s+$/, ''); v = String(v || '');
+    var old = storyCur().replace(/\s+$/, ''); v = String(v || '');
     if (old && v.length > old.length && v.indexOf(old) === 0 && /[.!?,;:)]$/.test(old) && /^[^\s.,;:!?)]/.test(v.slice(old.length))) return old + ' ' + v.slice(old.length);
     return v;
   }
@@ -2706,7 +2711,7 @@
       var bStoryCh = S.story.trim() !== storyBase(), bsl = [];
       if (bStoryCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.brew.known) { S.nudge = T.storyShort; return render(); }
-      if (bStoryCh) { bsl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
+      if (bStoryCh) { bsl.push(storyOut(S.story)); S.storySent = S.story; } else S.storySent = '';
       // Sent even when unchanged (while it's research's), so the line becomes hers.
       var bKnownCh = S.brew.known !== ((CUR.visit_rows || {}).known_for || '') || (!!S.brew.known && (C.visitResearch || []).indexOf('known_for') >= 0);
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
@@ -2779,7 +2784,7 @@
       var storyCh = S.story.trim() !== storyBase(), sl = [];
       if (storyCh && S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       if (!S.story.trim() && !S.wine.known) { S.nudge = T.storyShort; return render(); }
-      if (storyCh) { sl.push({ description: S.story }); S.storySent = S.story; } else S.storySent = '';
+      if (storyCh) { sl.push(storyOut(S.story)); S.storySent = S.story; } else S.storySent = '';
       var knownCh = S.wine.known !== ((CUR.visit_rows || {}).known_for || '');
       // Winery test 2: an unchanged Known for line is sent too, so it becomes hers (the server only records it once).
       if (knownCh || S.wine.known) sl.push({ visit_rows: { known_for: S.wine.known } });
@@ -2789,7 +2794,9 @@
     if (k === 'storySave') { S.story = storyJoinFix(el('suStory').value); if (S.storyReturn) S.storyFixed = true; if (S.story.trim().length < 30) { S.nudge = T.storyShort; return render(); }
       // Brewery test 4: the story she already sent (not checked yet) isn't sent twice.
       if (C.storyPending && S.story.trim() === String(C.storyPending).trim()) { S.storySent = ''; return saveAll('story', []); }
-      S.storySent = S.story; return saveAll('story', [{ description: S.story }], null, null, storyWaiting); }
+      // French setup: the page text kept as it is (the English description stays English) sends nothing.
+      if (C.lang === 'fr' && !C.storyPending && S.story.trim() === storyCur().trim()) { S.storySent = ''; return saveAll('story', []); }
+      S.storySent = S.story; return saveAll('story', [storyOut(S.story)], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
@@ -3033,7 +3040,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
       // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
       // replaces it (never her own story, sent or on the page).
-      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!CUR.description && inp.value === CUR.description;
+      var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!storyCur() && inp.value === storyCur();
       var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
     });
