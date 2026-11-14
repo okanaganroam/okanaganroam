@@ -54,7 +54,7 @@ test('validateWeeklyNights: canonical list, kinds, frequencies, lengths, times, 
   assert.equal(v(Array.from({ length: 8 }, () => TRIVIA)).ok, false, 'at most 7');
   assert.equal(v(Array.from({ length: 7 }, () => TRIVIA)).ok, true);
   for (const k of app.NIGHT_KINDS) assert.equal(v([{ ...TRIVIA, kind: k }]).ok, true, k);
-  assert.deepEqual(app.NIGHT_KINDS, ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'other']);
+  assert.deepEqual(app.NIGHT_KINDS, ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'other']);
   assert.equal(v([{ ...TRIVIA, kind: 'quiz' }]).ok, false);
   assert.equal(v([{ ...TRIVIA, kind: undefined }]).ok, false, 'kind is required');
   for (const f of ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th']) assert.equal(v([{ ...TRIVIA, frequency: f }]).nights[0].frequency, f);
