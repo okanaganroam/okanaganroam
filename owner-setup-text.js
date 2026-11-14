@@ -98,7 +98,7 @@ const fr = {
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait', half: 'heures enregistrées, jours fériés et fermetures à faire' },
   labels: {
     basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
-    photos: 'Photos', menu: 'Menu', offer: 'Ce que vous offrez', happy: 'Happy hour', specials: 'Spéciaux de la semaine', music: 'Événements de la semaine', story: 'Votre histoire',
+    photos: 'Photos', menu: 'Menu', offer: 'Ce que vous offrez', happy: '5 à 7', specials: 'Spéciaux de la semaine', music: 'Événements de la semaine', story: 'Votre histoire',
     book: 'Réservations', takeout: 'À emporter', known: 'Reconnu pour', groups: 'Groupes', instagram: 'Instagram', facebook: 'Facebook', door: 'Votre porte d’entrée',
   },
   savedTitle: 'Enregistré', savedLive: 'C’est sur votre page maintenant.', savedDay: 'Cela s’affichera sur votre page d’ici un jour.', emailTitle2: 'Merci!', savedEmail: 'Parfait. Dès que vous l’aurez envoyé, nous l’ajouterons d’ici un jour.',
@@ -141,18 +141,18 @@ const fr = {
   mailSubject: 'Menu de {name}',
   fileTooBig: '{name} est trop gros. Essayez plutôt des photos.', pageSmall: 'Cette page est un peu petite pour être lue. Essayez de la prendre de plus près.', tooManyPages: 'Cela fait {n} pages, le maximum à la fois.',
   offerQ: 'Touchez tout ce qui est vrai', offerLead: 'Les visiteurs s’en servent pour trouver des endroits comme le vôtre.', saveOffer: 'Enregistrer',
-  offers: { patio: 'Terrasse', kid_friendly: 'Enfants bienvenus', dog_friendly: 'Chiens bienvenus', vegan: 'Options véganes', vegetarian: 'Options végétariennes', gluten_free: 'Options sans gluten', nonalcoholic: 'Boissons sans alcool', lake_view: 'Vue sur le lac', sports_tv: 'Sports à la télé', live_music: 'Musique en direct', great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour' },
+  offers: { patio: 'Terrasse', kid_friendly: 'Enfants bienvenus', dog_friendly: 'Chiens bienvenus', vegan: 'Options véganes', vegetarian: 'Options végétariennes', gluten_free: 'Options sans gluten', nonalcoholic: 'Boissons sans alcool', lake_view: 'Vue sur le lac', sports_tv: 'Sports à la télé', live_music: 'Musique en direct', great_groups: 'Idéal pour les groupes', happy_hour: '5 à 7' },
   dogQ: 'Où les chiens sont-ils permis?', dogEx: 'Chiens bienvenus sur la terrasse, pas à l’intérieur. Bols d’eau à l’entrée.',
-  happyQ: 'Avez-vous un happy hour?', happyYes: 'Oui', howQ: 'Comment voulez-vous nous le dire?', howLead: 'Choisissez ce qui est le plus simple pour vous.',
-  happyUp: 'Téléverser mon menu du happy hour', specialsUp: 'Téléverser mes spéciaux', upSub: 'Un PDF ou une photo de votre téléphone', happyPhoto: 'Le photographier', specialsPhoto: 'Les photographier', photoSub: 'Comme une affiche, un tableau ou un chevalet de table',
+  happyQ: 'Avez-vous un 5 à 7?', happyYes: 'Oui', howQ: 'Comment voulez-vous nous le dire?', howLead: 'Choisissez ce qui est le plus simple pour vous.',
+  happyUp: 'Téléverser mon menu du 5 à 7', specialsUp: 'Téléverser mes spéciaux', upSub: 'Un PDF ou une photo de votre téléphone', happyPhoto: 'Le photographier', specialsPhoto: 'Les photographier', photoSub: 'Comme une affiche, un tableau ou un chevalet de table',
   happyWeb: 'C’est sur mon site Web', specialsWeb: 'Ils sont sur mon site Web', happyType: 'L’écrire', happyTypeSub: 'Jours, heures et spéciaux', specialsType: 'Les écrire', specialsTypeSub: 'Un par jour si vous voulez',
-  sheetHappyQ: 'Votre menu du happy hour', sheetSpecialsQ: 'Vos spéciaux', sheetLead: 'Un PDF, une photo d’affiche, de chevalet ou de tableau, tout fonctionne. Nous le retranscrirons pour vous.', sheetLeadSome: 'Un autre? Ajoutez-le. Sinon, envoyez-le.',
+  sheetHappyQ: 'Votre menu du 5 à 7', sheetSpecialsQ: 'Vos spéciaux', sheetLead: 'Un PDF, une photo d’affiche, de chevalet ou de tableau, tout fonctionne. Nous le retranscrirons pour vous.', sheetLeadSome: 'Un autre? Ajoutez-le. Sinon, envoyez-le.',
   chooseFile: 'Choisir un fichier', sendIt: 'Envoyer',
-  webWhereQ: 'Où sur votre site Web?', webWhereHappy: 'Nous avons inscrit votre site Web. Si votre happy hour est sur une autre page, ajoutez la fin de l’adresse.', webWhereSpecials: 'Nous avons inscrit votre site Web. Si vos spéciaux sont sur une autre page, ajoutez la fin de l’adresse.',
-  webExHappy: '{site}/happy-hour', webExSpecials: '{site}/speciaux', webCopy: 'Nous le reporterons sur votre page',
-  happyTypeQ: 'Vos happy hours', happyTypeLead: 'Des jours ou des heures différents? Ajoutez-en un pour chacun.', happyN: 'Happy hour {n}', whichDays: 'Quels jours?', whatTime: 'À quelle heure?', starts: 'Début', ends: 'Fin',
-  whatsOn: 'Quels sont les spéciaux?', whatsOnEx: 'Pintes à 6 $ et entrées à moitié prix', happyEx: 'Lun.–jeu. 15 h–17 h, pintes à 6 $. Ven. 14 h–18 h, ailes à 5 $.', addHappy: '+ Ajouter un autre happy hour', saveHappy: 'Enregistrer mes happy hours',
-  needDays: 'Touchez au moins un jour pour chacun.', twoPerDay: 'Un jour peut avoir au plus deux happy hours. Vérifiez {day}.',
+  webWhereQ: 'Où sur votre site Web?', webWhereHappy: 'Nous avons inscrit votre site Web. Si votre 5 à 7 est sur une autre page, ajoutez la fin de l’adresse.', webWhereSpecials: 'Nous avons inscrit votre site Web. Si vos spéciaux sont sur une autre page, ajoutez la fin de l’adresse.',
+  webExHappy: '{site}/5-a-7', webExSpecials: '{site}/speciaux', webCopy: 'Nous le reporterons sur votre page',
+  happyTypeQ: 'Vos 5 à 7', happyTypeLead: 'Des jours ou des heures différents? Ajoutez-en un pour chacun.', happyN: '5 à 7 {n}', whichDays: 'Quels jours?', whatTime: 'À quelle heure?', starts: 'Début', ends: 'Fin',
+  whatsOn: 'Quels sont les spéciaux?', whatsOnEx: 'Pintes à 6 $ et entrées à moitié prix', happyEx: 'Lun.–jeu. 15 h–17 h, pintes à 6 $. Ven. 14 h–18 h, ailes à 5 $.', addHappy: '+ Ajouter un autre 5 à 7', saveHappy: 'Enregistrer mes 5 à 7',
+  needDays: 'Touchez au moins un jour pour chacun.', twoPerDay: 'Un jour peut avoir au plus deux 5 à 7. Vérifiez {day}.',
   specialsQ: 'Des spéciaux chaque semaine?', specialsLead: 'Comme le mardi tacos ou le mercredi ailes. Vous pouvez en ajouter un pour chaque jour.',
   specialsTypeQ: 'Vos spéciaux de la semaine', upTo7: 'Ajoutez-en autant que vous en avez, jusqu’à 7.', specialN: 'Spécial {n}', whichDaysOr: 'Quel jour ou quels jours?', whatIsIt: 'Qu’est-ce que c’est?', specialEx: 'Mardi tacos, 3 tacos',
   priceIf: 'Prix, s’il y en a un', priceEx: '12 $', addSpecial: '+ Ajouter un autre spécial', saveSpecials: 'Enregistrer mes spéciaux', needText: 'Indiquez ce qu’est chacun.',
@@ -176,7 +176,7 @@ const fr = {
   badgeEarn: 'Atteignez 100 % pour obtenir le badge Complète et vérifiée.', badgeEarned: '🎉 Vous avez obtenu le badge Complète et vérifiée.', badgePaused: 'Votre badge Complète et vérifiée est en pause. Confirmez vos heures pour le récupérer.',
   aPerson: 'environ {n} $ par personne', noJs: 'Activez JavaScript, ou envoyez-nous vos renseignements à',
   menuNote: 'Envoyé depuis la configuration simple. Merci de faire notre menu à partir de ces pages.', sheetNote: 'Envoyé depuis la configuration simple : notre {what}. Merci de l’ajouter à notre page.', sheetWebNote: 'Notre {what} est sur notre site Web : {url}',
-  whatHappy: 'happy hour', whatSpecials: 'spéciaux de la semaine',
+  whatHappy: '5 à 7', whatSpecials: 'spéciaux de la semaine',
 };
 
 // ----- Split in two + fresh-eyes fixes (2026-11-09) -----
@@ -211,11 +211,11 @@ Object.assign(fr, {
   hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   welcomeLead: 'Vos réponses sont enregistrées.',
   essBar: 'L’essentiel : terminé', moreProg: 'Plus de détails · {n} sur {total}', moreDone: 'Facultatif · {n} sur {total}',
-  essQ: 'L’essentiel est fait!', moreOpt: 'Ajouter plus de détails', moreOptSub: 'Facultatif : happy hour, spéciaux, votre histoire et plus', doneNow: 'J’ai terminé pour l’instant',
+  essQ: 'L’essentiel est fait!', moreOpt: 'Ajouter plus de détails', moreOptSub: 'Facultatif : 5 à 7, spéciaux, votre histoire et plus', doneNow: 'J’ai terminé pour l’instant',
   moreQ: 'Plus de détails sur votre établissement', moreLead: 'Tout est facultatif. Touchez-en un, dans l’ordre que vous voulez. Chacun prend une minute ou deux.', backToMore: 'Retour à la liste',
   finishQ: 'Tout est fait!', finishHome: 'Tout ce que vous pouvez faire de chez vous est fait', finishSoFar: 'Voici votre page jusqu’ici',
   gotIt: 'C’est noté.', savedNo: 'Merci de nous l’avoir dit.', youSaid: '✓ Enregistré. Vous avez répondu : {a}. Vous pouvez le modifier ici.',
-  noLabels: { closures: 'rien à venir', happy: 'pas de happy hour', specials: 'pas de spéciaux', music: 'pas d’événements', book: 'sans réservation', takeout: 'pas de commandes à emporter', groups: 'pas de grands groupes', instagram: 'pas sur Instagram', facebook: 'pas sur Facebook' },
+  noLabels: { closures: 'rien à venir', happy: 'pas de 5 à 7', specials: 'pas de spéciaux', music: 'pas d’événements', book: 'sans réservation', takeout: 'pas de commandes à emporter', groups: 'pas de grands groupes', instagram: 'pas sur Instagram', facebook: 'pas sur Facebook' },
   helpYes: 'Oui. Quand vous voyez <strong>Enregistré ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous en ce moment :', helpNone: 'Rien encore. Commencez par la première question.',
   helpTail: 'Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.',
   closuresLead: 'Touchez les jours fériés où vous êtes fermé. Fermé plus longtemps? Ajoutez les dates ci-dessous.', anotherDay: '+ Fermé une semaine ou deux (ou d’autres dates)', wholeMonths: '+ Nous fermons des mois entiers chaque année',
@@ -288,7 +288,7 @@ Object.assign(en, {
 });
 en.offers.dog_friendly = 'Dogs welcome (even just the patio)';
 Object.assign(fr, {
-  dealLong: 'Happy hour {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
+  dealLong: '5 à 7 {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
   soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
@@ -573,8 +573,8 @@ Object.assign(fr, {
   seasonQ2: 'Quand est-ce offert?', seasonAll: 'Toute l’année', seasonSome: 'Seulement certains mois', seasonHint: 'Touchez les mois où c’est offert.',
   seasonExactLink: 'Ça commence ou finit en milieu de mois? Choisissez les dates exactes', seasonExactMonths: 'Utiliser des mois entiers', seasonFrom: 'Commence le', seasonTo: 'Finit le',
   seasonNeedMonths: 'Touchez les mois où c’est offert, ou touchez « Toute l’année ».', seasonNeedDates: 'Choisissez le premier et le dernier jour, ou utilisez des mois entiers.',
-  happySeasonH: 'Votre happy hour est-il offert toute l’année?',
-  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le happy hour a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
+  happySeasonH: 'Votre 5 à 7 est-il offert toute l’année?',
+  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le 5 à 7 a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
   seasonExactLead: 'Ou choisissez le premier et le dernier jour exacts :',
   monthsClosedQ: 'Quels mois êtes-vous fermé?', monthsClosedLead: 'Touchez chaque mois où vous êtes fermé. Votre page indique alors « Fermé pour la saison » et la date de réouverture.',
   monthsClosedNeed: 'Touchez les mois où vous êtes fermé.', monthsClosedInRow: 'Choisissez des mois de fermeture qui se suivent, comme de novembre à mars.', monthsAllClosed: 'Ce sont tous les mois. Ne touchez pas les mois où vous êtes ouvert.',
@@ -716,7 +716,7 @@ fr.cafe = {
   musicQ: 'Il se passe quelque chose à votre café?', musicLead: 'Comme une scène ouverte, de la musique en direct, de l’art aux murs ou un atelier.',
   knownEx: 'Les brioches à la cannelle et les places près de la fenêtre', igLead: 'Écrivez votre nom Instagram, comme @votrecafe.',
   groupsLead: 'Clubs de lecture, réunions, un café d’anniversaire.', storyEx: 'Un petit café-boulangerie au bord du lac. Tout est cuit ici chaque matin, et les places près de la fenêtre ont le soleil.',
-  happyQ: 'Avez-vous un happy hour?', styleDone: 'Terminé', aPersonCafe: 'environ {n} $ pour {words}', noWifi: 'Pas de Wi-Fi', noWifiSub: 'Nous n’avons pas de Wi-Fi pour les clients',
+  happyQ: 'Avez-vous un 5 à 7?', styleDone: 'Terminé', aPersonCafe: 'environ {n} $ pour {words}', noWifi: 'Pas de Wi-Fi', noWifiSub: 'Nous n’avons pas de Wi-Fi pour les clients',
 };
 
 // First café test (Dayton, 2026-11-11; drafts/fresh-eyes-cafe1-2026-11-11/REPORT.md). Shared words first, then café words.
@@ -1459,7 +1459,9 @@ function frSpacing(t) {
     .replace(/([^\s\u00a0\u202f\d/])[ \u00a0\u202f]?:(?=[\s»”)]|$)/g, '$1\u00a0:')
     .replace(/([^\s\u00a0\u202f?!])[ \u00a0\u202f]?([?!]+)(?=[\s»”)]|$)/g, '$1\u202f$2')
     // Distillery test 2 (2026-11-13): « 91 % » never wraps before the sign.
-    .replace(/(\d|\})[ \u202f]%/g, '$1\u00a0%');
+    .replace(/(\d|\})[ \u202f]%/g, '$1\u00a0%')
+    // Cocktail test 2 (2026-11-13): « 15 $ » never wraps before the sign either.
+    .replace(/(\d|\})[ \u202f]\$/g, '$1\u00a0$');
 }
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
