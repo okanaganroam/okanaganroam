@@ -546,9 +546,11 @@ function openingPeriods(parsed) {
 // live (the Food & Drink hub). Built from the functions themselves, so the
 // server and the browser can never read hours differently.
 const HOURS_CLIENT_SRC = [
-  `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
+  // 2026-11-14: happyHourState (copied to the map page on its own) calls parseOpenSeason since café test 2 (#835);
+  // without it here every happy hour threw in the browser and Roam Now's Happy hour filter showed 0 places.
+  `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES}; var OPEN_SEASON_LAST = ${JSON.stringify(OPEN_SEASON_LAST)};`,
   ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
-    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose].map((fn) => fn.toString()),
+    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose, parseOpenSeason].map((fn) => fn.toString()),
 ].join('\n');
 
 module.exports = {

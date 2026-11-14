@@ -142,7 +142,8 @@ test('homepage: the first item of the counts strip, in both languages, linking t
     assert.deepEqual(Object.keys(j).sort(), ['count', 'label', 'short', 'startsAt', 'state']);
     const map = await (await fetch(`${base}/map?show=happy-hour`)).text();
     assert.match(map, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/map">/);
-    assert.ok(map.includes("if (qs.get('show') === 'happy-hour') feats.happy = true;"), 'the map script switches Happy hour now on');
+    assert.ok(map.includes("var happyEntry = new URLSearchParams(location.search).get('show') === 'happy-hour';"), 'the map script reads ?show=happy-hour');
+    assert.ok(map.includes('if (happyEntry) { feats.happy = true; searchFit = true; }'), 'the map script switches Happy hour now on');
     const frMap = await (await fetch(`${base}/fr/map?show=happy-hour`)).text();
     assert.match(frMap, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/map">/);
   } finally { srv.close(); }
@@ -155,11 +156,17 @@ test('homepage item is left out when nothing is left today or tomorrow', () => {
 
 test('the map reads ?show=happy-hour and turns on its Happy hour now filter', () => {
   const page = app.renderPlacesMapPage();
-  const i = page.indexOf("if (qs.get('show') === 'happy-hour') feats.happy = true;");
+  assert.ok(page.includes("var happyEntry = new URLSearchParams(location.search).get('show') === 'happy-hour';"));
+  const i = page.indexOf('if (happyEntry) { feats.happy = true; searchFit = true; }');
   assert.ok(i > 0);
   assert.ok(i < page.indexOf('syncChips();', i), 'before the chips are drawn');
-  // Audit fix (2026-10-27): Happy hour now requires a current researched window.
-  assert.ok(page.includes("k === 'happy' ? !(p.hhs && p.hhs.now)"), 'the filter it turns on is Happy hour now');
+  // Audit fix (2026-10-27): Happy hour now requires a current researched window ...
+  assert.ok(page.includes("k === 'happy' ? !(p.hhs && p.hhs.now) && !p.hhe :"), 'the filter it turns on is Happy hour now');
+  // ... except when opened from the homepage line with none on yet (2026-11-14): later today, else tomorrow, never "· 0".
+  assert.ok(page.includes("function hhEntryWide(){ return happyEntry && feats.happy ? hhEntryMode : 'now'; }"), 'only the homepage entry widens it');
+  assert.ok(page.includes("'Happy Hour Later Today'") && page.includes("'5 à 7 plus tard aujourd’hui'"));
+  assert.ok(page.includes("'Happy Hour Tomorrow'") && page.includes("'5 à 7 demain'"));
+  assert.ok(page.includes('hhTomorrowNote'));
   assert.equal(app.HAPPY_HOUR_MAP_HREF, '/map?show=happy-hour');
 });
 
