@@ -53430,7 +53430,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, extraTopics: cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53832,6 +53832,36 @@ const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We c
   keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year'], keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année'],
   a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p>',
   aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture (par exemple du 25 avril au 12 octobre). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture. D’autres heures l’été aussi? Touchez <strong>Enregistrer et ajouter des heures d’été différentes</strong>.</p><p>Fermé une semaine ou deux aussi, chaque année? Ajoutez-le sous Jours fériés et fermetures et cochez <strong>Chaque année</strong>.</p>' };
+// Cocktail test 2 (2026-11-13): "How do I change my winter hours?" from a place that already has seasonal hours (her
+// winter hours were her usual ones, summer the season) was told to add « Heures d’hiver » Nov 1–Apr 30, an overlapping
+// second season, and that changes are checked first. Such a place gets an answer about its own two sets: which are the
+// usual hours and which the seasonal ones, the setup's Hours step first (it goes live at once), then the edit page, and
+// never a new season for the rest of the year. A place with no season keeps the general answer.
+function mdShift(md, days) {
+  const d = new Date(Date.UTC(2024, Number(String(md).slice(0, 2)) - 1, Number(String(md).slice(3, 5)) + days));
+  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+function ownerSeasonHelpTopic(venueId) {
+  let s0 = null;
+  try {
+    // Only where there is a setup to point to (the types with "Set up your page").
+    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId);
+    if (v && COMPLETENESS_TYPES.has(v.type)) s0 = (venueHoursExtras(venueId).seasons || [])[0] || null;
+  } catch (e) { s0 = null; }
+  const base = OWNER_HELP_TOPICS.find((t) => t.id === 'seasonal-hours');
+  if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '') || !base) return null;
+  const sea = (fr) => seasonRangeShort(s0.from, s0.to, fr), rest = (fr) => seasonRangeShort(mdShift(s0.to, 1), mdShift(s0.from, -1), fr);
+  const nameEn = escapeHtml(seasonLabelText(s0.label, false)), nameFr = escapeHtml(seasonLabelText(s0.label, true));
+  return { ...base, pages: ['edit', 'setup'],
+    a: `<p>Your page has two sets of hours: your <strong>usual hours</strong> (${escapeHtml(rest(false))}) and your <strong>seasonal hours</strong>${nameEn ? `, “${nameEn}”` : ''} (${escapeHtml(sea(false))}). Every year the seasonal hours take over between those dates, then your page switches back to the usual ones by itself.</p>`
+      + '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Change your usual hours, your seasonal hours or their dates there. Hours you save in the setup go live straight away.</li>'
+      + '<li>Or on your edit page: <strong>Opening hours</strong> are your usual hours, and <strong>Seasonal hours</strong> are the other set. Tap {SEND}. {LIVE}</li></ol>'
+      + '<p>Your usual hours already cover the rest of the year, so there’s no need to add another season for it.</p>',
+    aFr: `<p>Votre page a deux horaires : vos <strong>heures habituelles</strong> (${escapeHtml(rest(true))}) et vos <strong>heures saisonnières</strong>${nameFr ? `, « ${nameFr} »` : ''} (${escapeHtml(sea(true))}). Chaque année, les heures saisonnières s’appliquent entre ces dates, puis votre page revient d’elle-même aux heures habituelles.</p>`
+      + '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Vous y changez vos heures habituelles, vos heures saisonnières ou leurs dates. Les heures enregistrées dans la configuration sont en ligne tout de suite.</li>'
+      + '<li>Ou sur votre page de modification : <strong>Heures d’ouverture</strong>, ce sont vos heures habituelles, et <strong>Heures saisonnières</strong>, l’autre horaire. Touchez {SEND}. {LIVE}</li></ol>'
+      + '<p>Vos heures habituelles couvrent déjà le reste de l’année : inutile d’ajouter une autre saison.</p>' };
+}
 // Food styles a café may add under "Show more" (optional; what they serve is its own screen).
 const CAFE_CUISINES_POPULAR = ['Breakfast & Brunch', 'Sandwiches', 'Dessert', 'French', 'Italian', 'Japanese', 'Korean', 'Ukrainian', 'Polish', 'Mediterranean'];
 // Pubs (2026-11-10): what pub owners ask about the pub-only questions.
@@ -55691,6 +55721,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const mode = ownerHelpMode(page, !!opts.signedIn);
   const inPortal = page === 'setup' || page === 'edit' || page === 'menu';
+  const seasonTopic = opts.venueId ? ownerSeasonHelpTopic(opts.venueId) : null;
+  if (seasonTopic) opts = { ...opts, extraTopics: [seasonTopic, ...(opts.extraTopics || []).filter((x) => x.id !== seasonTopic.id)] };
   const cfg = {
     page,
     lang,
@@ -61717,7 +61749,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: venue.id, ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }
