@@ -8212,7 +8212,7 @@ module.exports = {
   publicVenue, breweryIsCidery, ciderAsked, kidsAllowed,
   stopFrom,
   parseVenueHours,
-  hoursFit, dayClosedAllDay, closedDayInfo,
+  hoursFit, dayClosedAllDay, closedDayInfo, tastingWordUsed, requirementClosedOnly, DAYTIME_NIGHT_KINDS,
   listedHoursText,
   cafeRole,
   SLOT_WINDOWS, kitchenMealFit,

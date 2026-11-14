@@ -1305,6 +1305,7 @@ en.brewery.kindDistillery = {
   // Distillery test 1 (2026-11-13): a distillery tour and a class are the first chips; how often is on the edit page.
   kinds: { tour: 'Distillery tour', class: 'Class' },
   eventsOften: 'Monthly or every other week? Set how often under Tours & events on your edit page.',
+  eventsGuess: 'We filled this in from what’s on your page. Check the day and time.',
   // The winery's "free with a bottle" question, on Tastings and bottles.
   waivedQ: 'Is a tasting free if people buy a bottle?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
   doorQ: 'Where’s the tasting room door?', doorHere: 'Are you at the distillery right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
@@ -1329,6 +1330,7 @@ fr.brewery.kindDistillery = {
   musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky',
   kinds: { tour: 'Visite de la distillerie', class: 'Atelier' },
   eventsOften: 'Une fois par mois ou une semaine sur deux? Choisissez la fréquence sous Visites et événements sur votre page de modification.',
+  eventsGuess: 'Nous l’avons rempli d’après ce qui est sur votre page. Vérifiez le jour et l’heure.',
   waivedQ: 'La dégustation est-elle gratuite à l’achat d’une bouteille?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   doorQ: fr.brewery.doorQ, doorHere: 'Êtes-vous à la distillerie en ce moment?', mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
   doorLead: fr.brewery.doorLead,
