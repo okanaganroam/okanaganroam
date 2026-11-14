@@ -3,6 +3,7 @@
 // date is passed in as the server resolves it (the Okanagan calendar date);
 // the Vancouver-time resolution itself is covered in server.test.js.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

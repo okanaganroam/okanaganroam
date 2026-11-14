@@ -2,6 +2,7 @@
 // only as a small "Timing conflict" tag with no warning (Origin Wines after three Naramata tastings; dinner at Gerni's
 // after a 90-minute drink on a Vernon date night). PURE tests on a small fixture valley, like r15b-planner.test.js.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

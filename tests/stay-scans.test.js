@@ -1,5 +1,6 @@
 'use strict';
 // Places to stay scans (2026-11-11): QR code scans and email link opens per hotel or rental, on the dashboard.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');

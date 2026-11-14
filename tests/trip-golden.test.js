@@ -14,6 +14,7 @@
 // "What to expect" Lake View count must match; and no other venue's name may
 // appear in a plan's text.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

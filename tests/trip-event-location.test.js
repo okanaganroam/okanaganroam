@@ -1,4 +1,5 @@
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test'),assert=require('node:assert/strict');
 const {resolveEventLocation}=require('../trip-event-location');
 const venue={id:1,name:'The Hub on Martin',region:'penticton',latitude:49.5,longitude:-119.6,redirect_to:null};

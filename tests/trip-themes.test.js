@@ -2,6 +2,7 @@
 // The requests are the real ones from the site review (drafts/site-review-2026-10-18.md). PURE tests: the
 // planner functions are called directly on a small fixture valley; no server.js, no database.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

@@ -2,6 +2,7 @@
 // Google sees is shrunk: French pages and thin templated pages stay live for visitors but are noindex and out of the
 // sitemap. Source checks, the same way the other SEO tests read server.js.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

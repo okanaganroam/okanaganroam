@@ -2,6 +2,7 @@
 // the planner's additive V3 output (stored facts on stops, "understood").
 // PURE: no server, no database; the real production-snapshot inputs.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
