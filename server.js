@@ -62883,6 +62883,11 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
+        // Dashboard 404 list (2026-11-14): a guide that used to have enough places (Armstrong open_early, Kaleden patio) and
+        // slipped under the minimum sent visitors with an old link to a dead end. Like the combination guides above, send them
+        // to the town page for now (302, not 301: the guide comes back on its own when the town reaches the minimum again).
+        res.writeHead(302, { Location: withCampaignParams(`${res.twinLang === 'fr' ? '/fr' : ''}/${region}`, parsed.search), 'Cache-Control': 'public, max-age=3600' });
+        return res.end();
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
