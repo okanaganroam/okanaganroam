@@ -13,7 +13,7 @@
   var WINERY_ITEM_STEP = { winery_kind: 'winery', food_here: 'winery', tasting_price: 'tastings', visit_how: 'visit', booking_link: 'visit', winery_groups: 'visit', access: 'offer', dogs_kids: 'offer', pyv_known: 'story', arrival: 'door' };
   // Breweries (2026-11-12): the flight price's quick buttons, the to-go chips, the group sizes, the quick opening and
   // closing times, and where each of their checklist items is answered.
-  var QUICK_FLIGHTS = [8, 10, 12, 15], TOGO = ['cans', 'bottles', 'growler', 'crowler'], GROUP_SIZES = [8, 10, 12, 15, 20];
+  var QUICK_FLIGHTS = [8, 10, 12, 15], TOGO = ['cans', 'bottles', 'growler', 'crowler'], GROUP_SIZES = [6, 8, 10, 12, 15, 20];
   // Distilleries (Decided 2, 2026-11-13): $10 · $15 · $20 · Other · Free tastings, and Bottles · Canned or bottled
   // cocktails (stored as 'cans') · Nothing to go. No growlers or crowlers.
   if (C.distillery) { QUICK_FLIGHTS = [10, 15, 20]; TOGO = ['bottles', 'cans']; }
@@ -905,7 +905,8 @@
   }
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸', experiences: '🍇', menu: '🍷' };
   // Distillery test 3 (2026-11-13): a cocktail glass for a distillery's happy hour.
-  if (C.distillery) P2_ICONS.happy = '🍸';
+  // Cocktail test 1 (2026-11-13): a lounge's too.
+  if (C.distillery || CK) P2_ICONS.happy = '🍸';
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
   // Distillery test 1 (2026-11-13): cocktails, not pints; tours, not a guitar.
@@ -1319,7 +1320,7 @@
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>';
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
-      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big('🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
+      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big(CK ? '🍽' : '🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:hours">' + h(T.skip) + '</button></div>';
     } else if (s === 'hours:kitchentime') {
       // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
@@ -1379,7 +1380,8 @@
         + '<div class="su-chips" role="group" aria-label="' + h(T.cpriceQ) + '" id="suCpChips">' + CQ.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (cpOn(n) ? 'true' : 'false') + '" data-cfee="' + n + '">' + h(cpText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (cp.other && !cp.none ? 'true' : 'false') + '" data-cfee="other">' + h(T.feeOther) + '</button></div>'
         + (cp.other && !cp.none ? field('suCfee', T.feeLabel, cp.fee == null || isNaN(cp.fee) ? '' : String(cp.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
-        + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (cp.none ? '' : ' su-alt') + '" aria-pressed="' + (cp.none ? 'true' : 'false') + '" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">' + (cp.none ? '✓' : '○') + '</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>'
+        // Cocktail test 1 (2026-11-13): no "We don't serve cocktails" for a lounge (only while it is the stored answer).
+        + (cp.none ? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">✓</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'cpriceSave') + '</div>' + skip('spend');
     } else if (s === 'spend') {
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';

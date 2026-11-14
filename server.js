@@ -21317,8 +21317,8 @@ function venueCardHtml(venue, opts = {}) {
     showRegion && REGION_LABELS[venue.region] ? escapeHtml(REGION_LABELS[venue.region]) : null,
     showType && venue.type ? escapeHtml(venue.type) : null,
     showTypeLabel && CATEGORY_LABELS[venue.type] ? escapeHtml(CATEGORY_LABELS[venue.type].singular) : null,
-    venue.cuisine ? venueCuisineList(venue).map(escapeHtml).join(', ') : null,
-    venue.cuisine && placeTypeDisplay(venue) && venueCuisineList(venue).length <= CARD_PLACE_TYPE_MAX_CUISINES ? escapeHtml(placeTypeDisplay(venue)) : null,
+    loungeCardLabel(venue, false) ? escapeHtml(loungeCardLabel(venue, false)) : venue.cuisine ? venueCuisineList(venue).map(escapeHtml).join(', ') : null,
+    !loungeCardLabel(venue, false) && venue.cuisine && placeTypeDisplay(venue) && venueCuisineList(venue).length <= CARD_PLACE_TYPE_MAX_CUISINES ? escapeHtml(placeTypeDisplay(venue)) : null,
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
   // Golf-only (2026-09-19): the description is wrapped so the page script
@@ -34417,7 +34417,7 @@ function frBadgeLabel(field) {
 // Café test 6 (2026-11-12): a cuisine name in French qualifies « cuisine », so it is feminine like the rest (« Française »,
 // « Italienne »); these few fell back to masculine names (« Américain » next to « Française »).
 const FR_CUISINE_FEMININE = { American: 'Américaine', Canadian: 'Canadienne', Taiwanese: 'Taïwanaise', 'Spanish & Tapas': 'Espagnole et tapas',
-  'Contemporary & Global': 'Contemporaine et internationale', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne' };
+  'Contemporary & Global': 'Contemporaine et internationale', 'Small plates & bar snacks': 'Petites assiettes et bouchées', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne' };
 const FR_CUISINE_ADJECTIVE = new Set(['American', 'Canadian', 'Chinese', 'Ethiopian', 'Filipino', 'French', 'German', 'Greek', 'Indian', 'Italian', 'Japanese', 'Korean',
   'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Polish', 'Portuguese', 'Taiwanese', 'Thai', 'Turkish', 'Ukrainian', 'Vietnamese', 'Spanish & Tapas']);
 function frCuisine(cuisine) {
@@ -37144,8 +37144,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
 
   const relatedStockPhotosUsed = new Set();
   function relatedCard(v) {
-    const meta = [v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null,
-      v.cuisine && placeTypeDisplay(v, fr) && venueCuisineList(v).length <= CARD_PLACE_TYPE_MAX_CUISINES ? placeTypeDisplay(v, fr) : null,
+    const meta = [loungeCardLabel(v, fr) || (v.cuisine ? venueCuisineList(v).map((c) => (fr ? frCuisine(c) : c)).join(', ') : null),
+      !loungeCardLabel(v, fr) && v.cuisine && placeTypeDisplay(v, fr) && venueCuisineList(v).length <= CARD_PLACE_TYPE_MAX_CUISINES ? placeTypeDisplay(v, fr) : null,
       v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const cvRel = !v.redirect_to && COMPLETENESS_TYPES.has(v.type) && completeVerifiedIds().has(v.id);
     const badge = (cvRel ? completeVerifiedCardChipHtml(fr) + ' ' : '') + ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
@@ -46369,7 +46369,7 @@ const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges
 const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Chicken & Wings', 'Chinese',
   'Comfort food', 'Contemporary & Global', 'Dessert', 'Ethiopian', 'Farm-to-Table', 'Filipino', 'Fish & Chips', 'French', 'German', 'Greek', 'Indian',
   'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Noodles & Ramen', 'Pizza',
-  'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
+  'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Small plates & bar snacks', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
   'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
 // Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
 const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food'];
@@ -46377,7 +46377,8 @@ const OWNER_CUISINES_MAX = 3;
 // Pubs (2026-11-10, SPEC-pubs.md): pub-friendly labels first; Pub Fare is picked for them in the easy setup.
 // Pub test 5 (2026-11-10): BBQ in the short list (it was only under "Show more"); Chicken & Wings stays near the top.
 // Cocktail lounges (2026-11-13): small plates and tapas first (never Pub Fare first).
-const COCKTAIL_CUISINES_POPULAR = ['Spanish & Tapas', 'Contemporary & Global', 'West Coast', 'Mediterranean', 'Farm-to-Table', 'Seafood', 'Pizza', 'Burgers', 'Latin American', 'Asian Fusion'];
+// Cocktail test 1 (2026-11-13): "Small plates & bar snacks" first (the lead promises it).
+const COCKTAIL_CUISINES_POPULAR = ['Small plates & bar snacks', 'Spanish & Tapas', 'Contemporary & Global', 'West Coast', 'Mediterranean', 'Farm-to-Table', 'Seafood', 'Pizza', 'Burgers', 'Latin American', 'Asian Fusion'];
 const PUB_CUISINES_POPULAR = ['Pub Fare', 'Burgers', 'Chicken & Wings', 'BBQ', 'Pizza', 'Fish & Chips', 'Comfort food', 'Canadian', 'Contemporary & Global', 'Mexican', 'Steakhouse'];
 const RESTAURANT_PLACE_TYPES = ['Casual', 'Family', 'Fine dining', 'Bistro', 'Pub or sports bar', 'Diner', 'Quick bite', 'Winery or brewery restaurant'];
 // Pubs (Dayton, 2026-11-10): their own short list of kinds, stored and shown the same way (venue_cuisines.place_type).
@@ -46451,6 +46452,13 @@ function venueCuisinesRow(venueId) {
 function servesCuisineFor(venue) {
   const list = venueCuisineList(venue);
   return list.length > 1 ? list : (list[0] || venue.cuisine);
+}
+// Cocktail test 1 (2026-11-13): a lounge whose first cuisine is a food label from the owner's picker ("Small plates & bar
+// snacks", "Contemporary & Global") still reads "Cocktail Lounge" on its card, not like a restaurant. A researched
+// "Cocktail bar" or "Speakeasy" label shows as before. '' when the card shows its cuisines.
+function loungeCardLabel(venue, fr) {
+  if (!venue || venue.type !== 'cocktail' || !venue.cuisine || !OWNER_CUISINES.includes(String(venue.cuisine))) return '';
+  return fr ? ((CATEGORY_LABELS_FR.cocktail || {}).singular || 'Bar à cocktails') : CATEGORY_LABELS.cocktail.singular;
 }
 function venueCuisineList(venue) {
   if (!venue) return [];
@@ -53069,7 +53077,7 @@ function renderOwnerSetupPage(found, opts) {
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
     Greek: '🥙', Indian: '🍛', Italian: '🍝', Japanese: '🍱', Korean: '🍜', Mexican: '🌮', 'Noodles & Ramen': '🍜', Pizza: '🍕', 'Poke & Hawaiian': '🍣', Poutine: '🍟', 'Pub Fare': '🍺', Sandwiches: '🥪',
-    Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍' };
+    Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍', 'Small plates & bar snacks': '🍢' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
   const offerGroups = brewery ? [
     // Breweries (2026-11-12, SPEC-breweries.md "What you offer"): the reused tiles, the pub games and Picnic area. No Kids
@@ -58539,7 +58547,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       }
     } catch (e) { /* unreadable */ }
     // Café test 6 (2026-11-12): names keep their capitals (« site Web », Instagram, Facebook; it read « Site web »).
-    const what = fields.join(', ').toLowerCase().replace(/\bsite web\b/g, 'site Web').replace(/\binstagram\b/g, 'Instagram').replace(/\bfacebook\b/g, 'Facebook').replace(/\btiktok\b/g, 'TikTok').replace(/^./, (c) => c.toUpperCase());
+    const what = fields.join(', ').toLowerCase().replace(/\bsite web\b/g, 'site Web').replace(/\binstagram\b/g, 'Instagram').replace(/\bfacebook\b/g, 'Facebook').replace(/\btiktok\b/g, 'TikTok').replace(/\bdjs?\b/g, (m) => m.toUpperCase().replace('DJS', 'DJs')).replace(/^./, (c) => c.toUpperCase());
     const base = fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update';
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.undone_at ? r.undo_reason || null : r.rejection_reason,
       title: none ? (fields.length ? `${base}. ${none}` : none) : base });

@@ -1367,7 +1367,7 @@ en.pub.cocktail = {
   // Cocktail price (the café "Price per person" screen, Decided 2)
   cpriceQ: 'About how much is a cocktail?', cpriceLead: 'It shows on your card and in Build My Trip right away.', cpriceLeadPick: 'It shows on your card as “{x}” right away.',
   cpriceGuess: 'Your page says about {x} now, so we picked it. Tap another price if it changed.', cpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
-  cpriceNone: 'We don’t serve cocktails', cpriceNoneSub: 'Your card shows no price', cpriceNeed: 'Please tap a price, or “We don’t serve cocktails”.',
+  cpriceNone: 'We don’t serve cocktails', cpriceNoneSub: 'Your card shows no price', cpriceNeed: 'Please tap a price.',
   cpriceSavedLive: 'Your cocktail price is on your card now.', cpriceSavedDay: 'We check prices over $40 first; it’ll show within a day.', cpriceSavedNone: 'Your card shows no price.',
   feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.', feeNeed: 'Please type the price in dollars, like 16.', feeCard: 'From {x}',
   // Photos and What you offer
@@ -1418,7 +1418,7 @@ fr.pub.cocktail = {
   menuQ: 'Comment ajouter votre menu ou votre carte des cocktails?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte des cocktails fonctionne aussi, aussi souvent qu’elle change.',
   cpriceQ: 'Combien coûte un cocktail environ?', cpriceLead: 'Il s’affiche sur votre fiche et dans Planifier mon voyage tout de suite.', cpriceLeadPick: 'Il s’affiche sur votre fiche comme « {x} » tout de suite.',
   cpriceGuess: 'Votre page indique environ {x} maintenant, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', cpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
-  cpriceNone: 'Nous ne servons pas de cocktails', cpriceNoneSub: 'Votre fiche n’affiche aucun prix', cpriceNeed: 'Touchez un prix, ou « Nous ne servons pas de cocktails ».',
+  cpriceNone: 'Nous ne servons pas de cocktails', cpriceNoneSub: 'Votre fiche n’affiche aucun prix', cpriceNeed: 'Touchez un prix.',
   cpriceSavedLive: 'Le prix de vos cocktails est sur votre fiche maintenant.', cpriceSavedDay: 'Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.', cpriceSavedNone: 'Votre fiche n’affiche aucun prix.',
   feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.', feeNeed: 'Écrivez le prix en dollars, comme 16.', feeCard: 'Dès {x}',
   photosLead: 'Votre bar, vos cocktails, la salle ou la terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
