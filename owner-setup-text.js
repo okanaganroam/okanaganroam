@@ -1375,6 +1375,7 @@ en.pub.cocktail = {
   offerLead: 'Visitors use these to find a bar like yours.',
   minorsNoteEx: 'Kids welcome for dinner until 8 PM; the bar is 19+.',
   minorsLive: 'It’s on your page now, and it decides your Kids welcome badge.',
+  minorsGuess: 'Your page says 19+, so we picked Adults only. Tap another answer if that’s not right.',
   // Live music, DJs and events (the weekly events screen, same storage)
   musicQ: 'Any live music, DJs or events?', musicLead: 'Like live music, a DJ, trivia or comedy.', musicTypeQ: 'Your live music, DJs and events', eventEx: 'Friday DJ night',
   eventsOften: 'Every other week or once a month? Tap Save my events, then set how often on your edit page.', eventsOftenLink: 'Set how often',
@@ -1425,6 +1426,7 @@ fr.pub.cocktail = {
   offerLead: 'Les visiteurs s’en servent pour trouver un bar comme le vôtre.',
   minorsNoteEx: 'Enfants bienvenus pour le souper jusqu’à 20 h; le bar est réservé aux 19 ans et plus.',
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre badge Enfants bienvenus.',
+  minorsGuess: 'Votre page indique 19 ans et plus, alors nous avons choisi Adultes seulement. Touchez une autre réponse si ce n’est pas juste.',
   musicQ: 'De la musique, des DJ ou des événements?', musicLead: 'Comme de la musique en direct, un DJ, un quiz ou de l’humour.', musicTypeQ: 'Votre musique, vos DJ et vos événements', eventEx: 'Soirée DJ du vendredi',
   eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence sur votre page de modification.', eventsOftenLink: 'Choisir la fréquence',
   storyQ: 'Parlez de votre bar aux visiteurs', storyEx: 'Un bar à cocktails caché au centre-ville. Cocktails de saison, petites assiettes et un DJ le vendredi.',
