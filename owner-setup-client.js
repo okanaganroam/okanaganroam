@@ -215,6 +215,8 @@
   // Seasonal kitchen time (pub test 7): 'same' (as the rest of the year), 'close' (food until close) or 'time'.
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
   S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || beforeClose(), note: (S.pubInfo.minors || {}).note || '' };
+  // Cocktail test 1 (2026-11-13): research's "19+" picks Adults only to start (saved only with the screen).
+  if (CK && !S.minors.policy && C.suggestAdults) { S.minors.policy = 'adults'; S.minorsGuessed = true; }
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
   if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || beforeClose(), note: BIm.note || '' };
     // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
@@ -258,6 +260,8 @@
   S.socSaved = { instagram: S.ig, facebook: S.fb }; S.socLines = [];
   // Brewery test 2 (2026-11-13): a facebook.com website pre-fills the Facebook box, as a suggestion saved only with the screen.
   if (!S.fb && !S.socNo.facebook && !S.done.facebook && fbFromSite(CUR.website || C.website || '')) { S.fb = fbFromSite(CUR.website || C.website); S.fbFromWebsite = true; }
+  // Cocktail test 1 (2026-11-13): an instagram.com website pre-fills the Instagram box the same way (saved only with the screen).
+  if (!S.ig && !S.socNo.instagram && !S.done.instagram && igFromSite(CUR.website || C.website || '')) { S.ig = igFromSite(CUR.website || C.website); S.igFromWebsite = true; }
   S.cuiTouched = false;
   // A café's happy hour is allowed only while it serves Beer & wine (outreach rule). 13 screens (2026-11-11): it is no
   // longer a café setup step (the edit page has it), so nothing is added to the list here.
@@ -907,6 +911,8 @@
     if (rest) S.savedLine.basics = T.phoneLiveNow + ' ' + rest;
     var d = digitsOf(ch.phone); CUR.phone = d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ch.phone; S.phone = null; }
   // "facebook.com/gords", "m.facebook.com/gords", "fb.com/gords" (with or without https://) -> https://www.facebook.com/gords.
+  // "instagram.com/velvetdoor", "https://www.instagram.com/velvetdoor/?hl=en" -> "@velvetdoor" (a profile, never a post or reel).
+  function igFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9._]{2,30})\/?(?:[?#]\S*)?$/i.exec(String(v || '').trim()); return m && !/^(?:p|reel|reels|explore|stories|accounts)$/i.test(m[1]) ? '@' + m[1] : ''; }
   function fbFromSite(v){ var m = /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com(\/\S*)$/i.exec(String(v || '').trim()); return m && m[1].length > 1 ? 'https://www.facebook.com' + m[1] : ''; }
   function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
@@ -1356,7 +1362,7 @@
         + '<p class="su-q">' + h(T.tvsQ) + '</p><div class="su-chips" role="group" aria-label="' + h(T.tvsQ) + '">' + C.tvs.map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.sports.tvs === o.k ? 'true' : 'false') + '" data-tv="' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
         + '<p class="su-hint" id="suSportsTip">' + h(T.sportsEx) + '</p><div class="su-stack">' + big('➜', T.nextPlain, '', false, 'sportsSave') + '</div>';
     } else if (s === 'offer:minors') {
-      x = q(T.minorsQ, T.minorsLead) + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
+      x = q(T.minorsQ, T.minorsLead) + (S.minorsGuessed && S.minors.policy === 'adults' && T.minorsGuess ? '<p class="su-sent su-research" id="suMinorsGuess">' + h(T.minorsGuess) + '</p>' : '') + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
         + (S.minors.policy === 'minors_until' ? '<div class="su-day" style="margin-top:14px"><div class="su-times"><label class="su-q" for="suMto" style="margin:0">' + h(T.minorsUntil) + '</label> <input type="time" id="suMto" value="' + h(S.minors.until || beforeClose()) + '"></div></div>' : '')
         + field('suMnote', T.minorsNoteLabel, S.minors.note, { max: 120 }) + ex(T.minorsNoteEx) + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'minorsSave') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
@@ -1605,7 +1611,7 @@
       if (C.winery && !S.done.offer && !S.picnicSuggested && S.wine.food === 'picnic' && C.offerLabels.picnic_area && !S.badges.picnic_area) { S.badges.picnic_area = true; S.picnicSuggested = true; }
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
-      if ((C.winery || C.brewery) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      if ((C.winery || C.brewery || CK) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -1765,7 +1771,7 @@
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
       var ig = s === 'instagram';
-      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + (!ig && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
+      x = doneLine(s) + (C.socialSent[s] ? '<p class="su-sent">' + h(T.socialSent) + '</p>' : '') + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '') + (!ig && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '') + (ig && S.igFromWebsite && S.ig && S.ig !== S.socSaved.instagram && T.igFromWebsite ? '<p class="su-sent su-research" id="suIgFromSite">' + h(T.igFromWebsite) + '</p>' : '') + q(ig ? T.igQ : T.fbQ, ig ? T.igLead : T.fbLead) + (ig ? '' : '<p class="su-hint" id="suFbWhy">' + h(T.fbWhy) + '</p>') + msgs() + '<label class="su-sr" for="suSoc">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="suSoc" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">'
         // Café test 3 (2026-11-11): no TikTok box (Dayton: keep it easy). A TikTok already saved stays on the page.
         + '<div class="su-stack">' + big('✓', T.saveBtn, '', false, 'socialSave:' + s) + big('✕', ig ? T.igNo : T.fbNo, '', true, 'socialNo:' + s)
         // Pub test 6 (2026-11-10): an answer for "I'm not sure" that still counts (never "we're not on it").
@@ -2154,6 +2160,7 @@
     return '<h2 class="su-h2">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
       + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '')
       + (!ig && !ch && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '')
+      + (ig && !ch && S.igFromWebsite && S.ig && S.ig !== S.socSaved.instagram && T.igFromWebsite ? '<p class="su-sent su-research" id="suIgFromSite">' + h(T.igFromWebsite) + '</p>' : '')
       + (ch ? '' : '<p class="su-hint">' + h(ig ? T.igLead : T.fbWhy) + '</p><label class="su-q" for="' + id + '">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="' + id + '" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">')
       + '<div class="su-chips" role="group" aria-label="' + h(ig ? 'Instagram' : 'Facebook') + '" style="margin-top:10px">'
       + [['no', ig ? T.igNo : T.fbNo], ['unsure', T.socialUnsure]].map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ch === o[0] ? 'true' : 'false') + '" data-soc="' + n + ':' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>';

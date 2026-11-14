@@ -37109,7 +37109,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // the main button as before.
     mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
     // Brewery test 2 (2026-11-13): a website that is the same Facebook page as the Facebook link shows once, as Facebook.
-    venue.website && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    venue.website && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) && !websiteIsInstagramLink(venue.website, venueLinkRow.instagram_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
       : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
@@ -46748,6 +46748,13 @@ function websiteIsFacebookLink(website, facebookUrl) {
   const w = norm(website);
   return !!w && /^facebook\.com\/./.test(w) && w === norm(facebookUrl);
 }
+// Cocktail test 1 (2026-11-13): the same for an Instagram profile used as the website ("instagram.com/x" and
+// "https://www.instagram.com/x/?hl=en" are one profile): the page links to it once, as Instagram.
+function websiteIsInstagramLink(website, instagramUrl) {
+  const norm = (u) => String(u || '').trim().toLowerCase().split(/[?#]/)[0].replace(/^https?:\/\//, '').replace(/^(?:www\.|m\.)/, '').replace(/^instagr\.am\//, 'instagram.com/').replace(/\/+$/, '');
+  const w = norm(website);
+  return !!w && /^instagram\.com\/./.test(w) && w === norm(instagramUrl);
+}
 const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
 function venueLinks(venueId) {
   return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, tiktok_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
@@ -47439,6 +47446,21 @@ function setupResearchTicks(venue, keys) {
 // Winery test 2 (2026-11-12): the "What you offer" tiles research's Plan your visit lines say yes to, for a winery whose
 // owner hasn't set them: free parking, step-free / wheelchair access, dogs welcome. Only research's lines (not hers),
 // never a tile she set herself (on or off) or a "No dogs" answer. -> badge keys.
+// Cocktail test 1 (2026-11-13): research's lines as suggestions on a lounge's setup (saved only with their screen):
+// "19+" / "adults only" pre-picks Adults only on Who's welcome; a Reservations line that takes bookings pre-ticks Takes
+// reservations, and a Groups line pre-ticks Great for groups.
+function loungeResearchHints(venue, badges) {
+  const info = venueVisitInfo(venue.id) || {};
+  const mine = new Set(info.owner_labels || []);
+  const rows = (info.rows || []).filter((r) => r && typeof r.text === 'string' && r.text && !mine.has(r.label));
+  const line = (re) => rows.filter((r) => re.test(r.label)).map((r) => r.text).join(' ');
+  const all = rows.map((r) => r.text).join(' ');
+  const res = line(/^reservations?$/i), groups = line(/^groups?$/i);
+  const ticks = [];
+  if (!(badges || {}).takes_reservations && /\b(?:reserv|book)/i.test(res) && !/\bno reservations?\b|\bwalk-?ins? only\b|\bdon[’']?t take reservations\b|\bnot? (?:take|accept)\w* reservations?\b/i.test(res)) ticks.push('takes_reservations');
+  if (!(badges || {}).great_groups && groups && !/\bno (?:large |big )?groups\b|\bnot (?:suitable|good) for groups\b|\bcan[’']?t take (?:large |big )?groups\b/i.test(groups)) ticks.push('great_groups');
+  return { suggestAdults: /\b19\s*\+|\b19 (?:and|&) (?:over|older|up)\b|\badults? only\b|\bno minors\b/i.test(all) && !/\ball ages\b|\bminors? (?:welcome|allowed)\b|\bkids? welcome\b/i.test(all), visitTicks: ticks };
+}
 function wineryVisitTicks(venue, badges) {
   const info = venueVisitInfo(venue.id) || {};
   const mine = new Set(info.owner_labels || []);
@@ -53275,7 +53297,7 @@ function renderOwnerSetupPage(found, opts) {
     // she taps Save), research's flight price as a starting point, and the quick flight prices' live limit.
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
     // Cocktail lounges (2026-11-13): the cocktail price's quick buttons and live limit, and research's price as a suggestion.
-    ...(cocktail ? { cocktailQuick: [12, 14, 16, 18], feeLiveMax: COCKTAIL_PRICE_LIVE_MAX, researchCocktail: cocktailPriceGuess(venue) } : {}),
+    ...(cocktail ? { cocktailQuick: [12, 14, 16, 18], feeLiveMax: COCKTAIL_PRICE_LIVE_MAX, researchCocktail: cocktailPriceGuess(venue), ...loungeResearchHints(venue, snap.badges) } : {}),
     cafe, pub, winery, brewery, distillery, cocktail, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
     base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, waiting: setupWaitingSteps(venue), holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && cocktail ? 'Bar à cocktails' : fr && venue.type === 'restaurant' ? 'Restaurant' : fr && winery ? 'Vignoble' : fr && distillery ? 'Distillerie' : fr && brewery ? 'Microbrasserie' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
@@ -66832,7 +66854,7 @@ module.exports = {
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
-  BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
+  websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS,
   PUB_SETUP_PART1, PUB_SETUP_PART2, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,

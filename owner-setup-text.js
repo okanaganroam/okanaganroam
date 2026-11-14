@@ -895,7 +895,7 @@ Object.assign(en, {
   holCovered: 'Covered by your closed dates', holSeason: 'You’re closed for the season',
   // The Facebook link goes on the page as soon as it's saved ("It's on your page now"); only a page name waits for us.
   fbWhy: 'Paste the link and it shows on your page right away. Only know the name? Type it and we’ll find the link.',
-  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', fbFromWebsite: 'Your website is your Facebook page, so we filled it in here. Change it if it’s not right.', menuFbKnown: 'Your Facebook: {x}',
+  fbFromSite: 'That’s your Facebook page. We’ve added it as your Facebook link.', fbFromWebsite: 'Your website is your Facebook page, so we filled it in here. Change it if it’s not right.', igFromWebsite: 'Your website is your Instagram, so we filled it in here. Change it if it’s not right.', menuFbKnown: 'Your Facebook: {x}',
   sendBeforeLeave: 'Tap Send before you leave this screen.',
   // The price question while prices aren't on pages (AVG_SPEND_PUBLIC off): why we ask, and an after-save line that says
   // what it's for ("Prices don't show on pages yet" made it sound pointless).
@@ -905,7 +905,7 @@ Object.assign(en, {
 Object.assign(fr, {
   holCovered: 'Compris dans vos dates de fermeture', holSeason: 'Vous êtes fermé pour la saison',
   fbWhy: 'Collez le lien et il s’affiche sur votre page tout de suite. Vous connaissez seulement le nom? Écrivez-le et nous trouverons le lien.',
-  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', fbFromWebsite: 'Votre site Web est votre page Facebook, alors nous l’avons inscrite ici. Modifiez-la si ce n’est pas la bonne.', menuFbKnown: 'Votre Facebook : {x}',
+  fbFromSite: 'C’est votre page Facebook. Nous l’avons ajoutée comme votre lien Facebook.', fbFromWebsite: 'Votre site Web est votre page Facebook, alors nous l’avons inscrite ici. Modifiez-la si ce n’est pas la bonne.', igFromWebsite: 'Votre site Web est votre Instagram, alors nous l’avons inscrit ici. Modifiez-le si ce n’est pas le bon.', menuFbKnown: 'Votre Facebook : {x}',
   sendBeforeLeave: 'Touchez Envoyer avant de quitter cet écran.',
   spendWhyOff: 'Nous l’utiliserons pour afficher votre gamme de prix quand les prix seront sur les pages.',
   savedSpendOff: 'Quand les prix seront sur les pages, le vôtre s’affichera comme votre gamme de prix.',
