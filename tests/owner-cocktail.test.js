@@ -419,3 +419,20 @@ test('edit page: Menu and Good to know boxes for a lounge (the same lines, one w
   assert.equal((await change(tokenFor(r0.id), { visit_rows: { good_to_know: 'x' } }, false)).status, 400);
   assert.doesNotMatch((await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text, /data-visit-key="menu"/);
 });
+
+test('Build My Trip kids trip: an adults-only lounge is named with “adults only (19+)”, never planned', async () => {
+  const v = mk('cocktail', { name: 'Velvet Kids Test Lounge', region: 'vernon', latitude: 50.267, longitude: -119.272, address: '3000 30 Ave, Vernon' }); const t = tokenFor(v.id);
+  assert.equal((await change(t, { pub_info: { minors: { policy: 'adults' } } })).status, 200);
+  const j = await planFor('a day in Vernon with the kids, cocktails for the parents');
+  const stops = (j.days || []).flatMap((d) => d.stops || []);
+  assert.ok(!stops.some((s) => s.venue && s.venue.id === v.id), 'never planned for a family');
+  assert.ok((j.warnings || []).includes('Velvet Kids Test Lounge is adults only (19+), so it isn’t in this family plan.'), JSON.stringify(j.warnings));
+  assert.ok(!(j.warnings || []).some((w) => /Nothing matching cocktail lounges/.test(w)));
+  assert.equal(require('../trip-french-copy.js').t3FrenchText('Velvet Kids Test Lounge is adults only (19+), so it isn’t in this family plan.'),
+    'Velvet Kids Test Lounge : Adultes seulement (19 ans et plus); ce lieu ne fait donc pas partie de ce plan en famille.');
+  // The requirement path (alternatives) gives the same reason code.
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /adultsOnlyOut && tripRequirements\.venueAllowed\(venue, noKidRule/);
+  // Without kids it is planned as usual.
+  const j2 = await planFor('cocktails in Vernon tonight');
+  assert.ok(!(j2.warnings || []).some((w) => /adults only/.test(w)));
+});

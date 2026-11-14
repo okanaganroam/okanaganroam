@@ -2940,6 +2940,10 @@ function buildDays(facts, ctx, days, pinned) {
     const closedHere = ctx.regions.length && ctx.tripDate ? facts.filter((v) => ctx.regions.includes(v.region) && (f.key.startsWith('food:') ? normWords(v.name || '').includes(normWords(f.key.slice(5))) : f.test(v)) && seasonClosedOnTrip(v, { date: ctx.tripDate })).sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))[0] : null;
     // Winery test 5 (2026-11-12): an owner's holiday closure is "closed on your dates", not "for the season".
     if (closedHere) { warnings.push(`${closedHere.name} is closed${seasonClosedOnTrip({ ...closedHere, ownerClosures: undefined }, { date: ctx.tripDate }) ? ' for the season' : ''} on your dates, so ${focusText(ctx, f.key)} is not in this plan.`); continue; }
+    // Cocktail test 1 (2026-11-13): on a kids' trip, a place in town left out only because its owner said Adults only
+    // (19+) is named with that reason ("The Velvet Door is adults only (19+), so it isn’t in this family plan."), never planned.
+    const adults = ctx.kids && ctx.regions.length ? facts.filter((v) => ctx.regions.includes(v.region) && v.ownerAdultsOnly && !kidsAllowed(v) && !f.key.startsWith('food:') && f.test(v)).sort((x, y) => (Number(y.rating) || 0) - (Number(x.rating) || 0)).slice(0, 2) : [];
+    if (adults.length) { warnings.push(`${listText(adults.map((v) => v.name))} ${adults.length > 1 ? 'are' : 'is'} adults only (19+), so ${adults.length > 1 ? 'they aren’t' : 'it isn’t'} in this family plan.`); continue; }
     // 2026-10-14: name the closest place that has it, one or two towns along the corridor, instead of only saying no.
     const near = nearbyFocusVenue(facts, ctx, f);
     if (near) warnings.push(`Nothing matching ${focusText(ctx, f.key)} is listed in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}; the closest is ${near.name} in ${regionLabel(ctx, near.region)}.`);
@@ -6403,6 +6407,11 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
   const requestedRegions = input.intent?.regions?.length ? input.intent.regions : baseRegion ? [baseRegion] : [];
   const daypart = requirements.daypart || input.intent?.daypart || null;
   const visitDate = requirements.startDate || input.tripDate;
+  // Cocktail test 1 (2026-11-13): on a kids' trip the "kid-friendly" must-have kept an adults-only place out before its
+  // reason could be given ("Nothing matching cocktail lounges"). It is checked without that one rule, so the owner's own
+  // Adults only (19+) is named; it is still never planned (only offered here, with that reason).
+  const kidsTrip = !!input.intent?.party?.kids;
+  const noKidRule = kidsTrip ? { ...requirements, items: (requirements.items || []).filter(i => !(i.kind === 'feature' && i.value === 'kid_friendly')) } : null;
   return results.map(item => {
     if (item.status !== 'unmet' || !['type', 'type_count', 'venue_kind', 'venue', 'activity', 'feature', 'rainy'].includes(item.kind)) return item;
     let weekday = input.startWeekday || null;
@@ -6417,7 +6426,8 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
     const candidates = [];
     for (const venue of input.facts || []) {
       if (selected.has(venue.id) || !venue.url || !/^\/(?!\/)/.test(venue.url)) continue;
-      if (!tripRequirements.venueAllowed(venue, requirements, item.dayIndex || 1, visitDate)) continue;
+      const adultsOnlyOut = kidsTrip && venue.ownerAdultsOnly && !kidsAllowed(venue);
+      if (!tripRequirements.venueAllowed(venue, requirements, item.dayIndex || 1, visitDate) && !(adultsOnlyOut && tripRequirements.venueAllowed(venue, noKidRule, item.dayIndex || 1, visitDate))) continue;
       // Audit fix (2026-10-27): a place closed for the season or under a closed advisory is never offered under "Not
       // included" (the closed Terrace Restaurant was offered as its own alternative).
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
