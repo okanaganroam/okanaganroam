@@ -10512,7 +10512,11 @@ const NIGHT_DETAIL_MAX = 80;
 const NIGHT_HOST_MAX = 40;
 const NIGHT_COST_MAX = 20;
 const NIGHTS_STALE_DAYS = 120;
-const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'other'];
+// Distillery test 1 (2026-11-13): 'tour' and 'class' (a distillery tour, a cocktail or whisky class), so Build My Trip can
+// match a tour at any time of day. Values only; the stored shape is unchanged.
+const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'other'];
+// The kinds that run at any time of day (not only evenings), for the trip planner's lines.
+const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
 const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th'];
 const NIGHT_TYPES = portalTypesWith('nights');
 // One night as stored and compared: every key, in this order, null when not given.
@@ -10520,8 +10524,8 @@ const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', '
 // A night's optional season (pub test 7, 2026-11-10), kept apart so nights without one keep their exact stored shape.
 const NIGHT_SEASON_KEYS = ['season_from', 'season_to'];
 const NIGHT_KIND_LABELS = {
-  en: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night', other: 'Other nights' },
-  fr: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture', other: 'Autres soirées' },
+  en: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night', tour: 'Tour', class: 'Class', other: 'Other nights' },
+  fr: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture', tour: 'Visite', class: 'Atelier', other: 'Autres soirées' },
 };
 // A text field of night n: the deal rules, worded for nights. -> { ok, value (null when empty) } | { ok: false, detail }
 function nightTextField(raw, what, max, n, required) {
@@ -10776,7 +10780,7 @@ const NIGHT_KIND_WORDS = {
   karaoke: ['karaoke'], trivia: ['trivia', 'quiz', 'trivingo'], open_mic: ['mic', 'jam', 'scene'], bingo: ['bingo', 'singo', 'trivingo'],
   live_music: ['music', 'band', 'jam', 'blue', 'jazz', 'musique', 'concert'], dj: ['dj', 'djs'], comedy: ['comedy', 'comedian', 'humour', 'standup'],
   run_club: ['run', 'running', 'course'], games: ['game', 'crib', 'cribbage', 'dart', 'pool', 'jeux', 'jeu'],
-  sports: ['sport', 'nfl', 'football', 'ufc', 'hockey', 'nhl', 'cfl', 'nba', 'mlb', 'gameday'], paint: ['paint', 'painting', 'peinture'], other: [],
+  sports: ['sport', 'nfl', 'football', 'ufc', 'hockey', 'nhl', 'cfl', 'nba', 'mlb', 'gameday'], paint: ['paint', 'painting', 'peinture'], tour: ['tour', 'visite'], class: ['class', 'workshop', 'masterclass', 'atelier', 'lesson'], other: [],
 };
 // The kind and night words the label itself is made of ("Games night" -> game, night).
 function nightKindWords(kind) {
@@ -20809,8 +20813,9 @@ const { BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR } = require('./
 function brewSetupType(t) { return t === 'brewery' || t === 'distillery'; }
 // Decided 5: a distillery may also answer the winery's "By appointment" (no set hours: visit 'appointment'; or walk-ins
 // in a season and by appointment the rest of the year: year 'appointment' with its season). Breweries never send these.
-const BREWERY_INFO_PARTS = ['food', 'trucks', 'outside', 'kitchen', 'no_flights', 'to_go', 'minors', 'year', 'visit', 'season'];
-const DISTILLERY_ONLY_PARTS = ['visit', 'season'];
+// Distillery test 1 (2026-11-13): 'waived' -- the winery's "free with a bottle" answer ('yes' | 'two' | 'no'), same values.
+const BREWERY_INFO_PARTS = ['food', 'trucks', 'outside', 'kitchen', 'no_flights', 'to_go', 'minors', 'year', 'visit', 'season', 'waived'];
+const DISTILLERY_ONLY_PARTS = ['visit', 'season', 'waived'];
 // Brewery test 2 (2026-11-13): "Food trucks most days" or "on weekends", the only food-truck detail (no schedule, no names).
 const BREWERY_TRUCKS = ['most_days', 'weekends'];
 // "weekend(s)", "Fri–Sun", "Sat & Sun", "Friday to Sunday", « fin de semaine », « week-end ».
@@ -20859,6 +20864,7 @@ function cleanBreweryInfoPart(key, x) {
   if (key === 'trucks') return BREWERY_TRUCKS.includes(x) ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'year') return BREWERY_YEAR.includes(x) || x === 'appointment' ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'visit') return x === 'appointment' ? { value: x } : { error: BREWERY_INFO_ERROR };
+  if (key === 'waived') return WINERY_WAIVED.includes(x) ? { value: x } : { error: BREWERY_INFO_ERROR };
   if (key === 'season') return cleanWineryInfoPart('season', x).error ? { error: BREWERY_INFO_ERROR } : cleanWineryInfoPart('season', x);
   if (key === 'no_flights') return x === true ? { value: true } : x === false ? { value: null } : { error: BREWERY_INFO_ERROR };
   if (key === 'kitchen') {
@@ -20930,7 +20936,9 @@ function breweryVisitLines(venue, info) {
   const fee = typeof b.fee === 'number' ? b.fee : null;
   // Distilleries (2026-11-13): tastings, not flights (the row's label shows as "Tastings" on their page, visitInfoHtml).
   const spirits = venue && venue.type === 'distillery';
-  if (fee != null) out.Flights = spirits ? (fee === 0 ? { en: 'Free tastings.', fr: 'Dégustations gratuites.' } : { en: `${wineryMoney(fee, false)} a tasting.`, fr: `${wineryMoney(fee, true)} la dégustation.` })
+  // Distillery test 1 (2026-11-13): "$12 a tasting, free with a bottle purchase." (the winery's words).
+  const waived = spirits && fee ? { yes: [', free with a bottle purchase', ', offerte à l’achat d’une bouteille'], two: [', free when you buy 2 bottles or more', ', offerte à l’achat de 2 bouteilles ou plus'] }[b.waived] : null;
+  if (fee != null) out.Flights = spirits ? (fee === 0 ? { en: 'Free tastings.', fr: 'Dégustations gratuites.' } : { en: `${wineryMoney(fee, false)} a tasting${waived ? waived[0] : ''}.`, fr: `${wineryMoney(fee, true)} la dégustation${waived ? waived[1] : ''}.` })
     : fee === 0 ? { en: 'Free tasting flights.', fr: 'Plateaux de dégustation gratuits.' } : { en: `${wineryMoney(fee, false)} a flight.`, fr: `${wineryMoney(fee, true)} le plateau.` };
   else if (b.no_flights === true) out.Flights = spirits ? { en: 'No tastings.', fr: 'Pas de dégustations.' } : { en: 'No tasting flights.', fr: 'Pas de plateaux de dégustation.' };
   // Food: the main pick, the kitchen time and outside food. Food trucks never name a truck (they change every week).
@@ -35978,7 +35986,7 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   return { rows, checked: happyHourCheckedText(oldest, fr), confirmed };
 }
 // A small line icon per kind (the existing uiIcon set; no emoji).
-const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', other: 'calendar' };
+const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', tour: 'calendar', class: 'calendar', other: 'calendar' };
 // The "Weekly nights" card (the weekly specials' list style): the days in their own column, the title with its time
 // and a "Tonight" tag on tonight's row (words, not only colour; "Today" for a night before 4 PM), then a line with the
 // kind, the detail, the host, the cost and "every other week". French without a French title or detail shows the
@@ -47809,6 +47817,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (next.year === 'appointment' && !next.season) errors.brewery_info = 'Please pick when you’re open for walk-in tastings.';
       // "Most days" / "weekends" goes with "Food trucks" only.
       if (next.food !== 'trucks') delete next.trucks;
+      // "Free with a bottle" goes with a tasting price only.
+      if (next.no_flights) delete next.waived;
       // Stored in BREWERY_INFO_PARTS order, so an Undo compares like with like.
       const ordered = Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => k in next).map((k) => [k, next[k]]));
       if (!errors.brewery_info && JSON.stringify(ordered) !== JSON.stringify(Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => k in cur).map((k) => [k, cur[k]])))) changes.brewery_info = ordered;
@@ -47949,6 +47959,7 @@ function ownerValueText(field, value) {
     if (o.food) parts.push(`Food: ${o.food}${o.kitchen ? (o.kitchen.mode === 'earlier' ? ` (kitchen closes ${o.kitchen.closes})` : ' (food until close)') : ''}${o.trucks ? (o.trucks === 'weekends' ? ' (weekends)' : ' (most days)') : ''}`);
     if (o.outside) parts.push(`Outside food: ${o.outside}`);
     if (o.no_flights) parts.push('No flights');
+    if (o.waived) parts.push(`Tasting free with a bottle: ${o.waived}`);
     if (Array.isArray(o.to_go)) parts.push(`To go: ${o.to_go.join(', ')}`);
     if (o.minors) parts.push(`Who's welcome: ${minorsLineText(o.minors, false)}`);
     if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
@@ -52954,9 +52965,12 @@ function renderOwnerSetupPage(found, opts) {
     nightKinds: venue.type === 'pub' ? ['trivia', 'live_music', 'karaoke', 'sports', 'dj', 'open_mic', 'comedy', 'bingo', 'games', 'paint', 'run_club', 'other']
       // Cafés (2026-11-10): open mic, live music, art and workshops first.
       : cafe ? ['open_mic', 'live_music', 'paint', 'games', 'run_club', 'trivia', 'comedy', 'karaoke', 'bingo', 'dj', 'sports', 'other']
+      // Distillery test 1 (2026-11-13): a distillery tour and a class first; the pub kinds wait under "More kinds".
+      : venue.type === 'distillery' ? ['tour', 'class', 'live_music', 'other', 'trivia', 'games', 'open_mic', 'comedy', 'paint', 'karaoke', 'bingo', 'run_club', 'dj', 'sports']
       // Breweries (2026-11-12): trivia, live music, bingo and run club first.
       : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
+    nightKindsTop: venue.type === 'distillery' ? 4 : 6,
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
@@ -53111,6 +53125,7 @@ function ownerFlightFeeWaiting(venueId) {
 // (from research's Food line) and the flight price (the card's researched "From $X" when it is a flight price, or
 // research's Flights line) as suggestions: nothing is saved until she taps Save (SPEC "Rules kept").
 const BREWERY_EVENT_KINDS = [['trivia', /\b(?:trivia|quiz)\b/i], ['bingo', /\bbingo\b/i], ['karaoke', /\bkaraoke\b/i], ['live_music', /\blive music\b/i], ['open_mic', /\bopen mic\b/i], ['run_club', /\brun club\b/i], ['comedy', /\bcomedy\b/i]];
+const DISTILLERY_EVENT_KINDS = [['tour', /\btours?\b/i], ['class', /\b(?:class|classes|workshops?|masterclass(?:es)?)\b/i], ...BREWERY_EVENT_KINDS];
 const BREWERY_EVENT_DAYS = { mon: /\bmondays?\b/i, tue: /\btuesdays?\b/i, wed: /\bwednesdays?\b/i, thu: /\bthursdays?\b/i, fri: /\bfridays?\b/i, sat: /\bsaturdays?\b/i, sun: /\bsundays?\b/i };
 function breweryResearchSuggestions(researchRow, info, mine, spirits = false) {
   const out = {};
@@ -53131,9 +53146,12 @@ function breweryResearchSuggestions(researchRow, info, mine, spirits = false) {
   // Distilleries (2026-11-13): research's Tours line too ("Distillery tours on Saturdays; book online"), as the hint.
   const g = (info.rows || []).find((r) => r && (spirits ? /^(?:games|events|weekly events|entertainment|tours|classes)$/i : /^(?:games|events|weekly events|entertainment)$/i).test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
   if (g) {
-    const kinds = BREWERY_EVENT_KINDS.filter(([, re]) => re.test(g.text)).map(([k]) => k);
+    // Distillery test 1 (2026-11-13): "Distillery tours Saturdays at 2 PM, book ahead" is Tour · Saturday · 2 PM.
+    const kinds = (spirits ? DISTILLERY_EVENT_KINDS : BREWERY_EVENT_KINDS).filter(([, re]) => re.test(g.text)).map(([k]) => k);
     const days = Object.keys(BREWERY_EVENT_DAYS).filter((d) => BREWERY_EVENT_DAYS[d].test(g.text));
-    if (kinds.length === 1 && days.length && g.text.split(/[.;]/).filter((x) => x.trim()).length === 1) out.suggestNights = [{ kind: kinds[0], days }];
+    const at = /\bat\s+(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s?m\b/i.exec(g.text);
+    const start = at && Number(at[1]) >= 1 && Number(at[1]) <= 12 ? `${String(Number(at[1]) % 12 + (/p/i.test(at[3]) ? 12 : 0)).padStart(2, '0')}:${at[2] || '00'}` : '';
+    if (kinds.length === 1 && days.length && g.text.split(/[.;]/).filter((x) => x.trim()).length === 1) out.suggestNights = [{ kind: kinds[0], days, ...(start && /\bat\b/i.test(g.text) && (g.text.match(/\d{1,2}(?::\d{2})?\s*[ap]\.?\s?m\b/gi) || []).length === 1 ? { start } : {}) }];
     out.researchEvents = String(g.text).slice(0, 140);
   }
   return out;
@@ -59462,7 +59480,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const x = nightsNow[i] || { days: [], kind: 'trivia', frequency: 'weekly' };
       const n = i + 1;
       const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
-      const kinds = `<select class="op-wn-kind" aria-label="${L(`Night ${n}: kind of night`, `Soirée ${n} : genre de soirée`)}">${NIGHT_KINDS.map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
+      const kinds = `<select class="op-wn-kind" aria-label="${L(`Night ${n}: kind of night`, `Soirée ${n} : genre de soirée`)}">${NIGHT_KINDS.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
       const freq = `<select class="op-wn-freq" aria-label="${L(`Night ${n}: how often`, `Soirée ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
       return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''}>
           <legend>${L(`Night ${n}`, `Soirée ${n}`)}</legend>

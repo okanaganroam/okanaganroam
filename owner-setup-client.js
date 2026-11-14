@@ -296,7 +296,7 @@
   // food and research's flight price are offered as a starting point only; nothing is saved until she taps Save.
   var BI = clone(CUR.brewery_info || {});
   S.brew = { food: BI.food || '', trucks: BI.trucks || (BI.food === 'trucks' ? 'most_days' : ''), outside: BI.outside || '', kmode: (BI.kitchen || {}).mode || '', kcloses: (BI.kitchen || {}).closes || '21:00',
-    fee: CUR.flight_fee == null ? null : CUR.flight_fee, feeOther: false, noFlights: BI.no_flights === true, togo: {},
+    fee: CUR.flight_fee == null ? null : CUR.flight_fee, feeOther: false, noFlights: BI.no_flights === true, togo: {}, waived: BI.waived || '',
     known: (CUR.visit_rows || {}).known_for || '', groups: (CUR.visit_rows || {}).groups || '' };
   (BI.to_go || []).forEach(function(k){ S.brew.togo[k] = true; });
   // Distilleries (Decided 1): the kind is Distillery, never asked (and never sent: it isn't stored).
@@ -876,6 +876,8 @@
   var P2_ICONS = { stay: '💻', order: '🛍️', diet: '🌱', coffee: '🫘', sellout: '⏰', happy: '🍻', spend: '🍽️', specials: '⭐', music: '🎸', story: '✍️', book: '📅', takeout: '🥡', known: '👍', groups: '👥', instagram: '📸', facebook: '📘', door: '📍', social: '📸', experiences: '🍇', menu: '🍷' };
   // Café test 3 (2026-11-11): a café's weekly events get a calendar, not a guitar.
   if (C.cafe) P2_ICONS.music = '🗓️';
+  // Distillery test 1 (2026-11-13): cocktails, not pints; tours, not a guitar.
+  if (C.distillery) { P2_ICONS.happy = '🍹'; P2_ICONS.music = '🥃'; }
   // Breweries (2026-11-12): their menu is food, not a wine list.
   if (C.brewery) P2_ICONS.menu = '📖';
   // "87 %" in French, as the line beside it says (café test 6).
@@ -1360,6 +1362,8 @@
         + (C.distillery && T.feeFree ? '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (feeOn(0) ? 'true' : 'false') + '" data-bfee="0">' + h(T.feeFree) + '</button>' : '') + '</div>'
         + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, bf.fee == null || isNaN(bf.fee) ? '' : String(bf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (bf.noFlights ? '' : ' su-alt') + '" aria-pressed="' + (bf.noFlights ? 'true' : 'false') + '" data-bfee="none"><span class="su-ico" aria-hidden="true">' + (bf.noFlights ? '✓' : '○') + '</span><span>' + h(T.noFlights) + '<small>' + h(T.noFlightsSub) + '</small></span></button></div>'
+        // Distillery test 1 (2026-11-13): the winery's "free with a bottle" question (not for free tastings or none).
+        + (C.distillery && T.waivedQ && !bf.noFlights && !(bf.fee === 0 && !bf.feeOther) ? '<h2 class="su-h2" id="suWaivedQ">' + h(T.waivedQ) + '</h2>' + bpicks('waived', ['yes', 'two', 'no'], T.waivedOpts) : '')
         + '<h2 class="su-h2">' + h(T.togoQ) + '</h2><p class="su-hint">' + h(T.togoLead) + '</p>' + (S.togoGuessed && T.togoGuess ? '<p class="su-sent su-research" id="suToGoGuess">' + h(T.togoGuess) + '</p>' : '') + '<div class="su-chips" role="group" aria-label="' + h(T.togoQ) + '" id="suToGo">'
         + TOGO.concat(['none']).map(function(k){ return '<button type="button" class="su-chip' + (String(T.togo[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (bf.togo[k] ? 'true' : 'false') + '" data-btogo="' + k + '">' + h(T.togo[k]) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'flightsSave') + '</div>' + skip('flights');
@@ -1626,7 +1630,7 @@
       if (C.brewery && C.researchEvents && !S.done.music && T.eventsHint) x = x.replace('</h1>', '</h1><p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>');
     } else if (s === 'music:yes') {
       // A plainly stated weekly event ("Trivia Tuesdays") is filled in as a suggestion; nothing is saved until Save.
-      if (C.brewery && !S.nights.length && !S.done.music && !S.nightsGuessSet && (C.suggestNights || []).length) { S.nightsGuessSet = true; S.nightsGuessed = true; C.suggestNights.forEach(function(g){ var dd = {}; g.days.forEach(function(d){ dd[d] = true; }); S.nights.push({ days: dd, kind: g.kind, what: (T.kinds || {})[g.kind] || '', start: '' }); }); }
+      if (C.brewery && !S.nights.length && !S.done.music && !S.nightsGuessSet && (C.suggestNights || []).length) { S.nightsGuessSet = true; S.nightsGuessed = true; C.suggestNights.forEach(function(g){ var dd = {}; g.days.forEach(function(d){ dd[d] = true; }); S.nights.push({ days: dd, kind: g.kind, what: (T.kinds || {})[g.kind] || '', start: g.start || '' }); }); }
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
       x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
@@ -1634,7 +1638,7 @@
             // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
             // show open; the rest wait under "More kinds" (open when the picked kind is one of them).
             var chip = function(k){ return '<button type="button" class="su-chip" aria-pressed="' + (e.kind === k ? 'true' : 'false') + '" data-kind="' + i + ':' + k + '">' + h(T.kinds[k]) + '</button>'; };
-            var top = C.nightKinds.slice(0, 6), rest = C.nightKinds.slice(6);
+            var nTop = C.nightKindsTop || 6, top = C.nightKinds.slice(0, nTop), rest = C.nightKinds.slice(nTop);
             return '<div class="su-chips su-kinds">' + top.map(chip).join('') + '</div>'
               + (rest.length ? '<details class="su-kinds"' + (rest.indexOf(e.kind) >= 0 ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + rest.map(chip).join('') + '</div></details>' : '');
           })()
@@ -1642,7 +1646,7 @@
           + '<p class="su-q">' + h(T.whichNights) + '</p>' + dayChips(e.days, 'nights.' + i)
           + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div>'
           + seasonBox('nights.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('nights', i, e) + '</div>';
-      }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
+      }).join('') + (T.eventsOften ? '<p class="su-hint" id="suEventsOften">' + h(T.eventsOften) + '</p>' : '') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
       x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : CUR.description ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
@@ -2560,6 +2564,8 @@
       var fl = [], bi2 = {};
       if (fb2.noFlights !== (BI.no_flights === true)) bi2.no_flights = fb2.noFlights ? true : null;
       if (JSON.stringify(tg) !== JSON.stringify(BI.to_go || [])) bi2.to_go = tg;
+      // A distillery's "free with a bottle" answer goes with a price only (a free tasting or none takes it back).
+      if (C.distillery) { var wv2 = fb2.noFlights || ff === 0 ? null : fb2.waived || null; if (wv2 !== (BI.waived || null)) bi2.waived = wv2; }
       // "We don't do flights" takes the price back too; a price takes back "no flights".
       if (fb2.noFlights && S.savedFlight != null) fl.push({ flight_fee: null });
       if (Object.keys(bi2).length) fl.push({ brewery_info: bi2 });

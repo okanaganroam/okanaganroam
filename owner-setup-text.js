@@ -70,7 +70,7 @@ const en = {
   priceIf: 'Price, if there is one', priceEx: '$12', addSpecial: '+ Add another special', saveSpecials: 'Save my specials', needText: 'Please say what each one is.',
   musicQ: 'Anything on each week?', musicLead: 'Like trivia, live music, karaoke, open mic, comedy, bingo, paint night or a run club.',
   musicTypeQ: 'Your weekly events', eventN: 'Event {n}', whatEvent: 'What is it? Tap one or type your own.', eventEx: 'Trivia night, 7 PM, free to play', whichNights: 'Which day or days?', addEvent: '+ Add another event', saveEvents: 'Save my events',
-  kinds: { trivia: 'Trivia', live_music: 'Live music', karaoke: 'Karaoke', open_mic: 'Open mic', comedy: 'Comedy', bingo: 'Bingo', paint: 'Paint night', run_club: 'Run club', dj: 'DJ night', games: 'Game night', sports: 'Sports night', other: 'Something else' },
+  kinds: { trivia: 'Trivia', live_music: 'Live music', karaoke: 'Karaoke', open_mic: 'Open mic', comedy: 'Comedy', bingo: 'Bingo', paint: 'Paint night', run_club: 'Run club', dj: 'DJ night', games: 'Game night', sports: 'Sports night', tour: 'Tour', class: 'Class', other: 'Something else' },
   storyQ: 'Tell visitors about your place', storyLead: 'A few sentences in your own words.', storyLabel: 'About your place', storyCount: '{n} of 120 letters', storyGood: '{n} letters ✓ Great', storyEx: 'A family bistro on the lake. We make our pasta by hand and the patio catches the sunset.', storyShort: 'Please write a little more, at least 30 letters.', saveThis: 'Save this',
   bookQ: 'Do people need to book a table?', bookYes: 'Yes, they book', bookHowQ: 'How do people book?', bookEx: 'Call us or book on our website',
   takeoutQ: 'Do you do takeout or delivery?', takeoutHowQ: 'How do people order?', takeoutEx: 'Call to order, or on DoorDash',
@@ -158,7 +158,7 @@ const fr = {
   priceIf: 'Prix, s’il y en a un', priceEx: '12 $', addSpecial: '+ Ajouter un autre spécial', saveSpecials: 'Enregistrer mes spéciaux', needText: 'Indiquez ce qu’est chacun.',
   musicQ: 'Quelque chose chaque semaine?', musicLead: 'Comme un quiz, de la musique en direct, du karaoké, une scène ouverte, de l’humour, du bingo, une soirée peinture ou un club de course.',
   musicTypeQ: 'Vos événements de la semaine', eventN: 'Événement {n}', whatEvent: 'Qu’est-ce que c’est? Touchez-en un ou écrivez le vôtre.', eventEx: 'Soirée quiz, 19 h, gratuit', whichNights: 'Quel jour ou quels jours?', addEvent: '+ Ajouter un autre événement', saveEvents: 'Enregistrer mes événements',
-  kinds: { trivia: 'Quiz', live_music: 'Musique en direct', karaoke: 'Karaoké', open_mic: 'Scène ouverte', comedy: 'Humour', bingo: 'Bingo', paint: 'Soirée peinture', run_club: 'Club de course', dj: 'Soirée DJ', games: 'Soirée jeux', sports: 'Soirée sports', other: 'Autre chose' },
+  kinds: { trivia: 'Quiz', live_music: 'Musique en direct', karaoke: 'Karaoké', open_mic: 'Scène ouverte', comedy: 'Humour', bingo: 'Bingo', paint: 'Soirée peinture', run_club: 'Club de course', dj: 'Soirée DJ', games: 'Soirée jeux', sports: 'Soirée sports', tour: 'Visite', class: 'Atelier', other: 'Autre chose' },
   storyQ: 'Parlez de votre établissement aux visiteurs', storyLead: 'Quelques phrases dans vos mots.', storyLabel: 'À propos de votre établissement', storyCount: '{n} sur 120 lettres', storyGood: '{n} lettres ✓ Parfait', storyEx: 'Un bistro familial au bord du lac. Nos pâtes sont faites à la main et la terrasse profite du coucher de soleil.', storyShort: 'Écrivez-en un peu plus, au moins 30 lettres.', saveThis: 'Enregistrer',
   bookQ: 'Faut-il réserver une table?', bookYes: 'Oui, on réserve', bookHowQ: 'Comment réserver?', bookEx: 'Appelez-nous ou réservez sur notre site Web',
   takeoutQ: 'Faites-vous des commandes à emporter ou la livraison?', takeoutHowQ: 'Comment commander?', takeoutEx: 'Appelez pour commander, ou sur DoorDash',
@@ -1301,7 +1301,12 @@ en.brewery.kindDistillery = {
   minorsNoteEx: 'Kids welcome in the tasting room until 6 PM; the cocktail bar is 19+.',
   // Tours, classes and events (the weekly events screen, same storage)
   musicQ: 'Any tours, classes or events?', musicLead: 'Like a distillery tour, a cocktail or whisky class, live music or trivia.',
-  musicTypeQ: 'Your tours, classes and events', eventEx: 'Whisky class, first Saturday',
+  musicTypeQ: 'Your tours, classes and events', eventEx: 'Whisky class',
+  // Distillery test 1 (2026-11-13): a distillery tour and a class are the first chips; how often is on the edit page.
+  kinds: { tour: 'Distillery tour', class: 'Class' },
+  eventsOften: 'Monthly or every other week? Set how often under Tours & events on your edit page.',
+  // The winery's "free with a bottle" question, on Tastings and bottles.
+  waivedQ: 'Is a tasting free if people buy a bottle?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
   doorQ: 'Where’s the tasting room door?', doorHere: 'Are you at the distillery right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
   doorLead: 'If your door is around the side or upstairs, a photo helps people find it. One photo, taken at the tasting room door, walks visitors right to it.',
 };
@@ -1321,7 +1326,10 @@ fr.brewery.kindDistillery = {
   flightGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', flightGuessVisit: 'Votre page indique {x} maintenant, d’après votre site Web, alors nous l’avons choisi. Touchez un autre prix s’il a changé.',
   minorsNoteEx: 'Enfants bienvenus dans la salle de dégustation jusqu’à 18 h; le bar à cocktails est réservé aux 19 ans et plus.',
   musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, de la musique en direct ou un quiz.',
-  musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky, le premier samedi',
+  musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky',
+  kinds: { tour: 'Visite de la distillerie', class: 'Atelier' },
+  eventsOften: 'Une fois par mois ou une semaine sur deux? Choisissez la fréquence sous Visites et événements sur votre page de modification.',
+  waivedQ: 'La dégustation est-elle gratuite à l’achat d’une bouteille?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   doorQ: fr.brewery.doorQ, doorHere: 'Êtes-vous à la distillerie en ce moment?', mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
   doorLead: fr.brewery.doorLead,
 };
