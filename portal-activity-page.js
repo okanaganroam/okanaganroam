@@ -3,13 +3,21 @@
 const { layout, askFor } = require('./dashboard-layout');
 const { esc, num, bars, stat, table } = require('./dashboard-page');
 
+const WHY_WORDS = { form_problem: 'a form field needed fixing', wrong_email_or_password: 'wrong email or password', not_from_our_site: 'sent from outside our site', link_not_valid: 'link not valid any more', already_sent: 'already sent', too_long: 'too long', wrong_type: 'wrong kind of request', too_many_tries: 'too many tries', server_error: 'our server had a problem' };
+function whyText(why) {
+  const [base, fields] = String(why).split(':');
+  const words = WHY_WORDS[base] || base.replace(/_/g, ' ');
+  return fields ? `${words} (${fields.split('+').map((f) => f.replace(/_/g, ' ')).join(', ')})` : words;
+}
+const whyList = (s) => (s.why && s.why.length ? `<small>${s.why.map((w) => `${esc(whyText(w.why))} ×${num(w.n)}`).join('; ')}</small>` : '');
+
 function siteCard(g, days) {
   if (g.error || !g.data) return `<section class="col"><h2>${esc(g.name)}</h2><p class="warn">${esc(g.error || 'No data.')}</p></section>`;
   const d = g.data;
   const by = Object.fromEntries(d.steps.map((s) => [s.key, s]));
   const clicks = ['portal_login_click_menu', 'portal_login_click_venue_page', 'portal_login_click_footer', 'portal_login_click_other'].reduce((a, k) => a + (by[k] ? by[k].n : 0), 0);
   const groups = [...new Set(d.steps.map((s) => s.group))];
-  const sections = groups.map((grp) => `<h4>${esc(grp)}</h4>${table(['Step', 'Times', 'Asked to fix something'], d.steps.filter((s) => s.group === grp).map((s) => [esc(s.text), s.n ? `<b>${num(s.n)}</b>` : '0', s.failed ? num(s.failed) : '']))}`).join('');
+  const sections = groups.map((grp) => `<h4>${esc(grp)}</h4>${table(['Step', 'Times', 'Asked to fix something'], d.steps.filter((s) => s.group === grp).map((s) => [esc(s.text), s.n ? `<b>${num(s.n)}</b>` : '0', [s.failed ? num(s.failed) : '', whyList(s)].filter(Boolean).join('<br>')]))}`).join('');
   return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card">
     <div class="stats">${stat(clicks, 'clicked Business login')}${stat(by.login_page_view ? by.login_page_view.n : 0, 'opened the login page')}${stat(by.login_success ? by.login_success.n : 0, 'signed in')}${stat(by.login_failed ? by.login_failed.n : 0, 'sign-in failed')}${stat(by.edit_save ? by.edit_save.n : 0, 'saved a listing')}</div>
     ${bars(d.login_clicks_per_day, 'Clicks on Business login per day')}${bars(d.logins_per_day, 'Sign-ins per day')}

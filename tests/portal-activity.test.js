@@ -95,3 +95,30 @@ test('link scanners are not counted as owners opening claim pages or edit links'
   answer(c, req('Mozilla/5.0 (Windows NT 10.0) Chrome/140', '', ''), 'GET', '/owner/login', 200, '9.9.9.3');
   assert.equal((db.prepare("SELECT n FROM site_event_counts WHERE name = 'portal:login_page_view'").get() || { n: 0 }).n, 1);
 });
+
+test('why a step failed (2026-11-14): a fixed code from the status and the flagged field names, counted next to the failed total, shown on the page', () => {
+  assert.equal(pa.whyCode(401, { ok: false, error: 'typed text is never used' }), 'wrong_email_or_password');
+  assert.equal(pa.whyCode(400, { ok: false, errors: { contact_name: 'Please add your name', event_date: 'x' } }), 'form_problem:contact_name+event_date');
+  assert.equal(pa.whyCode(400, { errors: { 'Bad Key!': 'x' } }), 'form_problem');
+  assert.equal(pa.whyCode(502, null), 'server_error');
+  assert.equal(pa.whyCode(418, null), 'status_418');
+  assert.equal(pa.safeWhy('form_problem:contact_name+event_date'), 'form_problem:contact_name+event_date');
+  assert.equal(pa.safeWhy('someone@example.com'), 'other');
+  const db = memDb(); const c = pa.createPortalCounter(db);
+  const fail = (path, code, why) => { const res = new EventEmitter(); res.statusCode = code; if (why) res.portalWhy = why; c.watch(req(), res, 'POST', path, '6.6.6.6'); res.emit('finish'); };
+  fail('/owner/login', 401, 'wrong_email_or_password');
+  fail('/owner/login', 401); // no helper ran: the status alone gives the code
+  fail('/owner/Tok-en_1/events', 400, 'form_problem:contact_name');
+  fail('/owner/Tok-en_1/events', 400, 'form_problem:contact_name');
+  fail('/owner/Tok-en_1/events', 400, 'sneaky text with spaces and a@b.com');
+  const r = c.report(30, NOW);
+  const by = Object.fromEntries(r.steps.map((s) => [s.key, s]));
+  assert.equal(by.login_failed.n, 2);
+  assert.deepEqual(by.login_failed.why, [{ why: 'wrong_email_or_password', n: 2 }]);
+  assert.equal(by.event_submit.failed, 3);
+  assert.deepEqual(by.event_submit.why, [{ why: 'form_problem:contact_name', n: 2 }, { why: 'other', n: 1 }]);
+  const html = renderPortalPage({ days: 30, sites: [{ name: 'Okanagan Roam', data: r }] });
+  assert.match(html, /wrong email or password ×2/);
+  assert.match(html, /a form field needed fixing \(contact name\) ×2/);
+  assert.doesNotMatch(html, /sneaky|a@b\.com/);
+});
