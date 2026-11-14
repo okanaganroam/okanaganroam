@@ -862,6 +862,15 @@
   var QUICK_COMMON = { only: 1, and: 1, the: 1, at: 1, on: 1, to: 1, too: 1, our: 1, us: 1, welcome: 1, dogs: 1, dog: 1, et: 1, seulement: 1, a: 1, l: 1, d: 1, la: 1, le: 1, les: 1, aux: 1, au: 1, chiens: 1, chien: 1, bienvenus: 1 };
   function quickWords(t){ return String(t || '').toLowerCase().replace(/[’']/g, ' ').split(/[^a-z0-9à-ÿ]+/).filter(function(w){ return w && !QUICK_COMMON[w] && w !== 'à'; }); }
   function saysIt(v, t){ if (has(v, t)) return true; var w = quickWords(t), b = ' ' + quickWords(v).join(' ') + ' '; return !!w.length && w.every(function(x){ return b.indexOf(' ' + x + ' ') >= 0; }); }
+  // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
+  // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
+  function enLineHint(text, id){
+    var t = String(text || '');
+    if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
+    var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
+    if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
+    return '<p class="su-hint su-enhint" id="' + id + '">' + h(T.lineEnglishHint) + '</p>';
+  }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
@@ -1765,7 +1774,7 @@
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn') + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
         // links"), and a link typed into the line above is offered a move into it instead of being refused.
         + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
@@ -1784,8 +1793,8 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = String(gl).replace(/\.$/, '') === fill(T.groupsLine, { n: n }) || (!!gsz && +gsz === n && /book|réserv/i.test(gl)); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
-        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn') + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);

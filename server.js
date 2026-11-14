@@ -59109,10 +59109,14 @@ const OWNER_BOOKING_FIRST_TYPES = portalTypesWith('bookingFirst');
 
 // What the folded Seasonal hours and Special closures headers say once something is set (2026-10-18), so an owner
 // sees it without opening them: "Winter hours Nov 1–Apr 30", "2 closures (next: Dec 25)".
+// Cocktail test 2 (2026-11-13): the season names the setup saves ("Summer hours", "Winter hours") read in French on
+// French pages (« Heures d’été »). A name the owner typed herself shows as typed.
+const SEASON_LABELS_FR = { 'summer hours': 'Heures d’été', 'winter hours': 'Heures d’hiver', 'spring hours': 'Heures du printemps', 'fall hours': 'Heures d’automne', 'autumn hours': 'Heures d’automne', 'seasonal hours': 'Heures saisonnières' };
+function seasonLabelText(label, fr) { const t = String(label || '').trim(); return fr ? SEASON_LABELS_FR[t.toLowerCase()] || t : t; }
 function ownerSeasonSummary(season, lang = 'en') {
   if (!season || !season.from || !season.to) return '';
   const fr = lang === 'fr';
-  const label = String(season.label || '').trim() || (fr ? 'Heures saisonnières' : 'Seasonal hours');
+  const label = seasonLabelText(season.label, fr) || (fr ? 'Heures saisonnières' : 'Seasonal hours');
   return fr ? `${label} du ${hoursExtraDayText(season.from, true)} au ${hoursExtraDayText(season.to, true)}`
     : `${label} ${hoursExtraDayText(season.from)}–${hoursExtraDayText(season.to)}`;
 }
@@ -59142,7 +59146,7 @@ function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
       <summary><span class="lyv-section-label">${L('Seasonal hours', 'Heures saisonnières')}${chip}</span> <span class="op-fold-hint" id="opSeasonalSummary">${season ? escapeHtml(ownerSeasonSummary(season, lang)) : L('Different hours part of the year, like winter hours from November to April', 'D’autres heures pendant une partie de l’année, comme des heures d’hiver de novembre à avril')}</span></summary>
       <label class="op-closed" style="width:auto"><input type="checkbox" id="opSeasonalOn"${season ? ' checked' : ''}> ${L('We have different hours part of the year', 'Nous avons d’autres heures pendant une partie de l’année')}</label>
       <div id="opSeasonalFields"${season ? '' : ' hidden'}>
-        <div class="op-season"><label for="opSeasonalLabel"><strong>${L('Name', 'Nom')}</strong> ${L('(optional)', '(facultatif)')}</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="${L('Winter hours', 'Heures d’hiver')}" value="${escapeHtml(season ? season.label || '' : '')}"></div>
+        <div class="op-season"><label for="opSeasonalLabel"><strong>${L('Name', 'Nom')}</strong> ${L('(optional)', '(facultatif)')}</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="${L('Winter hours', 'Heures d’hiver')}" value="${escapeHtml(season ? seasonLabelText(season.label, lang === 'fr') : '')}"${season && seasonLabelText(season.label, lang === 'fr') !== String(season.label || '').trim() ? ` data-stored="${escapeHtml(String(season.label || '').trim())}" data-shown="${escapeHtml(seasonLabelText(season.label, true))}"` : ''}></div>
         <div class="op-season"><strong>${L('From', 'Du')}</strong> ${pair('opSeasonalFromM', 'opSeasonalFromD', from, L('Seasonal hours start month', 'Mois du début des heures saisonnières'), L('Seasonal hours start day', 'Jour du début des heures saisonnières'))}
           <strong>${L('to', 'au')}</strong> ${pair('opSeasonalToM', 'opSeasonalToD', to, L('Seasonal hours last month', 'Dernier mois des heures saisonnières'), L('Seasonal hours last day', 'Dernier jour des heures saisonnières'))}
           <p class="op-hint">${L('Every year between these days (both included), your page shows the hours below instead of your usual hours.', 'Chaque année entre ces deux jours (inclusivement), votre page affiche les heures ci-dessous au lieu de vos heures habituelles.')}</p></div>
@@ -59159,14 +59163,17 @@ function ownerClosureRowHtml(c, today, lang = 'en') {
   if (c && hoursModule && hoursModule.isYearlyClosure(c)) {
     const range = lang === 'fr' ? `du ${hoursExtraDayText(c.from, true)} au ${hoursExtraDayText(c.to || c.from, true)}` : `${hoursExtraDayText(c.from)} \u2013 ${hoursExtraDayText(c.to || c.from)}`;
     return `<div class="op-closure op-closure-yearly" data-yfrom="${escapeHtml(c.from)}" data-yto="${escapeHtml(c.to || c.from)}" data-ynote="${escapeHtml(c.note || '')}">
-          <p style="margin:0"><strong>${L('Every year', 'Chaque année')}:</strong> ${escapeHtml(range)}${c.note ? ` (${escapeHtml(c.note)})` : ''}</p>
+          <p style="margin:0"><strong>${L('Every year', 'Chaque année')}:</strong> ${escapeHtml(range)}${c.note ? ` (${escapeHtml(presetAnswer(c.note, lang))})` : ''}</p>
           <button type="button" class="op-cl-remove">${L('Remove', 'Retirer')}</button>
         </div>`;
   }
+  // Cocktail test 2 (2026-11-13): a holiday name from the setup (stored in English, "Christmas Day") shows in the page's
+  // language (« Noël »); sent back untouched, it stays as stored.
+  const noteStored = c ? c.note || '' : '', noteShown = noteStored ? presetAnswer(noteStored, lang) : '';
   return `<div class="op-closure">
           <label>${L('First day', 'Premier jour')} <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
           <label>${L('Last day (optional)', 'Dernier jour (facultatif)')} <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
-          <label class="op-cl-note-l">${L('Note (optional)', 'Note (facultatif)')} <input type="text" class="op-cl-note" maxlength="${HOURS_EXTRA_NOTE_MAX}" placeholder="${L('Thanksgiving', 'Action de grâce')}" value="${escapeHtml(c ? c.note || '' : '')}"></label>
+          <label class="op-cl-note-l">${L('Note (optional)', 'Note (facultatif)')} <input type="text" class="op-cl-note" maxlength="${HOURS_EXTRA_NOTE_MAX}" placeholder="${L('Thanksgiving', 'Action de grâce')}" value="${escapeHtml(noteShown)}"${noteShown !== noteStored ? ` data-note-stored="${escapeHtml(noteStored)}" data-note-shown="${escapeHtml(noteShown)}"` : ''}></label>
           <button type="button" class="op-cl-remove">${L('Remove', 'Retirer')}</button>
         </div>`;
 }
@@ -60937,7 +60944,10 @@ ${ownerFooterHtml(fr)}
     var val = function(id){ return document.getElementById(id).value; };
     var from = val('opSeasonalFromM') + '-' + val('opSeasonalFromD'), to = val('opSeasonalToM') + '-' + val('opSeasonalToD');
     if (from === to) return { error: T.seasonSame };
-    return { list: [{ label: val('opSeasonalLabel').trim(), from: from, to: to, hours: w.week }].concat(rest) };
+    // Cocktail test 2 (2026-11-13): a setup name shown in French (« Heures d’été ») goes back as stored when left as is.
+    var labEl = document.getElementById('opSeasonalLabel'), lab = labEl.value.trim();
+    if (labEl.getAttribute('data-shown') !== null && lab === labEl.getAttribute('data-shown')) lab = labEl.getAttribute('data-stored');
+    return { list: [{ label: lab, from: from, to: to, hours: w.week }].concat(rest) };
   }
   function closuresValue(){
     if (!clBox) return { list: undefined };
@@ -60945,7 +60955,8 @@ ${ownerFooterHtml(fr)}
     Array.prototype.forEach.call(clBox.querySelectorAll('.op-closure'), function(row){
       // Café test 2 (2026-11-11): a yearly closure ("Every year: Apr 1 – Apr 24") is kept as it is (Remove takes it off).
       if (row.getAttribute('data-yfrom')) { out.push({ from: row.getAttribute('data-yfrom'), to: row.getAttribute('data-yto'), note: row.getAttribute('data-ynote') || '', yearly: true }); return; }
-      var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, n = row.querySelector('.op-cl-note').value.trim();
+      var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, ni = row.querySelector('.op-cl-note'), n = ni.value.trim();
+      if (ni.getAttribute('data-note-shown') !== null && n === ni.getAttribute('data-note-shown')) n = ni.getAttribute('data-note-stored');
       if (!f && !t && !n) return;
       if (!f) { err = T.clFirst; return; }
       if (t && t < f) { err = T.clOrder; return; }

@@ -583,7 +583,7 @@ Object.assign(fr, {
   kitchenSeasonQ: 'Pendant vos heures d’{kind} ({range}), à quelle heure la cuisine ferme-t-elle?', kitchenSeasonSame: 'Même heure que le reste de l’année', kitchenSeasonClose: 'Nourriture jusqu’à la fermeture',
   kitchenSeasonAt: 'La cuisine ferme à', kitchenSeasonNeed: 'Choisissez l’heure, ou touchez « Même heure que le reste de l’année ».',
   storyPendingHint: 'Vous avez envoyé une nouvelle histoire. Nous la vérifions d’ici un jour.',
-  storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.',
+  lineEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le, changez les mots ou touchez une réponse rapide.', storyEditHint: 'Voici ce que dit votre page maintenant. Modifiez les mots directement dans la boîte, ou touchez ✕ pour l’effacer et recommencer.',
   // Brewery test 3 (2026-11-13): the text on the page now is in English (research); said so, kept, never translated.
   storyEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le tel quel, ou écrivez votre texte en français\u00a0: il s’ajoute au texte anglais, qui reste pour les visiteurs anglophones.', storyClear: 'Effacer le texte',
   useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
