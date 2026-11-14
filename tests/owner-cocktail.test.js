@@ -309,6 +309,8 @@ test('help: cocktail list, DJ nights, 19+, walk-ins or booking, and the cocktail
   assert.match(T.find((x) => x.id === 'cocktail-djs').a, /\{EDIT\}#tours-events/);
   const v = mk('cocktail'); const t = tokenFor(v.id);
   const html = (await get(`/owner/${t}/setup`)).text;
-  for (const id of ['cocktail-price', 'cocktail-kids', 'cocktail-booking', 'pub-kitchen']) if (id !== 'pub-kitchen') assert.match(html, new RegExp(`"id":"${id}"`), id);
+  for (const id of ['cocktail-price', 'cocktail-kids', 'cocktail-booking', 'cocktail-menu']) assert.match(html, new RegExp(`"id":"${id}"`), id);
+  // "How does Set up your page work?" names the lounge's 8 essentials, not the restaurant's.
+  assert.match(T.find((x) => x.id === 'easy-setup').a, /\(8 steps\): address and phone, hours \(with when the kitchen closes, and holidays\), happy hour, your food, your menu or cocktail list, the cocktail price/);
   assert.match((await get(`/owner/${t}`)).text, /"id":"cocktail-djs"/, 'on the edit page too');
 });

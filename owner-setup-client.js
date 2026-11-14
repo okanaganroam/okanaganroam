@@ -1008,7 +1008,7 @@
     var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
     // A café's one Instagram and Facebook screen keeps its capitals too.
     if ((C.cafe || C.winery || C.brewery || CK) && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
-    var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase(); }).concat(social.map(function(k){ return T.labels[k]; }));
+    var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase().replace(/\bdj(s?)\b/g, 'DJ$1'); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
     return cl(T.optional) + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
   }
