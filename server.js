@@ -10111,11 +10111,14 @@ const VISIT_DUP_STOP = new Set(['with', 'that', 'this', 'from', 'have', 'also', 
 function visitWordSet(t) {
   return new Set((String(t || '').toLowerCase().match(/[a-z\u00e0-\u00ff0-9]{4,}/g) || []).filter((w) => !VISIT_DUP_STOP.has(w)).map((w) => w.replace(/(?:ing|es|s)$/, '')));
 }
+// Pub test (Whistler, 2026-11-14): never the owner's own Known for line (her "Après-ski and wings" was hidden as a repeat
+// of research's description); only research's.
 function visitDropRepeatedKnownFor(info, description) {
   if (!info || !Array.isArray(info.rows) || info.rows.length < 2 || !description) return info;
   const desc = visitWordSet(description);
+  const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
   const rows = info.rows.filter((r) => {
-    if (r.label !== 'Known for') return true;
+    if (r.label !== 'Known for' || mine.has(r.label)) return true;
     const w = visitWordSet(r.text);
     if (w.size < 5) return true;
     let hit = 0;
@@ -35702,12 +35705,16 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
     return s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to;
   });
   for (const s of parsed.seasons || []) {
-    const name = fr ? 'Heures saisonnières' : escapeHtml(s.label || 'Seasonal hours');
-    const range = escapeHtml(hoursExtraRangeText(s.from, s.to, fr));
+    // Pub test (Whistler, 2026-11-14): a season with no name (the setup's own) is named by its dates, never "Summer
+    // hours": "Hours (Apr 21 – Nov 24) apply now" (fr: « Heures du 21 avr. au 24 nov. en vigueur »).
+    const named = String(s.label || '').trim();
+    const head = !named
+      ? (fr ? `<strong>Heures du ${escapeHtml(hoursExtraDayText(s.from, true))} au ${escapeHtml(hoursExtraDayText(s.to, true))}</strong>` : `<strong>Hours</strong> (${escapeHtml(hoursExtraRangeText(s.from, s.to))})`)
+      : `<strong>${fr ? 'Heures saisonnières' : escapeHtml(named)}</strong> (${escapeHtml(hoursExtraRangeText(s.from, s.to, fr))})`;
     if (s === nowSeason) {
-      out.push(`<p class="venue-hours-note"><strong>${name}</strong> (${range}) ${L('apply now', 'en vigueur')}.</p><details class="venue-hours-usual"><summary>${L('Usual hours', 'Heures habituelles')}</summary>${list(parsed.days)}</details>`);
+      out.push(`<p class="venue-hours-note">${head} ${L('apply now', 'en vigueur')}.</p><details class="venue-hours-usual"><summary>${L('Usual hours', 'Heures habituelles')}</summary>${list(parsed.days)}</details>`);
     } else {
-      out.push(`<details class="venue-hours-usual"><summary>${name} (${range})</summary>${list(s.days)}</details>`);
+      out.push(`<details class="venue-hours-usual"><summary>${head.replace(/<\/?strong>/g, '')}</summary>${list(s.days)}</details>`);
     }
   }
   // Café test 4 (2026-11-11): a one-day closure inside a longer one ("Dec 25 (Christmas Day)" inside "Dec 25 – Jan 1")
@@ -46563,6 +46570,27 @@ const OWNER_VISIT_SLOTS = [
 // Cocktail test 1 (2026-11-13): and research's "Good to know" is its own box on the edit page (one writer, so nothing doubles).
 const COCKTAIL_VISIT_SLOTS = OWNER_VISIT_SLOTS.map((x) => (x.key === 'groups' ? { ...x, labels: ['Groups'], def: 'Groups' } : x)).concat([{ key: 'good_to_know', labels: ['Good to know'], def: 'Good to know', item: null }]);
 const OWNER_VISIT_KEYS = [...new Set([...OWNER_VISIT_SLOTS, ...COCKTAIL_VISIT_SLOTS].map((x) => x.key))];
+// Pub test (Whistler, 2026-11-14): her Groups answer replaced research's "Good to know: Live music on weekends in
+// winter" and showed as "Good to know". A groups answer is its own "Groups" line now and research's Good to know stays
+// beside it, unless that line is itself about groups (her answer covers it, so it is replaced as before). A line that
+// isn't about groups (the edit page's "Groups and good to know" box: "Free parking out back") is still "Good to know".
+// Her earlier answer saved under "Good to know" is still read as hers.
+const VISIT_GROUPS_RE = /\b(?:groups?|parties|party|buy-?outs?|private (?:rooms?|events?|parties|bookings?|dining)|large (?:groups?|parties)|\d+\s*(?:\+|or more|people|guests|persons?)|(?:call|book) ahead for)(?![a-z])|\bgroupes?\b|privatis|salle privée/i;
+function visitGroupsSlot(slot) { return slot.key === 'groups' && slot.labels.includes('Good to know') && slot.labels.includes('Groups'); }
+function visitSlotRowIndex(slot, rows, owned) {
+  const at = (l) => (rows || []).findIndex((r) => r && r.label === l);
+  if (visitGroupsSlot(slot)) {
+    const g = at('Groups'), k = at('Good to know');
+    if (g >= 0 && owned.has('Groups')) return g;
+    if (k >= 0 && owned.has('Good to know')) return k;
+    if (g >= 0) return g;
+    return k >= 0 && VISIT_GROUPS_RE.test(String(rows[k].text || '')) ? k : -1;
+  }
+  for (const l of slot.labels) { const i = at(l); if (i >= 0) return i; }
+  return -1;
+}
+// The label a new line of this slot gets: "Groups" for an answer about groups, else the slot's own.
+function visitSlotNewLabel(slot, text) { return visitGroupsSlot(slot) && VISIT_GROUPS_RE.test(String(text || '')) ? 'Groups' : slot.def; }
 function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return t === 'cocktail' ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
 // The classic edit page keeps its five boxes (the dogs line is only asked in the setup).
 const OWNER_VISIT_EDIT_KEYS = ['known_for', 'reservations', 'takeout', 'dietary', 'groups'];
@@ -46588,9 +46616,10 @@ function ownerVisitRows(venueId) {
   // Winery test 2: a line of the owner's set aside because the box was full (owner_dropped, owned) still counts as hers.
   const rows = (info.rows || []).concat((Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned));
   const out = {};
+  const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
   for (const slot of visitSlotsFor(venueId)) {
-    const r = slot.labels.map((l) => rows.find((x) => x.label === l)).find(Boolean);
-    out[slot.key] = r ? r.text : '';
+    const i = visitSlotRowIndex(slot, rows, owned);
+    out[slot.key] = i >= 0 ? rows[i].text : '';
   }
   return out;
 }
@@ -46600,7 +46629,7 @@ function ownerVisitResearchKeys(venueId) {
   const info = venueVisitInfo(venueId) || {};
   const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
   const rows = info.rows || [];
-  return visitSlotsFor(venueId).filter((slot) => slot.key !== 'menu' && slot.key !== 'good_to_know').filter((slot) => { const r = slot.labels.map((l) => rows.find((x) => x && x.label === l)).find(Boolean); return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
+  return visitSlotsFor(venueId).filter((slot) => slot.key !== 'menu' && slot.key !== 'good_to_know').filter((slot) => { const r = rows[visitSlotRowIndex(slot, rows, mine)]; return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
 }
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
@@ -46621,12 +46650,14 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   for (const slot of SLOTS) {
     if (!rows.some((r) => slot.labels.includes(r.label))) { const pk = parked.find((r) => slot.labels.includes(r.label)); if (pk) rows.push({ label: pk.label, text: pk.text }); }
     const next = typeof (value || {})[slot.key] === 'string' ? value[slot.key] : '';
-    const i = rows.findIndex((r) => slot.labels.includes(r.label));
+    let i = visitSlotRowIndex(slot, rows, owned);
+    // A "good to know" line of hers (not about groups) takes research's Good to know line's place, never a second one.
+    if (i < 0 && next && visitGroupsSlot(slot) && visitSlotNewLabel(slot, next) === 'Good to know') i = rows.findIndex((r) => r.label === 'Good to know');
     const old = i >= 0 ? rows[i].text : '';
     // Winery test 2 (2026-11-12): a line the owner confirmed unchanged in the setup (`_confirm`) is the owner's from now
     // on, so a full box never drops it as research's.
     if (next === old) { if (next && i >= 0 && confirmed.has(slot.key)) owned.add(rows[i].label); continue; }
-    const label = i >= 0 ? rows[i].label : slot.def;
+    const label = i >= 0 ? rows[i].label : visitSlotNewLabel(slot, next);
     const wasLabel = slot.labels.find((l) => was[l] && !was[l].owned && !WINERY_MANAGED_LABELS.includes(l));
     if (wasLabel && next && next === was[wasLabel].text) {
       // Back to exactly research's line (an Undo): research's again, with its link.
@@ -48030,7 +48061,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const confirm = errors.visit_rows || (body || {}).from_setup !== true ? [] : Object.keys(x).filter((k) => {
         if (!next[k] || next[k] !== cur[k]) return false;
         const slot = visitSlotsFor(venue.id).find((z) => z.key === k);
-        const row = vrows.find((r) => slot.labels.includes(r.label));
+        const row = vrows[visitSlotRowIndex(slot, vrows, ownedNow)];
         return !!row && !ownedNow.has(row.label);
       });
       if (!errors.visit_rows && (OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k]) || confirm.length)) changes.visit_rows = confirm.length ? { ...next, _confirm: confirm } : next;
@@ -53358,6 +53389,9 @@ function renderOwnerSetupPage(found, opts) {
     // Breweries (2026-11-12): the kinds, a kind and a food the name or research suggests (pre-selected only, saved when
     // she taps Save), research's flight price as a starting point, and the quick flight prices' live limit.
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
+    // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
+    // too (a suggestion, saved only with the screen), as it does for breweries.
+    ...(pub && !brewery ? (() => { const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []); return { suggestKidsUntil: researchKidsUntil((info.rows || []).filter((x) => x && !mine.has(x.label))) }; })() : {}),
     // Cocktail lounges (2026-11-13): the cocktail price's quick buttons and live limit, and research's price as a suggestion.
     ...(cocktail ? { cocktailQuick: [12, 14, 16, 18], feeLiveMax: COCKTAIL_PRICE_LIVE_MAX, researchCocktail: cocktailPriceGuess(venue), ...loungeResearchHints(venue, snap.badges) } : {}),
     cafe, pub, winery, brewery, distillery, cocktail, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
@@ -53888,16 +53922,28 @@ function ownerSeasonHelpTopic(venueId) {
   let s0 = null;
   try { s0 = (venueHoursExtras(venueId).seasons || [])[0] || null; } catch (e) { s0 = null; }
   const base = OWNER_HELP_TOPICS.find((t) => t.id === 'seasonal-hours');
-  if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '') || !base) return null;
+  if (!base) return null;
+  // Pub test (Whistler, 2026-11-14): "How do I change my hours when the mountain closes?" got the weekly hours answer and
+  // "changes are checked first", though hours saved in the setup go live at once. With no season yet, the answer is how
+  // to add one in the setup's Hours step; the edit page comes second, and only its edit-link changes are checked first.
+  if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '')) {
+    return { ...base, pages: ['edit', 'setup'],
+      a: '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Set your <strong>usual hours</strong>, then at “Are these your hours all year?” tap <strong>No, different in summer</strong> (or winter).</li>'
+        + '<li>Pick the first and last day of those other hours (like the day the lifts close), and set them. Hours saved in the setup go live straight away, and every year your page switches between the two by itself.</li></ol>'
+        + '<p>Or on your edit page, under <strong>Seasonal hours</strong>, then {SEND}. {LIVE} Closed for the whole off-season? Tap <strong>We’re closed part of the year</strong> after your hours instead.</p>',
+      aFr: '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Indiquez vos <strong>heures habituelles</strong>, puis à « Ces heures sont-elles les mêmes toute l’année? », touchez <strong>Non, elles changent en été</strong> (ou en hiver).</li>'
+        + '<li>Choisissez le premier et le dernier jour de ces autres heures (comme le jour où les remontées ferment) et indiquez-les. Les heures enregistrées dans la configuration sont en ligne tout de suite, et chaque année votre page passe de l’un à l’autre d’elle-même.</li></ol>'
+        + '<p>Ou sur votre page de modification, sous <strong>Heures saisonnières</strong>, puis {SEND}. {LIVE} Fermé toute la basse saison? Touchez plutôt <strong>Nous fermons une partie de l’année</strong> après vos heures.</p>' };
+  }
   const sea = (fr) => seasonRangeShort(s0.from, s0.to, fr), rest = (fr) => seasonRangeShort(mdShift(s0.to, 1), mdShift(s0.from, -1), fr);
   const nameEn = escapeHtml(seasonLabelText(s0.label, false)), nameFr = escapeHtml(seasonLabelText(s0.label, true));
   return { ...base, pages: ['edit', 'setup'],
-    a: `<p>Your page has two sets of hours: your <strong>usual hours</strong> (${escapeHtml(rest(false))}) and your <strong>seasonal hours</strong>${nameEn ? `, “${nameEn}”` : ''} (${escapeHtml(sea(false))}). Every year the seasonal hours take over between those dates, then your page switches back to the usual ones by itself.</p>`
-      + '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Change your usual hours, your seasonal hours or their dates there. Hours you save in the setup go live straight away.</li>'
-      + '<li>Or on your edit page: <strong>Opening hours</strong> are your usual hours, and <strong>Seasonal hours</strong> are the other set. Tap {SEND}. {LIVE}</li></ol>'
+    a: `<p>Your page has two sets of hours: your <strong>usual hours</strong> (${escapeHtml(rest(false))}) and your <strong>other hours</strong> (${escapeHtml(sea(false))}${nameEn ? `, “${nameEn}”` : ''}). Every year the other hours take over between those dates, then your page switches back to the usual ones by itself.</p>`
+      + '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Change either set of hours or the dates there. Hours you save in the setup go live straight away.</li>'
+      + '<li>Or on your edit page: <strong>Opening hours</strong> are your usual hours, and <strong>Seasonal hours</strong> are the other hours. Tap {SEND}. {LIVE}</li></ol>'
       + '<p>Your usual hours already cover the rest of the year, so there’s no need to add another season for it.</p>',
-    aFr: `<p>Votre page a deux horaires : vos <strong>heures habituelles</strong> (${escapeHtml(rest(true))}) et vos <strong>heures saisonnières</strong>${nameFr ? `, « ${nameFr} »` : ''} (${escapeHtml(sea(true))}). Chaque année, les heures saisonnières s’appliquent entre ces dates, puis votre page revient d’elle-même aux heures habituelles.</p>`
-      + '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Vous y changez vos heures habituelles, vos heures saisonnières ou leurs dates. Les heures enregistrées dans la configuration sont en ligne tout de suite.</li>'
+    aFr: `<p>Votre page a deux horaires : vos <strong>heures habituelles</strong> (${escapeHtml(rest(true))}) et votre <strong>autre horaire</strong> (${escapeHtml(sea(true))}${nameFr ? `, « ${nameFr} »` : ''}). Chaque année, l’autre horaire s’applique entre ces dates, puis votre page revient d’elle-même aux heures habituelles.</p>`
+      + '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Vous y changez l’un ou l’autre horaire, ou les dates. Les heures enregistrées dans la configuration sont en ligne tout de suite.</li>'
       + '<li>Ou sur votre page de modification : <strong>Heures d’ouverture</strong>, ce sont vos heures habituelles, et <strong>Heures saisonnières</strong>, l’autre horaire. Touchez {SEND}. {LIVE}</li></ol>'
       + '<p>Vos heures habituelles couvrent déjà le reste de l’année : inutile d’ajouter une autre saison.</p>' };
 }
@@ -55014,8 +55060,14 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, trouvez <strong>Heures d\u2019ouverture</strong> (le bouton <strong>Heures</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Fermé</strong>.</li><li>Fermé l\u2019après-midi? Touchez <strong>+ deuxième plage</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copier le lundi sur mar.\u2013ven.</strong> (ou <strong>tous les jours</strong>).</li><li>Touchez {SEND} au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 01:00.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
   // Help bot v2 (2026-10-18): seasonal hour sets and special closure dates on the edit page.
   { id: 'seasonal-hours', over: ['hours', 'season'], q: 'Different summer and winter hours', qFr: 'Heures différentes l\u2019été et l\u2019hiver', pages: ['edit'],
-    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on'],
-    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison'],
+    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on',
+      // Pub test (Whistler, 2026-11-14): "How do I change my hours when the mountain closes?" got the weekly hours.
+      'season', 'seasonal', 'seasons', 'off season', 'offseason', 'ski season', 'the ski season', 'end of the season', 'end of season', 'start of the season', 'hours for the season',
+      'mountain closes', 'the mountain closes', 'when the mountain closes', 'mountain close', 'lifts close', 'when the lifts close', 'closes for the winter', 'close for the winter', 'hours when the',
+      'for the winter', 'for the summer', 'after the season'],
+    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison',
+      'saison', 'saisonnier', 'saisonnieres', 'saison de ski', 'la saison de ski', 'fin de saison', 'fin de la saison', 'hors saison', 'pour l hiver', 'pour l ete',
+      'la montagne ferme', 'quand la montagne ferme', 'montagne ferme', 'les remontees ferment', 'quand les remontees ferment', 'fermeture de la montagne', 'mes heures quand'],
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],

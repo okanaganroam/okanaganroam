@@ -196,7 +196,8 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Closures: the button counts what's new; the date box opens on next month; no "Welcome back" mid-session.
   assert.match(s, /fill\(newC === 1 \? T\.saveClosures1 : T\.saveClosuresN, \{ n: newC \}\)/);
   assert.match(s, /S\.addFrom \|\| nextMonth\(\)/);
-  assert.match(s, /S\.fresh \? T\.welcome : T\.soFarQ/);
+  // Pub test (Whistler, 2026-11-14): one return heading on every visit, never "Welcome back" or "Change something?".
+  assert.match(s, /x = any \? q\(T\.soFarQ, /);
   assert.equal(cfg.t.saveClosures1, 'Save these closures ({n} new)'); assert.equal(cfg.t.soFarQ, 'Your answers so far');
   // Tap-first answers, in both languages.
   assert.deepEqual(cfg.t.quick.reservations, ['Call us', 'Book on our website', 'Walk-ins welcome too']);

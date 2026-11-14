@@ -690,15 +690,18 @@ test('« 5 à 7 » everywhere in French: setup words for every type, the edit pa
 test('seasonal-hours help: a place with summer hours is told which are usual and which seasonal, setup first, never another season', async () => {
   const v = mk('cocktail'); const t = tokenFor(v.id);
   const generic = app.OWNER_HELP_TOPICS.find((x) => x.id === 'seasonal-hours');
-  assert.equal(app.ownerSeasonHelpTopic(v.id), null, 'no season: the general answer');
+  // Pub test (Whistler, 2026-11-14): with no season yet, how to add one in the setup's Hours step (live at once).
+  const none = app.ownerSeasonHelpTopic(v.id);
+  assert.match(none.a, /^<ol><li>Easiest: <strong>Set up your page<\/strong> \u2192 <strong>Change an answer<\/strong> \u2192 <strong>Hours<\/strong>/);
+  assert.match(none.a, /Hours saved in the setup go live straight away/); assert.match(none.aFr, /en ligne tout de suite/);
   assert.equal((await change(t, { hours_seasons: [{ from: '06-01', to: '09-30', label: 'Summer hours', hours: weekOf('11:30', '00:00') }] })).status, 200);
   const topic = app.ownerSeasonHelpTopic(v.id);
-  assert.match(topic.a, /your <strong>usual hours<\/strong> \(Oct–May\) and your <strong>seasonal hours<\/strong>, “Summer hours” \(Jun–Sep\)/);
+  assert.match(topic.a, /your <strong>usual hours<\/strong> \(Oct–May\) and your <strong>other hours<\/strong> \(Jun–Sep, “Summer hours”\)/);
   assert.match(topic.a, /<strong>Set up your page<\/strong> \u2192 <strong>Change an answer<\/strong> \u2192 <strong>Hours<\/strong>.*Hours you save in the setup go live straight away/);
   assert.match(topic.a, /Tap \{SEND\}\. \{LIVE\}/, 'the edit page: checked first from the link, live when signed in');
   assert.match(topic.a, /no need to add another season/);
   assert.doesNotMatch(topic.a + topic.aFr, /November 1|1er novembre|Winter hours|Heures d’hiver/);
-  assert.match(topic.aFr, /vos <strong>heures habituelles<\/strong> \(oct\.–mai\) et vos <strong>heures saisonnières<\/strong>, « Heures d’été » \(juin–sept\.\)/);
+  assert.match(topic.aFr, /vos <strong>heures habituelles<\/strong> \(oct\.–mai\) et votre <strong>autre horaire<\/strong> \(juin–sept\., « Heures d’été »\)/);
   assert.match(topic.aFr, /<strong>Configurez votre page<\/strong> \u2192 <strong>Modifier une réponse<\/strong> \u2192 <strong>Heures<\/strong>/);
   assert.match(topic.aFr, /inutile d’ajouter une autre saison/);
   const help = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec((await get(`/fr/owner/${t}`)).text)[1]);
