@@ -150,7 +150,7 @@ const fr = {
   chooseFile: 'Choisir un fichier', sendIt: 'Envoyer',
   webWhereQ: 'Où sur votre site Web?', webWhereHappy: 'Nous avons inscrit votre site Web. Si votre 5 à 7 est sur une autre page, ajoutez la fin de l’adresse.', webWhereSpecials: 'Nous avons inscrit votre site Web. Si vos spéciaux sont sur une autre page, ajoutez la fin de l’adresse.',
   webExHappy: '{site}/5-a-7', webExSpecials: '{site}/speciaux', webCopy: 'Nous le reporterons sur votre page',
-  happyTypeQ: 'Vos 5 à 7', happyTypeLead: 'Des jours ou des heures différents? Ajoutez-en un pour chacun.', happyN: '5 à 7 {n}', whichDays: 'Quels jours?', whatTime: 'À quelle heure?', starts: 'Début', ends: 'Fin',
+  happyTypeQ: 'Vos 5 à 7', happyTypeLead: 'Des jours ou des heures différents? Ajoutez-en un pour chacun.', happyN: '5 à 7 nº {n}', whichDays: 'Quels jours?', whatTime: 'À quelle heure?', starts: 'Début', ends: 'Fin',
   whatsOn: 'Quels sont les spéciaux?', whatsOnEx: 'Pintes à 6 $ et entrées à moitié prix', happyEx: 'Lun.–jeu. 15 h–17 h, pintes à 6 $. Ven. 14 h–18 h, ailes à 5 $.', addHappy: '+ Ajouter un autre 5 à 7', saveHappy: 'Enregistrer mes 5 à 7',
   needDays: 'Touchez au moins un jour pour chacun.', twoPerDay: 'Un jour peut avoir au plus deux 5 à 7. Vérifiez {day}.',
   specialsQ: 'Des spéciaux chaque semaine?', specialsLead: 'Comme le mardi tacos ou le mercredi ailes. Vous pouvez en ajouter un pour chaque jour.',
@@ -288,7 +288,7 @@ Object.assign(en, {
 });
 en.offers.dog_friendly = 'Dogs welcome (even just the patio)';
 Object.assign(fr, {
-  dealLong: '5 à 7 {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
+  dealLong: '5 à 7 nº {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
   soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
