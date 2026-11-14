@@ -10873,19 +10873,19 @@ function nightsTripText(list, fr, bookAhead = false) {
   });
   return { text: shown.map((x) => x.text).join('; '), english: shown.some((x) => x.english) };
 }
-// A place's tours and classes are booked ahead when it has a booking link, or its own words say so ("book ahead",
-// "reservations required") in the event or its Plan your visit box.
+// A place's tours and classes are booked ahead only when their own words say so ("book ahead", "reservations
+// required") in the tour or class itself or its Tours line in Plan your visit, or a tour or class is "By appointment".
+// Distillery test 3 (2026-11-13): a booking link alone (often for groups) no longer counts.
 function nightsBookAhead(venueId, list) {
-  if (!(list || []).some((s) => DAYTIME_NIGHT_KINDS.includes(s.kind))) return false;
+  const tours = (list || []).filter((s) => DAYTIME_NIGHT_KINDS.includes(s.kind));
+  if (!tours.length) return false;
   const re = /\b(?:book|booking|bookings|reserv\w*|réserv\w*)\b/i;
-  if (list.some((s) => re.test(`${s.title || ''} ${s.detail || ''}`))) return true;
+  if (tours.some((s) => s.frequency === NIGHT_APPOINTMENT || re.test(`${s.title || ''} ${s.detail || ''}`))) return true;
   try {
-    const v = venueLinks(venueId);
-    if (v && v.booking_url) return true;
     const box = venueVisitInfo(venueId) || {};
-    if (box.booking_url) return true;
-    return (box.rows || []).some((r) => r && /^(?:tours?|classes|booking|reservations|tastings)$/i.test(r.label || '') && re.test(String(r.text || '')))
-      || (Array.isArray(box.owner_dropped) && box.owner_dropped.some((r) => r && /^(?:tours?|classes)$/i.test(r.label || '') && re.test(String(r.text || ''))));
+    const tourLine = /^(?:tours?|classes|tours? (?:&|and) classes|visits?|visites?|ateliers)$/i;
+    return (box.rows || []).some((r) => r && tourLine.test(String(r.label || '').trim()) && re.test(String(r.text || '')))
+      || (Array.isArray(box.owner_dropped) && box.owner_dropped.some((r) => r && tourLine.test(String(r.label || '').trim()) && re.test(String(r.text || ''))));
   } catch (e) { return false; }
 }
 // Build My Trip (2026-10-27): an evening stop (4 PM or later) on the date of one of the venue's nights says so ("Tonight:
@@ -21010,8 +21010,20 @@ function breweryVisitLines(venue, info) {
   // Food: the main pick, the kitchen time and outside food. Food trucks never name a truck (they change every week).
   if (b.food) {
     const k = b.kitchen || {};
+    // Distillery test 3 (2026-11-13): research's more specific food words ("Small plates") stay when her "Our own kitchen"
+    // answer replaces that line: "Small plates from our own kitchen; it closes at 8 PM."
+    let dish = '';
+    if (b.food === 'kitchen') {
+      try {
+        const vb = venueVisitInfo(venue.id) || {};
+        const res = (vb.owner_was && vb.owner_was.Food && vb.owner_was.Food.text) || ((vb.rows || []).find((r) => r.label === 'Food' && !(vb.owner_labels || []).includes('Food')) || {}).text || '';
+        const m = /\b(small plates|sharing plates|share plates|tapas|charcuterie boards?|charcuterie|flatbreads?)\b/i.exec(res);
+        if (m) dish = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+      } catch (e) { dish = ''; }
+    }
+    const ownK = dish ? `${dish} from our own kitchen` : 'Our own kitchen';
     const main = {
-      kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
+      kitchen: k.mode === 'earlier' && k.closes ? [`${ownK}; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? [`${ownK}, food until close.`, 'Cuisine sur place, jusqu’à la fermeture.'] : [`${ownK}.`, 'Cuisine sur place.'],
       trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions-restaurants la fin de semaine.'] : ['Food trucks most days.', 'Camions-restaurants la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
@@ -35976,6 +35988,16 @@ function specialTimeText(s, fr) {
   if (a !== null) return fr ? `dès ${happyHourTimeText(a, true)}` : `from ${happyHourTimeText(a, false)}`;
   return fr ? `jusqu’à ${happyHourTimeText(b, true)}` : `until ${happyHourTimeText(b, false)}`;
 }
+// Distillery test 3 (2026-11-13): has the place closed for the day (past today's last closing time, after-midnight
+// closes included, with no other opening later today)? Then a weekly row without its own end time is no longer "Today" /
+// "Tonight" (Tonight at 9:16 PM after a 9 PM close). Before opening, or between two openings, it keeps its tag.
+function placeDoneForToday(place, clock) {
+  if (!place || place.state !== 'closed' || place.closedToday || !clock) return false;
+  const o = place.opensAt;
+  if (!o) return true;
+  if (o.date) return o.date !== clock.date;
+  return o.weekday !== clock.weekday || o.minutes <= clock.minutes;
+}
 function venueSpecials(venue, statusHours, fr, now = new Date()) {
   if (!venue || venue.redirect_to) return null;
   const list = venueSpecialsList(venue.id);
@@ -36041,7 +36063,8 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   if (!shown.length) return null;
   const clock = okanaganClock(now);
   let closedToday = false;
-  try { const place = statusHours ? venueHoursStatusAt(statusHours, now) : null; closedToday = !!(place && place.closedToday); } catch (e) { closedToday = false; }
+  let doneToday = false;
+  try { const place = statusHours ? venueHoursStatusAt(statusHours, now) : null; closedToday = !!(place && place.closedToday); doneToday = placeDoneForToday(place, clock); } catch (e) { closedToday = false; }
   // Distillery test 2 (2026-11-13): today's row is tagged only when the place is open today: not in its by-appointment
   // season (a 7-day tour read "Daily … Tonight" on a November Friday) and not closed for the season.
   if (!closedToday && venueClosedForTagsToday(venue, now)) closedToday = true;
@@ -36050,7 +36073,10 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const yesterdayDate = addLocalDays(clock.date, -1);
   const rows = shown.map((s) => {
     const a = specialMinutes(s.start);
-    const tag = weeklyRowTag({ onToday: !closedToday && nightOnDate(s, clock.date), onYesterday: nightOnDate(s, yesterdayDate), a, b: specialMinutes(s.end),
+    // A row with no end time of its own stops being "Today" / "Tonight" once the place has closed for the day (unless it
+    // starts later still); a row with its own end keeps weeklyRowTag's rule (an after-hours class keeps its tag).
+    const afterClose = doneToday && specialMinutes(s.end) === null && (a === null || a <= clock.minutes);
+    const tag = weeklyRowTag({ onToday: !closedToday && !afterClose && nightOnDate(s, clock.date), onYesterday: nightOnDate(s, yesterdayDate), a, b: specialMinutes(s.end),
       fallbackToday: a !== null ? a + WEEKLY_TAG_NO_END_MINUTES : null, fallbackYesterday: a !== null ? a + WEEKLY_TAG_NO_END_MINUTES : null }, clock);
     return { s, days: nightDaysText(s, fr), today: !!tag, onNow: tag === 'now', time: nightTimeText(s, fr), freq: nightFrequencyText(s, fr) };
   });
@@ -53112,7 +53138,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, extraTopics: pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, extraTopics: pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53302,7 +53328,7 @@ function breweryCfg(venue, snap, fr) {
   const suggestKind = venue.type === 'distillery' ? 'Distillery' : breweryKindGuess(name) || 'Brewery';
   const foodRow = researchRow('Food');
   const ft = foodRow ? foodRow.text : '';
-  const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|pub fare|burgers?|pizzas?|wings|bistro|eatery)\b/i.test(ft) ? 'kitchen' : '';
+  const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|menu|pub fare|burgers?|pizzas?|wings|bistro|eatery|small plates?|sharing plates?|share plates?|tapas|charcuterie|appetizers|flatbreads?)\b/i.test(ft) ? 'kitchen' : '';
   // Brewery test 2 (2026-11-13): research's food-truck line pre-picks when the trucks are here, only when it plainly says
   // weekends (or most days), so a saved answer never makes the line less accurate than research had it.
   const suggestTrucks = suggestFood !== 'trucks' ? '' : BREWERY_TRUCKS_WEEKENDS_RE.test(ft) ? 'weekends' : /\b(?:most days|daily|every day|7 days)\b|tous les jours|la plupart des jours/i.test(ft) ? 'most_days' : '';
@@ -53388,6 +53414,13 @@ const BREWERY_SETUP_HELP_TOPICS = [
 // what really happens (on the page now, or within a day), with no "the link we emailed you" and no featured-spot pitch.
 // The shared ones (no website, booking link, groups) come from the brewery list; its beer-only topics are left out.
 const DISTILLERY_SETUP_HELP_TOPICS = [
+  // Distillery test 3 (2026-11-13): the edit page's "Weekly nights" topic, in a distillery's words (Tours & events,
+  // Event 1, + Add an event), with a link straight to that part of the edit page.
+  { id: 'weekly-nights', over: ['event-add', 'specials', 'features'], q: 'How often our tour or class runs (every other week)', qFr: 'La fréquence de notre visite ou atelier (une semaine sur deux)', pages: ['setup', 'edit'],
+    keys: ['how often', 'every other week', 'every second week', 'every 2 weeks', 'every two weeks', 'biweekly', 'bi weekly', 'every second', 'every other', 'monthly', 'once a month', 'first saturday', 'tours and events', 'tours events', 'weekly events', 'weekly nights', 'trivia', 'live music night', 'add a night'],
+    keysFr: ['frequence', 'une semaine sur deux', 'aux deux semaines', 'toutes les deux semaines', 'deux semaines', 'une fois par mois', 'par mois', 'premier samedi', 'visites et evenements', 'soirees de la semaine', 'quiz'],
+    a: '<ol><li>{ON}, open <a href="{EDIT}#tours-events"><strong>Tours &amp; events</strong></a>.</li><li>For each tour, class or event, tick its <strong>days</strong>, pick the <strong>kind</strong> (Tour, Class, Live music …) and <strong>how often</strong>: Every week, <strong>Every other week</strong>, set weeks of the month like the 1st &amp; 3rd, or By appointment. Then fill in its <strong>name</strong> (<em>Saturday distillery tour</em>) and the <strong>start time</strong>. A detail and the cost are optional. Tap <strong>+ Add an event</strong> for another (up to 7).</li><li>Tap {SEND}.</li></ol><p>{LIVE} Your listing shows them with today’s marked, and today’s shows on the map, on What’s On and in Build My Trip. A one-off event goes under <strong>Add an event</strong> instead. Clear every box to remove them.</p>',
+    aFr: '<ol><li>{ON}, ouvrez <a href="{EDIT}#tours-events"><strong>Visites et événements</strong></a>.</li><li>Pour chaque visite, atelier ou événement, cochez ses <strong>jours</strong>, choisissez le <strong>genre</strong> (Visite, Atelier, Musique live…) et la <strong>fréquence</strong> : Chaque semaine, <strong>Une semaine sur deux</strong>, certaines semaines du mois comme le 1er et le 3e, ou Sur rendez-vous. Puis remplissez son <strong>nom</strong> (<em>Visite de la distillerie du samedi</em>) et l’<strong>heure de début</strong>. Un détail et le prix sont facultatifs. Touchez <strong>+ Ajouter un événement</strong> pour un autre (jusqu’à 7).</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Votre fiche les affiche, celui du jour en évidence, et celui du jour s’affiche sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous <strong>Ajouter un événement</strong>. Videz toutes les cases pour les retirer.</p>' },
   SETUP_NO_WEBSITE_HELP_TOPIC,
   { id: 'distillery-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend', 'menu-add'], noRelated: ['price-range', 'avg-spend', 'cafe-price', 'winery-price', 'brewery-price'],
     q: 'How do I change our tasting price?', qFr: 'Comment changer le prix de notre dégustation?',
@@ -53403,8 +53436,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
   { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events', 'weekly-nights'], noRelated: ['weekly-nights'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
     keys: ['tour', 'tours', 'distillery tour', 'class', 'classes', 'cocktail class', 'whisky class', 'whiskey class', 'workshop', 'masterclass', 'events', 'event', 'book a tour'],
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Only on set weeks, like the first Saturday? Open <strong>Tours &amp; events</strong> on your edit page and pick how often.</p><p>Tours you book ahead? Put your booking page in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Seulement certaines semaines, comme le premier samedi? Ouvrez <strong>Visites et événements</strong> sur votre page de modification et choisissez la fréquence.</p><p>Des visites à réserver? Mettez votre page de réservation dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Every other week, or only on set weeks like the first Saturday? Tap <strong>Save my events</strong> first, then open <a href="{EDIT}#tours-events"><strong>Tours &amp; events</strong> on your edit page</a> and pick <strong>Every other week</strong> (or the weeks) under how often.</p><p>Tours people book ahead? Say so in the tour’s detail (“Book ahead online”), or tap <strong>By appointment</strong>. Build My Trip only says “book ahead” then. Your booking page goes in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Une semaine sur deux, ou seulement certaines semaines comme le premier samedi? Touchez d’abord <strong>Enregistrer mes événements</strong>, puis ouvrez <a href="{EDIT}#tours-events"><strong>Visites et événements</strong> sur votre page de modification</a> et choisissez <strong>Une semaine sur deux</strong> (ou les semaines) sous la fréquence.</p><p>Des visites à réserver? Dites-le dans le détail de la visite (« Réservez en ligne »), ou touchez <strong>Sur rendez-vous</strong>. Planifier mon voyage ne dit « réservez » qu’à ce moment-là. Votre page de réservation va dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
   // Distillery test 2 (2026-11-13): "our tours are by appointment" got the hours answer. Tours or visits by appointment
   // point to the "By appointment" choice on Tours, classes and events, ahead of the hours-by-appointment topic.
   { id: 'distillery-tours-appointment', pages: ['setup', 'edit'], over: ['distillery-hours', 'distillery-tours', 'winery-appointment', 'nights', 'events', 'weekly-nights', 'hours'], noRelated: ['weekly-nights'],
@@ -55275,6 +55308,8 @@ const OWNER_HELP_SCRIPT = String.raw`
   function close(){ panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
   btn.addEventListener('click', open);
   document.getElementById('ohbClose').addEventListener('click', close);
+  // Distillery test 3 (2026-11-13): a link in an answer to a part of this page ("#tours-events") closes the help so that part shows.
+  panel.addEventListener('click', function(e){ var a = e.target.closest ? e.target.closest('a[href^="#"]') : null; if (a && a.getAttribute('href').length > 1) { panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); } });
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
   window.__ohbMatch = match; window.__ohbBest = best;
@@ -55294,6 +55329,9 @@ function ownerHelpMode(page, signedIn) {
 }
 // The help button + panel for a business portal page (page: one of the OWNER_HELP_START keys; lang 'fr' on the
 // French entry pages and the French claim form).
+// Distillery test 3 (2026-11-13): "{EDIT}#tours-events" in an answer links to the edit page (the setup passes its edit
+// page; on the edit page itself the link is just "#tours-events").
+function helpEditHref(html, editHref) { return String(html || '').replace(/\{EDIT\}/g, escapeHtml(editHref || '')); }
 function ownerHelpWidgetHtml(page, opts = {}) {
   if (!OWNER_HELP_START[page]) return '';
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
@@ -55307,8 +55345,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     start: OWNER_HELP_START[page],
     // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
     topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: typeof t.qFr === 'string' ? OWNER_SETUP_STRINGS.frSpacing(t.qFr) : t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [],
-      a: inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.a, 'en', mode), 'en') : ownerHelpAnswer(t.a, 'en', mode),
-      aFr: frSpacingHtml(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.aFr, 'fr', mode), 'fr') : ownerHelpAnswer(t.aFr, 'fr', mode)) })),
+      a: helpEditHref(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.a, 'en', mode), 'en') : ownerHelpAnswer(t.a, 'en', mode), opts.editHref),
+      aFr: helpEditHref(frSpacingHtml(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.aFr, 'fr', mode), 'fr') : ownerHelpAnswer(t.aFr, 'fr', mode)), opts.editHref) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI_SPACED,
   };
@@ -58617,6 +58655,8 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-more { display: block; margin-top: 12px; background: #fff; border: 1px solid rgba(42,32,25,0.2); border-radius: 10px; padding: 9px 16px; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
   body.owner-page .op-unsent { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; max-width: 560px; margin: 0 auto; background: #1F2A36; color: #fff; border-radius: 14px; padding: 10px 12px 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.45); font-size: 0.9rem; font-weight: 700; }
   body.owner-page .op-unsent[hidden] { display: none; }
+  body.owner-page .op-unsent > span { min-width: 0; flex: 1 1 auto; }
+  body.owner-page .op-unsent button { flex: 0 0 auto; }
   body.owner-page .op-unsent button { background: #F2C14E; color: #1F2A36; border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
   body.owner-page .op-fold { border-top: 1px solid rgba(42,32,25,0.12); border-bottom: 1px solid rgba(42,32,25,0.12); margin: 18px 0; padding: 4px 0; }
   body.owner-page .op-fold > summary { cursor: pointer; padding: 10px 0; list-style: none; }
@@ -59457,6 +59497,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const cuisineHtml = () => {
     // Wineries (2026-11-12): no food picker; the kind of winery is asked in the setup ("Your winery").
     if (!completeOn || venue.type === 'winery') return '';
+    // Distillery test 3 (2026-11-13): no "What you serve" food picker for a distillery (its Food line comes from the setup),
+    // nor for a brewery without its own kitchen (its kind is asked in the setup).
+    if (venue.type === 'distillery' || (venue.type === 'brewery' && ((snap.brewery_info || {}).food || '') !== 'kitchen')) return '';
     const picked = Array.isArray(snap.cuisines) && snap.cuisines.length ? snap.cuisines : (snap.cuisine ? [snap.cuisine] : []);
     const place = snap.place_type || '';
     const label = (c) => (fr ? frCuisine(c) : c);
@@ -59503,35 +59546,67 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     // Café test 2 (2026-11-11): cafés answer reservations and takeout under Ordering, so those boxes aren't here; and the
     // count includes the Dogs line set from "What you offer" ("1 of 5 lines filled in" said so with Dogs and Known for set).
     // Wineries (2026-11-12): only Known for here; their Tastings, Groups, Restaurant and Winter lines come from their setup answers.
-    const editKeys = venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : venue.type === 'winery' ? ['known_for'] : OWNER_VISIT_EDIT_KEYS;
-    const countKeys = cur.dogs ? editKeys.concat(['dogs']) : editKeys;
-    const filled = countKeys.filter((k) => cur[k]).length;
+    // Distillery test 3 (2026-11-13): breweries and distilleries get the lines their setup writes, not the restaurant's
+    // Reservations / Takeout / Dietary boxes. Known for, Good to know and Dogs are the same visit_rows keys the setup saves
+    // (one writer, one label each, so nothing is doubled); Tastings, To go, Food and Kids & dogs are written from the setup
+    // answers (writeBreweryVisitRows), so they show as they read on the page, with a link to change the answer.
+    const brew = brewSetupType(venue.type);
+    const editKeys = venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : venue.type === 'winery' ? ['known_for'] : brew ? ['known_for', 'groups', 'dogs'] : OWNER_VISIT_EDIT_KEYS;
+    const answerLines = brew ? (() => {
+      const box = venueVisitInfo(venue.id) || {};
+      const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
+      const pick = (labels) => labels.map((l) => rows.find((r) => r && r.label === l && r.text)).find(Boolean);
+      const spirits = venue.type === 'distillery';
+      return [
+        [spirits ? L('Tastings', 'Dégustations') : L('Flights', 'Plateaux de dégustation'), pick(['Flights', 'Tastings'])],
+        [L('To go', 'Pour emporter'), pick(['To go'])],
+        [L('Food', 'Nourriture'), pick(['Food'])],
+        [L('Kids &amp; dogs', 'Enfants et chiens'), pick(['Kids & dogs', 'Kids'])],
+      ].map(([label, r]) => ({ label, text: r ? ((fr && box.owner_fr && box.owner_fr[r.label]) || r.text) : '' }));
+    })() : [];
+    const countKeys = cur.dogs ? editKeys.filter((k) => k !== 'dogs').concat(['dogs']) : editKeys.filter((k) => k !== 'dogs');
+    const filled = countKeys.filter((k) => cur[k]).length + answerLines.filter((x) => x.text).length;
+    const countAll = countKeys.length + answerLines.length;
     const fieldsEn = {
       known_for: ['Known for', 'What people come back for, in one line.', 'Wood-fired pizza and the lakeside patio'],
       reservations: ['Reservations', 'How to book, or say walk-ins only.', 'Book online or call; walk-ins welcome at the bar'],
       takeout: ['Takeout and delivery', 'Can people order to go? Which delivery apps?', 'Takeout by phone; delivery on DoorDash and Skip'],
       dietary: ['Dietary note', 'What you can do for allergies and diets.', 'Gluten-free pasta and a vegan menu; tell your server about allergies'],
       groups: ['Groups and good to know', 'Large parties, parking, kids, anything else that helps.', 'Groups of 10+ please call ahead; free parking out back'],
+      dogs: ['Dogs', 'Where dogs are welcome, in one line.', 'Dogs welcome on the patio'],
     };
+    if (brew) {
+      fieldsEn.known_for = ['Known for', 'What people come back for, in one line.', venue.type === 'distillery' ? 'Small-batch gin and craft cocktails' : 'Hazy IPAs and the big patio'];
+      fieldsEn.groups = ['Good to know', 'Groups, parking, anything else that helps.', 'Groups of 8+ please call ahead; free parking out back'];
+    }
     const fieldsFr = {
       known_for: ['Connu pour', 'Ce pour quoi les gens reviennent, en une ligne.', 'Pizza au four à bois et terrasse au bord du lac'],
       reservations: ['Réservations', 'Comment réserver, ou sans réservation seulement.', 'Réservez en ligne ou par téléphone; sans réservation au bar'],
       takeout: ['À emporter et livraison', 'Peut-on commander pour emporter? Quelles applis de livraison?', 'À emporter par téléphone; livraison avec DoorDash et Skip'],
       dietary: ['Note alimentaire', 'Ce que vous pouvez faire pour les allergies et les régimes.', 'Pâtes sans gluten et menu végane; parlez de vos allergies au serveur'],
       groups: ['Groupes et bon à savoir', 'Grands groupes, stationnement, enfants, tout ce qui aide.', 'Groupes de 10 et plus : appelez d’avance; stationnement gratuit derrière'],
+      dogs: ['Chiens', 'Où les chiens sont bienvenus, en une ligne.', 'Chiens bienvenus sur la terrasse'],
     };
+    if (brew) {
+      fieldsFr.known_for = ['Connu pour', 'Ce pour quoi les gens reviennent, en une ligne.', venue.type === 'distillery' ? 'Gin artisanal et cocktails maison' : 'IPA troubles et la grande terrasse'];
+      fieldsFr.groups = ['Bon à savoir', 'Groupes, stationnement, tout ce qui aide.', 'Groupes de 8 et plus : appelez d’avance; stationnement gratuit derrière'];
+    }
     const words = fr ? fieldsFr : fieldsEn;
-    const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups' };
+    const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups', dogs: 'opVisitDogs' };
+    const setupHref = token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang);
+    const answersHtml = answerLines.length ? `
+        <div class="op-visit-answers" id="opVisitAnswers">${answerLines.map((x) => `<p class="op-visit-ans"><strong>${x.label}:</strong> ${x.text ? escapeHtml(x.text) : `<span class="op-hint">${L('Not answered yet', 'Pas encore répondu')}</span>`}</p>`).join('')}
+        <p class="op-hint">${L('These lines come from your answers. To change one, open <a href="' + escapeHtml(setupHref) + '">Set up your page</a> and tap Change an answer.', 'Ces lignes viennent de vos réponses. Pour en changer une, ouvrez <a href="' + escapeHtml(setupHref) + '">Configurez votre page</a> et touchez Modifier une réponse.')}</p></div>` : '';
     const boxes = editKeys.map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
           <textarea id="${ids[k]}" class="op-visit-ta" rows="1" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}">${escapeHtml(cur[k] || '')}</textarea></div>`).join('');
     return `
-      <details class="op-fold op-sec" id="visit" data-task="more"${filled < countKeys.length ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
-      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${countKeys.length} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${countKeys.length} remplie${filled === 1 ? '' : 's'}`) : venue.type === 'cafe' ? L('Known for, dietary note and more', 'Connu pour, note alimentaire et plus') : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
+      <details class="op-fold op-sec" id="visit" data-task="more"${filled < countAll ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
+      <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${countAll} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${countAll} remplie${filled === 1 ? '' : 's'}`) : venue.type === 'cafe' ? L('Known for, dietary note and more', 'Connu pour, note alimentaire et plus') : brew ? L('Known for, tastings, food and more', 'Connu pour, dégustations, nourriture et plus') : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
       <p class="op-hint">${L('These short lines show in the &ldquo;Plan your visit&rdquo; box on your page. One line each, plain words, no links. Leave a box empty to leave that line off.', 'Ces courtes lignes paraissent dans la case « Planifiez votre visite » de votre page. Une ligne chacune, des mots simples, sans liens. Laissez une case vide pour ne pas afficher cette ligne.')}</p>
       <div class="form-row full op-visit-rows">${boxes}
-      </div>
+      </div>${answersHtml}
       <p class="op-hint">${L('Your booking link goes under &ldquo;Name, address &amp; links&rdquo;: it adds a Reserve button.', 'Votre lien de réservation va sous « Nom, adresse et liens » : il ajoute un bouton Réserver.')}</p>
       <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button> <span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span>
       <p class="lyv-error" id="opVisitError" hidden></p>
@@ -59600,26 +59675,31 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois'),
       // Distillery test 2 (2026-11-13): a tour or class by appointment (no day); offered where tours and classes are.
       appointment: L('By appointment (tours and classes)', 'Sur rendez-vous (visites et ateliers)') };
+    // Distillery test 3 (2026-11-13): a distillery's rows are "Event 1" (not "Night 1"), Tour and Class come first (and a new
+    // row starts as a Tour), with a tour placeholder, not trivia. Pubs keep "Night"; cafés keep their wording.
+    const dist = venue.type === 'distillery';
+    const W = dist ? { en: 'Event', fr: 'Événement', kindEn: 'kind of event', kindFr: 'genre d’événement' } : { en: 'Night', fr: 'Soirée', kindEn: 'kind of night', kindFr: 'genre de soirée' };
+    const kindOrder = dist ? [...DAYTIME_NIGHT_KINDS, ...NIGHT_KINDS.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k))] : NIGHT_KINDS;
     return Array.from({ length: NIGHTS_MAX }, (_, i) => {
-      const x = nightsNow[i] || { days: [], kind: 'trivia', frequency: 'weekly' };
+      const x = nightsNow[i] || { days: [], kind: dist ? 'tour' : 'trivia', frequency: 'weekly' };
       const n = i + 1;
       const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
-      const kinds = `<select class="op-wn-kind" aria-label="${L(`Night ${n}: kind of night`, `Soirée ${n} : genre de soirée`)}">${NIGHT_KINDS.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
-      const freq = `<select class="op-wn-freq" aria-label="${L(`Night ${n}: how often`, `Soirée ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT || venue.type === 'distillery' || x.frequency === f).map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
+      const kinds = `<select class="op-wn-kind" aria-label="${L(`${W.en} ${n}: ${W.kindEn}`, `${W.fr} ${n} : ${W.kindFr}`)}">${kindOrder.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
+      const freq = `<select class="op-wn-freq" aria-label="${L(`${W.en} ${n}: how often`, `${W.fr} ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT || venue.type === 'distillery' || x.frequency === f).map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
       return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''}>
-          <legend>${L(`Night ${n}`, `Soirée ${n}`)}</legend>
-          <div class="op-sp-days" role="group" aria-label="${L(`Night ${n}: days`, `Soirée ${n} : jours`)}">${days}</div>
+          <legend>${L(`${W.en} ${n}`, `${W.fr} ${n}`)}</legend>
+          <div class="op-sp-days" role="group" aria-label="${L(`${W.en} ${n}: days`, `${W.fr} ${n} : jours`)}">${days}</div>
           <span class="op-sp-line">${kinds}${freq}</span>
-          <input type="text" class="op-wn-title" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Night ${n}: name`, `Soirée ${n} : nom`)}" placeholder="${i === 0 ? L('Trivia Tuesday', 'Quiz du mardi') : ''}">
-          <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-wn-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`Night ${n}: starts at (optional)`, `Soirée ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-wn-end" value="${escapeHtml(x.end || '')}" aria-label="${L(`Night ${n}: ends at (optional)`, `Soirée ${n} : se termine à (facultatif)`)}"></span>
-          <input type="text" class="op-wn-detail" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail || '')}" aria-label="${L(`Night ${n}: detail (optional)`, `Soirée ${n} : détail (facultatif)`)}" placeholder="${i === 0 ? L('Teams up to 6, prizes for the top 3', 'Équipes de 6 au plus, prix pour les 3 premières') : ''}">
-          <span class="op-sp-line"><input type="text" class="op-wn-host" maxlength="${NIGHT_HOST_MAX}" value="${escapeHtml(x.host || '')}" aria-label="${L(`Night ${n}: host (optional)`, `Soirée ${n} : animateur (facultatif)`)}" placeholder="${i === 0 ? L('Host (optional)', 'Animateur (facultatif)') : ''}"><input type="text" class="op-wn-cost" maxlength="${NIGHT_COST_MAX}" value="${escapeHtml(x.cost || '')}" aria-label="${L(`Night ${n}: cost (optional)`, `Soirée ${n} : prix (facultatif)`)}" placeholder="${i === 0 ? L('Free', 'Gratuit') : ''}"></span>
-          <details class="op-sp-fr"${x.title_fr || x.detail_fr ? ' open' : ''}><summary>${L('In French (optional)', 'En français (facultatif)')}</summary>
-            <input type="text" class="op-wn-title-fr" lang="fr" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`Night ${n}: name in French`, `Soirée ${n} : nom en français`)}">
-            <input type="text" class="op-wn-detail-fr" lang="fr" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail_fr || '')}" aria-label="${L(`Night ${n}: detail in French`, `Soirée ${n} : détail en français`)}">
+          <input type="text" class="op-wn-title" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`${W.en} ${n}: name`, `${W.fr} ${n} : nom`)}" placeholder="${i === 0 ? (dist ? L('Saturday distillery tour', 'Visite de la distillerie du samedi') : L('Trivia Tuesday', 'Quiz du mardi')) : ''}">
+          <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-wn-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`${W.en} ${n}: starts at (optional)`, `${W.fr} ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-wn-end" value="${escapeHtml(x.end || '')}" aria-label="${L(`${W.en} ${n}: ends at (optional)`, `${W.fr} ${n} : se termine à (facultatif)`)}"></span>
+          <input type="text" class="op-wn-detail" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail || '')}" aria-label="${L(`${W.en} ${n}: detail (optional)`, `${W.fr} ${n} : détail (facultatif)`)}" placeholder="${i === 0 ? (dist ? L('Meet at the bar; about 45 minutes', 'Rendez-vous au bar; environ 45 minutes') : L('Teams up to 6, prizes for the top 3', 'Équipes de 6 au plus, prix pour les 3 premières')) : ''}">
+          <span class="op-sp-line"><input type="text" class="op-wn-host" maxlength="${NIGHT_HOST_MAX}" value="${escapeHtml(x.host || '')}" aria-label="${L(`${W.en} ${n}: host (optional)`, `${W.fr} ${n} : animateur (facultatif)`)}" placeholder="${i === 0 ? L('Host (optional)', 'Animateur (facultatif)') : ''}"><input type="text" class="op-wn-cost" maxlength="${NIGHT_COST_MAX}" value="${escapeHtml(x.cost || '')}" aria-label="${L(`${W.en} ${n}: cost (optional)`, `${W.fr} ${n} : prix (facultatif)`)}" placeholder="${i === 0 ? L('Free', 'Gratuit') : ''}"></span>
+          <details class="op-sp-fr"${x.title_fr || x.detail_fr ? ' open' : ''}><summary>${dist ? L('In French (optional, you can skip this)', 'En français (facultatif)') : L('In French (optional)', 'En français (facultatif)')}</summary>
+            <input type="text" class="op-wn-title-fr" lang="fr" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`${W.en} ${n}: name in French`, `${W.fr} ${n} : nom en français`)}">
+            <input type="text" class="op-wn-detail-fr" lang="fr" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail_fr || '')}" aria-label="${L(`${W.en} ${n}: detail in French`, `${W.fr} ${n} : détail en français`)}">
           </details>
         </fieldset>`;
-    }).join('') + `<button type="button" class="op-add op-wn-add" data-wn-add${shown >= NIGHTS_MAX ? ' hidden' : ''}>${L('+ Add a night', '+ Ajouter une soirée')}</button>`;
+    }).join('') + `<button type="button" class="op-add op-wn-add" data-wn-add${shown >= NIGHTS_MAX ? ' hidden' : ''}>${dist ? L('+ Add an event', '+ Ajouter un événement') : L('+ Add a night', '+ Ajouter une soirée')}</button>`;
   };
   const season0 = (snap.hours_seasons || [])[0] || null;
   const dayRows = (prefix, week, emptyMeansClosed, known = hoursKnown) => OWNER_DAYS.map((d) => {
@@ -59837,12 +59917,14 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-login summary { cursor: pointer; }
   body.owner-page .op-login form { margin-top: 12px; }
   body.owner-page .op-bar-in { font-size: 0.9rem; }
-  body.owner-page .op-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 18px; }
+  body.owner-page .op-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: 12px; margin: 12px 0 18px; }
   body.owner-page .op-photos figure { margin: 0; }
   body.owner-page .op-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
   body.owner-page .op-photos figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   body.owner-page .op-photos figcaption { align-items: stretch; }
-  body.owner-page .op-photos figcaption .op-status { align-self: flex-start; }
+  body.owner-page .op-photos figcaption .op-status { align-self: flex-start; white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+  body.owner-page .op-photos figure, body.owner-page .op-photos figcaption { min-width: 0; }
+  body.owner-page .op-photos img { max-width: 100%; }
   body.owner-page .op-photo-btns { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
   body.owner-page .op-photo-btns .op-btn { padding: 6px 8px; font-size: 0.85rem; }
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
@@ -59905,6 +59987,8 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-task-text strong { font-size: 1.08rem; line-height: 1.25; }
   body.owner-page .op-task-text span { font-size: 0.9rem; color: rgba(42,32,25,0.75); line-height: 1.3; }
   body.owner-page .op-all-link { margin: 14px 0 0; }
+  /* Distillery test 3 (2026-11-13): a link to Tours & events lands with its title below the site header. */
+  body.owner-page #tours-events { scroll-margin-top: 76px; }
   body.owner-page .op-linkbtn, body.owner-page .op-back { background: none; border: 0; padding: 10px 0; min-height: 44px; font: inherit; font-weight: 700; color: var(--ref-navy, #1F3A5F); text-decoration: underline; cursor: pointer; }
   body.owner-page .op-back { text-decoration: none; font-size: 1.05rem; }
   body.owner-page .op-taskbar { margin: 8px 0 4px; }
@@ -59928,7 +60012,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
     body.owner-page .op-add::before { content: '+'; font-size: 1.4rem; line-height: 1; }
     body.owner-page .op-secnav { position: sticky; top: 0; z-index: 30; flex-wrap: nowrap; overflow-x: auto; margin: 8px -16px; padding: 8px 16px; background: var(--paper, #FBF7F0); box-shadow: 0 6px 12px -10px rgba(0,0,0,0.35); }
     body.owner-page .op-secnav a { flex: 1 0 auto; justify-content: center; }
-    body.owner-page .op-photos { grid-template-columns: 1fr 1fr; }
+    body.owner-page .op-photos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   }${completeOn ? portalCompleteness.COMPLETENESS_CSS + OWNER_CUISINE_HOURS_CSS : ''}
 </style>
 </head>
@@ -59960,9 +60044,11 @@ ${renderGolfHeaderHtml()}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${showHappyHour && venue.type !== 'winery' ? tile('happy', fr ? '&#127865;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${showHappyHour && venue.type !== 'winery' ? tile('happy', fr ? '&#127865;' : venue.type === 'distillery' ? '&#127864;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
           ${tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
+        ${/* Distillery test 3 (2026-11-13): the weekly tours/nights editor (how often, every other week) is one tap from the list. */ ''}
+        ${showNights && venue.type !== 'winery' ? `<p class="op-all-link op-nights-link"><a href="#tours-events">${venue.type === 'distillery' ? L('Tours &amp; events: days and how often', 'Visites et événements : jours et fréquence') : venue.type === 'cafe' ? L('Weekly events: days and how often', 'Événements de la semaine : jours et fréquence') : L('Weekly nights: days and how often', 'Soirées de la semaine : jours et fréquence')}</a></p>` : ''}
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
       </section>
       <div class="op-taskbar" id="opTaskBar" data-task="hours photos arrival video events contact happy more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
@@ -60128,8 +60214,8 @@ ${priceFieldHtml}      </details>` : ''}
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'distillery' ? L('Tours &amp; events', 'Visites et événements') : venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' || venue.type === 'distillery' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
-      ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, like a distillery tour on Saturdays. Tick the days, pick how often, and fill in each box.`, `Vos visites, ateliers et événements réguliers, comme une visite de la distillerie le samedi. Cochez les jours, choisissez la fréquence et remplissez chaque case.`) : L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
+      <summary id="tours-events"><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'distillery' ? L('Tours &amp; events', 'Visites et événements') : venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' || venue.type === 'distillery' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, like a distillery tour on Saturdays. Tick the days, pick how often (like Every other week), and fill in each box.`, `Vos visites, ateliers et événements réguliers, comme une visite de la distillerie le samedi. Cochez les jours, choisissez la fréquence (comme Une semaine sur deux) et remplissez chaque case.`) : L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, up to ${NIGHTS_MAX}: a distillery tour, a cocktail or whisky class, live music (&ldquo;Saturday distillery tour&rdquo;, Saturdays 1 PM). Tick the days, pick the kind and how often (every week, every other week, once a month or by appointment), and add the time. We show today&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off event goes under Add an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos visites, ateliers et événements réguliers, jusqu’à ${NIGHTS_MAX} : une visite de la distillerie, un atelier de cocktails ou de whisky, de la musique live (« Visite de la distillerie du samedi », le samedi à 13 h). Cochez les jours, choisissez le genre et la fréquence (chaque semaine, une semaine sur deux, une fois par mois ou sur rendez-vous), et ajoutez l’heure. Nous affichons celui du jour sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous Ajouter un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`) : L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p></details>` : `<p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
@@ -60341,7 +60427,7 @@ ${ownerFooterHtml(fr)}
   }
   // Simple view (2026-11-04): start from a short list of tasks; picking one shows only that part of the page.
   // Old links (#photos, #hours, an email that points at a section) and "Show me the full page" open the whole page.
-  var TASK_OF = { hours: 'hours', photos: 'photos', arrival: 'arrival', video: 'video', events: 'events', badges: 'more', price: 'more', happy: 'happy', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
+  var TASK_OF = { hours: 'hours', photos: 'photos', arrival: 'arrival', video: 'video', events: 'events', badges: 'more', price: 'more', happy: 'happy', specials: 'more', 'weekly-nights': 'more', 'tours-events': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
   function setTask(t){
     document.body.setAttribute('data-op-task', t);
     var fm = document.getElementById('opForm'), dn = document.getElementById('opDone');
@@ -60856,12 +60942,21 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
     if (d) d.open = true;
     return t;
   }
+  // Distillery test 3 (2026-11-13): "Tours & events" links (the task list, the help answer) open that part of the page and
+  // scroll to it, also when the address already ends in that #.
+  function goSection(hash){
+    var hh = (hash || '').slice(1);
+    if (TASK_OF[hh] && document.body.getAttribute('data-op-task') !== 'all') { setTask(TASK_OF[hh]); var tg = openFor(hash); if (tg) setTimeout(function(){ tg.scrollIntoView({ block: 'start' }); }, 50); return; }
+    openFor(hash);
+  }
   document.addEventListener('click', function(e){
     var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
-    if (a && a.getAttribute('href').length > 1) openFor(a.getAttribute('href'));
+    if (!a || a.getAttribute('href').length < 2) return;
+    if (a.getAttribute('href') === location.hash) { e.preventDefault(); goSection(location.hash); var t0 = document.getElementById(location.hash.slice(1)); if (t0 && !TASK_OF[location.hash.slice(1)]) t0.scrollIntoView({ block: 'start' }); return; }
+    openFor(a.getAttribute('href'));
   });
   if (location.hash) openFor(location.hash);
-  window.addEventListener('hashchange', function(){ openFor(location.hash); });
+  window.addEventListener('hashchange', function(){ goSection(location.hash); });
   // The section bar sits just under the site header on phones.
   var secNav = document.getElementById('opSecNav'), siteHead = document.querySelector('body > header, .golf-header');
   function placeNav(){ if (secNav) secNav.style.top = (siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.offsetHeight : 0) + 'px'; }

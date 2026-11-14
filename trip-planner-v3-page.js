@@ -119,8 +119,8 @@ function t3PlanNextSteps(p) {
     var requestLabels={pottery:'pottery class'};
     // The category word in French too (2026-10-19: "event — Non inclus").
     var labelsFr={'hockey game':'match de hockey','live music':'musique en direct',festival:'festival',market:'marché','comedy show':'spectacle d’humour',show:'spectacle',concert:'concert',event:'événement','sports event':'événement sportif','pottery class':'atelier de poterie',restaurant:'restaurant',cafe:'café',winery:'vignoble',brewery:'microbrasserie',pub:'pub',cocktail:'bar à cocktails',distillery:'distillerie',beach:'plage',golf:'golf',indoor:'lieu intérieur',outdoor:'lieu de plein air',tour:'visite guidée',sport:'sport','dog friendly':'lieu qui accepte les chiens','kid friendly':'lieu adapté aux enfants',hiking:'randonnée',rainy:'activité par temps de pluie'};
-    var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
-    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode,appointment:a.appointment===true,closedDay:a.closedDay&&typeof a.closedDay.day==='string'&&Array.isArray(a.closedDay.open)?{day:a.closedDay.day,from:typeof a.closedDay.from==='string'?a.closedDay.from:null,to:typeof a.closedDay.to==='string'?a.closedDay.to:null,open:a.closedDay.open.filter(function(d){return typeof d==='string';})}:null};}):[]});
+    var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.venueName||i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',venue:i.kind==='venue',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode,appointment:a.appointment===true,closedDay:a.closedDay&&typeof a.closedDay.day==='string'&&Array.isArray(a.closedDay.open)?{day:a.closedDay.day,from:typeof a.closedDay.from==='string'?a.closedDay.from:null,to:typeof a.closedDay.to==='string'?a.closedDay.to:null,open:a.closedDay.open.filter(function(d){return typeof d==='string';})}:null};}):[]});
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
@@ -1817,7 +1817,9 @@ function renderScript(d) {
         var value = i.kind === 'duration' || i.kind === 'price_limit' || i.kind === 'rainy' ? i.kind : i.value;
         var label = names[value] || String(value).replace(/_/g, ' ');
         if (i.kind === 'days') label = i.value + (fr ? ' jour(s)' : ' day(s)');
-        if (i.kind === 'venue') label = i.sourceText || label;
+        // Distillery test 3: the place's name, not the visitor's request in lower case ("monday in kelowna bench road …").
+        if (i.kind === 'venue') label = i.venueName || i.sourceText || label;
+        if (i.reason && i.sourceText && (i.kind === 'venue' || i.sourceText.length > 25) && String(i.reason).indexOf(i.sourceText) >= 0) return '<li>' + esc(label) + ' — ' + esc(String(i.reason).split(i.sourceText).join(label)) + '</li>';
         if (i.kind.indexOf('excluded_') === 0) label = (fr ? 'Sans ' : 'No ') + label;
         return '<li>' + esc(label) + (i.reason ? ' — ' + esc(i.reason) : '') + '</li>';
       }).join('') + '</ul></details>';
@@ -1873,7 +1875,7 @@ function renderScript(d) {
       // 2026-10-21: folded by default. Each stop card already shows its time, and the full list pushed the day cards
       // three or four screens down on a phone.
       var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
-      html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+' arrêts, heures et trajets':stopCount+' stops, times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
+      html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+(stopCount===1?' arrêt':' arrêts')+', heures et trajets':stopCount+(stopCount===1?' stop':' stops')+', times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
         var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
@@ -1943,6 +1945,9 @@ function renderScript(d) {
         if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(nextFr?t3FrenchHref(step.url,step.urlFr):step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
+        // Distillery test 3 (2026-11-13): a named place that's closed that day says only why ("Bench Road Spirits (test) is
+        // closed Mondays · try Tue–Sun."), not the visitor's whole request in lower case before it.
+        if(step.venue&&t3MissingClosedText(step,nextFr))return '<li>'+esc(t3MissingClosedText(step,nextFr))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+'</li>';
         return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(t3MissingClosedText(step,nextFr)?esc((nextFr?'Non inclus : ':'Not included: ')+t3MissingClosedText(step,nextFr)):(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.'))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }

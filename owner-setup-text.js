@@ -1240,6 +1240,7 @@ fr.brewery = {
 // setup page lays the one for the kind picked over the brewery words (owner-setup-client.js kindWords). A brewery and a
 // taphouse keep the beer words.
 en.brewery.kindCidery = {
+  whatsOnEx: '$6 ciders and half-price snacks',
   hiLead: 'Let’s get your cidery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { taproom: 'Your tasting room', door: 'Your tasting room door', menu: 'Your menu or cider list' },
   menuQ: 'How should we add your menu or cider list?', menuLead: 'Pick the easiest one for you. A photo of your chalkboard works too, as often as your ciders change.',
@@ -1258,6 +1259,7 @@ en.brewery.kindNeutral = {
   doorQ: 'Where’s the tasting room door?', doorHere: 'Are you there right now?', mapFailQ: 'Send your tasting room door photo', doorPhotoQ: 'Take a photo of your tasting room door',
 };
 fr.brewery.kindCidery = {
+  whatsOnEx: 'Cidres à 6 $ et collations à moitié prix',
   hiLead: 'Préparons la page de votre cidrerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   menuQ: 'Comment ajouter votre menu ou votre liste des cidres?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, aussi souvent que vos cidres changent.',
   photosLead: 'Votre verger, votre salle de dégustation, votre terrasse. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une cidrerie comme la vôtre.',
@@ -1283,6 +1285,8 @@ fr.brewery.kindNeutral = {
 // choices on Hours (Decided 5) are reused word for word.
 const APPT_KEYS = ['allYearAppt', 'allYearApptSub', 'apptQ', 'apptLead', 'apptFrom', 'apptTo', 'apptSave', 'apptNeed', 'apptNow', 'needOpenDayAppt', 'noSetHours', 'noSetHoursNow', 'noSetHoursSaved'];
 en.brewery.kindDistillery = {
+  // Distillery test 3 (2026-11-13): a cocktail-bar happy hour example, not pints.
+  whatsOnEx: '$8 cocktails and half-price small plates',
   hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { taproom: 'Food here', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
   noLabels: { music: 'no tours, classes or events' },
@@ -1304,7 +1308,8 @@ en.brewery.kindDistillery = {
   musicTypeQ: 'Your tours, classes and events', eventEx: 'Whisky class',
   // Distillery test 1 (2026-11-13): a distillery tour and a class are the first chips; how often is on the edit page.
   kinds: { tour: 'Distillery tour', class: 'Class' },
-  eventsOften: 'Monthly or every other week? Set how often under Tours & events on your edit page.',
+  // Distillery test 3 (2026-11-13): the note links straight to Tours & events on the edit page (opened and scrolled to).
+  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often in Tours & events on your edit page.', eventsOftenLink: 'Open Tours & events',
   eventsGuess: 'We filled this in from what’s on your page. Check the day and time.',
   // The winery's "free with a bottle" question, on Tastings and bottles.
   waivedQ: 'Is a tasting free if people buy a bottle?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
@@ -1312,6 +1317,7 @@ en.brewery.kindDistillery = {
   doorLead: 'If your door is around the side or upstairs, a photo helps people find it. One photo, taken at the tasting room door, walks visitors right to it.',
 };
 fr.brewery.kindDistillery = {
+  whatsOnEx: 'Cocktails à 8 $ et petites assiettes à moitié prix',
   hiLead: 'Préparons la page de votre distillerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   labels: { taproom: 'Nourriture sur place', flights: 'Dégustations et bouteilles', music: 'Visites, ateliers et événements', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou carte des cocktails' },
   noLabels: { music: 'pas de visites, d’ateliers ni d’événements' },
@@ -1329,7 +1335,7 @@ fr.brewery.kindDistillery = {
   musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, ou de la musique en direct.',
   musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky',
   kinds: { tour: 'Visite de la distillerie', class: 'Atelier' },
-  eventsOften: 'Une fois par mois ou une semaine sur deux? Choisissez la fréquence sous Visites et événements sur votre page de modification.',
+  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence dans Visites et événements sur votre page de modification.', eventsOftenLink: 'Ouvrir Visites et événements',
   eventsGuess: 'Nous l’avons rempli d’après ce qui est sur votre page. Vérifiez le jour et l’heure.',
   waivedQ: 'La dégustation est-elle gratuite à l’achat d’une bouteille?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   doorQ: fr.brewery.doorQ, doorHere: 'Êtes-vous à la distillerie en ce moment?', mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
