@@ -885,7 +885,7 @@ test('fe3 #7 small fixes: happy hour example, 🍸, time defaults from closing, 
   // Kitchen-close and kids-until start an hour before the earliest closing time (never after closing), or blank.
   const src = CLIENT();
   assert.doesNotMatch(src, /\|\| '21:00'/);
-  assert.match(src, /until: BIm\.until \|\| beforeClose\(\)/); assert.match(src, /kcloses: \(BI\.kitchen \|\| \{\}\)\.closes \|\| beforeClose\(\)/);
+  assert.match(src, /until: BIm\.until \|\| minorsDefault\(\)/); assert.match(src, /kcloses: \(BI\.kitchen \|\| \{\}\)\.closes \|\| beforeClose\(\)/);
   const m = /function beforeClose\(\)\{[\s\S]*?\n  \}/.exec(src)[0];
   const run = (hours) => new Function('S', 'CUR', 'DAYS', 'parseWeek', `${m}; return beforeClose();`)({}, { hours }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], (w) => (w ? JSON.parse(w) : null));
   assert.equal(run(WEEK), '19:00');

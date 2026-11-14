@@ -3989,6 +3989,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
   const baseDate=requirements.startDate||input.tripDate;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(baseDate||'')||!Number.isFinite(Date.parse(baseDate+'T12:00:00Z')))return;
   const facts=input.facts||[],byId=new Map(facts.map(v=>[v.id,v]));
+  const kidsTrip=!!(input.intent&&((input.intent.party&&input.intent.party.kids)||input.intent.occasion==='family'));
   const softPins=swapSoftPins(input);
   const groups=plan.days.length?plan.days.map(d=>({day:d.day,date:d.date,stops:d.stops})):[{day:1,stops:plan.itinerary?.stops||plan.outing?.stops||[]}];
   const clock=m=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
@@ -4119,7 +4120,11 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         }
         const unknownHours=!hours||hours.status==='unknown';
         // A tasting room with no listed hours is timed from 11:00, never 09:00 (2026-10-18).
-        const ranges=unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges;
+        // Pub test (Whistler, 2026-11-14): on a kids trip, a place whose owner says "minors until 9 PM" is a visit that ends by
+        // then (it was planned 7:35-9:05 PM): its hours end at that time for this trip, so the visit is earlier, shorter or
+        // another stop. The "Kids welcome with an adult until 9 PM" line still shows.
+        const kidsCut=kidsTrip?kidsUntilMinutes(candidate):null;
+        const ranges=(unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges).map(([a,b])=>kidsCut!=null?[a,Math.min(b,kidsCut)]:[a,b]).filter(([a,b])=>b>a);
         if(hours?.status==='closed')return {bad:true};
         let transfer=0,guessedTransfer=false;
         if(previous){
@@ -4157,6 +4162,14 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
           const least=['restaurant','pub'].includes(candidate.type)?60:45,limit=eventStart-30-(eventTravel?.maxMinutes||0);
           range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+least<=Math.min(b,1440,limit));
           if(range)squeezed=Math.floor((Math.min(range[1],1440,limit)-Math.max(range[0],earliest,partStart,fillStart))/15)*15;
+          if(squeezed!=null&&squeezed<least)range=null;
+        }
+        // A kids stop that would run past its kids time is shortened to end by then (at least 45 minutes there, an hour
+        // for a meal).
+        if(!range&&kidsCut!=null&&!isLunchStop(stop)){
+          const least=isDinnerStop(stop)?60:45,limit=beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440;
+          range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+least<=Math.min(b,1440,limit));
+          if(range)squeezed=Math.floor((Math.min(range[1],1440,limit)-Math.max(range[0],earliest,partStart,fillStart))/5)*5;
           if(squeezed!=null&&squeezed<least)range=null;
         }
         if(!range)return {bad:true};

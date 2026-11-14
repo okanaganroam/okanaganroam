@@ -54,6 +54,13 @@
     var m = Math.max(best - 60, 0) % 1440;
     return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60);
   }
+  // Pub test (Whistler, 2026-11-14): "Minors welcome until" never starts at midnight or later (a pub open to 1 AM got
+  // 12 AM): an hour before the earliest close, but no later than 9 PM.
+  function minorsDefault(){
+    var t = beforeClose(); if (!t) return '';
+    var n = (+t.slice(0, 2)) * 60 + (+t.slice(3, 5));
+    return n < 300 || n > 21 * 60 ? '21:00' : t;
+  }
   function parseWeek(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; var out = {}; DAYS.forEach(function(d){ out[d] = o && o[d] && o[d].length ? o[d].map(function(x){ return [x[0], x[1]]; }) : null; }); return out; } catch (e) { return null; } }
 
   // ---------- Seasons (pub test 7, 2026-11-10) ----------
@@ -245,11 +252,14 @@
   S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '', note: (S.pubInfo.kitchen || {}).note || '' };
   // Seasonal kitchen time (pub test 7): 'same' (as the rest of the year), 'close' (food until close) or 'time'.
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
-  S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || beforeClose(), note: (S.pubInfo.minors || {}).note || '' };
+  S.minors = { policy: (S.pubInfo.minors || {}).policy || '', until: (S.pubInfo.minors || {}).until || minorsDefault(), note: (S.pubInfo.minors || {}).note || '' };
   // Cocktail test 1 (2026-11-13): research's "19+" picks Adults only to start (saved only with the screen).
   if (CK && !S.minors.policy && C.suggestAdults) { S.minors.policy = 'adults'; S.minorsGuessed = true; }
+  // Pub test (Whistler, 2026-11-14): research says "Minors until 9 PM": that answer and time are picked to start (saved
+  // only with the screen), never a default of an hour before a 1 AM close.
+  else if (C.pub && !S.minors.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; }
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
-  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || beforeClose(), note: BIm.note || '' };
+  if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || minorsDefault(), note: BIm.note || '' };
     // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
     if (!BIm.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; }
     // Distillery test 1 (2026-11-13): research's "Minors welcome with an adult" (no time) picks All ages to start.
@@ -1127,15 +1137,20 @@
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (COMBO && st === 'closures') st = chk = 'hours'; if (!st || seen[st] || (st === 'spend' && S.spendNotSure)) return; if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (COMBO && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
     return out;
+  }
+  // Pub test (Whistler, 2026-11-14): at 96% only "Dietary options" was offered, though Games was open too (both are
+  // answered on "What you offer"). One button a step still, but it names every open item: "Dietary options · Games".
+  function addName(out, st, lab){
+    for (var i = 0; i < out.length; i++) if (out[i].step === st && out[i].items && lab && out[i].label.split(' · ').indexOf(lab) < 0) { out[i].label += ' · ' + lab; return; }
   }
   // Winery test 2 (2026-11-12): setup ended below 100% with nothing left to answer (a story under 120 letters): the items
   // the score still misses, each with a way to fix it, instead of "Everything is done!" beside 95%.
   function gapList(){
     var sc = S.score || {}; if (leftList().length || Math.max(sc.pct || 0, sc.soon || 0) >= 100) return [];
     var out = [], seen = {};
-    (sc.left || []).forEach(function(it){ var st = itemStep(it.k) || ITEM_STEP[it.k]; if (!st || seen[st] || STEPS.indexOf(st.split(':')[0]) < 0) return; seen[st] = true; out.push({ step: st, label: C.lang === 'fr' ? it.fr : it.en }); });
+    (sc.left || []).forEach(function(it){ var st = itemStep(it.k) || ITEM_STEP[it.k], lab = C.lang === 'fr' ? it.fr : it.en; if (!st || STEPS.indexOf(st.split(':')[0]) < 0) return; if (seen[st]) return addName(out, st, lab); seen[st] = true; out.push({ step: st, label: lab, items: true }); });
     return out;
   }
   // One "To reach 100%" row (pub test 3, 2026-11-10). The front door says it waits for a visit; the average spend, when
@@ -1292,7 +1307,7 @@
       var any = STEPS.some(function(k){ return S.done[k]; });
       var nxt = firstOpen();
       // Welcome back: the button first, then what's done.
-      x = any ? q(nxt === 'finish' ? T.changeQ : S.fresh ? T.welcome : T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
+      x = any ? q(T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
           + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
@@ -1430,7 +1445,7 @@
       // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
       var ks0 = kitchenSeason(), kz = S.kitchen.sea;
       x = q(T.kitchenTimeQ, T.kitchenTimeLead) + msgs() + '<div class="su-day"><div class="su-times"><label class="su-q" for="suKto" style="margin:0">' + h(T.kitchenAt) + '</label> <input type="time" id="suKto" value="' + h(S.kitchen.closes) + '"></div>' + (function(){ var kw = kitchenWarn(S.kitchen.closes); return '<p class="su-hint su-closedwarn" id="suKitchenWarn" role="status"' + (kw ? '' : ' hidden') + '>' + h(kw) + '</p>'; })() + '</div>'
-        + (ks0 ? '<div class="su-day su-kseason" id="suKitchenSeason"><p class="su-q" style="margin-top:0">' + h(fill(T.kitchenSeasonQ, { kind: T.seasonWord[ks0.kind] || T.seasonWord.summer, range: mdText(ks0.from) + ' – ' + mdText(ks0.to) })) + '</p>'
+        + (ks0 ? '<div class="su-day su-kseason" id="suKitchenSeason"><p class="su-q" style="margin-top:0">' + h(fill(T.kitchenSeasonQ, { range: mdText(ks0.from) + ' – ' + mdText(ks0.to), a: mdText(ks0.from), b: mdText(ks0.to) })) + '</p>'
           + '<div class="su-stack" role="group">' + ['same', 'close', 'time'].map(function(m){ var on = kz.mode === m; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-ksea="' + m + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(m === 'same' ? T.kitchenSeasonSame : m === 'close' ? T.kitchenSeasonClose : T.kitchenSeasonAt + '…') + '</span></button>'; }).join('') + '</div>'
           + (kz.mode === 'time' ? '<div class="su-times" style="margin-top:12px"><label class="su-q" for="suKsto" style="margin:0">' + h(T.kitchenSeasonAt) + '</label> <input type="time" id="suKsto" value="' + h(kz.closes) + '"></div>' : '') + '</div>' : '')
         + field('suKnote', T.kitchenNoteLabel, S.kitchen.note, { max: 120 }) + ex(T.kitchenNoteEx) + '<div class="su-stack">' + big('✓', T.saveKitchen, '', false, 'kitchenSave') + '</div>';
@@ -1440,7 +1455,7 @@
         + '<p class="su-hint" id="suSportsTip">' + h(T.sportsEx) + '</p><div class="su-stack">' + big('➜', T.nextPlain, '', false, 'sportsSave') + '</div>';
     } else if (s === 'offer:minors') {
       x = q(T.minorsQ, T.minorsLead) + (S.minorsGuessed && S.minors.policy === 'adults' && T.minorsGuess ? '<p class="su-sent su-research" id="suMinorsGuess">' + h(T.minorsGuess) + '</p>' : '') + msgs() + '<div class="su-stack" role="group" aria-label="' + h(T.minorsQ) + '">' + ['adults', 'minors_until', 'all_ages'].map(function(k){ var on = S.minors.policy === k; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-minors="' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(T.minorsOpts[k]) + '</span></button>'; }).join('') + '</div>'
-        + (S.minors.policy === 'minors_until' ? '<div class="su-day" style="margin-top:14px"><div class="su-times"><label class="su-q" for="suMto" style="margin:0">' + h(T.minorsUntil) + '</label> <input type="time" id="suMto" value="' + h(S.minors.until || beforeClose()) + '"></div></div>' : '')
+        + (S.minors.policy === 'minors_until' ? '<div class="su-day" style="margin-top:14px"><div class="su-times"><label class="su-q" for="suMto" style="margin:0">' + h(T.minorsUntil) + '</label> <input type="time" id="suMto" value="' + h(S.minors.until || minorsDefault()) + '"></div></div>' : '')
         + field('suMnote', T.minorsNoteLabel, S.minors.note, { max: 120 }) + ex(T.minorsNoteEx) + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'minorsSave') + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:offer">' + h(T.skip) + '</button></div>';
     } else if (s === 'closures') {
@@ -2058,10 +2073,13 @@
         if (!S.sea.week || !windowsOk(S.sea.week)) { S.nudge = T.seasonNeedOpenDay; return render(); }
         var sw = {}; DAYS.forEach(function(d){ sw[d] = S.sea.week[d] || []; });
         var pad = function(n){ return ('0' + n).slice(-2); };
+        // Pub test (Whistler, 2026-11-14): a season picked here has no name of its own ("Summer hours" showed in mid-November
+        // for a ski town's Apr 21 – Nov 24), so the page names it by its dates in its own language: « Heures du 21 avr. au
+        // 24 nov. ». A stored name (research's "Winter hours") stays while the same season is kept.
         var same = s0 && S.sea.kind === S.sea.storedKind;
         // The same months as stored keep their exact dates (a set from Jun 15 stays Jun 15).
         var keepDates = same && JSON.stringify(S.sea.months) === S.sea.monthsWas;
-        list = [{ from: S.sea.exact ? S.sea.exact.from : keepDates ? s0.from : pad(r.a) + '-01', to: S.sea.exact ? S.sea.exact.to : keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : (S.sea.kind === 'winter' ? 'Winter hours' : 'Summer hours'), hours: sw }].concat(rest);
+        list = [{ from: S.sea.exact ? S.sea.exact.from : keepDates ? s0.from : pad(r.a) + '-01', to: S.sea.exact ? S.sea.exact.to : keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : '', hours: sw }].concat(rest);
       }
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
@@ -2607,7 +2625,10 @@
       if ((diet || !S.noDiet) && S.notOffered.indexOf('dietary') >= 0) { var cur0 = list.length ? list[list.length - 1].not_offered : S.notOffered; list.push({ not_offered: cur0.filter(function(z){ return z !== 'dietary'; }) }); }
       // "No dogs allowed" (pub test 4): taken back before Dog friendly is saved, given after it is turned off.
       if ((badges.dog_friendly || !S.noDogs) && S.notOffered.indexOf('dogs') >= 0) list.push({ not_offered: { remove: ['dogs'] } });
-      list.push({ badges: badges });
+      // Pub test (Whistler, 2026-11-14): only the tiles that differ from what is saved are sent (an untouched tile sent
+      // false read like an answer); the full set above still decides the rest of this save.
+      var sendB = {}; Object.keys(badges).forEach(function(b){ if (!!badges[b] !== !!S.savedBadges[b]) sendB[b] = badges[b]; });
+      if (Object.keys(sendB).length) list.push({ badges: sendB });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
       if (!badges.dog_friendly && S.noDogs && S.notOffered.indexOf('dogs') < 0) list.push({ not_offered: { add: ['dogs'] } });
@@ -3163,6 +3184,7 @@
   if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); if (S.done[startAt] && S.done[startAt] !== 'skip') S.toList = true; } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
   // Pubs: the checklist's kitchen, sports and who's-welcome rows open their own screens.
   else if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) || (C.brewery && startAt === 'offer:minors')) { S.hist = ['start']; S.step = startAt; S.toList = true; }
+  else if (C.pub && startAt === 'hours:kitchentime') { S.hist = ['start', 'hours:kitchen']; S.step = startAt; S.toList = true; }
   // Cafés: the checklist's "What you serve" row opens its own screen (the kind first while none is picked).
   else if (C.cafe && startAt === 'cuisine:serve') { S.hist = ['start']; S.step = S.place && CUR.place_type ? 'cuisine:serve' : 'cuisine'; S.toList = true; }
   // A reload or a language switch on an edit screen comes back to it (with what was typed), not to the summary.
@@ -3181,6 +3203,14 @@
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   };
   screen.addEventListener('input', timeTyped); screen.addEventListener('change', timeTyped);
+  // Pub test (Whistler, 2026-11-14): a quick answer stayed lit after its words were typed over; its chips follow the box.
+  var quickTyped = function(e){
+    var id = e.target && e.target.id; if (!id) return;
+    var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === id; }); if (!mine.length) return;
+    var sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
+    mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(e.target.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
+  };
+  screen.addEventListener('input', quickTyped);
   var kitchenTyped = function(e){ if (!e.target || e.target.id !== 'suKto') return; var n = el('suKitchenWarn'); if (!n) return; var t = kitchenWarn(e.target.value); n.textContent = t; n.hidden = !t; };
   screen.addEventListener('input', kitchenTyped); screen.addEventListener('change', kitchenTyped);
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
@@ -3209,7 +3239,9 @@
     if (s0 === 'hours:edit' || s0 === 'hours:season') return 'hours:edit';
     if (s0 === 'basics:edit') return s0;
     // The screens the address can open on their own (the pubs' kitchen, sports and who's-welcome; a café's serves).
-    if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.brewery && s0 === 'offer:minors') || (C.cafe && s0 === 'cuisine:serve')) return s0;
+    // Pub test (Whistler, 2026-11-14): the kitchen-time screen has its own address (it was #hours, so a reload or Back
+    // landed on the hours question).
+    if ((C.pub && ['hours:kitchen', 'hours:kitchentime', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.brewery && s0 === 'offer:minors') || (C.cafe && s0 === 'cuisine:serve')) return s0;
     if (s0 === 'hours:year') return s0;
     if (STEPS.indexOf(b0) >= 0) return b0;
     return s0 === 'more' ? 'more' : '';

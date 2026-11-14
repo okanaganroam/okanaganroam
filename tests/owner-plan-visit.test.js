@@ -93,7 +93,8 @@ test('save from the edit link: live at once, logged, in "Your updates"; other ro
   // A whole box written from nothing (no research box before).
   const w = mk('restaurant');
   assert.equal((await post(tokenFor(w.id), { visit_rows: { dietary: 'Gluten-free buns', groups: 'Groups of 10+ please call ahead', takeout: 'Takeout by phone' } })).status, 201);
-  assert.deepEqual(rows(w.id).map((x) => x.label).sort(), ['Dietary', 'Good to know', 'Takeout']);
+  // Pub test (Whistler, 2026-11-14): an answer about groups is its own "Groups" line.
+  assert.deepEqual(rows(w.id).map((x) => x.label).sort(), ['Dietary', 'Groups', 'Takeout']);
 });
 
 test('validation: length, < >, links and unknown keys are refused, in English and French', async () => {
