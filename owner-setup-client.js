@@ -1711,6 +1711,8 @@
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
       x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
+          // Cocktail test 1 (2026-11-13): its how often from the edit page ("1st Thu of the month"), kept when this is saved.
+          + (function(){ var k = e.orig ? (CUR.weekly_nights || []).indexOf(e.orig) : -1, o = k >= 0 && (C.nightsOften || [])[k]; return o && T.oftenNow ? '<p class="su-hint su-often" id="suOften' + i + '">' + h(fill(CUR.weekly_nights_waiting ? T.oftenWaiting : T.oftenNow, { x: o })) + '</p>' : ''; })()
           + '<p class="su-q" id="ntq' + i + '">' + h(T.whatEvent) + '</p>' + (function(){
             // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
             // show open; the rest wait under "More kinds" (open when the picked kind is one of them).

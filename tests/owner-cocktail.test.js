@@ -316,3 +316,49 @@ test('help: cocktail list, DJ nights, 19+, walk-ins or booking, and the cocktail
   assert.match(T.find((x) => x.id === 'easy-setup').a, /\(8 steps\): address and phone, hours \(with when the kitchen closes, and holidays\), happy hour, your food, your menu or cocktail list, the cocktail price/);
   assert.match((await get(`/owner/${t}`)).text, /"id":"cocktail-djs"/, 'on the edit page too');
 });
+
+// ---------- Fresh eyes cocktail test 1 (2026-11-13) ----------
+const liveNights = (id) => app.venueWeeklyNightsList(id).map((x) => `${x.title}|${x.frequency}`);
+const setupCfg = async (t) => cfgOf((await get(`/owner/${t}/setup`)).text);
+// The setup sends each night the way musicSave does: an untouched row exactly as it came in, a changed one with weekly
+// unless it carried one (here: always weekly, the worst case the server must still mend).
+const asSetup = (rows) => rows.map((x) => ({ days: x.days, kind: x.kind, title: x.title, start: x.start || null, end: x.end || null, detail: x.detail || null, host: x.host || null, cost: x.cost || null, frequency: 'weekly', title_fr: x.title_fr || null, detail_fr: x.detail_fr || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+for (const type of ['cocktail', 'pub', 'brewery', 'distillery', 'cafe']) {
+  test(`how often (${type}): a monthly set on the edit page (waiting) survives a setup re-save; the setup and owner home say so`, async () => {
+    const v = mk(type); const t = tokenFor(v.id);
+    const jazz = { days: ['thu'], kind: 'live_music', title: 'Jazz night', start: '20:00' }, dj = { days: ['fri'], kind: 'dj', title: 'DJ night', start: '22:00' };
+    assert.equal((await change(t, { weekly_nights: [jazz, dj] })).status, 200);
+    assert.deepEqual(liveNights(v.id), ['Jazz night|weekly', 'DJ night|weekly'], 'setup events are live');
+    // The edit page (no from_setup): jazz once a month waits for our check.
+    const r = await change(t, { weekly_nights: [{ ...jazz, frequency: 'monthly-1st' }, { ...dj, frequency: 'weekly' }] }, false);
+    assert.equal(r.status, 200); assert.ok((r.body.review || []).includes('weekly_nights'), 'waiting for review');
+    let cfg = await setupCfg(t);
+    assert.equal(cfg.cur.weekly_nights_waiting, true); assert.equal(cfg.cur.weekly_nights[0].frequency, 'monthly-1st', 'the setup starts from the waiting rows');
+    assert.match(cfg.nightsOften[0], /^1st Thu of the month$/); assert.equal(cfg.nightsOften[1], '');
+    assert.match((await get(`/owner/${t}`)).text, /id="opOftenWaiting"[^>]*>Waiting for our check \(usually within a day\): Jazz night, 1st Thu of the month/);
+    // Change an answer in the setup: fix the DJ's name, sent as weekly for every row (from the LIVE rows, the old bug).
+    const live = app.venueWeeklyNightsList(v.id);
+    assert.equal((await change(t, { weekly_nights: asSetup(live).map((x) => (x.kind === 'dj' ? { ...x, title: 'DJ Fridays' } : x)) })).status, 200);
+    assert.deepEqual(liveNights(v.id), ['Jazz night|monthly-1st', 'DJ Fridays|weekly'], 'the monthly is kept, never weekly');
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 AND changes LIKE '%weekly_nights%'").get(v.id).n, 0, 'nothing left waiting');
+    // Live now: another setup re-save (weekly again) keeps it; the screen says how often.
+    assert.equal((await change(t, { weekly_nights: asSetup(app.venueWeeklyNightsList(v.id)).map((x) => (x.kind === 'dj' ? { ...x, start: '21:00' } : x)) })).status, 200);
+    assert.deepEqual(liveNights(v.id), ['Jazz night|monthly-1st', 'DJ Fridays|weekly']);
+    cfg = await setupCfg(t);
+    assert.equal(cfg.cur.weekly_nights_waiting, false); assert.equal(cfg.nightsOften[0], '1st Thu of the month');
+    assert.doesNotMatch((await get(`/owner/${t}`)).text, /id="opOftenWaiting"/);
+    // A new event from the setup is weekly; a renamed one (same kind, days and time) keeps its how often.
+    assert.equal((await change(t, { weekly_nights: [...asSetup(app.venueWeeklyNightsList(v.id)).map((x) => (x.kind === 'live_music' ? { ...x, title: 'Jazz & blues' } : x)), { days: ['sat'], kind: 'comedy', title: 'Comedy night', start: '20:00', frequency: 'weekly' }] })).status, 200);
+    assert.deepEqual(liveNights(v.id), ['Jazz & blues|monthly-1st', 'DJ Fridays|weekly', 'Comedy night|weekly']);
+    // The edit page can still set it back to every week.
+    const back = app.venueWeeklyNightsList(v.id).map((x) => ({ days: x.days, kind: x.kind, title: x.title, start: x.start, frequency: 'weekly' }));
+    assert.equal((await change(t, { weekly_nights: back }, false)).status, 200);
+    assert.equal((await get(`/owner/${t}`)).text.includes('id="opOftenWaiting"'), false, 'a weekly waiting is not a how-often note');
+  });
+}
+test('how often: the client shows it under the event and sends the stored frequency of an untouched row', () => {
+  const s = CLIENT();
+  assert.match(s, /T\.oftenWaiting : T\.oftenNow/);
+  assert.match(s, /frequency: appt \? 'appointment' : n0\.frequency && n0\.frequency !== 'appointment' \? n0\.frequency : 'weekly'/);
+  assert.equal(text.en.oftenNow, 'How often: {x}. It stays when you save.');
+});

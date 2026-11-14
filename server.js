@@ -10851,6 +10851,12 @@ function nightDaysText(s, fr) {
   const names = s.days.map((d) => (fr ? `${HH_DAYS_SHORT.fr[d]}.` : HH_DAYS_SHORT.en[d])).join(', ');
   return `${weeks} ${names}`;
 }
+// How often in words, for the owner ("1st Thu of the month", "every other week"); '' for every week.
+function nightOftenText(s, fr) {
+  if (!s || !s.frequency || s.frequency === 'weekly' || nightByAppointment(s)) return '';
+  if (s.frequency === 'biweekly') return nightFrequencyText(s, fr);
+  return `${nightDaysText(s, fr)} ${fr ? 'du mois' : 'of the month'}`;
+}
 // Build My Trip (2026-10-27): "Tonight: Trivia at 7 PM" (« Ce soir : Quiz à 19 h »), up to two, "; " between.
 // Distillery test 1 (2026-11-13): a tour or class the place books ahead says so ("Tour at 2 PM, book ahead").
 // Distillery test 2 (2026-11-13): a tour or class reads as its event ("Distillery tour", « Visite de la distillerie »), not
@@ -47421,6 +47427,32 @@ function ownerNightsError(detail) {
   if (/start|end/.test(d)) return OWNER_NIGHTS_ERRORS.time;
   return OWNER_NIGHTS_ERRORS.unreadable;
 }
+// Cocktail test 1 (2026-11-13): "how often" is never lost to a setup re-save. The setup has no how-often control (it is
+// set on the edit page), so a setup row sent as weekly keeps the frequency of the same event still waiting for review
+// (an edit-page change), else of the same live event. The same event: the same kind and name, else the same kind, days and
+// start, else the same name. A new event stays weekly; By appointment is the setup's own answer and is never carried.
+function ownerPendingNights(venueId) {
+  try {
+    const p = pendingOwnerChange(venueId); const req = p ? getOwnerChange(p.id) : null;
+    return req && req.status === 'pending' && Array.isArray((req.changes || {}).weekly_nights) ? req.changes.weekly_nights : null;
+  } catch (e) { return null; }
+}
+function sameNightOf(s, list) {
+  const name = (x) => String(x.title || '').trim().toLowerCase();
+  const when = (x) => `${x.kind}|${(x.days || []).join(',')}|${x.start || ''}`;
+  const rows = Array.isArray(list) ? list : [];
+  return rows.find((x) => x.kind === s.kind && name(x) === name(s)) || rows.find((x) => when(x) === when(s)) || rows.find((x) => name(x) && name(x) === name(s)) || null;
+}
+const nightCarriedFrequency = (x) => !!x && !!x.frequency && x.frequency !== 'weekly' && x.frequency !== NIGHT_APPOINTMENT;
+function ownerNightsKeepFrequency(next, pending, live) {
+  for (const s of next) {
+    if ((s.frequency || 'weekly') !== 'weekly') continue;
+    const p = sameNightOf(s, pending), l = p ? null : sameNightOf(s, live);
+    if (nightCarriedFrequency(p)) s.frequency = p.frequency;
+    else if (nightCarriedFrequency(l)) s.frequency = l.frequency;
+  }
+  return next;
+}
 // Same nights? (what visitors see: never the source or date)
 function sameWeeklyNights(a, b) {
   const norm = (x) => (Array.isArray(x) && x.length ? JSON.stringify(x.map((s) => OWNER_NIGHT_KEYS.map((k) => (k === 'days' ? (s.days || []).join(',') : k === 'frequency' ? s.frequency || 'weekly' : s[k] == null ? '' : s[k])))) : null);
@@ -47756,6 +47788,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (!checked.ok) errors.weekly_nights = ownerNightsError(checked.detail);
       else {
         const next = checked.nights.map((s) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, s[k]])));
+        if (body && body.from_setup === true) ownerNightsKeepFrequency(next, ownerPendingNights(venue.id), current.weekly_nights);
         if (!sameWeeklyNights(next, current.weekly_nights)) changes.weekly_nights = next;
       }
     }
@@ -53061,7 +53094,10 @@ function renderOwnerSetupPage(found, opts) {
     happy_blocks: setupHappyBlocks(found),
     // Every owner field of each special and night, so one the owner didn't touch is sent back exactly as stored.
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
-    weekly_nights: (snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
+    // Cocktail test 1 (2026-11-13): events still waiting for review (an edit-page change, like "1st of the month") are what
+    // the setup starts from, so a later setup save carries them (and their how often) instead of the older live ones.
+    weekly_nights: (ownerPendingNights(venue.id) || snap.weekly_nights || []).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
+    weekly_nights_waiting: !!ownerPendingNights(venue.id),
     visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
     // box any more (café test 3, 2026-11-11: keep it easy); a TikTok already saved stays stored and on the page.
@@ -53207,6 +53243,9 @@ function renderOwnerSetupPage(found, opts) {
       : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
     nightKindsTop: venue.type === 'distillery' ? 4 : 6,
+    // Cocktail test 1 (2026-11-13): each event's how often when it isn't every week ("1st Thu of the month"), shown on the
+    // events screen; with weekly_nights_waiting it is still waiting for our check.
+    nightsOften: cur.weekly_nights.map((x) => (nightCarriedFrequency(x) ? nightOftenText(x, fr) : '')),
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
@@ -59875,6 +59914,10 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // name, times, how often, and optional detail, host, cost and French.
   const showNights = portalFields(venue.type).nights;
   const nightsNow = Array.isArray(snap.weekly_nights) ? snap.weekly_nights : [];
+  // Cocktail test 1 (2026-11-13): a how often still waiting for our check ("Jazz night: 1st Thu of the month") is named on
+  // the owner home, so "Live" in the updates list isn't the whole story.
+  const pendingOften = showNights ? (ownerPendingNights(venue.id) || []).filter(nightCarriedFrequency).filter((x) => { const l = sameNightOf(x, venueWeeklyNightsList(venue.id)); return !l || l.frequency !== x.frequency; }) : [];
+  const pendingOftenHtml = pendingOften.length ? `<p class="op-hint op-often-waiting" id="opOftenWaiting">${escapeHtml(L('Waiting for our check (usually within a day): ', 'En attente de notre vérification (habituellement d’ici un jour) : '))}${pendingOften.map((x) => escapeHtml(`${x.title}, ${nightOftenText(x, lang === 'fr')}`)).join('; ')}</p>` : '';
   const nightRows = () => {
     const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length + (nightsNow.length < NIGHTS_MAX ? 1 : 0)));
     const freqText = { weekly: L('Every week', 'Chaque semaine'), biweekly: L('Every other week', 'Une semaine sur deux'), 'monthly-1st': L('1st of the month', '1er du mois'),
@@ -60257,7 +60300,7 @@ ${renderGolfHeaderHtml()}
           ${tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         ${/* Distillery test 3 (2026-11-13): the weekly tours/nights editor (how often, every other week) is one tap from the list. */ ''}
-        ${showNights && venue.type !== 'winery' ? `<p class="op-all-link op-nights-link"><a href="#tours-events">${venue.type === 'distillery' ? L('Tours &amp; events: days and how often', 'Visites et événements : jours et fréquence') : venue.type === 'cocktail' ? L('Events: days and how often', 'Événements : jours et fréquence') : venue.type === 'cafe' ? L('Weekly events: days and how often', 'Événements de la semaine : jours et fréquence') : L('Weekly nights: days and how often', 'Soirées de la semaine : jours et fréquence')}</a></p>` : ''}
+        ${showNights && venue.type !== 'winery' ? `<p class="op-all-link op-nights-link"><a href="#tours-events">${venue.type === 'distillery' ? L('Tours &amp; events: days and how often', 'Visites et événements : jours et fréquence') : venue.type === 'cocktail' ? L('Events: days and how often', 'Événements : jours et fréquence') : venue.type === 'cafe' ? L('Weekly events: days and how often', 'Événements de la semaine : jours et fréquence') : L('Weekly nights: days and how often', 'Soirées de la semaine : jours et fréquence')}</a></p>${pendingOftenHtml}` : ''}
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
       </section>
       <div class="op-taskbar" id="opTaskBar" data-task="hours photos arrival video events contact happy more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
