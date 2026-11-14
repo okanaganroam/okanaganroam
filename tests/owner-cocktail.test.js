@@ -188,6 +188,7 @@ test('Build My Trip: a lounge joins a kids trip only on All ages or “until a s
   assert.equal(pv.typeLabel, 'Cocktail lounge'); assert.equal(pv.typeLabelFr, 'Bar à cocktails');
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(v3, /cost\.label === 'Cocktail' \? \(french \? 'Cocktails dès ' : 'Cocktails from '\)/);
+  // The French card label comes from the planner page's own words (public/scripts/app.js is frozen).
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /'tripv3\.type\.cocktail': 'Bar \\u00e0 cocktails'/);
 });
 

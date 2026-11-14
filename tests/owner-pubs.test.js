@@ -402,7 +402,7 @@ test('"We don\'t serve food" clears the food labels (kind of pub stays), logged,
   // The page script: no food clears the picks; serving food again brings Pub Fare back as the start.
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /if \(mode === 'none'\) \{ S\.cuis = \[\];/);
-  assert.match(js, /if \(was === 'none'\) \{ if \(S\.done\.cuisine === 'no'\) delete S\.done\.cuisine; if \(!S\.cuis\.length\) S\.cuis = \['Pub Fare'\]; \}/);
+  assert.match(js, /if \(was === 'none'\) \{ if \(S\.done\.cuisine === 'no'\) delete S\.done\.cuisine; if \(!S\.cuis\.length && !CK\) S\.cuis = \['Pub Fare'\]; \}/);
 });
 
 test('pub page: Local beer on tap and the games are in the visible highlights; restaurants unchanged', async () => {

@@ -933,7 +933,7 @@
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Cocktail lounges (2026-11-13): what they serve, the town and the cocktail price as the card shows it ("From $16").
-    if (CK) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
+    if (C.cocktail) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([C.typeLabel, S.cuis.length ? S.cuis.map(function(c){ return (C.cuisineShow || {})[c] || C.cuisineNames[c] || c; }).join(' · ') : '', C.regionLabel, typeof S.savedCp === 'number' && S.savedCp <= (C.feeLiveMax || 40) ? fill(T.feeCard, { x: cpText(S.savedCp) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Wineries (2026-11-12): the kind, the town and the tasting price as the card shows it.
     if (C.winery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
@@ -1007,7 +1007,7 @@
     var open = P2.filter(function(k){ return !answered(k) && !(C.pub && (k === 'book' || k === 'takeout')); });
     var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
     // A café's one Instagram and Facebook screen keeps its capitals too.
-    if ((C.cafe || C.winery || C.brewery || CK) && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
+    if ((C.cafe || C.winery || C.brewery || C.cocktail) && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase().replace(/\bdj(s?)\b/g, 'DJ$1'); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
     return cl(T.optional) + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
