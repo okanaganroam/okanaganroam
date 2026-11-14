@@ -1,5 +1,6 @@
 // Build My Trip parity (2026-11-06): the planner files are the same on every Roam site and everything that differs is in
 // trip-site.js. This file is the same on every site too: a site config has every value, and the French tokens all resolve.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const SITE = require('../trip-site.js');

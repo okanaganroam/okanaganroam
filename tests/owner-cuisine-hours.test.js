@@ -17,6 +17,8 @@ if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'owner-cuisine-hours-admin-token';
 delete process.env.AVG_SPEND_PUBLIC;
 const app = require('../server.js');
+// Owner changes send a notice to the site inbox; never a real one from tests.
+app.setVenueSubmissionTransport(async () => {});
 const db = require('../db.js');
 const pc = require('../portal-completeness.js');
 const frenchText = require('../french-text.js');

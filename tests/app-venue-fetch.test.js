@@ -9,6 +9,7 @@
 // permissive mock DOM; fetch, timers, scrolling and element lookups are
 // recorded. No server, no database.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

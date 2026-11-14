@@ -1,6 +1,7 @@
 // Golf data (2026-09-26): green-fee data, loader, freshness, sorting and the
 // golf-only HTML helpers. Pure unit tests against an in-memory database --
 // never the shared okanagan.db the server tests use.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

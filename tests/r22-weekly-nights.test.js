@@ -17,6 +17,8 @@ const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'r22-nights-admin-token';
 const app = require('../server.js');
+// Owner changes send a notice to the site inbox; never a real one from tests.
+app.setVenueSubmissionTransport(async () => {});
 const db = require('../db.js');
 
 const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];

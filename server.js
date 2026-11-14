@@ -1,3 +1,6 @@
+// Under `node --test` (or NODE_ENV=test) every outbound request is refused, so tests never send real email or reach
+// the internet. Never on for the live site: see test-network-guard.js.
+require('./test-network-guard').installIfTesting();
 const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault, roamRouteLocationMessage } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');

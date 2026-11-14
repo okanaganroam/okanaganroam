@@ -1,5 +1,6 @@
 'use strict';
 // Roam design system (2026-11-11): the shared stylesheet reaches list and town pages only, once, and changes no markup.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const polish = require('../roam-polish');

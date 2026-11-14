@@ -1,6 +1,7 @@
 'use strict';
 
 // Stage 4.4 (2026-10-01): /favorites page rules (favorites-page.js).
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { favoritesCore } = require('../favorites-page');

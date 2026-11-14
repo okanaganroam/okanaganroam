@@ -1,3 +1,4 @@
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test');const assert=require('node:assert/strict');
 const {roamOpenByDefault,renderRoamFilterGroups}=require('../roam-now-layout');
 test('fresh Roam Now entry starts open, while saved searches and events keep intent',()=>{

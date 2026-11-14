@@ -5,6 +5,7 @@
 // drafts/site-review-2026-10-19-pass7.md. PURE tests on a small fixture valley (no server.js, no database), plus a few
 // source checks on the /trip page.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

@@ -1,6 +1,7 @@
 // About page (2026-10-20, after the Oct 11 Google drop): who runs the site, live counts, how listings are checked, and
 // AboutPage / Organization structured data. French for the new lines is in data/french/about-2026-10-20.json.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

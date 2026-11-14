@@ -12,6 +12,7 @@
 //    are byte-for-byte unchanged (the English suites themselves are untouched).
 // 4. The V3 interface strings exist in English and French in /scripts/app.js.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

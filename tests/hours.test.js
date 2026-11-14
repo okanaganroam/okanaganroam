@@ -2,6 +2,7 @@
 // ({ weekday, minutes } -- the shape okanaganClock() returns), no database,
 // no server. Pacific Time / daylight-saving tests that go through the real
 // okanaganClock() live in server.test.js.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('../hours.js');

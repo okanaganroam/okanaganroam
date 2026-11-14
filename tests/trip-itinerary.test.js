@@ -7,6 +7,7 @@
 // discovery interpreter are covered, unchanged, by their own test files; the
 // last tests here prove those paths are not taken over.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

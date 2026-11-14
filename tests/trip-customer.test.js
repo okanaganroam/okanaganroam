@@ -1,4 +1,5 @@
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test'),assert=require('node:assert/strict');
 const d=require('../discovery-intent'),r=require('../trip-requirements'),tp=require('../trip-planner');
 const taxonomy={regions:['kelowna','vernon','penticton'],regionLabels:{kelowna:'Kelowna',vernon:'Vernon',penticton:'Penticton'},types:['cafe','restaurant','pub','winery','indoor','outdoor'],features:[],activities:['hiking','viewpoints'],collections:[],venues:[],eventCategories:['arts-culture','sports-recreation'],datePresets:['this-weekend']};

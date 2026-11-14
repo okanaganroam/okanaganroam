@@ -1,5 +1,6 @@
 'use strict';
 // Build My Trip quality pass (2026-10-14): requests a visitor would type, and what a good plan does with them.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test'), assert = require('node:assert/strict');
 const d = require('../discovery-intent'), r = require('../trip-requirements'), tp = require('../trip-planner');
 const { t3FrenchText, t3FrenchPlan } = require('../trip-french-copy');

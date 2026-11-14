@@ -1,3 +1,4 @@
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test');const assert=require('node:assert/strict');
 const {renderContent,styles}=require('../home-simple');
 const fixture={hero:'<section><picture><img src="/images/okanagan-valley-sunset-hero.webp"></picture><h1>Fall in the Okanagan</h1></section>',mood:'<a class="mood-card" href="/food-drink"><img src="/images/mood/food-drink-fall.jpg"><span class="mood-card-title">Food &amp; Drink</span></a>',editors:'',events:'',gems:'',destinations:'',stats:'',footer:''};

@@ -3,6 +3,7 @@
 // French reason lines and the plan's accessibility. The requests are the real ones from
 // drafts/site-review-2026-10-19-pass5.md. PURE tests on the pass-5 fixture valley (copied, so each file stands alone).
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

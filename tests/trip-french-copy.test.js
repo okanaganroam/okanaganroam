@@ -1,4 +1,5 @@
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test'),assert=require('node:assert/strict');
 const {t3FrenchText,t3FrenchPlan}=require('../trip-french-copy');
 test('French planner copy: timing preserves dates, times and uncertainty',()=>{

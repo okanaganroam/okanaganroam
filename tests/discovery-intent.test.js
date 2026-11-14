@@ -7,6 +7,7 @@
 // On presets/categories -- plus a handful of cuisines and venues, so every
 // expectation here is about the interpreter, not about live data.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');
