@@ -16606,7 +16606,8 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
     // Brewery test 1 (2026-11-12): app.js changed on purpose (badgeLabelFor: "Kids until 9 PM" on a card's kids badge).
     // Cocktail test 2 (2026-11-13): app.js changed on purpose (« Que recherchez-vous ? » with its narrow no-break space).
-    assert.equal(md5('public/scripts/app.js'), '01f8a3c739ff8773e8da1943b6bf8115', 'app.js is unchanged by the classic Open Now page');
+    // French public side (2026-11-14): app.js changed on purpose (French « 5 à 7 » badge, stamp, results note and Build My Trip copy).
+    assert.equal(md5('public/scripts/app.js'), '083a1eabef349f5237217ed757b8ada7', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 

@@ -159,7 +159,7 @@ test('Venue page: a Deals list under the happy hour times with its checked date;
   assert.ok(en.includes(`<span class="venue-hours-checked venue-hh-deals-checked">${checked}</span>`), en);
   // French without French lines: the English lines, each marked as English.
   const fr = row(page(v, at(TUE, '12:00'), 'fr'));
-  assert.match(fr, /aria-label="Spéciaux du happy hour"/);
+  assert.match(fr, /aria-label="Spéciaux du 5 à 7"/);
   assert.match(fr, /<span class="venue-hh-deal" role="listitem" lang="en"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span>/);
   assert.match(fr, /venue-hh-deals-checked">Vérifié le /);
   // With French lines: those, not marked English.
@@ -269,19 +269,19 @@ test('Countdown: "Happy hour on now · ends in 1 hr 20 min" on the venue page an
   assert.equal(app.happyHourLeftText(120, false), '2 hr');
   const clock = { weekday: 'tue', minutes: 1000 };
   assert.equal(app.happyHourOnNowText({ state: 'now', until: { weekday: 'tue', minutes: 1080 } }, clock, false), 'Happy hour on now · ends in 1 hr 20 min');
-  assert.equal(app.happyHourOnNowText({ state: 'now', until: { weekday: 'tue', minutes: 1080 } }, clock, true), 'Happy hour en cours · se termine dans 1 h 20');
+  assert.equal(app.happyHourOnNowText({ state: 'now', until: { weekday: 'tue', minutes: 1080 } }, clock, true), '5 à 7 en cours · se termine dans 1 h 20');
   assert.equal(app.happyHourOnNowText({ state: 'now', until: { weekday: 'wed', minutes: 60 } }, { weekday: 'tue', minutes: 1380 }, false), 'Happy hour on now · ends in 2 hr', 'past midnight');
   assert.equal(app.happyHourOnNowText({ state: 'later', from: { weekday: 'tue', minutes: 900 } }, clock, false), '');
   const v = mk({ name: 'Deals Countdown Pub' });
   setTimes(v, TUE_HH);
   assert.deepEqual(line(page(v, at(TUE, '16:40'))), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour on now · ends in 1 hr 20 min`]);
-  assert.deepEqual(line(page(v, at(TUE, '16:40'), 'fr')), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour en cours · se termine dans 1 h 20`]);
+  assert.deepEqual(line(page(v, at(TUE, '16:40'), 'fr')), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> 5 à 7 en cours · se termine dans 1 h 20`]);
   assert.deepEqual(line(page(v, at(TUE, '12:00'))), ['later', 'Happy hour today 3–6 PM'], 'later today is unchanged');
   // The map runs the same countdown functions, refreshed every minute with the rest of the status.
   const en = app.renderPlacesMapPage();
   assert.ok(en.includes('function happyHourLeftText(left, fr)') && en.includes('function happyHourMinutesLeft(until, clock)'));
   assert.ok(en.includes("hhOnNow: function(t){ return 'Happy hour on now · ends in ' + t; }"));
-  assert.ok(app.renderPlacesMapPage({ lang: 'fr' }).includes("hhOnNow: function(t){ return 'Happy hour en cours · se termine dans ' + t; }") || en.includes("hhOnNow: function(t){ return 'Happy hour en cours · se termine dans ' + t; }"));
+  assert.ok(app.renderPlacesMapPage({ lang: 'fr' }).includes("hhOnNow: function(t){ return '5 à 7 en cours · se termine dans ' + t; }") || en.includes("hhOnNow: function(t){ return '5 à 7 en cours · se termine dans ' + t; }"));
   assert.match(en, /if \(h && h\.state === 'now' && left != null\) return \{ now: true, text: T\.hhOnNow\(happyHourLeftText\(left, FR\)\) \};/);
 });
 
@@ -315,17 +315,17 @@ test('Build My Trip: a stop timed inside happy hour says "Happy hour: …" (EN/F
   const out = app.withTripHappyHourDeals(plan);
   const [lunch, pub] = out.itinerary.stops;
   assert.equal(pub.happyHourLine, 'Happy hour: $6 House pints (20 oz), $10 Cocktails');
-  assert.equal(pub.happyHourLineFr, 'Happy hour : $6 House pints (20 oz), $10 Cocktails');
+  assert.equal(pub.happyHourLineFr, '5 à 7\u00a0: $6 House pints (20 oz), $10 Cocktails');
   assert.equal(pub.happyHourLineFrLang, 'en', 'French falls back to the English lines');
   assert.equal(lunch.happyHourLine, undefined, 'noon is outside 3–6 PM');
   assert.equal(JSON.stringify(out.itinerary.stops.map((s) => s.venue.id)), before, 'order unchanged');
   setDeals(v, DEALS, { deals_fr: DEALS_FR });
   const fr = app.withTripHappyHourDeals({ schedule: [{ day: 1, date: TUE, venueId: v.id, startMinutes: 960 }], days: [{ day: 1, stops: [{ venue: { id: v.id } }] }] }).days[0].stops[0];
-  assert.equal(fr.happyHourLineFr, 'Happy hour : 6 $ Pintes maison (20 oz), 10 $ Cocktails');
+  assert.equal(fr.happyHourLineFr, '5 à 7\u00a0: 6 $ Pintes maison (20 oz), 10 $ Cocktails');
   assert.equal(fr.happyHourLineFrLang, undefined);
   // The planner page prints the line on the stop's card; the trip API adds it after planning.
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(v3.includes(`(stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour ' + (stop.happyHourWhenFr ? esc(stop.happyHourWhenFr) + ' ' : '') + ': <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')`));
+  assert.ok(v3.includes(`(stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? '5 à 7' + (stop.happyHourWhenFr ? ' (' + esc(stop.happyHourWhenFr) + ')' : '') + '\\u00a0: <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')`));
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.ok(src.includes('withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))'));
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /happy_hour_deals|happyHourDeals/, 'the planner itself never reads deals (ranking unchanged)');

@@ -167,6 +167,6 @@ module.exports = {
     sampleTown: 'penticton',
     sampleText: 'ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.',
     sampleTitle: 'A happy hour crawl in Penticton',
-    sampleStopLabel: { en: 'Happy hour', fr: 'Happy hour' },
+    sampleStopLabel: { en: 'Happy hour', fr: '5 à 7' },
   },
 };

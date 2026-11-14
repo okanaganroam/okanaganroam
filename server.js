@@ -7592,7 +7592,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   const flowFr = dinnerFirst
     ? `Soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}, puis ` + hhStops.map((c, i) => `${i ? 'puis ' : ''}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + '.'
     : hhStops.map((c, i) => `${i ? 'puis ' : 'Commencez à '}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + (dinnerStop ? `, et soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}` : '') + '.';
-  const timedEn = dinnerStop && !dinnerStop.x.hh ? 'The drinks stops are timed inside their happy hours' : 'Each stop is timed inside its happy hour', timedFr = dinnerStop && !dinnerStop.x.hh ? 'Les arrêts pour un verre sont prévus pendant leur happy hour' : 'Chaque arrêt est prévu pendant son happy hour';
+  const timedEn = dinnerStop && !dinnerStop.x.hh ? 'The drinks stops are timed inside their happy hours' : 'Each stop is timed inside its happy hour', timedFr = dinnerStop && !dinnerStop.x.hh ? 'Les arrêts pour un verre sont prévus pendant leur 5 à 7' : 'Chaque arrêt est prévu pendant son 5 à 7';
   const geoEn = `${timedEn}, and ${chain.length === 2 ? 'both' : 'all three'} are in ${town}. Plan a safe ride home.`;
   const geoFr = `${timedFr}, et ${chain.length === 2 ? 'les deux sont' : 'les trois sont'} à ${town}. Prévoyez un retour sécuritaire.`;
   const whenText = date === today ? (tonight ? 'tonight' : 'today') : date === addLocalDays(today, 1) ? 'tomorrow' : `on ${dayEn}`;
@@ -9478,7 +9478,7 @@ function happyHourMinutesLeft(until, clock) {
 function happyHourOnNowText(h, clock, fr) {
   const left = h && h.state === 'now' ? happyHourMinutesLeft(h.until, clock) : null;
   if (left == null) return '';
-  return fr ? `Happy hour en cours · se termine dans ${happyHourLeftText(left, true)}` : `Happy hour on now · ends in ${happyHourLeftText(left, false)}`;
+  return fr ? `5 à 7 en cours · se termine dans ${happyHourLeftText(left, true)}` : `Happy hour on now · ends in ${happyHourLeftText(left, false)}`;
 }
 // Build My Trip (2026-10-26): a stop timed inside the venue's happy hour says what is on ("Happy hour: $6 House pints,
 // $10 Cocktails"; French « Happy hour : … », the English lines when no French was given). Text only: the planner's
@@ -9524,14 +9524,14 @@ function withTripHappyHourDeals(plan, now = new Date()) {
       s.happyHourDealsFr = happyHourDealsCompact(x.deals.fr || x.deals.en);
       // Planner (2026-10-27): a happy hour crawl's stop says its window too ("Happy hour 3–6 PM: $6 House pints").
       s.happyHourLine = s.happyHourWhen ? `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}` : `Happy hour: ${s.happyHourDeals}`;
-      s.happyHourLineFr = s.happyHourWhenFr ? `Happy hour ${s.happyHourWhenFr} : ${s.happyHourDealsFr}` : `Happy hour : ${s.happyHourDealsFr}`;
+      s.happyHourLineFr = s.happyHourWhenFr ? `5 à 7 (${s.happyHourWhenFr}) : ${s.happyHourDealsFr}` : `5 à 7 : ${s.happyHourDealsFr}`;
       if (!x.deals.fr) s.happyHourLineFrLang = 'en';
     }
   }
   return plan;
 }
 // Audit fix (2026-10-27): each listed place's happy hour on the list's day ("Happy hour 3–6 PM: $6 House pints"; French
-// « Happy hour 15 h–18 h : … »), only for places whose deals are shown (happyHourDealsShown) and open for happy hour that day.
+// « 5 à 7 (15 h–18 h) : … »), only for places whose deals are shown (happyHourDealsShown) and open for happy hour that day.
 function withTripListHappyHour(plan, now = new Date()) {
   const date = parseLocalDate(plan.listDate) ? plan.listDate : todayLocal(now);
   const weekday = localWeekdayKey(date);
@@ -9552,7 +9552,7 @@ function withTripListHappyHour(plan, now = new Date()) {
     s.happyHourWhen = when(false);
     s.happyHourWhenFr = when(true);
     s.happyHourLine = `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}`;
-    s.happyHourLineFr = `Happy hour ${s.happyHourWhenFr} : ${s.happyHourDealsFr}`;
+    s.happyHourLineFr = `5 à 7 (${s.happyHourWhenFr}) : ${s.happyHourDealsFr}`;
     if (!deals.fr) s.happyHourLineFrLang = 'en';
   }
   return plan;
@@ -22910,11 +22910,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût', fireplace: 'Foyer', beachaccess: 'Accès à la plage', parking: 'Stationnement gratuit', rv: 'Place pour VR et remorques', offsales: 'Magasin d’alcool sur place' , wifi: 'Wi-Fi', laptop: 'Ordinateurs portables bienvenus', drivethru: 'Service au volant' }, spToday: 'Aujourd’hui :',
-    wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun happy hour en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: '5 à 7', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir', heated: 'Terrasse chauffée', localdrinks: 'Vins et bières locaux', access: 'Accessible en fauteuil roulant', booking: 'Réservations', takeout: 'Pour emporter', ownlocal: 'Propriété locale', games: 'Billard, fléchettes et jeux', localbeer: 'Bière locale ou artisanale en fût', fireplace: 'Foyer', beachaccess: 'Accès à la plage', parking: 'Stationnement gratuit', rv: 'Place pour VR et remorques', offsales: 'Magasin d’alcool sur place' , wifi: 'Wi-Fi', laptop: 'Ordinateurs portables bienvenus', drivethru: 'Service au volant' }, spToday: 'Aujourd’hui :',
+    wnMore: function(n){ return '+ ' + n + ' autre' + (n > 1 ? 's' : ''); }, hhLaterNote: 'Aucun 5 à 7 en ce moment. Ces endroits en ont un plus tard aujourd’hui.', openMicWords: 'scène ouverte',
     wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique en direct', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
-    micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhOnNow: function(t){ return 'Happy hour en cours · se termine dans ' + t; }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
+    micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return '5 à 7 en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhOnNow: function(t){ return '5 à 7 en cours · se termine dans ' + t; }, hhLater: function(t){ return '5 à 7 aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
     awayN: function(n){ return n === 1 ? '1 résultat hors de cette zone de la carte.' : n + ' résultats hors de cette zone de la carte.'; }, showThem: function(n){ return n === 1 ? 'L’afficher' : 'Les afficher'; },
     eventsFor: function(w){ return w ? 'Événements de la semaine avec « ' + w + ' ».' : 'Voici les événements de la semaine sur la carte.'; },
@@ -23424,7 +23424,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       items = mapPlaceList(onMap, { me: !!me, town: town || (happyEntry && feats.happy && !me), wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
       if (hhLater && !hhNoteShown) { hhNoteShown = true; setStatus(T.hhLaterNote, 9000); }
       if (!feats.happy) hhNoteShown = false;
-      countEl.textContent = happyEntry && feats.happy ? (FR ? 'Happy hour en cours' : 'Happy Hour Now') + ' · ' + items.length : town ? T.placesHere(items.length) + (FR ? ' à ' : ' in ') + CONF.r[town] : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
+      countEl.textContent = happyEntry && feats.happy ? (FR ? '5 à 7 en cours' : 'Happy Hour Now') + ' · ' + items.length : town ? T.placesHere(items.length) + (FR ? ' à ' : ' in ') + CONF.r[town] : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = evGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
@@ -24087,7 +24087,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function relaxHtml(){
-    if (happyEntry && feats.happy) return esc(FR ? 'Aucun happy hour en cours ne correspond à cette recherche.' : 'No happy hours are listed as happening now for this search.') +
+    if (happyEntry && feats.happy) return esc(FR ? 'Aucun 5 à 7 en cours ne correspond à cette recherche.' : 'No happy hours are listed as happening now for this search.') +
       ' <button type="button" class="pm-relax" data-relax="town">' + esc(FR ? 'Changer la zone' : 'Change search area') + '</button>';
     if (openOnly && !includeUnlistedHours && places.some(function(p){
       return !p.st && matchesPlace(p, true) && (!me || !radiusFixed || !radiusKm || town || p.d <= radiusKm);
@@ -25258,7 +25258,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','Happy hour en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les happy hours en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span></button></div>
+      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','5 à 7 en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les 5 à 7 en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span></button></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
@@ -34476,10 +34476,12 @@ const FR_STATIC_TEXT = {
   'Favorites': 'Favoris',
   // French gaps (2026-10-18): the header's business link on French place pages.
   'Business login': 'Espace entreprises',
+  // French public side (2026-11-14): the header's Happy Hour link (Food & Drink) reads « 5 à 7 », like the owner portal.
+  'Happy Hour': '5 \u00e0 7',
   'List an Event': 'Inscrire un \u00e9v\u00e9nement',
   'Coming soon': 'Bient\u00f4t disponible',
   'This directory is becoming the Okanagan Roam app': 'Ce r\u00e9pertoire devient l\u2019application Okanagan Roam',
-  'Same friendly filters, same directory, now in your pocket, including a live "happy hour now" check for wherever you happen to be standing.': 'Les m\u00eames filtres pratiques, le m\u00eame r\u00e9pertoire, maintenant dans votre poche, avec les happy hours en cours l\u00e0 o\u00f9 vous vous trouvez.',
+  'Same friendly filters, same directory, now in your pocket, including a live "happy hour now" check for wherever you happen to be standing.': 'Les m\u00eames filtres pratiques, le m\u00eame r\u00e9pertoire, maintenant dans votre poche, avec les 5 \u00e0 7 en cours l\u00e0 o\u00f9 vous vous trouvez.',
   'The app isn\'t available to download yet.': 'L\u2019application n\u2019est pas encore offerte au t\u00e9l\u00e9chargement.',
   'Get in touch': '\u00c9crivez-nous',
   'Questions, ideas, a correction or a hello? Send us a note and we will read it. We reply by email.': 'Une question, une id\u00e9e, une correction ou simplement un bonjour? \u00c9crivez-nous, nous lisons tous les messages. Nous r\u00e9pondons par courriel.',
@@ -35911,8 +35913,8 @@ function happyHourCheckedText(checked, fr) {
 function happyHourLiveText(h, fr, clock) {
   if (!h) return '';
   if (h.state === 'now') {
-    if (!h.until) return fr ? 'Happy hour en cours' : 'Happy hour now';
-    return fr ? `Happy hour jusqu’à ${happyHourTimeText(h.until.minutes, true)}` : `Happy hour until ${happyHourTimeText(h.until.minutes, false)}`;
+    if (!h.until) return fr ? '5 à 7 en cours' : 'Happy hour now';
+    return fr ? `5 à 7 jusqu’à ${happyHourTimeText(h.until.minutes, true)}` : `Happy hour until ${happyHourTimeText(h.until.minutes, false)}`;
   }
   if (h.state === 'later') {
     const when = h.to ? happyHourRangeText(h.from.minutes, h.to.minutes, fr) : happyHourTimeText(h.from.minutes, fr);
@@ -35920,9 +35922,9 @@ function happyHourLiveText(h, fr, clock) {
     // night, under "Closed · Opens 11 AM"). Before 5 AM the line names the day instead.
     if (clock && Number.isInteger(clock.minutes) && clock.minutes < 5 * 60) {
       const dn = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
-      return fr ? `Happy hour ${dn} ${when}` : `Happy hour ${dn} ${when}`;
+      return fr ? `5 à 7 ${dn} ${when}` : `Happy hour ${dn} ${when}`;
     }
-    return fr ? `Happy hour aujourd’hui ${when}` : `Happy hour today ${when}`;
+    return fr ? `5 à 7 aujourd’hui ${when}` : `Happy hour today ${when}`;
   }
   const day = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
   // Pub test 6 (2026-11-10): a dated answer (closures stepped over) knows how many days ahead it is; more than a week
@@ -35930,7 +35932,7 @@ function happyHourLiveText(h, fr, clock) {
   const tomorrow = h.daysAhead != null ? h.daysAhead === 1 : !!(clock && !h.nextWeek && h.from.weekday === SPECIAL_WEEK[(SPECIAL_WEEK.indexOf(clock.weekday) + 1) % 7]);
   const dayText = tomorrow ? (fr ? 'demain' : 'tomorrow') : h.daysAhead > 7 && h.from.date ? (fr ? `${day} ${hoursExtraDayText(h.from.date, true)}` : `${day}, ${hoursExtraDayText(h.from.date)}`)
     : h.nextWeek ? (fr ? `${day} prochain` : `next ${day}`) : day;
-  return fr ? `Prochain happy hour : ${dayText} ${happyHourTimeText(h.from.minutes, true)}` : `Next happy hour: ${dayText} ${happyHourTimeText(h.from.minutes, false)}`;
+  return fr ? `Prochain 5 à 7 : ${dayText} ${happyHourTimeText(h.from.minutes, true)}` : `Next happy hour: ${dayText} ${happyHourTimeText(h.from.minutes, false)}`;
 }
 // True when a happy hour day is a day the place is closed in its usual week or any of its seasonal weeks.
 function happyHourOnClosedDay(venueId, hoursJson, hhJson) {
@@ -36006,7 +36008,7 @@ function happyHourDealsHtml(deals, fr, opts = {}) {
   const shown = deals.items.slice(0, HH_DEALS_VISIBLE), rest = deals.items.slice(HH_DEALS_VISIBLE);
   // Audit fix (2026-10-27): `opts.noLabel` (the card's heading already says "Happy hour deals") drops the "Deals" label
   // under it; the lists are then named by aria-label.
-  const listName = opts.noLabel ? ` aria-label="${fr ? 'Spéciaux du happy hour' : 'Happy hour deals'}"` : ' aria-labelledby="venueHhDealsLabel"';
+  const listName = opts.noLabel ? ` aria-label="${fr ? 'Spéciaux du 5 à 7' : 'Happy hour deals'}"` : ' aria-labelledby="venueHhDealsLabel"';
   const more = rest.length ? `<details class="venue-hh-more"><summary>${fr ? `${rest.length} autre${rest.length > 1 ? 's' : ''} spécia${rest.length > 1 ? 'ux' : 'l'}` : `${rest.length} more deal${rest.length > 1 ? 's' : ''}`}</summary><span class="venue-hh-deal-list" role="list"${listName}>${rest.map(row).join('')}</span></details>` : '';
   return `<span class="venue-hh-deals">${opts.noLabel ? '' : `<span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span>`}<span class="venue-hh-deal-list" role="list"${listName}>${shown.map(row).join('')}</span>${more}${opts.noChecked ? '' : deals.confirmed ? `<span class="venue-hours-checked venue-hh-deals-checked">${deals.confirmed}</span>` : deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
 }
@@ -36276,7 +36278,7 @@ function happyHourNowSummary(now = new Date()) {
 // "happy hours dès 14 h aujourd’hui", "happy hours demain dès 14 h". '' for 'none'.
 function happyHourNowShort(s, fr) {
   if (!s || !s.count || s.state === 'none') return '';
-  const hh = s.count === 1 ? 'happy hour' : 'happy hours';
+  const hh = fr ? '5 à 7' : s.count === 1 ? 'happy hour' : 'happy hours';
   const t = s.startsAt == null ? '' : happyHourTimeText(s.startsAt, fr).replace(/ /g, '\u00a0');
   if (s.state === 'now') return fr ? `${hh} en cours` : `${hh} on now`;
   if (s.state === 'later') return fr ? `${hh} dès ${t} aujourd’hui` : `${hh} from ${t} today`;
@@ -36291,9 +36293,9 @@ function happyHourNowLabel(s, fr) {
   const n = s.count;
   const places = fr ? `${n} endroit${n > 1 ? 's' : ''}` : `${n} place${n === 1 ? '' : 's'}`;
   const t = s.startsAt == null ? '' : happyHourTimeText(s.startsAt, fr).replace(/ /g, ' ');
-  if (s.state === 'now') return fr ? `Happy hour en cours à ${places}` : `Happy hour on now at ${places}`;
-  if (s.state === 'later') return fr ? `Happy hour dès ${t} à ${places} aujourd’hui` : `Happy hour starts at ${t} at ${places} today`;
-  if (s.state === 'tomorrow') return fr ? `Happy hour demain dès ${t} à ${places}` : `Happy hour tomorrow from ${t} at ${places}`;
+  if (s.state === 'now') return fr ? `5 à 7 en cours à ${places}` : `Happy hour on now at ${places}`;
+  if (s.state === 'later') return fr ? `5 à 7 dès ${t} à ${places} aujourd’hui` : `Happy hour starts at ${t} at ${places} today`;
+  if (s.state === 'tomorrow') return fr ? `5 à 7 demain dès ${t} à ${places}` : `Happy hour tomorrow from ${t} at ${places}`;
   return '';
 }
 // Roam Now with its Happy hour now filter on (the map script reads ?show=happy-hour; the map's canonical stays /map).
@@ -36356,13 +36358,13 @@ function guideHappyHourInfo(venues, fr, now = new Date()) {
         if (day && day.status === 'open' && day.ranges.length && !st.closedToday) todayText = `${fr ? 'Aujourd’hui' : 'Today'} ${day.ranges.map(([a, b]) => happyHourRangeText(a, b, fr)).join(', ')}`;
       } catch (e) { todayText = ''; }
       const week = happyHourWeekText(r.happy_hour_times, fr);
-      if (!todayText && week) todayText = `${fr ? 'Pas de happy hour aujourd’hui' : 'No happy hour today'} · ${week}`;
+      if (!todayText && week) todayText = `${fr ? 'Pas de 5 à 7 aujourd’hui' : 'No happy hour today'} · ${week}`;
       let tag = '';
       if (h && h.state === 'now') {
         const left = happyHourMinutesLeft(h.until, clock);
         tag = left != null ? (fr ? `En cours · se termine dans ${happyHourLeftText(left, true)}` : `On now · ends in ${happyHourLeftText(left, false)}`) : (fr ? 'En cours' : 'On now');
       }
-      if (todayText || tag) parts.push(`<p class="guide-hh-when">${tag ? `<span class="guide-hh-tag">${escapeHtml(tag)}</span> ` : ''}<span class="guide-hh-label">${fr ? 'Happy hour :' : 'Happy hour:'}</span> ${escapeHtml(todayText)}</p>`);
+      if (todayText || tag) parts.push(`<p class="guide-hh-when">${tag ? `<span class="guide-hh-tag">${escapeHtml(tag)}</span> ` : ''}<span class="guide-hh-label">${fr ? '5 à 7 :' : 'Happy hour:'}</span> ${escapeHtml(todayText)}</p>`);
       rank.set(r.id, h && h.state === 'now' ? 0 : h && h.state === 'later' ? 1 : 2);
     }
     // Deals: the first two, price first, like the happy hour guide (only with the badge and a recent check).
@@ -36987,10 +36989,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const venueDealsCardHtml = (() => {
     const blocks = [];
     // Card polish (2026-10-27): one checked line at the bottom of the happy hour block (venueHappyHourBlockHtml).
-    if (happyHour && happyHour.deals) blocks.push(['hh', 'Happy hour', venueHappyHourBlockHtml(happyHour, fr, { noLabel: !weeklySpecials })]);
+    if (happyHour && happyHour.deals) blocks.push(['hh', L('Happy hour', '5 à 7'), venueHappyHourBlockHtml(happyHour, fr, { noLabel: !weeklySpecials })]);
     if (weeklySpecials) blocks.push(['sp', L('Weekly specials', 'Spéciaux de la semaine'), venueSpecialsHtml(weeklySpecials, fr)]);
     if (!blocks.length) return '';
-    const title = blocks.length === 2 ? L('Happy hour & weekly specials', 'Happy hour et spéciaux de la semaine') : blocks[0][0] === 'hh' ? L('Happy hour deals', 'Spéciaux du happy hour') : L('Weekly specials', 'Spéciaux de la semaine');
+    const title = blocks.length === 2 ? L('Happy hour & weekly specials', '5 à 7 et spéciaux de la semaine') : blocks[0][0] === 'hh' ? L('Happy hour deals', 'Spéciaux du 5 à 7') : L('Weekly specials', 'Spéciaux de la semaine');
     return `<section class="venue-section venue-deals-card" id="venueDeals" aria-labelledby="venueDealsTitle"><h2 id="venueDealsTitle">${title}</h2><div class="venue-deals-blocks">${blocks.map(([k, h, body]) => `<div class="venue-deals-block" data-block="${k}">${blocks.length === 2 ? `<h3>${h}</h3>` : ''}<div class="venue-deals-body">${body}</div></div>`).join('')}</div></section>`;
   })();
   const detailRows = [
@@ -37017,7 +37019,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // keeps the happy hour times; with deals, a "See deals" link jumps to the card.
     // Audit fix (2026-10-27): deals with no stored times get a Happy hour row too ("Times vary — check with the venue"
     // and the jump to the deals); it said only "See this week's specials" beside a card with happy hour deals.
-    happyHour && (happyHour.week || happyHour.deals) ? ['Happy hour', `<span class="venue-hh-times${happyHour.week ? '' : ' venue-hh-times-vary'}">${happyHour.week ? escapeHtml(happyHour.week) : HH_TIMES_VARY[fr ? 'fr' : 'en']}</span>${happyHour.checked && !happyHour.deals ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHour.deals || weeklySpecials ? `<a class="venue-deals-jump" href="#venueDeals">${happyHour.deals ? (weeklySpecials ? L('See the deals and specials', 'Voir les spéciaux') : L('See the deals', 'Voir les spéciaux')) : L('See weekly specials', 'Voir les spéciaux de la semaine')} ↓</a>` : ''}`] : null,
+    happyHour && (happyHour.week || happyHour.deals) ? [L('Happy hour', '5 à 7'), `<span class="venue-hh-times${happyHour.week ? '' : ' venue-hh-times-vary'}">${happyHour.week ? escapeHtml(happyHour.week) : HH_TIMES_VARY[fr ? 'fr' : 'en']}</span>${happyHour.checked && !happyHour.deals ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHour.deals || weeklySpecials ? `<a class="venue-deals-jump" href="#venueDeals">${happyHour.deals ? (weeklySpecials ? L('See the deals and specials', 'Voir les spéciaux') : L('See the deals', 'Voir les spéciaux')) : L('See weekly specials', 'Voir les spéciaux de la semaine')} ↓</a>` : ''}`] : null,
     weeklySpecials && !(happyHour && (happyHour.week || happyHour.deals)) ? [L('Weekly specials', 'Spéciaux de la semaine'), `<a class="venue-deals-jump" href="#venueDeals">${L('See this week’s specials', 'Voir les spéciaux de la semaine')} ↓</a>`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)

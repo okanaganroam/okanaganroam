@@ -88,33 +88,33 @@ test('valley-wide summary: on now, later today, tomorrow, none; Okanagan time; E
   assert.equal(noon.count, 4, JSON.stringify(noon));
   assert.equal(noon.startsAt, 15 * 60);
   assert.equal(noon.label.en, nb('Happy hour starts at 3_PM at 4 places today'));
-  assert.equal(noon.label.fr, nb('Happy hour dès 15_h à 4 endroits aujourd’hui'));
+  assert.equal(noon.label.fr, nb('5 à 7 dès 15_h à 4 endroits aujourd’hui'));
   // 5:20 PM: A and B on (G is closed; E later).
   const on = app.happyHourNowSummary(at(TUE, '17:20'));
   assert.deepEqual({ state: on.state, count: on.count }, { state: 'now', count: 2 });
   assert.equal(on.label.en, 'Happy hour on now at 2 places');
-  assert.equal(on.label.fr, 'Happy hour en cours à 2 endroits');
+  assert.equal(on.label.fr, '5 à 7 en cours à 2 endroits');
   // The same instant read as UTC would be Wednesday 00:20: nothing on. The answer follows the Okanagan clock.
   assert.equal(new Date(at(TUE, '17:20')).getUTCHours(), 0);
   // 11:30 PM: nothing left today; tomorrow (Wednesday) A, G, B, E (not H, Mondays only), first at 3 PM.
   const late = app.happyHourNowSummary(at(TUE, '23:30'));
   assert.deepEqual({ state: late.state, count: late.count, startsAt: late.startsAt }, { state: 'tomorrow', count: 4, startsAt: 15 * 60 });
   assert.equal(late.label.en, nb('Happy hour tomorrow from 3_PM at 4 places'));
-  assert.equal(late.label.fr, nb('Happy hour demain dès 15_h à 4 endroits'));
+  assert.equal(late.label.fr, nb('5 à 7 demain dès 15_h à 4 endroits'));
   // One place: singular.
   assert.equal(app.happyHourNowLabel({ state: 'now', count: 1 }, false), 'Happy hour on now at 1 place');
-  assert.equal(app.happyHourNowLabel({ state: 'now', count: 1 }, true), 'Happy hour en cours à 1 endroit');
+  assert.equal(app.happyHourNowLabel({ state: 'now', count: 1 }, true), '5 à 7 en cours à 1 endroit');
   assert.equal(app.happyHourNowLabel({ state: 'none', count: 0 }, false), '');
 });
 
 test('homepage: the first item of the counts strip, in both languages, linking to Roam Now with Happy hour now on', async () => {
   const on = app.renderHomeHappyHourHTML({ now: at(TUE, '17:20') });
   assert.match(on, /^<li class="home-hh" id="homeHappyHour" data-hh="now"><a href="\/map\?show=happy-hour"><span class="home-hh-dot" aria-hidden="true"><\/span><strong data-hh-n>2<\/strong> /);
-  assert.match(on, /<span class="home-en" data-hh-en>happy hours on now<\/span><span class="home-fr" lang="fr" data-hh-fr>happy hours en cours<\/span><\/a><\/li>$/);
+  assert.match(on, /<span class="home-en" data-hh-en>happy hours on now<\/span><span class="home-fr" lang="fr" data-hh-fr>5 à 7 en cours<\/span><\/a><\/li>$/);
   assert.match(app.renderHomeHappyHourHTML({ now: at(TUE, '13:00') }), /data-hh="later"/);
   assert.equal(app.happyHourNowShort({ state: 'now', count: 1 }, false), 'happy hour on now');
   assert.equal(app.happyHourNowShort({ state: 'later', count: 4, startsAt: 900 }, false), nb('happy hours from 3_PM today'));
-  assert.equal(app.happyHourNowShort({ state: 'later', count: 4, startsAt: 900 }, true), nb('happy hours dès 15_h aujourd’hui'));
+  assert.equal(app.happyHourNowShort({ state: 'later', count: 4, startsAt: 900 }, true), nb('5 à 7 dès 15_h aujourd’hui'));
   assert.equal(app.happyHourNowShort({ state: 'tomorrow', count: 4, startsAt: 900 }, false), nb('happy hours tomorrow from 3_PM'));
   assert.equal(app.happyHourNowShort({ state: 'none', count: 0 }, false), '');
   const srv = http.createServer(app.server.listeners('request')[0]);
@@ -198,10 +198,10 @@ test('town Happy Hour page: on now first, then later today, then the rest; tags,
 test('town Happy Hour page in French: tags, times, deals (French lines, else English marked lang="en")', async () => {
   const html = app.renderGuidePage('kelowna', 'happy_hour', guideList(), null, at(TUE, '17:20'), { lang: 'fr' });
   const a = cardOf(html, A);
-  assert.match(a, new RegExp(nb('<span class="guide-hh-tag">En cours · se termine dans 40 min</span> <span class="guide-hh-label">Happy hour_:</span> Aujourd’hui 15 h–18 h')));
+  assert.match(a, new RegExp(nb('<span class="guide-hh-tag">En cours · se termine dans 40 min</span> <span class="guide-hh-label">5 à 7_:</span> Aujourd’hui 15 h–18 h')));
   assert.match(a, new RegExp(nb('Spéciaux_:</span> <span>6 \\$ Pintes maison \\(20 oz\\), 10 \\$ Cocktails</span>')));
   assert.match(cardOf(html, B), /se termine dans 1 h 40[\s\S]*<span lang="en">\$0\.75 each Wings<\/span>/);
-  assert.match(cardOf(html, H), /Pas de happy hour aujourd’hui · Lun/);
+  assert.match(cardOf(html, H), /Pas de 5 à 7 aujourd’hui · Lun/);
   // Served at /fr/guide/kelowna/happy_hour (the real clock there): French lines, no English labels.
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
@@ -247,6 +247,6 @@ test('nav: Happy Hour in Food & Drink (computer dropdown and phone menu), EN + F
       assert.match(en, /<a href="\/guide\/kelowna\/happy_hour" class="nav-happy-hour"[^>]*>Happy Hour<\/a>/, p);
     }
     const fr = await (await fetch(`${base}/fr/food-drink`)).text();
-    assert.match(fr, /<a href="\/fr\/guide\/kelowna\/happy_hour" class="nav-happy-hour"[^>]*>Happy hour<\/a>/, 'French: /fr address, French label');
+    assert.match(fr, /<a href="\/fr\/guide\/kelowna\/happy_hour" class="nav-happy-hour"[^>]*>5 à 7<\/a>/, 'French: /fr address, French label');
   } finally { srv.close(); }
 });

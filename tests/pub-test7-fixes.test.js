@@ -95,7 +95,7 @@ test('1: hours.js happyHourState skips weekdays the place is closed, its seasona
 test('1: the venue page line skips closed weekdays, EN + FR (real-style data: winter Mon-Wed closed, summer every day)', async () => {
   const { v } = await sandbar();
   assert.equal(line(v, false, at('2026-11-10', '18:00')), 'Next happy hour: Thursday 3 PM');
-  assert.match(line(v, true, at('2026-11-10', '18:00')), /^Prochain happy hour\s:\sjeudi 15\sh$/);
+  assert.match(line(v, true, at('2026-11-10', '18:00')), /^Prochain 5 à 7\s:\sjeudi 15\sh$/);
   assert.equal(line(v, false, at('2026-11-09', '18:30')), 'Next happy hour: Thursday 3 PM', 'Monday evening');
   assert.equal(line(v, false, at('2026-11-11', '15:30')), 'Next happy hour: tomorrow 3 PM', 'closed Wednesday: never on now');
   assert.match(line(v, false, at('2026-11-12', '15:30')), /Happy hour (on now|until)/);

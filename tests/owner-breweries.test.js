@@ -690,7 +690,7 @@ test('fix 8: photo source label, photos waiting counts the one she has, happy ho
   const h = { state: 'later', from: { weekday: 'fri', minutes: 900 }, to: { weekday: 'fri', minutes: 1020 } };
   assert.match(app.happyHourLiveText(h, false, { weekday: 'fri', minutes: 30 }), /^Happy hour Friday 3/);
   assert.match(app.happyHourLiveText(h, false, { weekday: 'fri', minutes: 600 }), /^Happy hour today 3/);
-  assert.match(app.happyHourLiveText(h, true, { weekday: 'fri', minutes: 30 }), /^Happy hour vendredi 15/);
+  assert.match(app.happyHourLiveText(h, true, { weekday: 'fri', minutes: 30 }), /^5 à 7 vendredi 15/);
   // The story screen shows the description as it will be saved.
   const s = setupScript((await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text);
   assert.match(s, /id="suStorySent"/); assert.match(s, /st\.onblur = function\(\)\{ var fx = storyJoinFix\(st\.value\)/);

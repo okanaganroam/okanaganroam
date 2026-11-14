@@ -85,7 +85,7 @@ test('venue page: a next happy hour tomorrow says "tomorrow" (« demain »)', ()
   const v = mk({ name: 'R25 Tomorrow HH' });
   setTimes(v, { wed: [['16:00', '18:00']] });
   assert.match(page(v, at(TUE, '20:00')), /Next happy hour: tomorrow 4 PM/);
-  assert.match(page(v, at(TUE, '20:00'), 'fr'), /Prochain happy hour[\s\u00a0\u202f]:[\s\u00a0\u202f]demain 16[\s\u00a0\u202f]h/);
+  assert.match(page(v, at(TUE, '20:00'), 'fr'), /Prochain 5 à 7[\s\u00a0\u202f]:[\s\u00a0\u202f]demain 16[\s\u00a0\u202f]h/);
   assert.match(page(v, at('2026-10-26', '20:00')), /Next happy hour: Wednesday 4 PM/, 'two days ahead keeps the day name');
 });
 
