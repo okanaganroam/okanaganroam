@@ -49,6 +49,19 @@ const CLIENT_KEYS = new Set(STEPS.map((s) => s[0]).filter((k) => k.startsWith('p
 const STEP_KEYS = new Set(STEPS.map((s) => s[0]));
 const storedName = (key) => (CLIENT_KEYS.has(key) ? key : `portal:${key}`);
 
+// Why a step was refused (2026-11-14): a short fixed code kept next to the "failed" count, such as "wrong_email_or_password"
+// or "form_problem:contact_name". It is made from the answer's status and the NAMES of the form fields it flagged, never
+// from anything typed. Stored as "portal:why:<step>:<code>" daily totals, like every other count.
+const WHY_BY_STATUS = { 400: 'form_problem', 401: 'wrong_email_or_password', 403: 'not_from_our_site', 404: 'link_not_valid', 409: 'already_sent', 413: 'too_long', 415: 'wrong_type', 429: 'too_many_tries' };
+function whyCode(status, data) {
+  const code = Number(status) || 0;
+  const base = code >= 500 ? 'server_error' : (WHY_BY_STATUS[code] || `status_${code}`);
+  const errors = data && typeof data === 'object' && data.errors && typeof data.errors === 'object' && !Array.isArray(data.errors) ? data.errors : null;
+  const fields = errors ? Object.keys(errors).filter((k) => /^[a-z][a-z0-9_]{0,30}$/.test(k)).sort().slice(0, 3) : [];
+  return fields.length ? `${base}:${fields.join('+')}` : base;
+}
+const safeWhy = (why) => (/^[a-z0-9_]{1,40}(?::[a-z0-9_+]{1,100})?$/.test(String(why)) ? String(why) : 'other');
+
 // Which step a portal request is. Returns a key, or null for anything that isn't a step. POST steps also count a
 // "<key>_failed" when the answer is an error; sign-in has its own success / failed / locked steps.
 function classify(method, rawPath) {
@@ -120,9 +133,16 @@ function createPortalCounter(db) {
     res.on('finish', () => {
       try {
         const code = res.statusCode;
-        if (key === 'login') return bump(req, storedName(code === 200 ? 'login_success' : code === 429 ? 'login_locked' : 'login_failed'), ip);
+        const why = (step) => (res.portalWhy ? safeWhy(res.portalWhy) : whyCode(code, null));
+        if (key === 'login') {
+          const counted = bump(req, storedName(code === 200 ? 'login_success' : code === 429 ? 'login_locked' : 'login_failed'), ip);
+          if (counted && code !== 200 && code !== 429) bump(req, `portal:why:login_failed:${why()}`, ip);
+          return counted;
+        }
         if (method === 'GET') return code === 200 && !(SCAN_STEPS.has(key) && scannerLike(req, ip, pathname)) ? bump(req, storedName(key), ip) : false;
-        return bump(req, storedName(code < 400 ? key : `${key}_failed`), ip);
+        const counted = bump(req, storedName(code < 400 ? key : `${key}_failed`), ip);
+        if (counted && code >= 400) bump(req, `portal:why:${key}_failed:${why()}`, ip);
+        return counted;
       } catch (e) { return false; } // counting must never break the portal
     });
   }
@@ -134,10 +154,17 @@ function createPortalCounter(db) {
     const total = {}; const perDay = {};
     for (const r of rows) { total[r.name] = (total[r.name] || 0) + r.n; (perDay[r.name] = perDay[r.name] || new Map()).set(r.day, r.n); }
     const first = db.prepare("SELECT MIN(day) AS d FROM site_event_counts WHERE name LIKE 'portal:%' OR name LIKE 'portal\\_%' ESCAPE '\\'").get().d;
+    const reasons = {};
+    for (const [name, n] of Object.entries(total)) {
+      if (!name.startsWith('portal:why:')) continue;
+      const rest = name.slice('portal:why:'.length); const i = rest.indexOf(':');
+      if (i > 0) (reasons[rest.slice(0, i)] = reasons[rest.slice(0, i)] || []).push({ why: rest.slice(i + 1), n });
+    }
+    for (const k of Object.keys(reasons)) reasons[k].sort((a, b) => b.n - a.n || a.why.localeCompare(b.why));
     const series = (key) => list.map((day) => ({ day, n: (perDay[storedName(key)] && perDay[storedName(key)].get(day)) || 0 }));
     return {
       days, since: list[0], counting_since: first || null,
-      steps: STEPS.map(([key, text, group]) => ({ key, text, group, n: total[storedName(key)] || 0, failed: total[`portal:${key}_failed`] || 0 })),
+      steps: STEPS.map(([key, text, group]) => ({ key, text, group, n: total[storedName(key)] || 0, failed: total[`portal:${key}_failed`] || 0, why: reasons[`${key}_failed`] || (key === 'login_failed' ? reasons.login_failed : null) || [] })),
       logins_per_day: series('login_success'),
       login_clicks_per_day: list.map((day) => ({ day, n: STEPS.filter((s) => s[0].startsWith('portal_login_click')).reduce((a, s) => a + ((perDay[s[0]] && perDay[s[0]].get(day)) || 0), 0) })),
     };
@@ -146,4 +173,4 @@ function createPortalCounter(db) {
 }
 
 module.exports = {
-  scannerLike, _resetScanMemory: () => scanSeen.clear(), STEPS, CLIENT_KEYS, STEP_KEYS, classify, createPortalCounter };
+  whyCode, safeWhy, scannerLike, _resetScanMemory: () => scanSeen.clear(), STEPS, CLIENT_KEYS, STEP_KEYS, classify, createPortalCounter };
