@@ -181,7 +181,7 @@ test('6: a main photo picked in the setup reads "Your pick: on your page within 
   assert.match(page, /Your main photo · on your page within a day/);
   assert.doesNotMatch(page, /We chose this photo for you/);
   const fr = (await get(`/fr/owner/${t}`)).text;
-  assert.match(fr, /Votre choix : sur votre page d’ici un jour/);
+  assert.match(fr, /Votre choix\u00a0: sur votre page d’ici un jour/);
   // Without a pick the old wording stays.
   const v2 = mk('pub', { image_url: '/images/venues/sample.jpg' });
   assert.match((await get(`/owner/${tokenFor(v2.id)}`)).text, /We chose this photo for you/);

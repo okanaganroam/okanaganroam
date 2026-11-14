@@ -505,7 +505,7 @@ test('none words: “we don’t take bookings online” reads in words, and ever
   const home = (await get(`/owner/${t}`)).text;
   assert.match(home, /You told us you don’t have: online booking/);
   assert.ok(!/don’t have: booking_link/.test(home));
-  assert.match((await get(`/fr/owner/${t}`)).text, /Vous nous avez dit que vous n’avez pas : de réservation en ligne/);
+  assert.match((await get(`/fr/owner/${t}`)).text, /Vous nous avez dit que vous n’avez pas\u00a0: de réservation en ligne/);
 });
 
 test('tastings card: the owner’s own line is credited “From the winery”, not the website or a checked date', () => {
