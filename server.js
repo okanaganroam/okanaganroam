@@ -21010,7 +21010,7 @@ function breweryVisitLines(venue, info) {
     const k = b.kitchen || {};
     const main = {
       kitchen: k.mode === 'earlier' && k.closes ? [`Our own kitchen; it closes at ${pubClock(k.closes)}.`, `Cuisine sur place; elle ferme à ${pubClock(k.closes, true)}.`] : k.mode === 'same' ? ['Our own kitchen, food until close.', 'Cuisine sur place, jusqu’à la fermeture.'] : ['Our own kitchen.', 'Cuisine sur place.'],
-      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions de bouffe de rue la fin de semaine.'] : ['Food trucks most days.', 'Camions de bouffe de rue la plupart des jours.'],
+      trucks: b.trucks === 'weekends' ? ['Food trucks on weekends.', 'Camions-restaurants la fin de semaine.'] : ['Food trucks most days.', 'Camions-restaurants la plupart des jours.'],
       snacks: ['Snacks only.', 'Collations seulement.'],
       none: ['No food served.', 'Pas de nourriture servie.'],
     }[b.food];
@@ -53352,11 +53352,11 @@ const BREWERY_SETUP_HELP_TOPICS = [
     keysFr: ['liste des bieres', 'liste de bieres', 'nos bieres', 'bieres', 'en fut', 'fut', 'futs', 'pression', 'biere en fut', 'bieres en fut', 'tableau', 'ardoise', 'liste des cidres'],
     a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the menu”, so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
     aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir le menu », pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
-  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions de bouffe de rue',
+  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions-restaurants',
     keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
-    keysFr: ['camion', 'camions', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
+    keysFr: ['camion', 'camions', 'camions restaurants', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
     a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
-    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions de bouffe de rue</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions de bouffe de rue la plupart des jours » ou « Camions de bouffe de rue la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
+    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions-restaurants</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions-restaurants la plupart des jours » ou « Camions-restaurants la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
     keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
@@ -58231,7 +58231,7 @@ const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix du plateau de dégustation' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
-const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de happy hour'],
+const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de 5 à 7'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
   pyv_takeout: ['takeout or delivery', 'de commandes à emporter ni de livraison'], pyv_groups: ['room for big groups', 'de place pour les grands groupes'], dogs: ['dogs allowed', 'de chiens admis'], instagram: ['Instagram', 'Instagram'], facebook: ['Facebook', 'Facebook'],
   cuisine: ['food', 'de nourriture'], sports: ['sports on TV', 'de sports à la télé'], games: ['games', 'de jeux'],
@@ -59338,7 +59338,15 @@ function ownerCompletenessJson(found, token, lang) {
 }
 
 function renderOwnerPage(found, token, pending, lang = 'en') {
-  return ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  const html = ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
+  return lang === 'fr' ? frTypographyPage(html) : html;
+}
+// Distillery test 2 (2026-11-13): the French owner home through the French spacing (a no-break space before « : » and
+// « % », narrow before « ? » « ! »), text between tags only: never inside a script, a style or a text box (her own words).
+function frTypographyPage(html) {
+  if (typeof html !== 'string' || !html) return html;
+  return html.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<textarea\b[\s\S]*?<\/textarea>|<head\b[\s\S]*?<\/head>)/i)
+    .map((part, i) => (i % 2 ? part : frSpacingHtml(part))).join('');
 }
 
 // French (2026-10-18): lang 'fr' writes the whole page in French (L(en, fr)); its links, posts and the help bot stay
@@ -59946,7 +59954,7 @@ ${renderGolfHeaderHtml()}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${showHappyHour && venue.type !== 'winery' ? tile('happy', '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${showHappyHour && venue.type !== 'winery' ? tile('happy', fr ? '&#127865;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
           ${tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>

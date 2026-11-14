@@ -292,7 +292,7 @@ Object.assign(fr, {
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
   soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
-  pctAbout: 'Complète à environ {n} %', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
+  pctAbout: 'Complète à environ {n}\u00a0%', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
   menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
@@ -1186,8 +1186,8 @@ fr.brewery = {
   tkindQ: 'Quel genre d’endroit est-ce?', tkindLead: 'Choisissez celui qui convient le mieux.', tkindNeed: 'Touchez le genre d’endroit qui convient le mieux.',
   tkindSubs: { Brewery: 'Nous brassons ici', Cidery: 'Nous faisons du cidre ici', 'Taphouse or beer hall': 'Nous servons la bière d’autres brasseurs', Distillery: 'Nous distillons ici' },
   kindGuess: 'Nous avons choisi « {kind} ». Touchez-en un autre s’il ne convient pas.',
-  tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions de bouffe de rue', snacks: 'Collations seulement', none: 'Pas de nourriture' },
-  tfoodSubs: { trucks: 'Nous indiquerons « Camions de bouffe de rue la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
+  tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions-restaurants', snacks: 'Collations seulement', none: 'Pas de nourriture' },
+  tfoodSubs: { trucks: 'Nous indiquerons « Camions-restaurants la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
   ttrucksQ: 'Quand les camions sont-ils là?', ttrucks: { most_days: 'La plupart des jours', weekends: 'La fin de semaine seulement' }, ttrucksNeed: 'Touchez La plupart des jours ou La fin de semaine seulement.',
   trucksGuess: 'Votre page indique la fin de semaine, alors nous l’avons choisi.',
   foodGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez-en un autre si ça a changé.',
@@ -1284,7 +1284,7 @@ fr.brewery.kindNeutral = {
 const APPT_KEYS = ['allYearAppt', 'allYearApptSub', 'apptQ', 'apptLead', 'apptFrom', 'apptTo', 'apptSave', 'apptNeed', 'apptNow', 'needOpenDayAppt', 'noSetHours', 'noSetHoursNow', 'noSetHoursSaved'];
 en.brewery.kindDistillery = {
   hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
-  labels: { taproom: 'Your tasting room', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
+  labels: { taproom: 'Food here', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
   noLabels: { music: 'no tours, classes or events' },
   menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, as often as it changes.',
   photosLead: 'Your tasting room, your still, your bottles. Three photos is perfect.', offerLead: 'Visitors use these to find a distillery like yours.',
@@ -1313,7 +1313,7 @@ en.brewery.kindDistillery = {
 };
 fr.brewery.kindDistillery = {
   hiLead: 'Préparons la page de votre distillerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { taproom: 'Votre salle de dégustation', flights: 'Dégustations et bouteilles', music: 'Visites, ateliers et événements', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou carte des cocktails' },
+  labels: { taproom: 'Nourriture sur place', flights: 'Dégustations et bouteilles', music: 'Visites, ateliers et événements', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou carte des cocktails' },
   noLabels: { music: 'pas de visites, d’ateliers ni d’événements' },
   menuQ: 'Comment ajouter votre carte des cocktails ou de dégustation?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte ou de votre tableau fonctionne aussi, aussi souvent qu’elle change.',
   photosLead: 'Votre salle de dégustation, votre alambic, vos bouteilles. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une distillerie comme la vôtre.',
@@ -1326,7 +1326,7 @@ fr.brewery.kindDistillery = {
   flightSavedLive: 'Votre prix de dégustation et votre réponse pour emporter sont sur votre page maintenant.',
   flightGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', flightGuessVisit: 'Votre page indique {x} maintenant, d’après votre site Web, alors nous l’avons choisi. Touchez un autre prix s’il a changé.',
   minorsNoteEx: 'Enfants bienvenus dans la salle de dégustation jusqu’à 18 h; le bar à cocktails est réservé aux 19 ans et plus.',
-  musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, de la musique en direct ou un quiz.',
+  musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, ou de la musique en direct.',
   musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky',
   kinds: { tour: 'Visite de la distillerie', class: 'Atelier' },
   eventsOften: 'Une fois par mois ou une semaine sur deux? Choisissez la fréquence sous Visites et événements sur votre page de modification.',
@@ -1343,7 +1343,9 @@ for (const k of APPT_KEYS) { en.brewery.kindDistillery[k] = en.winery[k]; fr.bre
 function frSpacing(t) {
   return String(t)
     .replace(/([^\s\u00a0\u202f\d/])[ \u00a0\u202f]?:(?=[\s»”)]|$)/g, '$1\u00a0:')
-    .replace(/([^\s\u00a0\u202f?!])[ \u00a0\u202f]?([?!]+)(?=[\s»”)]|$)/g, '$1\u202f$2');
+    .replace(/([^\s\u00a0\u202f?!])[ \u00a0\u202f]?([?!]+)(?=[\s»”)]|$)/g, '$1\u202f$2')
+    // Distillery test 2 (2026-11-13): « 91 % » never wraps before the sign.
+    .replace(/(\d|\})[ \u202f]%/g, '$1\u00a0%');
 }
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
