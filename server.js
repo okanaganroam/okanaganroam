@@ -6813,6 +6813,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(brewSetupType(v.type) && breweryFlightFee(v.id) != null ? { flightFee: breweryFlightFee(v.id) } : {}),
       // Distilleries (Decided 4, 2026-11-13): planned for a family only when the owner said All ages or "until a set time".
       ...(v.type === 'distillery' && breweryKidsWelcome(v.id) === true ? { ownerKidsWelcome: true } : {}),
+      // Distillery test 2 (2026-11-13): the owner said Adults only (19+), so a kids' trip names that as the reason.
+      ...((v.type === 'distillery' || v.type === 'brewery') && breweryKidsWelcome(v.id) === false ? { ownerAdultsOnly: true } : {}),
       ...(v.type === 'brewery' && breweryKindOf(v) ? { breweryKind: breweryKindOf(v) } : {}),
       // Brewery test 1 (2026-11-12): "minors with an adult until 9 PM" (a brewery's or a pub's own answer), so a kids
       // trip names the time and isn't planned there after it; and hours the business saved or confirmed in the last

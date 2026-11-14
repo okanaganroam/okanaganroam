@@ -926,7 +926,12 @@
     var other = kinds.length && kinds.every(function(k){ return k === 'winter'; }) ? 'summer' : kinds.length && kinds.every(function(k){ return k === 'summer'; }) ? 'winter' : '';
     var ul = other ? String((T.seasonWord || {})[other] || other) : '';
     var lead = kinds.length ? (ul ? ul.charAt(0).toUpperCase() + ul.slice(1) : T.recapRest) : T.recapHours;
-    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', '));
+    // Distillery test 2 (2026-11-13): the walk-in season and "by appointment the rest of the year" (or the open dates of a
+    // place closed part of the year) go with the hours: « Ven–Dim 12 h – 17 h (1 juin – 30 sept.) · sur rendez-vous le reste de l’année ».
+    var per = '';
+    if (APPT && S.wine && S.wine.year === 'appointment' && S.wine.season && S.wine.season.from && S.wine.season.to) per = ' ' + fill(T.recapAppt, { a: mdLabel(S.wine.season.from), b: mdLabel(S.wine.season.to) });
+    else if (S.openSea && S.openSea.from && S.openSea.to && /^\d{2}-\d{2}$/.test(S.openSea.from) && /^\d{2}-\d{2}$/.test(S.openSea.to)) per = ' ' + fill(T.recapOpen, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) });
+    parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', ') + per);
     return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
   }
   function seasonInfo(sz){

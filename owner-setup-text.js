@@ -946,9 +946,9 @@ Object.assign(fr, {
 
 // Café test 6 (2026-11-12): the other season's hours, said on the "Are these still your hours?" screen.
 Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
-Object.assign(en, { recapHours: 'Your hours', recapRest: 'Rest of the year', stSocialIgLive: 'Instagram on your page now, Facebook within a day', stSocialFbLive: 'Facebook on your page now, Instagram within a day' });
+Object.assign(en, { recapAppt: '({a} – {b}) · by appointment the rest of the year', recapOpen: '({a} – {b})', recapHours: 'Your hours', recapRest: 'Rest of the year', stSocialIgLive: 'Instagram on your page now, Facebook within a day', stSocialFbLive: 'Facebook on your page now, Instagram within a day' });
 Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
-Object.assign(fr, { recapHours: 'Vos heures', recapRest: 'Le reste de l’année', stSocialIgLive: 'Instagram sur votre page maintenant, Facebook d’ici un jour', stSocialFbLive: 'Facebook sur votre page maintenant, Instagram d’ici un jour' });
+Object.assign(fr, { recapAppt: '({a} – {b}) · sur rendez-vous le reste de l’année', recapOpen: '({a} – {b})', recapHours: 'Vos heures', recapRest: 'Le reste de l’année', stSocialIgLive: 'Instagram sur votre page maintenant, Facebook d’ici un jour', stSocialFbLive: 'Facebook sur votre page maintenant, Instagram d’ici un jour' });
 
 // Wineries (Dayton, 2026-11-12; drafts/winery-portal-2026-11-12/SPEC-wineries.md, "Decided"): winery words and the
 // winery-only screens (Your winery, Tastings, Booking and groups, Experiences, the off-season by appointment), laid over

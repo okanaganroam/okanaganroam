@@ -490,7 +490,8 @@ const OCCASION_ALIASES = {
     // 2026-10-25: "a quiet weekend away from crowds" searched for the word "crowds".
     'away from crowds', 'away from the crowds', 'avoid crowds', 'avoid the crowds', 'avoiding crowds', 'avoiding the crowds', 'no crowds', 'fewer crowds', 'without crowds', 'without the crowds', 'less crowded', 'not crowded', 'peaceful', 'tranquil', 'slow down', 'recharge'],
   adventure: ['adventure weekend', 'adventure trip', 'adventurous', 'thrill', 'thrills'],
-  adults: ['two adults', 'for two adults', 'adults only', 'just adults', 'no kids', 'couple', 'a couple', 'just the two of us'],
+  // Distillery test 2 (2026-11-13): "two adults" is a head count, not an occasion (group size alone never is).
+  adults: ['adults only', 'just adults', 'no kids', 'couple', 'a couple', 'just the two of us'],
 };
 // Occasion phrases that also carry a trip length or pace.
 const OCCASION_EXTRAS = {

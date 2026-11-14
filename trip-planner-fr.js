@@ -260,7 +260,10 @@ const PHRASES = [
   ['jeunes enfants', 'toddlers'], ['tout petits', 'toddlers'], ['bambins', 'toddlers'], ['enfants', 'kids'], ['enfant', 'kid'],
   ['en famille', 'with the family'], ['pour toute la famille', 'family friendly'], ['familial', 'family friendly'],
   ['familiale', 'family friendly'], ['famille', 'family'], ['familles', 'families'],
-  ['adultes seulement', 'adults only'], ['entre adultes', 'adults only'], ['sans enfants', 'no kids'], ['sans les enfants', 'no kids'],
+  ['adultes seulement', 'adults only'], ['entre adultes', 'adults only'],
+  // Distillery test 2 (2026-11-13): « deux adultes » is a head count (it read "for two adultes": a romantic outing and a
+  // search for « adultes »), and « pique-nique » one word (it was searched as « pique » and « nique »).
+  ['adultes', 'adults'], ['adulte', 'adult'], ['pique nique', 'picnic'], ['pique niques', 'picnics'], ['pique niquer', 'picnic'], ['casse croute', 'snack'], ['casse croutes', 'snacks'], ['sans enfants', 'no kids'], ['sans les enfants', 'no kids'],
   ['en amoureux', 'romantic'], ['soiree en amoureux', 'date night'], ['sortie en amoureux', 'date night'], ['tete a tete', 'date night'],
   ['rendez vous galant', 'date night'], ['romantique', 'romantic'], ['romantiques', 'romantic'], ['amoureux', 'couples'],
   ['anniversaire de mariage', 'anniversary'], ['lune de miel', 'honeymoon'], ['anniversaire', 'birthday'],
@@ -481,6 +484,8 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
   if (!isFrenchTokens(tokens, keep, text, frenchPage)) return null;
   const pieces = [];
   const out = [];
+  // The hyphenated pairs as typed ("pique-nique" -> "pique nique"), the same folding as tokenize().
+  const hyphened = new Set((String(text).match(/[A-Za-zÀ-ÿœæ]+-[A-Za-zÀ-ÿœæ]+/g) || []).map((x) => tokenize(x).join(' ')));
   const realPush = out.push.bind(out);
   // Each English piece remembers the French tokens it came from.
   let pieceFrom = 0;
@@ -537,6 +542,8 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
       if (PHRASE_MAP.has(p)) { const en = PHRASE_MAP.get(p); if (en) out.push(en); matched = len; break; }
     }
     if (matched) { i += matched; continue; }
+    // Distillery test 2: a hyphenated French word we don't know (« porte-monnaie ») stays one term, never two searches.
+    if (hyphened.has(w + ' ' + (tokens[i + 1] || '')) && !keep.has(i + 1) && !PHRASE_MAP.has(tokens[i + 1])) { out.push(w + tokens[i + 1]); i += 2; continue; }
     out.push(w);
     i += 1;
   }

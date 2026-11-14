@@ -28,7 +28,53 @@ function frHeadingWhere(w){
 }
 const FR_HEADING_OCCASIONS={'a date night':'pour une soirée en amoureux','a romantic outing':'pour une sortie romantique','a family trip':'pour une sortie en famille','a rainy day':'pour un jour de pluie','a celebration':'pour une célébration','a group getaway':'pour une escapade en groupe','a relaxing getaway':'pour une escapade relaxante','an adventure':'pour une aventure','an adults-only trip':'pour une sortie entre adultes'};
 const FR_HEADING_WHEN_RE='(?: (on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (?:morning|afternoon|evening))?|tomorrow(?: (?:morning|afternoon|evening))?|this weekend|today|tonight|right now|this morning|this afternoon|this evening))?';
+// Distillery test 2 (2026-11-13): the plan's summary sentence (trip-planner.js buildSummary) in French. It stayed in English
+// (« A one-day plan around Naramata, focused on distilleries… ») whenever the plan had no stop to name.
+function frSummaryItems(list){
+ const items=String(list).split(/, | and /).map(x=>x.trim()).filter(Boolean).map(x=>{const k=x.toLowerCase();if(Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES,k))return FR_HEADING_NAMES[k];const q=/^“(.+)”$/.exec(x);return q?'« '+q[1]+' »':x;});
+ return items.length>1?items.slice(0,-1).join(', ')+' et '+items[items.length-1]:items[0]||'';
+}
+// « axée sur les distilleries et « adultes » »: the article before a plain list (not before a quoted typed word).
+function frSummaryList(list){const t=frSummaryItems(list);return /^«/.test(t)?t:'les '+t;}
+function frSummaryAround(w){
+ if(w==='@AREA@'||w===FR_SITE.area)return FR_SITE.inArea;
+ const towns=w.split(/, | and /);
+ return 'autour de '+(towns.length>1?towns.slice(0,-1).join(', ')+' et '+towns[towns.length-1]:towns[0]);
+}
+function frOccasionNoun(o){const v=FR_HEADING_OCCASIONS[o];return v?v.replace(/^pour /,''):null;}
+function t3FrenchSummary(text){
+ const s=String(text||'');
+ const occ=Object.keys(FR_HEADING_OCCASIONS).map(x=>x.replace(/^an? /,'')).join('|');
+ let m;
+ if(s==='We couldn’t work out a plan from that request yet.')return 'Nous n’avons pas encore pu faire un plan à partir de cette demande.';
+ if((m=new RegExp('^(A one-day plan|(\\d+) (?:(relaxed|packed) )?days) around (.+?)(?:, focused on (.+?))?(?: — planned as (an? (?:'+occ+')))?\\.$').exec(s))){
+  const head=m[2]?m[2]+' jours'+(m[3]==='relaxed'?' tranquilles':m[3]==='packed'?' bien remplis':''):'Une journée';
+  const o=m[6]?frOccasionNoun(m[6]):null;
+  const pl=!!m[2];
+  return head+' '+frSummaryAround(m[4])+(m[5]?(pl?', axés sur ':', axée sur ')+frSummaryList(m[5]):'')+(o?(pl?' — pensés pour ':' — pensée pour ')+o:'')+'.';
+ }
+ if((m=new RegExp('^(An outing|An? (?:'+occ+')) in (.+?)'+FR_HEADING_WHEN_RE+'(?:, focused on (.+?))?\\.$').exec(s))){
+  const where=frHeadingWhere(m[2]),when=frHeadingWhen(m[3]);if(!where||when===null)return null;
+  let noun=m[1]==='An outing'?'une sortie':frOccasionNoun(m[1].replace(/^An?/,(x)=>x.toLowerCase()));if(!noun)return null;
+  return noun.charAt(0).toUpperCase()+noun.slice(1)+' '+where+when+(m[4]?', axée sur '+frSummaryList(m[4]):'')+'.';
+ }
+ if((m=new RegExp('^Places that mention (.+?) in (.+?)'+FR_HEADING_WHEN_RE+'(, ranked by how closely they match and by their ratings)?\\.$').exec(s))){
+  const where=frHeadingWhere(m[2]),when=frHeadingWhen(m[3]);if(!where||when===null)return null;
+  return 'Lieux qui mentionnent '+frSummaryItems(m[1])+' '+where+when+(m[4]?', classés selon leur correspondance et leurs notes':'')+'.';
+ }
+ // "<interests> in X[ when][ for an occasion]." with an interest the heading table doesn't know (a typed word in quotes).
+ if((m=new RegExp('^(.+?) in ((?:@AREA@|'+FR_SITE.area+')|(?:[A-Z][^.]*?))'+FR_HEADING_WHEN_RE+'(?: for ('+Object.keys(FR_HEADING_OCCASIONS).join('|')+'))?\\.$').exec(s))){
+  const where=frHeadingWhere(m[2]),when=frHeadingWhen(m[3]);if(!where||when===null)return null;
+  const list=frSummaryItems(m[1]);
+  return list.charAt(0).toUpperCase()+list.slice(1)+' '+where+when+(m[4]?' '+FR_HEADING_OCCASIONS[m[4]]:'')+'.';
+ }
+ return null;
+}
 function t3FrenchHeading(text){
+ const h=t3FrenchHeadingCore(text);
+ return h!=null?h:t3FrenchSummary(text);
+}
+function t3FrenchHeadingCore(text){
  const s=String(text||'');
  let m;
  if((m=new RegExp('^What’s on in (.+?)\\.$').exec(s))){const where=frHeadingWhere(m[1]);return where?'À l’affiche '+where+'.':null;}
@@ -602,4 +648,4 @@ function t3FrenchPlan(plan){
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;
 }
-module.exports={FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};
+module.exports={t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun,FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};
