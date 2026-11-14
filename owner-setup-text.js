@@ -555,7 +555,7 @@ Object.assign(en, {
   seasonExactLink: 'Starts or ends mid-month? Pick the exact dates', seasonExactMonths: 'Use whole months instead', seasonFrom: 'Starts on', seasonTo: 'Ends on',
   seasonNeedMonths: 'Please tap the months it runs, or tap “All year”.', seasonNeedDates: 'Please pick the first and last day, or use whole months.',
   happySeasonH: 'Is your happy hour all year?',
-  closedWarn: 'Heads up: you’re closed on {days}{when}. It won’t show as on that day.', oftenNow: 'How often: {x}. It stays when you save.', oftenWaiting: 'How often: {x}. We’re checking it (usually within a day); it stays when you save.', happyOutside: 'Heads up: these times are outside your hours on {days}. Check the start and end.', closedWarnHappy: 'Heads up: you’re closed on {days}{when}. Your page will say happy hour is on when you’re open.', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (in your usual hours)',
+  closedWarn: 'Heads up: you’re closed on {days}{when}. It won’t show as on that day.', oftenNow: 'How often: {x}. It stays when you save.', stMusicOften: 'on your page · how often within a day', kitchenLate: 'Heads up: that’s later than your closing time on {days}. Check the time.', oftenWaiting: 'How often: {x}. We’re checking it (usually within a day); it stays when you save.', happyOutside: 'Heads up: these times are outside your hours on {days}. Check the start and end.', closedWarnHappy: 'Heads up: you’re closed on {days}{when}. Your page will say happy hour is on when you’re open.', closedWarnSeason: ' (in your {kind} hours)', closedWarnUsual: ' (in your usual hours)',
   seasonExactLead: 'Or pick the exact first and last day:',
   monthsClosedQ: 'Which months are you closed?', monthsClosedLead: 'Tap each month you’re closed. Your page says “Closed for the season” then, and when you reopen.',
   monthsClosedNeed: 'Please tap the months you’re closed.', monthsClosedInRow: 'Please pick closed months in a row, like November to March.', monthsAllClosed: 'That’s every month. Please leave the months you’re open untapped.',
@@ -566,7 +566,7 @@ Object.assign(en, {
   storyPendingHint: 'You sent a new story. We check it within a day.',
   storyEditHint: 'This is what your page says now. Change any words right in the box, or tap ✕ to clear it and start fresh.', storyEnglishHint: '', storyClear: 'Clear the text',
   useSite: 'Use {site}', useSiteSub: 'Your website',
-  curMainPending: 'Your new main photo (on your page within a day)', keepMainPending: 'Keep this one',
+  curMainPending: 'Your main photo (we’re adding it within a day)', keepMainPending: 'Keep it as my main photo',
   hoursDoneDayAria: 'Done with {day}',
 });
 Object.assign(fr, {
@@ -574,7 +574,7 @@ Object.assign(fr, {
   seasonExactLink: 'Ça commence ou finit en milieu de mois? Choisissez les dates exactes', seasonExactMonths: 'Utiliser des mois entiers', seasonFrom: 'Commence le', seasonTo: 'Finit le',
   seasonNeedMonths: 'Touchez les mois où c’est offert, ou touchez « Toute l’année ».', seasonNeedDates: 'Choisissez le premier et le dernier jour, ou utilisez des mois entiers.',
   happySeasonH: 'Votre 5 à 7 est-il offert toute l’année?',
-  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le 5 à 7 a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
+  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', stMusicOften: 'sur votre page · fréquence d’ici un jour', kitchenLate: 'Attention : c’est plus tard que votre heure de fermeture le {days}. Vérifiez l’heure.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le 5 à 7 a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
   seasonExactLead: 'Ou choisissez le premier et le dernier jour exacts :',
   monthsClosedQ: 'Quels mois êtes-vous fermé?', monthsClosedLead: 'Touchez chaque mois où vous êtes fermé. Votre page indique alors « Fermé pour la saison » et la date de réouverture.',
   monthsClosedNeed: 'Touchez les mois où vous êtes fermé.', monthsClosedInRow: 'Choisissez des mois de fermeture qui se suivent, comme de novembre à mars.', monthsAllClosed: 'Ce sont tous les mois. Ne touchez pas les mois où vous êtes ouvert.',
@@ -587,7 +587,7 @@ Object.assign(fr, {
   // Brewery test 3 (2026-11-13): the text on the page now is in English (research); said so, kept, never translated.
   storyEnglishHint: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le tel quel, ou écrivez votre texte en français\u00a0: il s’ajoute au texte anglais, qui reste pour les visiteurs anglophones.', storyClear: 'Effacer le texte',
   useSite: 'Utiliser {site}', useSiteSub: 'Votre site Web',
-  curMainPending: 'Votre nouvelle photo principale (sur votre page d’ici un jour)', keepMainPending: 'Garder celle-ci',
+  curMainPending: 'Votre photo principale (nous l’ajoutons d’ici un jour)', keepMainPending: 'La garder comme photo principale',
   hoursDoneDayAria: 'Terminé pour {day}',
 });
 
@@ -1290,7 +1290,7 @@ en.brewery.kindDistillery = {
   hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { taproom: 'Food here', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
   noLabels: { music: 'no tours, classes or events' },
-  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, as often as it changes.',
+  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, even if it changes often.',
   photosLead: 'Your tasting room, your still, your bottles. Three photos is perfect.', offerLead: 'Visitors use these to find a distillery like yours.',
   storyQ: 'Tell visitors about your distillery', storyEx: 'A small family distillery. We distill in the back, pour tastings up front, and the patio gets the evening sun.',
   knownEx: 'Small-batch gin with Okanagan botanicals',
@@ -1363,7 +1363,7 @@ en.pub.cocktail = {
   cuisineQ: 'Your food', cuisineLead: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineLeadEmpty: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineNext: 'Save my food',
   noFood: 'We don’t serve food', savedCuisine: 'Your food is on your page now.',
   // Menu or cocktail list
-  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your cocktail list works too, as often as it changes.',
+  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your cocktail list works too, even if it changes often.',
   // Cocktail price (the café "Price per person" screen, Decided 2)
   cpriceQ: 'About how much is a cocktail?', cpriceLead: 'It shows on your card and in Build My Trip right away.', cpriceLeadPick: 'It shows on your card as “{x}” right away.',
   cpriceGuess: 'Your page says about {x} now, so we picked it. Tap another price if it changed.', cpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',

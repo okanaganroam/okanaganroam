@@ -312,7 +312,7 @@ test('11: after a new main photo is picked, the photos screen says "Your new mai
   const s = scriptOf((await get(`/owner/${tokenFor(g.id)}/setup`)).text);
   assert.match(s, /C\.imageSource === 'pending' \? T\.curMainPending/);
   assert.match(s, /C\.image = S\.mainSrc; C\.imageSource = 'pending'/);
-  assert.equal(TEXT.en.curMainPending, 'Your new main photo (on your page within a day)');
+  assert.equal(TEXT.en.curMainPending, 'Your main photo (we’re adding it within a day)'); // cocktail test 3 (2026-11-14)
   assert.ok(TEXT.fr.curMainPending);
 });
 

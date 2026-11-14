@@ -763,3 +763,173 @@ test('small fixes (test 2): check-first wording, Musique en direct, Accepte les 
   assert.equal(require('../french-text.js').FR_TEXT['What are you looking for?'], 'Que recherchez-vous\u202f?');
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /'search\.mainLine': 'Que recherchez-vous\\u202f\?'/);
 });
+
+// ---------- Fresh eyes cocktail test 3 (2026-11-14) ----------
+const helpBest = (page, extra) => {
+  const vm = require('node:vm');
+  const html = app.ownerHelpWidgetHtml(page, { extraTopics: extra, completeness: true });
+  const c = JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
+  const ctx = { T: c.topics, cfg: c };
+  vm.runInNewContext(`${html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'))}; this.best = best;`, ctx);
+  return { best: (q) => ctx.best(q).id, topic: (id) => c.topics.find((x) => x.id === id) };
+};
+test('help (test 3): “How do I change my happy hour?” gets the happy hour times answer on every type with happy hour, EN and FR; deals and badges keep theirs', () => {
+  const sets = { cocktail: app.COCKTAIL_SETUP_HELP_TOPICS, pub: app.PUB_SETUP_HELP_TOPICS, brewery: app.BREWERY_SETUP_HELP_TOPICS, distillery: app.DISTILLERY_SETUP_HELP_TOPICS, restaurant: [], cafe: app.CAFE_SETUP_HELP_TOPICS, winery: app.WINERY_SETUP_HELP_TOPICS };
+  for (const [type, T] of Object.entries(sets)) for (const page of ['setup', 'edit']) {
+    const h = helpBest(page, T.filter((x) => page === 'setup' || x.pages.includes('edit')));
+    for (const q of ['How do I change my happy hour later?', 'How do I change my happy hour (later)?', 'change happy hour times', 'Comment changer mon 5 à 7 ?', 'changer les heures de mon 5 à 7']) assert.equal(h.best(q), 'hh-times', `${type} ${page}: ${q}`);
+    for (const q of ['How do I add my happy hour deals?', 'happy hour deals', 'Comment ajouter les spéciaux de mon 5 à 7?']) assert.equal(h.best(q), 'hh-deals', `${type} ${page}: ${q}`);
+    for (const q of ['What are the badges?', 'dog friendly']) assert.equal(h.best(q), 'features', `${type} ${page}: ${q}`);
+  }
+  const features = app.OWNER_HELP_TOPICS.find((x) => x.id === 'features');
+  assert.ok(!features.keys.includes('happy hour') && !features.keysFr.includes('5 a 7') && !features.keysFr.includes('cinq a sept'), 'badges no longer own happy hour');
+  const t = app.HH_TIMES_HELP_TOPIC;
+  assert.match(t.a, /<strong>Set up your page<\/strong>, tap <strong>Change an answer<\/strong>, then <strong>Happy hour<\/strong>\. Days and times you type in there go live straight away\./);
+  assert.match(t.a, /typed up by us first, usually within a day/); assert.match(t.a, /\{ON\}, open <strong>Happy hour<\/strong>.*tap \{SEND\}\. \{LIVE\}/);
+  assert.match(t.aFr, /<strong>Modifier une réponse<\/strong>, puis <strong>5 à 7<\/strong>/); assert.match(t.aFr, /ouvrez <strong>5 à 7<\/strong>/); assert.doesNotMatch(t.aFr, /happy hour/i);
+  // Cafés and wineries have no happy hour screen in their setup: the edit page only.
+  const cafeEdit = helpBest('edit', app.CAFE_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit'))).topic('hh-times');
+  assert.doesNotMatch(cafeEdit.a, /Change an answer/); assert.match(cafeEdit.a, /open <strong>Happy hour<\/strong>/);
+  // The rendered lounge answer: from the edit link it says it's checked first; the setup saves go live.
+  const lounge = helpBest('edit', app.COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit'))).topic('hh-times');
+  assert.match(lounge.a, /From the edit link we check changes first/);
+});
+
+test('chips (test 3): a tap re-checks only its own box; “Walk-ins only” and “Walk-ins welcome” are told apart; “Patio only” still reads “on the patio”', () => {
+  const s = CLIENT(), vm = require('node:vm');
+  const ctx = { T: { groupsLine: 'Groups of {n} or more: please book ahead' } };
+  vm.runInNewContext(s.slice(s.indexOf('  function has(v, t)'), s.indexOf('  // Cocktail test 2 (2026-11-13): in the French setup, a line filled')) + 'this.saysIt = saysIt; this.groupsKeep = groupsKeep;', ctx);
+  const on = (v, L) => [...L].filter((t) => ctx.saysIt(v, t, L));
+  const R = text.en.pub.cocktail.quick.reservations, RF = text.fr.pub.cocktail.quick.reservations, D = ['Patio only', 'Inside and patio', 'Water bowls at the door'], G = text.en.pub.cocktail.quick.groups;
+  assert.deepEqual(on('Walk-ins welcome', R), ['Walk-ins welcome']);
+  assert.deepEqual(on('Walk-ins only', R), ['Walk-ins only']);
+  assert.deepEqual(on('walk ins welcome too', R), ['Walk-ins welcome']);
+  assert.deepEqual(on('Clients sans réservation bienvenus', RF), ['Clients sans réservation bienvenus']);
+  assert.deepEqual(on('Sans réservation seulement', RF), ['Sans réservation seulement']);
+  assert.deepEqual(on('Dogs welcome on the patio', D), ['Patio only'], 'winery test 5 rule kept');
+  assert.deepEqual(on('Dogs inside and on the patio', D), ['Inside and patio']);
+  assert.deepEqual(on('Private room for 20. Groups of 10 or more: please book ahead', G), ['Private room']);
+  assert.match(s, /mine\.forEach\(function\(c\)\{ c\.setAttribute\('aria-pressed', saysIt\(box\.value, c\.getAttribute\('data-quick'\), sibs\)/);
+  assert.match(s, /return c\.getAttribute\('data-box'\) === b\.getAttribute\('data-box'\);/);
+  assert.doesNotMatch(s, /screen\.querySelectorAll\('\[data-quick\]'\), function\(c\)\{ c\.setAttribute\('aria-pressed'/);
+});
+
+test('groups (test 3): a size chip keeps a room or capacity from research; a quick answer replaces a line that only repeats it', () => {
+  const s = CLIENT(), vm = require('node:vm');
+  const ctx = { T: { groupsLine: 'Groups of {n} or more: please book ahead' } };
+  vm.runInNewContext(s.slice(s.indexOf('  function has(v, t)'), s.indexOf('  // Cocktail test 2 (2026-11-13): in the French setup, a line filled')) + 'this.groupsKeep = groupsKeep;', ctx);
+  const G = text.en.pub.cocktail.quick.groups;
+  const size = (v, n) => ctx.groupsKeep(v).concat([`Groups of ${n} or more: please book ahead`]).join('. ');
+  assert.equal(size('Private room for 20', 10), 'Private room for 20. Groups of 10 or more: please book ahead');
+  assert.equal(size('Private room for 20. Groups of 10 or more: please book ahead', 12), 'Private room for 20. Groups of 12 or more: please book ahead', 'a new size replaces only the size');
+  assert.equal(size('Groups welcome', 10), 'Groups of 10 or more: please book ahead', 'nothing extra to keep');
+  assert.equal(size('Groups of 8 or more: please book ahead', 10), 'Groups of 10 or more: please book ahead');
+  // Quick answers on research's untouched line: Buyouts keeps the room for 20; Private room itself is already said.
+  assert.deepEqual([...ctx.groupsKeep('Private room for 20', 'Buyouts', G)], ['Private room for 20']);
+  assert.deepEqual([...ctx.groupsKeep('Groups welcome, call ahead', 'Private room', G)], [], 'a line with nothing the chip lacks is replaced');
+  assert.match(s, /S\.brew\.groups = groupsKeep\(S\.brew\.groups\)\.concat\(\[fill\(T\.groupsLine, \{ n: \+b\.getAttribute\('data-bgroup'\) \}\)\]\)\.join\('\. '\);/);
+  assert.match(s, /v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);/);
+  // Un-pressing Private room inside "Private room for 20" takes the sentence, never leaving "for 20".
+  assert.match(s, /if \(inLonger\) v = sentencesOf\(v\)\.filter\(function\(x\)\{ return !has\(x, t\); \}\)\.join\(sep\);/);
+  // The pressed size is the "book ahead" sentence's, not the room's 20.
+  assert.match(s, /gsz = \(\/\\b\(\\d\{1,2\}\)\\b\/\.exec\(gszS\) \|\| \[\]\)\[1\]/);
+});
+
+test('lounge words (test 3): specials tips, the Events help answer, 🍸 on the owner home; pubs keep Weekly nights, distilleries Tours & events', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const en = (await get(`/owner/${t}`)).text, fr = (await get(`/fr/owner/${t}`)).text;
+  assert.match(en, /&ldquo;Martini Monday&rdquo; &middot; &ldquo;\$10 classic martinis&rdquo;/); assert.match(en, /live music and trivia go under Events\./);
+  assert.doesNotMatch(en, /Wing Wednesday|60¢ wings|trivia and karaoke go under Weekly nights/);
+  assert.match(fr, /« Lundi martini » · « Martinis classiques à 10/); assert.match(fr, /la musique en direct et les quiz vont sous Événements/);
+  const hhTile = (h) => (/data-pick="happy"><span class="op-task-icon" aria-hidden="true">([^<]+)<\/span><span class="op-task-text"><strong>([^<]+)</.exec(h) || []).slice(1).join(' ');
+  assert.equal(hhTile(en), '&#127864; Happy hour'); assert.equal(hhTile(fr), '&#127864; 5 à 7');
+  const help = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec(en)[1]);
+  const wn = help.topics.filter((x) => x.id === 'weekly-nights');
+  assert.equal(wn.length, 1); assert.match(wn[0].a, /open <a href="#tours-events"><strong>Events<\/strong><\/a>/); assert.match(wn[0].aFr, /<strong>Événements<\/strong>/);
+  assert.doesNotMatch(wn[0].a, /Weekly nights<\/strong>/);
+  const p = mk('pub'); const pe = (await get(`/owner/${tokenFor(p.id)}`)).text;
+  assert.match(pe, /Wing Wednesday/); assert.equal(hhTile(pe), '&#127867; Happy hour');
+  // The lounge's weekly specials answer: Martini Monday, not wings.
+  const sp = help.topics.find((x) => x.id === 'specials'); assert.match(sp.a, /<em>Martini Monday<\/em>/); assert.match(sp.aFr, /<em>Lundi martini<\/em>/);
+  const ph = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec(pe)[1]).topics.find((x) => x.id === 'weekly-nights');
+  assert.match(ph.a, /open <strong>Weekly nights<\/strong>/);
+  const d = mk('distillery'); const dh = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec((await get(`/owner/${tokenFor(d.id)}`)).text)[1]).topics.find((x) => x.id === 'weekly-nights');
+  assert.match(dh.a, /Tours &amp; events/);
+});
+
+test('service dogs (test 3): ticked when “No dogs allowed” is tapped (all types), still a choice, saved with the screen', () => {
+  const s = CLIENT();
+  assert.match(s, /if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); if \(C\.offerLabels\.service_dogs\) \{ S\.badges\.service_dogs = true; press\('service_dogs', true\); \} \}/);
+  assert.match(s, /badges\.service_dogs = !!\(S\.noDogs && !badges\.dog_friendly && S\.badges\.service_dogs\);/, 'sent only with the screen, and can be unticked');
+});
+
+test('events row (test 3): “on your page · how often within a day” while a how often waits; “on your page” once a setup save puts it live', async () => {
+  const s = CLIENT(), vm = require('node:vm');
+  assert.equal(text.en.stMusicOften, 'on your page · how often within a day'); assert.equal(text.fr.stMusicOften, 'sur votre page · fréquence d’ici un jour');
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  const jazz = { days: ['thu'], kind: 'live_music', title: 'Jazz night', start: '20:00' };
+  assert.equal((await change(t, { weekly_nights: [jazz] })).status, 200);
+  assert.equal((await change(t, { weekly_nights: [{ ...jazz, frequency: 'biweekly' }] }, false)).status, 200);
+  let cfg = await setupCfg(t);
+  assert.equal(cfg.cur.weekly_nights_waiting, true); assert.ok(cfg.nightsOften[0]); assert.ok(cfg.waiting.includes('music'));
+  assert.equal(cfg.t.stMusicOften, 'on your page · how often within a day');
+  const ctx = { CUR: cfg.cur, C: cfg, T: cfg.t, S: { wine: {}, brew: {}, done: {} }, FOLD: true };
+  vm.runInNewContext(s.slice(s.indexOf('  function musicOftenWaiting()'), s.indexOf('  // Brewery test 1 (2026-11-12): a step answered "within a day" reads')) + 'this.st = stText;', ctx);
+  assert.equal(ctx.st('music', 'live'), 'on your page · how often within a day');
+  // A setup events save sends it live (Dayton keeps that); the row then says "on your page".
+  assert.match(s, /saveAll\('music', list, null, null, function\(\)\{ CUR\.weekly_nights_waiting = false; \}\);/);
+  assert.equal((await change(t, { weekly_nights: asSetup(app.venueWeeklyNightsList(v.id)) })).status, 200);
+  assert.deepEqual(liveNights(v.id), ['Jazz night|biweekly']);
+  cfg = await setupCfg(t);
+  assert.equal(cfg.cur.weekly_nights_waiting, false);
+  const ctx2 = { CUR: cfg.cur, C: cfg, T: cfg.t, S: { wine: {}, brew: {}, done: {} }, FOLD: true };
+  vm.runInNewContext(s.slice(s.indexOf('  function musicOftenWaiting()'), s.indexOf('  // Brewery test 1 (2026-11-12): a step answered "within a day" reads')) + 'this.st = stText;', ctx2);
+  assert.equal(ctx2.st('music', 'live'), cfg.t.st.live);
+});
+
+test('small fixes (test 3): Midnight chip, main photo label, no empty Event 2, one time estimate, menu lead, one Known for heading, closed days, walk-ins, kitchen heads-up', async () => {
+  const s = CLIENT(), vm = require('node:vm');
+  // A typed close time un-presses "Midnight".
+  assert.match(s, /querySelectorAll\('\[data-late\^="' \+ d3 \+ ':' \+ j3 \+ ':"\]'\), function\(b\)\{ b\.setAttribute\('aria-pressed', b\.getAttribute\('data-late'\)\.split\(':'\)\.slice\(2\)\.join\(':'\) === vals\[1\]/);
+  assert.match(s, /screen\.addEventListener\('input', timeTyped\); screen\.addEventListener\('change', timeTyped\);/);
+  // The pending main photo.
+  assert.equal(text.en.curMainPending, 'Your main photo (we’re adding it within a day)'); assert.equal(text.en.keepMainPending, 'Keep it as my main photo');
+  assert.equal(text.fr.curMainPending, 'Votre photo principale (nous l’ajoutons d’ici un jour)');
+  // The edit page: one real event, no second pre-filled row showing.
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  assert.equal((await change(t, { weekly_nights: [{ days: ['thu'], kind: 'live_music', title: 'Jazz night', start: '20:00' }] })).status, 200);
+  const edit = (await get(`/owner/${t}`)).text;
+  assert.match(edit, /<fieldset class="op-sp op-wn" data-wn="1" data-season/); assert.match(edit, /<fieldset class="op-sp op-wn" data-wn="2" hidden/);
+  const e0 = (await get(`/owner/${tokenFor(mk('cocktail').id)}`)).text;
+  assert.match(e0, /<fieldset class="op-sp op-wn" data-wn="1" data-season/, 'no events yet: one empty row to fill');
+  // The same estimate on the owner home and at the setup start, for every type.
+  for (const type of ['cocktail', 'pub', 'restaurant', 'brewery', 'distillery', 'winery', 'cafe']) for (const lang of ['', '/fr']) {
+    const x = mk(type); const tk = tokenFor(x.id);
+    const home = (await get(`${lang}/owner/${tk}`)).text, start = cfgOf((await get(`${lang}/owner/${tk}/setup`)).text).t.hiLead;
+    const fig = (h) => (/(?:About|Environ) (\d+ (?:to|à) \d+) minutes/.exec(h) || [])[1];
+    assert.ok(fig(start), `${type}${lang}: a figure at the start`); assert.equal(fig(home.slice(home.indexOf('op-setup-card'))), fig(start), `${type}${lang}`);
+  }
+  // Menu lead.
+  assert.equal(cfgOf((await get(`/owner/${t}/setup`)).text).t.menuLead, 'Pick the easiest one for you. A photo of your cocktail list works too, even if it changes often.');
+  // Story screen: the box label is for screen readers only (the heading says it).
+  assert.match(s, /field\('suKnown', T\.knownQ, S\.brew\.known, \{ max: 180, sr: true \}\)/);
+  assert.match(s, /'<label class="' \+ \(opts\.sr \? 'su-sr' : 'su-q'\) \+ '" for="' \+ id \+ '">'/);
+  // Build My Trip: the whole week names its closed days, in French too.
+  const wk = JSON.stringify({ mon: [], tue: [['16:00', '24:00']], wed: [['16:00', '24:00']], thu: [['16:00', '24:00']], fri: [['16:00', '01:00']], sat: [['16:00', '01:00']], sun: [['16:00', '22:00']] });
+  const lh = planner.listedHoursText({ hours: wk }, null, null);
+  assert.match(lh, /; closed Mon$/);
+  assert.match(require('../trip-french-copy.js').t3FrenchText(lh), /; fermé lun\.$/);
+  assert.doesNotMatch(planner.listedHoursText({ hours: WEEK }, null, null), /closed/);
+  // Research "Walk-ins welcome" doesn't tick Takes reservations; a line about booking still does.
+  for (const [line, want] of [['Walk-ins welcome', []], ['Walk-ins welcome, no booking needed', []], ['Walk-ins welcome; reservations recommended on weekends', ['takes_reservations']], ['Recommended on weekends', ['takes_reservations']]]) {
+    const r = mk('cocktail'); research(r.id, [{ label: 'Reservations', text: line }]);
+    assert.deepEqual((await setupCfg(tokenFor(r.id))).visitTicks, want, line);
+  }
+  // Kitchen later than a day's closing: a gentle heads-up.
+  assert.ok(text.en.kitchenLate && text.fr.kitchenLate);
+  const ctx = { S: { week: { mon: null, tue: [['16:00', '00:00']], wed: [['16:00', '00:00']], thu: [['16:00', '00:00']], fri: [['16:00', '01:00']], sat: [['16:00', '01:00']], sun: [['16:00', '22:00']] } },
+    DAYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], T: { kitchenLate: 'late {days}' }, fill: (x, o) => x.replace('{days}', o.days), longDay: (d) => d, C: { lang: 'en' } };
+  vm.runInNewContext(s.slice(s.indexOf('  function hm(v)'), s.indexOf('  function hmStr(')) + s.slice(s.indexOf('  function daysInFull('), s.indexOf('  function closedWarnAny(')) + s.slice(s.indexOf('  function kitchenWarn('), s.indexOf('  function warnHtml(')) + 'this.kw = kitchenWarn;', ctx);
+  assert.equal(ctx.kw('23:00'), 'late sun'); assert.equal(ctx.kw('22:00'), ''); assert.equal(ctx.kw('00:30'), 'late tue, wed, thu and sun'.replace('tue, wed, thu and sun', 'tue, wed, thu and sun'));
+  assert.match(s, /id="suKitchenWarn" role="status"/);
+});

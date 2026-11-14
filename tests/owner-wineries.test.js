@@ -1171,9 +1171,11 @@ test('winery test 5: a quick chip replaces research’s untouched line, adds to 
   assert.deepEqual(cfg.visitResearch, ['dogs'], 'research’s Dogs line is still research’s');
   assert.equal(cfg.cur.visit_rows.dogs, 'Dogs welcome on the patio.');
   // The rule in the client: has it -> take it out; untouched research line -> replaced; already says it -> left; else added.
-  assert.match(CLIENT5, /else if \(v && pre && v === pre && \(C\.visitResearch \|\| \[\]\)\.indexOf\(qk\) >= 0\) v = t;\n\s*else if \(saysIt\(v, t\)\) return;\n\s*else v = v \? v\.replace/);
+  // Cocktail test 3 (2026-11-14): a Groups line keeps its facts (a room, a capacity); other lines are replaced as before.
+  assert.match(CLIENT5, /else if \(v && pre && v === pre && \(C\.visitResearch \|\| \[\]\)\.indexOf\(qk\) >= 0\) v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);\n\s*else if \(saysIt\(v, t, sibs\)\) return;\n\s*else v = v \? v\.replace/);
   // saysIt, run as the client runs it.
-  const fn = new Function(CLIENT5.match(/function has\(v, t\)\{[^\n]*\}/)[0] + '\n' + CLIENT5.match(/var QUICK_COMMON = [^\n]*/)[0] + '\n' + CLIENT5.match(/function quickWords\(t\)\{[^\n]*\}/)[0] + '\n' + CLIENT5.match(/function saysIt\(v, t\)\{[^\n]*\}/)[0] + '\nreturn saysIt;')();
+  // Cocktail test 3 (2026-11-14): saysIt spans several lines now (chips that share their words are told apart).
+  const fn = (() => { const ctx = { T: {} }; require('node:vm').runInNewContext(CLIENT5.slice(CLIENT5.indexOf('  function has(v, t)'), CLIENT5.indexOf('  // Cocktail test 2 (2026-11-13): in the French setup, a line filled')) + 'this.f = saysIt;', ctx); return ctx.f; })();
   assert.equal(fn('Dogs welcome on the patio.', 'Patio only'), true);
   assert.equal(fn('Dogs welcome on the patio.', 'Inside and patio'), false);
   assert.equal(fn('Chiens bienvenus sur la terrasse.', 'Terrasse seulement'), true);

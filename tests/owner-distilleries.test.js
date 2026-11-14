@@ -881,7 +881,7 @@ test('fe3 #7 small fixes: happy hour example, 🍸, time defaults from closing, 
   assert.equal(text.en.brewery.kindDistillery.whatsOnEx, '$8 cocktails and half-price small plates');
   assert.equal(text.fr.brewery.kindDistillery.whatsOnEx, 'Cocktails à 8\u00a0$ et petites assiettes à moitié prix'); // no-break space (cocktail test 2)
   assert.equal(text.en.brewery.kindCidery.whatsOnEx, '$6 ciders and half-price snacks');
-  assert.match(SRV(), /tile\('happy', fr \? '&#127865;' : venue\.type === 'distillery' \? '&#127864;' : '&#127867;'/);
+  assert.match(SRV(), /tile\('happy', venue\.type === 'cocktail' \? '&#127864;' : fr \? '&#127865;' : venue\.type === 'distillery' \? '&#127864;' : '&#127867;'/); // cocktail test 3: 🍸 for lounges
   // Kitchen-close and kids-until start an hour before the earliest closing time (never after closing), or blank.
   const src = CLIENT();
   assert.doesNotMatch(src, /\|\| '21:00'/);

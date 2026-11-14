@@ -22255,7 +22255,7 @@ const OHB_QUESTIONS = [
   ['how do i put my menu on', 'edit', 'menu-add'], ['can i type the menu myself', 'menu', 'menu-add'], ['where is the log out button', 'settings', 'logout'],
   ['I didnt get the password reset email', 'forgot', 'noemail'], ['can 2 people manage the listing', 'account', 'staff'], ['how much does it cost to be featured', 'edit', 'cost'],
   ['someone else claimed my busness', 'claim', 'dispute'], ['we have diffrent hours on stat holidays', 'edit', 'seasonal-hours'], ['how do i make a login', 'edit', 'login-create'],
-  ['is the menu scan blury', 'menu', 'menu-blurry'], ['how do i set the hapy hour', 'edit', 'features'], ['i forgot my pasword', 'login', 'forgot'],
+  ['is the menu scan blury', 'menu', 'menu-blurry'], ['how do i set the hapy hour', 'edit', 'hh-times' /* cocktail test 3 (2026-11-14): happy hour times have their own answer */], ['i forgot my pasword', 'login', 'forgot'],
   ['photo upload keeps failing', 'edit', 'photo-small'], ['can i change hours without waiting for approval', 'edit', 'live-speed'], ['what does $$ mean', 'edit', 'price-range'],
   // French, on French and English pages alike.
   ['ou est le bouton pour me deconnecter', 'account', 'logout', 'fr'], ['nous sommes fermés le 25 décembre', 'edit', 'closures', 'fr'], ['comment ajouter des photos', 'edit', 'photo-add', 'fr'],
