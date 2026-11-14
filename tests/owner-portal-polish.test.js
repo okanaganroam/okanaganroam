@@ -80,7 +80,7 @@ test('photo section on the edit link: no "Slide it", the previews are explained;
   }
   assert.match(html, /progress\.classList\.toggle\('op-ok', !!sent\);/);
   assert.match(html, /#ofProgress\.op-ok \{ color: #1E6B3A;/);
-  const cafe = await get(`/owner/${tokenFor(mk('cocktail').id)}`); // cafés have the setup and checklist since 2026-11-10; distilleries since 2026-11-13
+  const cafe = await get(`/owner/${tokenFor(mk('golf').id)}`); // cafés have the setup and checklist since 2026-11-10; distilleries since 2026-11-13
   assert.doesNotMatch(cafe, /op-ok/);
 });
 
@@ -89,7 +89,7 @@ test('Help button on phones is a small "?" at the top right that scrolls with th
   // Café test 1 (2026-11-11): 83px, centred on the "Owner edit page" line, clear of the page title.
   assert.match(html, /@media \(max-width: 699px\) \{[\s\S]*body\.owner-page \.ohb-btn, body\.owner-page:has\(\.op-unsent:not\(\[hidden\]\)\) \.ohb-btn \{ position: absolute; top: 83px; bottom: auto;/);
   assert.match(html, /<button type="button" class="ohb-btn" id="ohbBtn"[^>]*><span class="ohb-q" aria-hidden="true">\?<\/span>Help<\/button>/);
-  const winery = await get(`/owner/${tokenFor(mk('cocktail').id)}`); // distilleries have the setup since 2026-11-13
+  const winery = await get(`/owner/${tokenFor(mk('golf').id)}`); // distilleries have the setup since 2026-11-13
   assert.doesNotMatch(winery, /position: absolute; top: 83px/);
 });
 

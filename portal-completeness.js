@@ -106,6 +106,38 @@ const PUB_ITEMS = [
   R('owner_confirmed', { w: 3 }),
 ];
 if (PUB_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: pub weights must sum to 100');
+// Cocktail lounges (Dayton, 2026-11-13; drafts/cocktail-portal-2026-11-13/SPEC-cocktail-lounges.md, "Decided"): the pub
+// items with lounge words, minus Sports on TV (4), Games (2), the average spend (2) and Weekly specials (3: no longer a
+// setup screen, so it isn't scored; "honest 100%" from the setup alone). The new "Cocktail price" item takes 5, events
+// +3, and happy hour, the menu and Known for +1 each, so the total stays 100. Owner-only answers (kitchen, who's welcome,
+// the cocktail price) live in venue_pub_info, as for pubs.
+const PI = (key, over) => ({ ...PUB_ITEMS.find((i) => i.key === key), ...over });
+const COCKTAIL_ITEMS = [
+  PI('address_pin'),
+  PI('phone', { whyEn: 'The number guests call to book a table or ask a question.', whyFr: 'Le numéro que les clients appellent pour réserver une table ou poser une question.' }),
+  PI('website'),
+  PI('cuisine', { whyEn: 'Small plates, tapas, bar snacks and so on. Pick up to 3, or “We don’t serve food”.', whyFr: 'Petites assiettes, tapas, bouchées, etc. Choisissez-en jusqu’à 3, ou « Nous ne servons pas de nourriture ».' }),
+  PI('hours'),
+  PI('hours_fresh'),
+  PI('kitchen'),
+  PI('photo_main', { whyEn: 'Real photos only, taken by you. Your bar, your cocktails, the room or patio.', whyFr: 'De vraies photos seulement, prises par vous. Votre bar, vos cocktails, la salle ou la terrasse.' }),
+  PI('photo_extra', { whyEn: 'Your bar, your cocktails, the room or patio.', whyFr: 'Votre bar, vos cocktails, la salle ou la terrasse.' }),
+  PI('menu', { w: 8, en: 'Menu or cocktail list', fr: 'Menu ou carte des cocktails', whyEn: 'Your cocktail list or food menu. A photo of it is fine.', whyFr: 'Votre carte des cocktails ou votre menu. Une photo suffit.' }),
+  PI('happy_hour', { w: 7 }),
+  { key: 'cocktail_price', group: 'food', w: 5, fix: true, target: { setup: 'spend' }, fields: ['cocktail_price', 'pub_info'],
+    en: 'Cocktail price', fr: 'Prix d’un cocktail', whyEn: 'About how much is a cocktail? It shows on your card (“From $16”). “We don’t serve cocktails” counts too.', whyFr: 'Combien coûte un cocktail environ? Il s’affiche sur votre fiche (« Dès 16 $ »). « Nous ne servons pas de cocktails » compte aussi.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🍸' },
+  PI('dietary'),
+  PI('entertainment', { w: 8, en: 'Live music, DJs and events', fr: 'Musique, DJ et événements', whyEn: 'Live music, DJs, trivia, comedy: what’s on each week.', whyFr: 'Musique en direct, DJ, quiz, humour : ce qui se passe chaque semaine.' }),
+  PI('minors', { whyEn: 'Adults only (19+), minors with an adult until a set time, or all ages. Families check this before they come.', whyFr: 'Adultes seulement (19 ans et plus), mineurs accompagnés jusqu’à une heure donnée, ou tous les âges. Les familles vérifient avant de venir.' }),
+  PI('pyv_groups', { whyEn: 'Private room, buyouts, or call ahead for 8 or more.', whyFr: 'Salle privée, privatisation, ou appelez à l’avance pour 8 personnes ou plus.' }),
+  PI('pyv_known', { w: 4, whyEn: 'One line on what people come back for, e.g. Smoked old fashioned and a door down the alley.', whyFr: 'Une ligne sur ce pour quoi les gens reviennent, p. ex. le old fashioned fumé et la porte au fond de la ruelle.' }),
+  PI('description'),
+  PI('instagram'),
+  PI('facebook'),
+  PI('arrival', { en: 'Front door photo and exact spot', fr: 'Photo de la porte d’entrée et emplacement exact', whyEn: 'Stand at your front door and take one photo. Down an alley or upstairs? It helps people find you.', whyFr: 'Placez-vous devant votre porte et prenez une photo. Dans une ruelle ou à l’étage? Cela aide les gens à vous trouver.' }),
+  PI('owner_confirmed'),
+];
+if (COCKTAIL_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: cocktail lounge weights must sum to 100');
 // Cafés (Dayton, Nov 10 2026; drafts/cafe-portal-2026-11-10/SPEC-cafes.md, "Decided"): the same engine with their own
 // 100 points. Seven items are new: what kind of café, all year or seasonal, what you serve, staying a while (seats and
 // laptops), Wi-Fi, dogs and kids, and ordering. Wi-Fi, laptops and ordering are owner-only (never researched). Happy
@@ -260,7 +292,7 @@ const BREWERY_ITEMS = [
 if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: brewery weights must sum to 100');
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
 // (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS };
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -273,11 +305,11 @@ const EXTRA_NONE_KEYS = ['dogs'];
 // any other (remembered, research doesn't add them back), never scored and never in that type's checklist. Pubs are
 // asked about booking and takeout in the setup without scoring them.
 // Café test 2 (2026-11-11): "No washroom" is an explicit answer too (never shown on the page).
-const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom', 'ordering'], pub: ['pyv_reservations', 'pyv_takeout'] };
+const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom', 'ordering'], pub: ['pyv_reservations', 'pyv_takeout'], cocktail: ['pyv_reservations', 'pyv_takeout', 'specials'] };
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -324,8 +356,9 @@ const SECONDS = {
   cafe_kind: 10, season: 15, serves: 20, stay: 20, wifi: 5, dogs_kids: 15, ordering: 40,
   winery_kind: 10, tasting_price: 15, visit_how: 15, booking_link: 30, winery_groups: 15, food_here: 15, access: 10,
   brewery_kind: 10, flight_price: 15, to_go: 10,
+  cocktail_price: 10,
 };
-if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -344,6 +377,7 @@ const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', ho
 // Breweries (2026-11-12): the same item keys save other fields for them (food here and the season are brewery answers).
 const QUICK_FIELD_BY_TYPE = { brewery: { brewery_kind: 'place_type', flight_price: 'flight_fee', to_go: 'brewery_info', food_here: 'brewery_info', season: 'brewery_info', dogs_kids: 'brewery_info' } };
 QUICK_FIELD_BY_TYPE.distillery = { ...QUICK_FIELD_BY_TYPE.brewery };
+QUICK_FIELD_BY_TYPE.cocktail = { cocktail_price: 'cocktail_price' };
 const quickFieldFor = (type, key) => ((QUICK_FIELD_BY_TYPE[type] || {})[key]) || QUICK_FIELD[key];
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -489,11 +523,15 @@ function doneMap(input, today) {
         access: ['wheelchair_accessible', 'free_parking', 'rv_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),
-    ...(i.type === 'pub' ? {
+    ...(i.type === 'pub' || i.type === 'cocktail' ? {
       // "We don't serve food" in the kitchen question also answers the food type.
       cuisine: nonBlank(i.cuisine) || !!(pub.kitchen && pub.kitchen.mode === 'none'),
       // Sports on TV has its own item for pubs, so it no longer counts as an event.
       entertainment: !!i.liveMusic || Number(i.nightsCount) > 0,
+    } : {}),
+    // Cocktail lounges (2026-11-13): the owner's cocktail price, or "We don't serve cocktails" (venue_pub_info).
+    ...(i.type === 'cocktail' ? {
+      cocktail_price: (typeof i.cocktailPrice === 'number' && Number.isFinite(i.cocktailPrice) && i.cocktailPrice > 0) || pub.no_cocktails === true,
     } : {}),
   };
 }
@@ -1202,4 +1240,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

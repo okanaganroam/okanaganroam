@@ -47,7 +47,7 @@ test('1: no "Saved / Sent → Next" screen needs a tap: the ✓ line shows on th
   // Every route to a "saved:" screen goes through go(), which moves straight on unless the screen carries a real choice.
   assert.match(CLIENT, /var sv = \/\^saved:\(\.\+\)\$\/\.exec\(step\);\s*if \(sv && !savedKept\(sv\[1\]\)\) \{ S\.flash = savedText\(sv\[1\]\);(?: S\.flashStory = [^;]+;)? return after\(sv\[1\]\); \}/); // brewery test 4: plus the sent story's words
   // Kept only for the pubs' "your description still mentions sports" choice.
-  assert.match(CLIENT, /function savedKept\(step\)\{ return step === 'offer' && !S\.badges\.sports_tv && !S\.storyFixed && !!sportsBit\(\); \}/);
+  assert.match(CLIENT, /function savedKept\(step\)\{ return step === 'offer' && !CK && !S\.badges\.sports_tv && !S\.storyFixed && !!sportsBit\(\); \}/);
   // Nothing sets S.step to a saved screen directly (that would skip the check).
   assert.doesNotMatch(CLIENT, /S\.step = 'saved:/);
   // The line is a role="status" live region next to the screen, filled after the screen is drawn.

@@ -1343,6 +1343,112 @@ fr.brewery.kindDistillery = {
 };
 for (const k of APPT_KEYS) { en.brewery.kindDistillery[k] = en.winery[k]; fr.brewery.kindDistillery[k] = fr.winery[k]; }
 
+// Cocktail lounges (Dayton, 2026-11-13; drafts/cocktail-portal-2026-11-13/SPEC-cocktail-lounges.md, "Decided"): the pub
+// screens with lounge words ("your bar", never pub, taproom or beer words), laid over the pub words for a cocktail lounge's
+// setup (server.js renderOwnerSetupPage). Folded like breweries: holidays end the Hours step, Instagram and Facebook are one
+// screen, and Groups and booking is one screen with the booking box always shown. The cocktail price reuses the café
+// "Price per person" screen ('spend') with quick buttons. Pubs never see these.
+en.pub.cocktail = {
+  hiLead: 'Let’s get your bar’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  timeLine: 'About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { hours: 'Hours and holidays', happy: 'Happy hour', cuisine: 'Your food', menu: 'Menu or cocktail list', spend: 'Cocktail price', photos: 'Photos', offer: 'What you offer',
+    music: 'Live music, DJs and events', story: 'Your story and Known for', groups: 'Groups and booking', social: 'Instagram and Facebook', door: 'Your front door' },
+  noLabels: { social: 'not on Instagram or Facebook', groups: 'no big groups', music: 'no live music, DJs or events', happy: 'no happy hour', spend: 'no cocktails', cuisine: 'no food' },
+  stStoryKnown: 'Known for on your page, story within a day', stGroupsLink: 'on your page, new booking link within a day',
+  // Happy hour (the pub screen) with a cocktail-bar example.
+  whatsOnEx: '$8 cocktails and half-price small plates', happyEx: 'Tue–Fri 4–6 PM, $8 cocktails. Sun 9 PM to close, half-price small plates.',
+  // Kitchen close (the pub question, in the Hours step) and the kind of place (never asked of a lounge).
+  kitchenLead: 'Lots of bars stop serving food before last call. Visitors want to know before they come in hungry.', placeQ: 'What kind of bar is it?',
+  // Your food (the pub food picker, no Pub Fare to start)
+  cuisineQ: 'Your food', cuisineLead: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineLeadEmpty: 'Small plates, tapas, bar snacks… Pick up to 3.', cuisineNext: 'Save my food',
+  noFood: 'We don’t serve food', savedCuisine: 'Your food is on your page now.',
+  // Menu or cocktail list
+  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your cocktail list works too, as often as it changes.',
+  // Cocktail price (the café "Price per person" screen, Decided 2)
+  cpriceQ: 'About how much is a cocktail?', cpriceLead: 'It shows on your card and in Build My Trip right away.', cpriceLeadPick: 'It shows on your card as “{x}” right away.',
+  cpriceGuess: 'Your page says about {x} now, so we picked it. Tap another price if it changed.', cpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
+  cpriceNone: 'We don’t serve cocktails', cpriceNoneSub: 'Your card shows no price', cpriceNeed: 'Please tap a price, or “We don’t serve cocktails”.',
+  cpriceSavedLive: 'Your cocktail price is on your card now.', cpriceSavedDay: 'We check prices over $40 first; it’ll show within a day.', cpriceSavedNone: 'Your card shows no price.',
+  feeOther: 'Other', feeLabel: 'Price in dollars', feeOver: 'A price over ${n} is checked first and shows within a day.', feeNeed: 'Please type the price in dollars, like 16.', feeCard: 'From {x}',
+  // Photos and What you offer
+  photosLead: 'Your bar, your cocktails, the room or patio. Three photos is perfect.', photosNoMore: 'No, next: what you offer',
+  offerLead: 'Visitors use these to find a bar like yours.',
+  minorsNoteEx: 'Kids welcome for dinner until 8 PM; the bar is 19+.',
+  minorsLive: 'It’s on your page now, and it decides your Kids welcome badge.',
+  // Live music, DJs and events (the weekly events screen, same storage)
+  musicQ: 'Any live music, DJs or events?', musicLead: 'Like live music, a DJ, trivia or comedy.', musicTypeQ: 'Your live music, DJs and events', eventEx: 'Friday DJ night',
+  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often in Weekly nights on your edit page.', eventsOftenLink: 'Open Weekly nights',
+  // Your story and Known for
+  storyQ: 'Tell visitors about your bar', storyEx: 'A hidden cocktail bar downtown. Seasonal cocktails, small plates, and a DJ on Fridays.',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Smoked old fashioned and a door down the alley',
+  storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
+  // Groups and booking (one screen; the booking box always shows)
+  groupsQ: 'Groups: from what size should they book ahead?', groupsLead: 'Tap a size, or a quick answer. You can change the words.',
+  groupsEx: 'Private room for 20', groupsLine: 'Groups of {n} or more: please book ahead',
+  quickGroups: ['Groups of 8 or more: please book ahead', 'Groups of 10 or more: please book ahead', 'Groups of 12 or more: please book ahead', 'Groups of 15 or more: please book ahead', 'Groups of 20 or more: please book ahead'],
+  // Quick answers: "Private room", "Buyouts", "Call ahead for 8 or more" (Groups) and walk-ins or booking (Reservations).
+  quick: Object.assign({}, en.pub.quick, { groups: ['Private room', 'Buyouts', 'Call ahead for 8 or more'], reservations: ['Walk-ins only', 'Walk-ins welcome', 'Booking recommended', 'Please book ahead'] }),
+  groupsLineLabel: 'Your Groups line', groupsNone: 'We can’t take big groups',
+  groupsNeed: 'Please tap a size, a booking answer or type a line, or tap “We can’t take big groups”.',
+  bookQ2: 'Do people need to book a table?', bookLineLabel: 'Your Reservations line',
+  bookLinkLabel: 'Booking link (optional)', bookLinkEx: 'your OpenTable, Resy or website booking page', bookLinkBad: 'Please check the booking link, for example yourbusiness.com/book.',
+  groupsNoLink: 'Please leave links out of the Groups line. Your booking link has its own box below.',
+  groupsSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
+  // Instagram and Facebook on one screen, and the hours line on the holidays screen
+  socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.',
+  socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
+  hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.',
+  igLead: 'Type your Instagram name, like @yourbar.', knownLabel: 'Known for',
+  // Your front door
+  doorQ: 'Where’s your front door?', doorLead: 'Down an alley or upstairs? One photo, taken at your door, walks visitors right to it.',
+  doorPhotoLead: 'Stand outside so the door (and your sign or light) is in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
+  kinds: { dj: 'DJ', live_music: 'Live music', trivia: 'Trivia', comedy: 'Comedy' },
+};
+fr.pub.cocktail = {
+  hiLead: 'Préparons la page de votre bar, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  labels: { hours: 'Heures et jours fériés', happy: '5 à 7', cuisine: 'Votre nourriture', menu: 'Menu ou carte des cocktails', spend: 'Prix d’un cocktail', photos: 'Photos', offer: 'Ce que vous offrez',
+    music: 'Musique, DJ et événements', story: 'Votre histoire et ce pour quoi vous êtes reconnus', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'Votre porte d’entrée' },
+  noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', music: 'ni musique, ni DJ, ni événements', happy: 'pas de 5 à 7', spend: 'pas de cocktails', cuisine: 'pas de nourriture' },
+  stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
+  whatsOnEx: 'Cocktails à 8 $ et petites assiettes à moitié prix', happyEx: 'Mar.–ven. 16 h–18 h, cocktails à 8 $. Dim. 21 h à la fermeture, petites assiettes à moitié prix.',
+  kitchenLead: 'Bien des bars cessent de servir à manger avant le dernier service. Les visiteurs veulent le savoir avant d’arriver affamés.', placeQ: 'Quel genre de bar est-ce?',
+  cuisineQ: 'Votre nourriture', cuisineLead: 'Petites assiettes, tapas, bouchées… Choisissez-en jusqu’à 3.', cuisineLeadEmpty: 'Petites assiettes, tapas, bouchées… Choisissez-en jusqu’à 3.', cuisineNext: 'Enregistrer ma nourriture',
+  noFood: 'Nous ne servons pas de nourriture', savedCuisine: 'Votre nourriture est sur votre page maintenant.',
+  menuQ: 'Comment ajouter votre menu ou votre carte des cocktails?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte des cocktails fonctionne aussi, aussi souvent qu’elle change.',
+  cpriceQ: 'Combien coûte un cocktail environ?', cpriceLead: 'Il s’affiche sur votre fiche et dans Planifier mon voyage tout de suite.', cpriceLeadPick: 'Il s’affiche sur votre fiche comme « {x} » tout de suite.',
+  cpriceGuess: 'Votre page indique environ {x} maintenant, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', cpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
+  cpriceNone: 'Nous ne servons pas de cocktails', cpriceNoneSub: 'Votre fiche n’affiche aucun prix', cpriceNeed: 'Touchez un prix, ou « Nous ne servons pas de cocktails ».',
+  cpriceSavedLive: 'Le prix de vos cocktails est sur votre fiche maintenant.', cpriceSavedDay: 'Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.', cpriceSavedNone: 'Votre fiche n’affiche aucun prix.',
+  feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.', feeNeed: 'Écrivez le prix en dollars, comme 16.', feeCard: 'Dès {x}',
+  photosLead: 'Votre bar, vos cocktails, la salle ou la terrasse. Trois photos, c’est parfait.', photosNoMore: 'Non, suivant : ce que vous offrez',
+  offerLead: 'Les visiteurs s’en servent pour trouver un bar comme le vôtre.',
+  minorsNoteEx: 'Enfants bienvenus pour le souper jusqu’à 20 h; le bar est réservé aux 19 ans et plus.',
+  minorsLive: 'C’est sur votre page maintenant, et cela décide de votre badge Enfants bienvenus.',
+  musicQ: 'De la musique, des DJ ou des événements?', musicLead: 'Comme de la musique en direct, un DJ, un quiz ou de l’humour.', musicTypeQ: 'Votre musique, vos DJ et vos événements', eventEx: 'Soirée DJ du vendredi',
+  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence dans Soirées de la semaine sur votre page de modification.', eventsOftenLink: 'Ouvrir Soirées de la semaine',
+  storyQ: 'Parlez de votre bar aux visiteurs', storyEx: 'Un bar à cocktails caché au centre-ville. Cocktails de saison, petites assiettes et un DJ le vendredi.',
+  knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle s’affiche en haut de « Planifier la visite ».', knownEx: 'Le old fashioned fumé et la porte au fond de la ruelle',
+  storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  groupsQ: 'Groupes : à partir de combien faut-il réserver?', groupsLead: 'Touchez une taille, ou une réponse rapide. Vous pouvez changer les mots.',
+  groupsEx: 'Salle privée pour 20', groupsLine: 'Groupes de {n} ou plus : veuillez réserver',
+  quickGroups: ['Groupes de 8 ou plus : veuillez réserver', 'Groupes de 10 ou plus : veuillez réserver', 'Groupes de 12 ou plus : veuillez réserver', 'Groupes de 15 ou plus : veuillez réserver', 'Groupes de 20 ou plus : veuillez réserver'],
+  quick: Object.assign({}, fr.pub.quick, { groups: ['Salle privée', 'Privatisation possible', 'Appelez à l’avance pour 8 personnes ou plus'], reservations: ['Sans réservation seulement', 'Clients sans réservation bienvenus', 'Réservation conseillée', 'Veuillez réserver à l’avance'] }),
+  groupsLineLabel: 'Votre ligne Groupes', groupsNone: 'Nous n’accueillons pas de grands groupes',
+  groupsNeed: 'Touchez une taille, une réponse sur les réservations ou écrivez une ligne, ou touchez « Nous n’accueillons pas de grands groupes ».',
+  bookQ2: 'Faut-il réserver une table?', bookLineLabel: 'Votre ligne Réservations',
+  bookLinkLabel: 'Lien de réservation (facultatif)', bookLinkEx: 'votre page OpenTable, Resy ou de réservation sur votre site', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votreentreprise.com/reserver.',
+  groupsNoLink: 'Laissez les liens hors de la ligne Groupes. Votre lien de réservation a sa propre case plus bas.',
+  groupsSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, habituellement d’ici un jour.',
+  socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
+  socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
+  hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
+  igLead: 'Écrivez votre nom Instagram, comme @votrebar.', knownLabel: 'Connu pour',
+  doorQ: 'Où est votre porte d’entrée?', doorLead: 'Dans une ruelle ou à l’étage? Une photo, prise à votre porte, mène les visiteurs droit à elle.',
+  doorPhotoLead: 'Placez-vous dehors pour que la porte (et votre enseigne ou votre lumière) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
+  kinds: { dj: 'DJ', live_music: 'Musique en direct', trivia: 'Quiz', comedy: 'Humour' },
+};
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.
