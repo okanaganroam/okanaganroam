@@ -314,7 +314,9 @@ function listedHoursText(v, weekday, days) {
   if (!groups.length) return null;
   if (groups.length === 1 && groups[0].days.length === 7) return `Listed hours: ${groups[0].text} daily`;
   if (groups.length > 3) return 'Listed hours vary by day \u2014 see the venue page';
-  return `Listed hours: ${groups.map((g) => `${g.text} ${dayListText(g.days)}`).join('; ')}`;
+  // Cocktail test 3 (2026-11-14): the whole week names its closed days too ("…; closed Mon"), as the venue page does.
+  const closed = days ? [] : WEEKDAYS.filter((d) => parsed.days[d].status === 'closed');
+  return `Listed hours: ${groups.map((g) => `${g.text} ${dayListText(g.days)}`).join('; ')}${closed.length ? `; closed ${dayListText(closed)}` : ''}`;
 }
 
 // ---------- cafe roles (Phase 3.5) ----------

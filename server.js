@@ -60161,7 +60161,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const pendingOften = showNights ? (ownerPendingNights(venue.id) || []).filter(nightCarriedFrequency).filter((x) => { const l = sameNightOf(x, venueWeeklyNightsList(venue.id)); return !l || l.frequency !== x.frequency; }) : [];
   const pendingOftenHtml = pendingOften.length ? `<p class="op-hint op-often-waiting" id="opOftenWaiting">${escapeHtml(L('Waiting for our check (usually within a day): ', 'En attente de notre vérification (habituellement d’ici un jour) : '))}${pendingOften.map((x) => escapeHtml(`${x.title}, ${nightOftenText(x, lang === 'fr')}`)).join('; ')}</p>` : '';
   const nightRows = () => {
-    const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length + (nightsNow.length < NIGHTS_MAX ? 1 : 0)));
+    // Cocktail test 3 (2026-11-14): no empty, pre-filled "Event 2" (DJ night) under real events; "+ Add an event" opens it.
+    const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length));
     const freqText = { weekly: L('Every week', 'Chaque semaine'), biweekly: L('Every other week', 'Une semaine sur deux'), 'monthly-1st': L('1st of the month', '1er du mois'),
       'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois'),
       // Distillery test 2 (2026-11-13): a tour or class by appointment (no day); offered where tours and classes are.

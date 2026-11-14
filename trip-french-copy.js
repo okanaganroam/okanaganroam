@@ -570,6 +570,8 @@ function t3FrenchTextCore(value){
  for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–')||a.includes('&'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
+ // Cocktail test 3 (2026-11-14): the closed days of the week ("…; closed Mon").
+ if(/\d{2}:\d{2}/.test(text))text=text.replace(/; closed (?=(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b)/g,'; fermé ');
  if(/\d{2}:\d{2}/.test(text))text=text.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
  // Hour ranges read like the place pages (2026-10-18): "07:00–17:00" -> "7 h–17 h", "10:30–22:00" -> "10 h 30–22 h".
  // French typography (round 11, 2026-10-20): a space before the colon after a translated label (town names here start

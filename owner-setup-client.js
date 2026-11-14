@@ -663,6 +663,7 @@
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   // Brewery test 4 (2026-11-13): a status on its own line starts with a capital ("On your page").
   function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
+  function musicOftenWaiting(){ return !!CUR.weekly_nights_waiting && (C.nightsOften || []).some(Boolean) && (!C.waiting || C.waiting.indexOf('*') >= 0 || C.waiting.indexOf('music') >= 0); }
   function stText(step, d){
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
@@ -670,6 +671,9 @@
     if (FOLD && d === 'day' && step === 'story' && S.brew.known && T.stStoryKnown) return T.stStoryKnown;
     if (FOLD && d === 'day' && step === 'groups' && T.stGroupsLink) return T.stGroupsLink;
     if (C.winery && d === 'day' && step === 'visit' && T.stVisitLink) return T.stVisitLink;
+    // Cocktail test 3 (2026-11-14): events on the page while a how often sent from the edit page ("every other week") is
+    // still waiting for our check. A setup events save puts it live (Dayton), and the row then says "on your page".
+    if (step === 'music' && (d === 'live' || d === 'day') && T.stMusicOften && musicOftenWaiting()) return T.stMusicOften;
     if (d === 'day' && step === 'photos' && T.stDayPlural) return T.stDayPlural;
     // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
@@ -2161,7 +2165,7 @@
         title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null, season_from: ns.from, season_to: ns.to });
     }
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
-    list.push({ weekly_nights: out }); saveAll('music', list);
+    list.push({ weekly_nights: out }); saveAll('music', list, null, null, function(){ CUR.weekly_nights_waiting = false; });
   }
   // "No" answers: clear what the page shows, then say "we don't have one" where the checklist has one.
   function sayNo(step){
@@ -3154,11 +3158,16 @@
   // Answers tapped or typed but not saved yet (for "Exit setup").
   screen.addEventListener('input', function(e){ if (e.target && e.target.id !== 'suCq') mark(); });
   // Keep the after-midnight note in step with the time boxes as the owner types.
-  screen.addEventListener('input', function(e){
+  var timeTyped = function(e){
     var a = e.target && e.target.getAttribute && e.target.getAttribute('data-h'); if (!a || !W()) return;
     var q3 = a.split(':'), d3 = q3[0], j3 = +q3[1], o3 = el('o' + d3 + j3), c3 = el('c' + d3 + j3), n3 = el('suLate' + d3 + j3);
+    // Cocktail test 3 (2026-11-14): a typed time un-presses "Midnight" (and the other quick times) that no longer match.
+    var vals = [o3 ? o3.value : '', c3 ? (c3.value === '24:00' ? '00:00' : c3.value) : ''];
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-late^="' + d3 + ':' + j3 + ':"]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-late').split(':').slice(2).join(':') === vals[1] ? 'true' : 'false'); });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-bq^="' + d3 + ':' + j3 + ':"]'), function(b){ var p = b.getAttribute('data-bq').split(':'); b.setAttribute('aria-pressed', p[3] + ':' + p[4] === vals[+p[2]] ? 'true' : 'false'); });
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
-  });
+  };
+  screen.addEventListener('input', timeTyped); screen.addEventListener('change', timeTyped);
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
