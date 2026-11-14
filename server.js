@@ -55379,6 +55379,11 @@ const OWNER_HELP_TOPICS = [
 ];
 // Portal error messages the bot recognises on the page -> the topic that explains them (English and French pages).
 // The French portal's messages (2026-10-18) are matched too.
+// Cocktail lounge test 3 (2026-11-14): the weekly specials answer in a lounge's words ("Martini Monday", "$10 classic
+// martinis"), not a pub's wings.
+COCKTAIL_SETUP_HELP_TOPICS.push(((x) => ({ ...x, pages: ['edit'],
+  a: x.a.replace('<em>Wing Wednesday</em>', '<em>Martini Monday</em>').replace('<em>60¢ wings, dine-in only</em>', '<em>$10 classic martinis</em>'),
+  aFr: x.aFr.replace('<em>Mercredi des ailes</em>', '<em>Lundi martini</em>').replace('<em>Ailes à 60 ¢, sur place seulement</em>', '<em>Martinis classiques à 10 $</em>') }))(OWNER_HELP_TOPICS.find((t) => t.id === 'specials')));
 const OWNER_HELP_ERROR_RULES = [
   [/don.t match|wrong password|that password isn.t right|locked|ne correspondent pas|mots de passe erron|n.est pas le bon/i, 'signin'],
   [/isn.t valid|not valid any more|expired or was already used|link has expired|page has expired|n.est plus valide|a expiré|a déjà servi/i, 'newlink'],
