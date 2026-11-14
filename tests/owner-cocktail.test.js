@@ -362,3 +362,60 @@ test('how often: the client shows it under the event and sends the stored freque
   assert.match(s, /frequency: appt \? 'appointment' : n0\.frequency && n0\.frequency !== 'appointment' \? n0\.frequency : 'weekly'/);
   assert.equal(text.en.oftenNow, 'How often: {x}. It stays when you save.');
 });
+
+const lastInstant = (id) => db.prepare('SELECT id FROM owner_change_requests WHERE venue_id = ? AND instant = 1 ORDER BY id DESC').get(id).id;
+const rowText = (id, label) => (rows(id).find((r) => r.label === label) || {}).text;
+test('visit box: her $16 drops research’s “Cocktails from $15”; Who’s welcome drops “19+”, her DJ Fridays drops “DJ Fridays”; Undo brings each back', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  research(v.id, [{ label: 'Known for', text: 'Craft cocktails' }, { label: 'Good to know', text: '19+, DJ Fridays, cash only' }, { label: 'Menu', text: 'Cocktails from $15; small plates to share' }, { label: 'Groups', text: 'Groups welcome' }]);
+  assert.equal((await change(t, { cocktail_price: 16 })).status, 200);
+  assert.equal(rowText(v.id, 'Menu'), 'Small plates to share', 'the stale price is gone, the rest stays');
+  const priceId = lastInstant(v.id);
+  assert.equal((await change(t, { pub_info: { minors: { policy: 'adults' } } })).status, 200);
+  assert.equal(rowText(v.id, 'Good to know'), 'DJ Fridays, cash only');
+  assert.equal((await change(t, { weekly_nights: [{ days: ['fri'], kind: 'dj', title: 'DJ Fridays', start: '22:00' }] })).status, 200);
+  assert.equal(rowText(v.id, 'Good to know'), 'Cash only');
+  const nightsId = lastInstant(v.id);
+  assert.ok(db.prepare("SELECT 1 FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'visit_info' AND source = 'venue_owner'").get(v.id), 'logged');
+  // The page: one 19+, no $15, no second DJ Fridays line.
+  const pg = await get(`/kelowna/cocktail-lounges/${v.slug}`);
+  assert.equal(pg.status, 200);
+  assert.doesNotMatch(pg.text, /Cocktails from \$15/); assert.doesNotMatch(pg.text, /19\+, DJ Fridays/);
+  // Undo the events: "DJ Fridays" comes back; Undo the price: "$15" comes back.
+  assert.equal(app.undoOwnerInstantChange(nightsId, 'test').ok, true);
+  assert.equal(rowText(v.id, 'Good to know'), 'DJ Fridays, cash only');
+  assert.equal(app.undoOwnerInstantChange(priceId, 'test').ok, true);
+  assert.equal(rowText(v.id, 'Menu'), 'Cocktails from $15; small plates to share');
+  // The same price as research: nothing is dropped. A line with nothing left goes.
+  assert.equal((await change(t, { cocktail_price: 15 })).status, 200);
+  assert.equal(rowText(v.id, 'Menu'), 'Cocktails from $15; small plates to share');
+  const w = mk('cocktail'); const tw = tokenFor(w.id);
+  research(w.id, [{ label: 'Good to know', text: '19+' }, { label: 'Menu', text: 'Cocktails from $14' }]);
+  assert.equal((await change(tw, { cocktail_price: 16, pub_info: { minors: { policy: 'all_ages' } } })).status, 200);
+  assert.equal(rowText(w.id, 'Good to know'), undefined); assert.equal(rowText(w.id, 'Menu'), undefined);
+  // A pub's Good to know follows its events and Who's welcome too.
+  const p = mk('pub'); const tp = tokenFor(p.id);
+  research(p.id, [{ label: 'Good to know', text: 'Trivia Tuesdays; free parking' }]);
+  assert.equal((await change(tp, { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', start: '19:00' }] })).status, 200);
+  assert.equal(rowText(p.id, 'Good to know'), 'Free parking');
+});
+
+test('edit page: Menu and Good to know boxes for a lounge (the same lines, one writer); a line she writes is hers and never tidied', async () => {
+  const v = mk('cocktail'); const t = tokenFor(v.id);
+  research(v.id, [{ label: 'Good to know', text: '19+, DJ Fridays' }, { label: 'Menu', text: 'Cocktails from $15' }]);
+  const html = (await get(`/owner/${t}`)).text;
+  assert.match(html, /<textarea id="opVisitMenu"[^>]*data-visit-key="menu"[^>]*>Cocktails from \$15<\/textarea>/);
+  assert.match(html, /<textarea id="opVisitGoodToKnow"[^>]*data-visit-key="good_to_know"[^>]*>19\+, DJ Fridays<\/textarea>/);
+  assert.equal((await change(t, { visit_rows: { menu: 'Cocktails from $15 and bar snacks', good_to_know: 'Look for the green door' } }, false)).status, 200);
+  assert.equal(rowText(v.id, 'Menu'), 'Cocktails from $15 and bar snacks');
+  assert.equal(rowText(v.id, 'Good to know'), 'Look for the green door');
+  assert.equal(rows(v.id).filter((r) => r.label === 'Good to know').length, 1, 'never doubled');
+  assert.equal((await change(t, { cocktail_price: 16 })).status, 200);
+  assert.equal(rowText(v.id, 'Menu'), 'Cocktails from $15 and bar snacks', 'her own line is never tidied');
+  // A restaurant gets a Menu box only when research wrote one; never a separate Good to know box (its Groups box is that).
+  const r0 = mk('restaurant'); research(r0.id, [{ label: 'Menu', text: 'Seasonal menu' }]);
+  const rh = (await get(`/owner/${tokenFor(r0.id)}`)).text;
+  assert.match(rh, /data-visit-key="menu"/); assert.doesNotMatch(rh, /data-visit-key="good_to_know"/);
+  assert.equal((await change(tokenFor(r0.id), { visit_rows: { good_to_know: 'x' } }, false)).status, 400);
+  assert.doesNotMatch((await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text, /data-visit-key="menu"/);
+});

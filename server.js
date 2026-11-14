@@ -9801,7 +9801,7 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
   const rows = [...ownerRows, ...researchRows].slice(0, VISIT_ROWS_MAX);
   // A winery's own answers (2026-11-12): their French lines and what they replaced ride along.
-  const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
+  const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra', 'answer_was'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
   return JSON.stringify({ ...next, rows, owner_labels: [...owned].sort(), ...keep });
 }
 // Replaces (or clears, with visit null) a venue's box: compare-and-set on expected_current (GET /admin/visit-info/:id),
@@ -46522,14 +46522,17 @@ const OWNER_VISIT_SLOTS = [
   { key: 'groups', labels: ['Good to know', 'Groups'], def: 'Good to know', item: 'pyv_groups' },
   // Full easy setup (2026-11-09): "Dogs welcome" asks where dogs are allowed; the answer is this line. Not scored.
   { key: 'dogs', labels: ['Dogs'], def: 'Dogs', item: null },
+  // Cocktail test 1 (2026-11-13): research's Menu line can be changed on the edit page too (not scored).
+  { key: 'menu', labels: ['Menu'], def: 'Menu', item: null },
 ];
-const OWNER_VISIT_KEYS = OWNER_VISIT_SLOTS.map((x) => x.key);
 // Cocktail lounges (2026-11-13): their "Groups" line is its own line (research's "Good to know" -- DJs, 19+, a cinema --
 // stays beside it), so the owner's groups answer replaces research's Groups line only and nothing is doubled or lost.
-const COCKTAIL_VISIT_SLOTS = OWNER_VISIT_SLOTS.map((x) => (x.key === 'groups' ? { ...x, labels: ['Groups'], def: 'Groups' } : x));
+// Cocktail test 1 (2026-11-13): and research's "Good to know" is its own box on the edit page (one writer, so nothing doubles).
+const COCKTAIL_VISIT_SLOTS = OWNER_VISIT_SLOTS.map((x) => (x.key === 'groups' ? { ...x, labels: ['Groups'], def: 'Groups' } : x)).concat([{ key: 'good_to_know', labels: ['Good to know'], def: 'Good to know', item: null }]);
+const OWNER_VISIT_KEYS = [...new Set([...OWNER_VISIT_SLOTS, ...COCKTAIL_VISIT_SLOTS].map((x) => x.key))];
 function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return t === 'cocktail' ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
 // The classic edit page keeps its five boxes (the dogs line is only asked in the setup).
-const OWNER_VISIT_EDIT_KEYS = OWNER_VISIT_KEYS.filter((k) => k !== 'dogs');
+const OWNER_VISIT_EDIT_KEYS = ['known_for', 'reservations', 'takeout', 'dietary', 'groups'];
 const OWNER_VISIT_ERRORS = {
   long: `Please keep each line to ${VISIT_TEXT_MAX} characters or less.`,
   html: 'Please use plain words only, without < or >.',
@@ -46573,7 +46576,7 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const before = currentVisitInfoJson(venueId);
   const rows = cur && Array.isArray(cur.rows) ? cur.rows.map((r) => ({ ...r })) : [];
   const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
-  const slotLabels = new Set(OWNER_VISIT_SLOTS.flatMap((x) => x.labels));
+  const slotLabels = new Set(OWNER_VISIT_SLOTS.filter((x) => x.key !== 'menu').flatMap((x) => x.labels));
   const confirmed = new Set(Array.isArray((value || {})._confirm) ? value._confirm : []);
   const SLOTS = visitSlotsFor(venueId);
   // Winery test 4 (2026-11-12): research's line that an owner's line replaces or clears is kept (owner_was), so an Undo
@@ -46621,6 +46624,76 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   }
   const json = JSON.stringify(info);
   db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, json);
+  return { before, after: json };
+}
+// Cocktail test 1 (2026-11-13): research's "Menu" and "Good to know" lines must not contradict or repeat the owner's own
+// answers. A part of such a line the answers now cover is left out: a cocktail price that isn't the owner's ("Cocktails
+// from $15" next to her $16), an age rule once Who's welcome is answered ("19+"), and a weekly event the owner lists
+// ("DJ Fridays" once a DJ is on Fridays). The rest of the line stays; a line with nothing left goes. Research's whole line
+// is kept (answer_was), so this is worked out again from it after every answer and every Undo: an answer taken back
+// brings the part back. Lines the owner wrote (owner_labels) are never touched.
+const ANSWER_TIDY_LABELS = ['Menu', 'Good to know'];
+const ANSWER_KIND_WORDS = { dj: /\bdjs?\b/i, live_music: /\blive music\b|\bjazz\b|\blive bands?\b|\bbands?\b/i, trivia: /\btrivia\b|\bquiz\b/i, karaoke: /\bkaraoke\b/i, comedy: /\bcomedy\b|\bstand-?up\b/i, open_mic: /\bopen mic\b/i, bingo: /\bbingo\b/i };
+const DAY_WORDS = { mon: /\bmon(?:day)?s?\b/i, tue: /\btues?(?:day)?s?\b/i, wed: /\bwed(?:nesday)?s?\b/i, thu: /\bthu(?:rs?)?(?:day)?s?\b/i, fri: /\bfri(?:day)?s?\b/i, sat: /\bsat(?:urday)?s?\b/i, sun: /\bsun(?:day)?s?\b/i };
+function answerCoversPart(part, label, ans) {
+  const p = String(part || '').trim();
+  if (!p) return true;
+  if (label === 'Menu' && ans.cocktail != null) {
+    const m = /\bcocktails?\b[^$]{0,24}\$\s?(\d+(?:\.\d+)?)|\$\s?(\d+(?:\.\d+)?)[^.;,]{0,16}\bcocktails?\b/i.exec(p);
+    if (m && (ans.cocktail === 'none' || Number(m[1] || m[2]) !== ans.cocktail)) return true;
+  }
+  if (label === 'Good to know') {
+    if (ans.minors && p.length <= 40 && /\b19\s*\+|\b19 (?:and|&) (?:over|older|up)\b|\badults? only\b|\bno minors\b|\ball ages\b/i.test(p)) return true;
+    if (p.length <= 50) for (const [kind, re] of Object.entries(ANSWER_KIND_WORDS)) {
+      if (!re.test(p)) continue;
+      const days = Object.keys(DAY_WORDS).filter((d) => DAY_WORDS[d].test(p));
+      if (ans.nights.some((n) => n.kind === kind && (!days.length || days.every((d) => (n.days || []).includes(d))))) return true;
+    }
+  }
+  return false;
+}
+// "19+, DJ Fridays" -> parts with the separator before each; the kept ones are joined back as they were.
+function tidyAnswerLine(text, label, ans) {
+  const bits = String(text || '').split(/(\s*[;,·]\s*|\.\s+)/);
+  const kept = [];
+  for (let i = 0; i < bits.length; i += 2) if (!answerCoversPart(bits[i].replace(/\.$/, ''), label, ans)) kept.push({ sep: i ? bits[i - 1] : '', part: bits[i] });
+  if (kept.length * 2 - 1 === bits.length) return String(text || '');
+  const out = kept.map((k, i) => (i ? k.sep : '') + k.part).join('').trim().replace(/^[;,·.\s]+|[;,·\s]+$/g, '');
+  return out ? out.charAt(0).toUpperCase() + out.slice(1) : '';
+}
+function tidyAnswerVisitRows(venueId, now = new Date()) {
+  const cur = venueVisitInfo(venueId);
+  const before = currentVisitInfoJson(venueId);
+  if (!cur || !Array.isArray(cur.rows)) return { before, after: before };
+  const v = db.prepare('SELECT id, type FROM venues WHERE id = ?').get(venueId) || {};
+  const pubInfo = pubSetupType(v.type) ? venuePubInfo(venueId) : {};
+  const ans = {
+    cocktail: v.type === 'cocktail' ? cocktailPriceOf(venueId) : null,
+    minors: !!(pubInfo.minors && PUB_MINORS_POLICIES.includes(pubInfo.minors.policy)),
+    nights: venueWeeklyNightsList(venueId),
+  };
+  const owned = new Set(Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
+  const was = { ...(cur.answer_was || {}) };
+  const rows = cur.rows.map((r) => ({ ...r }));
+  for (const label of ANSWER_TIDY_LABELS) {
+    if (owned.has(label)) { delete was[label]; continue; }
+    const i = rows.findIndex((r) => r && r.label === label);
+    // Research's whole line: the one kept, unless research has written a new line since (it no longer tidies to this one).
+    let orig = was[label] ? was[label].text : null;
+    if (i >= 0 && orig != null && tidyAnswerLine(orig, label, was[label].ans || ans) !== rows[i].text) orig = null;
+    if (orig == null) { if (i < 0) { delete was[label]; continue; } orig = rows[i].text; }
+    const next = tidyAnswerLine(orig, label, ans);
+    const pos = i >= 0 ? i : Math.min(was[label] && Number.isInteger(was[label].at) ? was[label].at : rows.length, rows.length);
+    if (next) { const row = { ...(i >= 0 ? rows[i] : { label, ...(was[label] && was[label].url ? { url: was[label].url } : {}) }), text: next }; if (i >= 0) rows[i] = row; else rows.splice(pos, 0, row); }
+    else if (i >= 0) rows.splice(i, 1);
+    if (next === orig) delete was[label];
+    else was[label] = { text: orig, at: pos, ans: { cocktail: ans.cocktail, minors: ans.minors, nights: ans.nights.map((n) => ({ kind: n.kind, days: n.days })) }, ...((i >= 0 && rows[i] && rows[i].url) || (was[label] && was[label].url) ? { url: (was[label] && was[label].url) || rows[i].url } : {}) };
+  }
+  const info = { ...cur, rows };
+  if (Object.keys(was).length) info.answer_was = was; else delete info.answer_was;
+  const json = JSON.stringify(info);
+  if (json === before) return { before, after: before };
+  db.prepare('UPDATE venue_visit_info SET info = ?, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(json, venueId);
   return { before, after: json };
 }
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
@@ -47860,7 +47933,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('visit_rows' in input) {
     const x = input.visit_rows;
     if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
-    else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => !OWNER_VISIT_KEYS.includes(k))) errors.visit_rows = OWNER_VISIT_ERRORS.unreadable;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => !visitSlotsFor(venue.id).some((z) => z.key === k))) errors.visit_rows = OWNER_VISIT_ERRORS.unreadable;
     else {
       const cur = current.visit_rows || ownerVisitRows(venue.id);
       const next = { ...cur };
@@ -48167,7 +48240,7 @@ function ownerValueText(field, value) {
   if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
   if (field === 'hours_checked') return value ? `Hours confirmed as right (checked ${value})` : '(not checked)';
   if (field === 'visit_rows') {
-    const parts = OWNER_VISIT_SLOTS.filter((x) => value && value[x.key]).map((x) => `${x.def}: ${value[x.key]}`);
+    const parts = OWNER_VISIT_SLOTS.concat(COCKTAIL_VISIT_SLOTS.filter((x) => x.key === 'good_to_know')).filter((x) => value && value[x.key]).map((x) => `${x.def}: ${value[x.key]}`);
     return parts.length ? parts.join(' · ') : '(none)';
   }
   if (field === 'cuisines') return Array.isArray(value) && value.length ? value.join(', ') : '(none)';
@@ -57399,6 +57472,15 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     if (!r.ok) return { ok: false, reason: 'avg_spend_failed', detail: r.reason, applied };
     applied.push('avg_spend');
   }
+  // Cocktail test 1 (2026-11-13): research's Menu and Good to know lines leave out what the owner's answers now say
+  // (tidyAnswerVisitRows), after every answer and every Undo.
+  if (['cocktail_price', 'pub_info', 'weekly_nights', 'visit_rows'].some((f) => chosen.includes(f))) {
+    try {
+      const w = tidyAnswerVisitRows(venue.id, now);
+      if (w.before !== w.after) db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, 'visit_info', ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`).run(venue.id, w.before, w.after, meta.reason, meta.batch_id, reviewer);
+    } catch (e) { console.error(`[owner-portal] answer lines for #${venue.id} failed: ${e.message}`); }
+  }
   // Breweries (2026-11-12): the Kids & dogs line follows the dogs answer, and research's Games line the weekly events
   // answer, so a save of either rewrites the answers' lines (nothing changes when they already say it).
   if (brewSetupType(venue.type) && ['badges', 'not_offered', 'weekly_nights', 'visit_rows'].some((f) => chosen.includes(f))) {
@@ -59801,6 +59883,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         [L('Kids &amp; dogs', 'Enfants et chiens'), pick(['Kids & dogs', 'Kids'])],
       ].map(([label, r]) => ({ label, text: r ? ((fr && box.owner_fr && box.owner_fr[r.label]) || r.text) : '' }));
     })() : [];
+    // Cocktail test 1 (2026-11-13): research's Menu line (and a lounge's Good to know) can be changed here; shown when there
+    // is one (always for a lounge), never counted.
+    const extraKeys = brew || venue.type === 'winery' ? [] : venue.type === 'cocktail' ? ['menu', 'good_to_know'] : cur.menu ? ['menu'] : [];
     const countKeys = cur.dogs ? editKeys.filter((k) => k !== 'dogs').concat(['dogs']) : editKeys.filter((k) => k !== 'dogs');
     const filled = countKeys.filter((k) => cur[k]).length + answerLines.filter((x) => x.text).length;
     const countAll = countKeys.length + answerLines.length;
@@ -59811,6 +59896,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       dietary: ['Dietary note', 'What you can do for allergies and diets.', 'Gluten-free pasta and a vegan menu; tell your server about allergies'],
       groups: ['Groups and good to know', 'Large parties, parking, kids, anything else that helps.', 'Groups of 10+ please call ahead; free parking out back'],
       dogs: ['Dogs', 'Where dogs are welcome, in one line.', 'Dogs welcome on the patio'],
+      menu: ['Menu', 'A line about your menu (your prices are set in their own answers).', 'Seasonal cocktails and small plates to share'],
+      good_to_know: ['Good to know', 'Anything else that helps: parking, the door, dress code.', 'Look for the green door in the lane'],
     };
     if (brew) {
       fieldsEn.known_for = ['Known for', 'What people come back for, in one line.', venue.type === 'distillery' ? 'Small-batch gin and craft cocktails' : 'Hazy IPAs and the big patio'];
@@ -59823,6 +59910,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       dietary: ['Note alimentaire', 'Ce que vous pouvez faire pour les allergies et les régimes.', 'Pâtes sans gluten et menu végane; parlez de vos allergies au serveur'],
       groups: ['Groupes et bon à savoir', 'Grands groupes, stationnement, enfants, tout ce qui aide.', 'Groupes de 10 et plus : appelez d’avance; stationnement gratuit derrière'],
       dogs: ['Chiens', 'Où les chiens sont bienvenus, en une ligne.', 'Chiens bienvenus sur la terrasse'],
+      menu: ['Menu', 'Une ligne sur votre menu (vos prix se règlent dans leurs propres réponses).', 'Cocktails de saison et petites assiettes à partager'],
+      good_to_know: ['Bon à savoir', 'Tout ce qui aide : stationnement, la porte, tenue.', 'Cherchez la porte verte dans la ruelle'],
     };
     if (brew) {
       fieldsFr.known_for = ['Connu pour', 'Ce pour quoi les gens reviennent, en une ligne.', venue.type === 'distillery' ? 'Gin artisanal et cocktails maison' : 'IPA troubles et la grande terrasse'];
@@ -59837,12 +59926,12 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       fieldsFr.groups = ['Groupes', 'Salle privée, privatisation, grands groupes.', 'Salle privée pour 20; appelez d’avance pour 8 personnes ou plus'];
     }
     const words = fr ? fieldsFr : fieldsEn;
-    const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups', dogs: 'opVisitDogs' };
+    const ids = { known_for: 'opVisitKnown', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', dietary: 'opVisitDietary', groups: 'opVisitGroups', dogs: 'opVisitDogs', menu: 'opVisitMenu', good_to_know: 'opVisitGoodToKnow' };
     const setupHref = token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang);
     const answersHtml = answerLines.length ? `
         <div class="op-visit-answers" id="opVisitAnswers">${answerLines.map((x) => `<p class="op-visit-ans"><strong>${x.label}:</strong> ${x.text ? escapeHtml(x.text) : `<span class="op-hint">${L('Not answered yet', 'Pas encore répondu')}</span>`}</p>`).join('')}
         <p class="op-hint">${L('These lines come from your answers. To change one, open <a href="' + escapeHtml(setupHref) + '">Set up your page</a> and tap Change an answer.', 'Ces lignes viennent de vos réponses. Pour en changer une, ouvrez <a href="' + escapeHtml(setupHref) + '">Configurez votre page</a> et touchez Modifier une réponse.')}</p></div>` : '';
-    const boxes = editKeys.map((k) => `
+    const boxes = editKeys.concat(extraKeys.filter((k) => !editKeys.includes(k))).map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
           <textarea id="${ids[k]}" class="op-visit-ta" rows="1" data-visit-key="${k}" maxlength="${VISIT_TEXT_MAX}" aria-describedby="${ids[k]}Hint" placeholder="${escapeHtml(L('e.g. ', 'p. ex. ') + words[k][2])}">${escapeHtml(cur[k] || '')}</textarea></div>`).join('');
