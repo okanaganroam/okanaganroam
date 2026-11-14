@@ -259,7 +259,7 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   // Titles that don't name the kind (card polish 2026-10-27: a title that does drops the label).
   set(kinds, app.NIGHT_KINDS.slice(0, 7).map((k, i) => ({ days: ['mon'], kind: k, title: `Monday ${['one', 'two', 'three', 'four', 'five', 'six', 'seven'][i]}` })));
   const frKinds = card(page(kinds, at(TUE, '12:00'), 'fr'));
-  for (const w of ['Quiz', 'Karaoké', 'Scène ouverte', 'Bingo', 'Humour', 'Soirée DJ', 'Musique live']) assert.ok(frKinds.includes(` ${w}</span>`), w);
+  for (const w of ['Quiz', 'Karaoké', 'Scène ouverte', 'Bingo', 'Humour', 'Soirée DJ', 'Musique en direct']) assert.ok(frKinds.includes(` ${w}</span>`), w);
   // Owner-entered nights: "Confirmed by <venue>" (the #501 line), not the grey date.
   const own = mk({ name: 'Nights Owner Pub' });
   set(own, [TRIVIA], { source_url: 'venue_owner' });
@@ -541,4 +541,15 @@ test('Owner help bot: "How do I add my trivia or karaoke night?" in English and 
     assert.equal(ctx.best('How do I add my weekly specials?').id, 'specials');
     assert.equal(ctx.best('How do I add my happy hour deals?').id, 'hh-deals');
   }
+});
+
+// Cocktail test 2 (2026-11-13): a night's season is part of what an owner sends (OWNER_NIGHT_KEYS) and survives a
+// validate + store round trip with every other field.
+test('weekly nights: every field of a night, its season included, survives validation and storage', () => {
+  const night = { days: ['sat'], kind: 'live_music', title: 'Saturday music', start: '20:00', end: '23:00', detail: 'Local bands', host: 'Marc', cost: 'Free', frequency: 'monthly-last',
+    title_fr: 'Musique du samedi', detail_fr: 'Groupes locaux', season_from: '06-01', season_to: '09-30' };
+  const r = app.validateWeeklyNights([night], { source: 'venue_owner', checked_at: app.todayLocal() });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const { source, checked_at, ...rest } = r.nights[0];
+  assert.deepEqual(rest, night);
 });
