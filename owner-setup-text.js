@@ -1377,7 +1377,7 @@ en.pub.cocktail = {
   minorsLive: 'It’s on your page now, and it decides your Kids welcome badge.',
   // Live music, DJs and events (the weekly events screen, same storage)
   musicQ: 'Any live music, DJs or events?', musicLead: 'Like live music, a DJ, trivia or comedy.', musicTypeQ: 'Your live music, DJs and events', eventEx: 'Friday DJ night',
-  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often in Weekly nights on your edit page.', eventsOftenLink: 'Open Weekly nights',
+  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often on your edit page.', eventsOftenLink: 'Set how often',
   // Your story and Known for
   storyQ: 'Tell visitors about your bar', storyEx: 'A hidden cocktail bar downtown. Seasonal cocktails, small plates, and a DJ on Fridays.',
   knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Smoked old fashioned and a door down the alley',
@@ -1401,7 +1401,7 @@ en.pub.cocktail = {
   igLead: 'Type your Instagram name, like @yourbar.', knownLabel: 'Known for',
   // Your front door
   doorQ: 'Where’s your front door?', doorLead: 'Down an alley or upstairs? One photo, taken at your door, walks visitors right to it.',
-  doorPhotoLead: 'Stand outside so the door (and your sign or light) is in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
+  doorPhotoLead: 'Stand outside so the door (even if it isn’t marked) is in the picture. Your device will ask to share your location, so visitors get directions to this spot.',
   kinds: { dj: 'DJ', live_music: 'Live music', trivia: 'Trivia', comedy: 'Comedy' },
 };
 fr.pub.cocktail = {
@@ -1426,7 +1426,7 @@ fr.pub.cocktail = {
   minorsNoteEx: 'Enfants bienvenus pour le souper jusqu’à 20 h; le bar est réservé aux 19 ans et plus.',
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre badge Enfants bienvenus.',
   musicQ: 'De la musique, des DJ ou des événements?', musicLead: 'Comme de la musique en direct, un DJ, un quiz ou de l’humour.', musicTypeQ: 'Votre musique, vos DJ et vos événements', eventEx: 'Soirée DJ du vendredi',
-  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence dans Soirées de la semaine sur votre page de modification.', eventsOftenLink: 'Ouvrir Soirées de la semaine',
+  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence sur votre page de modification.', eventsOftenLink: 'Choisir la fréquence',
   storyQ: 'Parlez de votre bar aux visiteurs', storyEx: 'Un bar à cocktails caché au centre-ville. Cocktails de saison, petites assiettes et un DJ le vendredi.',
   knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle s’affiche en haut de « Planifier la visite ».', knownEx: 'Le old fashioned fumé et la porte au fond de la ruelle',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
@@ -1445,7 +1445,7 @@ fr.pub.cocktail = {
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.',
   igLead: 'Écrivez votre nom Instagram, comme @votrebar.', knownLabel: 'Connu pour',
   doorQ: 'Où est votre porte d’entrée?', doorLead: 'Dans une ruelle ou à l’étage? Une photo, prise à votre porte, mène les visiteurs droit à elle.',
-  doorPhotoLead: 'Placez-vous dehors pour que la porte (et votre enseigne ou votre lumière) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
+  doorPhotoLead: 'Placez-vous dehors pour que la porte (même sans enseigne) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
   kinds: { dj: 'DJ', live_music: 'Musique en direct', trivia: 'Quiz', comedy: 'Humour' },
 };
 
