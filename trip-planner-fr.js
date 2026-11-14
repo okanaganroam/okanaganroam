@@ -178,6 +178,15 @@ const PHRASES = [
   ['route de la biere', 'brewery crawl'], ['circuit des brasseries', 'brewery crawl'], ['circuit des microbrasseries', 'brewery crawl'],
   // Planner (2026-10-27): « tournée des bars / des pubs » is a bar or pub crawl (a timed happy hour outing, server.js).
   ['tournee des bars', 'bar crawl'], ['tournee des pubs', 'pub crawl'], ['tournee de bars', 'bar crawl'], ['tournee de pubs', 'pub crawl'],
+  // 2026-11-14: « une tournée des 5 à 7 » (the French trip page's own sample) and « … des happy hours » are a happy hour
+  // crawl. Without these « tournée » was left over and searched for (« Lieux qui mentionnent « tournee » »).
+  ['tournee des 5 a 7', 'happy hour crawl'], ['tournee de 5 a 7', 'happy hour crawl'], ['tournee des cinq a sept', 'happy hour crawl'],
+  ['tournee de cinq a sept', 'happy hour crawl'], ['tournee des happy hours', 'happy hour crawl'], ['tournee des happy hour', 'happy hour crawl'],
+  ['tournee de happy hours', 'happy hour crawl'], ['tournee des aperos', 'happy hour crawl'], ['tournee des apero', 'happy hour crawl'],
+  ['crawl de 5 a 7', 'happy hour crawl'], ['crawl des 5 a 7', 'happy hour crawl'], ['crawl de happy hours', 'happy hour crawl'],
+  ['tournee des bars a cocktails', 'bar crawl'], ['tournee des bars a cocktail', 'bar crawl'],
+  ['tournee de vignobles', 'wine tour'], ['tournee des vineries', 'wine tour'], ['tournee des wineries', 'wine tour'], ['tournee des caves', 'wine tour'],
+  ['tournee des caves a vin', 'wine tour'], ['tournee des domaines', 'wine tour'], ['tournee des domaines viticoles', 'wine tour'], ['tournee des vins', 'wine tour'],
   ['equitation', 'horseback riding'], ['balade a cheval', 'horseback riding'], ['randonnee a cheval', 'horseback riding'], ['planche a roulettes', 'skate park'], ['skateparc', 'skate park'], ['planchodrome', 'skate park'], ['promenade', 'walk'], ['promenades', 'walks'], ['journee spa', 'spa day'], ['journee de repos', 'rest day'], ['journee sans ski', 'rest day'], ['jours de ski', 'ski days'], ['journees de ski', 'ski days'], ['location de velos', 'bike rentals'], ['location de skis', 'ski rentals'],
   ['avec une journee de ski', 'with one ski day'], ['une journee de ski', 'one ski day'], ['journee de ski', 'ski day'], ['avec du ski', 'with skiing'],
   ['magasinage', 'shopping'], ['magasiner', 'shopping'], ['faire du magasinage', 'shopping'], ['faire les boutiques', 'shopping'], ['lèche-vitrine', 'shopping'], ['leche vitrine', 'shopping'], ['boutiques', 'shops'], ['souvenirs', 'souvenirs'], ['librairie', 'bookshop'], ['librairies', 'bookshops'],
