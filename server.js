@@ -47479,7 +47479,9 @@ function loungeResearchHints(venue, badges) {
   const all = rows.map((r) => r.text).join(' ');
   const res = line(/^reservations?$/i), groups = line(/^groups?$/i);
   const ticks = [];
-  if (!(badges || {}).takes_reservations && res && !/\bno reservations?\b|\bwalk-?ins? only\b|\bdon[’']?t take reservations\b|\bnot? (?:take|accept)\w* reservations?\b/i.test(res)) ticks.push('takes_reservations');
+  // Cocktail test 3 (2026-11-14): "Walk-ins welcome" (no word of booking) is not a place that takes reservations either.
+  const walkInsOnly = /\bwalk-?ins?\b|\bfirst come,? first served\b/i.test(res) && !/\b(?:book(?:ing|ings)?|reserv\w*|opentable|resy)\b/i.test(res.replace(/\b(?:no|without(?: an?)?|no need to|(?:you )?don[’']?t need to|not needed? to)\s+(?:book(?:ing)?|reserv\w*)\b/gi, ''));
+  if (!(badges || {}).takes_reservations && res && !walkInsOnly && !/\bno reservations?\b|\bwalk-?ins? only\b|\bdon[’']?t take reservations\b|\bnot? (?:take|accept)\w* reservations?\b/i.test(res)) ticks.push('takes_reservations');
   if (!(badges || {}).great_groups && groups && !/\bno (?:large |big )?groups\b|\bnot (?:suitable|good) for groups\b|\bcan[’']?t take (?:large |big )?groups\b/i.test(groups)) ticks.push('great_groups');
   return { suggestAdults: /\b19\s*\+|\b19 (?:and|&) (?:over|older|up)\b|\badults? only\b|\bno minors\b/i.test(all) && !/\ball ages\b|\bminors? (?:welcome|allowed)\b|\bkids? welcome\b/i.test(all), visitTicks: ticks };
 }

@@ -181,6 +181,19 @@
     var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
     return fill(T.closedWarnHappy, { days: daysInFull(all), when: when });
   }
+  // Cocktail test 3 (2026-11-14): a kitchen time later than a day's closing (Sunday closes at 10 PM, kitchen 11 PM) gets
+  // the same gentle heads-up. Checked against the usual week; a time after midnight counts as that night's.
+  function kitchenWarn(k){
+    var kt = hm(k); if (kt == null || !S.week || !T.kitchenLate) return '';
+    var out = DAYS.filter(function(d){
+      var w = S.week[d]; if (!w || !w.length) return false;
+      var r = w[w.length - 1], o = hm(w[0][0]), c = hm(r[1]); if (o == null || c == null) return false;
+      if (c <= hm(r[0])) c += 1440;
+      var kk = kt < o ? kt + 1440 : kt;
+      return kk > c;
+    });
+    return out.length ? fill(T.kitchenLate, { days: daysInFull(out) }) : '';
+  }
   function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
   function warnRefresh(){
     ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnOf(key, e); n.textContent = t; n.hidden = !t; }); });
@@ -1416,7 +1429,7 @@
     } else if (s === 'hours:kitchentime') {
       // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
       var ks0 = kitchenSeason(), kz = S.kitchen.sea;
-      x = q(T.kitchenTimeQ, T.kitchenTimeLead) + msgs() + '<div class="su-day"><div class="su-times"><label class="su-q" for="suKto" style="margin:0">' + h(T.kitchenAt) + '</label> <input type="time" id="suKto" value="' + h(S.kitchen.closes) + '"></div></div>'
+      x = q(T.kitchenTimeQ, T.kitchenTimeLead) + msgs() + '<div class="su-day"><div class="su-times"><label class="su-q" for="suKto" style="margin:0">' + h(T.kitchenAt) + '</label> <input type="time" id="suKto" value="' + h(S.kitchen.closes) + '"></div>' + (function(){ var kw = kitchenWarn(S.kitchen.closes); return '<p class="su-hint su-closedwarn" id="suKitchenWarn" role="status"' + (kw ? '' : ' hidden') + '>' + h(kw) + '</p>'; })() + '</div>'
         + (ks0 ? '<div class="su-day su-kseason" id="suKitchenSeason"><p class="su-q" style="margin-top:0">' + h(fill(T.kitchenSeasonQ, { kind: T.seasonWord[ks0.kind] || T.seasonWord.summer, range: mdText(ks0.from) + ' – ' + mdText(ks0.to) })) + '</p>'
           + '<div class="su-stack" role="group">' + ['same', 'close', 'time'].map(function(m){ var on = kz.mode === m; return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-ksea="' + m + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(m === 'same' ? T.kitchenSeasonSame : m === 'close' ? T.kitchenSeasonClose : T.kitchenSeasonAt + '…') + '</span></button>'; }).join('') + '</div>'
           + (kz.mode === 'time' ? '<div class="su-times" style="margin-top:12px"><label class="su-q" for="suKsto" style="margin:0">' + h(T.kitchenSeasonAt) + '</label> <input type="time" id="suKsto" value="' + h(kz.closes) + '"></div>' : '') + '</div>' : '')
@@ -3168,6 +3181,8 @@
     if (!o3 || !c3 || !n3) return; var t3 = lateNote(d3, [o3.value, c3.value]); n3.textContent = t3; n3.hidden = !t3;
   };
   screen.addEventListener('input', timeTyped); screen.addEventListener('change', timeTyped);
+  var kitchenTyped = function(e){ if (!e.target || e.target.id !== 'suKto') return; var n = el('suKitchenWarn'); if (!n) return; var t = kitchenWarn(e.target.value); n.textContent = t; n.hidden = !t; };
+  screen.addEventListener('input', kitchenTyped); screen.addEventListener('change', kitchenTyped);
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
