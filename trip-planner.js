@@ -3565,6 +3565,20 @@ function skiOpeningFor(facts, regions, date) {
   const opens = r && seasonReopening(r);
   return r && opens && opens > date ? { name: r.name, date: opens } : null;
 }
+// 2026-11-14: a Nordic centre can open before the downhill resort next to it (Sovereign Lake Nordic Centre aimed for
+// Nov 18, SilverStar's lifts Nov 27). Cross-country skiing or snowshoeing asked for on a day a Nordic centre in those
+// regions has reopened (its own dated season) is not off season; downhill skiing still waits for the resort.
+const NORDIC_ASKED_RE = /\b(?:cross country|nordic|x c|xc|classic ski\w*|skate ski\w*|snowshoe\w*)\b/;
+const NORDIC_VENUE_RE = /\b(?:nordic|cross country)\b/;
+function nordicOpenOn(facts, regions, date, text) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !NORDIC_ASKED_RE.test(normWords(text || ''))) return false;
+  const wanted = new Set((regions || []).flatMap((r) => [r, SKI_REGION_FOR_TOWN[r]]).filter(Boolean));
+  return (facts || []).some((v) => {
+    if (v.type !== 'outdoor' || (wanted.size && !wanted.has(v.region)) || !NORDIC_VENUE_RE.test(v.textName || normWords(v.name)) || !v.seasonClosed) return false;
+    const opens = seasonReopening(v);
+    return Boolean(opens) && opens <= date;
+  });
+}
 function skiOffSeasonMonth(text, intent, requirements, tripDate, namedDate, opening) {
   const t = normWords(text);
   if (!skiWordsAsked(t) || /\b(?:water ?ski|jet ?ski)/.test(t)) return null;
@@ -6104,7 +6118,7 @@ function planTripUnchecked(input) {
     if (plainInput && !plainInput.skiOffSeason) {
       const namedDay = ctxPlanDate({ startWeekday: plainInput.startWeekday, tripDate: plainInput.tripDate });
       const opening = namedDay ? skiOpeningFor(plainInput.facts, plainIntent.regions, namedDay) : null;
-      const off = namedDay ? skiOffSeasonMonth(plainInput.text || '', plainIntent, null, plainInput.tripDate, namedDay, opening) : null;
+      const off = namedDay && !nordicOpenOn(plainInput.facts, plainIntent.regions, namedDay, plainInput.text) ? skiOffSeasonMonth(plainInput.text || '', plainIntent, null, plainInput.tripDate, namedDay, opening) : null;
       if (off) { plainIntent.activities = (plainIntent.activities || []).filter((a) => !['winter', 'skiing'].includes(a)); plainInput = { ...plainInput, skiOffSeason: off, ...(opening ? { skiOpening: opening } : {}) }; }
     }
     const plain = planTripCore(plainInput); applyItinerarySwap(plain, plainInput); applySwapPreference(plain, plainInput); holdSwapPins(plain, plainInput); ensureDinners(plain, plainInput); oneRoundADay(plain); oneSimulatorATrip(plain, plainIntent); addNightOut(plain, plainInput); feedDrinkCrawl(plain, plainInput, plainInput.requirements || { items: [] }); refreshPlanCounts(plain, plainInput); return plain;
@@ -6155,7 +6169,8 @@ function planTripUnchecked(input) {
   // interests, never as three days at a closed ski hill.
   const namedDay = ctxPlanDate({ startWeekday: input.startWeekday, tripDate: input.tripDate });
   const skiOpening = skiOpeningFor(input.facts, intent.regions, requirements.startDate || namedDay);
-  const skiOff = skiOffSeasonMonth(requirements.text || input.text || '', intent, requirements, input.tripDate, namedDay, skiOpening);
+  const skiOff = nordicOpenOn(input.facts, intent.regions, requirements.startDate || namedDay, requirements.text || input.text) ? null
+    : skiOffSeasonMonth(requirements.text || input.text || '', intent, requirements, input.tripDate, namedDay, skiOpening);
   if (skiOff && skiOpening) input = { ...input, skiOpening };
   if (skiOff) {
     const kept = (i) => !(i.kind === 'activity' && ['skiing', 'winter', 'snowshoeing'].includes(i.value)) && !(i.kind === 'venue_kind' && i.value === 'snow_tour') && !(i.kind === 'type' && i.value === 'outdoor' && !(intent.types || []).includes('outdoor'));
@@ -8266,7 +8281,7 @@ module.exports = {
   // Build My Trip round 8 (2026-10-19)
   dayPartRegions, swapSoftPins, gapFillMinutes,
   // Build My Trip round 7 (2026-10-19)
-  applyFoodTourMeaning, foodTourMeansFood, fillDinnerGaps, eventAllowanceMinutes, skiOffSeasonMonth, asksWineryLunch, wineryLunchSpot, holidayTheme,
+  applyFoodTourMeaning, foodTourMeansFood, fillDinnerGaps, eventAllowanceMinutes, skiOffSeasonMonth, nordicOpenOn, asksWineryLunch, wineryLunchSpot, holidayTheme,
   // Build My Trip pass 6 (2026-10-19)
   isDinnerStop,
   wineryNameWords,
