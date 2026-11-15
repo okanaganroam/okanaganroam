@@ -279,7 +279,8 @@ test('spend: "Rolls from $9" never sets $9; mains lead; side items only guess fr
   assert.equal(cfgOf((await get(`/fr/owner/${tokenFor(a.id)}/setup`)).text).suggestSpendFrom, '$$ (15 à 30 $ par personne)');
   const b = mk('restaurant'); research(b.id, [{ label: 'Prices', text: 'Rolls from $9; mains $22–34' }]);
   c = cfgOf((await get(`/fr/owner/${tokenFor(b.id)}/setup`)).text);
-  assert.equal(c.suggestSpend, 22); assert.equal(c.suggestSpendFrom, 'Rolls from $9; mains $22–34');
+  // Restaurant test 3 (2026-11-15, Dayton approved): the mains range's middle on the $2 steps ($22–34 -> $28), not its low end.
+  assert.equal(c.suggestSpend, 28); assert.equal(c.suggestSpendFrom, 'Rolls from $9; mains $22–34');
   const d = mk('restaurant'); research(d.id, [{ label: 'Prices', text: 'Appetizers $8, pints $7' }]);
   assert.equal(cfgOf((await get(`/owner/${tokenFor(d.id)}/setup`)).text).suggestSpend, 0, 'side items and no price range: no guess');
   assert.equal(text.en.spendGuessed, 'We guessed from your listing: “{x}”.');

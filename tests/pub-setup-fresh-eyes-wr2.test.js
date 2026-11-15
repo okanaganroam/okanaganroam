@@ -209,7 +209,8 @@ test('spend: research "Burgers from $19" starts the spend screen at $19 (a sugge
   assert.equal(cfgOf((await get(`/fr/owner/${t}/setup`)).text).suggestSpend, 19);
   assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('pub').id)}/setup`)).text).suggestSpend, 0, 'no research line: no suggestion');
   const r = mk('restaurant'); research(r.id, [{ label: 'Prices', text: 'Mains $24–$38' }]);
-  assert.equal(cfgOf((await get(`/owner/${tokenFor(r.id)}/setup`)).text).suggestSpend, 24);
+  // Restaurant test 3 (2026-11-15, Dayton approved): a range starts at its middle on the $2 steps ($24–$38 -> $32), not its low end.
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(r.id)}/setup`)).text).suggestSpend, 32);
   assert.match(CLIENT(), /CUR\.avg_spend && CUR\.avg_spend\.amount \? CUR\.avg_spend\.amount : C\.suggestSpend \|\| 25,/);
 });
 

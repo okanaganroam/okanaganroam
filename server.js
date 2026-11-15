@@ -8168,6 +8168,8 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
     const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { text: requirementsText, kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
+    // Restaurant test 3 (2026-11-15): a word a planned place's special used ("free" in "Kids eat free") is not "not used".
+    if ((plan.specialWordsUsed || []).length) result.notUsed = (result.notUsed || []).filter((u) => !plan.specialWordsUsed.includes(String(u).toLowerCase()));
     // "No driving after 7pm" is applied by the planner (2026-10-19), so it is never listed as not used.
     if (requirements?.items.some(i=>i.kind==='evening_walk')) result.notUsed = (result.notUsed || []).filter(u=>!/\b(?:driv\w*|car)\b/i.test(String(u)));
     if (requirements?.items.some(i=>i.kind==='transport')) {
@@ -10486,9 +10488,21 @@ function specialTitleIsGeneric(title) {
 // its leading price, for a line that shows no price: Roam Now, Build My Trip) }. `s` gives price, start, end;
 // title/deal the language's lines. A generic title takes the deal's place ("Monday Deal" + "Mashawi wrap" ->
 // "Mashawi wrap").
+// Restaurant test 3 (Whistler, 2026-11-15): "Kids eat free, one kids meal per adult main" was saved from the setup as
+// the title "Kids eat free, one kids meal per adult" and the deal "main" (a line over 40 characters was cut at the last
+// space that fit), and the page showed "main" on a line of its own. Such a cut (an owner's line, the title as long as the
+// words that fit, no end mark, the deal going on in lower case) reads as the one line she typed. The setup now cuts at a
+// clear separator instead; rows already stored this way show joined, with no change to the data.
+function specialCutMidLine(s, title, deal) {
+  const t = String(title || ''), d = String(deal || '').trim();
+  if (!t || !d || (s && s.source && s.source !== 'venue_owner')) return false;
+  const first = d.split(/\s+/)[0];
+  return t.length <= SPECIAL_TITLE_MAX && t.length + 1 + first.length > SPECIAL_TITLE_MAX && !/[.,;:!?)]$/.test(t) && /^[a-z0-9(]/.test(d);
+}
 function specialShownText(s, title, deal) {
   const t = String(title || ''), d0 = String(deal || '');
   if (!d0.trim()) return { title: t, deal: '', dealFull: '' };
+  if (specialCutMidLine(s, t, d0)) return { title: `${t} ${d0.trim()}`, deal: '', dealFull: '' };
   const timed = cardTidy(stripShownTime(d0, s && s.start, s && s.end));
   // Not a deal that lists its own prices ("CRAFT Mule $8; any two pizzas $30"): that reads as a list, not a name.
   if (specialTitleIsGeneric(t) && timed && !/\$\s?\d|\d\s?(?:%|¢)/.test(timed)) return { title: timed.charAt(0).toUpperCase() + timed.slice(1), deal: '', dealFull: '' };
@@ -47755,11 +47769,19 @@ function wineryVisitTicks(venue, badges) {
   let owned = new Set();
   try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
   const no = new Set(venueNotOffered(venue.id));
-  return out.filter((k) => !(badges || {})[k] && !owned.has(k) && !(k === 'dog_friendly' && no.has('dogs')));
+  // Restaurant test 3 (2026-11-15): an owner's own answer to an extra tile (free parking) is logged as feature_<key>.
+  return out.filter((k) => !(badges || {})[k] && !owned.has(k) && !owned.has(`feature_${k}`) && !(k === 'dog_friendly' && no.has('dogs')));
 }
 // Restaurant test 1 (Whistler, 2026-11-14): research's Plan your visit "Reservations: Recommended" (or required,
 // essential, accepted) pre-ticks Takes reservations on "What you offer", as a suggestion while the screen is unsaved.
 // -> ['takes_reservations'] or []. Never once the owner has answered it, or with walk-ins only / no reservations.
+// Restaurant test 3 (Whistler, 2026-11-15): "Family Kitchen" / "a family restaurant" in the name or description pre-picks
+// "Family" on the place-type screen, as a suggestion only (saved when she taps Save). -> 'Family' or ''. Never once a
+// place type is stored.
+function restaurantPlaceGuess(venue, cur) {
+  if (!venue || venue.type !== 'restaurant' || (cur && cur.place_type)) return '';
+  return /\bfamil(?:y|ies)\b/i.test(`${venue.name || ''} ${venue.description || ''}`) && !/\bfamily day\b/i.test(venue.description || '') ? 'Family' : '';
+}
 function researchReservationTicks(venue, badges) {
   if ((badges || {}).takes_reservations) return [];
   const info = venueVisitInfo(venue.id) || {};
@@ -53680,7 +53702,9 @@ function renderOwnerSetupPage(found, opts) {
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
-    ...(venue.type === 'restaurant' ? { visitTicks: researchReservationTicks(venue, snap.badges) } : {}),
+    // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs
+    // and wineries (a suggestion while the screen is unsaved).
+    ...(venue.type === 'restaurant' ? { visitTicks: researchReservationTicks(venue, snap.badges).concat(wineryVisitTicks(venue, snap.badges).filter((k) => k === 'free_parking')), suggestPlace: restaurantPlaceGuess(venue, cur) } : {}),
     cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: cocktail ? COCKTAIL_CUISINES_POPULAR : pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     cuisineAliases: OWNER_CUISINE_ALIASES,
@@ -53761,7 +53785,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC], steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53972,7 +53996,15 @@ function researchSpendGuessInfo(venueId, fr = false) {
     let main = 0, plain = 0, side = false;
     for (const part of r.text.split(/\s*(?:[;·|]|,\s+(?=[A-Za-zÀ-ÿ])|\.\s+)\s*/)) {
       const re = /\$\s?(\d{1,3})(?:\.\d{2})?\b|\b(\d{1,3})(?:[.,]\d{2})?\s?\$/g; let m, n = 0;
-      while ((m = re.exec(part))) { const x = Number(m[1] || m[2]); if (x >= 5 && x <= 300) { n = x; break; } }
+      while ((m = re.exec(part))) {
+        const x = Number(m[1] || m[2]); if (!(x >= 5 && x <= 300)) continue;
+        n = x;
+        // Restaurant test 3 (Whistler, 2026-11-15; Dayton approved): a range ("Mains $20–$30", « 20 $ à 30 $ ») starts at
+        // its middle, on the screen's $2 steps ($20–$30 -> $26), not its low end.
+        const to = /^\s*(?:–|—|-|to|à)\s*\$?\s?(\d{1,3})(?:[.,]\d{2})?/i.exec(part.slice(m.index + m[0].length));
+        if (to && Number(to[1]) > x && Number(to[1]) <= 300) n = Math.round((x + Number(to[1])) / 4) * 2;
+        break;
+      }
       if (!n) continue;
       if (SPEND_MAIN_RE.test(part) && !main) main = n;
       else if (SPEND_SIDE_RE.test(part)) side = true;
@@ -54244,8 +54276,8 @@ function ownerTastingFeeWaiting(venueId) {
 const SETUP_NIGHTS_HELP_TOPIC = { id: 'weekly-nights', pages: ['setup'], over: ['event-add', 'specials', 'features'], q: 'How often our event runs (1st Thursday, every other week)', qFr: 'La fréquence de notre événement (1er jeudi, une semaine sur deux)',
   keys: ['how often', 'every other week', 'every second week', 'every 2 weeks', 'every two weeks', 'biweekly', 'bi weekly', 'every other', 'monthly', 'once a month', 'first thursday', 'first friday', 'first saturday', 'last friday', 'first of the month', '1st of the month', 'weekly events', 'weekly nights', 'weekly night', 'trivia', 'trivia night', 'pub quiz', 'quiz night', 'quiz', 'karaoke', 'open mic', 'open mic night', 'bingo', 'comedy night', 'dj night', 'games night', 'game night', 'run club', 'paint night', 'live music night', 'add a night', 'add trivia', 'add my trivia'],
   keysFr: ['frequence', 'a quelle frequence', 'une semaine sur deux', 'aux deux semaines', 'toutes les deux semaines', 'une fois par mois', 'par mois', 'premier jeudi', 'premier vendredi', 'premier samedi', 'dernier vendredi', '1er du mois', 'evenements de la semaine', 'soirees de la semaine', 'soiree quiz', 'quiz', 'karaoke', 'scene ouverte', 'bingo', 'soiree dj', 'soiree jeux', 'club de course', 'ajouter une soiree'],
-  a: '<p>In <strong>Set up your page</strong>, open <strong>Weekly events</strong> (tap <strong>Change an answer</strong> if it’s done). For each event, pick what it is, the day or days and the start time, then <strong>How often?</strong>: Every week, Every other week, 1st of the month, Last of the month, 1st &amp; 3rd or 2nd &amp; 4th. Open mic on the first Thursday? Tick Thursday and pick <strong>1st of the month</strong>. Tap <strong>Save my events</strong>.</p><p>It’s on your page right away, and Tonight, What’s On and Build My Trip show it only on those days.</p>',
-  aFr: '<p>Dans <strong>Configurez votre page</strong>, ouvrez <strong>Événements de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait). Pour chaque événement, choisissez ce que c’est, le ou les jours et l’heure de début, puis <strong>À quelle fréquence?</strong> : Chaque semaine, Une semaine sur deux, 1er du mois, Dernier du mois, 1er et 3e ou 2e et 4e. Une scène ouverte le premier jeudi? Cochez jeudi et choisissez <strong>1er du mois</strong>. Touchez <strong>Enregistrer mes événements</strong>.</p><p>C’est sur votre page tout de suite, et Ce soir, À l’affiche et Planifier mon voyage ne le montrent que ces jours-là.</p>' };
+  a: '<p>Right here in setup: <strong>Weekly events</strong> (tap <strong>Change an answer</strong> if it’s done), for anything on regularly, weekly or monthly. For each event, pick what it is, the day or days and the start time, then <strong>How often?</strong>: Every week, Every other week, 1st of the month, Last of the month, 1st &amp; 3rd or 2nd &amp; 4th. Open mic on the first Thursday? Tick Thursday and pick <strong>1st of the month</strong>. Tap <strong>Save my events</strong>.</p><p>It’s on your page right away, and Tonight, What’s On and Build My Trip show it only on those days.</p>',
+  aFr: '<p>Ici même, dans la configuration : <strong>Événements de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait), pour tout ce qui est régulier, chaque semaine ou chaque mois. Pour chaque événement, choisissez ce que c’est, le ou les jours et l’heure de début, puis <strong>À quelle fréquence?</strong> : Chaque semaine, Une semaine sur deux, 1er du mois, Dernier du mois, 1er et 3e ou 2e et 4e. Une scène ouverte le premier jeudi? Cochez jeudi et choisissez <strong>1er du mois</strong>. Touchez <strong>Enregistrer mes événements</strong>.</p><p>C’est sur votre page tout de suite, et Ce soir, À l’affiche et Planifier mon voyage ne le montrent que ces jours-là.</p>' };
 const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We close for part of the year', qFr: 'Nous fermons une partie de l’année',
   keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year',
     // Restaurant test 1 (Whistler, 2026-11-14): two closures a year.
@@ -54273,6 +54305,9 @@ function yearlyClosuresHelp(venueId) {
     fr: `<p>Fermé deux fois par année, comme au printemps et à l’automne? Ajoutez chaque période sous <strong>Jours fériés et fermetures</strong> et cochez <strong>Chaque année</strong>.${yearly.length ? ` Vous fermez déjà chaque année : ${list(true).replace(/\.$/, '')}.` : ''}</p>`,
   };
 }
+// Restaurant test 3 (Whistler, 2026-11-15): the day card's "two times a day" line, in the help answers too.
+const SETUP_TWO_TIMES_EN = 'Up to two times a day. Breakfast runs into lunch? Start the first time earlier (for example 8 AM – 3 PM).';
+const SETUP_TWO_TIMES_FR = 'Jusqu’à deux plages par jour. Le déjeuner se poursuit jusqu’au dîner ? Faites commencer la première plage plus tôt (par exemple 8 h – 15 h).';
 // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day ("close between lunch and dinner", "split shift",
 // "lunch hours only in summer") are a second time on the setup's day card, for every type (the screen is shared).
 const SETUP_SPLIT_HOURS_HELP_TOPIC = { id: 'setup-split-hours', pages: ['setup'], over: ['hours', 'seasonal-hours', 'setup-season'],
@@ -54282,9 +54317,9 @@ const SETUP_SPLIT_HOURS_HELP_TOPIC = { id: 'setup-split-hours', pages: ['setup']
     'lunch only in summer', 'lunch hours only in summer', 'lunch in summer', 'lunch in the summer', 'summer lunch', 'open for lunch in summer', 'lunch service', 'dinner service'],
   keysFr: ['diner et souper', 'midi et soir', 'le midi et le soir', 'ferme entre le diner et le souper', 'fermé entre le diner et le souper', 'entre le diner et le souper', 'ferme l apres midi', 'fermé l après midi', 'pause l apres midi',
     'deuxieme plage', 'deuxième plage', 'deux plages', 'horaire coupe', 'horaire coupé', 'diner seulement l ete', 'dîner seulement l été', 'diner l ete', 'le diner en ete', 'service du midi', 'rouvre pour le souper'],
-  a: '<p>Open for lunch, closed in the afternoon, then open again for dinner? In <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>, tap <strong>Change</strong> beside the day, then <strong>+ Add a second time (lunch &amp; dinner)</strong>. Lunch goes in the first time and dinner in the second (like 11:30 AM \u2013 2:30 PM and 5 PM \u2013 10 PM). <strong>Copy these hours to</strong> copies both, and <strong>\u2715 Remove this time</strong> takes one away.</p>'
+  a: '<p>Open for lunch, closed in the afternoon, then open again for dinner? Right here in setup: <strong>Hours</strong> (tap <strong>Change an answer</strong> if it\u2019s done) \u2192 <strong>Change</strong> beside the day, then <strong>+ Add a second time (lunch &amp; dinner)</strong>. Lunch goes in the first time and dinner in the second (like 11:30 AM \u2013 2:30 PM and 5 PM \u2013 10 PM). <strong>Copy these hours to</strong> copies both, and <strong>\u2715 Remove this time</strong> takes one away. ' + SETUP_TWO_TIMES_EN + '</p>'
     + '<p>Lunch only in summer? Set your usual hours first. At <strong>Are these your hours all year?</strong> tap <strong>No, different in summer</strong>, then add the second time to your summer days. Hours saved in the setup go live straight away, and your page shows you closed between the two times. On your edit page it\u2019s <strong>+ second time</strong>.</p>',
-  aFr: '<p>Ouvert le midi, fermé l\u2019après-midi, puis ouvert de nouveau pour le souper? Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>, touchez <strong>Modifier</strong> à côté de la journée, puis <strong>+ Ajouter une deuxième plage (midi et soir)</strong>. Le dîner va dans la première plage et le souper dans la deuxième (par exemple 11 h 30 \u2013 14 h 30 et 17 h \u2013 22 h). <strong>Copier ces heures à</strong> copie les deux, et <strong>\u2715 Retirer cette plage</strong> en retire une.</p>'
+  aFr: '<p>Ouvert le midi, fermé l\u2019après-midi, puis ouvert de nouveau pour le souper? Ici même, dans la configuration : <strong>Heures</strong> (touchez <strong>Modifier une réponse</strong> si c\u2019est fait) \u2192 <strong>Modifier</strong> à côté de la journée, puis <strong>+ Ajouter une deuxième plage (midi et soir)</strong>. Le dîner va dans la première plage et le souper dans la deuxième (par exemple 11 h 30 \u2013 14 h 30 et 17 h \u2013 22 h). <strong>Copier ces heures à</strong> copie les deux, et <strong>\u2715 Retirer cette plage</strong> en retire une. ' + SETUP_TWO_TIMES_FR + '</p>'
     + '<p>Le dîner seulement l\u2019été? Indiquez d\u2019abord vos heures habituelles. À <strong>Ces heures sont-elles les mêmes toute l\u2019année?</strong>, touchez <strong>Non, elles changent en été</strong>, puis ajoutez la deuxième plage à vos journées d\u2019été. Les heures enregistrées dans la configuration sont en ligne tout de suite, et votre page vous indique fermé entre les deux plages. Sur votre page de modification, c\u2019est <strong>+ deuxième plage</strong>.</p>' };
 // Restaurant test 2 (Whistler, 2026-11-14): a happy hour between lunch and dinner (« le 5 à 7 est entre le dîner et le
 // souper, c'est grave? ») got the split-hours answer and nothing about the warning. Every type with a happy hour.
@@ -54308,6 +54343,47 @@ const SETUP_DELIVERY_HELP_TOPIC = { id: 'setup-delivery', pages: ['setup'], over
     + '<p>Later, you can also change it on your edit page under <strong>Plan your visit</strong> \u2192 <strong>Takeout and delivery</strong>.</p>',
   aFr: '<p>Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>À emporter</strong>, répondez <strong>Oui</strong> à <strong>Faites-vous des commandes à emporter ou la livraison?</strong> Touchez ensuite comment commander : <strong>Appelez pour commander</strong>, <strong>Commandez au comptoir</strong>, <strong>DoorDash</strong>, <strong>SkipTheDishes</strong> ou <strong>Uber Eats</strong> (ou écrivez vos mots dans la boîte), puis touchez <strong>Enregistrer</strong>. C\u2019est sur votre page tout de suite, dans <strong>Planifiez votre visite</strong>.</p>'
     + '<p>Plus tard, vous pouvez aussi le changer sur votre page de modification, sous <strong>Planifier la visite</strong> \u2192 <strong>À emporter et livraison</strong>.</p>' };
+// Restaurant test 3 (Whistler, 2026-11-15): help in the setup answered "On your edit page…" (hours, "kids eat free",
+// events) and "I'm not sure" for a third time on Saturday for breakfast. In the setup these answers start with the
+// setup's own path ("Right here in setup: Hours → …"); the edit page comes after. Every type (the screens are shared).
+const SETUP_THIRD_TIME_HELP_TOPIC = { id: 'setup-third-time', pages: ['setup'], over: ['hours', 'setup-split-hours', 'seasonal-hours', 'setup-season'],
+  q: 'A third time, or breakfast and brunch hours', qFr: 'Une troisième plage, ou les heures du déjeuner et du brunch',
+  keys: ['third time', '3rd time', 'third time range', 'third range', 'third slot', 'three times', 'three time ranges', 'three times a day', 'add a third time', 'breakfast hours', 'brunch hours', 'add brunch', 'add breakfast',
+    'weekend brunch', 'weekend brunch hours', 'brunch on weekends', 'brunch on the weekend', 'saturday brunch', 'sunday brunch', 'breakfast on weekends', 'weekend breakfast', 'breakfast lunch and dinner', 'breakfast and lunch', 'how do i add weekend brunch hours', 'add weekend brunch hours', 'brunch time'],
+  keysFr: ['troisieme plage', 'troisième plage', '3e plage', 'trois plages', 'trois plages par jour', 'ajouter une troisieme plage', 'heures du brunch', 'heures de brunch', 'heures du dejeuner', 'heures du déjeuner', 'ajouter le brunch', 'ajouter un brunch',
+    'brunch la fin de semaine', 'brunch du week end', 'brunch le samedi', 'brunch le dimanche', 'dejeuner la fin de semaine', 'dejeuner diner et souper', 'déjeuner, dîner et souper'],
+  a: `<p>Right here in setup: <strong>Hours</strong> (tap <strong>Change an answer</strong> if it’s done) → <strong>Change</strong> beside the day. ${SETUP_TWO_TIMES_EN}</p>`
+    + '<p>Brunch on weekends only? Give Saturday and Sunday a first time from 8 AM, keep your weekdays as they are, and tap <strong>Save my hours</strong>. Hours saved in the setup go live straight away. On your edit page it’s <strong>Opening hours</strong>.</p>',
+  aFr: `<p>Ici même, dans la configuration : <strong>Heures</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait) → <strong>Modifier</strong> à côté de la journée. ${SETUP_TWO_TIMES_FR}</p>`
+    + '<p>Le brunch seulement la fin de semaine ? Faites commencer la première plage du samedi et du dimanche à 8 h, gardez vos heures de semaine, puis touchez <strong>Enregistrer mes heures</strong>. Les heures enregistrées dans la configuration sont en ligne tout de suite. Sur votre page de modification, c’est <strong>Heures d’ouverture</strong>.</p>' };
+// The setup's own answer for plain hours (same id as the edit page's, so it takes its place in the setup; its pages stay
+// the edit page's so it is matched exactly as before, only the words change).
+const SETUP_HOURS_HELP_TOPIC = { id: 'hours', pages: ['edit'], q: 'How do I set my hours?', qFr: 'Comment changer mes heures d’ouverture?',
+  keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time', 'change hours', 'change my hours', 'change our hours', 'update hours', 'update our hours', 'set hours', 'closing time', 'opening time', 'open late', 'past midnight'],
+  keysFr: ['heures', 'heure', 'heures d ouverture', 'horaire', 'horaires', 'heure d ouverture', 'heure de fermeture', 'ouvert', 'ouverts', 'ouverture', 'changer mes heures', 'changer nos heures', 'modifier mes heures', 'modifier nos heures', 'modifier les heures', 'changer l horaire', 'modifier l horaire', 'changer les heures', 'midi', 'apres minuit'],
+  a: '<p>Right here in setup: <strong>Hours</strong> (tap <strong>Change an answer</strong> if it’s done) → <strong>Change</strong> beside a day. Set the open and close times, or tap <strong>Mark closed</strong>. Closed in the afternoon? <strong>+ Add a second time (lunch &amp; dinner)</strong>. <strong>Copy these hours to</strong> fills the other days. Tap <strong>Save my hours</strong>: hours saved in the setup go live straight away.</p>'
+    + '<p>Open past midnight? Use the real closing time, like 1:00 AM. On your edit page it’s <strong>Opening hours</strong>.</p>',
+  aFr: '<p>Ici même, dans la configuration : <strong>Heures</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait) → <strong>Modifier</strong> à côté d’une journée. Indiquez l’heure d’ouverture et de fermeture, ou marquez la journée fermée. Fermé l’après-midi ? <strong>+ Ajouter une deuxième plage (midi et soir)</strong>. <strong>Copier ces heures à</strong> remplit les autres jours. Touchez <strong>Enregistrer mes heures</strong> : les heures enregistrées dans la configuration sont en ligne tout de suite.</p>'
+    + '<p>Ouvert après minuit ? Indiquez l’heure réelle de fermeture, comme 01:00. Sur votre page de modification, c’est <strong>Heures d’ouverture</strong>.</p>' };
+const SETUP_SPECIALS_HELP_TOPIC = { id: 'specials', pages: ['edit'], over: ['features', 'menu-add', 'hh-deals'], q: 'How do I add my weekly specials?', qFr: 'Comment ajouter mes spéciaux de la semaine?',
+  keys: ['weekly specials', 'weekly special', 'daily specials', 'daily special', 'day specials', 'specials of the day', 'nightly specials', 'weekday specials', 'add weekly specials', 'add my specials', 'add a special', 'add specials', 'taco tuesday', 'wing wednesday', 'wing night', 'wings night', 'rib night', 'prime rib night', 'burger night', 'kids eat free', 'kids eat free special', 'kids eat free on monday', 'monday special', 'tuesday special', 'wednesday special', 'thursday special', 'friday special', 'saturday special', 'sunday special', 'specials by day', 'weekly features', 'weekly deals', 'day of the week'],
+  keysFr: ['speciaux de la semaine', 'special de la semaine', 'speciaux du jour', 'special du jour', 'plat du jour', 'speciaux quotidiens', 'ajouter mes speciaux', 'ajouter un special', 'mardi tacos', 'mercredi des ailes', 'soiree ailes', 'enfants mangent gratuitement', 'les enfants mangent gratuitement', 'special du lundi', 'special du mardi', 'special du mercredi', 'special du jeudi', 'special du vendredi', 'jour de la semaine'],
+  a: '<p>Right here in setup: <strong>Weekly specials</strong> (tap <strong>Change an answer</strong> if it’s done) → <strong>Yes</strong> → <strong>Type them in</strong>. For each special, tap <strong>Which day or days?</strong> and type <strong>What is it?</strong> in one line, like <em>Kids eat free, one kids meal per adult main</em>. Add a price or a time if you like (or until close), then tap <strong>Save my specials</strong>. It’s on your page right away, and Build My Trip shows it on those days.</p>'
+    + '<p>Later, your edit page has <strong>Weekly specials</strong> too.</p>',
+  aFr: '<p>Ici même, dans la configuration : <strong>Spéciaux de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait) → <strong>Oui</strong> → <strong>Les écrire</strong>. Pour chaque spécial, touchez <strong>Quel jour ou quels jours ?</strong> et écrivez <strong>Qu’est-ce que c’est ?</strong> en une ligne, par exemple <em>Les enfants mangent gratuitement, un repas enfant par plat adulte</em>. Ajoutez un prix ou une heure si vous voulez (ou jusqu’à la fermeture), puis touchez <strong>Enregistrer mes spéciaux</strong>. C’est sur votre page tout de suite, et Planifier mon voyage l’affiche ces jours-là.</p>'
+    + '<p>Plus tard, votre page de modification a aussi <strong>Spéciaux de la semaine</strong>.</p>' };
+// Events in the setup: anything regular (weekly or monthly) is Weekly events here; a one-off date is the edit page's.
+const SETUP_EVENTS_A = '<p>Right here in setup: <strong>Weekly events</strong> (tap <strong>Change an answer</strong> if it’s done) → <strong>Yes</strong>, for anything on regularly, weekly or monthly. Pick what it is, the day or days and the start time, then <strong>How often?</strong>: every week, every other week, or set weeks of the month (like the 2nd &amp; 4th Thursday). Tap <strong>Save my events</strong>. It’s on your page right away.</p>'
+  + '<p>A one-off event on a single date (a wine dinner, a holiday party)? Add it on your edit page under <strong>Add an event</strong>. We check those first.</p>';
+const SETUP_EVENTS_A_FR = '<p>Ici même, dans la configuration : <strong>Événements de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait) → <strong>Oui</strong>, pour tout ce qui est régulier, chaque semaine ou chaque mois. Choisissez ce que c’est, le ou les jours et l’heure de début, puis <strong>À quelle fréquence ?</strong> : chaque semaine, une semaine sur deux, ou certaines semaines du mois (par exemple le 2e et le 4e jeudi). Touchez <strong>Enregistrer mes événements</strong>. C’est sur votre page tout de suite.</p>'
+  + '<p>Un événement unique, à une seule date (un souper vins, une fête) ? Ajoutez-le sur votre page de modification, sous <strong>Ajouter un événement</strong>. Nous les vérifions d’abord.</p>';
+function setupEventTopics(edit) {
+  const base = (id) => OWNER_HELP_TOPICS.find((t) => t.id === id);
+  return ['event-add', 'event-repeat'].map((id) => base(id)).filter(Boolean).map((t) => ({ ...t,
+    keys: t.keys.concat(t.id === 'event-repeat' ? ['twice a month', 'two times a month', '2nd and 4th', 'second and fourth', '1st and 3rd', 'first and third', 'every second thursday', 'regular event', 'on regularly'] : []),
+    keysFr: (t.keysFr || []).concat(t.id === 'event-repeat' ? ['deux fois par mois', '2e et 4e', 'deuxieme et quatrieme', '1er et 3e', 'premier et troisieme', 'evenement regulier'] : []),
+    a: SETUP_EVENTS_A, aFr: SETUP_EVENTS_A_FR }));
+}
 // Restaurant test 1: the kitchen / last seating question ("my kitchen closes at 9:30" got "I'm not sure").
 const RESTAURANT_KITCHEN_HELP_TOPIC = { id: 'restaurant-kitchen', pages: ['setup'], over: ['hours'],
   q: 'When the kitchen closes or last seating', qFr: 'L’heure de fermeture de la cuisine ou du dernier service',
@@ -54326,10 +54402,10 @@ function ownerSeasonHelpTopic(venueId) {
   // to add one in the setup's Hours step; the edit page comes second, and only its edit-link changes are checked first.
   if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '')) {
     return { ...base, pages: ['edit', 'setup'],
-      a: '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Set your <strong>usual hours</strong>, then at “Are these your hours all year?” tap <strong>No, different in summer</strong> (or winter).</li>'
+      a: '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Set your <strong>usual hours</strong>, then at “Are these your hours all year?” tap <strong>No, different in summer</strong> (or winter, or for a shoulder season or any other dates: <strong>No, different for part of the year</strong>).</li>'
         + '<li>Pick the first and last day of those other hours (like the day the lifts close), and set them. Hours saved in the setup go live straight away, and every year your page switches between the two by itself.</li></ol>'
         + '<p>Or on your edit page, under <strong>Seasonal hours</strong>, then {SEND}. {LIVE} Closed for the whole off-season? Tap <strong>We’re closed part of the year</strong> after your hours instead.</p>',
-      aFr: '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Indiquez vos <strong>heures habituelles</strong>, puis à « Ces heures sont-elles les mêmes toute l’année? », touchez <strong>Non, elles changent en été</strong> (ou en hiver).</li>'
+      aFr: '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Indiquez vos <strong>heures habituelles</strong>, puis à « Ces heures sont-elles les mêmes toute l’année? », touchez <strong>Non, elles changent en été</strong> (ou en hiver, ou pour l’intersaison et d’autres dates : <strong>Non, c’est différent une partie de l’année</strong>).</li>'
         + '<li>Choisissez le premier et le dernier jour de ces autres heures (comme le jour où les remontées ferment) et indiquez-les. Les heures enregistrées dans la configuration sont en ligne tout de suite, et chaque année votre page passe de l’un à l’autre d’elle-même.</li></ol>'
         + '<p>Ou sur votre page de modification, sous <strong>Heures saisonnières</strong>, puis {SEND}. {LIVE} Fermé toute la basse saison? Touchez plutôt <strong>Nous fermons une partie de l’année</strong> après vos heures.</p>' };
   }

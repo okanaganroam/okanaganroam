@@ -1545,6 +1545,22 @@ Object.assign(fr, {
 en.kinds.tasting = 'Tasting';
 fr.kinds.tasting = 'Dégustation';
 
+// Restaurant test 3 (Whistler, 2026-11-15; Whistler Roam drafts/fresh-eyes-restaurant3-2026-11-15/REPORT.md). Shared by
+// every type: two times a day explained, a year that changes for part of it (a shoulder season), and the events lead.
+// Québec meal words: déjeuner = breakfast, dîner = lunch, souper = dinner.
+Object.assign(en, {
+  twoTimesMax: 'Up to two times a day. Breakfast runs into lunch? Start the first time earlier (for example 8 AM – 3 PM).',
+  allYearPart: 'No, different for part of the year (like shoulder season)', allYearPartSub: 'You pick the dates next',
+  musicQ: 'Anything on regularly? Weekly or monthly.',
+  placeGuess: 'We picked “{kind}” from your listing. Tap another one if it’s not right. Nothing is saved until you tap Save.',
+});
+Object.assign(fr, {
+  twoTimesMax: 'Jusqu’à deux plages par jour. Le déjeuner se poursuit jusqu’au dîner ? Faites commencer la première plage plus tôt (par exemple 8 h – 15 h).',
+  allYearPart: 'Non, c’est différent une partie de l’année (comme l’intersaison)', allYearPartSub: 'Vous choisissez les dates ensuite',
+  musicQ: 'Quelque chose de régulier ? Chaque semaine ou chaque mois.',
+  placeGuess: 'Nous avons choisi « {kind} » d’après votre fiche. Touchez-en un autre s’il ne convient pas. Rien n’est enregistré avant que vous touchiez Enregistrer.',
+});
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.
