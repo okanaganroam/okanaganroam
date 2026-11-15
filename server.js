@@ -8021,6 +8021,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   if (requirements) {
     trip = requirementModule.expandTripComponents(trip.multi ? trip : {...trip, regions:intent.regions || [], party:intent.party || trip.party, when:intent.when || trip.when}, requirements);
     if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;
+    // Pub test 3 (Whistler, 2026-11-14): "Function Junction Brewpub" named by name is not a request for breweries.
+    const namedVenues = requirements.items.filter((i) => i.kind === 'venue').map((i) => (taxonomy.venues || []).find((v) => v.id === i.value)).filter(Boolean);
+    if (namedVenues.length) intent.types = tripPlannerModule().dropNameOnlyTypes(intent.types, namedVenues, text);
   }
   // A place named with no town (2026-10-25: "day trip to Joffre Lakes" was planned in Pemberton without Joffre): the
   // trip is based where the named places are.
@@ -10539,6 +10542,12 @@ const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', '
 // The kinds that run at any time of day (not only evenings), for the trip planner's lines.
 const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
 const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th', 'appointment'];
+// How often, in the owner's words: the edit page's list and the setup's "How often" choice (pub test 3, Whistler, 2026-11-14).
+// Distillery test 2 (2026-11-13): a tour or class by appointment (no day); offered where tours and classes are.
+const NIGHT_FREQUENCY_LABELS = {
+  en: { weekly: 'Every week', biweekly: 'Every other week', 'monthly-1st': '1st of the month', 'monthly-last': 'Last of the month', 'monthly-1st-3rd': '1st & 3rd of the month', 'monthly-2nd-4th': '2nd & 4th of the month', appointment: 'By appointment (tours and classes)' },
+  fr: { weekly: 'Chaque semaine', biweekly: 'Une semaine sur deux', 'monthly-1st': '1er du mois', 'monthly-last': 'Dernier du mois', 'monthly-1st-3rd': '1er et 3e du mois', 'monthly-2nd-4th': '2e et 4e du mois', appointment: 'Sur rendez-vous (visites et ateliers)' },
+};
 // Distillery test 2 (2026-11-13): a tour or class "By appointment" (« Sur rendez-vous ») is the frequency 'appointment'
 // with no days: it never falls on a date (no Today / Tonight tag, no Build My Trip time slot). Tours and classes only.
 const NIGHT_APPOINTMENT = 'appointment';
@@ -46411,7 +46420,7 @@ const OWNER_FEATURE_CONTRADICTION = {
   takeout: 'You told us you don’t do takeout. Undo that answer first, or untick “Takeout”.',
   great_groups: 'You told us you can’t take big groups. Undo that answer first, or untick “Great for groups”.',
 };
-const OWNER_CHANGE_KEYS = new Set(['changes', 'note', 'contact_name', 'contact_email', 'company_website', 'started_at', 'from_setup']);
+const OWNER_CHANGE_KEYS = new Set(['changes', 'note', 'contact_name', 'contact_email', 'company_website', 'started_at', 'from_setup', 'setup_frequency']);
 
 // The optional "your email" on link-only forms: -> { email } or { error }.
 // The first one given is also kept on the edit link for later emails.
@@ -47563,7 +47572,10 @@ function wineryVisitTicks(venue, badges) {
   const line = (re) => rows.filter((r) => re.test(r.label)).map((r) => r.text).join(' ');
   const out = [];
   const park = line(/^(?:parking|getting there)$/i);
-  if (/\bfree\b[^.]*\bparking\b|\bparking\b[^.]*\bfree\b/i.test(park) && !/\b(?:no|not|paid)\b[^.]*parking|parking[^.]*\b(?:not free|paid)\b/i.test(park)) out.push('free_parking');
+  // Pub test 3 (Whistler, 2026-11-14): "Free parking" said in Good to know too (only the phrase itself there).
+  const gtk = line(/^(?:good to know|know before you go|tips?)$/i);
+  if ((/\bfree\b[^.]*\bparking\b|\bparking\b[^.]*\bfree\b/i.test(park) && !/\b(?:no|not|paid)\b[^.]*parking|parking[^.]*\b(?:not free|paid)\b/i.test(park))
+    || (/\bfree (?:on-?site |street |lot |customer )?parking\b|\bparking is free\b/i.test(gtk) && !/\b(?:no|not)\s+free\s+parking\b/i.test(gtk))) out.push('free_parking');
   const acc = line(/^(?:accessibility|wheelchair access)$/i);
   if (/step-?free|wheelchair|accessible|\bramps?\b|no stairs/i.test(acc) && !/\bnot (?:fully |wheelchair )?accessible|inaccessible|\bno (?:wheelchair|ramp)|stairs only|only by stairs/i.test(acc)) out.push('wheelchair_accessible');
   const dogs = line(/^(?:dogs|pets|kids & dogs)$/i);
@@ -47640,10 +47652,10 @@ const nightCarriedFrequency = (x) => !!x && !!x.frequency && x.frequency !== 'we
 // the owner left or picked, so a setup row with no season keeps the live season only when the waiting row it came from had
 // lost it; "All year" picked on the setup screen for an event that showed its months stays all year.
 const nightSeasonOf = (x) => (x && x.season_from && x.season_to ? { season_from: x.season_from, season_to: x.season_to } : null);
-function ownerNightsKeepFrequency(next, pending, live) {
+function ownerNightsKeepFrequency(next, pending, live, opts = {}) {
   for (const s of next) {
     const p = sameNightOf(s, pending), l = p ? null : sameNightOf(s, live);
-    if ((s.frequency || 'weekly') === 'weekly') {
+    if (!opts.ownFrequency && (s.frequency || 'weekly') === 'weekly') {
       if (nightCarriedFrequency(p)) s.frequency = p.frequency;
       else if (nightCarriedFrequency(l)) s.frequency = l.frequency;
     }
@@ -48000,7 +48012,9 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (!checked.ok) errors.weekly_nights = ownerNightsError(checked.detail);
       else {
         const next = checked.nights.map((s) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, s[k]])));
-        if (body && body.from_setup === true) ownerNightsKeepFrequency(next, ownerPendingNights(venue.id), current.weekly_nights);
+        // Pub test 3 (Whistler, 2026-11-14): a setup that has its own "How often" (setup_frequency) sends what the owner
+        // left or picked, so "Every week" there is kept; only the season is carried. An older setup page still carries both.
+        if (body && body.from_setup === true) ownerNightsKeepFrequency(next, ownerPendingNights(venue.id), current.weekly_nights, { ownFrequency: body.setup_frequency === true });
         else ownerNightsKeepSeason(next, current.weekly_nights);
         if (!sameWeeklyNights(next, current.weekly_nights)) changes.weekly_nights = next;
       }
@@ -53419,7 +53433,11 @@ function renderOwnerSetupPage(found, opts) {
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
     // too (a suggestion, saved only with the screen), as it does for breweries.
-    ...(pub && !brewery ? (() => { const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []); return { suggestKidsUntil: researchKidsUntil((info.rows || []).filter((x) => x && !mine.has(x.label))) }; })() : {}),
+    // Pub test 3 (Whistler, 2026-11-14): and research's "Family friendly" (or "All ages") pre-picks All ages on a pub's
+    // Who's welcome, as for distilleries (a suggestion, saved only with the screen). Not lounges: they are mostly 19+, and
+    // research saying 19+ or adults only never suggests it (researchKidsAll). Research's Free parking pre-ticks its tile.
+    ...(pub && !brewery ? (() => { const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []); const rows = (info.rows || []).filter((x) => x && !mine.has(x.label));
+      return { suggestKidsUntil: researchKidsUntil(rows), suggestKidsAll: venue.type === 'pub' && researchKidsAll(rows), ...(cocktail ? {} : { visitTicks: wineryVisitTicks(venue, snap.badges).filter((k) => k === 'free_parking') }) }; })() : {}),
     // Cocktail lounges (2026-11-13): the cocktail price's quick buttons and live limit, and research's price as a suggestion.
     ...(cocktail ? { cocktailQuick: [12, 14, 16, 18], feeLiveMax: COCKTAIL_PRICE_LIVE_MAX, researchCocktail: cocktailPriceGuess(venue), ...loungeResearchHints(venue, snap.badges) } : {}),
     cafe, pub, winery, brewery, distillery, cocktail, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
@@ -53466,6 +53484,8 @@ function renderOwnerSetupPage(found, opts) {
     // Cocktail test 1 (2026-11-13): each event's how often when it isn't every week ("1st Thu of the month"), shown on the
     // events screen; with weekly_nights_waiting it is still waiting for our check.
     nightsOften: cur.weekly_nights.map((x) => (nightCarriedFrequency(x) ? nightOftenText(x, fr) : '')),
+    // Pub test 3 (Whistler, 2026-11-14): "How often" on each event, the edit page's list (By appointment is its own button).
+    nightFreqs: NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT).map((f) => [f, NIGHT_FREQUENCY_LABELS[fr ? 'fr' : 'en'][f]]),
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
     // Pub test 2 (Whistler, 2026-11-14): research's price line ("Burgers from $19") starts the spend screen at $19 instead
     // of $25, as a suggestion (saved only when she saves the screen). Not for cafés (their own starting prices).
@@ -53514,7 +53534,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC] })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC]) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53524,9 +53544,12 @@ ${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, comple
 // (OWNER_SETUP_LINK_INSTANT_FIELDS); a photo, menu or web page sent from the setup is typed up first; the edit page is
 // {LIVE}. Cafés and wineries have no happy hour screen in their setup, so they get the edit-page-only answer.
 const HH_TIMES_KEYS = ['happy hour', 'change my happy hour', 'change our happy hour', 'change the happy hour', 'change happy hour', 'happy hour times', 'happy hour time', 'happy hour hours', 'happy hour days',
-  'edit happy hour', 'edit my happy hour', 'update happy hour', 'update my happy hour', 'update our happy hour', 'happy hour later', 'new happy hour', 'happy hour start', 'happy hour ends', 'when is happy hour'];
+  'edit happy hour', 'edit my happy hour', 'update happy hour', 'update my happy hour', 'update our happy hour', 'happy hour later', 'new happy hour', 'happy hour start', 'happy hour ends', 'when is happy hour',
+  // Pub test 3 (Whistler, 2026-11-14): a second, late-night or weekend happy hour ("How do I add a second happy hour on weekends").
+  'second happy hour', 'add a second happy hour', 'another happy hour', 'add another happy hour', 'two happy hours', 'late night happy hour', 'late happy hour', 'night happy hour', 'reverse happy hour', 'weekend happy hour', 'happy hour on weekends', 'happy hour on the weekend', 'happy hour until close'];
 const HH_TIMES_KEYS_FR = ['5 a 7', 'cinq a sept', 'happy hour', 'changer mon 5 a 7', 'changer notre 5 a 7', 'changer le 5 a 7', 'modifier mon 5 a 7', 'modifier notre 5 a 7', 'heures du 5 a 7', 'heures de mon 5 a 7',
-  'jours du 5 a 7', 'mettre a jour mon 5 a 7', 'changer mon cinq a sept', 'heures du cinq a sept'];
+  'jours du 5 a 7', 'mettre a jour mon 5 a 7', 'changer mon cinq a sept', 'heures du cinq a sept',
+  'deuxieme 5 a 7', 'second 5 a 7', 'un autre 5 a 7', 'autre 5 a 7', 'ajouter un autre 5 a 7', 'deux 5 a 7', '5 a 7 de fin de soiree', '5 a 7 en fin de soiree', '5 a 7 de soiree', '5 a 7 la fin de semaine', '5 a 7 de fin de semaine', '5 a 7 jusqu a la fermeture'];
 // Pub test 2 (Whistler, 2026-11-14): how owners say "part of the year" when it isn't summer or winter: the shoulder
 // season, the fall or the spring only (« saison morte », « intersaison », « fermé le lundi en automne seulement » got
 // "I'm not sure" or the special closures answer). Added to every seasonal-hours topic.
@@ -53542,8 +53565,8 @@ const SEASON_TALK_KEYS_FR = ['saison morte', 'la saison morte', 'en saison morte
 function withSeasonTalk(list, extra) { return [...new Set(list.concat(extra))]; }
 const HH_TIMES_HELP_TOPIC = { id: 'hh-times', over: ['features', 'hours', 'seasonal-hours'], q: 'How do I change my happy hour days or times?', qFr: 'Comment changer les jours ou les heures de mon 5 à 7?', pages: ['setup', 'edit'],
   keys: HH_TIMES_KEYS, keysFr: HH_TIMES_KEYS_FR,
-  a: '<p>Two ways to change your happy hour days, times or deals:</p><ul><li>In <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Happy hour</strong>. Days and times you type in there go live straight away. A photo, menu or web page you send instead is typed up by us first, usually within a day.</li><li>{ON}, open <strong>Happy hour</strong>, change the days, times or deals, and tap {SEND}. {LIVE}</li></ul><p>Badges like Patio or Dog friendly are separate: ask \u201cbadges\u201d.</p>',
-  aFr: '<p>Deux façons de changer les jours, les heures ou les spéciaux de votre 5 à 7 :</p><ul><li>Dans <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>5 à 7</strong>. Les jours et les heures que vous y tapez sont en ligne tout de suite. Une photo, un menu ou une page Web que vous envoyez plutôt est d\u2019abord retranscrit par nous, habituellement d\u2019ici un jour.</li><li>{ON}, ouvrez <strong>5 à 7</strong>, changez les jours, les heures ou les spéciaux, puis touchez {SEND}. {LIVE}</li></ul><p>Les caractéristiques comme Terrasse ou Chiens acceptés sont à part : demandez « caractéristiques ».</p>' };
+  a: '<p>Two ways to change your happy hour days, times or deals:</p><ul><li>In <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Happy hour</strong>. A second one (late night, or weekends only)? Tap <strong>+ Add another happy hour</strong>, pick its days and times, or tap <strong>Until close</strong> for the end. Days and times you type in there go live straight away. A photo, menu or web page you send instead is typed up by us first, usually within a day.</li><li>{ON}, open <strong>Happy hour</strong>, change the days, times or deals, and tap {SEND}. {LIVE}</li></ul><p>Badges like Patio or Dog friendly are separate: ask \u201cbadges\u201d.</p>',
+  aFr: '<p>Deux façons de changer les jours, les heures ou les spéciaux de votre 5 à 7 :</p><ul><li>Dans <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>5 à 7</strong>. Un deuxième (en fin de soirée, ou la fin de semaine seulement)? Touchez <strong>+ Ajouter un autre 5 à 7</strong>, choisissez ses jours et ses heures, ou touchez <strong>Jusqu’à la fermeture</strong> pour la fin. Les jours et les heures que vous y tapez sont en ligne tout de suite. Une photo, un menu ou une page Web que vous envoyez plutôt est d\u2019abord retranscrit par nous, habituellement d\u2019ici un jour.</li><li>{ON}, ouvrez <strong>5 à 7</strong>, changez les jours, les heures ou les spéciaux, puis touchez {SEND}. {LIVE}</li></ul><p>Les caractéristiques comme Terrasse ou Chiens acceptés sont à part : demandez « caractéristiques ».</p>' };
 const HH_TIMES_EDIT_ONLY_HELP_TOPIC = { ...HH_TIMES_HELP_TOPIC, pages: ['edit'],
   a: '<p>{ON}, open <strong>Happy hour</strong> (it shows for places that serve alcohol), change the days, times or deals, and tap {SEND}. {LIVE}</p><p>Badges like Patio or Dog friendly are separate: ask \u201cbadges\u201d.</p>',
   aFr: '<p>{ON}, ouvrez <strong>5 à 7</strong> (affiché pour les endroits qui servent de l\u2019alcool), changez les jours, les heures ou les spéciaux, puis touchez {SEND}. {LIVE}</p><p>Les caractéristiques comme Terrasse ou Chiens acceptés sont à part : demandez « caractéristiques ».</p>' };
@@ -53836,8 +53859,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
   { id: 'weekly-nights', over: ['event-add', 'specials', 'features'], q: 'How often our tour or class runs (every other week)', qFr: 'La fréquence de notre visite ou atelier (une semaine sur deux)', pages: ['setup', 'edit'],
     keys: ['how often', 'every other week', 'every second week', 'every 2 weeks', 'every two weeks', 'biweekly', 'bi weekly', 'every second', 'every other', 'monthly', 'once a month', 'first saturday', 'tours and events', 'tours events', 'weekly events', 'weekly nights', 'trivia', 'live music night', 'add a night'],
     keysFr: ['frequence', 'une semaine sur deux', 'aux deux semaines', 'toutes les deux semaines', 'deux semaines', 'une fois par mois', 'par mois', 'premier samedi', 'visites et evenements', 'soirees de la semaine', 'quiz'],
-    a: '<ol><li>{ON}, open <a href="{EDIT}#tours-events"><strong>Tours &amp; events</strong></a>.</li><li>For each tour, class or event, tick its <strong>days</strong>, pick the <strong>kind</strong> (Tour, Class, Live music …) and <strong>how often</strong>: Every week, <strong>Every other week</strong>, set weeks of the month like the 1st &amp; 3rd, or By appointment. Then fill in its <strong>name</strong> (<em>Saturday distillery tour</em>) and the <strong>start time</strong>. A detail and the cost are optional. Tap <strong>+ Add an event</strong> for another (up to 7).</li><li>Tap {SEND}.</li></ol><p>{LIVE} Your listing shows them with today’s marked, and today’s shows on the map, on What’s On and in Build My Trip. A one-off event goes under <strong>Add an event</strong> instead. Clear every box to remove them.</p>',
-    aFr: '<ol><li>{ON}, ouvrez <a href="{EDIT}#tours-events"><strong>Visites et événements</strong></a>.</li><li>Pour chaque visite, atelier ou événement, cochez ses <strong>jours</strong>, choisissez le <strong>genre</strong> (Visite, Atelier, Musique en direct…) et la <strong>fréquence</strong> : Chaque semaine, <strong>Une semaine sur deux</strong>, certaines semaines du mois comme le 1er et le 3e, ou Sur rendez-vous. Puis remplissez son <strong>nom</strong> (<em>Visite de la distillerie du samedi</em>) et l’<strong>heure de début</strong>. Un détail et le prix sont facultatifs. Touchez <strong>+ Ajouter un événement</strong> pour un autre (jusqu’à 7).</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Votre fiche les affiche, celui du jour en évidence, et celui du jour s’affiche sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous <strong>Ajouter un événement</strong>. Videz toutes les cases pour les retirer.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong> and pick <strong>How often?</strong> on each one (Every other week, 1st of the month…), then tap <strong>Save my events</strong>. It’s on your page right away.</p><p>Or on your edit page:</p><ol><li>{ON}, open <a href="{EDIT}#tours-events"><strong>Tours &amp; events</strong></a>.</li><li>For each tour, class or event, tick its <strong>days</strong>, pick the <strong>kind</strong> (Tour, Class, Live music …) and <strong>how often</strong>: Every week, <strong>Every other week</strong>, set weeks of the month like the 1st &amp; 3rd, or By appointment. Then fill in its <strong>name</strong> (<em>Saturday distillery tour</em>) and the <strong>start time</strong>. A detail and the cost are optional. Tap <strong>+ Add an event</strong> for another (up to 7).</li><li>Tap {SEND}.</li></ol><p>{LIVE} Your listing shows them with today’s marked, and today’s shows on the map, on What’s On and in Build My Trip. A one-off event goes under <strong>Add an event</strong> instead. Clear every box to remove them.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong> et choisissez <strong>À quelle fréquence?</strong> pour chacun (Une semaine sur deux, 1er du mois…), puis touchez <strong>Enregistrer mes événements</strong>. C’est sur votre page tout de suite.</p><p>Ou sur votre page de modification :</p><ol><li>{ON}, ouvrez <a href="{EDIT}#tours-events"><strong>Visites et événements</strong></a>.</li><li>Pour chaque visite, atelier ou événement, cochez ses <strong>jours</strong>, choisissez le <strong>genre</strong> (Visite, Atelier, Musique en direct…) et la <strong>fréquence</strong> : Chaque semaine, <strong>Une semaine sur deux</strong>, certaines semaines du mois comme le 1er et le 3e, ou Sur rendez-vous. Puis remplissez son <strong>nom</strong> (<em>Visite de la distillerie du samedi</em>) et l’<strong>heure de début</strong>. Un détail et le prix sont facultatifs. Touchez <strong>+ Ajouter un événement</strong> pour un autre (jusqu’à 7).</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Votre fiche les affiche, celui du jour en évidence, et celui du jour s’affiche sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous <strong>Ajouter un événement</strong>. Videz toutes les cases pour les retirer.</p>' },
   SETUP_NO_WEBSITE_HELP_TOPIC,
   { id: 'distillery-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend', 'menu-add'], noRelated: ['price-range', 'avg-spend', 'cafe-price', 'winery-price', 'brewery-price'],
     q: 'How do I change our tasting price?', qFr: 'Comment changer le prix de notre dégustation?',
@@ -53853,8 +53876,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
   { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events', 'weekly-nights'], noRelated: ['weekly-nights'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
     keys: ['tour', 'tours', 'distillery tour', 'class', 'classes', 'cocktail class', 'whisky class', 'whiskey class', 'workshop', 'masterclass', 'events', 'event', 'book a tour'],
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Every other week, or only on set weeks like the first Saturday? Tap <strong>Save my events</strong> first, then open <a href="{EDIT}#tours-events"><strong>Tours &amp; events</strong> on your edit page</a> and pick <strong>Every other week</strong> (or the weeks) under how often.</p><p>Tours people book ahead? Say so in the tour’s detail (“Book ahead online”), or tap <strong>By appointment</strong>. Build My Trip only says “book ahead” then. Your booking page goes in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Une semaine sur deux, ou seulement certaines semaines comme le premier samedi? Touchez d’abord <strong>Enregistrer mes événements</strong>, puis ouvrez <a href="{EDIT}#tours-events"><strong>Visites et événements</strong> sur votre page de modification</a> et choisissez <strong>Une semaine sur deux</strong> (ou les semaines) sous la fréquence.</p><p>Des visites à réserver? Dites-le dans le détail de la visite (« Réservez en ligne »), ou touchez <strong>Sur rendez-vous</strong>. Planifier mon voyage ne dit « réservez » qu’à ce moment-là. Votre page de réservation va dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Every other week, or only on set weeks like the first Saturday? Pick it under <strong>How often?</strong> on each one (Every other week, 1st of the month…) before you save.</p><p>Tours people book ahead? Say so in the tour’s detail (“Book ahead online”), or tap <strong>By appointment</strong>. Build My Trip only says “book ahead” then. Your booking page goes in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Une semaine sur deux, ou seulement certaines semaines comme le premier samedi? Choisissez-le sous <strong>À quelle fréquence?</strong> pour chacun (Une semaine sur deux, 1er du mois…) avant d’enregistrer.</p><p>Des visites à réserver? Dites-le dans le détail de la visite (« Réservez en ligne »), ou touchez <strong>Sur rendez-vous</strong>. Planifier mon voyage ne dit « réservez » qu’à ce moment-là. Votre page de réservation va dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
   // Distillery test 2 (2026-11-13): "our tours are by appointment" got the hours answer. Tours or visits by appointment
   // point to the "By appointment" choice on Tours, classes and events, ahead of the hours-by-appointment topic.
   { id: 'distillery-tours-appointment', pages: ['setup', 'edit'], over: ['distillery-hours', 'distillery-tours', 'winery-appointment', 'nights', 'events', 'weekly-nights', 'hours'], noRelated: ['weekly-nights'],
@@ -53895,8 +53918,8 @@ const COCKTAIL_SETUP_HELP_TOPICS = [
   { id: 'cocktail-djs', pages: ['setup', 'edit'], over: ['nights', 'events', 'weekly-nights'], noRelated: ['weekly-nights'], q: 'How do I add our DJ nights or live music?', qFr: 'Comment ajouter nos soirées DJ ou notre musique en direct?',
     keys: ['dj', 'djs', 'dj night', 'dj nights', 'live music', 'band', 'bands', 'trivia', 'comedy', 'karaoke', 'events', 'event', 'every other week', 'how often', 'once a month', 'monthly', 'weekly nights'],
     keysFr: ['dj', 'soiree dj', 'soirees dj', 'musique', 'musique en direct', 'groupe', 'quiz', 'humour', 'karaoke', 'evenement', 'evenements', 'une semaine sur deux', 'frequence', 'une fois par mois'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Live music, DJs and events</strong>, then <strong>Yes</strong>. Tap <strong>DJ</strong> (or Live music, Comedy…), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, with tonight’s marked, and Build My Trip can show them.</p><p>Every other week or once a month? Tap <strong>Save my events</strong> first, then open <a href="{EDIT}#tours-events"><strong>Set how often</strong></a> on your edit page and pick how often.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Musique, DJ et événements</strong>, puis <strong>Oui</strong>. Touchez <strong>DJ</strong> (ou Musique en direct, Humour…), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, celui de ce soir en évidence, et Planifier mon voyage peut les montrer.</p><p>Une semaine sur deux ou une fois par mois? Touchez d’abord <strong>Enregistrer mes événements</strong>, puis ouvrez <a href="{EDIT}#tours-events"><strong>Choisir la fréquence</strong></a> sur votre page de modification et choisissez la fréquence.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Live music, DJs and events</strong>, then <strong>Yes</strong>. Tap <strong>DJ</strong> (or Live music, Comedy…), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, with tonight’s marked, and Build My Trip can show them.</p><p>Every other week or once a month? Pick it under <strong>How often?</strong> on each event (Every other week, 1st of the month…) before you save. It’s on your page right away too.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Musique, DJ et événements</strong>, puis <strong>Oui</strong>. Touchez <strong>DJ</strong> (ou Musique en direct, Humour…), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, celui de ce soir en évidence, et Planifier mon voyage peut les montrer.</p><p>Une semaine sur deux ou une fois par mois? Choisissez-le sous <strong>À quelle fréquence?</strong> pour chaque événement (Une semaine sur deux, 1er du mois…) avant d’enregistrer. C’est aussi sur votre page tout de suite.</p>' },
   // Cocktail lounge test 3 (2026-11-14): the edit page's "Weekly nights" topic in a lounge's words. Its section is
   // Events (« Événements »), with Event 1 and + Add an event; pubs keep Weekly nights, distilleries Tours & events.
   { id: 'weekly-nights', over: ['event-add', 'specials', 'features'], q: 'How do I add a regular event, like trivia or comedy?', qFr: 'Comment ajouter un événement régulier, comme un quiz ou de l’humour?', pages: ['edit'],
@@ -53948,6 +53971,12 @@ function cocktailPriceGuess(venue) {
   return null;
 }
 // The help topics for a type that uses the brewery setup.
+// The setup's own "how often" answer for a place with weekly events, unless its type list already has one (distilleries)
+// or answers events in its own words (lounges' DJ topic says how often).
+function withSetupNightsTopic(type, list) {
+  if (!portalFields(type).nights || list.some((t) => t.id === 'weekly-nights' || t.id === 'cocktail-djs')) return list;
+  return [...list, SETUP_NIGHTS_HELP_TOPIC];
+}
 function brewHelpTopics(type) { return type === 'distillery' ? DISTILLERY_SETUP_HELP_TOPICS : BREWERY_SETUP_HELP_TOPICS; }
 // A tasting fee over $75 the owner sent that is still waiting for our check (a number), or null.
 function ownerTastingFeeWaiting(venueId) {
@@ -53960,6 +53989,14 @@ function ownerTastingFeeWaiting(venueId) {
   return null;
 }
 // Café test 2 (2026-11-11): the easy setup's "We're closed part of the year" (every type).
+// Pub test 3 (Whistler, 2026-11-14): on the setup, "how often" and "first Thursday" are answered from the setup's own
+// Weekly events screen, which now has "How often?" and saves straight to the page (no "we check changes first" line). The
+// edit-page answer (weekly-nights) stays on the edit page; distilleries and lounges keep their own topics.
+const SETUP_NIGHTS_HELP_TOPIC = { id: 'weekly-nights', pages: ['setup'], over: ['event-add', 'specials', 'features'], q: 'How often our event runs (1st Thursday, every other week)', qFr: 'La fréquence de notre événement (1er jeudi, une semaine sur deux)',
+  keys: ['how often', 'every other week', 'every second week', 'every 2 weeks', 'every two weeks', 'biweekly', 'bi weekly', 'every other', 'monthly', 'once a month', 'first thursday', 'first friday', 'first saturday', 'last friday', 'first of the month', '1st of the month', 'weekly events', 'weekly nights', 'weekly night', 'trivia', 'trivia night', 'pub quiz', 'quiz night', 'quiz', 'karaoke', 'open mic', 'open mic night', 'bingo', 'comedy night', 'dj night', 'games night', 'game night', 'run club', 'paint night', 'live music night', 'add a night', 'add trivia', 'add my trivia'],
+  keysFr: ['frequence', 'a quelle frequence', 'une semaine sur deux', 'aux deux semaines', 'toutes les deux semaines', 'une fois par mois', 'par mois', 'premier jeudi', 'premier vendredi', 'premier samedi', 'dernier vendredi', '1er du mois', 'evenements de la semaine', 'soirees de la semaine', 'soiree quiz', 'quiz', 'karaoke', 'scene ouverte', 'bingo', 'soiree dj', 'soiree jeux', 'club de course', 'ajouter une soiree'],
+  a: '<p>In <strong>Set up your page</strong>, open <strong>Weekly events</strong> (tap <strong>Change an answer</strong> if it’s done). For each event, pick what it is, the day or days and the start time, then <strong>How often?</strong>: Every week, Every other week, 1st of the month, Last of the month, 1st &amp; 3rd or 2nd &amp; 4th. Open mic on the first Thursday? Tick Thursday and pick <strong>1st of the month</strong>. Tap <strong>Save my events</strong>.</p><p>It’s on your page right away, and Tonight, What’s On and Build My Trip show it only on those days.</p>',
+  aFr: '<p>Dans <strong>Configurez votre page</strong>, ouvrez <strong>Événements de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait). Pour chaque événement, choisissez ce que c’est, le ou les jours et l’heure de début, puis <strong>À quelle fréquence?</strong> : Chaque semaine, Une semaine sur deux, 1er du mois, Dernier du mois, 1er et 3e ou 2e et 4e. Une scène ouverte le premier jeudi? Cochez jeudi et choisissez <strong>1er du mois</strong>. Touchez <strong>Enregistrer mes événements</strong>.</p><p>C’est sur votre page tout de suite, et Ce soir, À l’affiche et Planifier mon voyage ne le montrent que ces jours-là.</p>' };
 const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We close for part of the year', qFr: 'Nous fermons une partie de l’année',
   keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year'], keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année'],
   a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p>',
@@ -55275,7 +55312,7 @@ const OWNER_HELP_TOPICS = [
     } },
   { id: 'more-businesses', q: 'I manage more than one business', qFr: 'Je gère plus d\u2019une entreprise', pages: ['account', 'edit', 'settings'],
     keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'second business', 'more than one business', 'more than one location', 'other listing', 'add listing', 'add another listing', 'multiple businesses', 'multiple locations', 'several businesses', 'locations', 'businesses',
-      'second venue', 'another venue', 'another location', 'second restaurant', 'another restaurant', 'add a second', 'add another business'],
+      'second venue', 'another venue', 'another location', 'second restaurant', 'another restaurant', 'add a second business', 'add a second location', 'add a second listing', 'add a second restaurant', 'add another business'],
     keysFr: ['autre entreprise', 'deux entreprises', 'deux restaurants', 'deux succursales', 'deuxieme succursale', 'plusieurs entreprises', 'plusieurs succursales', 'autre fiche', 'ajouter une fiche',
       // French pass 6 (2026-10-19): "deuxième établissement" found nothing.
       'deuxieme etablissement', 'second etablissement', 'autre etablissement', 'un autre etablissement', 'deux etablissements', 'plusieurs etablissements',
@@ -60290,10 +60327,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const nightRows = () => {
     // Cocktail test 3 (2026-11-14): no empty, pre-filled "Event 2" (DJ night) under real events; "+ Add an event" opens it.
     const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length));
-    const freqText = { weekly: L('Every week', 'Chaque semaine'), biweekly: L('Every other week', 'Une semaine sur deux'), 'monthly-1st': L('1st of the month', '1er du mois'),
-      'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois'),
-      // Distillery test 2 (2026-11-13): a tour or class by appointment (no day); offered where tours and classes are.
-      appointment: L('By appointment (tours and classes)', 'Sur rendez-vous (visites et ateliers)') };
+    // Pub test 3 (Whistler, 2026-11-14): the same words as the setup's "How often" (NIGHT_FREQUENCY_LABELS).
+    const freqText = Object.fromEntries(NIGHT_FREQUENCIES.map((f) => [f, escapeHtml(NIGHT_FREQUENCY_LABELS[lang === 'fr' ? 'fr' : 'en'][f])]));
     // Distillery test 3 (2026-11-13): a distillery's rows are "Event 1" (not "Night 1"), Tour and Class come first (and a new
     // row starts as a Tour), with a tour placeholder, not trivia. Pubs keep "Night"; cafés keep their wording.
     const dist = venue.type === 'distillery';
@@ -66915,6 +66950,8 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Cocktail test 2 (2026-11-13).
+  // Pub test 3 (Whistler, 2026-11-14).
+  NIGHT_FREQUENCY_LABELS, SETUP_NIGHTS_HELP_TOPIC, withSetupNightsTopic, researchKidsAll, wineryVisitTicks,
   ownerNightsKeepFrequency, ownerNightsKeepSeason, ownerSetupNights, ownerSeasonHelpTopic, seasonLabelText, renderAdminChangeCard, ownerFieldLabelsFor,
   visitDropRepeatedKnownFor, frCardMetaText, researchSpendGuess,
   // Café test 6 (2026-11-12): preset answers in the page's language

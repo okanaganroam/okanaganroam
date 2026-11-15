@@ -114,6 +114,8 @@
   function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : T.seasonEditQOther; }
   // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
   function seaWhen(){ if (seaNamed()) return fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }); var sp = seaSpan(S.sea); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
+  // The stored season's dates for the year question's "Change my {a} – {b} hours", or null when none is stored.
+  function storedSea(){ if (!S.sea.on || !(CUR.hours_seasons || []).length || !S.sea.week) return null; var r = seaOut(S.sea); return r && r.ok && r.from && r.to ? { a: mdLabel(r.from), b: mdLabel(r.to) } : null; }
   function seaTitleRefresh(){ if (S.step !== 'hours:season') return; var t = screen.querySelector('h1'); if (t) t.textContent = seaTitle(); var dh = el('suSeaDaysH'); if (dh) dh.textContent = S.sea.exact ? T.seasonDaysHDates : T.seasonDaysH; }
   // The season box on a screen: "All year" / "Only some months", the month chips, and "Starts or ends mid-month? Pick the
   // exact dates" (two date boxes; the year is only there for the date picker).
@@ -286,6 +288,8 @@
   // Pub test (Whistler, 2026-11-14): research says "Minors until 9 PM": that answer and time are picked to start (saved
   // only with the screen), never a default of an hour before a 1 AM close.
   else if (C.pub && !S.minors.policy && C.suggestKidsUntil) { S.minors.policy = 'minors_until'; S.minors.until = C.suggestKidsUntil; }
+  // Pub test 3 (Whistler, 2026-11-14): research's "Family friendly" picks All ages to start (saved only with the screen).
+  else if (C.pub && !CK && !S.minors.policy && C.suggestKidsAll) S.minors.policy = 'all_ages';
   // Breweries (2026-11-12): "Who's welcome?" is the pub answer, stored with the brewery's own answers.
   if (C.brewery) { var BIm = (CUR.brewery_info || {}).minors || {}; S.minors = { policy: BIm.policy || '', until: BIm.until || minorsDefault(), note: BIm.note || '' };
     // Brewery test 4 (2026-11-13): research says "Kids welcome until 8 PM": that answer is picked to start (saved with the screen).
@@ -567,18 +571,20 @@
   S.happyKeep = [];
   // "Mon–Fri: …" (pub fresh-eyes, 2026-11-10: "Mon, Tue, Wed, Thu, Fri: …" read clunky). Runs of 3+ days become a range.
   // Deals saved before this used the long list; both are recognised, so old ones still come back as typed.
-  function dayPrefix(e){
+  // Pub test 3 (Whistler, 2026-11-14): a deal on every day reads "Every day: …" (« Tous les jours : … »), not "Mon–Sun: …".
+  function dayPrefix(e){ return DAYS.every(function(d){ return !!e.days[d]; }) && T.everyDayPrefix ? T.everyDayPrefix : rangePrefix(e); }
+  function rangePrefix(e){
     var on = DAYS.map(function(d){ return !!e.days[d]; }), out = [], i = 0;
     while (i < 7) { if (!on[i]) { i++; continue; } var j = i; while (j + 1 < 7 && on[j + 1]) j++;
       if (j - i >= 2) out.push(dayName(DAYS[i]) + '–' + dayName(DAYS[j])); else for (var k = i; k <= j; k++) out.push(dayName(DAYS[k])); i = j + 1; }
     return out.join(', ') + ': ';
   }
   function oldPrefix(e){ return DAYS.filter(function(d){ return e.days[d]; }).map(dayName).join(', ') + ': '; }
-  function prefixOf(e, text){ var a = dayPrefix(e), b = oldPrefix(e); return text.indexOf(a) === 0 ? a : text.indexOf(b) === 0 ? b : null; }
+  function prefixOf(e, text){ var a = dayPrefix(e), r = rangePrefix(e), b = oldPrefix(e); return text.indexOf(a) === 0 ? a : text.indexOf(r) === 0 ? r : text.indexOf(b) === 0 ? b : null; }
   (function(){
     if (CUR.happy_blocks && CUR.happy_blocks.length) {
       CUR.happy_blocks.forEach(function(b){ var days = {}; b.days.forEach(function(d){ days[d] = true; }); S.happy.push({ days: days, from: b.from, to: b.to, what: b.what, close: !!b.close }); });
-      var mine = {}; S.happy.forEach(function(e){ if (e.what) { mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? oldPrefix(e) : '') + e.what] = true; } });
+      var mine = {}; S.happy.forEach(function(e){ if (e.what) { mine[(S.happy.length > 1 ? dayPrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? rangePrefix(e) : '') + e.what] = true; mine[(S.happy.length > 1 ? oldPrefix(e) : '') + e.what] = true; } });
       S.happyKeep = (CUR.happy_hour_deals && CUR.happy_hour_deals.deals ? CUR.happy_hour_deals.deals : []).filter(function(d){ return d.price || !mine[d.text]; });
       S.happyTyped = true; return;
     }
@@ -606,7 +612,12 @@
   (CUR.specials || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var text = x.deal && x.deal.indexOf(x.title) === 0 ? x.deal : x.title + (x.deal && x.deal !== x.title ? (longCut(x.title, x.deal) ? ' ' : ', ') + x.deal : '');
     // Pub test 8 (2026-11-10): a special's optional times ("Sunday brunch 10 AM to 1 PM"), the start/end it always had.
     var e = { days: days, text: text, price: x.price || '', start: x.start || '', end: x.end && x.end !== 'close' ? x.end : '', endClose: x.end === 'close', orig: x, sea: seaFrom(x.season_from, x.season_to) }; e.was = daysKey(days) + '|' + e.text + '|' + e.price + '|' + seaKey(e.sea) + '|' + e.start + '|' + e.end; S.specials.push(e); });
-  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to), appt: x.frequency === 'appointment' }; e.was = daysKey(days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea) + (e.appt ? '|appt' : ''); S.nights.push(e); });
+  // Pub test 3 (Whistler, 2026-11-14): each event's "How often?" (the edit page's list; By appointment is its own button).
+  function nightFreqOf(f){ return f && f !== 'appointment' && (C.nightFreqs || []).some(function(o){ return o[0] === f; }) ? f : 'weekly'; }
+  function nightKey(e){ var ap = !!(e.appt && (e.kind === 'tour' || e.kind === 'class')); return daysKey(ap ? {} : e.days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea) + (ap ? '|appt' : '|' + (e.freq || 'weekly')); }
+  function freqLabel(f){ var o = (C.nightFreqs || []).filter(function(x){ return x[0] === f; })[0]; return o ? o[1] : ''; }
+  (CUR.weekly_nights || []).forEach(function(x){ var days = {}; (x.days || []).forEach(function(d){ days[d] = true; }); var e = { days: days, kind: x.kind, what: x.title, start: x.start || '', orig: x, sea: seaFrom(x.season_from, x.season_to), appt: x.frequency === 'appointment', freq: nightFreqOf(x.frequency) }; e.was = nightKey(e); S.nights.push(e); });
+  S.nightsSaved = (CUR.weekly_nights || []).slice();
   S.happySea = (function(){ try { var o = typeof CUR.happy_hour === 'string' ? JSON.parse(CUR.happy_hour) : CUR.happy_hour; var z = o && o._season; return seaFrom(z && z.from, z && z.to); } catch (e) { return seaFrom(); } })();
   S.happySeaWas = seaKey(S.happySea);
   S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
@@ -698,7 +709,7 @@
     var parts = memoParts(changes);
     if (parts.length && parts.every(function(x){ return sentMemo[x[0]] && sentMemo[x[0]].v === x[1]; })) return Promise.resolve(parts.some(function(x){ return sentMemo[x[0]].st === 'day'; }) ? 'day' : 'live');
     var remember = function(st){ if (changes.not_offered || changes.pub_info) sentMemo = {}; else parts.forEach(function(x){ sentMemo[x[0]] = { v: x[1], st: st }; }); return st; };
-    return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
+    return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
       if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
         if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); if (changes.cafe_info && 'year' in changes.cafe_info) S.savedYear = changes.cafe_info.year || ''; if (changes.brewery_info && 'year' in changes.brewery_info) S.savedYear = changes.brewery_info.year || '';
         return remember(j.review && j.review.length ? 'day' : 'live'); }
@@ -1032,12 +1043,21 @@
   // Cocktail test 3 (2026-11-14): opts.sr keeps the label for screen readers only, when the heading just above says the same.
   function field(id, label, value, opts){ opts = opts || {}; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
+  // Pub test 3 (Whistler, 2026-11-14): the Events row names each saved event that isn't every week ("Open mic: 1st of the month").
+  function musicOftenLine(){
+    if (!S.done.music || S.done.music === 'no' || S.done.music === 'skip') return '';
+    return (S.nightsSaved || []).filter(function(x){ return x && x.frequency && x.frequency !== 'weekly' && x.frequency !== 'appointment' && freqLabel(x.frequency); })
+      .map(function(x){ return fill(T.stOften, { title: x.title, often: freqLabel(x.frequency) }); }).join('; ');
+  }
   function statusRows(steps){
     return list(steps.map(function(s){
       var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
-      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
+      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '') + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
+  // Pub test 3 (Whistler, 2026-11-14): the spend's − and + move $2 at a time ($1 at a time was slow from $18 to $26); cafés
+  // keep $1 (a coffee and a pastry), with their 25-cent buttons.
+  var SPEND_STEP = C.cafe ? 1 : 2;
   var TOP2 = C.top2 || ['happy', 'specials', 'music', 'story'];
   // After "What you offer": the follow-up screens, in this order (pubs: sports, dogs, then always "Who's welcome?").
   function offerNext(from){
@@ -1397,8 +1417,10 @@
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
       var mrN = S.sea.on ? monthRun(S.sea.months) : null;
-      x = q(T.allYearQ, T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + msgs()
-        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+      x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + msgs()
+        // Pub test 3 (Whistler, 2026-11-14): with a season stored, "Change my Apr 20 – Jun 30 hours" opens it with its own
+        // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
+        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + (storedSea() ? big('✎', fill(T.seaChange, storedSea()), T.seaChangeSub, true, 'yearSeasonEdit') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter'))
         // Café test 2 (2026-11-11): a seasonal place says its open dates here, once, for every type.
         + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')
         // Wineries (2026-11-12): the one new choice, "In the off-season we're open by appointment".
@@ -1535,7 +1557,7 @@
       var guess = CUR.avg_spend && CUR.avg_spend.source === 'research' ? ' ' + fill(T.spendGuess, { n: CUR.avg_spend.amount }) : '';
       // Cafés (Decided 2): "About how much is a coffee and a pastry?" in the words for their kind.
       var sw = C.cafe ? cafeWords() : '';
-      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-1" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + '\u00a0$' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:1" aria-label="' + h(T.more) + '">+</button></div>'
+      x = doneLine('spend') + q(fill(T.spendQ, { words: sw }), fill(C.spendPublic ? T.spendLead : T.spendLeadOff || T.spendLead, { n: money(S.spend), words: sw }) + guess) + (C.spendPublic ? '' : '<p class="su-hint" id="suSpendWhy">' + h(T.spendWhyOff) + '</p>') + msgs() + '<div class="su-num"><button type="button" data-act="spend:-' + SPEND_STEP + '" aria-label="' + h(T.less) + '">−</button><output id="suSpend" aria-live="polite">' + (C.lang === 'fr' ? money(S.spend) + '\u00a0$' : '$' + money(S.spend)) + '</output><button type="button" data-act="spend:' + SPEND_STEP + '" aria-label="' + h(T.more) + '">+</button></div>'
         // Café test 2 (2026-11-11): cents for cafés ($5.50 a scoop), in 25-cent steps.
         + (C.cafe ? '<div class="su-samerow su-cents" role="group" aria-label="' + h(T.centsLabel) + '"><button type="button" class="su-toggle" data-act="spend:-0.25" aria-label="' + h(T.centsLess) + '">' + h(T.centsDown || '−25¢') + '</button><button type="button" class="su-toggle" data-act="spend:0.25" aria-label="' + h(T.centsMore) + '">' + h(T.centsUp || '+25¢') + '</button></div>' : '')
         + '<div class="su-stack">' + big('✓', fill(T.spendYes, { n: money(S.spend) }), '', false, 'spendSave') + '</div>' + skip('spend');
@@ -1732,7 +1754,8 @@
       if (C.winery && !S.done.offer && !S.picnicSuggested && S.wine.food === 'picnic' && C.offerLabels.picnic_area && !S.badges.picnic_area) { S.badges.picnic_area = true; S.picnicSuggested = true; }
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
-      if ((C.winery || C.brewery || CK) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      // Pub test 3 (Whistler, 2026-11-14): pubs too (research's "Free parking" in Good to know), only on an untouched tile.
+      if ((C.winery || C.brewery || C.pub) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -1838,8 +1861,9 @@
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
       x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
-          // Cocktail test 1 (2026-11-13): its how often from the edit page ("1st Thu of the month"), kept when this is saved.
-          + (function(){ var k = e.orig ? (CUR.weekly_nights || []).indexOf(e.orig) : -1, o = k >= 0 && (C.nightsOften || [])[k]; return o && T.oftenNow ? '<p class="su-hint su-often" id="suOften' + i + '">' + h(fill(CUR.weekly_nights_waiting ? T.oftenWaiting : T.oftenNow, { x: o })) + '</p>' : ''; })()
+          // Cocktail test 1 (2026-11-13): a how often sent from the edit page that we are still checking says so. Pub test 3
+          // (Whistler, 2026-11-14): otherwise "How often?" below shows it, so the "it stays when you save" line is gone.
+          + (function(){ var k = e.orig ? (CUR.weekly_nights || []).indexOf(e.orig) : -1, o = k >= 0 && (C.nightsOften || [])[k]; return o && CUR.weekly_nights_waiting && T.oftenWaiting ? '<p class="su-hint su-often" id="suOften' + i + '">' + h(fill(T.oftenWaiting, { x: o })) + '</p>' : ''; })()
           + '<p class="su-q" id="ntq' + i + '">' + h(T.whatEvent) + '</p>' + (function(){
             // Pub fresh-eyes (2026-11-10): the kinds sat folded under "Pick a kind" and went unseen. The 6 most common
             // show open; the rest wait under "More kinds" (open when the picked kind is one of them).
@@ -1852,9 +1876,11 @@
           // Distillery test 2 (2026-11-13): a tour or class may be "By appointment" (no day): next to the day chips.
           + '<p class="su-q">' + h(T.whichNights) + '</p>' + (nightAppt(e) ? '' : dayChips(e.days, 'nights.' + i))
           + (apptKind(e.kind) ? '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" id="suAppt' + i + '" aria-pressed="' + (nightAppt(e) ? 'true' : 'false') + '" data-act="ntAppt:' + i + '">' + h(T.byAppt) + '</button></div>' : '')
+          // Pub test 3 (Whistler, 2026-11-14): "How often?", one small choice (Every week to start).
+          + (nightAppt(e) || !(C.nightFreqs || []).length ? '' : '<label class="su-q" for="ntf' + i + '">' + h(T.howOften) + '</label><select class="su-field su-often-pick" id="ntf' + i + '" data-ntf="' + i + '">' + C.nightFreqs.map(function(o){ return '<option value="' + h(o[0]) + '"' + ((e.freq || 'weekly') === o[0] ? ' selected' : '') + '>' + h(o[1]) + '</option>'; }).join('') + '</select>')
           + '<label class="su-q" for="ntt' + i + '">' + h(T.eventTime) + '</label><div class="su-times" style="margin-top:0"><input type="time" id="ntt' + i + '" data-ntt="' + i + '" value="' + h(e.start || '') + '"></div>'
           + seasonBox('nights.' + i, e.sea || (e.sea = seaFrom())) + warnHtml('nights', i, e) + '</div>';
-      }).join('') + (T.eventsOften ? '<p class="su-hint" id="suEventsOften">' + h(T.eventsOften) + (T.eventsOftenLink && C.back ? ' <a href="' + h(C.back + '#tours-events') + '" id="suEventsOftenLink">' + h(T.eventsOftenLink) + '</a>' : '') + '</p>' : '') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
+      }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
       x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
@@ -1867,7 +1893,7 @@
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
       var qk = quick(cfg[0], 'suLine', S.visit[cfg[0]] || '');
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn', !qk) + qk + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn', !qk) + qk + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" data-vk="' + h(cfg[0]) + '" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
         // links"), and a link typed into the line above is offered a move into it instead of being refused.
         + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
@@ -2179,6 +2205,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sp]'), function(inp){ var q2 = inp.getAttribute('data-sp').split(':'); S.specials[+q2[0]][q2[1]] = inp.value; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-nt]'), function(inp){ S.nights[+inp.getAttribute('data-nt')].what = inp.value; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ntt]'), function(inp){ S.nights[+inp.getAttribute('data-ntt')].start = inp.value; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-ntf]'), function(inp){ S.nights[+inp.getAttribute('data-ntf')].freq = nightFreqOf(inp.value); });
   }
   // "18" -> "$18": a bare number typed as a price gets its dollar sign.
   // Café test 3 (2026-11-11): its own name. As a second `function money` it replaced the price screen's one, which
@@ -2219,14 +2246,14 @@
       if (!ds.length && !appt) { S.nudge = T.needDays; return render(); }
       if (!title) { S.nudge = T.needText; return render(); }
       var ns = seaOut(e.sea); if (!ns.ok) { S.nudge = ns.why; return render(); }
-      if (e.orig && e.was === daysKey(appt ? {} : e.days) + '|' + e.kind + '|' + e.what + '|' + e.start + '|' + seaKey(e.sea) + (appt ? '|appt' : '')) { out.push(e.orig); continue; }
+      if (e.orig && e.was === nightKey(e)) { out.push(e.orig); continue; }
       if (title.length > 40) { S.nudge = fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
       var n0 = e.orig || {}, sameTitle = e.orig && n0.title === title;
-      out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: appt ? 'appointment' : n0.frequency && n0.frequency !== 'appointment' ? n0.frequency : 'weekly',
+      out.push({ days: ds, kind: e.kind || 'other', title: title, start: e.start || null, end: n0.end || null, detail: n0.detail || null, host: n0.host || null, cost: n0.cost || null, frequency: appt ? 'appointment' : nightFreqOf(e.freq),
         title_fr: sameTitle ? n0.title_fr || null : null, detail_fr: sameTitle ? n0.detail_fr || null : null, season_from: ns.from, season_to: ns.to });
     }
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
-    list.push({ weekly_nights: out }); saveAll('music', list, null, null, function(){ CUR.weekly_nights_waiting = false; });
+    list.push({ weekly_nights: out }); saveAll('music', list, null, null, function(){ CUR.weekly_nights_waiting = false; S.nightsSaved = out; });
   }
   // "No" answers: clear what the page shows, then say "we don't have one" where the checklist has one.
   function sayNo(step){
@@ -2469,7 +2496,7 @@
       S.openSea = oNew; S.openDraft = null; S.openTouched = true; S.dirty = 'hours';
       if (S.openFrom === 'hours') {
         if (APPT) S.wYearPick = 'seasonal';
-        if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { S.sea.kind = 'summer'; S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } S.sea.on = true; S.sea.open = {}; S.seaTouched = true; return go('hours:season'); }
+        if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { var keepSt = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'summer'; if (!keepSt) { S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.seaTouched = true; return go('hours:season'); }
         if (k === 'openNone') return go('hours:year', true);
         if (v !== 'keep') { S.sea.on = false; S.seaTouched = true; }
         return hoursSave();
@@ -2483,10 +2510,15 @@
       if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
       return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
     }
+    // Pub test 3 (Whistler, 2026-11-14): the stored season, as it is (its dates and its own day hours).
+    if (k === 'yearSeasonEdit') { if (APPT) S.wYearPick = 'all'; S.sea.on = true; S.sea.open = {}; S.seaTouched = true; S.dirty = 'hours'; return go('hours:season'); }
     if (k === 'yearSeason') {
       if (S.sea.kind !== v || !S.sea.week) {
         // A new season (or the other one): its usual months, and the usual week to start from (every day, closed ones too).
-        S.sea.kind = v; S.sea.months = {}; SEA_MONTHS[v].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week);
+        // Pub test 3 (Whistler, 2026-11-14): never over a stored season's own dates and day hours (switching summer to winter
+        // copied the usual week over its Sun–Wed 10 PM): only its name changes.
+        var keepStored = !!(S.sea.week && (CUR.hours_seasons || []).length);
+        S.sea.kind = v; if (!keepStored) { S.sea.months = {}; SEA_MONTHS[v].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); }
       }
       if (APPT) S.wYearPick = 'all';
       S.sea.on = true; S.sea.open = {}; S.seaTouched = true; S.dirty = 'hours'; return go('hours:season');
@@ -3163,11 +3195,12 @@
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
     // Pub test 7 (2026-11-10): the story box too (its old text could only be removed with a long backspace).
-    Array.prototype.forEach.call(screen.querySelectorAll('input.su-field[type=text], input.su-field[type=tel], input.su-field[type=search], textarea.su-area'), function(inp){
+    // Pub test 3 (Whistler, 2026-11-14): the Known for, booking and groups lines (two-line boxes) too.
+    Array.prototype.forEach.call(screen.querySelectorAll('input.su-field[type=text], input.su-field[type=tel], input.su-field[type=search], textarea.su-area, textarea.su-line'), function(inp){
       if (inp.parentNode && /\bsu-fwrap\b/.test(inp.parentNode.className)) return;
-      var area = inp.tagName === 'TEXTAREA';
+      var area = inp.tagName === 'TEXTAREA', line = /\bsu-line\b/.test(inp.className);
       var w = document.createElement('div'); w.className = 'su-fwrap' + (area ? ' su-fwrap-area' : ''); inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'su-clear'; b.setAttribute('aria-label', area ? T.storyClear : T.clearField); b.setAttribute('data-clear', inp.id); b.textContent = '✕'; b.hidden = !inp.value; w.appendChild(b);
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'su-clear'; b.setAttribute('aria-label', area && !line ? T.storyClear : T.clearField); b.setAttribute('data-clear', inp.id); b.textContent = '✕'; b.hidden = !inp.value; w.appendChild(b);
       var keep = function(e){ e.preventDefault(); }; b.addEventListener('mousedown', keep); b.addEventListener('pointerdown', keep);
       b.onclick = function(){ inp.value = ''; b.hidden = true; try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} };
       inp.addEventListener('input', function(){ b.hidden = !inp.value; });
@@ -3180,7 +3213,10 @@
       // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
       // replaces it (never her own story, sent or on the page).
       var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!storyCur() && inp.value === storyCur();
-      var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory, first = true;
+      // Pub test 3 (Whistler, 2026-11-14): a Known for, booking or groups line still holding research's words is selected on
+      // its first tap too ("Locals' pub with house-brewed beerHouse-brewed beer…" was typed onto the end of it).
+      var vk = inp.getAttribute('data-vk'), researchLine = !!vk && !!inp.value && (C.visitResearch || []).indexOf(vk) >= 0 && inp.value === ((CUR.visit_rows || {})[vk] || '');
+      var pre = (inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory || researchLine, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
     });
   }

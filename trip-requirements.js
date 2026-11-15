@@ -297,6 +297,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   })();
   const startClock=/\b(?:starting|start|begin|leave|depart)(?:ing)?\s+(?:at\s+)?(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i.exec(original)||bareStart;
   const startMinutes=startClock?(Number(startClock[1])%12)*60+Number(startClock[2]||0)+(startClock[3].toLowerCase()==='pm'?720:0):null;
+  // Pub test 3 (Whistler, 2026-11-14): "Dinner at 7 PM at <place>" put dinner at 6 PM (the meal's own time was skipped as a
+  // start time and read nowhere else). A meal's own time is that meal's time: dinner or supper from 4 to 10 PM, lunch
+  // from 11 AM to 2 PM. -> mealMinutes { dinner, lunch } (absent when not said).
+  const mealMinutes={};
+  {const re=/\b(dinner|supper|lunch)\s+(?:at|around|for)\s+(1[0-2]|[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/gi;let mm;
+    while((mm=re.exec(original))){
+      const meal=/^lunch$/i.test(mm[1])?'lunch':'dinner',min=(Number(mm[2])%12)*60+Number(mm[3]||0)+(/^p/i.test(mm[4])?720:0);
+      if(mealMinutes[meal]==null&&(meal==='dinner'?min>=960&&min<=1320:min>=660&&min<=840))mealMinutes[meal]=min;
+    }}
   let deadlineMinutes=null;
   if(deadline){
     const clock=/^(\d+)(?::(\d+))?\s*(am|pm)$/.exec(deadline[1]);
@@ -455,7 +464,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
   // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
   const {onceTerms,onceEvening}=onceFoods(normalizedText);
-  return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
+  return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,...(Object.keys(mealMinutes).length?{mealMinutes}:{}),startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
 }
 // Time windows (2026-10-20, round 11): a request that names only a town and a time -- "this weekend in Squamish",
 // "Saturday evening in Squamish", "an afternoon in Whistler", "morning in Pemberton" -- is a plan for that time, not

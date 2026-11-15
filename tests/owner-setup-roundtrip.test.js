@@ -175,7 +175,9 @@ test('the page script: typed answers are never cut or joined, one number on the 
   // Pub test 8: the special's own times are part of the "unchanged" check.
   assert.match(s, /if \(e\.orig && e\.was === daysKey\(e\.days\) \+ '\|' \+ e\.text \+ '\|' \+ e\.price \+ '\|' \+ seaKey\(e\.sea\) \+ '\|' \+ \(e\.start \|\| ''\) \+ '\|' \+ \(e\.end \|\| ''\) && !!e\.endClose === \(e\.orig\.end === 'close'\)\) \{ out\.push\(e\.orig\); continue; \}/ /* pub test 9: until close is part of it */);
   // Distillery test 2 (2026-11-13): a tour by appointment keeps no days and is part of the "unchanged" key.
-  assert.match(s, /if \(e\.orig && e\.was === daysKey\(appt \? \{\} : e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start \+ '\|' \+ seaKey\(e\.sea\) \+ \(appt \? '\|appt' : ''\)\) \{ out\.push\(e\.orig\); continue; \}/);
+  // Pub test 3 (Whistler, 2026-11-14): the same check with the event's how often in it (nightKey).
+  assert.match(s, /if \(e\.orig && e\.was === nightKey\(e\)\) \{ out\.push\(e\.orig\); continue; \}/);
+  assert.match(s, /return daysKey\(ap \? \{\} : e\.days\) \+ '\|' \+ e\.kind \+ '\|' \+ e\.what \+ '\|' \+ e\.start \+ '\|' \+ seaKey\(e\.sea\) \+ \(ap \? '\|appt' : '\|' \+ \(e\.freq \|\| 'weekly'\)\);/);
   assert.doesNotMatch(s, /text\.slice\(0, 80\)/);
   // Seasonal hours not touched are not sent; a holiday keeps the note it was stored with.
   // Pub test 6: seasonal hours are only sent once the all-year question was answered on this visit (S.seaTouched).

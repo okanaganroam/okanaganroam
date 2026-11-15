@@ -401,7 +401,8 @@ var TRANSLATIONS = {
     'tripv3.map.marker': 'Day {day}, stop {n}: {name}',
     'tripv3.map.showInPlan': 'Show in plan',
     'tripv3.day': 'Day {n}',
-    'tripv3.from': 'from',
+    // Pub test 3 (Whistler, 2026-11-14): read aloud "4.5 out of 5 (188 reviews)", never "4.5 from (188 reviews)".
+    'tripv3.from': 'out of 5',
     'tripv3.reviews': '({n} reviews)',
     'tripv3.priceLevel': 'Price level {n} of 4',
     'tripv3.verified': 'Verified on Okanagan Roam',

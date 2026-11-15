@@ -226,10 +226,10 @@ test('events: “Live music, DJs and events” (« Musique, DJ et événements �
   assert.equal(en.t.labels.music, 'Live music, DJs and events');
   assert.equal(fr.t.labels.music, 'Musique, DJ et événements');
   assert.deepEqual(en.nightKinds.slice(0, 4), ['live_music', 'dj', 'trivia', 'comedy']);
-  // Cocktail test 1 (2026-11-13): "set how often on your edit page. Set how often" (never "Weekly nights").
-  assert.match(en.t.eventsOften, /set how often on your edit page\./); assert.equal(en.t.eventsOftenLink, 'Set how often');
-  assert.doesNotMatch(en.t.eventsOften, /Weekly nights/); assert.doesNotMatch(fr.t.eventsOften, /Soirées de la semaine/); assert.equal(fr.t.eventsOftenLink, 'Choisir la fréquence');
-  assert.match(CLIENT(), /C\.back \+ '#tours-events'/);
+  // Pub test 3 (Whistler, 2026-11-14): "How often?" is on each event in the setup now, so the "set how often on your edit
+  // page" note and its link are gone.
+  assert.equal(en.t.eventsOften, undefined); assert.equal(fr.t.eventsOften, undefined);
+  assert.equal(en.t.howOften, 'How often?'); assert.deepEqual(en.nightFreqs.map((x) => x[0]), ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th']);
   assert.match((await get(`/owner/${t}`)).text, /<summary id="tours-events">/, 'the anchor on the edit page');
   // Groups and booking: one screen, the booking box always shown, quick answers for groups and walk-ins.
   assert.equal(en.t.labels.groups, 'Groups and booking');
@@ -310,7 +310,7 @@ test('help: cocktail list, DJ nights, 19+, walk-ins or booking, and the cocktail
   for (const x of T) for (const a of [x.a, x.aFr]) { assert.doesNotMatch(a, /we emailed|we sent you|nous vous avons écrit|upgrade|premium|paid|payant/i, x.id); }
   assert.match(T.find((x) => x.id === 'cocktail-price').a, /\$12, \$14, \$16 or \$18/);
   assert.match(T.find((x) => x.id === 'cocktail-kids').a, /Adults only \(19\+\)/);
-  assert.match(T.find((x) => x.id === 'cocktail-djs').a, /\{EDIT\}#tours-events/);
+  assert.match(T.find((x) => x.id === 'cocktail-djs').a, /Pick it under <strong>How often\?<\/strong> on each event/);
   const v = mk('cocktail'); const t = tokenFor(v.id);
   const html = (await get(`/owner/${t}/setup`)).text;
   for (const id of ['cocktail-price', 'cocktail-kids', 'cocktail-booking', 'cocktail-menu']) assert.match(html, new RegExp(`"id":"${id}"`), id);
@@ -360,8 +360,9 @@ for (const type of ['cocktail', 'pub', 'brewery', 'distillery', 'cafe']) {
 }
 test('how often: the client shows it under the event and sends the stored frequency of an untouched row', () => {
   const s = CLIENT();
-  assert.match(s, /T\.oftenWaiting : T\.oftenNow/);
-  assert.match(s, /frequency: appt \? 'appointment' : n0\.frequency && n0\.frequency !== 'appointment' \? n0\.frequency : 'weekly'/);
+  // Pub test 3 (Whistler, 2026-11-14): only a how often still waiting for our check gets a line; "How often?" shows the rest.
+  assert.match(s, /CUR\.weekly_nights_waiting && T\.oftenWaiting \?/);
+  assert.match(s, /frequency: appt \? 'appointment' : nightFreqOf\(e\.freq\)/);
   assert.equal(text.en.oftenNow, 'How often: {x}. It stays when you save.');
 });
 
@@ -471,7 +472,7 @@ test('Events wording for a lounge: page, edit page (Event 1, DJ first, lounge ex
   assert.doesNotMatch(edit.replace(/<script[\s\S]*?<\/script>/g, ''), /House pints|Wing Wednesday|Local wine &amp; craft beer/);
   assert.match(edit, /Martini Monday/);
   const help = app.COCKTAIL_SETUP_HELP_TOPICS.find((x) => x.id === 'cocktail-djs');
-  assert.match(help.a, /Tap <strong>DJ<\/strong> \(or Live music, Comedy…\)/); assert.match(help.a, /<strong>Set how often<\/strong><\/a>/); assert.doesNotMatch(help.a, /Weekly nights|Trivia/);
+  assert.match(help.a, /Tap <strong>DJ<\/strong> \(or Live music, Comedy…\)/); assert.match(help.a, /<strong>How often\?<\/strong>/); assert.doesNotMatch(help.a, /Weekly nights|Trivia/);
   assert.deepEqual(help.noRelated, ['weekly-nights']);
   const pub = (await get(`/owner/${tokenFor(mk('pub').id)}`)).text;
   assert.match(pub, /<legend>Night 1<\/legend>/); assert.match(pub, /Weekly nights: days and how often/); assert.match(pub, /House pints/);
@@ -788,7 +789,7 @@ test('help (test 3): “How do I change my happy hour?” gets the happy hour ti
   const features = app.OWNER_HELP_TOPICS.find((x) => x.id === 'features');
   assert.ok(!features.keys.includes('happy hour') && !features.keysFr.includes('5 a 7') && !features.keysFr.includes('cinq a sept'), 'badges no longer own happy hour');
   const t = app.HH_TIMES_HELP_TOPIC;
-  assert.match(t.a, /<strong>Set up your page<\/strong>, tap <strong>Change an answer<\/strong>, then <strong>Happy hour<\/strong>\. Days and times you type in there go live straight away\./);
+  assert.match(t.a, /<strong>Set up your page<\/strong>, tap <strong>Change an answer<\/strong>, then <strong>Happy hour<\/strong>\. .*Days and times you type in there go live straight away\./);
   assert.match(t.a, /typed up by us first, usually within a day/); assert.match(t.a, /\{ON\}, open <strong>Happy hour<\/strong>.*tap \{SEND\}\. \{LIVE\}/);
   assert.match(t.aFr, /<strong>Modifier une réponse<\/strong>, puis <strong>5 à 7<\/strong>/); assert.match(t.aFr, /ouvrez <strong>5 à 7<\/strong>/); assert.doesNotMatch(t.aFr, /happy hour/i);
   // Cafés and wineries have no happy hour screen in their setup: the edit page only.
@@ -881,7 +882,7 @@ test('events row (test 3): “on your page · how often within a day” while a 
   vm.runInNewContext(s.slice(s.indexOf('  function musicOftenWaiting()'), s.indexOf('  // Brewery test 1 (2026-11-12): a step answered "within a day" reads')) + 'this.st = stText;', ctx);
   assert.equal(ctx.st('music', 'live'), 'on your page · how often within a day');
   // A setup events save sends it live (Dayton keeps that); the row then says "on your page".
-  assert.match(s, /saveAll\('music', list, null, null, function\(\)\{ CUR\.weekly_nights_waiting = false; \}\);/);
+  assert.match(s, /saveAll\('music', list, null, null, function\(\)\{ CUR\.weekly_nights_waiting = false; S\.nightsSaved = out; \}\);/);
   assert.equal((await change(t, { weekly_nights: asSetup(app.venueWeeklyNightsList(v.id)) })).status, 200);
   assert.deepEqual(liveNights(v.id), ['Jazz night|biweekly']);
   cfg = await setupCfg(t);
