@@ -367,6 +367,8 @@
   S.noWifi = (CUR.not_offered || []).indexOf('wifi') >= 0 && !(CUR.badges || {}).wifi;
   // Decided 6: a kind the name suggests ("… Bakery" → Bakery) is pre-selected only. It is saved when the owner taps Save.
   if (C.cafe && !S.place && C.suggestKind) { S.place = C.suggestKind; S.kindGuessed = C.suggestKind; }
+  // Restaurant test 3 (Whistler, 2026-11-15): "Family Kitchen" pre-picks Family (saved only with the screen).
+  if (C.restaurant && !S.place && C.suggestPlace) { S.place = C.suggestPlace; S.kindGuessed = C.suggestPlace; }
   // Bug-check (2026-11-12): the starting price fits the kind: a single scoop starts at $6 and a bubble tea at $7, not the
   // $9 coffee and pastry. It follows the kind she picks until she changes the price.
   function cafeSpendStart(){ return S.place === 'Ice cream & gelato' ? 6 : S.place === 'Bubble tea' ? 7 : 9; }
@@ -1491,7 +1493,10 @@
       x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + msgs()
         // Pub test 3 (Whistler, 2026-11-14): with a season stored, "Change my Apr 20 – Jun 30 hours" opens it with its own
         // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
-        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + (storedSea() ? big('✎', fill(T.seaChange, storedSea()), T.seaChangeSub, true, 'yearSeasonEdit') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter'))
+        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + (storedSea() ? big('✎', fill(T.seaChange, storedSea()), T.seaChangeSub, true, 'yearSeasonEdit') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+          // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
+          // months set, the date boxes open, and she picks the dates.
+          + (T.allYearPart ? big('🍂', T.allYearPart, T.allYearPartSub, true, 'yearSeason:part') : ''))
         // Café test 2 (2026-11-11): a seasonal place says its open dates here, once, for every type.
         + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')
         // Wineries (2026-11-12): the one new choice, "In the off-season we're open by appointment".
@@ -1554,6 +1559,9 @@
             // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
             // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
             + (w.length < 2 && T.addSecond ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : '')
+            // Restaurant test 3 (Whistler, 2026-11-15): with two times the button goes; the card says why, and how breakfast
+            // that runs into lunch fits (start the first time earlier).
+            + (w.length >= 2 && T.twoTimesMax ? '<p class="su-hint su-twotimes">' + h(T.twoTimesMax) + '</p>' : '')
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
@@ -1748,7 +1756,7 @@
         // Only before the kitchen question is answered (pub test 5: offered right after "food until we close").
         + (C.pub && !S.kitchen.mode ? '<div class="su-skip"><button type="button" class="su-link" data-act="noFood">' + h(T.noFood) + '</button></div>' : '') + skip('cuisine');
     } else if (s === 'cuisine:place') {
-      x = q(T.placeQ, T.placeLead) + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
+      x = q(T.placeQ, T.placeLead) + (C.restaurant && T.placeGuess && S.kindGuessed && S.place === S.kindGuessed && !CUR.place_type ? '<p class="su-sent su-research" id="suKindGuess">' + h(fill(T.placeGuess, { kind: C.placeNames[S.place] || S.place })) + '</p>' : '') + msgs() + '<div class="su-tiles">' + C.placeTypes.map(function(pt){ return '<button type="button" class="su-tile" aria-pressed="' + (S.place === pt ? 'true' : 'false') + '" data-place="' + h(pt) + '">' + h(C.placeNames[pt] || pt) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
     } else if (s === 'photos') {
       x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ').replace(/^✓ (\S)/, function(m, c){ return '✓ ' + c.toUpperCase(); })) + '</p>' + q(T.photosMore) : q(T.photosQ, photosHint())) + msgs()
@@ -2322,8 +2330,12 @@
       // became "Buy 9" over "get the 10th free"). A line that fits a title (40) is the title, and the deal repeats it
       // (the deal is required; the page never shows a repeat). A longer line is cut between words: the title is the words
       // that fit, the deal the rest, so the page reads it in order.
+      // Restaurant test 3 (Whistler, 2026-11-15): "Kids eat free, one kids meal per adult main" was cut mid-sentence (the
+      // page showed "main" alone). A longer line is split at its first clear separator (" · ", " - ", " – ", ": ") when
+      // the title before it fits; only a line with none is still cut between words, and the page shows that cut as one
+      // line (server.js specialCutMidLine). A comma never splits ("Buy 9, get the 10th free…", café test 3).
       var t1 = text, rest = '';
-      if (text.length > 40) { var cut = text.lastIndexOf(' ', 40); if (cut < 10) cut = 40; t1 = text.slice(0, cut).trim(); rest = text.slice(cut).trim(); }
+      if (text.length > 40) { var sepM = /^(.{3,40}?)(?: · | - | – |: )(.+)$/.exec(text), cut = text.lastIndexOf(' ', 40); if (cut < 10) cut = 40; t1 = sepM ? sepM[1].trim() : text.slice(0, cut).trim(); rest = sepM ? sepM[2].trim() : text.slice(cut).trim(); }
       out.push({ days: ds, title: frNew ? '' : sameText ? o0.title : t1, deal: frNew ? '' : sameText ? o0.deal : (rest || text), price: moneyStr(e.price) || null, kind: o0.kind || (C.servesAlcohol ? 'both' : 'food'),
         start: e.start || null, end: e.end || (e.endClose ? 'close' : null), title_fr: frNew ? t1 : sameText ? o0.title_fr || null : null, deal_fr: frNew ? (rest || text) : sameText ? o0.deal_fr || null : null, season_from: ss.from, season_to: ss.to });
     }
@@ -2624,7 +2636,7 @@
         // Pub test 3 (Whistler, 2026-11-14): never over a stored season's own dates and day hours (switching summer to winter
         // copied the usual week over its Sun–Wed 10 PM): only its name changes.
         var keepStored = !!(S.sea.week && (CUR.hours_seasons || []).length);
-        S.sea.kind = v; if (!keepStored) { S.sea.months = {}; SEA_MONTHS[v].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); }
+        S.sea.kind = v; if (!keepStored) { S.sea.months = {}; (SEA_MONTHS[v] || []).forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); if (v === 'part') S.sea.exact = { from: '', to: '' }; }
       }
       if (APPT) S.wYearPick = 'all';
       S.sea.on = true; S.sea.open = {}; S.seaTouched = true; S.dirty = 'hours'; return go('hours:season');
@@ -3284,7 +3296,7 @@
       else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
       else if (saysIt(v, t, sibs)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
-      box.value = v.slice(0, 180); mark();
+      box.value = v.slice(0, 180); box._qPrev = box.value; mark();
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
@@ -3402,10 +3414,29 @@
   };
   screen.addEventListener('input', timeTyped); screen.addEventListener('change', timeTyped);
   // Pub test (Whistler, 2026-11-14): a quick answer stayed lit after its words were typed over; its chips follow the box.
+  // Restaurant test 3 (Whistler, 2026-11-15): "Patio only" tapped, then her own sentence typed after it read "Patio
+  // onlyDogs welcome…". When the box holds only quick answers and she types on at the end, the chips' own separator
+  // (". ", or ", " for takeout) goes in first: "Patio only. Dogs welcome…". Nothing she typed is ever changed or lost;
+  // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
+  var quickJoin = function(box, prev, sibs, sep){
+    var v = box.value, p0 = String(prev || '');
+    if (!p0.trim() || v.length <= p0.length || v.slice(0, p0.length) !== p0 || /[\s.,;:!?]$/.test(p0)) return false;
+    var added = v.slice(p0.length);
+    // A space typed first: wait for the next letter (the box still holds only the chips).
+    if (!added.trim()) return 'wait';
+    if (!/^\s?[^\s.,;:!?]/.test(added)) return false;
+    var low = sibs.map(function(x){ return String(x).toLowerCase(); });
+    if (!p0.split(sep.trim()).every(function(x){ return low.indexOf(x.trim().toLowerCase()) >= 0; })) return false;
+    var at = box.selectionStart, lead = /^\s/.test(added) ? 1 : 0, nv = (p0 + sep + added.slice(lead)).slice(0, 180);
+    box.value = nv; try { if (at != null) box.setSelectionRange(Math.min(nv.length, at + sep.length - lead), Math.min(nv.length, at + sep.length - lead)); } catch (e0) {}
+    return true;
+  };
+  screen.addEventListener('focusin', function(e){ if (e.target && e.target.id && screen.querySelector('[data-quick][data-box="' + e.target.id + '"]')) e.target._qPrev = e.target.value; });
   var quickTyped = function(e){
     var id = e.target && e.target.id; if (!id) return;
     var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === id; }); if (!mine.length) return;
     var sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
+    if (e.target._qPrev == null || quickJoin(e.target, e.target._qPrev, sibs, mine[0].getAttribute('data-sep') || '. ') !== 'wait') e.target._qPrev = e.target.value;
     mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(e.target.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
   };
   screen.addEventListener('input', quickTyped);

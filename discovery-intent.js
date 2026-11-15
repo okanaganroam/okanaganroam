@@ -2277,6 +2277,27 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     for (const k of c.collections) if (!keep.collections.includes(k)) keep.collections.push(k);
     return false;
   });
+  // Restaurant test 3 (Whistler, 2026-11-15): "Family dinner … at 5:30pm, somewhere kids eat free" planned dinner and then a
+  // second "restaurants" stop ("eat" was a part of its own). A plain eating word ("eat", "food", "a restaurant") next to the
+  // one meal asked for is that meal, not another stop; the trip stays a plan of that meal.
+  {
+    const meals = parts.filter((c) => c.kind === 'venue' && c.meal);
+    if (meals.length === 1) {
+      const meal = meals[0];
+      const before = parts.length;
+      parts = parts.filter((c) => {
+        if (c === meal || c.kind !== 'venue' || c.meal || c.generic || c.activities.length || c.cuisines.length) return true;
+        if (!/^(?:eat|eats|eating|food|restaurants?|a restaurant|somewhere to eat|place to eat|a place to eat)$/.test(String(c.phrase || ''))) return true;
+        if (!c.types.length || !c.types.every((ty) => meal.types.includes(ty))) return true;
+        if (c.daypart && meal.daypart && c.daypart !== meal.daypart) return true;
+        meal.dog = meal.dog || c.dog;
+        for (const f of c.features) if (!meal.features.includes(f)) meal.features.push(f);
+        for (const k of c.collections) if (!meal.collections.includes(k)) meal.collections.push(k);
+        return false;
+      });
+      if (parts.length < before && parts.length === 1) out.foldedMeal = true;
+    }
+  }
   for (const c of parts) {
     if (c.kind !== 'venue') continue;
     if (out.party.dog) c.dog = true;
@@ -2334,7 +2355,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };
   const venueParts = parts.filter((c) => c.kind === 'venue').length;
   if (base.mode === 'events' && venueParts === 0) return { ...out, multi: false };
-  out.multi = out.route ? parts.length >= 1 : parts.length >= 2;
+  out.multi = out.route || out.foldedMeal ? parts.length >= 1 : parts.length >= 2;
   return out;
 }
 

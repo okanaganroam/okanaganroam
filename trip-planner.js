@@ -58,6 +58,10 @@ const SLOT_AFFINITY = {
   // without dinner ("Evening: Sperling Vineyards", no hours listed). A winery with a restaurant is a restaurant listing.
   evening: { restaurant: 3, cocktail: 3, pub: 3, brewery: 2, indoor: 2, tour: 1, sport: 1 },
 };
+// Restaurant test 3 (Whistler, 2026-11-15): a restaurant listed as Breakfast & Brunch suits the morning like a café (a
+// family brunch at 9 picked a café over the family restaurant open from 8 for brunch).
+function brunchPlace(v) { return !!v && v.type === 'restaurant' && /\b(?:breakfast|brunch)\b/i.test(`${v.cuisine || ''} ${v.cuisineLabel || ''}`); }
+function slotAffinity(part, v) { return ((SLOT_AFFINITY[part] || {})[v.type] || 0) || (part === 'morning' && brunchPlace(v) ? SLOT_AFFINITY.morning.cafe : 0); }
 // Types on which the Food & Drink badge columns are meaningful.
 const BADGE_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery'];
 const DINING_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'];
@@ -708,6 +712,33 @@ function specialFoodMatch(v, ft, date) {
     return textHas(t, term) || (stem.length >= 3 && textHas(t, stem));
   }) || null;
 }
+// Restaurant test 3 (Whistler, 2026-11-15): "somewhere kids eat free" on a Monday missed the family place whose Monday
+// special is "Kids eat free" ("free" was a word it couldn't use). A special whose own name (or deal) is two or more words
+// and every one of them is in the request ("kids eat free", "wing night", "taco tuesday") is that special, on the plan's
+// day (any day when undated) and in its season. -> the special or null.
+const SPECIAL_SKIP_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'with', 'per', 'of', 'for', 'on', 'at', 'to', 'in', 'our', 'all', 'any', 'every', 'each']);
+function specialWords(t) { return normWords(t).split(' ').filter((w) => w && !SPECIAL_SKIP_WORDS.has(w) && !/^\d/.test(w)).map((w) => w.length > 3 ? w.replace(/(?:es|s)$/, '') : w); }
+function specialPhraseMatch(v, ctx) {
+  const list = (v && v.specials) || [];
+  const q = ctx && ctx.queryText;
+  if (!list.length || !q) return null;
+  const date = ctxPlanDate(ctx);
+  const weekday = date ? ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${date}T12:00:00Z`).getUTCDay()] : null;
+  const md = date ? date.slice(5) : null;
+  const asked = new Set(specialWords(q));
+  // The name, the deal, and each part of them between a comma, colon, dash or dot ("Kids eat free, one kids meal per
+  // adult" is "Kids eat free" first).
+  const phrases = (s) => [s.title, s.deal].flatMap((t) => [t].concat(String(t || '').split(/\s*(?:[,;:·|]|\s[-–—]\s)\s*/))).map((t) => String(t || '').trim()).filter(Boolean);
+  for (const s of list) {
+    if (weekday && !(s.days || []).includes(weekday)) continue;
+    if (md && s.season_from && s.season_to && !(s.season_from <= s.season_to ? md >= s.season_from && md <= s.season_to : md >= s.season_from || md <= s.season_to)) continue;
+    const hit = phrases(s).find((t) => { const w = specialWords(t); return w.length >= 2 && w.length <= 5 && w.every((x) => asked.has(x)); });
+    if (hit) return { ...s, phrase: hit };
+  }
+  return null;
+}
+// The request's words a planned place's special used (so they are never listed as not used).
+function specialPhraseWords(sp) { return sp ? normWords(sp.phrase || '').split(' ').filter(Boolean) : []; }
 // A request word met by the listing's own nights or specials (for eligibility; scoreVenue ranks them).
 function listedMatch(v, ft, ctx) {
   const kind = nightKindOfTerm(ft && ft.term);
@@ -1158,6 +1189,10 @@ function scoreVenue(v, ctx) {
     const m = foodMatch(v, ft);
     if (!m) continue;
     if (m.cuisine) add('food', 18, `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
+    // Restaurant test 3 (Whistler, 2026-11-15): "family Saturday brunch at 9am" picked a café that only mentions brunch over
+    // the family restaurant listed as Breakfast & Brunch (open at 8). A brunch or breakfast place by its listed cuisine is
+    // what was asked for, like a cuisine match, and ahead of a word in a name.
+    else if (m.inCui && /^(?:brunch|breakfast)$/.test(ft.term)) add('food', 26 + (m.inName ? 4 : 0) + (m.inDesc ? 4 : 0), `Listed cuisine: ${v.cuisineLabel || v.cuisine} — matches “${ft.term}”`);
     else {
       const where = [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 'description'].filter(Boolean);
       // A loose word in a restaurant's description ("desert", "quiet") counts for less than a dish it serves.
@@ -1166,6 +1201,8 @@ function scoreVenue(v, ctx) {
       add('food', (m.inName ? 15 : 0) + (m.inCui ? 10 : 0) + (m.inDesc ? (loose ? 3 : 7) : 0), `Mentions “${ft.term}” in its ${listText(where)}`);
     }
   }
+  const phraseSp = specialPhraseMatch(v, ctx);
+  if (phraseSp) add('special', planDate ? 30 : 15, `${planDate ? `${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]]} special` : 'Weekly special'}: ${phraseSp.phrase.charAt(0).toUpperCase() + phraseSp.phrase.slice(1)}`);
   // 2026-10-28: a cozy or intimate request is not a sports bar (Montana's and King Taps for "a cozy dinner").
   if (v.features.sports_tv && !ctx.features.includes('sports_tv') && ctx.foodTerms.some((ft) => VIBE_TERM_RE.test(ft.term))) add('vibe_miss', -15, null);
   if (vibeMealAsked(ctx) && v.type === 'restaurant' && ctx.foodTerms.some((ft) => VIBE_TERM_RE.test(ft.term) && foodMatch(v, ft))) add('vibe_meal', 8, null);
@@ -1772,7 +1809,7 @@ function requestedTimeFit(v, ctx) {
     const day = parsed.days[weekday];
     if (parsed.known && provenClosed(day, live.win)) return { skip: true };
     const typePart = part || (live.now >= 17 * 60 ? 'evening' : live.now >= 13 * 60 ? 'afternoon' : live.now >= 11 * 60 + 30 ? 'midday' : 'morning');
-    score += ((SLOT_AFFINITY[typePart] || {})[v.type] || 0) * 4;
+    score += slotAffinity(typePart, v) * 4;
     if (typePart === 'evening') score += dinnerAdjust(v);
     const role = cafeRole(v);
     if (role && CAFE_SLOT_ADJUST[role]) score += CAFE_SLOT_ADJUST[role][typePart] || 0;
@@ -1792,7 +1829,7 @@ function requestedTimeFit(v, ctx) {
     if (parsed.known && days.every((d) => provenClosed(parsed.days[d], win))) return { skip: true };
     let fit = hoursFit(v, part, weekday);
     if (fit.status === 'closed') fit = { status: 'short', days };
-    score += ((SLOT_AFFINITY[part] || {})[v.type] || 0) * 4;
+    score += slotAffinity(part, v) * 4;
     if (part === 'evening') score += dinnerAdjust(v);
     const role = cafeRole(v);
     if (role && CAFE_SLOT_ADJUST[role]) score += CAFE_SLOT_ADJUST[role][part] || 0;
@@ -2620,7 +2657,7 @@ function buildDays(facts, ctx, days, pinned) {
           if (activityGap && DINING_TYPES.includes(v.type)) continue;
           if (daytimePart(daypart) && eveningOnlyVenue(v)) continue; // round 11: no comedy club at 1 PM
           if (notAMeal(v) && (daypart === 'midday' || daypart === 'evening')) continue; // round 12: a dessert stand is not a meal
-          const aff = (SLOT_AFFINITY[daypart] || {})[v.type] || (daypart === 'morning' && v.type === 'winery' && days === 1 && ctx.types.has('winery') && dayDayparts.includes('midday') ? 2 : 0);
+          const aff = slotAffinity(daypart, v) || (daypart === 'morning' && v.type === 'winery' && days === 1 && ctx.types.has('winery') && dayDayparts.includes('midday') ? 2 : 0);
           if (!aff) continue;
           if (offSeasonSkip(v, ctx)) continue;
           if (placeKey(v) && usedPlaces.has(placeKey(v)) && !(ctx.requirements?.items || []).some((i) => i.kind === 'venue' && i.value === v.id)) continue;
@@ -4043,6 +4080,12 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
     if(assumed&&first?.venue&&/\b(?:dinner|supper)\b/i.test(first.label||'')){
       const anchor=group.stops.find(s=>s.event),start=anchor&&parseEventStart(anchor.event.time);
       if(start!=null&&start>=1020)cursor=Math.min(cursor,900);
+    }
+    // Restaurant test 3 (Whistler, 2026-11-15): "Family dinner … at 5:30pm" planned dinner at 6. A day that opens with the
+    // meal asked for at its own time starts then, not at the usual 6 PM (or 12 PM) of that part of the day.
+    if(assumed&&first&&!first.event&&requirements.mealMinutes){
+      const own=isDinnerStop(first)?requirements.mealMinutes.dinner:isLunchStop(first)?requirements.mealMinutes.lunch:null;
+      if(Number.isFinite(own)&&own<cursor)cursor=own;
     }
     // 2026-10-19: lunch right before an event that starts at lunchtime (a noon Halloween trail) cannot fit before it
     // with travel and the arrival allowance, so it was a "Timing conflict"; lunch moves to after the event instead.
@@ -8230,6 +8273,18 @@ function planItinerary(input) {
   };
   if (trip.party && trip.party.dog && stops.some((s) => s.kind === 'event')) result.notes.push('Events aren’t checked for dogs; the dog-friendly requirement applies to the places.');
   if (stops.some((s) => s.kind === 'venue')) result.notes.push(`Stops are checked against each venue’s listed hours on ${SITE.brand} where it has them; hours can change, so check before you go.`);
+  // Restaurant test 3 (2026-11-15): a word a planned place's special used ("free" in "Kids eat free") is not "not used".
+  const byFactId = new Map(facts.map((f) => [f.id, f]));
+  const spUsed = new Set(stops.filter((st) => st.venue).flatMap((st) => specialPhraseWords(specialPhraseMatch(byFactId.get(st.venue.id), baseCtx))));
+  if (spUsed.size && leftover.some((w) => spUsed.has(w))) {
+    const left = leftover.filter((w) => !spUsed.has(w));
+    result.specialWordsUsed = leftover.filter((w) => spUsed.has(w));
+    const at = result.warnings.findIndex((w) => /^Not part of this plan: /.test(w));
+    if (at >= 0) {
+      if (left.length) result.warnings[at] = `Not part of this plan: ${listText(left.map((w) => `“${w}”`))} — ${SITE.brand} couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
+      else result.warnings.splice(at, 1);
+    }
+  }
   return result;
 }
 
@@ -8266,7 +8321,7 @@ module.exports = {
   partAt,
   relabelDayparts,
   // Build My Trip audit fixes (2026-10-27)
-  ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, afterMidnightTonight, skiOpeningFor,
+  ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, specialPhraseMatch, afterMidnightTonight, skiOpeningFor,
   withSameEstates, longDayHike, longDayHikeMinutes, oneSpaAsked,
   coolBeachMonth,
   dogOnlyPlace,
