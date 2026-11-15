@@ -22068,7 +22068,15 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(frForm, /<html lang="fr" data-page-lang="fr">/, 'French pass 6: the French twin markup, like the other French pages');
     assert.match(frForm, /<h1>Réclamer cette fiche<\/h1>/);
     assert.match(frForm, /Envoyer ma demande/);
-    assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
+    // A removed listing's claim link (2026-11-14): the town's list of that kind of place, or the town page when it has none; an unknown town still 404s.
+    const gone = await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`, { redirect: 'manual' });
+    assert.equal(gone.status, 302);
+    assert.equal(gone.headers.get('location'), '/kelowna/cafes');
+    assert.equal((await fetch(`${base}/fr/claim/kelowna/cafes/no-such-cafe`, { redirect: 'manual' })).headers.get('location'), '/fr/kelowna/cafes');
+    if (!db.prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL').get('kelowna', 'distillery')) {
+      assert.equal((await fetch(`${base}/claim/kelowna/distilleries/no-such-place`, { redirect: 'manual' })).headers.get('location'), '/kelowna');
+    }
+    assert.equal((await fetch(`${base}/claim/atlantis/cafes/no-such-cafe`, { redirect: 'manual' })).status, 404);
     // An old claim link (emailed before the listing was renamed) follows the rename (2026-11-07).
     db.prepare('INSERT OR REPLACE INTO venue_slug_redirects (region, type, old_slug, venue_id, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)').run('kelowna', 'cafe', 'claim-fixture-cafe-old', v.id);
     const oldLink = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe-old?utm_medium=email`, { redirect: 'manual' });

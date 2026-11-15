@@ -65364,6 +65364,13 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(301, { Location: `${cm[1] || ''}/claim${venuePagePath(moved)}${parsed.search || ''}` });
             return res.end();
           }
+          // A listing that was removed (2026-11-14, dashboard Broken pages): no dead end. Send them to that town's list
+          // of the same kind of place, or the town page when it has none (302: the listing could come back).
+          if (REGION_LABELS[cm[2]]) {
+            const hasKind = type && CATEGORY_SLUGS[type] && db.prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL LIMIT 1').get(cm[2], type);
+            res.writeHead(302, { Location: `${cm[1] || ''}/${cm[2]}${hasKind ? `/${CATEGORY_SLUGS[type]}` : ''}`, 'Cache-Control': 'public, max-age=3600' });
+            return res.end();
+          }
           res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(render404Page(pathname));
         }
