@@ -296,7 +296,7 @@ Object.assign(fr, {
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
   menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
-  quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'Sans réservation aussi'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
+  quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'On accepte aussi les clients sans réservation'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
     dogs: ['Terrasse seulement', 'Intérieur et terrasse', 'Bols d’eau à l’entrée'], groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible'] },
   quickDogsFull: ['Chiens bienvenus sur la terrasse seulement', 'Chiens bienvenus à l’intérieur et sur la terrasse'],
   savedCuisine: 'Vos types de cuisine et votre genre d’endroit sont sur votre page maintenant.', stSoon: 'bientôt sur votre page',
@@ -1450,6 +1450,35 @@ fr.pub.cocktail = {
   doorPhotoLead: 'Placez-vous dehors pour que la porte (même sans enseigne) soit sur la photo. Votre appareil demandera votre position, pour que les visiteurs aient l’itinéraire jusqu’ici.',
   kinds: { dj: 'DJ', live_music: 'Musique en direct', trivia: 'Quiz', comedy: 'Humour' },
 };
+
+// Pub test 2 (Whistler, 2026-11-14; drafts/fresh-eyes-pub2-2026-11-14/REPORT.md). Shared by every type.
+// A season the owner sets is named by its dates on every setup screen ("from Oct 15 to Nov 25" / « du 15 oct. au 25 nov. »),
+// or "Your other hours" before any are picked; never "summer"/"winter" guessed from its months. {span} is one of the
+// seaSpan* lines. A season research named ("Winter hours") keeps the older seasonEditQ / seasonWord words.
+Object.assign(en, {
+  seaSpanDays: 'from {a} to {b}', seaSpanMonths: 'from {a} to {b}', seaSpanMonth: 'in {a}',
+  seasonEditQSpan: 'Your hours {span}', seasonEditQOther: 'Your other hours', seasonDaysHDates: 'Hours on those dates',
+  seasonNowSpan: 'Your page has other hours {span}.', closedWarnOther: ' (in your other hours)',
+  seasonHoursLineSpan: '{span}: {hours} ✓',
+  // Change an answer → Hours → "Yes, all year" with a season stored (bug 3): the dates that would go, and a choice.
+  yearAllDropQ: 'Remove your other hours?', yearAllDropLead: 'Your page also has other hours {span}. "Yes, all year" removes them.',
+  yearAllDropYes: 'Yes, remove the other hours', yearAllDropYesSub: 'Only your usual hours stay on your page',
+  yearAllDropKeep: 'No, keep them', yearAllDropKeepSub: 'Your usual hours and the other hours both stay',
+  // Known for etc. (French only): the English-line note without "or tap a quick answer" when the screen has none.
+  quickLegacy: { reservations: ['Walk-ins welcome too'] },
+});
+Object.assign(fr, {
+  seaSpanDays: 'du {a} au {b}', seaSpanMonths: '{de}{a} à {b}', seaSpanMonth: 'en {a}',
+  seasonEditQSpan: 'Vos heures {span}', seasonEditQOther: 'Vos autres heures', seasonDaysHDates: 'Heures pendant ces dates',
+  seasonNowSpan: 'Votre page a d’autres heures {span}.', closedWarnOther: ' (selon vos autres heures)',
+  seasonHoursLineSpan: '{span} : {hours} ✓',
+  yearAllDropQ: 'Retirer vos autres heures?', yearAllDropLead: 'Votre page a aussi d’autres heures {span}. Avec «\u202fOui, toute l’année\u202f», elles sont retirées.',
+  yearAllDropYes: 'Oui, retirer les autres heures', yearAllDropYesSub: 'Seules vos heures habituelles restent sur votre page',
+  yearAllDropKeep: 'Non, les garder', yearAllDropKeepSub: 'Vos heures habituelles et les autres heures restent toutes les deux',
+  lineEnglishHintNoQuick: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le ou changez les mots.',
+  // Older answers saved with the earlier wording still read as the same preset.
+  quickLegacy: { reservations: ['Sans réservation aussi'] },
+});
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the

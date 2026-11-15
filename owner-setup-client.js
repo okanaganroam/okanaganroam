@@ -93,6 +93,28 @@
     var a = +r.from.slice(0, 2), b = +r.to.slice(0, 2), j = a; for (var n = 0; n < 12; n++) { out[j] = true; if (j === b) break; j = j % 12 + 1; }
     return out;
   }
+  // Pub test 2 (Whistler, 2026-11-14): a season is named by its dates on every setup screen ("from Oct 15 to Nov 25" /
+  // « du 15 oct. au 25 nov. », "from October to November" for whole months), never "summer"/"winter" guessed from its
+  // months (Marc's Oct 15 – Nov 25 was « Vos heures d'été » on one screen and « Hiver » on another). spanOf() is '' when
+  // there are no dates yet ("Your other hours"). A stored season whose name says summer or winter (research's "Winter
+  // hours") keeps that name while its kind is unchanged.
+  function spanOf(from, to){
+    if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '')) return '';
+    var a = +from.slice(0, 2), b = +to.slice(0, 2), whole = from.slice(3) === '01' && (+to.slice(3) === MLAST[b - 1] || (b === 2 && to.slice(3) === '28'));
+    if (!whole) return fill(T.seaSpanDays, { a: mdLabel(from), b: mdLabel(to) });
+    var L = C.monthLong || C.monthNames, ma = String(L[a - 1]), mb = String(L[b - 1]);
+    if (a === b) return fill(T.seaSpanMonth, { a: ma });
+    return fill(T.seaSpanMonths, { a: ma, b: mb, de: /^[aeiouyéèêh]/i.test(ma) ? 'd’' : 'de ' });
+  }
+  function seaSpan(o){ var r = o && o.on ? seaOut(o) : null; return r && r.ok && r.from ? spanOf(r.from, r.to) : ''; }
+  function seaLabelKind(lab){ lab = String(lab || '').toLowerCase(); return /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : ''; }
+  function seaNamed(){ var s0 = (CUR.hours_seasons || [])[0]; return !!(s0 && seaLabelKind(s0.label) && S.sea.kind === S.sea.storedKind); }
+  function capF(x){ x = String(x || ''); return x.charAt(0).toUpperCase() + x.slice(1); }
+  // The season screen's title: "Your hours from Oct 15 to Nov 25", or "Your other hours" before any dates.
+  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : T.seasonEditQOther; }
+  // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
+  function seaWhen(){ if (seaNamed()) return fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }); var sp = seaSpan(S.sea); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
+  function seaTitleRefresh(){ if (S.step !== 'hours:season') return; var t = screen.querySelector('h1'); if (t) t.textContent = seaTitle(); var dh = el('suSeaDaysH'); if (dh) dh.textContent = S.sea.exact ? T.seasonDaysHDates : T.seasonDaysH; }
   // The season box on a screen: "All year" / "Only some months", the month chips, and "Starts or ends mid-month? Pick the
   // exact dates" (two date boxes; the year is only there for the date picker).
   function seaObj(id){ var q2 = String(id).split('.'); if (q2[0] === 'happy') return S.happySea; if (q2[0] === 'hours') return S.sea; var e = S[q2[0]] && S[q2[0]][+q2[1]]; if (!e) return null; return e.sea || (e.sea = seaFrom()); }
@@ -136,7 +158,7 @@
     // open in summer, for a special that runs all year).
     var all = DAYS.filter(function(d){ return days[d] && (!usual || !S.week[d]) && (!seas || !S.sea.week[d]); });
     if (!all.length) return '';
-    var when = hasSea ? (seas && !usual ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : usual && !seas ? T.closedWarnUsual : '') : '';
+    var when = hasSea ? (seas && !usual ? seaWhen() : usual && !seas ? T.closedWarnUsual : '') : '';
     return fill(T.closedWarn, { days: daysInFull(all), when: when });
   }
   // Brewery test 4 (2026-11-13): happy hour too (its season is the screen's one season box); the page adds "(when open)".
@@ -144,6 +166,7 @@
   // counts: "you're closed on Mon (in your usual hours)".
   function warnOf(key, e){ return key === 'happy' ? [closedWarnAny(e.days, S.happySea), hoursWarn(e)].filter(Boolean).join(' ') : closedWarn(e.days, e.sea); }
   // Cocktail test 1 (2026-11-13): a new happy hour starts at the usual opening time and lasts 2 hours, never past closing
+  // (pub test 2, 2026-11-14: unless 3–5 PM fits the hours on most open days, then 3–5 PM)
   // (it was 3–5 PM for a bar that opens at 5). With no hours yet it stays 3–5 PM.
   function hm(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; }
   function hmStr(n){ n = ((n % 1440) + 1440) % 1440; return pad2(Math.floor(n / 60)) + ':' + pad2(n % 60); }
@@ -151,6 +174,11 @@
     var w = S.week, count = {}, best = null;
     DAYS.forEach(function(d){ var r = w && w[d] && w[d][0]; if (r && hm(r[0]) != null) { count[r[0]] = (count[r[0]] || 0) + 1; if (!best || count[r[0]] > count[best[0]]) best = r; } });
     if (!best) return { days: {}, from: '15:00', to: '17:00', what: '' };
+    // Pub test 2 (Whistler, 2026-11-14): a « 5 à 7 » for a pub open 11:30 AM to 11 PM was 11:30 AM – 1:30 PM. 3–5 PM when
+    // that is inside the hours on most open days; otherwise (a bar that opens at 5) from opening time, as before.
+    var open = 0, fits = 0;
+    DAYS.forEach(function(d){ var r = w && w[d]; if (!r || !r.length) return; open++; if (r.some(function(x){ var a = hm(x[0]), b = hm(x[1]); if (a == null || b == null) return false; if (b <= a) b += 1440; return a <= 900 && b >= 1020; })) fits++; });
+    if (open && fits * 2 > open) return { days: {}, from: '15:00', to: '17:00', what: '' };
     var o = hm(best[0]), c = hm(best[1]); if (c != null && c <= o) c += 1440;
     return { days: {}, from: best[0], to: hmStr(c != null ? Math.min(o + 120, c) : o + 120), what: '' };
   }
@@ -185,7 +213,7 @@
     var all = DAYS.filter(function(d){ return inUsual.indexOf(d) >= 0 || inSea.indexOf(d) >= 0; });
     if (!all.length) return '';
     var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
-    var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }) : '') : '';
+    var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? seaWhen() : '') : '';
     return fill(T.closedWarnHappy, { days: daysInFull(all), when: when });
   }
   // Cocktail test 3 (2026-11-14): a kitchen time later than a day's closing (Sunday closes at 10 PM, kitchen 11 PM) gets
@@ -217,7 +245,7 @@
     step: 'start', hist: [], done: clone(C.progress.done || {}), error: '', nudge: '', busy: false, toFinish: false, savedLine: {}, addLen: '1',
     notOffered: (CUR.not_offered || []).slice(),
     week: parseWeek(CUR.hours), photos: [], rights: false, photosSent: 0, menuFiles: [], menuPages: [], sheetFiles: [], webUrl: null,
-    spend: CUR.avg_spend && CUR.avg_spend.exact ? CUR.avg_spend.exact : CUR.avg_spend && CUR.avg_spend.amount ? CUR.avg_spend.amount : 25,
+    spend: CUR.avg_spend && CUR.avg_spend.exact ? CUR.avg_spend.exact : CUR.avg_spend && CUR.avg_spend.amount ? CUR.avg_spend.amount : C.suggestSpend || 25,
     cuis: (CUR.cuisines || []).filter(function(c){ return C.cuisines.indexOf(c) >= 0; }), place: CUR.place_type || '', cuiAll: false, cuiQ: '',
     badges: clone(CUR.badges || {}), dogNote: (CUR.visit_rows || {}).dogs || '',
     months: {}, closures: [], extra: [], sea: { on: false, kind: '', months: {}, week: null, open: {} },
@@ -921,12 +949,13 @@
   function groupsKeep(v, t, sibs){ return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(t && (has(x, t) || saysIt(x, t, sibs))); }); }
   // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
   // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
-  function enLineHint(text, id){
+  // Pub test 2 (Whistler, 2026-11-14): without "or tap a quick answer" on a screen that has none (noQuick).
+  function enLineHint(text, id, noQuick){
     var t = String(text || '');
     if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
     var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
-    return '<p class="su-hint su-enhint" id="' + id + '">' + h(T.lineEnglishHint) + '</p>';
+    return '<p class="su-hint su-enhint" id="' + id + '">' + h(noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + '</p>';
   }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
@@ -1069,7 +1098,7 @@
   // (Nov–Apr): Mon–Thu closed, Fri–Sun Noon – 4 PM"), so both seasons are checked at a glance.
   function hoursRecap(){
     var parts = [], kinds = [];
-    (CUR.hours_seasons || []).forEach(function(sz){ var x = seasonInfo(sz); if (x) { parts.push(x.kw + ' (' + x.range + ')' + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(x.w, ', ')); kinds.push(x.kind); } });
+    (CUR.hours_seasons || []).forEach(function(sz){ var x = seasonInfo(sz); if (x) { parts.push(x.head + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(x.w, ', ')); kinds.push(x.kind); } });
     var w = S.week; if (!w || !DAYS.some(function(d){ return w[d] && w[d].length; })) return '';
     var other = kinds.length && kinds.every(function(k){ return k === 'winter'; }) ? 'summer' : kinds.length && kinds.every(function(k){ return k === 'summer'; }) ? 'winter' : '';
     var ul = other ? String((T.seasonWord || {})[other] || other) : '';
@@ -1085,24 +1114,21 @@
   function seasonInfo(sz){
       if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return null;
       var w = parseWeek(sz.hours); if (!w) return null;
-      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
-      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
-      var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
-      var last = new Date(2025, b, 0).getDate();
-      var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
-      return { kind: kind, kw: kw, w: w, range: md2(a, da, da > 1) + '–' + md2(b, db, db < last) };
-  }
-  function seasonLines(){
-    return (CUR.hours_seasons || []).map(function(sz){
-      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
-      var w = parseWeek(sz.hours); if (!w) return '';
-      var lab = String(sz.label || '').toLowerCase(), a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
-      var kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : (a <= b ? a <= 7 && 7 <= b : !(b < 7 && 7 < a)) ? 'summer' : 'winter';
+      var a = +sz.from.slice(0, 2), b = +sz.to.slice(0, 2), da = +sz.from.slice(3), db = +sz.to.slice(3);
+      // Pub test 2: named only by its own name (research's "Winter hours"); otherwise by its dates ("From Oct 15 to Nov 25").
+      var kind = seaLabelKind(sz.label);
+      if (!kind) return { kind: '', w: w, head: capF(spanOf(sz.from, sz.to)) };
       var kw = String((T.seasonWord || {})[kind] || kind); kw = kw.charAt(0).toUpperCase() + kw.slice(1);
       var last = new Date(2025, b, 0).getDate();
       var md2 = function(m, d, show){ return !show ? monthName(m - 1) : mdLabel(('0' + m).slice(-2) + '-' + ('0' + d).slice(-2)); };
       var range = md2(a, da, da > 1) + '–' + md2(b, db, db < last);
-      return '<p class="su-sent su-seasonnow su-seahours">' + h(fill(T.seasonHoursLine, { kind: kw, range: range, hours: weekShort(w) })) + '</p>';
+      return { kind: kind, kw: kw, w: w, range: range, head: kw + ' (' + range + ')' };
+  }
+  function seasonLines(){
+    return (CUR.hours_seasons || []).map(function(sz){
+      if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
+      var x = seasonInfo(sz); if (!x) return '';
+      return '<p class="su-sent su-seasonnow su-seahours">' + h(x.kind ? fill(T.seasonHoursLine, { kind: x.kw, range: x.range, hours: weekShort(x.w) }) : fill(T.seasonHoursLineSpan, { span: x.head, hours: weekShort(x.w) })) + '</p>';
     }).join('');
   }
   function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
@@ -1172,7 +1198,7 @@
   function unsaved(){ return !!(S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length); }
   function exitAction(){
     var st = S.step, b = base(st);
-    var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:year': 'hoursSave', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
+    var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:year': 'hoursSave', 'hours:yeardrop': 'yearDropKeep', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
       'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook', social: 'socialBoth',
       'menu:web': 'menuWebSave', 'menu:social': 'menuSocialSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
       'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave', 'hours:open': 'openSave:keep',
@@ -1371,12 +1397,15 @@
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
       var mrN = S.sea.on ? monthRun(S.sea.months) : null;
-      x = q(T.allYearQ, T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) })) + '</p>' : '') + msgs()
+      x = q(T.allYearQ, T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + msgs()
         + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
         // Café test 2 (2026-11-11): a seasonal place says its open dates here, once, for every type.
         + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')
         // Wineries (2026-11-12): the one new choice, "In the off-season we're open by appointment".
         + (APPT && T.allYearAppt ? big('📞', T.allYearAppt, T.allYearApptSub, true, 'yearAppt') : '') + '</div>';
+    } else if (s === 'hours:yeardrop') {
+      // Pub test 2: "Yes, all year" with other hours stored: the dates that would be removed, and a choice.
+      x = q(T.yearAllDropQ, fill(T.yearAllDropLead, { span: seaSpan(S.sea) })) + msgs() + '<div class="su-stack">' + big('✓', T.yearAllDropKeep, T.yearAllDropKeepSub, false, 'yearDropKeep') + big('✕', T.yearAllDropYes, T.yearAllDropYesSub, true, 'yearDropYes') + '</div>';
     } else if (s === 'hours:open') {
       // Café test 2: "Open from [Apr 25] to [Oct 12] every year". Whole months stay a quick path (the months screen).
       var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
@@ -1402,8 +1431,8 @@
       if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
       var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
-      x = (seas ? q(T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer, T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
-          + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2">' + h(T.seasonDaysH) + '</h2>'
+      x = (seas ? q(seaTitle(), T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
+          + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2" id="suSeaDaysH">' + h(S.sea.exact ? T.seasonDaysHDates : T.seasonDaysH) + '</h2>'
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
           : q(T.hoursEditQ, T.hoursEditLead)) + msgs() + DAYS.map(function(d, i){
@@ -1831,13 +1860,14 @@
       x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
-        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
-        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
+        + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true) + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
+        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn', true) + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
         + '<div class="su-stack">' + big('✓', C.winery || FOLD ? T.saveThese : T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn') + quick(cfg[0], 'suLine', S.visit[cfg[0]] || '') + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      var qk = quick(cfg[0], 'suLine', S.visit[cfg[0]] || '');
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn', !qk) + qk + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
         // links"), and a link typed into the line above is offered a move into it instead of being refused.
         + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
@@ -1857,7 +1887,7 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn') + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !(CK && quick('groups', 'suGroupsLine', gl))) + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
@@ -2412,6 +2442,11 @@
     // Café test 3 (2026-11-11): "Yes, all year" also clears a saved open season (open_months), so the page stops saying
     // "Closed for the season".
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
+    // Pub test 2 (Whistler, 2026-11-14): with other hours stored, "Yes, all year" first says which dates would go and asks
+    // (one tap removed Marc's Oct 15 – Nov 25 hours without a word). "No, keep them" saves the usual hours and keeps them.
+    if (k === 'yearAll' && S.sea.on && (CUR.hours_seasons || []).length && seaSpan(S.sea)) return go('hours:yeardrop');
+    if (k === 'yearDropKeep') { var sk = (CUR.hours_seasons || [])[0], sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { S.sea.on = true; S.sea.months = sf0.months; S.sea.exact = sf0.exact; S.sea.week = parseWeek(sk.hours); S.sea.kind = S.sea.storedKind; S.sea.monthsWas = JSON.stringify(S.sea.months); } S.seaTouched = false; return hoursSave(); }
+    if (k === 'yearDropYes') k = 'yearAll';
     if (k === 'yearAll' && APPT) S.wYearPick = 'all';
     if (k === 'yearAll') { S.sea.on = false; S.seaTouched = true; if (S.openSea || CUR.open_months || (YEAR_ANSWER && S.savedYear !== 'all')) { S.openSea = null; S.openTouched = true; } return hoursSave(); }
     // Café test 2 (2026-11-11): "We're closed part of the year" and its dates.
@@ -2946,8 +2981,8 @@
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-smon]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-smon').split(':'), o = seaObj(q2[0]); if (!o) return; o.months[q2[1]] = !o.months[q2[1]];
-      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); warnRefresh(); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ inp.addEventListener('change', function(){ readSeasons(); if (inp.getAttribute('data-sexact').indexOf('hours') === 0) S.seaTouched = true; warnRefresh(); }); });
+      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); warnRefresh(); if (q2[0] === 'hours') seaTitleRefresh(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ inp.addEventListener('change', function(){ readSeasons(); if (inp.getAttribute('data-sexact').indexOf('hours') === 0) { S.seaTouched = true; seaTitleRefresh(); } warnRefresh(); }); });
     // One-tap Closed on the short list (pub test 7): closes the day, or opens it again with the hours it had (or the
     // first open day's), without opening its card.
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hoff]'), function(b){ b.onclick = function(){

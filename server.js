@@ -10175,7 +10175,12 @@ function visitInfoHtml(info, fr = false, opts = {}) {
   if (fr) {
     // A winery's answers (2026-11-12) carry their own French line (owner_fr), used while the English line is unchanged.
     const ownFr = info.owner_fr && typeof info.owner_fr === 'object' ? info.owner_fr : {};
-    const rowsFr = info.rows.map((r) => ({ ...r, text: ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    // Pub test 2 (Whistler, 2026-11-14): a line the owner wrote herself (owner_labels, or one of hers parked under More)
+    // shows on the French page as she typed it when there is no French for it (Marc's French Known for and Groups were
+    // dropped); research's lines with no French are still left off.
+    const mineFr = new Set([...(Array.isArray(info.owner_labels) ? info.owner_labels : []), ...parkedSet]);
+    const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? r.text : null);
+    const rowsFr = info.rows.map((r) => ({ ...r, text: ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
   } else {
@@ -35431,6 +35436,25 @@ function frHideEnglishEventCardText(html) {
     return !plain || frText(plain) != null ? m : `${a}${FR_EVENT_CARD_FALLBACK}${b}`;
   });
 }
+// A card's meta line (escaped HTML text, " &middot; " between parts) with its food types and kind of place in French, or
+// null when nothing in it is one.
+let PLACE_TYPE_FROM_DISPLAY = null;
+function frCardMetaText(t) {
+  if (!PLACE_TYPE_FROM_DISPLAY) PLACE_TYPE_FROM_DISPLAY = new Map(Object.entries(PLACE_TYPE_DISPLAY).map(([k, v]) => [v, k]));
+  let changed = false;
+  const parts = String(t).split(' &middot; ').map((seg) => {
+    const plain = frDecode(seg);
+    const key = PLACE_TYPE_FROM_DISPLAY.get(plain);
+    if (key && PLACE_TYPE_DISPLAY_FR[key] && PLACE_TYPE_DISPLAY_FR[key] !== plain) { changed = true; return escapeHtml(PLACE_TYPE_DISPLAY_FR[key]); }
+    const list = plain.split(', ');
+    if (list.length && list.every((c) => OWNER_CUISINES.includes(c))) {
+      const fr = list.map((c) => frCuisine(c));
+      if (fr.join(', ') !== plain) { changed = true; return escapeHtml(fr.join(', ')); }
+    }
+    return seg;
+  });
+  return changed ? parts.join(' &middot; ') : null;
+}
 function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
@@ -35451,6 +35475,10 @@ function frenchTwinHtml(html, enPath, search = '') {
     const names = frDecode(t).split(', ').map((x) => { const f = frText(x); return f == null ? x : f; }).join(', ');
     return `<span class="chip chip-more" title="${escapeHtml(names)}" aria-label="${n} de plus : ${escapeHtml(names)}">`;
   });
+  // Pub test 2 (Whistler, 2026-11-14): a card's food line in French, as the French page says it ("PUB FARE, BURGERS ·
+  // TAPHOUSE / CRAFT BEER BAR" on a French card): each food type through frCuisine, the kind of place through
+  // PLACE_TYPE_DISPLAY_FR. Anything else in the line (rating, town) is left as it was.
+  html = html.replace(/(<(p|span) class="venue-meta">)([^<]*)(<\/\2>)/g, (m, a, tag, t, b) => { const x = frCardMetaText(t); return x == null ? m : `${a}${x}${b}`; });
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -53439,6 +53467,9 @@ function renderOwnerSetupPage(found, opts) {
     // events screen; with weekly_nights_waiting it is still waiting for our check.
     nightsOften: cur.weekly_nights.map((x) => (nightCarriedFrequency(x) ? nightOftenText(x, fr) : '')),
     happyHour: happyHourAllowed(venue), servesAlcohol: !!venueServesAlcohol(venue), spendPublic: avgSpendPublic(),
+    // Pub test 2 (Whistler, 2026-11-14): research's price line ("Burgers from $19") starts the spend screen at $19 instead
+    // of $25, as a suggestion (saved only when she saves the screen). Not for cafés (their own starting prices).
+    suggestSpend: cafe ? 0 : researchSpendGuess(venue.id),
     dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
@@ -53496,6 +53527,19 @@ const HH_TIMES_KEYS = ['happy hour', 'change my happy hour', 'change our happy h
   'edit happy hour', 'edit my happy hour', 'update happy hour', 'update my happy hour', 'update our happy hour', 'happy hour later', 'new happy hour', 'happy hour start', 'happy hour ends', 'when is happy hour'];
 const HH_TIMES_KEYS_FR = ['5 a 7', 'cinq a sept', 'happy hour', 'changer mon 5 a 7', 'changer notre 5 a 7', 'changer le 5 a 7', 'modifier mon 5 a 7', 'modifier notre 5 a 7', 'heures du 5 a 7', 'heures de mon 5 a 7',
   'jours du 5 a 7', 'mettre a jour mon 5 a 7', 'changer mon cinq a sept', 'heures du cinq a sept'];
+// Pub test 2 (Whistler, 2026-11-14): how owners say "part of the year" when it isn't summer or winter: the shoulder
+// season, the fall or the spring only (« saison morte », « intersaison », « fermé le lundi en automne seulement » got
+// "I'm not sure" or the special closures answer). Added to every seasonal-hours topic.
+const SEASON_TALK_KEYS = ['shoulder season', 'shoulder seasons', 'the shoulder season', 'in the shoulder season', 'off season', 'off-season', 'in the off season', 'slow season', 'low season',
+  'fall', 'the fall', 'in the fall', 'in the fall only', 'fall only', 'only in the fall', 'fall hours', 'autumn', 'in autumn', 'autumn only',
+  'spring', 'the spring', 'in the spring', 'spring only', 'only in the spring', 'in the spring only', 'spring hours', 'fall and spring', 'spring and fall'];
+const SEASON_TALK_KEYS_FR = ['saison morte', 'la saison morte', 'en saison morte', 'seulement en saison morte', 'intersaison', 'l intersaison', 'en intersaison', 'inter saison', 'entre saisons', 'entre deux saisons',
+  'basse saison', 'en basse saison', 'la basse saison', 'hors saison',
+  'automne', 'l automne', 'en automne', 'a l automne', 'en automne seulement', 'seulement en automne', 'automne seulement', 'heures d automne', 'horaire d automne',
+  'printemps', 'le printemps', 'au printemps', 'au printemps seulement', 'seulement au printemps', 'printemps seulement', 'heures de printemps', 'horaire de printemps',
+  'lundi en automne', 'lundis en automne', 'lundi au printemps', 'lundis au printemps', 'lundi en saison morte', 'lundis en saison morte', 'mardi en automne', 'mardis en automne', 'mardi au printemps', 'mardis au printemps', 'mardis en saison morte',
+  'ferme le lundi en automne', 'ferme les lundis en automne', 'ferme le lundi au printemps', 'ferme le lundi en saison morte', 'fermes les lundis en automne', 'fermes le lundi en automne', 'fermes les lundis et mardis'];
+function withSeasonTalk(list, extra) { return [...new Set(list.concat(extra))]; }
 const HH_TIMES_HELP_TOPIC = { id: 'hh-times', over: ['features', 'hours', 'seasonal-hours'], q: 'How do I change my happy hour days or times?', qFr: 'Comment changer les jours ou les heures de mon 5 à 7?', pages: ['setup', 'edit'],
   keys: HH_TIMES_KEYS, keysFr: HH_TIMES_KEYS_FR,
   a: '<p>Two ways to change your happy hour days, times or deals:</p><ul><li>In <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Happy hour</strong>. Days and times you type in there go live straight away. A photo, menu or web page you send instead is typed up by us first, usually within a day.</li><li>{ON}, open <strong>Happy hour</strong>, change the days, times or deals, and tap {SEND}. {LIVE}</li></ul><p>Badges like Patio or Dog friendly are separate: ask \u201cbadges\u201d.</p>',
@@ -53661,6 +53705,18 @@ function breweryListTile(venue) {
 }
 // 'HH:MM' from a research line that clearly says kids are welcome until a time ("Kids welcome until 8 PM", « enfants
 // jusqu’à 20 h »), or ''.
+// Research's Prices line as a starting spend: the first whole-dollar amount from $5 to $300 ("Burgers from $19" -> 19,
+// « Burgers dès 19 $ » -> 19), or 0. Only research's line (never one the owner wrote).
+function researchSpendGuess(venueId) {
+  const info = venueVisitInfo(venueId) || {}; const mine = new Set(info.owner_labels || []);
+  for (const r of info.rows || []) {
+    if (!r || mine.has(r.label) || !/^(?:Prices?|Price range)$/i.test(String(r.label || '')) || typeof r.text !== 'string') continue;
+    const m = /\$\s?(\d{1,3})(?:\.\d{2})?\b|\b(\d{1,3})(?:[.,]\d{2})?\s?\$/.exec(r.text);
+    const n = m ? Number(m[1] || m[2]) : 0;
+    if (n >= 5 && n <= 300) return n;
+  }
+  return 0;
+}
 function researchKidsUntil(rows) {
   for (const r of rows || []) {
     if (!r || typeof r.text !== 'string' || !/\b(?:kids?|children|minors|families|enfants|mineurs)\b/i.test(`${r.label || ''} ${r.text}`)) continue;
@@ -53751,8 +53807,8 @@ const BREWERY_SETUP_HELP_TOPICS = [
     aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions-restaurants</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions-restaurants la plupart des jours » ou « Camions-restaurants la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
-    keys: ['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'off season', 'off-season'],
-    keysFr: ['hiver', 'heures d hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'reouverture', 'changer mes heures', 'heures d ete'],
+    keys: withSeasonTalk(['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours'], SEASON_TALK_KEYS),
+    keysFr: withSeasonTalk(['hiver', 'heures d hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'reouverture', 'changer mes heures', 'heures d ete'], SEASON_TALK_KEYS_FR),
     a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. After your hours:</p><ul><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day. Outside them your card and page say “Closed for the season” and when you reopen.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li></ul><p>Hours saved in the setup are on your page right away, and they come back every year by themselves.</p>',
     aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Après vos heures :</p><ul><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture. En dehors de ces dates, votre fiche et votre page indiquent « Fermé pour la saison » et la date de réouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et elles reviennent chaque année d’elles-mêmes.</p>' },
   { id: 'booking-link', over: ['links'], q: 'Where do I put our booking link?', qFr: 'Où mettre notre lien de réservation?', pages: ['edit', 'setup'],
@@ -53809,8 +53865,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
     aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>, puis <strong>Oui</strong>. Touchez <strong>Visite de la distillerie</strong> (ou <strong>Atelier</strong>), puis <strong>Sur rendez-vous</strong> sous les jours. Aucun jour n’est nécessaire. Touchez <strong>Enregistrer mes événements</strong>.</p><p>Votre page indique « Visite de la distillerie · sur rendez-vous », sans jour ni mention Aujourd’hui ou Ce soir, et Planifier mon voyage invite les visiteurs à appeler avant. C’est sur votre page tout de suite. Sur votre page de modification, c’est « Sur rendez-vous » sous la fréquence, dans <strong>Visites et événements</strong>.</p>' },
   { id: 'distillery-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures', 'brewery-seasonal-hours', 'winery-appointment'],
     q: 'We’re seasonal, or open by appointment', qFr: 'Nous sommes saisonniers, ou ouverts sur rendez-vous',
-    keys: ['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'off season', 'off-season', 'change hours', 'change my hours'],
-    keysFr: ['rendez-vous', 'sur rendez-vous', 'appelez', 'pas d heures fixes', 'hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'basse saison', 'changer mes heures'],
+    keys: withSeasonTalk(['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours'], SEASON_TALK_KEYS),
+    keysFr: withSeasonTalk(['rendez-vous', 'sur rendez-vous', 'appelez', 'pas d heures fixes', 'hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'changer mes heures'], SEASON_TALK_KEYS_FR),
     a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>.</p><ul><li>By appointment all year, with no set hours? Tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</li><li>Walk-ins part of the year? After your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick your walk-in dates. Outside them your card says “By appointment · call ahead”.</li><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li></ul><p>Hours saved in the setup are on your page right away, and the dates come back every year by themselves.</p>',
     aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>.</p><ul><li>Sur rendez-vous toute l’année, sans heures fixes? Touchez <strong>Nous n’avons pas d’heures fixes. Visites sur rendez-vous</strong>. Vos anciennes heures sont retirées de votre page, qui indique « Sur rendez-vous · appelez avant ».</li><li>Sans réservation une partie de l’année? Après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez vos dates sans réservation. En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».</li><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et les dates reviennent chaque année d’elles-mêmes.</p>' },
   { id: 'distillery-menu', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'menu-import', 'photo-pending', 'brewery-taplist'], q: 'How do I update our spirits or cocktail list?', qFr: 'Comment mettre à jour notre liste de spiritueux ou de cocktails?',
@@ -55060,14 +55116,14 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, trouvez <strong>Heures d\u2019ouverture</strong> (le bouton <strong>Heures</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Fermé</strong>.</li><li>Fermé l\u2019après-midi? Touchez <strong>+ deuxième plage</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copier le lundi sur mar.\u2013ven.</strong> (ou <strong>tous les jours</strong>).</li><li>Touchez {SEND} au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 01:00.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
   // Help bot v2 (2026-10-18): seasonal hour sets and special closure dates on the edit page.
   { id: 'seasonal-hours', over: ['hours', 'season'], q: 'Different summer and winter hours', qFr: 'Heures différentes l\u2019été et l\u2019hiver', pages: ['edit'],
-    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on',
+    keys: withSeasonTalk(['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on',
       // Pub test (Whistler, 2026-11-14): "How do I change my hours when the mountain closes?" got the weekly hours.
       'season', 'seasonal', 'seasons', 'off season', 'offseason', 'ski season', 'the ski season', 'end of the season', 'end of season', 'start of the season', 'hours for the season',
       'mountain closes', 'the mountain closes', 'when the mountain closes', 'mountain close', 'lifts close', 'when the lifts close', 'closes for the winter', 'close for the winter', 'hours when the',
-      'for the winter', 'for the summer', 'after the season'],
-    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison',
+      'for the winter', 'for the summer', 'after the season'], SEASON_TALK_KEYS),
+    keysFr: withSeasonTalk(['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison',
       'saison', 'saisonnier', 'saisonnieres', 'saison de ski', 'la saison de ski', 'fin de saison', 'fin de la saison', 'hors saison', 'pour l hiver', 'pour l ete',
-      'la montagne ferme', 'quand la montagne ferme', 'montagne ferme', 'les remontees ferment', 'quand les remontees ferment', 'fermeture de la montagne', 'mes heures quand'],
+      'la montagne ferme', 'quand la montagne ferme', 'montagne ferme', 'les remontees ferment', 'quand les remontees ferment', 'fermeture de la montagne', 'mes heures quand'], SEASON_TALK_KEYS_FR),
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
@@ -66860,7 +66916,7 @@ if (require.main === module) {
 module.exports = {
   // Cocktail test 2 (2026-11-13).
   ownerNightsKeepFrequency, ownerNightsKeepSeason, ownerSetupNights, ownerSeasonHelpTopic, seasonLabelText, renderAdminChangeCard, ownerFieldLabelsFor,
-  visitDropRepeatedKnownFor,
+  visitDropRepeatedKnownFor, frCardMetaText, researchSpendGuess,
   // Café test 6 (2026-11-12): preset answers in the page's language
   presetAnswer, isPresetAnswer, closureNoteFor, presetInLang, visitInfoHtml, cafeFrChipsHtml,
   displayPhone,
