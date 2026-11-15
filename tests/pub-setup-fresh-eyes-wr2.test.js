@@ -195,8 +195,9 @@ test('happy hour default: 3–5 PM for a pub open 11:30 AM–11 PM; from opening
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.hd())), { days: {}, from: '17:00', to: '19:00', what: '' }, 'a bar opening at 5 gets 5–7');
   // Open at 4 PM most days: 3–5 doesn't fit, so from opening.
   ctx.S.week = wk('16:00', '23:00'); assert.equal(ctx.hd().from, '16:00');
-  // Split lunch/dinner hours: 3–5 PM is inside neither range.
-  ctx.S.week = Object.fromEntries(DAYS.map((d) => [d, [['11:00', '14:00'], ['17:00', '22:00']]])); assert.equal(ctx.hd().from, '11:00');
+  // Split lunch/dinner hours: restaurant test 2 (Whistler, 2026-11-14) made the afternoon break 3–5 PM (the bar open between
+  // services; the screen then says how to show that) instead of 11 AM from opening.
+  ctx.S.week = Object.fromEntries(DAYS.map((d) => [d, [['11:00', '14:00'], ['17:00', '22:00']]])); assert.equal(ctx.hd().from, '15:00');
   ctx.S.week = null; assert.equal(ctx.hd().from, '15:00');
 });
 
@@ -218,8 +219,8 @@ test('small: no "tap a quick answer" without quick answers; « On accepte aussi 
   assert.match(text.fr.lineEnglishHintNoQuick, /^Ce texte est en anglais, tel qu’il paraît maintenant sur votre page\. Gardez-le ou changez les mots\.$/);
   assert.doesNotMatch(text.fr.lineEnglishHintNoQuick, /réponse rapide/);
   assert.match(src, /var qk = quick\(cfg\[0\], 'suLine', S\.visit\[cfg\[0\]\] \|\| ''\);/);
-  assert.match(src, /'suLineEn', !qk\) \+ qk/);
-  assert.match(src, /'suKnownEn', true\)/);
+  assert.match(src, /'suLineEn', !qk, cfg\[0\]\) \+ qk/); // restaurant test 2: the line's key
+  assert.match(src, /'suKnownEn', true, 'known_for'\)/); // restaurant test 2: the line's key
   assert.deepEqual(text.fr.quick.reservations, ['Appelez-nous', 'Réservez sur notre site Web', 'Réservez en ligne', 'On accepte aussi les clients sans réservation']); // + « Réservez en ligne » (restaurant test 1, 2026-11-14)
   assert.equal(app.presetAnswer('On accepte aussi les clients sans réservation', 'en'), 'Walk-ins welcome too');
   assert.equal(app.presetAnswer('Walk-ins welcome too', 'fr'), 'On accepte aussi les clients sans réservation');

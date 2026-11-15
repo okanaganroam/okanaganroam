@@ -228,7 +228,7 @@ test('two ways of saying "when", the honest time, the greeting, event kinds open
   assert.match(s, /nTop = C\.nightKindsTop \|\| 6, top = C\.nightKinds\.slice\(0, nTop\)/);
   assert.equal(cfg.nightKindsTop, 6);
   const restCfg = cfgOf(await text(`/owner/${tokenFor(mk('restaurant').id)}/setup`));
-  assert.equal(restCfg.nightKinds.length, 12);
+  assert.equal(restCfg.nightKinds.length, 13); // restaurant test 2: + Tasting
   assert.match(restCfg.t.hiLead, /About 15 to 30 minutes\. You can stop any time and carry on later\./); // pub test 6
 });
 

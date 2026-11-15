@@ -484,6 +484,8 @@ function frenchWordsFor(text, taxonomy, words) {
   }
   return out;
 }
+// The foods and drinks « après » can stand before as a happy hour (« après sushi », « après tapas »).
+const APRES_FOOD = new Set('sushi sushis tapas pizza pizzas burger burgers ailes wings tacos nachos huitres oysters poke ramen biere bieres vin vins cocktail cocktails sake bouchees saumon fruits'.split(' '));
 function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
   if (typeof text !== 'string') return null;
   const tokens = tokenize(text);
@@ -516,6 +518,24 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
         out.push(`starting at ${hour % 12 || 12}:${departure[2] || '00'} ${hour >= 12 ? 'pm' : 'am'}`);
         i += consumed; continue;
       }
+    }
+    // Restaurant test 2 (Whistler, 2026-11-14): a meal's French clock (« souper … à 20 h », « vers 19 h », « 20 h 30 »,
+    // « à 20h30 ») is that time in the English the planner reads ("at 8:00 pm", "around 7:00 pm"). Only after « à »,
+    // « vers », « pour » or « dès », or right after a meal word, so a duration (« 2 h de route ») is never a clock.
+    const clock = /^(?:(a|vers|pour|des|autour de|aux alentours de)\s+)?([01]?\d|2[0-3])(?:\s*h(?:\s*([0-5]\d))?|h([0-5]\d)?)(?=$|[\s,.;])/.exec(tokens.slice(i, i + 6).join(' '));
+    const afterMeal = /^(?:dinner|lunch|breakfast|brunch|dinners|lunches)$/.test(String(out[out.length - 1] || ''));
+    if (clock && (clock[1] || afterMeal) && !(clock[0].split(/\s+/).length === 1 && !/h/.test(clock[0]))) {
+      const consumed = clock[0].trim().split(/\s+/).length;
+      if (!tokens.slice(i, i + consumed).some((_, n) => keep.has(i + n))) {
+        const hour = Number(clock[2]), min = clock[3] || clock[4] || '00';
+        out.push(`${/^(?:vers|autour de|aux alentours de)$/.test(clock[1] || '') ? 'around' : 'at'} ${hour % 12 || 12}:${min} ${hour >= 12 ? 'pm' : 'am'}`);
+        i += consumed; continue;
+      }
+    }
+    // Restaurant test 2: « après-ski » and « après » before a food or drink (« après sushi ») are the happy hour (5 à 7),
+    // not "after" (or pubs).
+    if (w === 'apres' && (tokens[i + 1] === 'ski' || APRES_FOOD.has(tokens[i + 1] || '')) && !keep.has(i + 1)) {
+      out.push('happy hour'); i += tokens[i + 1] === 'ski' ? 2 : 1; continue;
     }
     // Calendar ranges must preserve both days before ordinary du/au grammar.
     if (w === 'du' && /^\d{1,2}$/.test(tokens[i+1] || '')) {out.push('from');i++;continue;}

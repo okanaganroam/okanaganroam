@@ -1068,7 +1068,7 @@ test('brewery test 4: happy hour warns about closed days, and the page says "(wh
   const { v } = await carla({ name: 'Happyshut Brewing', slug: 'happyshut-brewing', region: 'kelowna' });
   const s = CLIENT_SRC();
   assert.match(s, /dayChips\(e\.days, 'happy\.' \+ i\) \+ warnHtml\('happy', i, e\)/);
-  assert.match(s, /key === 'happy' \? \[closedWarnAny\(e\.days, S\.happySea\), hoursWarn\(e\)\]/); // + the outside-hours heads-up (cocktail test 1)
+  assert.match(s, /if \(key === 'happy'\) \{ var hw = hoursWarn\(e\); return \[closedWarnAny\(e\.days, S\.happySea\), hw,/); // + the outside-hours heads-up (cocktail test 1)
   assert.match(s, /var inUsual = DAYS\.filter\(function\(d\)\{ return days\[d\] && usual && !S\.week\[d\]; \}\)/, 'a day closed in either week counts');
   assert.match(s, /\['specials', 'nights', 'happy'\]\.forEach/);
   assert.match(text.en.closedWarnHappy, /^Heads up: you’re closed on \{days\}\{when\}\. Your page will say happy hour is on when you’re open\.$/);

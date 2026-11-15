@@ -6782,7 +6782,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   try { specialsByVenue = allVenueSpecials(); } catch (e) { specialsByVenue = new Map(); }
   const specialsFact = (v) => {
     if (!specialsByVenue.has(v.id)) return undefined;
-    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at, new Date(), x)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+    const list = specialsByVenue.get(v.id).filter((x) => x.title && x.kind !== 'drink' && !specialsStale(x.checked_at, new Date(), x)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
     return list.length ? list : undefined;
   };
   const golfWindows = getGolfRateWindows();
@@ -9401,13 +9401,16 @@ function guardedHappyHourDealsUpdate(id, expectedCurrent, input, meta, now = new
   if (v.deals !== null) {
     const en = validateHappyHourDeals(v.deals);
     if (!en.ok) return { ok: false, reason: 'invalid_deals', detail: en.detail };
-    if (!en.deals.length) return { ok: false, reason: 'invalid_deals', detail: 'at least one deal (use deals: null to clear)' };
     let frJson = null;
     if (v.deals_fr !== undefined && v.deals_fr !== null) {
       const fr = validateHappyHourDeals(v.deals_fr);
       if (!fr.ok) return { ok: false, reason: 'invalid_deals', detail: `French ${fr.detail}` };
       if (fr.deals.length) frJson = JSON.stringify(fr.deals);
     }
+    // Restaurant test 2 (Whistler, 2026-11-14): the owner's French-only deals (from the French setup) are stored with an
+    // empty English list ('[]'): the French page shows them, every English place (and everything that reads the English
+    // deals) leaves them out.
+    if (!en.deals.length && !(frJson && m.allow_french_only)) return { ok: false, reason: 'invalid_deals', detail: 'at least one deal (use deals: null to clear)' };
     const src = v.source_url;
     if (src !== 'venue_owner' && (typeof src !== 'string' || !/^https?:\/\/[^\s]+$/.test(src) || src.length > 500)) {
       return { ok: false, reason: 'invalid_source', detail: "source_url must be the http(s) page the deals were read on, or 'venue_owner'" };
@@ -9493,6 +9496,15 @@ function happyHourDealsShown(row, now = new Date()) {
   const en = parseHappyHourDealsJson(row.happy_hour_deals);
   if (!en) return null;
   return { en, fr: parseHappyHourDealsJson(row.happy_hour_deals_fr), checked: row.happy_hour_deals_checked_at };
+}
+// Restaurant test 2 (Whistler, 2026-11-14): deals the owner gave in French only (English list empty): the French venue
+// page's deals ({ en: [], fr, checked }), under the same badge and staleness rules; null otherwise.
+function happyHourDealsFrenchOnly(row, now = new Date()) {
+  if (!row || !Number(row.happy_hour) || !row.happy_hour_deals || parseHappyHourDealsJson(row.happy_hour_deals)) return null;
+  const fr = parseHappyHourDealsJson(row.happy_hour_deals_fr);
+  if (!fr) return null;
+  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now, row.happy_hour_times !== undefined ? seasonOfHappyHour(row.happy_hour_times) : null)) return null;
+  return { en: [], fr, checked: row.happy_hour_deals_checked_at };
 }
 function venueHappyHourDeals(venueId, now = new Date()) {
   let row = null;
@@ -9662,11 +9674,15 @@ function validateSpecials(list, opts = {}, now = new Date()) {
     if (!Array.isArray(s.days) || !s.days.length) return { ok: false, detail: `special ${n}: pick at least one day` };
     if (s.days.some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `special ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
     const item = { days: SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
-    for (const [k, what, max, required] of [['title', 'title', SPECIAL_TITLE_MAX, true], ['deal', 'deal', SPECIAL_DEAL_MAX, true], ['price', 'price', SPECIAL_PRICE_MAX, false]]) {
+    // Restaurant test 2 (Whistler, 2026-11-14): a special written in the French setup is French only (title_fr and deal_fr,
+    // with an empty English title and deal) until there is an English version: only French pages show it.
+    const frOnly = (s.title == null || s.title === '') && (s.deal == null || s.deal === '') && !!s.title_fr && !!s.deal_fr;
+    for (const [k, what, max, required] of [['title', 'title', SPECIAL_TITLE_MAX, !frOnly], ['deal', 'deal', SPECIAL_DEAL_MAX, !frOnly], ['price', 'price', SPECIAL_PRICE_MAX, false]]) {
       const f = specialTextField(s[k], what, max, n, required);
       if (!f.ok) return f;
       item[k] = f.value;
     }
+    if (frOnly) { item.title = ''; item.deal = ''; }
     if (!SPECIAL_KINDS.includes(s.kind)) return { ok: false, detail: `special ${n}: kind must be food, drink or both` };
     item.kind = s.kind;
     const start = s.start == null || s.start === '' ? null : s.start;
@@ -9682,6 +9698,7 @@ function validateSpecials(list, opts = {}, now = new Date()) {
       item[k] = f.value;
     }
     if (!item.title_fr !== !item.deal_fr) return { ok: false, detail: `special ${n}: give both the French title and the French deal, or neither` };
+    if (frOnly && !item.title_fr) return { ok: false, detail: `special ${n}: title is empty` };
     const from = s.season_from == null || s.season_from === '' ? null : specialMonthDay(s.season_from);
     const to = s.season_to == null || s.season_to === '' ? null : specialMonthDay(s.season_to);
     if ((s.season_from != null && s.season_from !== '' && !from) || (s.season_to != null && s.season_to !== '' && !to)) return { ok: false, detail: `special ${n}: season dates must be real MM-DD days` };
@@ -9843,7 +9860,7 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   let cur = null;
   try { cur = currentJson ? JSON.parse(currentJson) : null; } catch (e) { cur = null; }
   const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
-  if (!owned.size) return nextJson;
+  if (!owned.size && !(cur && cur.owner_fr_lines)) return nextJson;
   const blocked = new Set(owned);
   for (const slot of OWNER_VISIT_SLOTS) if (slot.labels.some((l) => owned.has(l))) slot.labels.forEach((l) => blocked.add(l));
   // A brewery's or distillery's own tasting line also stands for research's "Tastings" (distillery test 1, 2026-11-13).
@@ -9853,7 +9870,8 @@ function mergeOwnerVisitRows(currentJson, nextJson) {
   const researchRows = (next.rows || []).filter((r) => !blocked.has(r.label));
   const rows = [...ownerRows, ...researchRows].slice(0, VISIT_ROWS_MAX);
   // A winery's own answers (2026-11-12): their French lines and what they replaced ride along.
-  const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra', 'answer_was'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
+  // Restaurant test 2 (2026-11-14): and the owner's French lines from the French setup (owner_fr_lines).
+  const keep = Object.fromEntries(['owner_fr', 'owner_was', 'winery_labels', 'owner_was_extra', 'winery_extra', 'answer_was', 'owner_fr_lines'].filter((k) => cur[k] != null).map((k) => [k, cur[k]]));
   return JSON.stringify({ ...next, rows, owner_labels: [...owned].sort(), ...keep });
 }
 // Replaces (or clears, with visit null) a venue's box: compare-and-set on expected_current (GET /admin/visit-info/:id),
@@ -10206,7 +10224,23 @@ function dogsChipLine(text) {
   const segs = presetAnswerParts(text).filter((seg, i) => !(i % 2)).map((seg) => presetAnswerNorm(seg.replace(/\.$/, ''))).filter(Boolean);
   return segs.length > 0 && segs.every((x) => DOGS_CHIP_SET.has(x));
 }
+// Restaurant test 2 (Whistler, 2026-11-14): the owner's French lines (owner_fr_lines, from the French setup) in the box of
+// the French page: each takes its row's place, or is added as that row (the English page has no such row then).
+function visitWithFrLines(info, type) {
+  const frl = ownerVisitFrLines(info);
+  if (!Object.keys(frl).length) return info;
+  const rows = (Array.isArray(info.rows) ? info.rows : []).map((r) => ({ ...r }));
+  const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  for (const slot of type === 'cocktail' ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS) {
+    const t = frl[slot.key];
+    if (!t) continue;
+    const i = visitSlotRowIndex(slot, rows, owned);
+    if (i >= 0) { const { url, ...r } = rows[i]; rows[i] = { ...r, text: t, __frOwn: true }; } else rows.push({ label: visitSlotNewLabel(slot, t), text: t, __frOwn: true });
+  }
+  return { ...info, rows };
+}
 function visitInfoHtml(info, fr = false, opts = {}) {
+  if (fr && info) info = visitWithFrLines(info, opts.type);
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
   // under "More" at the end, never lost.
@@ -10229,7 +10263,7 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     // dropped); research's lines with no French are still left off.
     const mineFr = new Set([...(Array.isArray(info.owner_labels) ? info.owner_labels : []), ...parkedSet]);
     const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? r.text : null);
-    const rowsFr = info.rows.map((r) => ({ ...r, text: ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    const rowsFr = info.rows.map((r) => ({ ...r, text: r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
   } else {
@@ -10309,9 +10343,11 @@ function specialInSeason(s, date) {
 }
 // The specials a visitor may see for a venue row (needs type, happy_hour): not stale, the alcohol rule, in season on
 // `date` (today by default).
-function specialsShown(venue, list, now = new Date(), date = todayLocal(now)) {
+// Restaurant test 2 (Whistler, 2026-11-14): a French-only special (no English title) only where `fr` is passed (the French
+// venue page); every other place reads the English lines and leaves it out.
+function specialsShown(venue, list, now = new Date(), date = todayLocal(now), fr = false) {
   const alcohol = venueServesAlcohol(venue);
-  return (list || []).filter((s) => !specialsStale(s.checked_at, now, s) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
+  return (list || []).filter((s) => (s.title || (fr && s.title_fr)) && !specialsStale(s.checked_at, now, s) && (s.kind === 'food' || alcohol) && specialInSeason(s, date));
 }
 // Where a special's time stands at `minutes` on its day: 'allday' (no time given), 'later', 'now' or 'over'.
 function specialTimeState(s, minutes) {
@@ -10584,7 +10620,8 @@ const NIGHT_COST_MAX = 20;
 const NIGHTS_STALE_DAYS = 120;
 // Distillery test 1 (2026-11-13): 'tour' and 'class' (a distillery tour, a cocktail or whisky class), so Build My Trip can
 // match a tour at any time of day. Values only; the stored shape is unchanged.
-const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'other'];
+// Restaurant test 2 (Whistler, 2026-11-14): 'tasting' (a sake, wine or whisky tasting at a restaurant). Values only.
+const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'tasting', 'other'];
 // The kinds that run at any time of day (not only evenings), for the trip planner's lines.
 const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
 const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th', 'appointment'];
@@ -10604,8 +10641,8 @@ const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', '
 // A night's optional season (pub test 7, 2026-11-10), kept apart so nights without one keep their exact stored shape.
 const NIGHT_SEASON_KEYS = ['season_from', 'season_to'];
 const NIGHT_KIND_LABELS = {
-  en: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night', tour: 'Tour', class: 'Class', other: 'Other nights' },
-  fr: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique en direct', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture', tour: 'Visite', class: 'Atelier', other: 'Autres soirées' },
+  en: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night', tour: 'Tour', class: 'Class', tasting: 'Tasting', other: 'Other nights' },
+  fr: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique en direct', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture', tour: 'Visite', class: 'Atelier', tasting: 'Dégustation', other: 'Autres soirées' },
 };
 // A text field of night n: the deal rules, worded for nights. -> { ok, value (null when empty) } | { ok: false, detail }
 function nightTextField(raw, what, max, n, required) {
@@ -10646,13 +10683,17 @@ function validateWeeklyNights(list, opts = {}, now = new Date()) {
     const item = { days: appt ? [] : SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
     if (!NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: kind must be one of ${NIGHT_KINDS.join(', ')}` };
     item.kind = s.kind;
-    for (const [k, what, max, required] of [['title', 'title', NIGHT_TITLE_MAX, true], ['detail', 'detail', NIGHT_DETAIL_MAX, false], ['host', 'host', NIGHT_HOST_MAX, false], ['cost', 'cost', NIGHT_COST_MAX, false],
+    // Restaurant test 2 (Whistler, 2026-11-14): an event of no set kind written in the French setup is French only (title_fr,
+    // empty English title) until there is an English version: only French pages show it.
+    const frOnly = (s.title == null || s.title === '') && !!s.title_fr;
+    for (const [k, what, max, required] of [['title', 'title', NIGHT_TITLE_MAX, !frOnly], ['detail', 'detail', NIGHT_DETAIL_MAX, false], ['host', 'host', NIGHT_HOST_MAX, false], ['cost', 'cost', NIGHT_COST_MAX, false],
       ['title_fr', 'French title', NIGHT_TITLE_MAX, false], ['detail_fr', 'French detail', NIGHT_DETAIL_MAX, false]]) {
       const f = nightTextField(s[k], what, max, n, required);
       if (!f.ok) return f;
       item[k] = f.value;
     }
     if (item.detail_fr && !item.detail) return { ok: false, detail: `night ${n}: a French detail needs the English detail too` };
+    if (frOnly) { if (!item.title_fr) return { ok: false, detail: `night ${n}: title is empty` }; item.title = ''; }
     const start = s.start == null || s.start === '' ? null : s.start;
     const end = s.end == null || s.end === '' ? null : s.end;
     if (start !== null && specialMinutes(start) === null) return { ok: false, detail: `night ${n}: start must be HH:MM` };
@@ -10769,9 +10810,10 @@ function nightsStale(checkedAt, now = new Date(), item = null) {
 }
 // The nights a visitor may see: not stale, and in season today (pub test 7: a summer-only night is hidden in winter,
 // like an out-of-season special).
-function nightsShown(list, now = new Date()) {
+// Restaurant test 2: a French-only night (no English title) only where `fr` is passed (the French venue page).
+function nightsShown(list, now = new Date(), fr = false) {
   const today = todayLocal(now);
-  return (list || []).filter((s) => !nightsStale(s.checked_at, now, s) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
+  return (list || []).filter((s) => (s.title || (fr && s.title_fr)) && !nightsStale(s.checked_at, now, s) && inMonthDaySeason(s.season_from ? { from: s.season_from, to: s.season_to } : null, today));
 }
 // Is a night on this date ('YYYY-MM-DD')? Its day of the week, then its frequency: weekly and every other week always
 // (we don't know which week, so "every other week" may be tonight and says so), monthly-1st the first such day of the
@@ -10864,7 +10906,7 @@ const NIGHT_KIND_WORDS = {
   karaoke: ['karaoke'], trivia: ['trivia', 'quiz', 'trivingo'], open_mic: ['mic', 'jam', 'scene'], bingo: ['bingo', 'singo', 'trivingo'],
   live_music: ['music', 'band', 'jam', 'blue', 'jazz', 'musique', 'concert'], dj: ['dj', 'djs'], comedy: ['comedy', 'comedian', 'humour', 'standup'],
   run_club: ['run', 'running', 'course'], games: ['game', 'crib', 'cribbage', 'dart', 'pool', 'jeux', 'jeu'],
-  sports: ['sport', 'nfl', 'football', 'ufc', 'hockey', 'nhl', 'cfl', 'nba', 'mlb', 'gameday'], paint: ['paint', 'painting', 'peinture'], tour: ['tour', 'visite'], class: ['class', 'workshop', 'masterclass', 'atelier', 'lesson'], other: [],
+  sports: ['sport', 'nfl', 'football', 'ufc', 'hockey', 'nhl', 'cfl', 'nba', 'mlb', 'gameday'], paint: ['paint', 'painting', 'peinture'], tour: ['tour', 'visite'], class: ['class', 'workshop', 'masterclass', 'atelier', 'lesson'], tasting: ['tasting', 'degustation', 'sake', 'pairing'], other: [],
 };
 // The kind and night words the label itself is made of ("Games night" -> game, night).
 function nightKindWords(kind) {
@@ -12842,7 +12884,7 @@ function guideIntroContext(badge, venues, now = new Date()) {
       if (d) ctx.deals.set(r.id, d.en);
     }
   } catch (e) { /* older schema: no happy hour facts */ }
-  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now, x)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
+  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => x.title && !specialsStale(x.checked_at, now, x)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
   try {
     for (const [id, list] of allVenueWeeklyNights()) {
       if (!idSet.has(id) || !NIGHT_TYPES.has(types.get(id))) continue;
@@ -20145,9 +20187,11 @@ function cleanPubInfoPart(key, x) {
     return t.text.length > PUB_NOTE_MAX ? { error: OWNER_VISIT_ERRORS.long } : t;
   };
   if (key === 'kitchen') {
-    if (Object.keys(x).some((k) => !['mode', 'closes', 'note', 'season'].includes(k)) || !PUB_KITCHEN_MODES.includes(x.mode)) return { error: PUB_INFO_ERROR };
+    if (Object.keys(x).some((k) => !['mode', 'closes', 'note', 'note_fr', 'season'].includes(k)) || !PUB_KITCHEN_MODES.includes(x.mode)) return { error: PUB_INFO_ERROR };
     if (x.mode === 'earlier' && !time(x.closes)) return { error: 'Please pick the time your kitchen closes.' };
     const n = note(x.note); if (n.error) return n;
+    // Restaurant test 2 (Whistler, 2026-11-14): a note written in the French setup (note_fr), shown on French pages.
+    const nf = note(x.note_fr); if (nf.error) return nf;
     // Seasonal kitchen time (pub test 7, 2026-11-10): during the summer or winter hours ({ from, to } 'MM-DD', the
     // seasonal hours' dates) the kitchen closes at its own time ('HH:MM') or with the bar ('close'). Optional; kitchens
     // stored before this read exactly as they did.
@@ -20159,13 +20203,14 @@ function cleanPubInfoPart(key, x) {
       if (!sf || !st || sf === st || !(z.closes === 'close' || time(z.closes))) return { error: 'Please pick the time your kitchen closes in that season.' };
       season = { from: sf, to: st, closes: z.closes };
     }
-    return { value: { mode: x.mode, ...(x.mode === 'earlier' ? { closes: x.closes } : {}), ...(n.text && x.mode !== 'none' ? { note: n.text } : {}), ...(season ? { season } : {}) } };
+    return { value: { mode: x.mode, ...(x.mode === 'earlier' ? { closes: x.closes } : {}), ...(n.text && x.mode !== 'none' ? { note: n.text } : {}), ...(nf.text && x.mode !== 'none' ? { note_fr: nf.text } : {}), ...(season ? { season } : {}) } };
   }
   if (key === 'minors') {
-    if (Object.keys(x).some((k) => !['policy', 'until', 'note'].includes(k)) || !PUB_MINORS_POLICIES.includes(x.policy)) return { error: PUB_INFO_ERROR };
+    if (Object.keys(x).some((k) => !['policy', 'until', 'note', 'note_fr'].includes(k)) || !PUB_MINORS_POLICIES.includes(x.policy)) return { error: PUB_INFO_ERROR };
     if (x.policy === 'minors_until' && !time(x.until)) return { error: 'Please pick the time minors are welcome until.' };
     const n = note(x.note); if (n.error) return n;
-    return { value: { policy: x.policy, ...(x.policy === 'minors_until' ? { until: x.until } : {}), ...(n.text ? { note: n.text } : {}) } };
+    const nf = note(x.note_fr); if (nf.error) return nf;
+    return { value: { policy: x.policy, ...(x.policy === 'minors_until' ? { until: x.until } : {}), ...(n.text ? { note: n.text } : {}), ...(nf.text ? { note_fr: nf.text } : {}) } };
   }
   if (key === 'sports') {
     if (Object.keys(x).some((k) => !['list', 'tvs'].includes(k)) || !Array.isArray(x.list) || x.list.some((s) => !PUB_SPORTS.includes(s)) || new Set(x.list).size !== x.list.length) return { error: PUB_INFO_ERROR };
@@ -20193,22 +20238,25 @@ function pubInfoLinesHtml(venue, fr, now = new Date()) {
   const lines = [];
   // The kitchen time for today's date (pub test 7): its seasonal time inside that season.
   const k = pubKitchenOn(info.kitchen, todayLocal(now));
-  if (k && k.mode === 'earlier' && k.closes) lines.push(['kitchen', L(`Kitchen closes at ${pubClock(k.closes)}`, `La cuisine ferme à ${pubClock(k.closes, true)}`), k.note]);
-  else if (k && k.mode === 'same') lines.push(['kitchen', L('Food served until close', 'Nourriture servie jusqu’à la fermeture'), k.note]);
+  // Restaurant test 2 (Whistler, 2026-11-14): the business's note in the page's language: the French note (from the French
+  // setup) on French pages, else the one she typed in English (as typed); English pages never show a French-only note.
+  const noteOf = (o) => (o ? (fr ? o.note_fr || o.note : o.note) || '' : '');
+  if (k && k.mode === 'earlier' && k.closes) lines.push(['kitchen', L(`Kitchen closes at ${pubClock(k.closes)}`, `La cuisine ferme à ${pubClock(k.closes, true)}`), noteOf(k)]);
+  else if (k && k.mode === 'same') lines.push(['kitchen', L('Food served until close', 'Nourriture servie jusqu’à la fermeture'), noteOf(k)]);
   else if (k && k.mode === 'none') lines.push(['kitchen', L('No food served', 'Pas de nourriture servie'), '']);
   const m = info.minors;
-  if (m && m.policy) lines.push(['minors', minorsLineText(m, fr), m.note]);
+  if (m && m.policy) lines.push(['minors', minorsLineText(m, fr), noteOf(m)]);
   // Breweries (2026-11-12): once they say who's welcome, their Kids & dogs line in Plan your visit carries "No dogs".
   const dogs = brewSetupType(venue.type) && breweryKidsWelcome(venue.id) !== null ? '' : noDogsLineText(venue, fr);
   if (dogs) lines.push(['dogs', dogs, '']);
   if (!lines.length) return '';
-  // The business's own notes are in their words (usually English): the French page shows only the line.
-  return `<div class="venue-pub-lines" style="margin:10px 0 0">${lines.map(([cls, text, note]) => `<p class="venue-pub-line venue-pub-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${PUB_LINE_ICONS[cls] || '👪'}</span> <strong>${escapeHtml(text)}</strong>${note && !fr ? `<span class="venue-pub-note" style="display:block;margin-left:1.6em;opacity:.85">${escapeHtml(note)}</span>` : ''}</p>`).join('')}</div>`;
+  return `<div class="venue-pub-lines" style="margin:10px 0 0">${lines.map(([cls, text, note]) => `<p class="venue-pub-line venue-pub-${cls}" style="margin:0 0 8px"><span aria-hidden="true">${PUB_LINE_ICONS[cls] || '👪'}</span> <strong>${escapeHtml(text)}</strong>${note ? `<span class="venue-pub-note" style="display:block;margin-left:1.6em;opacity:.85">${escapeHtml(note)}</span>` : ''}</p>`).join('')}</div>`;
 }
 // The kitchen answer as it applies on a date: inside its season the seasonal time ('close' = food until close).
 function pubKitchenOn(k, date) {
-  if (!k || !k.season || !inMonthDaySeason(k.season, date)) return k ? { mode: k.mode, closes: k.closes, note: k.note } : k;
-  return k.season.closes === 'close' ? { mode: 'same', note: k.note } : { mode: 'earlier', closes: k.season.closes, note: k.note };
+  const nf = k && k.note_fr ? { note_fr: k.note_fr } : {};
+  if (!k || !k.season || !inMonthDaySeason(k.season, date)) return k ? { mode: k.mode, closes: k.closes, note: k.note, ...nf } : k;
+  return k.season.closes === 'close' ? { mode: 'same', note: k.note, ...nf } : { mode: 'earlier', closes: k.season.closes, note: k.note, ...nf };
 }
 // "Adults only (19+)" / "Minors welcome with an adult until 8 PM" / "All ages welcome" (the business's own rule).
 function minorsLineText(m, fr) {
@@ -21482,8 +21530,12 @@ function venueCardHtml(venue, opts = {}) {
   let tourInfo = null;
   if (isTourCard) { try { tourInfo = venueVisitInfo(venue.id); } catch (e) { tourInfo = null; } }
   const tourKnown = tourInfo && Array.isArray(tourInfo.rows) ? tourInfo.rows.find((r) => r.label === 'Known for') : null;
+  // Restaurant test 2 (Whistler, 2026-11-14): the owner's French Known for (from the French setup) is the French card's
+  // line; the English card never shows it (it keeps its English Known for, or the description).
+  const knownFr = tourInfo ? ownerVisitFrLines(tourInfo).known_for || '' : '';
   const tourSummaryHtml = isTourCard
-    ? (tourKnown ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(tourKnown.text)}</p></div>`
+    ? (tourKnown ? `<div class="golf-desc" id="${descId}"><p>${knownFr ? bilingualDescHtml(tourKnown.text, knownFr) : escapeHtml(tourKnown.text)}</p></div>`
+      : knownFr && venue.description ? `<div class="golf-desc" id="${descId}"><p>${bilingualDescHtml(descEn, knownFr)}</p></div>`
       : noteIsSummary && cardNoteRaw ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(cardNoteRaw)}</p></div>` : desc)
     : desc;
   const tourKind = isTourCard && (venue.type === 'tour' || tourStyle) ? tourCardKind(venue) : '';
@@ -36079,7 +36131,7 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   let row = null;
   try { row = db.prepare('SELECT hours, happy_hour, happy_hour_times, happy_hour_checked_at, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
   // Deals (2026-10-26): only with the happy_hour badge and a check from the last HH_DEALS_STALE_DAYS days.
-  const deals = happyHourDealsShown(row, now);
+  const deals = happyHourDealsShown(row, now) || (fr ? happyHourDealsFrenchOnly(row, now) : null);
   if (!row || (!row.happy_hour_times && !deals)) return null;
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
   // Brewery test 4 (2026-11-13): happy hour on a day the place is closed (all year or in a season): "(when open)".
@@ -36196,7 +36248,7 @@ function placeDoneForToday(place, clock) {
 }
 function venueSpecials(venue, statusHours, fr, now = new Date()) {
   if (!venue || venue.redirect_to) return null;
-  const list = venueSpecialsList(venue.id);
+  const list = venueSpecialsList(venue.id).filter((s) => s.title || (fr && s.title_fr));
   if (!list.length) return null;
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
   let row = null;
@@ -36204,7 +36256,7 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
   // Restaurant test 1 (Whistler, 2026-11-14): a special with its own season ("Fondue Fridays", Dec–Mar) is on the page
   // out of season too, with its months beside it and never "Today" (it had vanished until December).
   const today0 = todayLocal(now);
-  const inSeason = specialsShown(row || venue, list, now);
+  const inSeason = specialsShown(row || venue, list, now, todayLocal(now), fr);
   const later = list.filter((x) => !specialInSeason(x, today0) && !specialsStale(x.checked_at, now, x) && (x.kind === 'food' || venueServesAlcohol(row || venue)));
   const shown = inSeason.concat(later);
   if (!shown.length) return null;
@@ -36257,13 +36309,13 @@ function venueSpecialsHtml(sp, fr) {
 // marked only when the night falls on today (its frequency too) and the place's own hours don't call it closed today.
 function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   if (!venue || venue.redirect_to || (venue.type && !NIGHT_TYPES.has(venue.type))) return null;
-  const list = venueWeeklyNightsList(venue.id);
+  const list = venueWeeklyNightsList(venue.id).filter((x) => x.title || (fr && x.title_fr));
   if (!list.length) return null;
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
   // Restaurant test 1 (Whistler, 2026-11-14): one with its own season is shown out of season too, with its months and
   // never "Tonight" (like the weekly specials).
   const today0 = todayLocal(now), nightIn = (x) => inMonthDaySeason(x.season_from ? { from: x.season_from, to: x.season_to } : null, today0);
-  const shown = nightsSorted(nightsShown(list, now).concat(list.filter((x) => !nightIn(x) && !nightsStale(x.checked_at, now, x))));
+  const shown = nightsSorted(nightsShown(list, now, fr).concat(list.filter((x) => !nightIn(x) && !nightsStale(x.checked_at, now, x))));
   if (!shown.length) return null;
   const clock = okanaganClock(now);
   let closedToday = false;
@@ -36302,7 +36354,7 @@ function venueClosedForTagsToday(venue, now = new Date()) {
   return false;
 }
 // A small line icon per kind (the existing uiIcon set; no emoji).
-const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', tour: 'calendar', class: 'calendar', other: 'calendar' };
+const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', tour: 'calendar', class: 'calendar', tasting: 'calendar', other: 'calendar' };
 // The "Weekly nights" card (the weekly specials' list style): the days in their own column, the title with its time
 // and a "Tonight" tag on tonight's row (words, not only colour; "Today" for a night before 4 PM), then a line with the
 // kind, the detail, the host, the cost and "every other week". French without a French title or detail shows the
@@ -46522,6 +46574,11 @@ const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch',
   'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Noodles & Ramen', 'Pizza',
   'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Small plates & bar snacks', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
   'Swiss & Alpine', 'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
+// Restaurant test 2 (Whistler, 2026-11-14): the setup's food search finds a cuisine by a dish or style word too ("sushi" and
+// "izakaya" found nothing, not even Japanese). A small list; each word points at labels above.
+const OWNER_CUISINE_ALIASES = { sushi: ['Japanese'], sushis: ['Japanese'], izakaya: ['Japanese'], omakase: ['Japanese'], ramen: ['Japanese', 'Noodles & Ramen'],
+  taco: ['Mexican'], tacos: ['Mexican'], burrito: ['Mexican'], pho: ['Vietnamese'], 'banh mi': ['Vietnamese'], curry: ['Indian', 'Thai'], cari: ['Indian', 'Thai'],
+  'dim sum': ['Chinese'], souvlaki: ['Greek'], gyro: ['Greek'], wings: ['Chicken & Wings'], ailes: ['Chicken & Wings'], fondue: ['Swiss & Alpine'], raclette: ['Swiss & Alpine'], tapas: ['Spanish & Tapas'] };
 // Restaurant test 1 (Whistler, 2026-11-14): "European" and "Swiss & Alpine" (fondue and raclette had no label). A stored
 // label from before ("Alpine / European") picks them for the owner in the setup (ownerCuisineSuggestions).
 // Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
@@ -46745,6 +46802,25 @@ function ownerVisitRows(venueId) {
   }
   return out;
 }
+// Restaurant test 2 (Whistler, 2026-11-14): the owner's own French lines from the French setup, by slot key
+// ({ known_for: 'Sushi frais…' }), stored in the box as owner_fr_lines. The French page shows them; the English page never
+// does (its line stays empty until there is an English one). -> {} when none.
+function ownerVisitFrLines(info) {
+  const o = info && info.owner_fr_lines;
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
+  return Object.fromEntries(Object.entries(o).filter(([k, v]) => OWNER_VISIT_KEYS.includes(k) && typeof v === 'string' && v.trim()));
+}
+// The lines as the French setup shows them: her French line, else the English one (as typed).
+function ownerVisitRowsFr(venueId) {
+  const en = ownerVisitRows(venueId), frl = ownerVisitFrLines(venueVisitInfo(venueId));
+  return Object.fromEntries(Object.keys(en).map((k) => [k, frl[k] || en[k]]));
+}
+// The owner's snapshot of the lines: the English ones, and her French ones (`_fr`) when she has some, so an Undo puts
+// both back.
+function ownerVisitRowsSnapshot(venueId) {
+  const frl = ownerVisitFrLines(venueVisitInfo(venueId));
+  return { ...ownerVisitRows(venueId), ...(Object.keys(frl).length ? { _fr: frl } : {}) };
+}
 // Winery test 5 (2026-11-12): the Plan your visit keys whose line is still research's (not one the owner wrote or
 // confirmed). The setup's quick-answer chips replace such a line instead of adding onto it.
 function ownerVisitResearchKeys(venueId) {
@@ -46804,7 +46880,12 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
-  if (!rows.length && !info.booking_url && !info.owner_labels.length) {
+  // Restaurant test 2 (2026-11-14): her French lines (`_fr`), exactly as sent; a value without `_fr` leaves them as they are.
+  if (value && value._fr && typeof value._fr === 'object' && !Array.isArray(value._fr)) {
+    const frl = ownerVisitFrLines({ owner_fr_lines: value._fr });
+    if (Object.keys(frl).length) info.owner_fr_lines = frl; else delete info.owner_fr_lines;
+  }
+  if (!rows.length && !info.booking_url && !info.owner_labels.length && !info.owner_fr_lines) {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
     return { before, after: null };
   }
@@ -47556,7 +47637,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // "We don't have one" (2026-11-08): the sorted item keys; only for the types with a completeness list.
     ...(COMPLETENESS_TYPES.has(venue.type) ? { not_offered: venueNotOffered(venue.id) } : {}),
     // Cuisine and the date the hours were last checked (2026-11-08): only for the types with a completeness list.
-    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
+    ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRowsSnapshot(venue.id) } : {}),
     // Pubs (2026-11-10): { kitchen, minors, sports } as stored ({} when none).
     ...(venue.type === 'pub' ? { pub_info: venuePubInfo(venue.id) } : {}),
     // Restaurant test 1 (2026-11-14): a restaurant's kitchen / last seating answer ({ kitchen } or {}).
@@ -47832,12 +47913,14 @@ function ownerHappyHourDealsSnapshot(venueId) {
   let row = null;
   try { row = db.prepare('SELECT happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venueId); } catch (e) { row = null; }
   const deals = row ? parseHappyHourDealsJson(row.happy_hour_deals) : null;
-  if (!deals) return null;
-  return { deals, deals_fr: parseHappyHourDealsJson(row.happy_hour_deals_fr) || [], source: row.happy_hour_deals_source || null, checked_at: row.happy_hour_deals_checked_at || null };
+  // French-only deals (restaurant test 2): no English lines, only French ones.
+  const dealsFr = row ? parseHappyHourDealsJson(row.happy_hour_deals_fr) : null;
+  if (!deals && !(row && row.happy_hour_deals && dealsFr)) return null;
+  return { deals: deals || [], deals_fr: dealsFr || [], source: row.happy_hour_deals_source || null, checked_at: row.happy_hour_deals_checked_at || null };
 }
 // Same deals? (the lines only, English and French; never the source or date)
 function sameHappyHourDeals(a, b) {
-  const norm = (x) => (x && Array.isArray(x.deals) && x.deals.length ? JSON.stringify([x.deals.map((d) => [d.text, d.price || '']), (x.deals_fr || []).map((d) => [d.text, d.price || ''])]) : null);
+  const norm = (x) => (x && Array.isArray(x.deals) && (x.deals.length || (x.deals_fr || []).length) ? JSON.stringify([x.deals.map((d) => [d.text, d.price || '']), (x.deals_fr || []).map((d) => [d.text, d.price || ''])]) : null);
   return norm(a) === norm(b);
 }
 
@@ -48068,7 +48151,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const frList = validateHappyHourDeals(x.deals_fr == null ? [] : x.deals_fr);
       const bad = !en.ok ? en : !frList.ok ? frList : null;
       if (bad) errors.happy_hour_deals = ownerDealsError(bad.detail);
-      else if (!en.deals.length && frList.deals.length) errors.happy_hour_deals = OWNER_DEALS_ERRORS.englishFirst;
+      // Restaurant test 2 (Whistler, 2026-11-14): the French setup saves the owner's French deals as French only (no English
+      // yet): the French page shows them and the English page leaves them out until there is an English version.
+      else if (!en.deals.length && frList.deals.length && !(body || {}).from_setup) errors.happy_hour_deals = OWNER_DEALS_ERRORS.englishFirst;
+      else if (!en.deals.length && frList.deals.length) { const next = { deals: [], deals_fr: frList.deals }; if (!sameHappyHourDeals(next, current.happy_hour_deals)) changes.happy_hour_deals = next; }
       else if (!en.deals.length) { if (current.happy_hour_deals) changes.happy_hour_deals = null; }
       else {
         const next = { deals: en.deals, deals_fr: frList.deals };
@@ -48188,26 +48274,42 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('visit_rows' in input) {
     const x = input.visit_rows;
     if (!COMPLETENESS_TYPES.has(venue.type)) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
-    else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => !visitSlotsFor(venue.id).some((z) => z.key === k))) errors.visit_rows = OWNER_VISIT_ERRORS.unreadable;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => k !== '_lang' && !visitSlotsFor(venue.id).some((z) => z.key === k)) || (x._lang !== undefined && x._lang !== 'fr')) errors.visit_rows = OWNER_VISIT_ERRORS.unreadable;
     else {
-      const cur = current.visit_rows || ownerVisitRows(venue.id);
+      const cur = current.visit_rows || ownerVisitRowsSnapshot(venue.id);
       const next = { ...cur };
-      for (const k of Object.keys(x)) {
+      // Restaurant test 2 (Whistler, 2026-11-14): lines sent from the French setup (`_lang: 'fr'`) are her French lines
+      // (`_fr`, owner_fr_lines). One she left as shown changes nothing; a changed one is French only: the English line of
+      // that row is cleared (the English page leaves it out until there is an English one).
+      const frSetup = x._lang === 'fr';
+      const frWas = { ...(cur._fr || {}) }, frNext = { ...frWas };
+      let frChanged = false;
+      for (const k of Object.keys(x).filter((kk) => kk !== '_lang')) {
         const t = ownerVisitText(x[k]);
         if (t.error) { errors.visit_rows = t.error; errors.visit_rows_key = k; break; }
+        if (frSetup) {
+          if (t.text === (frWas[k] || cur[k] || '')) continue;
+          // A line made only of quick answers (« Sans réservation ») reads in either language: stored as before.
+          if (t.text && isPresetAnswer(t.text)) { next[k] = t.text; if (frNext[k]) { delete frNext[k]; frChanged = true; } continue; }
+          next[k] = '';
+          if (t.text) frNext[k] = t.text; else delete frNext[k];
+          frChanged = true;
+          continue;
+        }
         next[k] = t.text;
       }
+      if (frChanged) next._fr = frNext;
       // Winery test 2 (2026-11-12): from the setup, a line sent back unchanged is the owner confirming research's line: it
       // becomes hers (writeOwnerVisitRows), so a full box never drops it. Only while it isn't hers yet.
       const ownedNow = new Set((venueVisitInfo(venue.id) || {}).owner_labels || []);
       const vrows = (venueVisitInfo(venue.id) || {}).rows || [];
       const confirm = errors.visit_rows || (body || {}).from_setup !== true ? [] : Object.keys(x).filter((k) => {
-        if (!next[k] || next[k] !== cur[k]) return false;
+        if (k === '_lang' || !next[k] || next[k] !== cur[k] || (frSetup && frWas[k])) return false;
         const slot = visitSlotsFor(venue.id).find((z) => z.key === k);
         const row = vrows[visitSlotRowIndex(slot, vrows, ownedNow)];
         return !!row && !ownedNow.has(row.label);
       });
-      if (!errors.visit_rows && (OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k]) || confirm.length)) changes.visit_rows = confirm.length ? { ...next, _confirm: confirm } : next;
+      if (!errors.visit_rows && (OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k]) || confirm.length || frChanged)) changes.visit_rows = confirm.length ? { ...next, _confirm: confirm } : next;
     }
   }
   if ('price_range' in input) {
@@ -48497,7 +48599,8 @@ function ownerValueText(field, value) {
   if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
   if (field === 'hours_checked') return value ? `Hours confirmed as right (checked ${value})` : '(not checked)';
   if (field === 'visit_rows') {
-    const parts = OWNER_VISIT_SLOTS.concat(COCKTAIL_VISIT_SLOTS.filter((x) => x.key === 'good_to_know')).filter((x) => value && value[x.key]).map((x) => `${x.def}: ${value[x.key]}`);
+    const frl = value && value._fr && typeof value._fr === 'object' ? value._fr : {};
+    const parts = OWNER_VISIT_SLOTS.concat(COCKTAIL_VISIT_SLOTS.filter((x) => x.key === 'good_to_know')).filter((x) => value && (value[x.key] || frl[x.key])).map((x) => `${x.def}: ${[value[x.key], frl[x.key] ? `FR: ${frl[x.key]}` : ''].filter(Boolean).join(' | ')}`);
     return parts.length ? parts.join(' · ') : '(none)';
   }
   if (field === 'cuisines') return Array.isArray(value) && value.length ? value.join(', ') : '(none)';
@@ -48553,7 +48656,7 @@ function ownerValueText(field, value) {
     if (o.kitchen && o.kitchen.season) parts.push(`${hoursExtraRangeText(o.kitchen.season.from, o.kitchen.season.to)}: ${o.kitchen.season.closes === 'close' ? 'food until close' : `kitchen closes at ${pubClock(o.kitchen.season.closes)}`}`);
     if (o.minors) parts.push(minorsLineText(o.minors, false));
     if (o.sports) parts.push(`Sports: ${(o.sports.list || []).map((k) => (PUB_SPORT_SHORT[k] || {}).en || k).join(', ') || '(none)'}${o.sports.tvs ? ` · ${PUB_TV_LABELS[o.sports.tvs].page[0]}` : ''}`);
-    for (const k of ['kitchen', 'minors']) if (o[k] && o[k].note) parts.push(`Note: ${o[k].note}`);
+    for (const k of ['kitchen', 'minors']) { if (o[k] && o[k].note) parts.push(`Note: ${o[k].note}`); if (o[k] && o[k].note_fr) parts.push(`Note (FR): ${o[k].note_fr}`); }
     return parts.length ? parts.join(' · ') : '(none)';
   }
   if (field === 'not_offered') {
@@ -49731,7 +49834,7 @@ const VISITOR_REPORT_RATE_LIMIT = 20;
 // Every visitor-facing string, [English, French].
 const VC_TEXT = {
   heading: ['Visitor photos & tips', 'Photos et conseils des visiteurs'],
-  invite: ['Been here? Share a photo or tip', 'Vous y êtes allé? Partagez une photo ou un conseil'],
+  invite: ['Been here? Share a photo or tip', 'Vous y êtes allé\u202f? Partagez une photo ou un conseil'],
   share: ['Share a photo or tip', 'Partager une photo ou un conseil'],
   name: ['Your name', 'Votre nom'],
   nameHint: ['Shown as your first name and last initial, e.g. Sarah M.', 'Affiché avec votre prénom et l’initiale de votre nom, p. ex. Sarah M.'],
@@ -53172,7 +53275,9 @@ function setupHappySig(found) {
   const d = ownerHappyHourDealsSnapshot(found.venue.id);
   // Until close (pub test 9) is part of what the page stored; added only when there is some, so older rows still match.
   const close = happyHourCloseOf(found.happyHourTimes);
-  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []].concat(close ? [close] : []));
+  // Restaurant test 2: French-only deals (no English ones) are part of it too (added only then, so older rows match).
+  const frd = d && Array.isArray(d.deals_fr) && d.deals_fr.length && !(d.deals || []).length ? [['fr', d.deals_fr.map((x) => [x.text, x.price || ''])]] : [];
+  return JSON.stringify([week, d && Array.isArray(d.deals) ? d.deals.map((x) => [x.text, x.price || '']) : []].concat(close ? [close] : [], frd));
 }
 function cleanSetupHappyBlocks(list) {
   if (!Array.isArray(list) || !list.length || list.length > 6) return null;
@@ -53186,8 +53291,9 @@ function cleanSetupHappyBlocks(list) {
   return out;
 }
 // The rows to show again, or null when the page no longer matches them.
-function setupHappyBlocks(found) {
+function setupHappyBlocks(found, lang = 'en') {
   const b = (setupProgress(found.venue.id).blocks || {}).happy;
+  if (b && b.lang === 'fr' && lang !== 'fr') return null;
   return b && Array.isArray(b.entries) && b.sig === setupHappySig(found) ? b.entries : null;
 }
 // A step that was saved or sent is never downgraded (fresh-eyes 2026-11-10: "Skip this for now" on a menu already sent
@@ -53320,7 +53426,9 @@ async function handleOwnerSetupProgress(req, res, method, found) {
     // A "skip" or "later" never touches them (it never replaces an answer either).
     if (body.status === 'skip' || body.status === 'later') return send(200, { ok: true, progress: { done: p1.done }, waiting: setupWaitingSteps(found.venue), score: setupScore(found) });
     const blocks = { ...(p1.blocks || {}) };
-    if (entries) blocks.happy = { entries, sig: setupHappySig(found) }; else delete blocks.happy;
+    // Restaurant test 2 (Whistler, 2026-11-14): rows typed in the French setup are French (lang 'fr'): the English setup
+    // doesn't offer them back (it starts from the page's English deals, or none).
+    if (entries) blocks.happy = { entries, sig: setupHappySig(found), ...(body.lang === 'fr' ? { lang: 'fr' } : {}) }; else delete blocks.happy;
     if (Object.keys(blocks).length) p1.blocks = blocks; else delete p1.blocks;
     writeSetupProgress(found.venue.id, p1);
     progress = p1;
@@ -53423,15 +53531,20 @@ function renderOwnerSetupPage(found, opts) {
     address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, description_fr: snap.description_fr || '', hours: snap.hours, open_months: snap.open_months || '',
     hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
-    happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [] } : null,
-    happy_blocks: setupHappyBlocks(found),
+    happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [], deals_fr: snap.happy_hour_deals.deals_fr || [] } : null,
+    happy_blocks: setupHappyBlocks(found, lang),
     // Every owner field of each special and night, so one the owner didn't touch is sent back exactly as stored.
     specials: (snap.specials || []).map((x) => Object.fromEntries(OWNER_SPECIAL_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     // Cocktail test 1 (2026-11-13): events still waiting for review (an edit-page change, like "1st of the month") are what
     // the setup starts from, so a later setup save carries them (and their how often) instead of the older live ones.
     weekly_nights: ownerSetupNights(venue.id, snap.weekly_nights).map((x) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, x[k] == null ? null : x[k]]))),
     weekly_nights_waiting: !!ownerPendingNights(venue.id),
-    visit_rows: snap.visit_rows || {}, not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
+    // Restaurant test 2 (Whistler, 2026-11-14): the French setup starts from her French lines (else the English ones, as
+    // typed); the English setup from the English ones.
+    visit_rows: fr ? ownerVisitRowsFr(venue.id) : Object.fromEntries(Object.entries(snap.visit_rows || {}).filter(([k]) => k !== '_fr')),
+    // French setup: the keys whose line is her French one (never called English); English setup: the keys with only a French line.
+    visit_fr: Object.fromEntries(Object.keys((snap.visit_rows || {})._fr || {}).filter((k) => fr || !(snap.visit_rows || {})[k]).map((k) => [k, true])),
+    not_offered: snap.not_offered || [], instagram_url: snap.instagram_url || '', facebook_url: snap.facebook_url || '',
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
     // box any more (café test 3, 2026-11-11: keep it easy); a TikTok already saved stays stored and on the page.
     booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(),
@@ -53570,6 +53683,7 @@ function renderOwnerSetupPage(found, opts) {
     ...(venue.type === 'restaurant' ? { visitTicks: researchReservationTicks(venue, snap.badges) } : {}),
     cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: cocktail ? COCKTAIL_CUISINES_POPULAR : pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
+    cuisineAliases: OWNER_CUISINE_ALIASES,
     // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
     cuisineShow: fr ? Object.fromEntries(OWNER_CUISINES.filter((c) => FR_CUISINE_ADJECTIVE.has(c)).map((c) => [c, `Cuisine ${frCuisine(c).toLowerCase()}`])) : {},
     // A café's kind as its page shows it ("Bubble tea shop"), for the preview line (café test 3).
@@ -53586,7 +53700,11 @@ function renderOwnerSetupPage(found, opts) {
       : venue.type === 'distillery' ? ['tour', 'class', 'live_music', 'other', 'trivia', 'games', 'open_mic', 'comedy', 'paint', 'karaoke', 'bingo', 'run_club', 'dj', 'sports']
       // Breweries (2026-11-12): trivia, live music, bingo and run club first.
       : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
+      // Restaurant test 2 (Whistler, 2026-11-14): restaurants lead with live music and a tasting (« Dégustation de saké »).
+      : venue.type === 'restaurant' ? ['live_music', 'tasting', 'trivia', 'paint', 'comedy', 'open_mic', 'karaoke', 'bingo', 'run_club', 'dj', 'games', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
+    // Restaurant test 2: each kind's English name (a French-setup event keeps it as its English name).
+    nightKindsEn: NIGHT_KIND_LABELS.en,
     nightKindsTop: venue.type === 'distillery' ? 4 : 6,
     // Cocktail test 1 (2026-11-13): each event's how often when it isn't every week ("1st Thu of the month"), shown on the
     // events screen; with weekly_nights_waiting it is still waiting for our check.
@@ -53597,6 +53715,8 @@ function renderOwnerSetupPage(found, opts) {
     // Pub test 2 (Whistler, 2026-11-14): research's price line ("Burgers from $19") starts the spend screen at $19 instead
     // of $25, as a suggestion (saved only when she saves the screen). Not for cafés (their own starting prices).
     suggestSpend: cafe ? 0 : researchSpendGuess(venue.id),
+    // Restaurant test 2: what the guess was read from, for "We guessed from your listing: …".
+    suggestSpendFrom: cafe ? '' : researchSpendGuessInfo(venue.id, fr).from,
     dayNames: shortDays, longDays: dayNames, monthLong: MONTH_NAMES[fr ? 'fr' : 'en'], monthNames: fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
@@ -53641,7 +53761,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC])) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53837,16 +53957,38 @@ function breweryListTile(venue) {
 // jusqu’à 20 h »), or ''.
 // Research's Prices line as a starting spend: the first whole-dollar amount from $5 to $300 ("Burgers from $19" -> 19,
 // « Burgers dès 19 $ » -> 19), or 0. Only research's line (never one the owner wrote).
-function researchSpendGuess(venueId) {
+// Restaurant test 2 (Whistler, 2026-11-14): "Rolls from $9" set $9. Side items (rolls, appetizers, pints, coffee, sides,
+// snacks, drinks...) never set the guess; "mains" / "entrées" / "plats" lead. A Prices line with only side-item prices
+// guesses from the listing's price range instead ($$ is about $25). -> { amount, from } (from: what it was read from), or
+// { amount: 0 }.
+const SPEND_SIDE_RE = /\b(?:rolls?|maki|nigiri|sushi pieces?|appetizers?|appies|apps|starters?|pints?|beers?|pitchers?|coffees?|espressos?|lattes?|teas?|sides?|snacks?|drinks?|cocktails?|glass(?:es)?|wines? by the glass|desserts?|small plates?|tapas|kids?|children|add[- ]?ons?|extras?|entrées? froides?|accompagnements?|bières?|cafés?|boissons?|collations?|desserts?)\b/i;
+const SPEND_MAIN_RE = /\b(?:mains?|main courses?|main dishes?|entrées?|entrees?|plats?(?: principaux)?|dinners?|meals?|per person|a person|pp)\b/i;
+const SPEND_RANGE_GUESS = { 1: 12, 2: 25, 3: 45, 4: 70 };
+function researchSpendGuessInfo(venueId, fr = false) {
   const info = venueVisitInfo(venueId) || {}; const mine = new Set(info.owner_labels || []);
+  let sideOnly = '';
   for (const r of info.rows || []) {
     if (!r || mine.has(r.label) || !/^(?:Prices?|Price range)$/i.test(String(r.label || '')) || typeof r.text !== 'string') continue;
-    const m = /\$\s?(\d{1,3})(?:\.\d{2})?\b|\b(\d{1,3})(?:[.,]\d{2})?\s?\$/.exec(r.text);
-    const n = m ? Number(m[1] || m[2]) : 0;
-    if (n >= 5 && n <= 300) return n;
+    let main = 0, plain = 0, side = false;
+    for (const part of r.text.split(/\s*(?:[;·|]|,\s+(?=[A-Za-zÀ-ÿ])|\.\s+)\s*/)) {
+      const re = /\$\s?(\d{1,3})(?:\.\d{2})?\b|\b(\d{1,3})(?:[.,]\d{2})?\s?\$/g; let m, n = 0;
+      while ((m = re.exec(part))) { const x = Number(m[1] || m[2]); if (x >= 5 && x <= 300) { n = x; break; } }
+      if (!n) continue;
+      if (SPEND_MAIN_RE.test(part) && !main) main = n;
+      else if (SPEND_SIDE_RE.test(part)) side = true;
+      else if (!plain) plain = n;
+    }
+    if (main || plain) return { amount: main || plain, from: r.text };
+    if (side && !sideOnly) sideOnly = r.text;
   }
-  return 0;
+  if (sideOnly) {
+    let price = 0;
+    try { price = Number((db.prepare('SELECT price FROM venues WHERE id = ?').get(venueId) || {}).price) || 0; } catch (e) { price = 0; }
+    if (SPEND_RANGE_GUESS[price]) return { amount: SPEND_RANGE_GUESS[price], from: `${'$'.repeat(price)} (${fr ? `${OWNER_PRICE_SCALE_FR[price]} par personne` : `${OWNER_PRICE_SCALE[price]} per person`})` };
+  }
+  return { amount: 0, from: '' };
 }
+function researchSpendGuess(venueId) { return researchSpendGuessInfo(venueId).amount; }
 function researchKidsUntil(rows) {
   for (const r of rows || []) {
     if (!r || typeof r.text !== 'string' || !/\b(?:kids?|children|minors|families|enfants|mineurs)\b/i.test(`${r.label || ''} ${r.text}`)) continue;
@@ -54144,6 +54286,28 @@ const SETUP_SPLIT_HOURS_HELP_TOPIC = { id: 'setup-split-hours', pages: ['setup']
     + '<p>Lunch only in summer? Set your usual hours first. At <strong>Are these your hours all year?</strong> tap <strong>No, different in summer</strong>, then add the second time to your summer days. Hours saved in the setup go live straight away, and your page shows you closed between the two times. On your edit page it\u2019s <strong>+ second time</strong>.</p>',
   aFr: '<p>Ouvert le midi, fermé l\u2019après-midi, puis ouvert de nouveau pour le souper? Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>, touchez <strong>Modifier</strong> à côté de la journée, puis <strong>+ Ajouter une deuxième plage (midi et soir)</strong>. Le dîner va dans la première plage et le souper dans la deuxième (par exemple 11 h 30 \u2013 14 h 30 et 17 h \u2013 22 h). <strong>Copier ces heures à</strong> copie les deux, et <strong>\u2715 Retirer cette plage</strong> en retire une.</p>'
     + '<p>Le dîner seulement l\u2019été? Indiquez d\u2019abord vos heures habituelles. À <strong>Ces heures sont-elles les mêmes toute l\u2019année?</strong>, touchez <strong>Non, elles changent en été</strong>, puis ajoutez la deuxième plage à vos journées d\u2019été. Les heures enregistrées dans la configuration sont en ligne tout de suite, et votre page vous indique fermé entre les deux plages. Sur votre page de modification, c\u2019est <strong>+ deuxième plage</strong>.</p>' };
+// Restaurant test 2 (Whistler, 2026-11-14): a happy hour between lunch and dinner (« le 5 à 7 est entre le dîner et le
+// souper, c'est grave? ») got the split-hours answer and nothing about the warning. Every type with a happy hour.
+const SETUP_HAPPY_SPLIT_HELP_TOPIC = { id: 'setup-happy-split', pages: ['setup'], over: ['setup-split-hours', 'hours', 'happy-hour'],
+  q: 'Happy hour between lunch and dinner', qFr: 'Un 5 à 7 entre le dîner et le souper',
+  keys: ['happy hour between lunch and dinner', 'happy hour between', 'happy hour is between', 'happy hour in the afternoon break', 'happy hour outside my hours', 'happy hour outside our hours', 'happy hour outside opening hours',
+    'outside your opening hours', 'outside my opening hours', 'bar open between lunch and dinner', 'bar is open between lunch and dinner', 'bar stays open', 'bar open in the afternoon', 'happy hour when the kitchen is closed'],
+  keysFr: ['5 a 7 entre le diner et le souper', '5 a 7 est entre le diner et le souper', '5 a 7 entre', '5 a 7 est entre', 'happy hour entre le diner et le souper', 'en dehors de vos heures d ouverture', 'en dehors de mes heures',
+    'le bar reste ouvert', 'bar ouvert entre le diner et le souper', 'le bar est ouvert entre', '5 a 7 en dehors', 'apres ski entre le diner et le souper'],
+  a: '<p>The heads-up only means your page shows you closed at that time. If the bar stays open between lunch and dinner, change your hours so they run through: in <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>, tap <strong>\u2715 Remove this time</strong> on the dinner time and set the lunch time to close at dinner\u2019s closing time (like 12 PM \u2013 10 PM). The happy hour screen has a <strong>Change my hours</strong> button that takes you there.</p>'
+    + '<p>If you\u2019re really closed between services, keep your hours: your happy hour still saves, and you can move it to when you\u2019re open (like 5 PM \u2013 6 PM). When the kitchen closes in the afternoon, the kitchen question after your hours is the place to say so.</p>',
+  aFr: '<p>L\u2019avertissement veut seulement dire que votre page vous indique fermé à cette heure-là. Si le bar reste ouvert entre le dîner et le souper, changez vos heures pour qu\u2019elles se suivent : dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>, touchez <strong>\u2715 Retirer cette plage</strong> sur celle du souper et faites finir celle du dîner à l\u2019heure de fermeture du soir (par exemple 12 h \u2013 22 h). L\u2019écran du 5 à 7 a un bouton <strong>Changer mes heures</strong> qui vous y mène.</p>'
+    + '<p>Si vous êtes vraiment fermé entre les services, gardez vos heures : votre 5 à 7 s\u2019enregistre quand même, et vous pouvez le placer quand vous êtes ouvert (par exemple 17 h \u2013 18 h). Si la cuisine ferme l\u2019après-midi, dites-le à la question sur la cuisine, après vos heures.</p>' };
+// Restaurant test 2: « comment j'ajoute la livraison » pointed to the edit page; the setup's Takeout (« À emporter ») step
+// and its delivery chips come first.
+const SETUP_DELIVERY_HELP_TOPIC = { id: 'setup-delivery', pages: ['setup'], over: ['plan-visit'],
+  q: 'How do I add takeout or delivery?', qFr: 'Comment ajouter les commandes à emporter ou la livraison?',
+  keys: ['delivery', 'add delivery', 'how do i add delivery', 'add takeout', 'takeout and delivery', 'we deliver', 'do delivery', 'offer delivery', 'delivery apps', 'uber eats', 'doordash', 'skipthedishes', 'skip the dishes', 'order online for delivery'],
+  keysFr: ['livraison', 'ajoute la livraison', 'ajouter la livraison', 'comment j ajoute la livraison', 'la livraison', 'a emporter', 'commandes a emporter', 'nous livrons', 'on livre', 'faire la livraison', 'applis de livraison', 'uber eats', 'doordash'],
+  a: '<p>In <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Takeout</strong>, answer <strong>Do you do takeout or delivery?</strong> with <strong>Yes</strong>. Then tap how people order: <strong>Call to order</strong>, <strong>Order at the counter</strong>, <strong>DoorDash</strong>, <strong>SkipTheDishes</strong> or <strong>Uber Eats</strong> (or type your own words in the box), and tap <strong>Save this</strong>. It\u2019s on your page right away, in <strong>Plan your visit</strong>.</p>'
+    + '<p>Later, you can also change it on your edit page under <strong>Plan your visit</strong> \u2192 <strong>Takeout and delivery</strong>.</p>',
+  aFr: '<p>Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>À emporter</strong>, répondez <strong>Oui</strong> à <strong>Faites-vous des commandes à emporter ou la livraison?</strong> Touchez ensuite comment commander : <strong>Appelez pour commander</strong>, <strong>Commandez au comptoir</strong>, <strong>DoorDash</strong>, <strong>SkipTheDishes</strong> ou <strong>Uber Eats</strong> (ou écrivez vos mots dans la boîte), puis touchez <strong>Enregistrer</strong>. C\u2019est sur votre page tout de suite, dans <strong>Planifiez votre visite</strong>.</p>'
+    + '<p>Plus tard, vous pouvez aussi le changer sur votre page de modification, sous <strong>Planifier la visite</strong> \u2192 <strong>À emporter et livraison</strong>.</p>' };
 // Restaurant test 1: the kitchen / last seating question ("my kitchen closes at 9:30" got "I'm not sure").
 const RESTAURANT_KITCHEN_HELP_TOPIC = { id: 'restaurant-kitchen', pages: ['setup'], over: ['hours'],
   q: 'When the kitchen closes or last seating', qFr: 'L’heure de fermeture de la cuisine ou du dernier service',
@@ -57751,7 +57915,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       }
       // "Plan your visit" lines (2026-11-08): the five lines become exactly these (an Undo writes the old ones back).
       if (field === 'visit_rows') {
-        const w = writeOwnerVisitRows(venue.id, value, now);
+        // Restaurant test 2: an Undo writes her French lines back too (none, when the old value had none).
+        const w = writeOwnerVisitRows(venue.id, opts.undo && value && typeof value === 'object' && !value._fr ? { ...value, _fr: {} } : value, now);
         if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer);
         applied.push(field);
         continue;
@@ -57872,12 +58037,12 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
   // lines with their own source and date (the previous value is the full snapshot).
   if (chosen.includes('happy_hour_deals')) {
     const value = values.happy_hour_deals;
-    const has = value && Array.isArray(value.deals) && value.deals.length;
+    const has = value && Array.isArray(value.deals) && (value.deals.length || (Array.isArray(value.deals_fr) && value.deals_fr.length));
     const undoOld = opts.undo && has && value.checked_at && (value.source === 'venue_owner' || /^https?:\/\//.test(String(value.source || '')));
     const input = !has ? { deals: null }
       : { deals: value.deals, deals_fr: value.deals_fr && value.deals_fr.length ? value.deals_fr : null, source_url: undoOld ? value.source : 'venue_owner', checked_at: undoOld ? value.checked_at : todayLocal(now) };
     const cur = db.prepare('SELECT happy_hour_deals FROM venues WHERE id = ?').get(venue.id);
-    const r = guardedHappyHourDealsUpdate(venue.id, cur ? cur.happy_hour_deals : null, input, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
+    const r = guardedHappyHourDealsUpdate(venue.id, cur ? cur.happy_hour_deals : null, input, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, allow_french_only: true }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_deals_failed', detail: r.reason, applied };
     applied.push('happy_hour_deals');
   }
@@ -57985,7 +58150,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
-  if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || ''));
+  if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || '') && (((a || {})._fr || {})[k] || '') === (((b || {})._fr || {})[k] || ''));
   // Winery test 1 (2026-11-12): the winery answers are stored in WINERY_INFO_PARTS order, the request in the order the
   // owner's saves merged them ("year" before "food"): compared with sorted keys, so an Undo of a winery answer works.
   if (field === 'winery_info') { const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v)); return canon(a || {}) === canon(b || {}); }
@@ -59612,7 +59777,7 @@ function ownerPickedMainHtml(venueId, ownLive, lang = 'en') {
 function ownerStaffLineHtml(lang = 'en', linkMode = true) {
   const fr = lang === 'fr';
   return linkMode
-    ? (fr ? 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci (<a href="#opLogin" data-open-login>Créer un compte</a>); vous vous verrez ensuite tous sous « Personnes ayant accès ».'
+    ? (fr ? 'Les gérants et le personnel peuvent aussi utiliser ce lien. Chaque personne peut créer son propre compte à partir de celui-ci (<a href="#opLogin" data-open-login>Créer un compte</a>)\u202f; vous vous verrez ensuite tous sous « Personnes ayant accès ».'
       : 'Managers and staff can use this link too. Each person can make their own login from it (<a href="#opLogin" data-open-login>Create a login</a>); you’ll then all see each other under “People with access”.')
     : (fr ? 'Les gérants et le personnel peuvent avoir leur propre compte : envoyez-leur votre lien de modification privé. Vous les verrez sous « Personnes ayant accès ».'
       : 'Managers and staff can have their own login: send them your private edit link. You’ll see them under “People with access”.');
@@ -67984,6 +68149,9 @@ module.exports = {
   APP_JS_SRC,
   appJsSrcFor,
   buildTripPlannerFacts,
+  // Restaurant test 2 (2026-11-14): read by its tests.
+  ownerVisitRows,
+  venueHappyHourDeals,
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan,

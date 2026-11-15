@@ -146,7 +146,8 @@ test('happy hour typed in the setup: logged as the business’s own, the feature
   assert.ok(db.prepare("SELECT source FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'happy_hour_times'").all(x.id).every((l) => l.source === 'happy_hour_research'));
   // The page script sends the feature with the times, and "No" still switches it off.
   const s = scriptOf(await text(`/owner/${t}/setup`));
-  assert.match(s, /list\.push\(\{ happy_hour: week, happy_hour_deals: [^}]+\} : null, badges: \{ happy_hour: true \} \}\);/);
+  assert.match(s, /list\.push\(\{ happy_hour: week, happy_hour_deals: dealsOut\(deals\), badges: \{ happy_hour: true \} \}\);/); // restaurant test 2: dealsOut (French setup words as French)
+  assert.match(s, /if \(C\.lang !== 'fr'\) return \{ deals: deals, deals_fr: \[\] \};/);
   assert.match(s, /badges: \{ happy_hour: false \}/);
 });
 
