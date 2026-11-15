@@ -228,8 +228,23 @@
       if (!e.days[d]) return false;
       return weeks.some(function(w){ return w && w[d] && !inside(w, d); });
     });
-    return out.length && T.happyOutside ? fill(T.happyOutside, { days: daysInFull(out) }) : '';
+    // Café test 1 (Whistler, 2026-11-15): times that fit one set of hours but not the other say so ("outside your hours on
+    // Monday (your hours right now; fine in your Nov 27 – Apr 18 hours)"), instead of only warning.
+    var note = '';
+    if (out.length && usual && seas && S.week && S.sea.week) {
+      var outOf = function(w){ return DAYS.filter(function(d){ return e.days[d] && w[d] && !inside(w, d); }).length; };
+      var oU = outOf(S.week), oS = outOf(S.sea.week), r = seaOut(S.sea);
+      var tpl = r && r.ok && r.from && r.to && (!oU || !oS) ? (oS ? T.outsideSeaOnly : mdInRange(todayMd(), r.from, r.to) ? T.outsideUsualFine : T.outsideNowFine) : '';
+      if (tpl) note = fill(tpl, { a: mdLabel(r.from), b: mdLabel(r.to) });
+    }
+    return out.length && T.happyOutside ? fill(T.happyOutside, { days: daysInFull(out) + note }) : '';
   }
+  // The specials box's character count, shown from 60 of its 80 characters ('' before that).
+  var SP_MAX = 80, SP_COUNT_FROM = 60;
+  function spCount(v){ var n = String(v || '').length; return n >= SP_COUNT_FROM && T.specialCount ? fill(T.specialCount, { n: n, max: SP_MAX }) : ''; }
+  // Today as MM-DD (the phone's date), and whether an MM-DD is inside a from–to span (one that may wrap the new year).
+  function todayMd(){ var n = new Date(); return pad2(n.getMonth() + 1) + '-' + pad2(n.getDate()); }
+  function mdInRange(md, from, to){ return from <= to ? md >= from && md <= to : md >= from || md <= to; }
   // Cocktail test 2 (2026-11-13): warnings name the days in full: "Monday and Tuesday"; French « lundi et le mardi » (the
   // sentence already says « le {days} »: « fermé le lundi et le mardi »).
   function daysInFull(list){
@@ -376,6 +391,9 @@
   // never changes the price shown under "✓ Saved" (spendFollows).
   var spendAuto = C.cafe && !(CUR.avg_spend && CUR.avg_spend.amount);
   if (spendAuto) S.spend = cafeSpendStart();
+  // Café test 1 (Whistler, 2026-11-15): a sensible price read from research starts the screen instead (never a single
+  // coffee's price); it no longer follows the kind, and the screen says where it came from.
+  if (spendAuto && C.suggestSpend) { S.spend = C.suggestSpend; spendAuto = false; }
   if (S.done.spend) spendAuto = false;
   function spendFollows(){ return spendAuto && !S.done.spend && S.spend === cafeSpendStart(); }
   // The social screen (cafés): "not on it" / "not sure" as answered before, and what's saved now.
@@ -1075,6 +1093,8 @@
   // "Closes at midnight or later?" Midnight · 1 AM · 2 AM: one tap sets that day's closing time.
   var LATE = ['00:00', '01:00', '02:00'];
   function lateBtns(d, j, y){
+    // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
+    if (C.cafe) return '';
     var c = y[1] === '24:00' ? '00:00' : y[1];
     return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(fill(T.lateQ, { day: dayName(d) })) + '"><span class="su-latelbl">' + h(T.lateLbl) + '</span>' + LATE.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (c === t ? 'true' : 'false') + '" data-late="' + d + ':' + j + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>';
   }
@@ -1609,6 +1629,8 @@
         // year?"). This screen only shows a saved open season, with Change.
         + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
+        // Café test 1 (Whistler, 2026-11-15): a holiday tile is closed all day; an early close is a message to us.
+        + (T.holEarly ? '<p class="su-hint" id="suHolEarly">' + h(T.holEarly) + '</p>' : '')
         + HOL.filter(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }).map(function(o){ return '<label class="su-tick" style="margin:10px 0 0"><input type="checkbox" data-yearly="' + o.key + '"' + (yearlyOn(o.key) ? ' checked' : '') + '><span>' + h(cl(T.holidays[o.key]) + T.everyYear) + '</span></label>'; }).join('')
         + (HOL.some(function(o){ return o.yearly && S.closures.indexOf(o.key) >= 0 && !holCovered(o); }) ? '<p class="su-example">' + h(T.everyYearSub) + '</p>' : '')
         // Pub test 6 (2026-11-10): not sticky. On a 375x667 phone the big button sat over the holiday tiles; it now comes
@@ -1846,6 +1868,8 @@
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
       // Pub test 3 (Whistler, 2026-11-14): pubs too (research's "Free parking" in Good to know), only on an untouched tile.
       if ((C.winery || C.brewery || C.pub || C.restaurant) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      // Café test 1 (Whistler, 2026-11-15): cafés too (research's "Free Wi-Fi" and "Free parking"); never over her "No Wi-Fi".
+      if (C.cafe && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'wifi' && S.noWifi)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -1938,7 +1962,9 @@
       x = q(T.specialsTypeQ, T.upTo7) + msgs() + ((S.specialsFr || []).length ? frOnlyHint('suSpecialsFr') : '') + S.specials.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.specialN, { n: i + 1 })) + '</span>' + (S.specials.length > 1 ? '<button type="button" class="su-toggle" data-rm="specials:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           // Café test 3 (2026-11-11): "Every day" in one tap (tap again to clear), like the happy hour's.
-          + '<p class="su-q">' + h(T.whichDaysOr) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-chip su-chip-wide" id="suSpAll' + i + '" aria-pressed="' + (allDays(e.days) ? 'true' : 'false') + '" data-act="spDays:' + i + '">' + h(T.everyDay) + '</button></div>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: 80, data: 'data-sp="' + i + ':text"' }) + (i === 0 ? ex(T.specialEx) : '')
+          + '<p class="su-q">' + h(T.whichDaysOr) + '</p><div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-chip su-chip-wide" id="suSpAll' + i + '" aria-pressed="' + (allDays(e.days) ? 'true' : 'false') + '" data-act="spDays:' + i + '">' + h(T.everyDay) + '</button></div>' + dayChips(e.days, 'specials.' + i) + field('sp' + i, T.whatIsIt, e.text, { max: SP_MAX, data: 'data-sp="' + i + ':text"' })
+          // Café test 1 (Whistler, 2026-11-15): the box stops at 80 characters; near the limit it says how many are used.
+          + '<p class="su-hint su-count" id="spc' + i + '" aria-live="polite"' + (spCount(e.text) ? '' : ' hidden') + '>' + h(spCount(e.text)) + '</p>' + (i === 0 ? ex(T.specialEx) : '')
           + field('spp' + i, T.priceIf, e.price, { max: 20, data: 'data-sp="' + i + ':price"' }) + (i === 0 ? ex(T.priceEx) : '')
           + '<p class="su-q" id="spwq' + i + '">' + h(T.specialTimeQ) + '</p><div class="su-times" style="margin-top:0" role="group" aria-labelledby="spwq' + i + '"><label class="su-sr" for="sps' + i + '">' + h(T.starts) + '</label><input type="time" id="sps' + i + '" data-sp="' + i + ':start" value="' + h(e.start || '') + '"> ' + h(T.to) + ' ' + (e.endClose ? '<span class="su-closetxt">' + h(T.untilCloseShort) + '</span>' : '<label class="su-sr" for="spe' + i + '">' + h(T.ends) + '</label><input type="time" id="spe' + i + '" data-sp="' + i + ':end" value="' + h(e.end || '') + '">') + '</div>'
           + '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" aria-pressed="' + (e.endClose ? 'true' : 'false') + '" data-act="spClose:' + i + '">' + h(T.untilClose) + '</button></div>' + (i === 0 ? ex(T.specialTimeEx) : '')
@@ -2041,13 +2067,16 @@
         x = '<div class="su-saved" style="padding-top:4px"><div class="su-check" aria-hidden="true">✓</div><h1>' + h(T.doneNowTitle) + '</h1><p class="su-lead">' + h(T.doneNowLead) + '</p></div>' + scoreBox() + preview() + (C.statsHtml || '')
           + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
           + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>'
-          + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>' + changeLink;
+          + '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.map(leftItem).join('') + '</div></details>'
+          + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '') + changeLink;
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
         // Greyed until it's earned, with "Reach 100% to earn it" beside it (pub fresh-eyes 2: it looked already won).
         + '<p class="su-badge-line"><span class="su-badge-pill' + (sc.badge === 'earned' ? '' : ' su-badge-off') + '"' + (sc.badge === 'earned' ? '' : ' aria-disabled="true"') + '>' + C.badgeChip + '</span>' + (sc.badge === 'earned' ? '' : ' <span class="su-badge-reach">' + h(Math.max(sc.pct, sc.soon || 0) < 100 || sc.soon < sc.pct ? T.badgeReach : T.badgeSoon) + '</span>') + '</p>'
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
         + (left.length ? '<h2 class="su-h2">' + h(T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
+        // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
+        + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
         + preview()
         // Owner stats (pub test 9, 2026-11-10): the page's own numbers for the last 30 days (made on the server, owner-only).
         + (C.statsHtml || '')
@@ -3111,6 +3140,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(){ if (!S.busy) act(b.getAttribute('data-act')); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('input[data-hh]'), function(inp){ inp.addEventListener('change', function(){ var q2 = inp.getAttribute('data-hh').split(':'); if (q2[1] !== 'what' && S.happy[+q2[0]]) { S.happy[+q2[0]][q2[1]] = inp.value; warnRefresh(); } }); });
     // Restaurant test 2: a special's start and end times check its days' hours as they change.
+    Array.prototype.forEach.call(screen.querySelectorAll('input[data-sp$=":text"]'), function(inp){ inp.addEventListener('input', function(){ var c = el('spc' + inp.getAttribute('data-sp').split(':')[0]); if (!c) return; var t = spCount(inp.value); c.textContent = t; c.hidden = !t; }); });
     Array.prototype.forEach.call(screen.querySelectorAll('input[data-sp]'), function(inp){ inp.addEventListener('change', function(){ var q2 = inp.getAttribute('data-sp').split(':'); if ((q2[1] === 'start' || q2[1] === 'end') && S.specials[+q2[0]]) { S.specials[+q2[0]][q2[1]] = inp.value; warnRefresh(); } }); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-chip]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-chip').split(':'), path = q2[0].split('.'), key = q2[1];

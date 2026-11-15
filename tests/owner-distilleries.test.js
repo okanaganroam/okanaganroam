@@ -799,7 +799,11 @@ test('fe3 #3 the edit page Tours & events editor in a distillery’s words; pubs
   assert.match(html, /<select class="op-wn-kind" aria-label="Event 1: kind of event"><option value="tour" selected>Tour<\/option><option value="class">Class<\/option><option value="trivia">/);
   assert.match(html, /<summary>In French \(optional, you can skip this\)<\/summary>/);
   assert.doesNotMatch(html, /Night 1|\+ Add a night|Teams up to 6/);
-  for (const type of ['pub', 'cafe']) {
+  // Café test 1 on Whistler (2026-11-15): cafés now have their own words too ("Event 1", a latte art night; see
+  // cafe-setup-fresh-eyes-wr1.test.js). Pubs keep theirs.
+  const cafeHtml = await editPage(tokenFor(mk('cafe').id));
+  assert.match(cafeHtml, /<legend>Event 1<\/legend>/); assert.match(cafeHtml, /\+ Add an event/); assert.doesNotMatch(cafeHtml, /<legend>Night 1<\/legend>|Teams up to 6/);
+  for (const type of ['pub']) {
     const h2 = await editPage(tokenFor(mk(type).id));
     assert.match(h2, /<legend>Night 1<\/legend>/, type); assert.match(h2, /\+ Add a night/, type); assert.match(h2, /Teams up to 6, prizes for the top 3/, type);
     assert.match(h2, /<select class="op-wn-kind" aria-label="Night 1: kind of night"><option value="trivia" selected>Trivia/, type);

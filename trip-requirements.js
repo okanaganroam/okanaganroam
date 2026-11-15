@@ -711,7 +711,8 @@ function requirementDay(item,date) {
 }
 function applicable(item,day,date){const wanted=requirementDay(item,date);return wanted==null||wanted===day;}
 function coffeeEvidence(v){
-  const text=norm([v.name,v.plannerDescription||v.description,v.textName,v.textDesc].filter(Boolean).join(' '));
+  // Café test 1 (Whistler, 2026-11-15): a café listed as "Coffee" or "Coffee shop" (its cuisine) serves coffee too.
+  const text=norm([v.name,v.plannerDescription||v.description,v.textName,v.textDesc,v.textCuisine,v.cuisine].filter(Boolean).join(' '));
   if(/\b(?:no coffee|without coffee|does not serve coffee|do not serve coffee|coffee free)\b/.test(text))return false;
   return /\b(?:coffee|espresso|cappuccino|latte|americano|flat white|cortado)\b/.test(text);
 }
