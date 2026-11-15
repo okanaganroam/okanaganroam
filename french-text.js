@@ -23,6 +23,7 @@ const FR_CUISINE = {
   'Breakfast & Brunch': 'Déjeuner et brunch', 'Dessert': 'Desserts', 'Chinese': 'Chinois', 'Bakery': 'Boulangerie', 'Café': 'Café',
   'Seafood': 'Poissons et fruits de mer', 'Pizza': 'Pizza', 'West Coast': 'Cuisine de la côte Ouest', 'Vietnamese': 'Vietnamien', 'BBQ': 'BBQ',
   'French': 'Français', 'Farm-to-Table': 'De la ferme à la table', 'Burgers': 'Burgers', 'Thai': 'Thaïlandais', 'Steakhouse': 'Grilladerie',
+  'European': 'Européen', 'Swiss & Alpine': 'Suisse et alpin',
   'Sandwiches': 'Sandwichs', 'Lebanese': 'Libanais', 'Greek': 'Grec', 'Canadian': 'Canadien', 'Bubble Tea': 'Thé aux perles', 'Ukrainian': 'Ukrainien',
   'Mediterranean': 'Méditerranéen', 'Korean': 'Coréen', 'German': 'Allemand', 'Asian Fusion': 'Fusion asiatique', 'Vegan': 'Végane',
   'American': 'Américain', 'Poutine': 'Poutine', 'Juice & Smoothies': 'Jus et smoothies', 'Asian': 'Asiatique', 'Tapas': 'Tapas',

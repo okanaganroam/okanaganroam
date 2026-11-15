@@ -114,7 +114,7 @@ test('3: "No dogs allowed" is a tile on What you offer (pubs and restaurants), s
     // Picking one turns the other off.
     // Pub test 8: un-ticking No dogs also un-ticks its "Service dogs welcome" follow-up.
     // Cocktail test 3 (2026-11-14): "Service dogs welcome" starts ticked under No dogs.
-    assert.match(s, /if \(k === 'no_dogs'\) \{ S\.noDogs = !S\.noDogs; press\('no_dogs', S\.noDogs\); if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); if \(C\.offerLabels\.service_dogs\) \{ S\.badges\.service_dogs = true; press\('service_dogs', true\); \} \} else \{ S\.badges\.service_dogs = false; press\('service_dogs', false\); \} sdog\(\); return; \}/);
+    assert.match(s, /if \(k === 'no_dogs'\) \{ S\.noDogs = !S\.noDogs; press\('no_dogs', S\.noDogs\); if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); if \(C\.offerLabels\.service_dogs\) \{ S\.badges\.service_dogs = true; S\.sdogAuto = true; press\('service_dogs', true\); \} \} else \{ S\.badges\.service_dogs = false; press\('service_dogs', false\); \} sdog\(\); return; \}/);
     assert.match(s, /if \(k === 'dog_friendly' && S\.badges\[k\]\) \{ S\.noDogs = false; press\('no_dogs', false\); S\.badges\.service_dogs = false; press\('service_dogs', false\); sdog\(\); \}/);
     // Saved in order: "no dogs" taken back before Dog friendly goes on; given after it goes off.
     // Pub test (Whistler, 2026-11-14): only the tiles that changed are sent (sendB), in the same order.

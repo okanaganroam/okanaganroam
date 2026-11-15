@@ -150,14 +150,17 @@ test('2: specials and weekly nights take a season: hidden out of season, labelle
   const nights = app.venueWeeklyNightsList(v.id);
   assert.equal(nights[0].season_from, '06-01'); assert.equal(nights[0].season_to, '08-31');
   assert.ok(!('season_from' in nights[1]), 'a night without a season keeps its exact old shape');
-  // November: the summer night and the summer special are hidden; Wednesday's special is listed but not "Today" (closed).
+  // November: Wednesday's special is listed but not "Today" (closed). Restaurant test 1 (Whistler, 2026-11-14): the summer
+  // special and the summer night are listed too, with their months and never "Today" (they had vanished until summer).
   const nov = at('2026-11-11', '12:00');
   const venue = app.getVenue(v.id);
   const sp = app.venueSpecials(venue, app.hoursWithExtras(venue, nov), false, nov);
-  assert.deepEqual(sp.rows.map((r) => r.s.title), ['Wing Wednesday']);
-  assert.equal(sp.rows[0].today, false, 'closed Wednesday: not Today');
+  assert.deepEqual(sp.rows.map((r) => r.s.title), ['Wing Wednesday', 'Beach BBQ']);
+  assert.ok(sp.rows.every((r) => !r.today), 'closed Wednesday, and out of season: not Today');
+  assert.match(app.venueSpecialsHtml(sp, false), /Beach BBQ<\/span> <span class="venue-season-tag">\(May 20 – Sep 6\)<\/span>/);
   const wn = app.venueWeeklyNights(venue, app.hoursWithExtras(venue, nov), false, nov);
-  assert.deepEqual(wn.rows.map((r) => r.s.title), ['Trivia']);
+  assert.deepEqual(wn.rows.map((r) => r.s.title).sort(), ['Live music', 'Trivia']);
+  assert.ok(!wn.rows.find((r) => r.s.title === 'Live music').today);
   // July: both show, each with its months.
   // (Last July: the specials were checked today, so a date next summer would read them as stale.)
   const jul = at('2026-07-10', '12:00');
@@ -205,7 +208,7 @@ test('4: the story box edits the old text in place, has a ✕, and a join with n
   assert.match(s, /textarea\.su-area, textarea\.su-line'\), function\(inp\)/);
   assert.match(s, /T\.storyEditHint/);
   // Cocktail test 2 (2026-11-13): the page text is storyCur() (the French description in the French setup, when there is one).
-  const fix = new Function('CUR', 'C', `${/function storyCur\(\)\{[^\n]*\}/.exec(s)[0]} ${/function storyJoinFix\(v\)\{[\s\S]*?\n  \}/.exec(s)[0]}; return storyJoinFix;`)({ description: 'A pub in Osoyoos with cold beer and pub food.' }, { lang: 'en' });
+  const fix = new Function('CUR', 'C', `${/function storyCur\(\)\{[^\n]*\}/.exec(s)[0]} ${/function storyJoinFix\(v, was\)\{[\s\S]*?\n  \}/.exec(s)[0]}; return storyJoinFix;`)({ description: 'A pub in Osoyoos with cold beer and pub food.' }, { lang: 'en' });
   assert.equal(fix('A pub in Osoyoos with cold beer and pub food.A beach bar on the lake.'), 'A pub in Osoyoos with cold beer and pub food. A beach bar on the lake.');
   assert.equal(fix('A new story, written fresh.'), 'A new story, written fresh.');
   assert.equal(fix('A pub in Osoyoos with cold beer and pub food. More.'), 'A pub in Osoyoos with cold beer and pub food. More.');

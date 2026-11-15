@@ -227,7 +227,7 @@ test('Free parking: research’s Good to know "Free parking" pre-ticks the tile 
   assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(v.id)}/setup`)).text).visitTicks, ['free_parking']);
   const w = mk('pub'); research(w.id, [{ label: 'Good to know', text: 'There is no free parking nearby; free Wi-Fi.' }]);
   assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(w.id)}/setup`)).text).visitTicks, []);
-  assert.match(CLIENT(), /if \(\(C\.winery \|\| C\.brewery \|\| C\.pub\) && !S\.done\.offer && !S\.visitTicksSet\) \{ S\.visitTicksSet = true; S\.visitTicked = \(C\.visitTicks \|\| \[\]\)\.filter\(function\(k\)\{ if \(S\.badges\[k\]/);
+  assert.match(CLIENT(), /if \(\(C\.winery \|\| C\.brewery \|\| C\.pub \|\| C\.restaurant\) && !S\.done\.offer && !S\.visitTicksSet\) \{ S\.visitTicksSet = true; S\.visitTicked = \(C\.visitTicks \|\| \[\]\)\.filter\(function\(k\)\{ if \(S\.badges\[k\]/);
 });
 
 test('deals: a happy hour on every day reads "Every day: …" (« Tous les jours : … »); older "Mon–Sun: " deals still come back as typed', () => {

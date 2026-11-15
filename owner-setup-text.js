@@ -34,7 +34,7 @@ const en = {
   holidays: { xmasEve: 'Christmas Eve', xmas: 'Christmas Day', boxing: 'Boxing Day', nye: 'New Year’s Eve', nyd: 'New Year’s Day', family: 'Family Day', goodFri: 'Good Friday', easterMon: 'Easter Monday' },
   spendQ: 'About how much does one person spend?', spendLead: 'One main and a soft drink, before tax and tip.', spendGuess: 'We guessed ${n} from your menu.', less: 'Less', more: 'More', spendYes: 'Yes, about ${n}',
   cuisineQ: 'What kind of food do you serve?', cuisineLead: 'Pick up to 3.', picked: 'Picked: {list}', showMore: 'Don’t see yours? Show more kinds of food', typeToFind: 'Or type to find it',
-  findEx: 'For example: Thai', notOnList: 'Not on the list? Pick the closest one.', pickOne: 'Please tap at least one kind of food, or tap Skip.', upTo3: 'You can pick up to 3. Tap one you picked to remove it.', cuisineNext: 'Next: what kind of place',
+  findEx: 'For example: Thai', notOnList: 'Not on the list? Pick the closest, or type it in your story.', pickOne: 'Please tap at least one kind of food, or tap Skip.', upTo3: 'You can pick up to 3. Tap one you picked to remove it.', cuisineNext: 'Next: what kind of place',
   placeQ: 'What kind of place is it?', placeLead: 'Pick the one that fits best.', placeNeed: 'Please tap the one that fits best.', saveFood: 'Save',
   photosQ: 'Add photos of your place', photosLead: 'Your food, your room, your patio. Three photos is perfect.', take: 'Take a photo', takeSub: 'Opens your camera', choose: 'Choose from my photos',
   photosSent: '✓ {n} photos sent. They’ll show on your page within a day.', photosMore: 'Want to add more photos?', photosNoMore: 'No, next: your menu',
@@ -122,7 +122,7 @@ const fr = {
   holidays: { xmasEve: 'Veille de Noël', xmas: 'Noël', boxing: 'Lendemain de Noël', nye: 'Veille du jour de l’An', nyd: 'Jour de l’An', family: 'Jour de la famille', goodFri: 'Vendredi saint', easterMon: 'Lundi de Pâques' },
   spendQ: 'Environ combien dépense une personne?', spendLead: 'Un plat principal et une boisson sans alcool, avant taxes et pourboire.', spendGuess: 'D’après votre menu, nous avons estimé {n} $.', less: 'Moins', more: 'Plus', spendYes: 'Oui, environ {n} $',
   cuisineQ: 'Quel genre de cuisine servez-vous?', cuisineLead: 'Choisissez-en jusqu’à 3.', picked: 'Choisi : {list}', showMore: 'Vous ne la voyez pas? Afficher plus de cuisines', typeToFind: 'Ou tapez pour la trouver',
-  findEx: 'Par exemple : thaï', notOnList: 'Pas dans la liste? Choisissez la plus proche.', pickOne: 'Touchez au moins une cuisine, ou touchez Passer.', upTo3: 'Vous pouvez en choisir 3. Touchez-en une choisie pour la retirer.', cuisineNext: 'Suivant : le genre d’endroit',
+  findEx: 'Par exemple : thaï', notOnList: 'Pas dans la liste? Choisissez la plus proche, ou écrivez-la dans votre histoire.', pickOne: 'Touchez au moins une cuisine, ou touchez Passer.', upTo3: 'Vous pouvez en choisir 3. Touchez-en une choisie pour la retirer.', cuisineNext: 'Suivant : le genre d’endroit',
   placeQ: 'Quel genre d’endroit est-ce?', placeLead: 'Choisissez celui qui convient le mieux.', placeNeed: 'Touchez celui qui convient le mieux.', saveFood: 'Enregistrer',
   photosQ: 'Ajoutez des photos de votre établissement', photosLead: 'Vos plats, votre salle, votre terrasse. Trois photos, c’est parfait.', take: 'Prendre une photo', takeSub: 'Ouvre votre appareil photo', choose: 'Choisir dans mes photos',
   photosSent: '✓ {n} photos envoyées. Elles s’afficheront sur votre page d’ici un jour.', photosMore: 'Voulez-vous ajouter d’autres photos?', photosNoMore: 'Non, suivant : votre menu',
@@ -194,7 +194,7 @@ Object.assign(en, {
   helpTail: 'Photos, your menu, your address, phone and description show on your page within a day. Everything else is on your page right away.',
   closuresLead: 'Tap the holidays you’re closed. Closing for longer? Add the dates below.', anotherDay: '+ Closed for a week or two (or other dates)', wholeMonths: '+ We close for whole months each year',
   monthsRow: 'Open {a} to {b} each year', monthsUse: 'Use these months', allYearBtn: 'We’re open all year',
-  closeAddLead: 'For a winter break, renovations, a private event or a holiday that’s not on the list.', howLong: 'How long are you closed?', len1: '1 day', len7: '1 week', len14: '2 weeks', lenPick: 'Pick the last day', lastDay: 'Last day closed',
+  closeAddLead: 'For a seasonal break, renovations, a private event or a holiday that’s not on the list.', howLong: 'How long are you closed?', len1: '1 day', len7: '1 week', len14: '2 weeks', lenPick: 'Pick the last day', lastDay: 'Last day closed',
   uploadSub: 'A file or photos from your phone or computer', upLead: 'Pick the file your menu is in. A file or photos both work.', sendMenu: 'Send my menu',
   emailLead: 'Send a photo or a file of your menu. Put “{name}” in the subject.', upSub: 'A file or a photo from your phone', sheetLead: 'A file, a photo of a sign, a table card or a chalkboard all work. We’ll type it up for you.',
   dogLead: 'One short line is perfect.',
@@ -220,7 +220,7 @@ Object.assign(fr, {
   helpTail: 'Les photos, votre menu, votre adresse, votre téléphone et votre description s’affichent d’ici un jour. Tout le reste est en ligne tout de suite.',
   closuresLead: 'Touchez les jours fériés où vous êtes fermé. Fermé plus longtemps? Ajoutez les dates ci-dessous.', anotherDay: '+ Fermé une semaine ou deux (ou d’autres dates)', wholeMonths: '+ Nous fermons des mois entiers chaque année',
   monthsRow: 'Ouvert de {a} à {b} chaque année', monthsUse: 'Utiliser ces mois', allYearBtn: 'Nous sommes ouverts toute l’année',
-  closeAddLead: 'Pour une pause hivernale, des rénovations, un événement privé ou un jour férié qui n’est pas sur la liste.', howLong: 'Combien de temps êtes-vous fermé?', len1: '1 jour', len7: '1 semaine', len14: '2 semaines', lenPick: 'Choisir le dernier jour', lastDay: 'Dernier jour de fermeture',
+  closeAddLead: 'Pour une pause saisonnière, des rénovations, un événement privé ou un jour férié qui n’est pas sur la liste.', howLong: 'Combien de temps êtes-vous fermé?', len1: '1 jour', len7: '1 semaine', len14: '2 semaines', lenPick: 'Choisir le dernier jour', lastDay: 'Dernier jour de fermeture',
   uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur', upLead: 'Choisissez le fichier de votre menu. Un fichier ou des photos, les deux fonctionnent.', sendMenu: 'Envoyer mon menu',
   emailLead: 'Envoyez une photo ou un fichier de votre menu. Indiquez « {name} » dans l’objet.', upSub: 'Un fichier ou une photo de votre téléphone', sheetLead: 'Un fichier, une photo d’affiche, de chevalet ou de tableau, tout fonctionne. Nous le retranscrirons pour vous.',
   dogLead: 'Une courte ligne, c’est parfait.',
@@ -275,7 +275,7 @@ Object.assign(en, {
   saveClosures1: 'Save these closures ({n} new)', saveClosuresN: 'Save these closures ({n} new)',
   menuSentQ: 'Your menu is sent ✓', menuNewer: 'Want to send a newer menu?',
   quickLead: 'Tap what fits:', quickOr: 'Or type it in your own words:',
-  quick: { reservations: ['Call us', 'Book on our website', 'Walk-ins welcome too'], takeout: ['Call to order', 'Order at the counter', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
+  quick: { reservations: ['Call us', 'Book on our website', 'Book online', 'Walk-ins welcome too'], takeout: ['Call to order', 'Order at the counter', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
     dogs: ['Patio only', 'Inside and patio', 'Water bowls at the door'], groups: ['Call ahead for 10 or more', 'Private room available'] },
   // Brewery test 1 (2026-11-12): how the Dogs chips read on the page, as whole sentences ("Dogs: Patio only" read like a
   // form). The chips stay short on the setup screen; the page swaps them in (server.js visitInfoHtml).
@@ -296,7 +296,7 @@ Object.assign(fr, {
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
   menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
-  quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'On accepte aussi les clients sans réservation'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
+  quick: { reservations: ['Appelez-nous', 'Réservez sur notre site Web', 'Réservez en ligne', 'On accepte aussi les clients sans réservation'], takeout: ['Appelez pour commander', 'Commandez au comptoir', 'DoorDash', 'SkipTheDishes', 'Uber Eats'],
     dogs: ['Terrasse seulement', 'Intérieur et terrasse', 'Bols d’eau à l’entrée'], groups: ['Appelez à l’avance pour 10 ou plus', 'Salle privée disponible'] },
   quickDogsFull: ['Chiens bienvenus sur la terrasse seulement', 'Chiens bienvenus à l’intérieur et sur la terrasse'],
   savedCuisine: 'Vos types de cuisine et votre genre d’endroit sont sur votre page maintenant.', stSoon: 'bientôt sur votre page',
@@ -1486,6 +1486,40 @@ Object.assign(fr, {
   howOften: 'À quelle fréquence?', stOften: '{title} : {often}', everyDayPrefix: 'Tous les jours : ',
   allYearLeadSea: 'Pour changer vos autres heures, touchez Modifier.', seaChange: 'Modifier mes heures du {a} au {b}', seaChangeSub: 'Vos dates et les heures de chaque jour restent comme elles sont',
 });
+
+// Restaurant test 1 (Whistler, 2026-11-14; Whistler Roam drafts/fresh-eyes-restaurant1-2026-11-14/REPORT.md). Shared by
+// every type except the kitchen words, which pubs and lounges replace with their own (en.pub / fr.pub).
+Object.assign(en, {
+  // Lunch and dinner on one day: a second time on the day card (the edit page's "+ second time").
+  addSecond: '+ Add a second time (lunch & dinner)', removeSecond: 'Remove this time', secondLbl: 'and',
+  // The kitchen / last seating question (restaurants; pubs keep "Does your kitchen close before the bar?").
+  kitchenQ: 'When does the kitchen close / last seating?', kitchenLead: 'People planning a late dinner want to know the last time they can sit down to eat.',
+  kitchenEarlier: 'Earlier than we close: pick the time', kitchenSame: 'Food until we close', kitchenNone: 'We don’t serve food',
+  kitchenTimeQ: 'When does the kitchen close / last seating?', kitchenTimeLead: 'The same time every night is fine. If it changes on weekends, add a note.',
+  kitchenAt: 'Kitchen closes / last seating at', kitchenNoteLabel: 'Different on some nights? (optional)', kitchenNoteEx: 'Fri and Sat, last seating at 10 PM',
+  kitchenSaid: { same: 'You said: food until you close.', earlier: 'You said: the kitchen closes (last seating) at {t}.', none: 'You said: you don’t serve food.' },
+  // "We're closed part of the year": closing twice a year is two yearly closures.
+  openTwice: 'Closed twice a year, like a spring and a fall shoulder season? Add each one under Holidays & closures and tick “Every year”.',
+  openTwiceHave: 'You already close {list} every year.',
+  // Service dogs, ticked for you on "No dogs".
+  serviceDogsTicked: 'Service dogs welcome is ticked for you. Tap it to untick.',
+});
+Object.assign(fr, {
+  addSecond: '+ Ajouter une deuxième plage (midi et soir)', removeSecond: 'Retirer cette plage', secondLbl: 'et',
+  kitchenQ: 'À quelle heure la cuisine ferme-t-elle (dernier service)?', kitchenLead: 'Les gens qui prévoient un souper tardif veulent savoir jusqu’à quelle heure ils peuvent s’attabler.',
+  kitchenEarlier: 'Plus tôt que la fermeture : choisir l’heure', kitchenSame: 'Nourriture jusqu’à la fermeture', kitchenNone: 'Nous ne servons pas de nourriture',
+  kitchenTimeQ: 'À quelle heure la cuisine ferme-t-elle (dernier service)?', kitchenTimeLead: 'La même heure tous les soirs, c’est parfait. Si elle change la fin de semaine, ajoutez une note.',
+  kitchenAt: 'La cuisine ferme (dernier service) à', kitchenNoteLabel: 'Différent certains soirs? (facultatif)', kitchenNoteEx: 'Ven. et sam., dernier service à 22 h',
+  kitchenSaid: { same: 'Vous avez dit : nourriture jusqu’à la fermeture.', earlier: 'Vous avez dit : la cuisine ferme (dernier service) à {t}.', none: 'Vous avez dit : vous ne servez pas de nourriture.' },
+  openTwice: 'Fermé deux fois par année, comme au printemps et à l’automne? Ajoutez chaque période sous Jours fériés et fermetures et cochez « Chaque année ».',
+  openTwiceHave: 'Vous fermez déjà chaque année : {list}.',
+  serviceDogsTicked: 'Chiens d’assistance bienvenus est coché pour vous. Touchez-le pour le décocher.',
+});
+// A restaurant's happy hour example (pubs keep the pints).
+Object.assign(en.pub, { whatsOnEx: en.whatsOnEx });
+Object.assign(fr.pub, { whatsOnEx: fr.whatsOnEx });
+en.whatsOnEx = '$8 wine and half-price small plates';
+fr.whatsOnEx = 'Vin à 8 $ et petites assiettes à moitié prix';
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the

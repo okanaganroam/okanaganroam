@@ -240,7 +240,7 @@ test('small: chips follow typing; kitchen-time screen has its own address; one r
   assert.match(src, /var quickTyped = function\(e\)\{/);
   assert.match(src, /screen\.addEventListener\('input', quickTyped\)/);
   assert.match(src, /\['hours:kitchen', 'hours:kitchentime', 'offer:sports', 'offer:minors'\]\.indexOf\(s0\)/);
-  assert.match(src, /else if \(C\.pub && startAt === 'hours:kitchentime'\) \{ S\.hist = \['start', 'hours:kitchen'\]; S\.step = startAt; S\.toList = true; \}/);
+  assert.match(src, /else if \(KITCHEN_Q && startAt === 'hours:kitchentime'\) \{ S\.hist = \['start', 'hours:kitchen'\]; S\.step = startAt; S\.toList = true; \}/);
   assert.match(src, /x = any \? q\(T\.soFarQ, /);
   assert.doesNotMatch(src, /S\.fresh \? T\.welcome : T\.soFarQ/);
   assert.equal(text.en.soFarQ, 'Your answers so far'); assert.match(text.fr.soFarQ, /^Vos réponses jusqu’ici$/);

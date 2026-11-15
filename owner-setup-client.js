@@ -279,6 +279,9 @@
   function sportsNote(){ var n = el('suSportsNote'); if (n) n.hidden = !(sportsBit() && !S.badges.sports_tv); }
   // Pubs (2026-11-10): the kitchen, who's welcome and the sports, as stored (venue_pub_info); Pub Fare picked to start.
   S.pubInfo = clone(CUR.pub_info || {});
+  // Restaurant test 1 (Whistler, 2026-11-14): restaurants answer the pub's kitchen screen too ("When does the kitchen close
+  // / last seating?"), stored the same way; no "We don't serve food" for them.
+  var KITCHEN_Q = !!(C.pub || C.restaurant);
   S.kitchen = { mode: (S.pubInfo.kitchen || {}).mode || '', closes: (S.pubInfo.kitchen || {}).closes || '', note: (S.pubInfo.kitchen || {}).note || '' };
   // Seasonal kitchen time (pub test 7): 'same' (as the rest of the year), 'close' (food until close) or 'time'.
   (function(){ var z = (S.pubInfo.kitchen || {}).season; S.kitchen.sea = z ? (z.closes === 'close' ? { mode: 'close', closes: '' } : { mode: 'time', closes: z.closes }) : { mode: 'same', closes: '' }; })();
@@ -299,6 +302,9 @@
   S.sports = { list: {}, tvs: (S.pubInfo.sports || {}).tvs || '' };
   ((S.pubInfo.sports || {}).list || []).forEach(function(k){ S.sports.list[k] = true; });
   // Cocktail lounges: no Pub Fare to start (their food is picked from small plates, tapas…).
+  // Restaurant test 1 (Whistler, 2026-11-14): a stored label from before that isn't on the list ("Alpine / European")
+  // starts with the list's labels for it picked (saved only with the screen).
+  if (!S.cuis.length && (C.suggestCuisines || []).length) S.cuis = C.suggestCuisines.filter(function(c){ return C.cuisines.indexOf(c) >= 0; });
   if (C.pub && !CK && !S.cuis.length && S.kitchen.mode !== 'none') S.cuis = ['Pub Fare'];
   // Cafés (2026-11-10; drafts/cafe-portal-2026-11-10/SPEC-cafes.md): the café's own answers (venue_cafe_info), as stored.
   var CI = clone(CUR.cafe_info || {}), CL = CUR.cafe_links || {}, CIs = CI.stay || {}, CId = CI.diet || {}, CIc = CI.coffee || {}, CIo = CI.order || {};
@@ -920,7 +926,9 @@
     // Winery test 2 (2026-11-12): a screen opened from a list ("Tap any line to change it", the "More" tiles, the edit
     // page) wasn't just saved: no "Saved. You can change it here." on it (a "You said: ..." answer still shows).
     if ((S.toList || S.hist[S.hist.length - 1] === 'more') && d !== 'no' && d !== 'unsure' && !yn0) return '';
-    var yn = ['happy', 'specials', 'music', 'book', 'takeout', 'groups'].indexOf(step) >= 0;
+    // Restaurant test 1 (Whistler, 2026-11-14): "You said: Yes." only on the screen that asks the yes/no question; the
+    // booking line's own screen (no Yes button) says "Saved. You can change it here."
+    var yn = yn0 && S.step === step && !(step === 'groups' && FOLD);
     if (d === 'unsure') return '<p class="su-sent">' + h(fill(T.youSaid, { a: T.st.unsure })) + '</p>';
     return '<p class="su-sent">' + h(d === 'no' ? fill(T.youSaid, { a: T.noLabels[step] || T.no }) : yn ? fill(T.youSaid, { a: T.yes }) : T.alreadyDone) + '</p>';
   }
@@ -1433,6 +1441,9 @@
       var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
       x = q(T.openQ, T.openLead) + msgs() + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
         + '<p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p><p class="su-hint"><button type="button" class="su-link" data-act="openMonths">' + h(T.openMonthsLink) + '</button></p>'
+        // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year is two yearly closures ("Every year"), and the ones
+        // already saved are named.
+        + (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : '')
         + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || s === 'hours:season') {
@@ -1476,7 +1487,10 @@
             : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.dayClosedNow, { day: longDay(d) }) + '. ' + fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
-          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '"></div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
+          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + ': ' + t12(y[0]) + ' – ' + t12(y[1])) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
+            // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
+            // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
+            + (w.length < 2 && T.addSecond ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : '')
             + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
@@ -1490,7 +1504,7 @@
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>';
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
-      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big(CK ? '🍽' : '🍔', T.kitchenSame, '', true, 'kitchenSame') + big('✕', T.kitchenNone, '', true, 'kitchenNone') + '</div>'
+      x = ks + q(T.kitchenQ, T.kitchenLead) + msgs() + '<div class="su-stack">' + big('✓', T.kitchenEarlier, '', false, 'go:hours:kitchentime') + big(CK || C.restaurant ? '🍽' : '🍔', T.kitchenSame, '', true, 'kitchenSame') + (C.restaurant ? '' : big('✕', T.kitchenNone, '', true, 'kitchenNone')) + '</div>'
         + '<div class="su-skip"><button type="button" class="su-link" data-act="go:saved:hours">' + h(T.skip) + '</button></div>';
     } else if (s === 'hours:kitchentime') {
       // Pub test 7 (2026-11-10): with summer (or winter) hours on file, that season's kitchen time too.
@@ -1652,13 +1666,13 @@
       var showAll = S.cuiAll || S.cuiQ.trim();
       var shown = showAll ? C.cuisines : C.popular.concat(S.cuis.filter(function(c){ return C.popular.indexOf(c) < 0; }));
       if (s === 'cuisine:style') { x = q(T.styleMore, T.styleLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
-        + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'search', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
+        + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'text', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
         + '<div class="su-tiles" id="suCuiTiles">' + shown.map(function(c){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cuis.indexOf(c) >= 0 ? 'true' : 'false') + '" data-cui="' + h(c) + '"><span class="su-e" aria-hidden="true">' + (C.cuisineIcons[c] || '🍽️') + '</span>' + h(C.cuisineNames[c] || c) + '</button>'; }).join('') + '</div>'
         + '<p class="su-lead" id="suCuiNone" hidden>' + h(T.notOnList) + '</p>' + (showAll ? '' : '<button type="button" class="su-more" data-act="cuiAll">' + h(T.showMore) + '</button>')
         + '<div class="su-stack su-sticky">' + big('✓', T.styleDone, '', false, 'styleDone') + '</div>';
       } else
       x = doneLine('cuisine') + q(T.cuisineQ, C.pub && !S.cuis.length ? T.cuisineLeadEmpty : T.cuisineLead) + (S.cuis.length ? '<p class="su-sent">' + h(fill(T.picked, { list: S.cuis.map(function(c){ return C.cuisineNames[c] || c; }).join(', ') })) + '</p>' : '') + msgs()
-        + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'search', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
+        + (showAll ? field('suCq', T.typeToFind, S.cuiQ, { type: 'text', data: 'placeholder="' + h(T.findEx) + '"' }) : '')
         + '<div class="su-tiles" id="suCuiTiles">' + shown.map(function(c){ return '<button type="button" class="su-tile" aria-pressed="' + (S.cuis.indexOf(c) >= 0 ? 'true' : 'false') + '" data-cui="' + h(c) + '"><span class="su-e" aria-hidden="true">' + (C.cuisineIcons[c] || '🍽️') + '</span>' + h(C.cuisineNames[c] || c) + '</button>'; }).join('') + '</div>'
         + '<p class="su-lead" id="suCuiNone" hidden>' + h(T.notOnList) + '</p>'
         + (showAll ? '' : '<button type="button" class="su-more" data-act="cuiAll">' + h(T.showMore) + '</button>')
@@ -1755,7 +1769,7 @@
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
       // Pub test 3 (Whistler, 2026-11-14): pubs too (research's "Free parking" in Good to know), only on an untouched tile.
-      if ((C.winery || C.brewery || C.pub) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      if ((C.winery || C.brewery || C.pub || C.restaurant) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
       x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -1769,7 +1783,9 @@
           + (C.pub && g.keys.indexOf('sports_tv') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noSports ? 'true' : 'false') + '" data-off="no_sports"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noSports) + '<span class="su-tile-sub">' + h(T.noSportsSub) + '</span></button>' : '')
           + (g.keys.indexOf('dog_friendly') >= 0 ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDogs ? 'true' : 'false') + '" data-off="no_dogs"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noDogs) + '<span class="su-tile-sub" id="suNoDogsSub">' + h(dogSubText()) + '</span></button>'
             // Pub test 8 (2026-11-10): "Service dogs welcome", the follow-up to No dogs (shown only while No dogs is on).
-            + (C.offerLabels.service_dogs ? '<button type="button" class="su-tile su-tile-wide su-subtile" id="suServiceDogs" aria-pressed="' + (S.badges.service_dogs ? 'true' : 'false') + '" data-off="service_dogs"' + (S.noDogs ? '' : ' hidden') + '><span class="su-e" aria-hidden="true">' + C.offerIcons.service_dogs + '</span>' + h(C.offerLabels.service_dogs) + '<span class="su-tile-sub">' + h(T.serviceDogsSub) + '</span></button>' : '') : '') + '</div>'; }).join('')
+            + (C.offerLabels.service_dogs ? '<button type="button" class="su-tile su-tile-wide su-subtile" id="suServiceDogs" aria-pressed="' + (S.badges.service_dogs ? 'true' : 'false') + '" data-off="service_dogs"' + (S.noDogs ? '' : ' hidden') + '><span class="su-e" aria-hidden="true">' + C.offerIcons.service_dogs + '</span>' + h(C.offerLabels.service_dogs) + '<span class="su-tile-sub">' + h(T.serviceDogsSub) + '</span></button>'
+              // Restaurant test 1 (Whistler, 2026-11-14): it was ticked for her, so say so (a tap meant to tick it unticked it).
+              + (T.serviceDogsTicked ? '<p class="su-hint" id="suSdogTicked" role="status"' + (S.sdogAuto && S.noDogs && S.badges.service_dogs ? '' : ' hidden') + '>' + h(T.serviceDogsTicked) + '</p>' : '') : '') : '') + '</div>'; }).join('')
         + '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>'
         + '<div class="su-stack su-offer-save">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:laptops') {
@@ -2145,7 +2161,7 @@
     // Wineries (2026-11-12): the off-season answer (all year, closed part of the year, or by appointment).
     var wyNew = APPT && S.wYearPick ? (S.wYearPick === 'appointment' ? 'appointment' : openVal(S.openSea) ? 'seasonal' : 'all') : '';
     if (wyNew && (wyNew !== S.savedWYear || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(AI.season || null)))) listH.push(apptPart(wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew }));
-    saveAll('hours', listH, null, C.pub ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
+    saveAll('hours', listH, null, KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
       if (wyNew) { S.savedWYear = wyNew; S.wine.year = wyNew; AI.year = wyNew; if (C.distillery) S.savedYear = wyNew; if (wyNew === 'appointment') AI.season = S.wine.season; else { delete AI.season; S.wine.season = null; } S.wYearPick = ''; }
       if (ch.hours_seasons) { CUR.hours_seasons = ch.hours_seasons; S.sea.storedKind = S.sea.on ? S.sea.kind : ''; S.sea.monthsWas = JSON.stringify(S.sea.months); }
@@ -2388,8 +2404,8 @@
 
   // Pub test 7 (2026-11-10): new words typed straight after the old description ("…pub food.A beach bar…") get the
   // space they were missing. Only that one join is touched; the rest is exactly as she typed it.
-  function storyJoinFix(v){
-    var old = storyCur().replace(/\s+$/, ''); v = String(v || '');
+  function storyJoinFix(v, was){
+    var old = String(was != null ? was : storyCur()).replace(/\s+$/, ''); v = String(v || '');
     if (old && v.length > old.length && v.indexOf(old) === 0 && /[.!?,;:)]$/.test(old) && /^[^\s.,;:!?)]/.test(v.slice(old.length))) return old + ' ' + v.slice(old.length);
     return v;
   }
@@ -2400,6 +2416,9 @@
     return { from: s0.from, to: s0.to, kind: /winter|hiver/.test(lab) ? 'winter' : /summer|été/.test(lab) ? 'summer' : (m >= 4 && m <= 9 ? 'summer' : 'winter') };
   }
   function mdText(md){ return mdLabel(md); }
+  // The yearly closures of more than a day ("Apr 19 – May 14"), as they stand on the closures screen.
+  function yearlyClosed(){ return (S.extra || []).filter(function(c){ return c && c.yearly && c.to && c.to !== c.from; }).map(function(c){ return mdText(c.from) + ' – ' + mdText(c.to); }); }
+  function andList(xs){ return xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + (C.lang === 'fr' ? ' et ' : ' and ') + xs[xs.length - 1]; }
   function readKsea(){ var e = el('suKsto'); if (e) S.kitchen.sea.closes = e.value; }
   // ---------- Wiring ----------
   function act(a){
@@ -3023,6 +3042,21 @@
       else { tapClosed(d, false); var tpl = S.hoffWas[S.step + d] || wk[DAYS.filter(function(x){ return wk[x]; })[0]] || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [['11:00', '21:00']]; delete S.hoffWas[S.step + d]; }
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); var nb = screen.querySelector('[data-hoff="' + d + '"]'); if (nb) try { nb.focus({ preventScroll: true }); } catch (e) {} }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'), wk = W(); if (wk[d]) { wk[d] = null; tapClosed(d, true); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
+    // Restaurant test 1: "+ Add a second time (lunch & dinner)" and its ✕. A dinner-only day gets lunch before it, a
+    // lunch-only day dinner after it, and one long range (11:30 AM – 10 PM) is split at 2:30 PM and 5 PM.
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-addtime]'), function(b){ b.onclick = function(){
+      readTimes(); var d = b.getAttribute('data-addtime'), wk = W(), w = wk[d]; if (!w || !w.length || w.length >= 2) return;
+      var a = w[0][0], z = w[0][1], late = z <= a;
+      var first = a >= '14:00';
+      if (a >= '15:00') w.unshift(['11:30', '14:30']);
+      else if (first) w.unshift(['11:00', '13:30']);
+      else if (late || z > '17:30') wk[d] = [[a, '14:30'], ['17:00', z]];
+      else w.push([z < '17:00' ? '17:00' : '18:00', '22:00']);
+      mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
+      var f = el('o' + d + (first ? 0 : 1)); if (f) try { f.focus({ preventScroll: true }); } catch (e) {} }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-rmtime]'), function(b){ b.onclick = function(){
+      readTimes(); var q5 = b.getAttribute('data-rmtime').split(':'), wk = W(), w = wk[q5[0]]; if (!w || w.length < 2) return;
+      w.splice(+q5[1], 1); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); var ab = screen.querySelector('[data-addtime="' + q5[0] + '"]'); if (ab) try { ab.focus({ preventScroll: true }); } catch (e) {} }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-samemon]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-samemon'), wk = W(); if (wk.mon) { wk[d] = clone(wk.mon); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-late]'), function(b){ b.onclick = function(){ readTimes(); var q4 = b.getAttribute('data-late').split(':'), d4 = q4[0], wk = W(), w4 = wk[d4] && wk[d4][+q4[1]]; if (!w4) return; w4[1] = q4[2] + ':' + q4[3]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Hours (pub test 4): open one day's card, fold it back, or copy an open day's hours to every day or Mon–Fri.
@@ -3082,11 +3116,12 @@
       if (k === 'wifi' && !S.badges.wifi) { S.noWifi = false; press('no_wifi', false); }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
       // Distillery test 1 (2026-11-13): the service-dogs tile shows right under No dogs, scrolled into view.
-      var sdog = function(){ var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
+      var sdog = function(){ var tk = el('suSdogTicked'); if (tk) tk.hidden = !(S.sdogAuto && S.noDogs && S.badges.service_dogs); var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
       // Cocktail test 3 (2026-11-14): "Service dogs welcome" starts ticked under "No dogs allowed" (she can untick it; it
       // is saved only with the screen).
-      if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); if (C.offerLabels.service_dogs) { S.badges.service_dogs = true; press('service_dogs', true); } } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
+      if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); if (C.offerLabels.service_dogs) { S.badges.service_dogs = true; S.sdogAuto = true; press('service_dogs', true); } } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }
       S.badges[k] = !S.badges[k]; press(k, S.badges[k]);
+      if (k === 'service_dogs') { S.sdogAuto = false; var tk0 = el('suSdogTicked'); if (tk0) tk0.hidden = true; }
       if (k === 'patio') { var dsub = el('suNoDogsSub'); if (dsub) dsub.textContent = dogSubText(); }
       if (k === 'dog_friendly' && S.badges[k]) { S.noDogs = false; press('no_dogs', false); S.badges.service_dogs = false; press('service_dogs', false); sdog(); }
       // A heated or covered patio is a patio (pub test 5): ticking it ticks Patio; unticking Patio unticks it.
@@ -3190,6 +3225,9 @@
     var cfe = el('suCfee'), cfl = el('suCpLead'); if (cfe && cfl && CK) cfe.addEventListener('input', function(){ readBrew(); cfl.textContent = cpLeadText(); });
     var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteUrl(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
+    // Restaurant test 1 (Whistler, 2026-11-14): typing straight after her own saved booking (or Known for / groups) line
+    // ("…at the bar.Strongly recommended") gets the missing space, as the story box does.
+    var ln = el('suLine'); if (ln && ln.getAttribute('data-vk')) ln.addEventListener('blur', function(){ var fx = storyJoinFix(ln.value, (CUR.visit_rows || {})[ln.getAttribute('data-vk')] || ''); if (fx !== ln.value) { ln.value = fx; try { ln.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} } });
     var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
     if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
@@ -3254,8 +3292,8 @@
   // what's done") is a fix: saving it goes back to the list, not on through the next questions.
   if (STEPS.indexOf(startAt) >= 0) { S.hist = ['start']; S.step = entry(startAt); if (S.done[startAt] && S.done[startAt] !== 'skip') S.toList = true; } else if (startAt === 'more') { S.hist = ['start']; S.step = 'more'; }
   // Pubs: the checklist's kitchen, sports and who's-welcome rows open their own screens.
-  else if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) || (C.brewery && startAt === 'offer:minors')) { S.hist = ['start']; S.step = startAt; S.toList = true; }
-  else if (C.pub && startAt === 'hours:kitchentime') { S.hist = ['start', 'hours:kitchen']; S.step = startAt; S.toList = true; }
+  else if ((C.pub && ['hours:kitchen', 'offer:sports', 'offer:minors'].indexOf(startAt) >= 0) || (C.restaurant && startAt === 'hours:kitchen') || (C.brewery && startAt === 'offer:minors')) { S.hist = ['start']; S.step = startAt; S.toList = true; }
+  else if (KITCHEN_Q && startAt === 'hours:kitchentime') { S.hist = ['start', 'hours:kitchen']; S.step = startAt; S.toList = true; }
   // Cafés: the checklist's "What you serve" row opens its own screen (the kind first while none is picked).
   else if (C.cafe && startAt === 'cuisine:serve') { S.hist = ['start']; S.step = S.place && CUR.place_type ? 'cuisine:serve' : 'cuisine'; S.toList = true; }
   // A reload or a language switch on an edit screen comes back to it (with what was typed), not to the summary.
@@ -3284,7 +3322,7 @@
   screen.addEventListener('input', quickTyped);
   var kitchenTyped = function(e){ if (!e.target || e.target.id !== 'suKto') return; var n = el('suKitchenWarn'); if (!n) return; var t = kitchenWarn(e.target.value); n.textContent = t; n.hidden = !t; };
   screen.addEventListener('input', kitchenTyped); screen.addEventListener('change', kitchenTyped);
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
@@ -3312,7 +3350,7 @@
     // The screens the address can open on their own (the pubs' kitchen, sports and who's-welcome; a café's serves).
     // Pub test (Whistler, 2026-11-14): the kitchen-time screen has its own address (it was #hours, so a reload or Back
     // landed on the hours question).
-    if ((C.pub && ['hours:kitchen', 'hours:kitchentime', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.brewery && s0 === 'offer:minors') || (C.cafe && s0 === 'cuisine:serve')) return s0;
+    if ((C.pub && ['hours:kitchen', 'hours:kitchentime', 'offer:sports', 'offer:minors'].indexOf(s0) >= 0) || (C.restaurant && ['hours:kitchen', 'hours:kitchentime'].indexOf(s0) >= 0) || (C.brewery && s0 === 'offer:minors') || (C.cafe && s0 === 'cuisine:serve')) return s0;
     if (s0 === 'hours:year') return s0;
     if (STEPS.indexOf(b0) >= 0) return b0;
     return s0 === 'more' ? 'more' : '';
