@@ -743,8 +743,8 @@ test('winery test 2: What you offer pre-ticks tiles research supports (free park
   assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(w2.id)}/setup`)).text).visitTicks, []);
   const js = fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
   assert.match(js, /C\.visitTicks/);
-  // Restaurants get none.
-  assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).visitTicks, undefined);
+  // Restaurants get none of these (restaurant test 1, 2026-11-14: only research's "Reservations: Recommended", and this one has none).
+  assert.deepEqual(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).visitTicks, []);
 });
 
 // ---------- Winery test 3 (Sylvie, iPad, French; drafts/fresh-eyes-winery3-2026-11-12/REPORT.md) ----------

@@ -153,6 +153,13 @@ function kitchenMealFit(v, win, weekday) {
   if (!days.some((d) => parsed.days[d] && parsed.days[d].status === 'open' && windowOverlap(parsed.days[d], { from: win.from, to }) >= 60)) return { ok: false };
   return { ok: true, closes };
 }
+// The owner's kitchen-close or last-seating time in minutes (after midnight as 24:00 and on), or null.
+function kitchenCloseMinutes(v) {
+  const m = /^(\d{2}):(\d{2})$/.exec(String((v && v.ownKitchen && v.ownKitchen.closes) || ''));
+  if (!m) return null;
+  const n = Number(m[1]) * 60 + Number(m[2]);
+  return n < NIGHT_ENDS_AT_KIDS ? n + 1440 : n;
+}
 function kitchenMealText(v, meal, closes) {
   return `${meal === 'lunch' ? 'Lunch' : 'Dinner'} at ${v.name}${closes != null ? ` (kitchen until ${kidsClock(closes)})` : ' (its own kitchen)'}`;
 }
@@ -1271,7 +1278,8 @@ function scoreVenue(v, ctx) {
 // recording studio and a parkour gym first, alphabetically. Visitor attractions (museums, galleries, cinemas, bowling,
 // arcades, climbing) come first; venues for members or adults (casinos, gyms, studios) only when asked for by name.
 // Dishes and cuisines ("pizza", "sushi", "tacos") are capped per day; words like "quiet" or "local" are not.
-const DISH_WORDS_RE = /^(?:pizzas?|burgers?|sushi|tacos?|ramen|pho|bbq|barbecue|steaks?|steakhouse|seafood|fish and chips|wings|poutine|noodles?|dumplings?|curry|indian|thai|mexican|italian|chinese|japanese|korean|greek|vietnamese|french|middle eastern|lebanese|sandwich(?:es)?|ice cream|gelato|donuts?|doughnuts?|crepes?|waffles?|pancakes?|pasta|tapas|dim sum|shawarma|kebabs?|fried chicken|hot dogs?)$/;
+// Restaurant test 1 (Whistler, 2026-11-14): fondue, raclette and schnitzel are dishes too ("we love cheese fondue").
+const DISH_WORDS_RE = /^(?:fondue|raclette|schnitzel|pizzas?|burgers?|sushi|tacos?|ramen|pho|bbq|barbecue|steaks?|steakhouse|seafood|fish and chips|wings|poutine|noodles?|dumplings?|curry|indian|thai|mexican|italian|chinese|japanese|korean|greek|vietnamese|french|middle eastern|lebanese|sandwich(?:es)?|ice cream|gelato|donuts?|doughnuts?|crepes?|waffles?|pancakes?|pasta|tapas|dim sum|shawarma|kebabs?|fried chicken|hot dogs?)$/;
 const BRUNCH_FOOD_RE = /\b(?:brunch|breakfast|breakfasts|eggs benedict|benny|bennies|pancakes?|waffles?|omelett?es?|french toast|hash browns?|diner)\b/;
 const KIDS_ONLY_RE = /\b(?:indoor playground|indoor play (?:centre|center|area|space)|play area|playhouse cafe|ball pit|play structures|for (?:young|little|small) (?:kids|children|ones)|toddlers?|preschoolers?)\b/;
 const THINGS_TO_DO_RE = /\b(?:things? to do|something (?:fun )?to do|stuff to do|what to do|what can we do|activities|something fun|fun things|have fun)\b/;
@@ -1880,6 +1888,9 @@ function outingSteps(ctx) {
       label: s.types.map((t) => typeLabel(ctx, t, 'singular')).join(' or '), prefer: {},
     }));
   }
+  // Restaurant test 1 (Whistler, 2026-11-14): "Dinner for two… Saturday February 13 at 7pm" asks for dinner at 7 and
+  // nothing else; the drink first pushed dinner to 8:05. Dinner alone, at its time.
+  if (ctx.requirements && ctx.requirements.dinnerAtClock) return [{ types: ['restaurant'], daypart: 'evening', window: 'evening', label: 'Dinner', prefer: {} }];
   // 2026-10-28: a date night's drink is a lounge or a winery before a pub (Vernon's date night opened at 1516 Pub & Grill).
   // Default date-night shape (a heuristic): a drink in the early evening,
   // then dinner. Lounges first, then pubs and breweries, then wineries --
@@ -1925,7 +1936,10 @@ function buildOuting(facts, ctx) {
       const dist = distanceTerm(prev, v, kmCost, maxHop);
       // A cheap date night (2026-10-25: it got Rimrock Café, $$$$): listed prices of $$$ and up rank well down.
       const budgetCost = ctx.budget === 'budget' && v.price != null ? (v.price >= 3 ? -40 : v.price === 1 ? 6 : 0) : 0;
-      const score = s.score + 20 + (step.prefer[v.type] || 0) + fit.score + dist.score + budgetCost;
+      // Restaurant test 1 (Whistler, 2026-11-14): a dish the visitor asked for ("we love cheese fondue") that the place
+      // serves (its cuisine, description or Known for line) puts it ahead for dinner, over a romantic place without it.
+      const dish = step.types.includes('restaurant') && ctx.foodTerms.some((ft) => DISH_WORDS_RE.test(ft.term) && foodMatch(v, ft)) ? 15 : 0;
+      const score = s.score + 20 + (step.prefer[v.type] || 0) + fit.score + dist.score + budgetCost + dish;
       const extra = [{ code: 'step', text: `Chosen for the “${step.label}” part of your outing`, weight: 20 }].concat(fit.reasons, dist.reasons);
       cands.push({ v, score, reasons: s.reasons.concat(extra), caveats: fit.caveats.concat(dist.caveats) });
     }
@@ -1948,6 +1962,9 @@ function buildOuting(facts, ctx) {
     pairs.sort((a, b) => b.score - a.score || compareScored({ score: 0, v: a.v }, { score: 0, v: b.v }));
     const chosen = pairs.length ? rotateWithinType(pairs.filter((x, i) => i === 0 || x.pair[1]), ctx, undefined, { slot: 'outing', dinner: true }) : null;
     picks = chosen ? chosen.pair : [null, null];
+    // Restaurant test 1 (2026-11-14): no drink open nearby left the evening with no dinner either ("No restaurant could be
+    // fitted"); dinner is planned on its own.
+    if (!picks[1]) { const d = candidatesFor(steps[1], null, new Set(picks[0] ? [picks[0].v.id] : []))[0]; if (d && !picks[0]) picks = [null, d]; }
   } else {
     const used = new Set();
     let prev = null;
@@ -4138,7 +4155,10 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // then (it was planned 7:35-9:05 PM): its hours end at that time for this trip, so the visit is earlier, shorter or
         // another stop. The "Kids welcome with an adult until 9 PM" line still shows.
         const kidsCut=kidsTrip?kidsUntilMinutes(candidate):null;
-        const ranges=(unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges||[]).map(([a,b])=>kidsCut!=null?[a,Math.min(b,kidsCut)]:[a,b]).filter(([a,b])=>b>a);
+        // Restaurant test 1 (Whistler, 2026-11-14): a meal ends by the time the owner said the kitchen closes or the last
+        // seating is (dinner booked 8:05–9:35 at a place whose kitchen closes at 9:30).
+        const kitchenCut=isDinnerStop(stop)||isLunchStop(stop)?kitchenCloseMinutes(candidate):null;
+        const ranges=(unknownHours?[[candidate.type==='winery'?660:0,1440]]:hours.ranges||[]).map(([a,b])=>kidsCut!=null?[a,Math.min(b,kidsCut)]:[a,b]).map(([a,b])=>kitchenCut!=null?[a,Math.min(b,kitchenCut)]:[a,b]).filter(([a,b])=>b>a);
         if(hours?.status==='closed')return {bad:true};
         let transfer=0,guessedTransfer=false;
         if(previous){
@@ -8291,7 +8311,7 @@ module.exports = {
   hoursFit, dayClosedAllDay, closedDayInfo, tastingWordUsed, requirementClosedOnly, DAYTIME_NIGHT_KINDS,
   listedHoursText,
   cafeRole,
-  SLOT_WINDOWS, kitchenMealFit,
+  SLOT_WINDOWS, kitchenMealFit, kitchenCloseMinutes,
   PLAN_DAYPARTS,
   PLAN_MAX_HOP_KM,
   SLOT_AFFINITY,

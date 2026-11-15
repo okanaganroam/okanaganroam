@@ -6756,6 +6756,16 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const openMonthsById = new Map();
   try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id) || undatedClosure.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
+  // Restaurant test 1 (Whistler, 2026-11-14): "we love cheese fondue" finds a place whose Plan your visit "Known for" line
+  // says it ("Cheese fondue and raclette"), as its description or cuisine would. Read once per plan.
+  const knownForById = new Map();
+  try {
+    for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Known for%'").all()) {
+      let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
+      const row = o && Array.isArray(o.rows) ? o.rows.find((x) => x && x.label === 'Known for' && x.text) : null;
+      if (row) knownForById.set(r.venue_id, String(row.text).slice(0, 200));
+    }
+  } catch (e) { /* none */ }
   // Recognised places (2026-10-25, data/acclaimed-restaurants.json): award and readers' poll results with their sources,
   // so Build My Trip can put memorable places first on special trips (the listings have no ratings).
   const acclaimed = tripAcclaimedById();
@@ -6797,7 +6807,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
       cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()),
-      textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}`),
+      textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}`),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
       ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
@@ -6832,7 +6842,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(plannerKidsUntil(v) ? { kidsUntil: plannerKidsUntil(v) } : {}),
       // Brewery test 4 (2026-11-13): a brewery whose owner answered "Our own kitchen" (or a pub with a kitchen answer), with
       // its kitchen close time when earlier, so a dinner slot can be there within its kitchen hours.
-      ...(plannerOwnKitchen(v) ? { ownKitchen: plannerOwnKitchen(v) } : {}),
+      ...(plannerOwnKitchen(v, hoursDate) ? { ownKitchen: plannerOwnKitchen(v, hoursDate) } : {}),
       ...(v.hours && v.hours_source === 'venue_owner' && parseLocalDate(v.hours_checked_at) && localDateToDayNumber(todayLocal()) - localDateToDayNumber(v.hours_checked_at) <= OPEN_NOW_MAX_CHECK_AGE_DAYS.food_drink ? { ownerHours: true } : {}),
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, a 2.5 km creek walk had no text and got the 3-hour hiking allowance).
@@ -6844,7 +6854,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       hours: (apptType(v.type) && wineryAppointmentOn(v.id, hoursDate, v.type) === true) ? null : (weekJsonOn(v, hoursDate) || null),
       openMonths: openMonthsById.get(v.id) || undefined,
       // Winery test 5 (2026-11-12): with the owner's note ("Boxing Day"), so a left-out place says why in holiday words.
-      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from, ...(x.note ? { note: String(x.note).slice(0, 60) } : {}) })) : undefined; })(),
+      // Restaurant test 1 (2026-11-14): a yearly closure's rows say so (yearly), for "closed for the season on that date".
+      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from, ...(x.note ? { note: String(x.note).slice(0, 60) } : {}), ...(x.yearly ? { yearly: true } : {}) })) : undefined; })(),
       // ...and the owner's season whose week applies on that date ("11-01" to "04-30"), for "closed Wednesdays from Nov to Apr".
       // Brewery test 4 (2026-11-13): or, on a date in the usual week of a place with one season ("Summer hours" May to
       // Sep), the rest of the year (Oct to Apr), so "Closed Mondays (Oct–Apr)" can be said in January too.
@@ -7663,8 +7674,16 @@ function tripClosedWeekday(f, date) {
   try { parsed = hoursModule.parseHours(f.hours); } catch (e) { return null; }
   return parsed && parsed.known && parsed.days && parsed.days[wd] && parsed.days[wd].status === 'closed' ? wd : null;
 }
+// Restaurant test 1 (Whistler, 2026-11-14): a yearly closure ("04-19" to "05-14", every year) matches on any year's date,
+// as do the dated rows it is expanded into.
 function tripOwnerClosureOn(f, date) {
-  return parseLocalDate(date) && Array.isArray(f && f.ownerClosures) ? f.ownerClosures.find((c) => date >= c.from && date <= (c.to || c.from)) || null : null;
+  if (!parseLocalDate(date) || !Array.isArray(f && f.ownerClosures)) return null;
+  const md = date.slice(5, 10);
+  return f.ownerClosures.find((c) => {
+    if (!c) return false;
+    if (hoursModule && hoursModule.isYearlyClosure(c)) { const a = c.from, b = c.to || c.from; return a <= b ? md >= a && md <= b : md >= a || md <= b; }
+    return date >= c.from && date <= (c.to || c.from);
+  }) || null;
 }
 function tripClosedNamedNotes(list, date, dayDated = false) {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -7679,7 +7698,11 @@ function tripClosedNamedNotes(list, date, dayDated = false) {
     // date ("closed on December 26 for Boxing Day", "closed Wednesdays from Nov to Apr"), not "for the season".
     const oc = dayDated && !closedSeason ? tripOwnerClosureOn(f, date) : null;
     const wd = dayDated && !closedSeason && !oc ? tripClosedWeekday(f, date) : null;
-    if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
+    // Restaurant test 1: a yearly closure of more than a day (a shoulder season) is "closed for the season" on that date,
+    // with the owner's own reason when there is one.
+    const ocSeason = oc && !tripHolidayName(oc.note) && (oc.yearly || (hoursModule && hoursModule.isYearlyClosure(oc))) && oc.from !== (oc.to || oc.from);
+    if (ocSeason) { const why = String(oc.note || '').replace(/[()]/g, '').trim(); dated.push(`${f.name} is closed for the season on ${monthDay(date)}${why ? ` (${why})` : ''}, so it isn’t in this plan.`); }
+    else if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
     else if (wd && f.hoursSeason && !(Array.isArray(f.hoursSeason.otherOpen) && !f.hoursSeason.otherOpen.includes(wd))) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${shortMonth(f.hoursSeason.from)} to ${shortMonth(f.hoursSeason.to)}, so it isn’t in this plan.`);
     else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
     else if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
@@ -7713,7 +7736,11 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     if (core && core.every((w) => leftover.has(w) && textWords.has(w))) maybe.add(v.id);
   }
   if (!maybe.size) return plan;
-  const planDate = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null);
+  // Restaurant test 1 (Whistler, 2026-11-14): a plan that couldn't place anything ("Dinner at Alpenglow Bistro on Saturday
+  // May 1") has no schedule rows, so the date asked for (plan.season.date) is the plan's date; without it a place closed
+  // today for its fall shoulder season was "closed right now" on a May trip.
+  const askedDate = plan.season && parseLocalDate(plan.season.date) && plan.season.date !== todayLocal(now) ? plan.season.date : null;
+  const planDate = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null) || askedDate;
   const date = planDate || todayLocal(now);
   const facts = buildTripPlannerFacts(false, date).filter((f) => maybe.has(f.id));
   const byId = new Map(facts.map((f) => [f.id, f]));
@@ -7724,7 +7751,9 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   const dayClosed = (f) => !!planDate && !usedIds.has(f.id) && !!tripClosedWeekday(f, planDate);
   const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)) || dayClosed(f));
   const hits = [];
-  for (const i of named) { const f = byId.get(i.value); if (f) hits.push({ f, item: i, re: tripNameRegex(norm(String(f.name).replace(/['’]/g, ' ')).split(' '), true) }); }
+  // Restaurant test 1 (2026-11-14): a bracketed part of a listed name ("Alpenglow Bistro (Upper Village)") is optional in
+  // the request, so "dinner at Alpenglow Bistro" is taken out of the request too.
+  for (const i of named) { const f = byId.get(i.value); if (f) hits.push({ f, item: i, re: tripNameRegex(norm(String(f.name).replace(/\s*\([^)]*\)/g, ' ').replace(/['’]/g, ' ')).split(' ').filter(Boolean), true) }); }
   for (const f of facts) {
     if (hits.some((h) => h.f.id === f.id) || !closed(f)) continue;
     const core = tripNameCore(f.name);
@@ -7773,6 +7802,22 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   }
   let again = null;
   try { again = runTripPlanCore({ ...args, text: rewritten }, now); } catch (e) { again = null; }
+  // Restaurant test 1 (Whistler, 2026-11-14): "Dinner at Alpenglow Bistro on Saturday May 1", closed for its spring
+  // shoulder season, came back as a list of ideas with "No restaurant could be fitted". A meal planned at one named
+  // restaurant that is closed is planned at the best open restaurant from that list instead, which the plan says.
+  let substitute = null;
+  try {
+    const meal = /\b(dinner|supper|lunch|brunch|breakfast)\b/i;
+    const hit = closedHits.length === 1 ? closedHits[0].f : null;
+    if (hit && hit.type === 'restaurant' && !['discover', 'recommendations'].includes(plan.kind) && again && ['discover', 'recommendations'].includes(again.kind) && meal.test(rewritten)) {
+      const pick = (again.recommendations || []).find((r) => r && r.venue && r.venue.type === hit.type && r.venue.id !== hit.id);
+      if (pick) {
+        const third = runTripPlanCore({ ...args, text: rewritten.replace(meal, (m) => `${m} at ${pick.venue.name}`) }, now);
+        const usesIt = third && [...((third.itinerary && third.itinerary.stops) || []), ...(third.days || []).flatMap((d) => d.stops || []), ...((third.outing && third.outing.stops) || [])].some((x) => x && x.venue && x.venue.id === pick.venue.id);
+        if (usesIt) { again = third; substitute = pick.venue.name; }
+      }
+    }
+  } catch (e) { substitute = null; }
   const usable = again && !tripPlanEmpty(again) && !(again.kind === 'unknown');
   const out = usable ? again : plan;
   out.query = plan.query || text;
@@ -7793,6 +7838,7 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
     }).filter(Boolean);
   // Winery test 5: the planner's own "X matches but is closed for the season …" for a place these notes already explain.
   out.warnings = out.warnings.filter((w) => !closedHits.some((h) => String(w).startsWith(`${h.f.name} matches but is closed `)));
+  if (substitute) notes.push(`${substitute} is planned in its place.`);
   out.warnings = notes.concat(out.warnings.filter((w) => !notes.includes(w)));
   out.unsupported = dropWords(out.unsupported);
   if (out.understood) out.understood.notUsed = dropWords(out.understood.notUsed);
@@ -20006,6 +20052,9 @@ function pubKidsWelcome(venueId) {
 // The types that answer the pub's questions (kitchen close, who's welcome) in venue_pub_info: pubs, and cocktail lounges
 // (Dayton, 2026-11-13: the pub setup with lounge words, folded like breweries).
 function pubSetupType(t) { return t === 'pub' || t === 'cocktail'; }
+// Restaurant test 1 (Whistler, 2026-11-14): restaurants answer the kitchen question too ("When does the kitchen close /
+// last seating?"), in the same venue_pub_info storage, kitchen part only (no who's welcome or sports).
+function kitchenAnswerType(t) { return pubSetupType(t) || t === 'restaurant'; }
 // Cocktail lounges (Decided 4, 2026-11-13): the brewery rule. Their own "Who's welcome?" answer -> true (all ages, or minors
 // until a set time) / false (adults only); null when they haven't answered (the researched Kids badge stands, as today).
 function cocktailKidsWelcome(venueId) {
@@ -20139,7 +20188,7 @@ function noDogsLineText(venue, fr) {
 const PUB_LINE_ICONS = { kitchen: '🍳', minors: '👪', dogs: '🐕' };
 function pubInfoLinesHtml(venue, fr, now = new Date()) {
   if (!venue || !OWNER_FEATURE_TYPES.has(venue.type) || venue.redirect_to) return '';
-  const info = pubSetupType(venue.type) ? venuePubInfo(venue.id) : {};
+  const info = kitchenAnswerType(venue.type) ? venuePubInfo(venue.id) : {};
   const L = (en, f) => (fr ? f : en);
   const lines = [];
   // The kitchen time for today's date (pub test 7): its seasonal time inside that season.
@@ -21062,11 +21111,13 @@ function plannerKidsUntil(v) {
 }
 // { closes: 'HH:MM' } (kitchen closes before the taproom) or {} (same hours), for a brewery that answered "Our own
 // kitchen" or a pub that answered its kitchen hours; null otherwise.
-function plannerOwnKitchen(v) {
-  if (!v || (!brewSetupType(v.type) && !pubSetupType(v.type))) return null;
+// Restaurant test 1 (2026-11-14): restaurants too, and the kitchen's seasonal time on the plan's date (date: 'YYYY-MM-DD').
+function plannerOwnKitchen(v, date) {
+  if (!v || (!brewSetupType(v.type) && !kitchenAnswerType(v.type))) return null;
   if (brewSetupType(v.type) && venueBreweryInfo(v.id).food !== 'kitchen') return null;
-  const k = (brewSetupType(v.type) ? venueBreweryInfo(v.id) : venuePubInfo(v.id)).kitchen || {};
-  if (pubSetupType(v.type) && !['same', 'earlier'].includes(k.mode)) return null;
+  const k0 = (brewSetupType(v.type) ? venueBreweryInfo(v.id) : venuePubInfo(v.id)).kitchen || {};
+  const k = kitchenAnswerType(v.type) && parseLocalDate(date) ? pubKitchenOn(k0, date) || {} : k0;
+  if (kitchenAnswerType(v.type) && !['same', 'earlier'].includes(k.mode)) return null;
   return k.mode === 'earlier' && /^\d{2}:\d{2}$/.test(String(k.closes || '')) ? { closes: k.closes } : {};
 }
 function breweryKidsWelcome(venueId) {
@@ -34468,9 +34519,10 @@ function frBadgeLabel(field) {
 // Café test 6 (2026-11-12): a cuisine name in French qualifies « cuisine », so it is feminine like the rest (« Française »,
 // « Italienne »); these few fell back to masculine names (« Américain » next to « Française »).
 const FR_CUISINE_FEMININE = { American: 'Américaine', Canadian: 'Canadienne', Taiwanese: 'Taïwanaise', 'Spanish & Tapas': 'Espagnole et tapas',
-  'Contemporary & Global': 'Contemporaine et internationale', 'Small plates & bar snacks': 'Petites assiettes et bouchées', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne' };
+  'Contemporary & Global': 'Contemporaine et internationale', 'Small plates & bar snacks': 'Petites assiettes et bouchées', 'Middle Eastern': 'Moyen-orientale', 'Poke & Hawaiian': 'Poké et hawaïenne',
+  European: 'Européenne', 'Swiss & Alpine': 'Suisse et alpine' };
 const FR_CUISINE_ADJECTIVE = new Set(['American', 'Canadian', 'Chinese', 'Ethiopian', 'Filipino', 'French', 'German', 'Greek', 'Indian', 'Italian', 'Japanese', 'Korean',
-  'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Polish', 'Portuguese', 'Taiwanese', 'Thai', 'Turkish', 'Ukrainian', 'Vietnamese', 'Spanish & Tapas']);
+  'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Polish', 'Portuguese', 'Taiwanese', 'Thai', 'Turkish', 'Ukrainian', 'Vietnamese', 'Spanish & Tapas', 'European', 'Swiss & Alpine']);
 function frCuisine(cuisine) {
   if (FR_CUISINE_FEMININE[cuisine]) return FR_CUISINE_FEMININE[cuisine];
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
@@ -35777,21 +35829,26 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
   const x = hoursExtrasMap().get(venueId);
   const seasons = ((x && x.seasons) || []).filter((z) => z && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to) && z.hours)
     .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days }));
-  if (!seasons.length && !shut) return '';
+  // Restaurant test 1 (Whistler, 2026-11-14): the owner's yearly closures of a week or more (a spring and a fall shoulder
+  // season, "04-19" to "05-14" every year) are part of the year too: "Apr 19 – May 14: Closed every year".
+  const MD_DAYS = (md) => { const m = Number(md.slice(0, 2)), d = Number(md.slice(3, 5)); return Math.round((Date.UTC(2028, m - 1, d) - Date.UTC(2028, 0, 1)) / 86400000); };
+  const yearlyShut = ((x && x.raw) || []).filter((c) => c && hoursModule.isYearlyClosure(c) && c.to && c.to !== c.from && ((MD_DAYS(c.to) - MD_DAYS(c.from) + 366) % 366) >= 6);
+  if (!seasons.length && !shut && !yearlyShut.length) return '';
   const os = openMonths ? hoursModule.parseOpenSeason(openMonths) : null;
   // Closed for the season with neither a seasonal set nor an open season of its own (a dated closure set by us): the
   // usual hours fold away as before; a list of "Jan 1 – Dec 31" would add nothing.
-  if (!seasons.length && !os) return '';
+  if (!seasons.length && !os && !yearlyShut.length) return '';
   // Every day of a leap year as 'MM-DD', from the first open day (or the day after the first set ends) round the year.
   const all = [];
   for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) all.push(new Date(t).toISOString().slice(5, 10));
-  const startMd = os ? os.from : seasons.length ? all[(all.indexOf(seasons[0].to) + 1) % all.length] : '01-01';
+  const startMd = os ? os.from : seasons.length ? all[(all.indexOf(seasons[0].to) + 1) % all.length] : yearlyShut.length ? all[(all.indexOf(yearlyShut[0].to) + 1) % all.length] : '01-01';
   const start = Math.max(0, all.indexOf(startMd));
   const runs = [];
   for (let i = 0; i < all.length; i++) {
     const md = all[(start + i) % all.length];
     if (os && !hoursModule.mdInRange(md, os.from, os.to)) break;
-    const k = seasons.findIndex((z) => hoursModule.mdInRange(md, z.from, z.to));
+    const shutK = yearlyShut.findIndex((c) => hoursModule.mdInRange(md, c.from, c.to));
+    const k = shutK >= 0 ? -2 - shutK : seasons.findIndex((z) => hoursModule.mdInRange(md, z.from, z.to));
     const last = runs[runs.length - 1];
     if (last && last.k === k) last.to = md; else runs.push({ k, from: md, to: md });
   }
@@ -35808,7 +35865,10 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
   for (const r of runs) if (!order.includes(r.k)) order.push(r.k);
   const and = fr ? ' et ' : ' and ';
   const lines = order.map((k) => {
-    const when = runs.filter((r) => r.k === k).map((r) => (r.from === r.to ? hoursExtraDayText(r.from, fr) : hoursExtraRangeText(r.from, r.to, fr))).join(and);
+    // Restaurant test 1: three or more runs read "A, B and C" (two shoulder closures cut the usual hours in three).
+    const ws = runs.filter((r) => r.k === k).map((r) => (r.from === r.to ? hoursExtraDayText(r.from, fr) : hoursExtraRangeText(r.from, r.to, fr)));
+    const when = ws.length > 2 ? `${ws.slice(0, -1).join(', ')}${and}${ws[ws.length - 1]}` : ws.join(and);
+    if (k <= -2) { const note = String(yearlyShut[-2 - k].note || '').trim(); return `<li><span>${escapeHtml(when)}</span><span>${fr ? 'Fermé chaque année' : 'Closed every year'}${note && !fr ? ` (${escapeHtml(note)})` : ''}</span></li>`; }
     return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days))}</span></li>`;
   });
   return `<div class="venue-hours-year"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list">${lines.join('')}</ul></div>`;
@@ -36141,7 +36201,12 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
   let row = null;
   try { row = db.prepare('SELECT type, happy_hour FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
-  const shown = specialsShown(row || venue, list, now);
+  // Restaurant test 1 (Whistler, 2026-11-14): a special with its own season ("Fondue Fridays", Dec–Mar) is on the page
+  // out of season too, with its months beside it and never "Today" (it had vanished until December).
+  const today0 = todayLocal(now);
+  const inSeason = specialsShown(row || venue, list, now);
+  const later = list.filter((x) => !specialInSeason(x, today0) && !specialsStale(x.checked_at, now, x) && (x.kind === 'food' || venueServesAlcohol(row || venue)));
+  const shown = inSeason.concat(later);
   if (!shown.length) return null;
   const clock = okanaganClock(now);
   let closedToday = false;
@@ -36151,7 +36216,7 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
     .sort((a, b) => a.first - b.first || a.i - b.i)
     .map(({ s }) => {
       // Audit fix (2026-10-27): "Today" only until the special ends (weeklyRowTag), on the Okanagan clock.
-      const tag = weeklyRowTag({ onToday: !closedToday && s.days.includes(clock.weekday), onYesterday: s.days.includes(yesterday), a: specialMinutes(s.start),
+      const tag = specialInSeason(s, today0) && weeklyRowTag({ onToday: !closedToday && s.days.includes(clock.weekday), onYesterday: s.days.includes(yesterday), a: specialMinutes(s.start),
         b: s.end === 'close' ? null : specialMinutes(s.end), fallbackToday: hoursCloseOn(statusHours, clock.weekday), yesterdayNeedsEnd: true }, clock);
       // Café test 4 (2026-11-11): a café's punch card or an any-day special shows just its text, never "Daily" (Gord's
       // punch card read "Daily" though he closes Sundays). Every day with a time ("7–9 AM") reads "Every day".
@@ -36195,7 +36260,10 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
   const list = venueWeeklyNightsList(venue.id);
   if (!list.length) return null;
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
-  const shown = nightsSorted(nightsShown(list, now));
+  // Restaurant test 1 (Whistler, 2026-11-14): one with its own season is shown out of season too, with its months and
+  // never "Tonight" (like the weekly specials).
+  const today0 = todayLocal(now), nightIn = (x) => inMonthDaySeason(x.season_from ? { from: x.season_from, to: x.season_to } : null, today0);
+  const shown = nightsSorted(nightsShown(list, now).concat(list.filter((x) => !nightIn(x) && !nightsStale(x.checked_at, now, x))));
   if (!shown.length) return null;
   const clock = okanaganClock(now);
   let closedToday = false;
@@ -36212,7 +36280,7 @@ function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
     // A row with no end time of its own stops being "Today" / "Tonight" once the place has closed for the day (unless it
     // starts later still); a row with its own end keeps weeklyRowTag's rule (an after-hours class keeps its tag).
     const afterClose = doneToday && specialMinutes(s.end) === null && (a === null || a <= clock.minutes);
-    const tag = weeklyRowTag({ onToday: !closedToday && !afterClose && nightOnDate(s, clock.date), onYesterday: nightOnDate(s, yesterdayDate), a, b: specialMinutes(s.end),
+    const tag = nightIn(s) && weeklyRowTag({ onToday: !closedToday && !afterClose && nightOnDate(s, clock.date), onYesterday: nightOnDate(s, yesterdayDate), a, b: specialMinutes(s.end),
       fallbackToday: a !== null ? a + WEEKLY_TAG_NO_END_MINUTES : null, fallbackYesterday: a !== null ? a + WEEKLY_TAG_NO_END_MINUTES : null }, clock);
     return { s, days: nightDaysText(s, fr), today: !!tag, onNow: tag === 'now', time: nightTimeText(s, fr), freq: nightFrequencyText(s, fr) };
   });
@@ -46450,10 +46518,12 @@ const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'descri
 // name (french-text.js FR_CUISINE, frCuisine). venues.cuisine keeps the first pick, so every existing reader (filters,
 // the trip planner, older pages) keeps working; the full list lives in venue_cuisines (venueCuisineList()).
 const OWNER_CUISINES = ['American', 'Asian Fusion', 'BBQ', 'Breakfast & Brunch', 'Burgers', 'Canadian', 'Caribbean', 'Chicken & Wings', 'Chinese',
-  'Comfort food', 'Contemporary & Global', 'Dessert', 'Ethiopian', 'Farm-to-Table', 'Filipino', 'Fish & Chips', 'French', 'German', 'Greek', 'Indian',
+  'Comfort food', 'Contemporary & Global', 'Dessert', 'Ethiopian', 'European', 'Farm-to-Table', 'Filipino', 'Fish & Chips', 'French', 'German', 'Greek', 'Indian',
   'Italian', 'Japanese', 'Korean', 'Latin American', 'Lebanese', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Noodles & Ramen', 'Pizza',
   'Poke & Hawaiian', 'Polish', 'Portuguese', 'Poutine', 'Pub Fare', 'Sandwiches', 'Seafood', 'Small plates & bar snacks', 'Spanish & Tapas', 'Steakhouse', 'Taiwanese', 'Thai',
-  'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
+  'Swiss & Alpine', 'Turkish', 'Ukrainian', 'Vietnamese', 'West Coast'];
+// Restaurant test 1 (Whistler, 2026-11-14): "European" and "Swiss & Alpine" (fondue and raclette had no label). A stored
+// label from before ("Alpine / European") picks them for the owner in the setup (ownerCuisineSuggestions).
 // Shown first in the picker (the 10 most used by live restaurants, Nov 9 2026); "Show more" opens the rest.
 const OWNER_CUISINES_POPULAR = ['Italian', 'Japanese', 'Indian', 'Breakfast & Brunch', 'Chinese', 'Mexican', 'Pub Fare', 'Pizza', 'Burgers', 'Comfort food'];
 const OWNER_CUISINES_MAX = 3;
@@ -46552,6 +46622,21 @@ function venueCuisineList(venue) {
   if (!list.length) return first ? [first] : [];
   if (first && list[0] !== first) return [first, ...list.filter((c) => c !== first)].slice(0, OWNER_CUISINES_MAX);
   return list.slice(0, OWNER_CUISINES_MAX);
+}
+// Restaurant test 1 (Whistler, 2026-11-14): a stored label that isn't on the owner's list ("Alpine / European", from
+// research) -> the list labels it names, as the setup's starting picks (saved only when the owner saves the screen).
+const CUISINE_WORD_LABELS = { alpine: 'Swiss & Alpine', swiss: 'Swiss & Alpine', fondue: 'Swiss & Alpine', raclette: 'Swiss & Alpine', european: 'European', europe: 'European' };
+function ownerCuisineSuggestions(list) {
+  const out = [];
+  for (const c of list || []) {
+    if (OWNER_CUISINES.includes(c)) continue;
+    for (const part of String(c).split(/\s*(?:\/|,|&|\band\b|\+)\s*/i)) {
+      const p = part.trim().toLowerCase(); if (!p) continue;
+      const hit = OWNER_CUISINES.find((o) => o.toLowerCase() === p) || CUISINE_WORD_LABELS[p];
+      if (hit && !out.includes(hit)) out.push(hit);
+    }
+  }
+  return out.slice(0, OWNER_CUISINES_MAX);
 }
 function venuePlaceType(venue) {
   if (!venue || !CUISINE_LIST_TYPES.has(venue.type)) return '';
@@ -47474,6 +47559,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     ...(COMPLETENESS_TYPES.has(venue.type) ? { cuisine: venue.cuisine || '', cuisines: venueCuisineList(venue), place_type: venuePlaceType(venue), hours_checked: venueHoursCheckedAt(venue.id), visit_rows: ownerVisitRows(venue.id) } : {}),
     // Pubs (2026-11-10): { kitchen, minors, sports } as stored ({} when none).
     ...(venue.type === 'pub' ? { pub_info: venuePubInfo(venue.id) } : {}),
+    // Restaurant test 1 (2026-11-14): a restaurant's kitchen / last seating answer ({ kitchen } or {}).
+    ...(venue.type === 'restaurant' ? { pub_info: venuePubInfo(venue.id).kitchen ? { kitchen: venuePubInfo(venue.id).kitchen } : {} } : {}),
     // Cocktail lounges (2026-11-13): the pub answers (kitchen, who's welcome) and their cocktail price (number | 'none' | null).
     ...(venue.type === 'cocktail' ? { pub_info: pubInfoAnswers(venue.id), cocktail_price: cocktailPriceOf(venue.id) } : {}),
     // Cafés (2026-11-10): { serves, diet, stay, order, coffee, sellout, year } and { order_url, preorder_url } as stored.
@@ -47588,6 +47675,20 @@ function wineryVisitTicks(venue, badges) {
   try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
   const no = new Set(venueNotOffered(venue.id));
   return out.filter((k) => !(badges || {})[k] && !owned.has(k) && !(k === 'dog_friendly' && no.has('dogs')));
+}
+// Restaurant test 1 (Whistler, 2026-11-14): research's Plan your visit "Reservations: Recommended" (or required,
+// essential, accepted) pre-ticks Takes reservations on "What you offer", as a suggestion while the screen is unsaved.
+// -> ['takes_reservations'] or []. Never once the owner has answered it, or with walk-ins only / no reservations.
+function researchReservationTicks(venue, badges) {
+  if ((badges || {}).takes_reservations) return [];
+  const info = venueVisitInfo(venue.id) || {};
+  const mine = new Set(info.owner_labels || []);
+  const text = (info.rows || []).filter((r) => r && typeof r.text === 'string' && !mine.has(r.label) && /^(?:reservations?|booking|bookings|book ahead)$/i.test(r.label)).map((r) => r.text).join(' ');
+  if (!/\b(?:recommended|required|essential|suggested|advised|accepted|taken|a must|yes)\b/i.test(text) || /\bno reservations\b|\bnot (?:accepted|taken)\b|\bwalk-?ins? only\b|\bfirst[- ]come\b/i.test(text)) return [];
+  let owned = new Set();
+  try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return []; }
+  // An owner feature's own answer is logged as feature_<key>.
+  return owned.has('takes_reservations') || owned.has('feature_takes_reservations') ? [] : ['takes_reservations'];
 }
 // New hours from the edit link still waiting for review?
 function ownerHoursWaiting(venueId) {
@@ -48171,8 +48272,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('pub_info' in input) {
     const x = input.pub_info;
     // Cocktail lounges (2026-11-13): the kitchen and who's welcome (no sports).
-    if (!pubSetupType(venue.type)) errors.form = PUB_INFO_ERROR;
-    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !(venue.type === 'cocktail' ? ['kitchen', 'minors'] : ['kitchen', 'minors', 'sports']).includes(k))) errors.pub_info = PUB_INFO_ERROR;
+    if (!kitchenAnswerType(venue.type)) errors.form = PUB_INFO_ERROR;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !(venue.type === 'restaurant' ? ['kitchen'] : venue.type === 'cocktail' ? ['kitchen', 'minors'] : ['kitchen', 'minors', 'sports']).includes(k))) errors.pub_info = PUB_INFO_ERROR;
+    // Restaurant test 1: a restaurant's kitchen is "earlier" (a time) or "same" (until close), never "we don't serve food".
+    else if (venue.type === 'restaurant' && x.kitchen && x.kitchen.mode === 'none') errors.pub_info = PUB_INFO_ERROR;
     else {
       const cur = current.pub_info || {};
       const next = { ...cur };
@@ -53332,7 +53435,8 @@ function renderOwnerSetupPage(found, opts) {
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
     // box any more (café test 3, 2026-11-11: keep it easy); a TikTok already saved stays stored and on the page.
     booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(),
-    ...(pub ? { pub_info: snap.pub_info || {} } : {}),
+    // Restaurant test 1 (2026-11-14): a restaurant's kitchen / last seating answer too.
+    ...(pub || venue.type === 'restaurant' ? { pub_info: snap.pub_info || {} } : {}),
     // Cocktail lounges: the price on the card (number | 'none' | null) and one over $40 still waiting for our check.
     ...(cocktail ? { cocktail_price: snap.cocktail_price == null ? null : snap.cocktail_price, cocktail_price_waiting: ownerCocktailPriceWaiting(venue.id) } : {}),
     ...(cafe ? { cafe_info: snap.cafe_info || {}, cafe_links: snap.cafe_links || { order_url: '', preorder_url: '' } } : {}),
@@ -53343,7 +53447,7 @@ function renderOwnerSetupPage(found, opts) {
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
     Greek: '🥙', Indian: '🍛', Italian: '🍝', Japanese: '🍱', Korean: '🍜', Mexican: '🌮', 'Noodles & Ramen': '🍜', Pizza: '🍕', 'Poke & Hawaiian': '🍣', Poutine: '🍟', 'Pub Fare': '🍺', Sandwiches: '🥪',
-    Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍', 'Small plates & bar snacks': '🍢' };
+    Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', European: '🍷', 'Swiss & Alpine': '🧀', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍', 'Small plates & bar snacks': '🍢' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
   const offerGroups = brewery ? [
     // Breweries (2026-11-12, SPEC-breweries.md "What you offer"): the reused tiles, the pub games and Picnic area. No Kids
@@ -53440,7 +53544,7 @@ function renderOwnerSetupPage(found, opts) {
       return { suggestKidsUntil: researchKidsUntil(rows), suggestKidsAll: venue.type === 'pub' && researchKidsAll(rows), ...(cocktail ? {} : { visitTicks: wineryVisitTicks(venue, snap.badges).filter((k) => k === 'free_parking') }) }; })() : {}),
     // Cocktail lounges (2026-11-13): the cocktail price's quick buttons and live limit, and research's price as a suggestion.
     ...(cocktail ? { cocktailQuick: [12, 14, 16, 18], feeLiveMax: COCKTAIL_PRICE_LIVE_MAX, researchCocktail: cocktailPriceGuess(venue), ...loungeResearchHints(venue, snap.badges) } : {}),
-    cafe, pub, winery, brewery, distillery, cocktail, combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
+    cafe, pub, winery, brewery, distillery, cocktail, restaurant: venue.type === 'restaurant', combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
     base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, waiting: setupWaitingSteps(venue), holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
     name: venue.name, typeLabel: fr && cocktail ? 'Bar à cocktails' : fr && venue.type === 'restaurant' ? 'Restaurant' : fr && winery ? 'Vignoble' : fr && distillery ? 'Distillerie' : fr && brewery ? 'Microbrasserie' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
@@ -53461,6 +53565,9 @@ function renderOwnerSetupPage(found, opts) {
     // and whether the page's description is research's (her first tap in the box selects it, so typing replaces it).
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
+    suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
+    ...(venue.type === 'restaurant' ? { visitTicks: researchReservationTicks(venue, snap.badges) } : {}),
     cur, cuisines: fr ? OWNER_CUISINES.slice().sort((a, b) => frCuisine(a).localeCompare(frCuisine(b), 'fr', { sensitivity: 'base' })) : OWNER_CUISINES, popular: cocktail ? COCKTAIL_CUISINES_POPULAR : pub ? PUB_CUISINES_POPULAR : cafe ? CAFE_CUISINES_POPULAR : OWNER_CUISINES_POPULAR, cuisineIcons, socialSent: setupSocialNotes(venue.id),
     cuisineNames: Object.fromEntries(OWNER_CUISINES.map((c) => [c, fr ? frCuisine(c) : c])),
     // Café test 6: the preview line says « Cuisine française », not a bare « Française ».
@@ -53534,7 +53641,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC]) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...CAFE_SETUP_HELP_TOPICS] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC])) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53998,7 +54105,10 @@ const SETUP_NIGHTS_HELP_TOPIC = { id: 'weekly-nights', pages: ['setup'], over: [
   a: '<p>In <strong>Set up your page</strong>, open <strong>Weekly events</strong> (tap <strong>Change an answer</strong> if it’s done). For each event, pick what it is, the day or days and the start time, then <strong>How often?</strong>: Every week, Every other week, 1st of the month, Last of the month, 1st &amp; 3rd or 2nd &amp; 4th. Open mic on the first Thursday? Tick Thursday and pick <strong>1st of the month</strong>. Tap <strong>Save my events</strong>.</p><p>It’s on your page right away, and Tonight, What’s On and Build My Trip show it only on those days.</p>',
   aFr: '<p>Dans <strong>Configurez votre page</strong>, ouvrez <strong>Événements de la semaine</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait). Pour chaque événement, choisissez ce que c’est, le ou les jours et l’heure de début, puis <strong>À quelle fréquence?</strong> : Chaque semaine, Une semaine sur deux, 1er du mois, Dernier du mois, 1er et 3e ou 2e et 4e. Une scène ouverte le premier jeudi? Cochez jeudi et choisissez <strong>1er du mois</strong>. Touchez <strong>Enregistrer mes événements</strong>.</p><p>C’est sur votre page tout de suite, et Ce soir, À l’affiche et Planifier mon voyage ne le montrent que ces jours-là.</p>' };
 const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We close for part of the year', qFr: 'Nous fermons une partie de l’année',
-  keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year'], keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année'],
+  keys: ['closed part of the year', 'seasonal', 'closed for the season', 'closed in winter', 'open in summer', 'reopen', 'season dates', 'open from', 'every year',
+    // Restaurant test 1 (Whistler, 2026-11-14): two closures a year.
+    'closed twice a year', 'close twice a year', 'twice a year', 'two closures', 'two shoulder seasons', 'both shoulder seasons', 'spring and fall closures', 'closed in spring and fall'],
+  keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année', 'deux fois par année', 'deux fois par an', 'fermé deux fois', 'deux fermetures', 'printemps et automne'],
   a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p>',
   aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture (par exemple du 25 avril au 12 octobre). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture. D’autres heures l’été aussi? Touchez <strong>Enregistrer et ajouter des heures d’été différentes</strong>.</p><p>Fermé une semaine ou deux aussi, chaque année? Ajoutez-le sous Jours fériés et fermetures et cochez <strong>Chaque année</strong>.</p>' };
 // Cocktail test 2 (2026-11-13): "How do I change my winter hours?" from a place that already has seasonal hours (her
@@ -54010,6 +54120,37 @@ function mdShift(md, days) {
   const d = new Date(Date.UTC(2024, Number(String(md).slice(0, 2)) - 1, Number(String(md).slice(3, 5)) + days));
   return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
+// Restaurant test 1 (Whistler, 2026-11-14): the "closed twice a year" paragraph for the seasonal answers, naming the
+// yearly closures already saved ("You already close Apr 19 – May 14 and Oct 12 – Nov 26 every year."). -> { en, fr }
+function yearlyClosuresHelp(venueId) {
+  let yearly = [];
+  try { yearly = (venueHoursExtras(venueId).raw || []).filter((c) => c && hoursModule && hoursModule.isYearlyClosure(c)); } catch (e) { yearly = []; }
+  const list = (fr) => { const xs = yearly.map((c) => escapeHtml(hoursExtraRangeText(c.from, c.to || c.from, fr))); return xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${xs[xs.length - 1]}`; };
+  return {
+    en: `<p>Closed twice a year, like a spring and a fall shoulder season? Add each one under <strong>Holidays &amp; closures</strong> and tick <strong>Every year</strong>.${yearly.length ? ` You already close ${list(false)} every year.` : ''}</p>`,
+    fr: `<p>Fermé deux fois par année, comme au printemps et à l’automne? Ajoutez chaque période sous <strong>Jours fériés et fermetures</strong> et cochez <strong>Chaque année</strong>.${yearly.length ? ` Vous fermez déjà chaque année : ${list(true).replace(/\.$/, '')}.` : ''}</p>`,
+  };
+}
+// Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day ("close between lunch and dinner", "split shift",
+// "lunch hours only in summer") are a second time on the setup's day card, for every type (the screen is shared).
+const SETUP_SPLIT_HOURS_HELP_TOPIC = { id: 'setup-split-hours', pages: ['setup'], over: ['hours', 'seasonal-hours', 'setup-season'],
+  q: 'Open for lunch and dinner, closed in between', qFr: 'Ouvert le midi et le soir, fermé entre les deux',
+  keys: ['lunch and dinner', 'lunch & dinner', 'split shift', 'split shifts', 'split hours', 'close between lunch and dinner', 'closed between lunch and dinner', 'closing between lunch and dinner', 'between lunch and dinner',
+    'close in the afternoon', 'closed in the afternoon', 'afternoon break', 'break in the afternoon', 'closed for a break', 'second time', 'two times', 'two time ranges', 'second range', 'open twice a day', 'reopen for dinner',
+    'lunch only in summer', 'lunch hours only in summer', 'lunch in summer', 'lunch in the summer', 'summer lunch', 'open for lunch in summer', 'lunch service', 'dinner service'],
+  keysFr: ['diner et souper', 'midi et soir', 'le midi et le soir', 'ferme entre le diner et le souper', 'fermé entre le diner et le souper', 'entre le diner et le souper', 'ferme l apres midi', 'fermé l après midi', 'pause l apres midi',
+    'deuxieme plage', 'deuxième plage', 'deux plages', 'horaire coupe', 'horaire coupé', 'diner seulement l ete', 'dîner seulement l été', 'diner l ete', 'le diner en ete', 'service du midi', 'rouvre pour le souper'],
+  a: '<p>Open for lunch, closed in the afternoon, then open again for dinner? In <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>, tap <strong>Change</strong> beside the day, then <strong>+ Add a second time (lunch &amp; dinner)</strong>. Lunch goes in the first time and dinner in the second (like 11:30 AM \u2013 2:30 PM and 5 PM \u2013 10 PM). <strong>Copy these hours to</strong> copies both, and <strong>\u2715 Remove this time</strong> takes one away.</p>'
+    + '<p>Lunch only in summer? Set your usual hours first. At <strong>Are these your hours all year?</strong> tap <strong>No, different in summer</strong>, then add the second time to your summer days. Hours saved in the setup go live straight away, and your page shows you closed between the two times. On your edit page it\u2019s <strong>+ second time</strong>.</p>',
+  aFr: '<p>Ouvert le midi, fermé l\u2019après-midi, puis ouvert de nouveau pour le souper? Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>, touchez <strong>Modifier</strong> à côté de la journée, puis <strong>+ Ajouter une deuxième plage (midi et soir)</strong>. Le dîner va dans la première plage et le souper dans la deuxième (par exemple 11 h 30 \u2013 14 h 30 et 17 h \u2013 22 h). <strong>Copier ces heures à</strong> copie les deux, et <strong>\u2715 Retirer cette plage</strong> en retire une.</p>'
+    + '<p>Le dîner seulement l\u2019été? Indiquez d\u2019abord vos heures habituelles. À <strong>Ces heures sont-elles les mêmes toute l\u2019année?</strong>, touchez <strong>Non, elles changent en été</strong>, puis ajoutez la deuxième plage à vos journées d\u2019été. Les heures enregistrées dans la configuration sont en ligne tout de suite, et votre page vous indique fermé entre les deux plages. Sur votre page de modification, c\u2019est <strong>+ deuxième plage</strong>.</p>' };
+// Restaurant test 1: the kitchen / last seating question ("my kitchen closes at 9:30" got "I'm not sure").
+const RESTAURANT_KITCHEN_HELP_TOPIC = { id: 'restaurant-kitchen', pages: ['setup'], over: ['hours'],
+  q: 'When the kitchen closes or last seating', qFr: 'L’heure de fermeture de la cuisine ou du dernier service',
+  keys: ['kitchen', 'kitchen closes', 'kitchen close', 'kitchen closing', 'kitchen hours', 'last seating', 'last sitting', 'last orders', 'last order', 'last call for food', 'food until', 'stop serving food', 'kitchen closes at', 'when the kitchen closes'],
+  keysFr: ['cuisine ferme', 'la cuisine ferme', 'fermeture de la cuisine', 'derniere commande', 'dernière commande', 'dernier service', 'dernieres commandes', 'heures de la cuisine', 'nourriture jusqu'],
+  a: '<p>In <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>, tap <strong>Yes, that\u2019s right</strong> (or change your hours and save). The next question is <strong>When does the kitchen close / last seating?</strong> Tap <strong>Earlier than we close</strong> and pick the time, like 9:30 PM. With summer or winter hours you can give that season its own time. It goes on your page right away, and Build My Trip plans dinners to end by then.</p>',
+  aFr: '<p>Dans <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>, touchez <strong>Oui, c\u2019est exact</strong> (ou changez vos heures et enregistrez). La question suivante est <strong>À quelle heure la cuisine ferme-t-elle (dernier service)?</strong> Touchez <strong>Plus tôt que la fermeture</strong> et choisissez l\u2019heure, par exemple 21 h 30. Avec des heures d\u2019été ou d\u2019hiver, vous pouvez donner une heure à cette saison. C\u2019est sur votre page tout de suite, et Planifier mon voyage prévoit les soupers pour qu\u2019ils se terminent avant.</p>' };
 function ownerSeasonHelpTopic(venueId) {
   // Only asked for where there is a setup to point to (the setup page, and the edit page of a type with one).
   let s0 = null;
@@ -54148,6 +54289,12 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-day { background: var(--su-card); border: 2px solid var(--su-line); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; }
   body.owner-setup .su-dh { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
   body.owner-setup .su-times { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  /* Restaurant test 1 (2026-11-14): a food tile the search hides is hidden (.su-tile's display: flex kept every tile on screen). */
+  body.owner-setup .su-tile[hidden] { display: none; }
+  /* Restaurant test 1 (2026-11-14): one ✕ in a search box (ours), never the browser's own as well. */
+  body.owner-setup input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+  /* Restaurant test 1 (2026-11-14): ✕ beside a day's second time. */
+  body.owner-setup .su-rmtime { min-height: 44px; }
   body.owner-setup .su-times input { font: inherit; font-size: 18px; min-height: 52px; padding: 6px 10px; border-radius: 12px; border: 2px solid var(--su-line); background: #fff; color: var(--su-ink); }
   body.owner-setup .su-toggle { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--su-line); background: #fff; color: var(--su-ink); font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
   body.owner-setup .su-toggle[aria-pressed="true"] { background: var(--su-warn-bg); color: var(--su-warn); border-color: var(--su-warn); }
@@ -55915,6 +56062,12 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   const inPortal = page === 'setup' || page === 'edit' || page === 'menu';
   const seasonTopic = opts.venueId ? ownerSeasonHelpTopic(opts.venueId) : null;
   if (seasonTopic) opts = { ...opts, extraTopics: [seasonTopic, ...(opts.extraTopics || []).filter((x) => x.id !== seasonTopic.id)] };
+  // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year (spring and fall shoulder seasons) is two yearly closures;
+  // the seasonal answers say so, with the ones already saved.
+  if (opts.venueId && page !== 'menu') {
+    const twice = yearlyClosuresHelp(opts.venueId);
+    opts = { ...opts, extraTopics: (opts.extraTopics || []).map((x) => (x.id === 'seasonal-hours' || x.id === 'setup-season' ? { ...x, a: `${x.a}${twice.en}`, aFr: `${x.aFr}${twice.fr}` } : x)) };
+  }
   const cfg = {
     page,
     lang,
@@ -58895,6 +59048,8 @@ function ownerFieldLabelsFor(venue, fr) {
   const base = fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS;
   if (!venue) return base;
   // Cocktail lounges (2026-11-13): no sports in their pub answers; events are live music and DJs.
+  // Restaurant test 1 (2026-11-14): a restaurant's pub_info is only its kitchen / last seating time.
+  if (venue.type === 'restaurant') return { ...base, pub_info: fr ? 'Fermeture de la cuisine' : 'Kitchen / last seating' };
   if (venue.type === 'cocktail') return { ...base, ...(fr ? { pub_info: 'Cuisine et qui est le bienvenu', weekly_nights: 'Musique, DJ et événements' } : { pub_info: 'Kitchen and who’s welcome', weekly_nights: 'Live music, DJs and events' }) };
   if (venue.type === 'distillery') return { ...base, ...(fr ? { brewery_info: 'Réponses sur votre salle de dégustation', flight_fee: 'Prix de la dégustation', weekly_nights: 'Visites et événements' } : { brewery_info: 'Your tasting room answers', flight_fee: 'Tasting price', weekly_nights: 'Tours & events' }) };
   if (venue.type === 'brewery') { let k = ''; try { k = breweryWordsKind(venue); } catch (e) { k = ''; } if (k === 'Cidery') return { ...base, brewery_info: fr ? 'Réponses sur votre cidrerie' : 'Your cidery answers' }; }

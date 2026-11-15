@@ -202,7 +202,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /x = any \? q\(T\.soFarQ, /);
   assert.equal(cfg.t.saveClosures1, 'Save these closures ({n} new)'); assert.equal(cfg.t.soFarQ, 'Your answers so far');
   // Tap-first answers, in both languages.
-  assert.deepEqual(cfg.t.quick.reservations, ['Call us', 'Book on our website', 'Walk-ins welcome too']);
+  assert.deepEqual(cfg.t.quick.reservations, ['Call us', 'Book on our website', 'Book online', 'Walk-ins welcome too']); // + Book online (restaurant test 1, 2026-11-14)
   assert.deepEqual(cfg.t.quick.takeout, ['Call to order', 'Order at the counter', 'DoorDash', 'SkipTheDishes', 'Uber Eats']);
   assert.deepEqual(cfg.t.quick.dogs, ['Patio only', 'Inside and patio', 'Water bowls at the door']);
   assert.deepEqual(cfg.t.quick.groups, ['Call ahead for 10 or more', 'Private room available']);

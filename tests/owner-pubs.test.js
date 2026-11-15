@@ -143,7 +143,9 @@ test('pub answers: checked like Plan your visit lines; only pubs can send them',
   }
   assert.deepEqual(app.venuePubInfo(v.id), {});
   const rest = mk('restaurant');
-  assert.equal((await change(tokenFor(rest.id), { pub_info: { kitchen: { mode: 'same' } } })).status, 400, 'a restaurant cannot send pub answers');
+  // Restaurant test 1 (2026-11-14): a restaurant sends its kitchen / last seating time, never the other pub answers.
+  assert.equal((await change(tokenFor(rest.id), { pub_info: { minors: { policy: 'adults' } } })).status, 400, 'a restaurant cannot send the other pub answers');
+  assert.equal((await change(tokenFor(rest.id), { pub_info: { kitchen: { mode: 'same' } } })).status, 200, 'its kitchen time it can');
 });
 
 test('pub kind of place: the pub list only, shown on the Cuisine row in both languages', async () => {
@@ -276,7 +278,7 @@ test('setup: the pub parts and screens; restaurants keep theirs', async () => {
   const rc = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.deepEqual(rc.part1, app.SETUP_PART1); assert.deepEqual(rc.part2, app.SETUP_PART2);
   assert.ok(!rc.pub && rc.offerGroups.flatMap((g) => g.keys).includes('kid_friendly'));
-  assert.equal(rc.t.kitchenQ, undefined);
+  assert.equal(rc.t.kitchenQ, 'When does the kitchen close / last seating?'); // restaurant test 1 (2026-11-14): their own kitchen question
 });
 
 test('setup: "essentials done" follows the pub Part 1; the edit page has the card and the bar', async () => {

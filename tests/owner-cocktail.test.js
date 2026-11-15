@@ -505,7 +505,7 @@ test('small fixes: happy hour from the opening time, small plates tile and card 
   const card = list.slice(list.indexOf(v.name) - 3000, list.indexOf(v.name) + 200);
   assert.doesNotMatch(card, /Small plates &amp; bar snacks ·|Small plates &amp; bar snacks<\/span>/);
   // Icons, 6+, no "We don't serve cocktails", door words.
-  assert.match(s, /if \(C\.distillery \|\| CK\) P2_ICONS\.happy = '🍸';/); assert.match(s, /big\(CK \? '🍽' : '🍔', T\.kitchenSame/);
+  assert.match(s, /if \(C\.distillery \|\| CK\) P2_ICONS\.happy = '🍸';/); assert.match(s, /big\(CK \|\| C\.restaurant \? '🍽' : '🍔', T\.kitchenSame/); // + restaurants (restaurant test 1, 2026-11-14)
   assert.match(s, /GROUP_SIZES = \[6, 8, 10, 12, 15, 20\]/);
   assert.match(s, /\(cp\.none \? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none"/);
   assert.equal(cfg.t.cpriceNeed, 'Please tap a price.');
@@ -864,7 +864,7 @@ test('lounge words (test 3): specials tips, the Events help answer, 🍸 on the 
 
 test('service dogs (test 3): ticked when “No dogs allowed” is tapped (all types), still a choice, saved with the screen', () => {
   const s = CLIENT();
-  assert.match(s, /if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); if \(C\.offerLabels\.service_dogs\) \{ S\.badges\.service_dogs = true; press\('service_dogs', true\); \} \}/);
+  assert.match(s, /if \(S\.noDogs\) \{ S\.badges\.dog_friendly = false; press\('dog_friendly', false\); if \(C\.offerLabels\.service_dogs\) \{ S\.badges\.service_dogs = true; S\.sdogAuto = true; press\('service_dogs', true\); \} \}/); // + "ticked for you" (restaurant test 1, 2026-11-14)
   assert.match(s, /badges\.service_dogs = !!\(S\.noDogs && !badges\.dog_friendly && S\.badges\.service_dogs\);/, 'sent only with the screen, and can be unticked');
 });
 

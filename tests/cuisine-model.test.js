@@ -43,9 +43,9 @@ const page = (v, lang) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { 
 const ldOf = (html) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
 const serves = (html) => { for (const j of ldOf(html)) { const s = JSON.stringify(j); const m = /"servesCuisine":("[^"]*"|\[[^\]]*\])/.exec(s); if (m) return JSON.parse(m[1]); } return undefined; };
 
-test('the lists: 46 food labels (small plates added for lounges, 2026-11-13) and 8 kinds of place, each with French; the 10 popular ones are on the list', () => {
-  assert.equal(app.OWNER_CUISINES.length, 46);
-  assert.equal(new Set(app.OWNER_CUISINES).size, 46);
+test('the lists: 48 food labels (small plates added for lounges, 2026-11-13; European and Swiss & Alpine, 2026-11-14) and 8 kinds of place, each with French; the 10 popular ones are on the list', () => {
+  assert.equal(app.OWNER_CUISINES.length, 48);
+  assert.equal(new Set(app.OWNER_CUISINES).size, 48);
   for (const c of ['Poke & Hawaiian', 'Contemporary & Global', 'Chicken & Wings', 'Fish & Chips', 'Noodles & Ramen', 'Spanish & Tapas', 'Farm-to-Table']) assert.ok(app.OWNER_CUISINES.includes(c), c);
   for (const c of ['Sushi', 'Casual dining', 'Family dining', 'Vegan', 'Vegetarian', 'Healthy', 'Asian', 'Diner', 'Fast Food', 'Cuban', 'Tapas', 'Spanish', 'Chicken', 'Contemporary Canadian']) assert.ok(!app.OWNER_CUISINES.includes(c), `${c} is not a food choice any more`);
   for (const c of app.OWNER_CUISINES) assert.ok(frenchText.FR_CUISINE[c] || app.frCuisine(c) !== c || /^(Pizza|Poutine|Burgers|BBQ|Bistro)$/.test(c), `${c} has French`);

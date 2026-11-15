@@ -220,7 +220,7 @@ test('small: no "tap a quick answer" without quick answers; « On accepte aussi 
   assert.match(src, /var qk = quick\(cfg\[0\], 'suLine', S\.visit\[cfg\[0\]\] \|\| ''\);/);
   assert.match(src, /'suLineEn', !qk\) \+ qk/);
   assert.match(src, /'suKnownEn', true\)/);
-  assert.deepEqual(text.fr.quick.reservations, ['Appelez-nous', 'Réservez sur notre site Web', 'On accepte aussi les clients sans réservation']);
+  assert.deepEqual(text.fr.quick.reservations, ['Appelez-nous', 'Réservez sur notre site Web', 'Réservez en ligne', 'On accepte aussi les clients sans réservation']); // + « Réservez en ligne » (restaurant test 1, 2026-11-14)
   assert.equal(app.presetAnswer('On accepte aussi les clients sans réservation', 'en'), 'Walk-ins welcome too');
   assert.equal(app.presetAnswer('Walk-ins welcome too', 'fr'), 'On accepte aussi les clients sans réservation');
   assert.equal(app.presetAnswer('Appelez-nous, Sans réservation aussi', 'en'), 'Call us, Walk-ins welcome too', 'an older answer still reads');
@@ -230,7 +230,10 @@ test('small: no "tap a quick answer" without quick answers; « On accepte aussi 
     const ctx = { T: text.fr, C: { lang: 'fr' } }; vm.createContext(ctx);
     try { vm.runInContext(code, ctx); } catch (e) { return; }
     const sib = text.fr.quick.reservations;
-    assert.equal(ctx.saysIt('Appelez-nous. On accepte aussi les clients sans réservation.', sib[2], sib), true);
-    assert.equal(ctx.saysIt('Appelez-nous.', sib[2], sib), false);
+    const walk = sib.indexOf('On accepte aussi les clients sans réservation');
+    assert.equal(ctx.saysIt('Appelez-nous. On accepte aussi les clients sans réservation.', sib[walk], sib), true);
+    assert.equal(ctx.saysIt('Appelez-nous.', sib[walk], sib), false);
+    // Restaurant test 1 (2026-11-14): « Réservez en ligne » is its own chip, not « Réservez sur notre site Web ».
+    assert.equal(ctx.saysIt('Réservez sur notre site Web.', 'Réservez en ligne', sib), false);
   }
 });
