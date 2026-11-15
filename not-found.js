@@ -9,6 +9,18 @@ const { classifyAgent } = require('./referrals');
 
 const OWN = /(?:^|\.)(?:okanaganroam\.com|whistlerroam\.com|localhost)$|\.up\.railway\.app$/;
 const PROBE = /\.(?:php\d?|asp|aspx|jsp|env|git|svn|sql|bak|ini|cgi|yml|yaml|log|zip|tar|gz|rar|swp)(?:$|\/)|wp-|wordpress|phpmyadmin|xmlrpc|cgi-bin|\/\.|actuator|server-status|\/vendor\/|\/node_modules\/|\/etc\/|\/proc\/|\/shell|\/admin\.|\/solr\/|\/config/i;
+// More scanner probes (2026-11-14), from the dashboard's own Broken pages list: bots hunting for secret files, cloud
+// keys, debug tools and source maps. None of these is a page on either site, so they are scanners, not visitors.
+const PROBE_MORE = new RegExp([
+  String.raw`\.(?:map|properties|toml|tfstate|tfvars|tfstate\.backup|sqlite|axd|action|pem|plist|py|csv|old)$`,
+  String.raw`^\/(?:[\w-]+\/)?_*env(?:\.[\w.]+)?$`, String.raw`%2e`, String.raw`environments?[\w.\/-]*\.json$`,
+  String.raw`(?:^|\/)(?:app)?settings[\w.-]*\.json$`, String.raw`(?:^|\/)secrets?(?:\.[a-z]+|\/|$)`, String.raw`credentials`, String.raw`^\/auth\.json$`,
+  String.raw`(?:^|\/)(?:client_secrets?|service-account|firebase[\w.-]*|gcp[\w.-]*|google[\w-]*credentials|google-services|application_default_credentials|aws[\w.-]*|s3|key|api-keys|keys\/[\w.-]+)\.(?:json|js|txt)$`,
+  String.raw`(?:^|\/)(?:id_rsa|id_ed25519|kubeconfig|jenkinsfile|error_log|composer\.json|ormconfig\.json|netlify\.toml|vercel\.json|webpack\.json|asset-manifest\.json|stats\.json|readme\.html|web\.config|[\w-]*task-definition\.json)$`,
+  String.raw`(?:^|\/)(?:app|index|main|bundle|vendor|runtime|commons|env-config|runtime-config|app\.config|aws\.config)\.(?:js|json)$`,
+  String.raw`telescope\/|_profiler|phpinfo|_debugbar|_ignition|\/debug\/default|elmah|trace\.axd|server-info|\/manager\/html|^\/webmail|___proxy_subdomain|\/v2\/_catalog|\/api\/v1\/namespaces|^\/metrics$|^\/-\/ping|@vite|_nuxt\/|^\/ecp\/|^\/curl\/|^\/(?:getcmd|aaa9|aab9|aaabbbccc|v2|fwc|fzh)$|__bf_catchall|^\/api\/session\/|^\/api\/(?:settings|v1\/version)$|^\/actions\/users\/|^\/language\/[\w-]+\/[\w.-]+\.xml$|^\/media\/system\/|^\/scripts\/app\.js`,
+].join('|'), 'i');
+const isProbe = (path) => !path || PROBE.test(path) || PROBE_MORE.test(path);
 const NEW_ROWS_PER_DAY = 2000;
 
 const cleanPath = (url) => {
@@ -43,7 +55,7 @@ function createNotFoundCounter(db) {
       try {
         if (res.statusCode !== 404 || !demandEnabled() || isInternal(req)) return;
         const day = dayOf(now());
-        if (!path || PROBE.test(path)) return bump(day, 'probe', '', '');
+        if (isProbe(path)) return bump(day, 'probe', '', '');
         const ua = String(req.headers['user-agent'] || '');
         if (classifyAgent(ua) || isBot(req)) return bump(day, 'crawler', path, '');
         if (rateLimited(ip)) return;
@@ -60,8 +72,10 @@ function createNotFoundCounter(db) {
     const totals = { visitor: 0, crawler: 0, probe: 0 };
     const pages = new Map(); const links = new Map(); const perDay = new Map();
     for (const r of rows) {
-      totals[r.kind] = (totals[r.kind] || 0) + r.n;
-      if (r.kind === 'probe') continue;
+      // Rows counted before a probe pattern was added are counted as probes now, and not listed.
+      const kind = r.kind !== 'probe' && isProbe(r.path) ? 'probe' : r.kind;
+      totals[kind] = (totals[kind] || 0) + r.n;
+      if (kind === 'probe') continue;
       const e = pages.get(r.path) || { path: r.path, visitors: 0, crawlers: 0, last_day: '', refs: new Map() };
       if (r.kind === 'visitor') {
         e.visitors += r.n; perDay.set(r.day, (perDay.get(r.day) || 0) + r.n);
@@ -82,4 +96,4 @@ function createNotFoundCounter(db) {
   return { watch, report, bump };
 }
 
-module.exports = { cleanPath, refOf, createNotFoundCounter };
+module.exports = { cleanPath, refOf, isProbe, createNotFoundCounter };

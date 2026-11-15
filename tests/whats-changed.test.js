@@ -89,3 +89,26 @@ test('each number also carries the last 7 days including today, for counters tha
   const m = wc.summarize(db, NOW).metrics.find((x) => x.key === 'views');
   assert.deepEqual([m.cur, m.prev, m.recent], [0, 0, 9]);
 });
+
+test('scanner probes (2026-11-14): secret-file and debug-tool hunts are probes, real pages are not, and old rows stop counting as visitors', () => {
+  const { isProbe, createNotFoundCounter } = require('../not-found');
+  for (const p of ['/telescope/requests', '/auth.json', '/secrets.json', '/secrets/aws.json', '/credentials.json', '/terraform.tfstate', '/appsettings.Production.json',
+    '/env', '/env.txt', '/__ENV.js', '/%2eenv', '/id_rsa', '/main.js.map', '/v2/_catalog', '/_profiler/phpinfo', '/assets/environments/environment.prod.json']) {
+    assert.ok(isProbe(p), `${p} is a probe`);
+  }
+  for (const p of ['/', '/secret-spots', '/fr/secret-spots', '/kelowna/restaurants/env-cafe', '/kelowna/restaurants/secret-garden', '/guide/kaleden/patio',
+    '/claim/whistler/restaurants/araxi-restaurant-oyster-bar', '/kelowna/events/aws-summit', '/ads.txt', '/map/data.json', '/hidden-gems', '/owner/login']) {
+    assert.ok(!isProbe(p), `${p} is a real address`);
+  }
+  const db = memDb();
+  const n = db.prepare('INSERT INTO not_found_counts VALUES (?, ?, ?, ?, ?)');
+  n.run('2026-11-05', 'visitor', '/telescope/requests', '', 4); // counted as a visitor before the list grew
+  n.run('2026-11-05', 'visitor', '/guide/armstrong/open_early', 'own:/', 3);
+  n.run('2026-11-05', 'probe', '', '', 10);
+  const rep = createNotFoundCounter(db).report(30, 100, NOW);
+  assert.deepEqual(rep.totals, { visitor: 3, crawler: 0, probe: 14 });
+  assert.deepEqual(rep.missing.map((m) => m.path), ['/guide/armstrong/open_early']);
+  const sum = wc.summarize(db, NOW);
+  assert.equal(sum.metrics.find((m) => m.key === 'broken').cur, 3);
+  assert.deepEqual(sum.lists.broken_pages.map((p) => p.path), ['/guide/armstrong/open_early']);
+});

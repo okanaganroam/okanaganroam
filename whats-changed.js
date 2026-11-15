@@ -2,6 +2,7 @@
 // What changed (2026-11-06): one short summary of the last complete 7 days against the 7 days before, built only from
 // counts the site already keeps. Used by the dashboard's top card and the Monday email. Pure reads; no visitor data.
 const { dayOf } = require('./trip-demand');
+const { isProbe } = require('./not-found');
 
 const OUTBOUND = ['website', 'booking', 'call_button', 'phone_number', 'directions', 'full_menu', 'social_link'].map((k) => `click:${k}`);
 const AI = { chatgpt: 'ChatGPT', perplexity: 'Perplexity', gemini: 'Gemini', copilot: 'Copilot', claude: 'Claude', google: 'Google', bing: 'Bing', duckduckgo: 'DuckDuckGo', facebook: 'Facebook', instagram: 'Instagram' };
@@ -66,7 +67,8 @@ function summarize(db, now = new Date()) {
   }
   if (has('owner_accounts')) add('logins_created', 'Owner logins created', (a, b) => one('SELECT COUNT(*) FROM owner_accounts WHERE substr(created_at,1,10) BETWEEN ? AND ?', a, b));
   if (has('owner_change_requests')) add('changes_sent', 'Change requests from owners', (a, b) => one('SELECT COUNT(*) FROM owner_change_requests WHERE substr(submitted_at,1,10) BETWEEN ? AND ?', a, b));
-  if (has('not_found_counts')) add('broken', 'Visitors who hit a missing page', (a, b) => one("SELECT SUM(n) FROM not_found_counts WHERE kind = 'visitor' AND day BETWEEN ? AND ?", a, b));
+  // Scanner probes counted as visitors before the probe list grew are left out (2026-11-14).
+  if (has('not_found_counts')) add('broken', 'Visitors who hit a missing page', (a, b) => q("SELECT path, SUM(n) AS n FROM not_found_counts WHERE kind = 'visitor' AND day BETWEEN ? AND ? GROUP BY path", a, b).filter((r) => !isProbe(r.path)).reduce((t, r) => t + r.n, 0));
 
   const lists = {};
   if (has('venue_event_counts')) {
@@ -92,7 +94,7 @@ function summarize(db, now = new Date()) {
     lists.no_results = rows.filter((r) => r.none > 0).sort((a, b) => b.none - a.none || a.term.localeCompare(b.term)).slice(0, 5).map((r) => ({ term: r.term, n: r.none }));
   }
   if (has('not_found_counts')) {
-    const pages = (a, b) => new Map(q("SELECT path, SUM(n) AS n FROM not_found_counts WHERE kind = 'visitor' AND day BETWEEN ? AND ? GROUP BY path", a, b).map((r) => [r.path, r.n]));
+    const pages = (a, b) => new Map(q("SELECT path, SUM(n) AS n FROM not_found_counts WHERE kind = 'visitor' AND day BETWEEN ? AND ? GROUP BY path", a, b).filter((r) => !isProbe(r.path)).map((r) => [r.path, r.n]));
     const cur = pages(w.cur.start, w.cur.end); const prev = pages(w.prev.start, w.prev.end);
     lists.broken_pages = [...cur.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([path, n]) => ({ path, n, is_new: !prev.has(path) }));
   }
