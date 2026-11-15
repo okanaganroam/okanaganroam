@@ -154,6 +154,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Camping means a night away, so this is a 2-day plan; change the length if you like\.$/,'Le camping suppose une nuit sur place : voici donc un plan de 2 jours; modifiez la durée au besoin.');
  text=text.replace(/^No (dog-friendly )?(.+?) matched (?:in )?(.+), so the rest of the plan is shown\.$/,(_,dog,kind,where)=>`Aucun lieu (${FR_HEADING_NAMES[kind.toLowerCase()]||kind}${dog?', qui accepte les chiens':''}) ne correspond ${where==='@AREA@'?'@IN_AREA@':'à '+where.replace(/ and /g,' et ')}; voici le reste du plan.`);
  text=text.replace(/^Recognised: (.+)$/,(_,a)=>`Distinction : ${a}`);
+ // Restaurant test 2 (Whistler, 2026-11-14): the cuisine reason on the French « Autres bonnes options » cards.
+ text=text.replace(/^Listed cuisine: (.+) — matches “(.+)”$/,(_,c,w)=>`Cuisine indiquée : ${({Japanese:'japonaise',Italian:'italienne',Mexican:'mexicaine',Chinese:'chinoise',Indian:'indienne',Thai:'thaïlandaise',Vietnamese:'vietnamienne',Korean:'coréenne',Greek:'grecque',French:'française',Seafood:'poissons et fruits de mer',Pizza:'pizza',Burgers:'burgers',Steakhouse:'grilladerie',Mediterranean:'méditerranéenne',European:'européenne','Swiss & Alpine':'suisse et alpine',Canadian:'canadienne',American:'américaine','Pub Fare':'de pub','Noodles & Ramen':'nouilles et ramen','Poke & Hawaiian':'poke et hawaïenne','West Coast':'de la côte Ouest','Spanish & Tapas':'espagnole et tapas'})[c]||c} — correspond à « ${w} »`);
  text=text.replace(/^There are no wineries in @AREA@, so these are wine bars and lounges instead\.$/,'Il n’y a pas de vignobles @IN_AREA@ : voici plutôt des bars à vin et des lounges.');
  text=text.replace(/^(.+) opens for the season on (\w+) (\d+), so this plan is for then\.$/,(_,n,m,d)=>`${n} ouvre pour la saison le ${d} ${({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m}; ce plan est donc pour cette date.`);
  text=text.replace(/^Nothing in (.+?) fits “(.+)”, so that stop is in (.+), a few minutes away\.$/,(_,a,w,b)=>`Rien à ${a.replace(/ and /g,' et ')} ne correspond à « ${w} »; cet arrêt est donc à ${b.replace(/ and /g,' et ')}, à quelques minutes.`);
@@ -659,6 +661,10 @@ function t3FrenchPlan(plan){
  if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(x=>{const q=/^“(.+)”$/.exec(String(x));if(!q)return t3FrenchText(x);const fr=t3FrenchText(q[1]);return fr!==q[1]?fr:'« '+q[1]+' »';});if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
  const stops=p.days?.length?p.days.flatMap(d=>d.stops||[]):p.itinerary?.stops||p.outing?.stops||p.recommendations||[];
  for(const s of stops)translateStop(s);
+ // Restaurant test 2 (Whistler, 2026-11-14): the outing's « Autres bonnes options » cards (and its stops or the list beside
+ // an itinerary) in French too; each card once.
+ const done=new Set(stops);
+ for(const s of [...(p.outing?.stops||[]),...(p.outing?.alternates||[]),...(p.recommendations||[])])if(s&&!done.has(s)){done.add(s);translateStop(s);}
  if(p.events)p.events=p.events.map(t3FrenchEvent);
  for(const i of p.requirementResults||[])if(i.reason)i.reason=t3FrenchText(i.reason);
  // Round 11 (2026-10-20): « Squamish et Whistler », not « Squamish and Whistler ».

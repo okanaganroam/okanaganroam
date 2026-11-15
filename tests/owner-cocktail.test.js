@@ -238,7 +238,7 @@ test('events: “Live music, DJs and events” (« Musique, DJ et événements �
   const s = CLIENT();
   assert.match(s, /\} else if \(s === 'groups' && FOLD\) \{/);
   // Cocktail test 2 (2026-11-13): the French "this text is in English" hint sits above the quick answers.
-  assert.match(s, /\(CK \? '<h2 class="su-h2" id="suBookQ">' \+ h\(T\.bookQ2\) \+ '<\/h2>' \+ enLineHint\(.*?'suBookEn'\) \+ quick\('reservations', 'suBookLine', S\.brew\.book\)/);
+  assert.match(s, /\(CK \? '<h2 class="su-h2" id="suBookQ">' \+ h\(T\.bookQ2\) \+ '<\/h2>' \+ enLineHint\(.*?'suBookEn'(?:, [^)]*)?\) \+ quick\('reservations', 'suBookLine', S\.brew\.book\)/);
   assert.match(s, /if \(gline \|\| bline\) \{ var vr2 = \{\}; if \(gline\) vr2\.groups = gline; if \(bline\) vr2\.reservations = bline;/);
   // Specials stay on the edit page.
   assert.match((await get(`/owner/${t}`)).text, /id="opSpecials"/);

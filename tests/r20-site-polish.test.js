@@ -75,7 +75,7 @@ test('Visitor photos & tips: an empty venue gets one slim invite row that opens 
   assert.match(en, /\.vc-section \.vc-open\.vc-invite \{[^}]*min-height: 44px;/, '44px tap target');
   const fr = app.visitorSectionHtml(app.getVenue(v.id), 'fr');
   assert.match(fr, /<h2 id="vcHead" class="vc-visually-hidden">Photos et conseils des visiteurs<\/h2>/);
-  assert.match(fr, />Vous y êtes allé\? Partagez une photo ou un conseil<span class="vc-invite-arrow" aria-hidden="true">&rarr;<\/span><\/button>/);
+  assert.match(fr, />Vous y êtes allé\u202f\? Partagez une photo ou un conseil<span class="vc-invite-arrow" aria-hidden="true">&rarr;<\/span><\/button>/);
   const page = app.renderVenuePage(app.getVenue(v.id), [], [], [], {});
   assert.ok(page.includes('class="venue-section vc-section vc-compact"'));
 });

@@ -574,7 +574,7 @@ Object.assign(fr, {
   seasonExactLink: 'Ça commence ou finit en milieu de mois? Choisissez les dates exactes', seasonExactMonths: 'Utiliser des mois entiers', seasonFrom: 'Commence le', seasonTo: 'Finit le',
   seasonNeedMonths: 'Touchez les mois où c’est offert, ou touchez « Toute l’année ».', seasonNeedDates: 'Choisissez le premier et le dernier jour, ou utilisez des mois entiers.',
   happySeasonH: 'Votre 5 à 7 est-il offert toute l’année?',
-  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', stMusicOften: 'sur votre page · fréquence d’ici un jour', kitchenLate: 'Attention : c’est plus tard que votre heure de fermeture le {days}. Vérifiez l’heure.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour); elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le 5 à 7 a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
+  closedWarn: 'Attention : vous êtes fermé le {days}{when}. Ce ne sera pas affiché comme offert ce jour-là.', oftenNow: 'Fréquence : {x}. Elle reste quand vous enregistrez.', stMusicOften: 'sur votre page · fréquence d’ici un jour', kitchenLate: 'Attention : c’est plus tard que votre heure de fermeture le {days}. Vérifiez l’heure.', oftenWaiting: 'Fréquence : {x}. Nous la vérifions (habituellement d’ici un jour)\u202f; elle reste quand vous enregistrez.', happyOutside: 'Attention : ces heures sont en dehors de vos heures d’ouverture le {days}. Vérifiez le début et la fin.', closedWarnHappy: 'Attention : vous êtes fermé le {days}{when}. Votre page dira que le 5 à 7 a lieu les jours d’ouverture.', closedWarnSeason: ' (selon vos heures d’{kind})', closedWarnUsual: ' (selon vos heures habituelles)',
   seasonExactLead: 'Ou choisissez le premier et le dernier jour exacts :',
   monthsClosedQ: 'Quels mois êtes-vous fermé?', monthsClosedLead: 'Touchez chaque mois où vous êtes fermé. Votre page indique alors « Fermé pour la saison » et la date de réouverture.',
   monthsClosedNeed: 'Touchez les mois où vous êtes fermé.', monthsClosedInRow: 'Choisissez des mois de fermeture qui se suivent, comme de novembre à mars.', monthsAllClosed: 'Ce sont tous les mois. Ne touchez pas les mois où vous êtes ouvert.',
@@ -1520,6 +1520,30 @@ Object.assign(en.pub, { whatsOnEx: en.whatsOnEx });
 Object.assign(fr.pub, { whatsOnEx: fr.whatsOnEx });
 en.whatsOnEx = '$8 wine and half-price small plates';
 fr.whatsOnEx = 'Vin à 8 $ et petites assiettes à moitié prix';
+
+// Restaurant test 2 (Whistler, 2026-11-14; Whistler Roam drafts/fresh-eyes-restaurant2-2026-11-14/REPORT.md). Shared by
+// every type: French setup words saved as French, a happy hour between lunch and dinner, the kitchen's "Keep", the spend
+// guess's source, the tasting event and the restaurant events lead.
+Object.assign(en, {
+  frOnlyHint: 'Your French version is on your French page. Write it in English here to show it on your English page too.',
+  happySplit: 'Is the bar open between lunch and dinner? Change your hours so they run through.',
+  happySplitBtn: 'Change my hours',
+  kitchenKeep: 'Keep {t}', kitchenKeepIt: 'Keep this answer',
+  spendGuessed: 'We guessed from your listing: “{x}”.',
+  musicLeadRestaurant: 'Like live music, a tasting (wine, sake or whisky), trivia, a chef’s table or a paint night.',
+  specialsMany: 'Up to 7 specials, please. Remove one to add another.',
+});
+Object.assign(fr, {
+  frOnlyHint: 'Votre version française est sur votre page française. Écrivez-la en anglais ici pour l’afficher aussi sur votre page anglaise.',
+  happySplit: 'Le bar reste ouvert entre le dîner et le souper ? Changez vos heures pour qu’elles se suivent.',
+  happySplitBtn: 'Changer mes heures',
+  kitchenKeep: 'Garder {t}', kitchenKeepIt: 'Garder cette réponse',
+  spendGuessed: 'Estimation d’après votre fiche : « {x} ».',
+  musicLeadRestaurant: 'Comme de la musique en direct, une dégustation (vin, saké ou whisky), un quiz, une table du chef ou une soirée peinture.',
+  specialsMany: 'Jusqu’à 7 spéciaux, s’il vous plaît. Retirez-en un pour en ajouter un autre.',
+});
+en.kinds.tasting = 'Tasting';
+fr.kinds.tasting = 'Dégustation';
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the

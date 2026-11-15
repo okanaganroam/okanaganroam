@@ -72,7 +72,7 @@ test('split hours: "+ Add a second time (lunch & dinner)" and ✕ on the setup d
   assert.equal(text.en.removeSecond, 'Remove this time'); assert.equal(text.fr.removeSecond, 'Retirer cette plage');
   // Drawn on every open day card of both weeks (the screen is W(): the usual week or the season's), two ranges at most.
   assert.match(s, /\(w\.length < 2 && T\.addSecond \? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' \+ d \+ '">' \+ h\(T\.addSecond\)/);
-  assert.match(s, /\(w\.length > 1 \? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' \+ d \+ ':' \+ j \+ '" aria-label="' \+ h\(T\.removeSecond \+ ': ' \+ t12\(y\[0\]\) \+ ' – ' \+ t12\(y\[1\]\)\) \+ '"><span aria-hidden="true">✕<\/span> ' \+ h\(T\.removeSecond\) \+ '<\/button>' : ''\)/, 'with two times, ✕ on each');
+  assert.match(s, /\(w\.length > 1 \? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' \+ d \+ ':' \+ j \+ '" aria-label="' \+ h\(T\.removeSecond \+ \(C\.lang === 'fr' \? '\\u00a0: ' : ': '\) \+ t12\(y\[0\]\) \+ ' – ' \+ t12\(y\[1\]\)\) \+ '"><span aria-hidden="true">✕<\/span> ' \+ h\(T\.removeSecond\) \+ '<\/button>' : ''\)/, 'with two times, ✕ on each');
   assert.match(s, /querySelectorAll\('\[data-addtime\]'\)[\s\S]{0,200}var d = b\.getAttribute\('data-addtime'\), wk = W\(\), w = wk\[d\]; if \(!w \|\| !w\.length \|\| w\.length >= 2\) return;/);
   assert.match(s, /if \(a >= '15:00'\) w\.unshift\(\['11:30', '14:30'\]\);/, 'a dinner-only day gets lunch before it');
   assert.match(s, /w\.splice\(\+q5\[1\], 1\);/, '✕ removes that time');
