@@ -188,7 +188,7 @@ test('"We don\'t have one" still works for Reservations and Takeout when the box
   assert.ok(!s.missing.some((i) => i.key === 'pyv_takeout'));
 });
 
-test('public page: the owner\'s lines show in the Plan your visit box, escaped; a French page leaves untranslated lines off', async () => {
+test('public page: the owner\'s lines show in the Plan your visit box, escaped; a French page shows them as typed', async () => {
   const v = mk('restaurant');
   assert.equal((await post(tokenFor(v.id), { visit_rows: { known_for: 'Fish & chips "the best"', dietary: 'Ask about gluten-free' } })).status, 201);
   const page = await get(app.venuePagePath(app.getVenue(v.id)));
@@ -197,12 +197,13 @@ test('public page: the owner\'s lines show in the Plan your visit box, escaped; 
   assert.ok(page.includes('Ask about gluten-free'));
   assert.ok(/From the venue, checked/.test(page), 'owner lines are credited to the venue');
   assert.ok(!page.includes('Fish & chips "the best"'));
-  // A French page shows a line only once it is translated (the box's existing rule): no English line there.
+  // Pub test 2 (2026-11-14): the owner's own line shows on the French page as typed (Marc's French lines were dropped);
+  // research's lines still show only once translated (tests/pub-setup-fresh-eyes-wr2.test.js).
   const f = mk('restaurant', { description_fr: 'Un restaurant de test utilisé seulement par ces essais.' });
   assert.equal((await post(tokenFor(f.id), { visit_rows: { known_for: 'Owner line in English only' } })).status, 201);
   const frPage = await get(app.venuePagePath(app.getVenue(f.id), 'fr'));
   assert.ok(frPage.includes('lang="fr'), 'a real French page');
-  assert.ok(!frPage.includes('Owner line in English only'));
+  assert.ok(frPage.includes('Owner line in English only'));
 });
 
 test('indexing: Plan your visit lines are not owner content (yet); like any live owner edit they show the Verified tick', async () => {

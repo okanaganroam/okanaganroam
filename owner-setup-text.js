@@ -1458,7 +1458,7 @@ fr.pub.cocktail = {
 Object.assign(en, {
   seaSpanDays: 'from {a} to {b}', seaSpanMonths: 'from {a} to {b}', seaSpanMonth: 'in {a}',
   seasonEditQSpan: 'Your hours {span}', seasonEditQOther: 'Your other hours', seasonDaysHDates: 'Hours on those dates',
-  seasonNowSpan: 'Your page has other hours {span}.', closedWarnSpan: ' ({span})', closedWarnOther: ' (in your other hours)',
+  seasonNowSpan: 'Your page has other hours {span}.', closedWarnOther: ' (in your other hours)',
   seasonHoursLineSpan: '{span}: {hours} ✓',
   // Change an answer → Hours → "Yes, all year" with a season stored (bug 3): the dates that would go, and a choice.
   yearAllDropQ: 'Remove your other hours?', yearAllDropLead: 'Your page also has other hours {span}. "Yes, all year" removes them.',
@@ -1470,7 +1470,7 @@ Object.assign(en, {
 Object.assign(fr, {
   seaSpanDays: 'du {a} au {b}', seaSpanMonths: '{de}{a} à {b}', seaSpanMonth: 'en {a}',
   seasonEditQSpan: 'Vos heures {span}', seasonEditQOther: 'Vos autres heures', seasonDaysHDates: 'Heures pendant ces dates',
-  seasonNowSpan: 'Votre page a d’autres heures {span}.', closedWarnSpan: ' ({span})', closedWarnOther: ' (selon vos autres heures)',
+  seasonNowSpan: 'Votre page a d’autres heures {span}.', closedWarnOther: ' (selon vos autres heures)',
   seasonHoursLineSpan: '{span} : {hours} ✓',
   yearAllDropQ: 'Retirer vos autres heures?', yearAllDropLead: 'Votre page a aussi d’autres heures {span}. Avec «\u202fOui, toute l’année\u202f», elles sont retirées.',
   yearAllDropYes: 'Oui, retirer les autres heures', yearAllDropYesSub: 'Seules vos heures habituelles restent sur votre page',

@@ -743,8 +743,9 @@ test('saved text in her language: « Heures d’été » and French holiday name
   // The French setup says an English research line is English (Groups, Reservations, Known for).
   assert.equal(text.fr.lineEnglishHint, 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le, changez les mots ou touchez une réponse rapide.');
   const s = CLIENT();
-  assert.match(s, /enLineHint\(gl === \(\(CUR\.visit_rows \|\| \{\}\)\.groups \|\| ''\) \? gl : '', 'suGroupsEn'\)/);
-  assert.match(s, /enLineHint\(S\.brew\.known === \(\(CUR\.visit_rows \|\| \{\}\)\.known_for \|\| ''\) \? S\.brew\.known : '', 'suKnownEn'\)/);
+  // Pub test 2 (2026-11-14): a third argument drops "or tap a quick answer" when the screen has none.
+  assert.match(s, /enLineHint\(gl === \(\(CUR\.visit_rows \|\| \{\}\)\.groups \|\| ''\) \? gl : '', 'suGroupsEn'[,)]/);
+  assert.match(s, /enLineHint\(S\.brew\.known === \(\(CUR\.visit_rows \|\| \{\}\)\.known_for \|\| ''\) \? S\.brew\.known : '', 'suKnownEn'[,)]/);
 });
 
 test('small fixes (test 2): check-first wording, Musique en direct, Accepte les réservations, no-break spaces, Groups row, menu lead, search button', async () => {

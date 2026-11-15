@@ -113,7 +113,7 @@
   // The season screen's title: "Your hours from Oct 15 to Nov 25", or "Your other hours" before any dates.
   function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : T.seasonEditQOther; }
   // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
-  function seaWhen(){ if (seaNamed()) return fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }); var sp = seaSpan(S.sea); return sp ? fill(T.closedWarnSpan, { span: sp }) : T.closedWarnOther; }
+  function seaWhen(){ if (seaNamed()) return fill(T.closedWarnSeason, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer }); var sp = seaSpan(S.sea); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
   function seaTitleRefresh(){ if (S.step !== 'hours:season') return; var t = screen.querySelector('h1'); if (t) t.textContent = seaTitle(); var dh = el('suSeaDaysH'); if (dh) dh.textContent = S.sea.exact ? T.seasonDaysHDates : T.seasonDaysH; }
   // The season box on a screen: "All year" / "Only some months", the month chips, and "Starts or ends mid-month? Pick the
   // exact dates" (two date boxes; the year is only there for the date picker).
