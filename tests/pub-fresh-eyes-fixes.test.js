@@ -129,7 +129,8 @@ test('G: deal prefixes are compact ("Mon–Fri: ") and old stored deals ("Mon, T
   const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const names = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   // eslint-disable-next-line no-new-func
-  const lib = new Function('DAYS', 'dayName', `${fn('dayPrefix')}\n${fn('oldPrefix')}\n${fn('prefixOf')}\nreturn { dayPrefix, oldPrefix, prefixOf };`)(DAYS, (d) => names[d]);
+  // Pub test 3 (Whistler, 2026-11-14): dayPrefix is "Every day: " for all seven days, else rangePrefix's compact form.
+  const lib = new Function('DAYS', 'dayName', 'T', `${fn('dayPrefix')}\n${fn('rangePrefix')}\n${fn('oldPrefix')}\n${fn('prefixOf')}\nreturn { dayPrefix, oldPrefix, prefixOf };`)(DAYS, (d) => names[d], { everyDayPrefix: 'Every day: ' });
   const e = (ds) => ({ days: Object.fromEntries(ds.map((d) => [d, true])) });
   assert.equal(lib.dayPrefix(e(['mon', 'tue', 'wed', 'thu', 'fri'])), 'Mon–Fri: ');
   assert.equal(lib.dayPrefix(e(['mon', 'tue', 'thu', 'fri', 'sat'])), 'Mon, Tue, Thu–Sat: ');

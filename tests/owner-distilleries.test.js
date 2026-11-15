@@ -471,8 +471,8 @@ test('fe1 wording: “Tours & events” on a distillery’s page, edit page and 
   assert.doesNotMatch(act, /taproom|flight price|weekly nights/i);
   assert.match(app.ownerVenueActivity(d.id, 12, 'fr').map((x) => x.title).join(' | '), /salle de dégustation/);
   const tours = app.DISTILLERY_SETUP_HELP_TOPICS.find((x) => x.id === 'distillery-tours');
-  assert.match(tours.a, /Tours &amp; events/); assert.doesNotMatch(tours.a, /Weekly nights/);
-  assert.match(tours.aFr, /Visites et événements/); assert.doesNotMatch(tours.aFr, /Soirées de la semaine/);
+  assert.match(tours.a, /Tours, classes and events/); assert.doesNotMatch(tours.a, /Weekly nights/);
+  assert.match(tours.aFr, /Visites, ateliers et événements/); assert.doesNotMatch(tours.aFr, /Soirées de la semaine/);
   // A brewery's page and list keep "Weekly nights" and "Your taproom answers".
   const b = mk('brewery'); const tb = tokenFor(b.id);
   await change(tb, { brewery_info: { to_go: ['cans'] }, flight_fee: 10 });
@@ -492,9 +492,8 @@ test('fe1 tours screen: Distillery tour and Class first, research’s tour pre-f
   assert.equal(text.en.brewery.kindDistillery.kinds.tour, 'Distillery tour');
   assert.equal(text.fr.brewery.kindDistillery.kinds.tour, 'Visite de la distillerie');
   assert.equal(text.fr.brewery.kindDistillery.kinds.class, 'Atelier');
-  // Distillery test 3 (2026-11-13): the note names every other week and links straight to Tours & events (eventsOftenLink).
-  assert.match(text.en.brewery.kindDistillery.eventsOften, /^Every other week or once a month\? Tap Save my events, then set how often in Tours & events on your edit page\.$/);
-  assert.equal(text.en.brewery.kindDistillery.eventsOftenLink, 'Open Tours & events');
+  // Pub test 3 (Whistler, 2026-11-14): "How often?" is on each event in the setup, so the edit-page note is gone.
+  assert.equal(text.en.brewery.kindDistillery.eventsOften, undefined); assert.equal(text.en.brewery.kindDistillery.eventsOftenLink, undefined);
   const s = CLIENT();
   assert.match(s, /start: g\.start \|\| ''/);
   assert.match(s, /nTop = C\.nightKindsTop \|\| 6/);
@@ -778,16 +777,16 @@ test('fe3 #2 a direct route to "how often": owner home link, #tours-events opens
   assert.match(await editPage(tokenFor(mk('pub').id)), /<a href="#tours-events">Weekly nights: days and how often<\/a>/);
   assert.match(await editPage(tokenFor(mk('cafe').id)), /<a href="#tours-events">Weekly events: days and how often<\/a>/);
   assert.doesNotMatch(await editPage(tokenFor(mk('winery').id)), /op-nights-link/);
-  // The setup: the note names every other week and links to the edit page's section (C.back + #tours-events).
+  // The setup (pub test 3, Whistler, 2026-11-14): "How often?" is on the events screen itself; the help says so, and its
+  // edit-page answer still links straight to the edit page's section.
   const page = (await get(`/owner/${t}/setup`)).text;
   const c = cfgOf(page);
   assert.equal(c.back, `/owner/${t}`);
-  assert.match(CLIENT(), /T\.eventsOftenLink && C\.back \? ' <a href="' \+ h\(C\.back \+ '#tours-events'\) \+ '" id="suEventsOftenLink">'/);
-  assert.equal(text.fr.brewery.kindDistillery.eventsOftenLink, 'Ouvrir Visites et événements');
+  assert.doesNotMatch(CLIENT(), /suEventsOftenLink/);
   const scfg = JSON.parse(/<script type="application\/json" id="ohbCfg">(.*?)<\/script>/s.exec(page)[1]);
   const tours = scfg.topics.find((x) => x.id === 'distillery-tours');
-  assert.ok(tours.a.includes(`<a href="/owner/${t}#tours-events"><strong>Tours &amp; events</strong> on your edit page</a>`), tours.a);
-  assert.match(tours.a, /pick <strong>Every other week<\/strong>/);
+  assert.match(tours.a, /Pick it under <strong>How often\?<\/strong> on each one/);
+  assert.ok(scfg.topics.find((x) => x.id === 'weekly-nights').a.includes(`<a href="/owner/${t}#tours-events"><strong>Tours &amp; events</strong></a>`));
 });
 
 test('fe3 #3 the edit page Tours & events editor in a distillery’s words; pubs and cafés keep theirs', async () => {

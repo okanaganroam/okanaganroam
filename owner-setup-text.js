@@ -1308,8 +1308,6 @@ en.brewery.kindDistillery = {
   musicTypeQ: 'Your tours, classes and events', eventEx: 'Whisky class',
   // Distillery test 1 (2026-11-13): a distillery tour and a class are the first chips; how often is on the edit page.
   kinds: { tour: 'Distillery tour', class: 'Class' },
-  // Distillery test 3 (2026-11-13): the note links straight to Tours & events on the edit page (opened and scrolled to).
-  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often in Tours & events on your edit page.', eventsOftenLink: 'Open Tours & events',
   eventsGuess: 'We filled this in from what’s on your page. Check the day and time.',
   // The winery's "free with a bottle" question, on Tastings and bottles.
   waivedQ: 'Is a tasting free if people buy a bottle?', waivedOpts: { yes: 'Yes, with a bottle', two: 'With 2 or more bottles', no: 'No' },
@@ -1335,7 +1333,6 @@ fr.brewery.kindDistillery = {
   musicQ: 'Des visites, des ateliers ou des événements?', musicLead: 'Comme une visite de la distillerie, un atelier de cocktails ou de whisky, ou de la musique en direct.',
   musicTypeQ: 'Vos visites, ateliers et événements', eventEx: 'Atelier whisky',
   kinds: { tour: 'Visite de la distillerie', class: 'Atelier' },
-  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence dans Visites et événements sur votre page de modification.', eventsOftenLink: 'Ouvrir Visites et événements',
   eventsGuess: 'Nous l’avons rempli d’après ce qui est sur votre page. Vérifiez le jour et l’heure.',
   waivedQ: 'La dégustation est-elle gratuite à l’achat d’une bouteille?', waivedOpts: { yes: 'Oui, avec une bouteille', two: 'Avec 2 bouteilles ou plus', no: 'Non' },
   doorQ: fr.brewery.doorQ, doorHere: 'Êtes-vous à la distillerie en ce moment?', mapFailQ: fr.brewery.mapFailQ, doorPhotoQ: fr.brewery.doorPhotoQ,
@@ -1378,7 +1375,6 @@ en.pub.cocktail = {
   minorsGuess: 'Your page says 19+, so we picked Adults only. Tap another answer if that’s not right.',
   // Live music, DJs and events (the weekly events screen, same storage)
   musicQ: 'Any live music, DJs or events?', musicLead: 'Like live music, a DJ, trivia or comedy.', musicTypeQ: 'Your live music, DJs and events', eventEx: 'Friday DJ night',
-  eventsOften: 'Every other week or once a month? Tap Save my events, then set how often on your edit page.', eventsOftenLink: 'Set how often',
   // Your story and Known for
   storyQ: 'Tell visitors about your bar', storyEx: 'A hidden cocktail bar downtown. Seasonal cocktails, small plates, and a DJ on Fridays.',
   knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit”.', knownEx: 'Smoked old fashioned and a door down the alley',
@@ -1428,7 +1424,6 @@ fr.pub.cocktail = {
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre badge Enfants bienvenus.',
   minorsGuess: 'Votre page indique 19 ans et plus, alors nous avons choisi Adultes seulement. Touchez une autre réponse si ce n’est pas juste.',
   musicQ: 'De la musique, des DJ ou des événements?', musicLead: 'Comme de la musique en direct, un DJ, un quiz ou de l’humour.', musicTypeQ: 'Votre musique, vos DJ et vos événements', eventEx: 'Soirée DJ du vendredi',
-  eventsOften: 'Une semaine sur deux ou une fois par mois? Touchez Enregistrer mes événements, puis choisissez la fréquence sur votre page de modification.', eventsOftenLink: 'Choisir la fréquence',
   storyQ: 'Parlez de votre bar aux visiteurs', storyEx: 'Un bar à cocktails caché au centre-ville. Cocktails de saison, petites assiettes et un DJ le vendredi.',
   knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle s’affiche en haut de « Planifier la visite ».', knownEx: 'Le old fashioned fumé et la porte au fond de la ruelle',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
@@ -1478,6 +1473,18 @@ Object.assign(fr, {
   lineEnglishHintNoQuick: 'Ce texte est en anglais, tel qu’il paraît maintenant sur votre page. Gardez-le ou changez les mots.',
   // Older answers saved with the earlier wording still read as the same preset.
   quickLegacy: { reservations: ['Sans réservation aussi'] },
+});
+
+// Pub test 3 (Whistler, 2026-11-14): "How often?" on each event in the setup (the edit page's list), each event's how
+// often on the Events row in Change an answer, "Every day:" for a deal on every day, and the reopened year question's
+// "Change my Apr 20 – Jun 30 hours" (the stored dates, opened with their own day hours) once a season is stored.
+Object.assign(en, {
+  howOften: 'How often?', stOften: '{title}: {often}', everyDayPrefix: 'Every day: ',
+  allYearLeadSea: 'To change your other hours, tap Change.', seaChange: 'Change my {a} – {b} hours', seaChangeSub: 'Your dates and the hours for each day stay as they are',
+});
+Object.assign(fr, {
+  howOften: 'À quelle fréquence?', stOften: '{title} : {often}', everyDayPrefix: 'Tous les jours : ',
+  allYearLeadSea: 'Pour changer vos autres heures, touchez Modifier.', seaChange: 'Modifier mes heures du {a} au {b}', seaChangeSub: 'Vos dates et les heures de chaque jour restent comme elles sont',
 });
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow

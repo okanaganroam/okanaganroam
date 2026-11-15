@@ -202,7 +202,7 @@ test('4: the story box edits the old text in place, has a ✕, and a join with n
   const v = mk('pub');
   const html = (await get(`/owner/${tokenFor(v.id)}/setup`)).text;
   const s = scriptOf(html);
-  assert.match(s, /textarea\.su-area'\), function\(inp\)/);
+  assert.match(s, /textarea\.su-area, textarea\.su-line'\), function\(inp\)/);
   assert.match(s, /T\.storyEditHint/);
   // Cocktail test 2 (2026-11-13): the page text is storyCur() (the French description in the French setup, when there is one).
   const fix = new Function('CUR', 'C', `${/function storyCur\(\)\{[^\n]*\}/.exec(s)[0]} ${/function storyJoinFix\(v\)\{[\s\S]*?\n  \}/.exec(s)[0]}; return storyJoinFix;`)({ description: 'A pub in Osoyoos with cold beer and pub food.' }, { lang: 'en' });

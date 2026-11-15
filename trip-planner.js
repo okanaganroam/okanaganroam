@@ -587,6 +587,19 @@ function indoorAskedLabel(text, form) {
 // Brewery test 3 (2026-11-13): cider asked for, and not beer ("cideries in Summerland", « cidreries »): the breweries are
 // read as cideries (the owner's own kind first, see scoreVenue), and the plan says "Cideries".
 const CIDER_ASKED_RE = /\b(?:cider|ciders|cidery|cideries|craft cider|cider houses?)\b/;
+// A clock word in the request ("7pm", "pm", "noon"): the time, never a search word.
+const TRIP_CLOCK_WORD = /^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|a\.?m\.?|p\.?m\.?|noon|midday|midnight)$/i;
+// The words that ask for a kind of place; a kind whose word is only inside a named place's name isn't asked for.
+const NAME_ONLY_TYPE_WORDS = {
+  brewery: /\b(?:brewery|breweries|brewpubs?|brew pubs?|beers?|craft beer|taprooms?|brasseries?|bières?)\b/,
+  winery: /\b(?:winery|wineries|wines?|vineyards?|vignobles?|vins?)\b/,
+  distillery: /\b(?:distillery|distilleries|spirits|gin|whisk(?:e)?y|distilleries?)\b/,
+};
+function dropNameOnlyTypes(types, named, text) {
+  if (!(named || []).length) return types || [];
+  const nameFree = named.reduce((t, v) => t.split(String(v.name || '').toLowerCase()).join(' '), String(text || '').toLowerCase());
+  return (types || []).filter((t) => named.some((v) => v.type === t) || !NAME_ONLY_TYPE_WORDS[t] || NAME_ONLY_TYPE_WORDS[t].test(nameFree));
+}
 const BEER_ASKED_RE = /\b(?:beers?|brewery|breweries|brewpubs?|craft beer|ipa|pints?)\b/;
 function ciderAsked(q) { return CIDER_ASKED_RE.test(String(q || '')) && !BEER_ASKED_RE.test(String(q || '')); }
 function typeLabel(ctx, type, form = 'plural') {
@@ -1444,7 +1457,8 @@ function buildUnderstood(intent, trip, labels, extras) {
   // Stage 3.5: an exclusion the plan applied is no longer "not used".
   const applied = new Set(x.appliedExclusions || []);
   const notUsed = (i.unsupported || []).filter((u) => !applied.has(u));
-  if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w) && !tastingWordUsed(w, trip)) notUsed.push(w);
+  // Pub test 3 (Whistler, 2026-11-14): a clock time ("at 7pm", "7 PM") is read as the time, never listed as not used.
+  if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w) && !tastingWordUsed(w, trip) && !TRIP_CLOCK_WORD.test(String(w))) notUsed.push(w);
   // Stage 3.5 D6: a named place the day plan did not use.
   for (const r of unusedPlanRegions(ctx.regions, x.dayRegions)) { const l = regionLabel(ctx, r); if (!notUsed.includes(l)) notUsed.push(l); }
   const occasionNotUsed = trip && trip.multi ? unappliedItineraryOccasion(i, trip) : null;
@@ -4149,7 +4163,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 10 (2026-10-19): a dinner after a long empty afternoon is moved earlier (from 5 PM), see pullDinnersForward.
         // A dinner kept through a Swap keeps the earlier time it had on screen.
         const earlyDinner=Math.min(Number.isFinite(stop.dinnerFrom)?stop.dinnerFrom:Infinity,Number.isFinite(stop.keepStart)&&stop.keepStart>=DINNER_EARLIEST?stop.keepStart:Infinity);
-        const partStart=isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
+        // Pub test 3 (Whistler, 2026-11-14): a meal's own time ("dinner at 7 PM", "lunch at 12:30 pm") is when it starts.
+        const askedMeal=!beforeEvent&&requirements.mealMinutes?(isDinnerStop(stop)?requirements.mealMinutes.dinner:isLunchStop(stop)?requirements.mealMinutes.lunch:null):null;
+        const partStart=Number.isFinite(askedMeal)?askedMeal:isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
@@ -6187,6 +6203,9 @@ function planTripUnchecked(input) {
   if (base && !input.trip?.route) intent.regions = dayTripTo && dayTripTo.value !== base.value ? [base.value, dayTripTo.value] : [base.value];
   const named = requirements.items.filter(i => i.kind === 'venue').map(i => (input.facts || []).find(v => v.id === i.value)).filter(Boolean);
   intent.types = [...new Set([...(intent.types || []), ...named.map(v => v.type)])];
+  // Pub test 3 (Whistler, 2026-11-14): "Dinner at 7 PM at Function Junction Brewpub" added Breweries: the kind came only
+  // from the named place's own name. A kind said nowhere outside the names of the places asked for by name is dropped.
+  intent.types = dropNameOnlyTypes(intent.types, named, requirements.text || input.text || '');
   intent.features = (intent.features || []).filter(f => !requirements.items.some(i => i.kind === 'feature' && i.value === f));
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
@@ -7734,7 +7753,7 @@ function planItinerary(input) {
   // Step 1 (2026-09-29): the visitor's own words that no part of the plan
   // used are named, never silently dropped ("a lake walk").
   // 2026-10-25: a clock time ("lunch at noon", "at 7pm") is read as the time, never reported as a leftover word.
-  const leftover = (trip.leftoverTerms || []).filter((w) => !tastingWordUsed(w, trip) && !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)) && !/^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w)));
+  const leftover = (trip.leftoverTerms || []).filter((w) => !tastingWordUsed(w, trip) && !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)) && !TRIP_CLOCK_WORD.test(String(w)));
   if (leftover.length) result.warnings.push(`Not part of this plan: ${listText(leftover.map((w) => `“${w}”`))} — ${SITE.brand} couldn’t match ${leftover.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`);
   if (route && !route.from && route.to) result.notes.push(`No starting point was given, so the stops are in ${regionLabel(baseCtx, route.to)}.`);
   const whereText = route && route.from && route.to
@@ -8213,6 +8232,7 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  dropNameOnlyTypes,
   skiWordsAsked,
   // Site audit (2026-10-27)
   liveWindow,

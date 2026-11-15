@@ -1378,7 +1378,7 @@ function renderScript(d) {
   // ---- rendering ----
   function factsLine(v){
     var parts = [];
-    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(num(v.rating)) + (v.reviews ? ' <span class="t3-sr">' + esc(tx('tripv3.from')) + '</span>' + esc(tx('tripv3.reviews', { n: Number(v.reviews).toLocaleString(lang() === 'fr' ? 'fr-CA' : 'en-CA') })) : ''));
+    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(num(v.rating)) + (v.reviews ? ' <span class="t3-sr">' + esc(tx('tripv3.from')) + ' </span>' + esc(tx('tripv3.reviews', { n: Number(v.reviews).toLocaleString(lang() === 'fr' ? 'fr-CA' : 'en-CA') })) : ''));
     if (v.price) parts.push('<span aria-label="' + esc(tx('tripv3.priceLevel', { n: v.price })) + '">' + new Array(v.price + 1).join('$') + '</span>');
     return parts.length ? '<p class="t3-facts">' + parts.join(' · ') + '</p>' : '';
   }
