@@ -1558,6 +1558,18 @@ if (!db.prepare('PRAGMA table_info(venue_menus)').all().some((c) => c.name === '
   db.exec('ALTER TABLE venue_menus ADD COLUMN help_kind TEXT');
 }
 
+// Researched menus (Dayton, 2026-11-16): a menu typed up from the venue's own website by us, not the owner. source
+// 'owner' (default, every menu before this) | 'research'; source_url = the venue's menu page; source_checked_at = the
+// day we checked it; owner_confirmed_at = when the owner tapped "This is right". A research menu that the owner has not
+// confirmed is noindex and left out of the sitemap, and never makes the venue "Verified by the business".
+{
+  const cols = db.prepare('PRAGMA table_info(venue_menus)').all().map((c) => c.name);
+  if (!cols.includes('source')) db.exec("ALTER TABLE venue_menus ADD COLUMN source TEXT NOT NULL DEFAULT 'owner'");
+  if (!cols.includes('source_url')) db.exec('ALTER TABLE venue_menus ADD COLUMN source_url TEXT');
+  if (!cols.includes('source_checked_at')) db.exec('ALTER TABLE venue_menus ADD COLUMN source_checked_at TEXT');
+  if (!cols.includes('owner_confirmed_at')) db.exec('ALTER TABLE venue_menus ADD COLUMN owner_confirmed_at TEXT');
+}
+
 // Owner-only restaurant features (Dayton, 2026-11-09): six yes/no answers only the business gives (never researched):
 // local_drinks, heated_patio, wheelchair_accessible, locally_owned, takes_reservations, takeout. Kept in their own table
 // so the venues row, the public API and the badge guide pages don't change. features: JSON { key: true }.
