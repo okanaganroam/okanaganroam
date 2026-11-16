@@ -80,7 +80,7 @@ test('split hours: "+ Add a second time (lunch & dinner)" and ✕ on the setup d
   assert.match(s, /gets\.forEach\(function\(x\)\{ if \(all \|\| \(we \? \['sat', 'sun'\] : \['mon', 'tue', 'wed', 'thu', 'fri'\]\)\.indexOf\(x\) >= 0\) wk\[x\] = clone\(src\); \}\);/);
   // Saving stores every range of each day; reading them back keeps both.
   assert.match(s, /var week = \{\}; DAYS\.forEach\(function\(d\)\{ week\[d\] = S\.week\[d\] \|\| \[\]; \}\);/);
-  assert.match(s, /var sw = \{\}; DAYS\.forEach\(function\(d\)\{ sw\[d\] = S\.sea\.week\[d\] \|\| \[\]; \}\);/);
+  assert.match(s, /var sw = \{\}; DAYS\.forEach\(function\(d\)\{ sw\[d\] = so\.week\[d\] \|\| \[\]; \}\);/);
   assert.match(s, /out\[d\] = o && o\[d\] && o\[d\]\.length \? o\[d\]\.map\(function\(x\)\{ return \[x\[0\], x\[1\]\]; \}\) : null;/);
   assert.match(SERVER(), /body\.owner-setup \.su-rmtime \{ min-height: 44px; \}/);
 });
@@ -134,7 +134,7 @@ test('kitchen: restaurants are asked "When does the kitchen close / last seating
   assert.equal(pub.t.kitchenQ, 'Does your kitchen close before the bar?'); assert.equal(pub.t.kitchenNone, 'We don’t serve food'); assert.ok(!pub.restaurant);
   const s = CLIENT();
   assert.match(s, /var KITCHEN_Q = !!\(C\.pub \|\| C\.restaurant\);/);
-  assert.match(s, /saveAll\('hours', listH, null, KITCHEN_Q \? 'hours:kitchen' : COMBO \? 'closures' : null,/);
+  assert.match(s, /saveAll\('hours', listH, null, addNext \? 'hours:season2' : KITCHEN_Q \? 'hours:kitchen' : COMBO \? 'closures' : null,/);
   assert.match(s, /\(C\.restaurant \? '' : big\('✕', T\.kitchenNone, '', true, 'kitchenNone'\)\)/, 'no "We don’t serve food" for a restaurant');
 });
 

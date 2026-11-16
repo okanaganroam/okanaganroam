@@ -152,13 +152,13 @@ test('help: on the setup, "how often" and "first Thursday" are answered from the
 // ---------- 2. The reopened year question with a stored season ----------
 test('year question: with a stored season it offers "Change my Apr 20 – Jun 30 hours" (EN and FR), never summer/winter that would reset its days', () => {
   const s = CLIENT();
-  assert.match(s, /\(storedSea\(\) \? big\('✎', fill\(T\.seaChange, storedSea\(\)\), T\.seaChangeSub, true, 'yearSeasonEdit'\) : big\('☀️', T\.allYearSummer/);
-  assert.match(s, /if \(k === 'yearSeasonEdit'\) \{ if \(APPT\) S\.wYearPick = 'all'; S\.sea\.on = true; S\.sea\.open = \{\}; S\.seaTouched = true; S\.dirty = 'hours'; return go\('hours:season'\); \}/);
+  assert.match(s, /\(stS\.length \? stS\.map\(function\(st\)\{ return big\('✎', fill\(T\.seaChange, st\), T\.seaChangeSub, true, 'yearSeasonEdit:' \+ st\.i\); \}\)\.join\(''\)[\s\S]{0,400}? : big\('☀️', T\.allYearSummer/);
+  assert.match(s, /if \(k === 'yearSeasonEdit'\) \{ seaUse\(\+v === 1 && S\.seaList\[1\] \? 1 : 0\); if \(APPT\) S\.wYearPick = 'all'; S\.sea\.on = true; S\.sea\.open = \{\}; S\.sea\.dirty = true; S\.seaTouched = true; S\.dirty = 'hours'; return go\(S\.seaI === 1 \? 'hours:season2' : 'hours:season'\); \}/);
   // Never over a stored season's dates and day hours.
   assert.match(s, /var keepStored = !!\(S\.sea\.week && \(CUR\.hours_seasons \|\| \[\]\)\.length\);\n\s+S\.sea\.kind = v; if \(!keepStored\) \{/);
   assert.match(s, /var keepSt = !!\(S\.sea\.week && \(CUR\.hours_seasons \|\| \[\]\)\.length\);/);
   // The all-year keep/remove confirm from #871 stays.
-  assert.match(s, /if \(k === 'yearAll' && S\.sea\.on && \(CUR\.hours_seasons \|\| \[\]\)\.length && seaSpan\(S\.sea\)\) return go\('hours:yeardrop'\);/);
+  assert.match(s, /if \(k === 'yearAll' && storedSeas\(\)\.length\) \{ S\.dropI = null; return go\('hours:yeardrop'\); \}/);
   // storedSea, run: Apr 20 – Jun 30 in both languages.
   for (const [lang, want] of [['en', 'Change my Apr 20 – Jun 30 hours'], ['fr', 'Modifier mes heures du 20 avr. au 30 juin']]) {
     const C = { lang, monthNames: lang === 'fr' ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] };
@@ -205,7 +205,7 @@ test('Known for, booking and groups boxes: research text is selected on the firs
   assert.match(s, /textarea\.su-area, textarea\.su-line'\), function\(inp\)\{/);
   assert.match(s, /b\.setAttribute\('aria-label', area && !line \? T\.storyClear : T\.clearField\);/);
   assert.match(s, /var vk = inp\.getAttribute\('data-vk'\), researchLine = !!vk && !!inp\.value && \(C\.visitResearch \|\| \[\]\)\.indexOf\(vk\) >= 0 && inp\.value === \(\(CUR\.visit_rows \|\| \{\}\)\[vk\] \|\| ''\);/);
-  assert.match(s, /\|\| researchStory \|\| researchLine, first = true;/);
+  assert.match(s, /\|\| researchStory \|\| researchLine\) && !chipOwn, first = true;/);
 });
 
 // ---------- 5. All ages from research's "Family friendly" ----------

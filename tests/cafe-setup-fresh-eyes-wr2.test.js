@@ -376,5 +376,5 @@ test('small ones in the setup: French-only special or event said once; spend gue
   // The story hint goes once the text is hers.
   assert.match(s, /if \(inp\.id === 'suStory' && T\.storyEnglishHint\) inp\.addEventListener\('input', function\(\)\{ var hn = el\('suStoryEdit'\); if \(hn && \(hn\._en \|\| hn\.textContent === T\.storyEnglishHint\)\) \{ hn\._en = true; hn\.hidden = inp\.value !== CUR\.description; \} \}\);/);
   // The winter screen: no « Quels mois ? » over the exact dates.
-  assert.match(s, /q\(seaTitle\(\), T\.seasonEditLead\) \+ \(S\.sea\.exact \? '' : '<p class="su-q">' \+ h\(T\.whichMonths\) \+ '<\/p>'\)/);
+  assert.match(s, /q\(seaTitle\(\), S\.sea\.exact && T\.seasonEditLeadDates \? T\.seasonEditLeadDates : T\.seasonEditLead\) \+ \(S\.sea\.exact \? '' : '<p class="su-q">' \+ h\(T\.whichMonths\) \+ '<\/p>'\)/);
 });

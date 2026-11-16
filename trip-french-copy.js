@@ -242,7 +242,7 @@ function t3FrenchTextCore(value){
  ['Because you mentioned kids, kid-friendly places come first. Check ages and bookings with each place.','Comme vous voyagez avec des enfants, les lieux adaptés aux enfants passent en premier. Vérifiez l’âge requis et les réservations auprès de chaque lieu.'],['Because you mentioned kids, kid-friendly places, parks and beaches come first. Kid-Friendly is the badge @BRAND@ verifies.','Comme vous voyagez avec des enfants, les lieux adaptés aux enfants, les parcs et les plages passent en premier. Adapté aux enfants est le badge vérifié par @BRAND@.'],
  ['@BRAND_A@ Local Favourite','Un coup de cœur local @OF_BRAND@'],['One of @BRAND@’s Hidden Gems','L’un des trésors cachés @OF_BRAND@'],
  ['By the lake','Au bord du lac'],['A trail with a lake view','Un sentier avec vue sur le lac'],['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
- ['Has the Kid-Friendly badge','Possède le badge Adapté aux enfants'],
+ ['Has the Kid-Friendly badge','Possède le badge Adapté aux enfants'],['Dogs outside only','Chiens à l’extérieur seulement'],
  ['A restaurant suits a date night','Un restaurant convient à une soirée en amoureux'],
  ['Indoor kinds of places come first.','Les lieux intérieurs sont proposés en priorité.'],
  ['@BRAND@ doesn’t track the weather or confirm that a place is indoors, so check before you go.','@BRAND@ ne suit pas la météo et ne confirme pas si un lieu est intérieur; vérifiez avant de partir.'],
@@ -375,6 +375,8 @@ function t3FrenchTextCore(value){
  const FR_NIGHTS={trivia:'un quiz',karaoke:'un karaoké',bingo:'un bingo','open mic':'une scène ouverte',comedy:'une soirée humour','run club':'un club de course','games night':'une soirée jeux','paint night':'une soirée peinture','live music':'de la musique live'};
  const frNightClock=(t)=>{const m=/^(\d{1,2})(?::(\d{2}))? (AM|PM)$/.exec(t||'');if(!m)return t;const h=Number(m[1])%12+(m[3]==='PM'?12:0);return h+' h'+(m[2]?' '+m[2]:'');};
  text=text.replace(/^(Trivia|Karaoke|Bingo|Open mic|Comedy|Run club|Games night|Paint night|Live music) on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: from (\d{1,2}(?::\d{2})? [AP]M))?, from its listing$/,(_,k,d,t)=>{const fr=FR_NIGHTS[k.toLowerCase()];return fr?(fr.charAt(0).toUpperCase()+fr.slice(1))+' le '+FR_HEADING_DAYS[d]+(t?' à '+frNightClock(t):'')+', selon sa fiche':_;});
+ text=text.replace(/^Tour on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: at (\d{1,2}(?::\d{2})? [AP]M))?, from its listing$/,(_,d,t)=>'Visite le '+FR_HEADING_DAYS[d]+(t?' à '+frNightClock(t):'')+', selon sa fiche');
+ text=text.replace(/^Runs a tour on (.+), from its listing$/,(raw,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Offre une visite le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
  text=text.replace(/^Hosts (trivia|karaoke|bingo|open mic|comedy|run club|games night|paint night) on (.+), from its listing$/,(raw,k,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Accueille '+FR_NIGHTS[k]+' le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
  text=text.replace(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) special: (.+)$/,(_,d,t)=>'Spécial du '+FR_HEADING_DAYS[d]+' : '+t);
  text=text.replace(/^Weekly special: (.+)$/,'Spécial de la semaine : $1');
@@ -388,6 +390,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^By appointment only \(the winery’s own answer\)\. Book ahead\.$/,'Sur rendez-vous seulement (réponse du vignoble). Réservez à l’avance.');
  text=text.replace(/^By appointment only \(the distillery’s own answer\)\. Book ahead\.$/,'Sur rendez-vous seulement (réponse de la distillerie). Réservez à l’avance.');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.
+ text=text.replace(/^Kids are welcome until (\d{1,2}(?::\d{2})? [AP]M|midnight) only$/,(_,t)=>'Enfants bienvenus jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+' seulement');
  text=text.replace(/^Kids welcome with an adult until (\d{1,2}(?::\d{2})? [AP]M|midnight)(, so plan to leave by then)?$/,(_,t,late)=>'Enfants bienvenus avec un adulte jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+(late?'; prévoyez de partir avant':''));
  // Brewery test 4 (2026-11-13): a meal at a brewery's or pub's own kitchen, with its kitchen close time.
  text=text.replace(/^(Dinner|Lunch) at (.+?) \((?:kitchen until (\d{1,2}(?::\d{2})? [AP]M|midnight)|its own kitchen)\)$/,(_,m,n,t)=>(m==='Lunch'?'Dîner':'Souper')+' à '+n+(t?' (cuisine jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+')':' (sa propre cuisine)'));

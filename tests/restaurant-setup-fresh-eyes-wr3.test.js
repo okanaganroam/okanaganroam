@@ -232,7 +232,7 @@ test('year question: "No, different for part of the year (like shoulder season)"
   const s = CLIENT();
   assert.match(s, /big\('❄️', T\.allYearWinter, T\.allYearWinterSub, true, 'yearSeason:winter'\)\n[^\n]*\n[^\n]*\n {10}\+ \(T\.allYearPart \? big\('🍂', T\.allYearPart, T\.allYearPartSub, true, 'yearSeason:part'\) : ''\)\)/);
   // Shown only where summer/winter are (no stored season: #872's "Change my … hours" otherwise).
-  assert.match(s, /\(storedSea\(\) \? big\('✎', fill\(T\.seaChange, storedSea\(\)\), T\.seaChangeSub, true, 'yearSeasonEdit'\) : big\('☀️'/);
+  assert.match(s, /\(stS\.length \? stS\.map\(function\(st\)\{ return big\('✎', fill\(T\.seaChange, st\), T\.seaChangeSub, true, 'yearSeasonEdit:' \+ st\.i\); \}\)\.join\(''\)[\s\S]{0,400}? : big\('☀️'/);
   // No months, the date boxes open, the usual week to start from.
   const S = { sea: { kind: '', week: null, months: { 6: true } }, week: { mon: [['11:30', '15:00']] } };
   const ctx = { S, CUR: { hours_seasons: [] }, SEA_MONTHS: { summer: [6, 7, 8], winter: [11, 12, 1, 2, 3, 4] }, clone: (x) => JSON.parse(JSON.stringify(x)), v: 'part' };

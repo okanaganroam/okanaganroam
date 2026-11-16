@@ -351,7 +351,7 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: â€
   }
   // The search: the page's own deal matcher over the deal + special words, run with the page's mapNameKey.
   const keySrc = html.match(/function mapNameKey\(name\)\{[^\n]*\}/)[0];
-  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p){'));
+  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p'));
   const ctx = {};
   vm.runInNewContext(`${keySrc}\nvar dealQuery = '', dealWordsFor = null, dealWords = [];\n${dealSrc}\nthis.hit = function(q, a){ var p = {}; if (a[17] && a[17][1]) p.dk = (p.dk || ' ') + mapNameKey(a[17].slice(1).join(' ')).slice(1); dealQuery = q; return dealHit(p); };`, ctx);
   const ribRow = tue.find((p) => p[2] === 'Specials Map Pub FR');
