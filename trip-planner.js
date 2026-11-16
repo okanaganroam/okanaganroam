@@ -799,20 +799,30 @@ function listedMatch(v, ft, ctx) {
   const kind = nightKindOfTerm(ft && ft.term);
   const date = ctxPlanDate(ctx);
   if (kind) { const m = venueNight(v, kind, date); return !!(m && (m.on || !date)); }
-  return !!specialFoodMatch(v, ft, date) || !!nightTitleMatch(v, ft, date);
+  return !!specialFoodMatch(v, ft, date) || !!nightTitleMatch(v, ft, date, ctx);
 }
 // Distillery test 2 (Whistler, 2026-11-16): a word asked for in the name of an event the place lists ("brunch" or "jazz" in
 // her Sunday « Brunch jazz », its English or French name) on the plan's day (any day when undated). -> { n, title } | null
-function nightTitleMatch(v, ft, date) {
+// Jazz brunch on real data (2026-11-16): "brunch" is a known cuisine there, and a cuisine word alone never matches an event
+// name (plain "brunch" stays a meal at brunch places). It does when the request also asks for that event's kind ("jazz",
+// read as live music, for a live-music event) or another word in the same event's name.
+function nightTitleWordIn(w, term) {
+  const stem = term.replace(/(?:es|s)$/, '');
+  return term.length >= 3 && (textHas(w, term) || (stem.length >= 4 && textHas(w, stem)));
+}
+function nightTitleMatch(v, ft, date, ctx) {
   const list = (v && v.nights) || [];
-  if (!list.length || !ft || ft.cuisine) return null;
-  const term = normWords(ft.term || ''), stem = term.replace(/(?:es|s)$/, '');
+  if (!list.length || !ft) return null;
+  const term = normWords(ft.term || '');
   if (term.length < 3) return null;
+  const others = ft.cuisine ? ((ctx && ctx.foodTerms) || []).map((f) => normWords((f && f.term) || '')).filter((x) => x && x !== term && x.length >= 3) : [];
+  const kinds = ft.cuisine ? ((ctx && ctx.features) || []) : [];
+  if (ft.cuisine && !others.length && !kinds.length) return null;
   for (const n of list) {
     if (date && !nightOnPlanDate(n, date)) continue;
     for (const t of [n.title, n.titleFr]) {
       const w = normWords(t || '');
-      if (w && (textHas(w, term) || (stem.length >= 4 && textHas(w, stem)))) return { n, title: String(t).split(/\s*[,;:(]/)[0].trim() };
+      if (w && nightTitleWordIn(w, term) && (!ft.cuisine || kinds.includes(n.kind) || others.some((o) => nightTitleWordIn(w, o)))) return { n, title: String(t).split(/\s*[,;:(]/)[0].trim() };
     }
   }
   return null;
@@ -1275,7 +1285,7 @@ function scoreVenue(v, ctx) {
     const sp = !nk && !foodMatch(v, ft) ? specialFoodMatch(v, ft, planDate) : null;
     if (sp) { add('food', 14, `${planDate ? `${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]]} special` : 'Weekly special'}: ${sp.title}`); continue; }
     // Distillery test 2: the word in a listed event's name on the day ("Brunch jazz on Sunday at 11 AM, from its listing").
-    const nt = !nk && !foodMatch(v, ft) ? nightTitleMatch(v, ft, planDate) : null;
+    const nt = !nk && !foodMatch(v, ft) ? nightTitleMatch(v, ft, planDate, ctx) : null;
     if (nt) { const t = nightClock(nt.n.start), dn = planDate ? WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]] : null; add('night', 30, dn && t && nt.title.length <= 40 ? `${nt.title} on ${dn} at ${t}, from its listing` : null); continue; }
     const m = foodMatch(v, ft);
     if (!m) continue;

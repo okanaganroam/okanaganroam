@@ -8278,8 +8278,12 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const namedNonDining = requirements ? requirements.items.filter((i) => i.kind === 'venue' && i.venueType && !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'].includes(i.venueType)) : [];
   const namedAll = requirements ? requirements.items.filter((i) => i.kind === 'venue' && i.venueType) : [];
   let mealFirst = false;
+  // 2026-11-16 (from the Whistler port of #894): "a drink" now plans distilleries too, so "a drink at <a named distillery>"
+  // read the place as one of the drink's own kinds and came back as a list with pubs and lounges; it is that place, like a
+  // named brewery (the drink part is then absorbed below).
+  const drinkPart = (c) => !c.meal && c.phrase && /^(?:an? |some )?drinks?$/i.test(String(c.phrase).trim());
   if (!trip.multi && namedAll.length === 1 && !(intent.days > 1) && trip.components.length === 1 && trip.components[0].kind === 'venue' && !trip.components[0].venueId
-    && (trip.components[0].meal || !(trip.components[0].types || []).includes(namedAll[0].venueType))) {
+    && (trip.components[0].meal || !(trip.components[0].types || []).includes(namedAll[0].venueType) || (namedAll[0].venueType === 'distillery' && drinkPart(trip.components[0])))) {
     trip = { ...trip, multi: true };
     const lower = interpretationText.toLowerCase(), at = lower.indexOf(String(namedAll[0].venueName || '').toLowerCase().split(' ')[0]);
     const other = trip.components[0];
@@ -8321,9 +8325,11 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     }
     // The name itself can also read as a generic place to eat ("Bearfoot Bistro" as "a bistro"): once a named restaurant
     // fills a part, a generic eating part without a meal of its own is dropped (it booked two dinners).
-    const DINING = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery'];
+    // 2026-11-16 (from the Whistler port of #894): "a drink" now plans distilleries too, so a named distillery counts here
+    // (a drink at a named brewery or distillery was planned as that place plus a pub).
+    const DINING = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery'];
     const namedDining = comps.some((c) => c.venueId && (c.types || []).some((x) => DINING.includes(x)));
-    // A generic part made from a named place's own words ("gondola", "art museum") is that place, not another stop.
+      // A generic part made from a named place's own words ("gondola", "art museum") is that place, not another stop.
     const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     const namedWords = comps.filter((c) => c.venueId).map((c) => ` ${n(c.phrase)} `);
     const fromName = (c) => !c.venueId && !c.meal && c.phrase && namedWords.some((w) => w.includes(` ${n(c.phrase).replace(/ restaurants?$/, '')} `));
