@@ -13643,6 +13643,7 @@ const EVENT_PHOTO_RULES = [
   ['murder', /murder mystery|murder in/], ['oktoberfest', /oktoberfest/], ['whisky', /whisk(e)?y/],
   ['cookingclass', /cooking class|culinary class/], ['charcuterie', /charcuterie|cheese (class|tasting|pairing)/],
   ['tea', /afternoon tea|high tea/], ['smores', /s'mores|smores/], ['baking', /bake sale|baking|\bbake\b/],
+  ['lightup', /light[- ]?up|lite[- ]?up|tree lighting|christmas parade|santa claus parade|parade of lights|festival of lights/],
   ['market', /farmers.? market/], ['xmasmarket', /christmas market|holiday market|yuletide|winter (warm-up )?market|christmas at the/],
   ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage (fair|market|fashion|clothing|sale)|antique|rummage|retromania|collectibles|flea market|closet/],
   ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/], ['santa', /\bsanta\b/], ['pumpkinpatch', /pumpkin (patch|picking)/],
@@ -13655,6 +13656,7 @@ const EVENT_PHOTO_RULES = [
   ['coffee', /coffee social|networking|forget-me-not|dementia/], ['pubnight', /bingo|trivia|quiz night/],
   ['dinner', /dinner|long table|feast|friendsgiving|four courses|pasta/], ['wine', /wine (tasting|info)|holiday cheer|barrel|wine club/],
   // Music, by sound; a big-arena show gets the crowd photo.
+  ['rockgem', /rock (and|&) gem|gem (and|&) mineral|gem show|mineral show|lapidary/],
   ['dj', /\bdj\b|turntable/], ['linedance', /line danc/],
   ['latin', /\blatin\b|salsa|mambo|cuban|flamenco|buena vista/], ['bigband', /big band|swing band/],
   ['classical', /chamber music|symphony|orchestra|string quartet|piano trio|classical/], ['jazz', /\bjazz\b|saxophon|\bsax\b|speakeasy/],

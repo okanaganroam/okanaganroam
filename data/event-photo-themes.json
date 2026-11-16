@@ -374,7 +374,7 @@
   "671": "classical",
   "672": "classical",
   "673": "ballet",
-  "674": "wo-holiday-seasonal",
+  "674": "lightup",
   "675": "storytime",
   "676": "hayride",
   "677": "skating",
@@ -397,7 +397,7 @@
   "694": "trail",
   "695": "hockey",
   "696": "halloweenkids",
-  "697": "wo-holiday-seasonal",
+  "697": "lightup",
   "698": "dinner",
   "699": "crafts",
   "700": "haunted",
@@ -728,7 +728,12 @@
   "1025": "cornmaze",
   "1052": "xmasmarket",
   "1059": "charcuterie",
-  "1061": "rock"
+  "1061": "rock",
+  "1078": "lightup",
+  "1079": "rockgem",
+  "1049": "wo-holiday-seasonal",
+  "1042": "wo-holiday-seasonal",
+  "1077": "wo-wineries-wine-events"
  },
  "names": {
   "1": "Kelowna Rockets Home Games 2026–27",
@@ -1458,6 +1463,11 @@
   "1025": "Fall Weekends at O'Keefe Ranch: Corn Maze, Kids Haunted House & Haunted Mini Golf",
   "1052": "Armstrong Farmers' Market Annual Christmas Market",
   "1059": "Dine Thompson Okanagan 2027",
-  "1061": "Dropkick Murphys: St. Patrick's Day Tour"
+  "1061": "Dropkick Murphys: St. Patrick's Day Tour",
+  "1078": "Osoyoos Christmas Lite-Up",
+  "1079": "Vernon ROCKS Rock and Gem Show",
+  "1049": "Candy Cane Lane",
+  "1042": "Armstrong Downtown Light Up: A Little Christmas Magic",
+  "1077": "Light Up the Vines on Summerland's Bottleneck Drive"
  }
 }
