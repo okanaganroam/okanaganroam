@@ -331,7 +331,16 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // Keep sentence/semicolon boundaries and carry explicit day headers across
   // comma-separated clauses. Negation applies within its clause, never across a sentence.
   let dayHeader='';
-  const clauses=String(text||'').split(/[.;\n]/).flatMap(sentence=>{
+  // Brewery test 3 (Whistler, 2026-11-16): a "." inside a listed name ("High Mountain Brewing Co. (The Brewhouse)",
+  // "Bartier Bros. Vineyard & Winery") is not the end of a sentence: the request is not split there.
+  let clauseSource=String(text||'');
+  for(const v of (taxonomy&&Array.isArray(taxonomy.venues)?taxonomy.venues:[])){
+    const n=v&&typeof v.name==='string'?v.name:'';
+    if(!n.includes('.')||n.length<4)continue;
+    let at=clauseSource.toLowerCase().indexOf(n.toLowerCase());
+    while(at>=0){clauseSource=clauseSource.slice(0,at)+n.replace(/\./g,' ')+clauseSource.slice(at+n.length);at=clauseSource.toLowerCase().indexOf(n.toLowerCase(),at+n.length);}
+  }
+  const clauses=clauseSource.split(/[.;\n]/).flatMap(sentence=>{
     dayHeader='';return sentence.split(/[,]/).map(part=>{const c=norm(part);if(/\bday\s+[1-7]\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b/.test(c))dayHeader=c;return {c,scopeText:dayHeader&&dayHeader!==c?`${dayHeader} ${c}`:c};});
   });
   for(const {c:clauseText,scopeText} of clauses){
@@ -1006,7 +1015,9 @@ function evaluateTripRequirements({requirements,plan,facts,tripDate}){
     return {day:s.day,v:s.kitchenMeal?{...v,fdTypes:[...new Set([...(v.fdTypes||[]),'restaurant'])]}:v};});
   return (requirements?.items||[]).map(i=>{
     const pool=selected.filter(s=>applicable(i,s.day,tripDate));let status='unmet',reason='';
-    if(i.kind==='event'){const events=[...selectedStops(plan),...(plan.kind==='events'?(plan.events||[]).map(event=>({kind:'event',event,day:1})):[])].filter(s=>s.kind==='event'&&s.event&&applicable(i,s.day,tripDate));status=events.some(s=>eventMatches(s.event,i))?'satisfied':'unmet';reason=status==='satisfied'?'Matched a dated event occurrence.':'No matching event was scheduled for the requested dates.';}
+    if(i.kind==='event'){const events=[...selectedStops(plan),...(plan.kind==='events'?(plan.events||[]).map(event=>({kind:'event',event,day:1})):[])].filter(s=>s.kind==='event'&&s.event&&applicable(i,s.day,tripDate));status=events.some(s=>eventMatches(s.event,i))?'satisfied':'unmet';reason=status==='satisfied'?'Matched a dated event occurrence.':'No matching event was scheduled for the requested dates.';
+      // Brewery test 3 (Whistler, 2026-11-16): a stop planned for the place's own listed live music that night meets it.
+      if(status==='unmet'&&i.value==='live-music'&&selectedStops(plan).some(s=>((s.listedNight&&s.listedNight.kind==='live_music')||(s.reasons||[]).some(r=>r&&r.code==='night'&&/^Live music on /.test(r.text||'')))&&applicable(i,s.day,tripDate))){status='satisfied';reason='A place in the plan lists live music that night.';}}
     else if(i.kind==='type_count'&&i.perDay){
       // A count per day is checked day by day; some but fewer than asked is "needs confirmation", never "missing" (2026-10-18).
       const dayNumbers=(plan.days||[]).map(d=>d.day).filter(d=>applicable(i,d,tripDate));
