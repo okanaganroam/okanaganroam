@@ -440,6 +440,101 @@ body.pm-app-page .pm-stage.is-nav .pm-route { margin: 0; padding: 0 12px; }
   body.pm-app-page .pm-stage.is-nav .pm-sheet-body { height: auto; min-height: 0; padding: 0; }
   body.pm-app-page .pm-stage.is-nav .pm-route { background: transparent; box-shadow: none; }
 }
+</style><style id="roam-approved-discovery">
+/* Approved discovery layout. Route and map-picker screens retain their dedicated controls. */
+body.pm-app-page.rn-design {
+  --rn-ink: #1b303c;
+  --rn-paper: #fffdf8;
+  --rn-edge: #ddd6c7;
+}
+body.pm-app-page.rn-design .rn-location-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+body.pm-app-page.rn-design .rn-locate-quick { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 4px 6px; border: 0; background: transparent; color: var(--rn-ink); font: 800 12px/1.3 Nunito, sans-serif; cursor: pointer; }
+body.pm-app-page.rn-design .rn-locate-quick svg { flex-shrink: 0; }
+body.pm-app-page.rn-design .rn-search-row { display: flex; gap: 10px; align-items: stretch; margin-top: 12px; }
+body.pm-app-page.rn-design .rn-search-row .pm-searchbar { flex: 1; min-width: 0; height: 48px; margin: 0; padding: 0 12px; border-radius: 12px; }
+body.pm-app-page.rn-design .rn-search-row .pm-search { min-width: 0; width: 100%; font-size: 15px; padding: 0; }
+body.pm-app-page.rn-design .rn-search-row .pm-filters-btn { display: inline-flex; flex-direction: row; justify-content: center; align-items: center; gap: 6px; min-height: 48px; border: 0; border-radius: 12px; padding: 0 13px; background: var(--rn-ink); color: white; white-space: nowrap; font: 800 13px Nunito, sans-serif; cursor: pointer; }
+body.pm-app-page.rn-design .rn-search-row .pm-badge { display: none; }
+body.pm-app-page.rn-design .rn-selected-filters { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+body.pm-app-page.rn-design .rn-selected-filters[hidden] { display: none; }
+body.pm-app-page.rn-design .rn-selected-filters .pm-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 5px 12px; background: var(--rn-paper); color: var(--rn-ink); border: 1px solid var(--rn-ink); border-radius: 22px; font: 800 12px/1.3 Nunito, sans-serif; cursor: pointer; box-shadow: none; }
+body.pm-app-page.rn-design .rn-selected-filters .pm-chip span { font-size: 18px; line-height: 1; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-intro { display: block; margin-bottom: 12px; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-intro h1 { font: 900 30px/1.1 Nunito, sans-serif; letter-spacing: -.6px; color: #573b32; margin-bottom: 5px; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-intro p { font-size: 14px; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-location-row { margin-top: 14px; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-location { flex: 1; justify-content: space-between; min-width: 0; min-height: 44px; padding: 7px 12px; border: 1px solid var(--rn-edge); background: var(--rn-paper); border-radius: 10px; margin: 0; text-align: left; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-location small { display: none; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .rn-location b { font-size: 14px; overflow-wrap: anywhere; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-tabs { display: flex; width: 100%; padding: 4px; background: #eee8dc; border-radius: 12px; box-sizing: border-box; margin-top: 10px; }
+body.pm-app-page.rn-design .pm-tabs .pm-tab { flex: 1; border-radius: 9px; min-height: 40px; }
+body.pm-app-page.rn-design .pm-tabs .pm-tab[aria-selected="true"] { background: var(--rn-ink); color: white; box-shadow: none; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-feat],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-open],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-top],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-tagchips { display: none; }
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind="coffee"],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind="food"],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind="drinks"],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind="indoor"],
+body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-quick > [data-pm-kind="do"] { display: inline-flex; flex: 0 0 auto; }
+body.pm-app-page.rn-design .pm-sheet-head { padding: 0 0 10px; }
+body.pm-app-page.rn-design .pm-count { color: #573b32; }
+body.pm-app-page.rn-design .pm-item { border: 1px solid var(--rn-edge); border-radius: 14px; background: var(--rn-paper); box-shadow: 0 2px 6px #253b430b; }
+body.pm-app-page.rn-design .pm-item .pm-acts { gap: 8px; padding: 0 12px 12px; }
+body.pm-app-page.rn-design .pm-item .pm-acts a { min-height: 44px; border-radius: 10px; }
+body.pm-app-page.rn-design .pm-item .pm-name { color: var(--rn-ink); font-weight: 900; font-size: 18px; }
+body.pm-app-page.rn-design .is-route .rn-intro,
+body.pm-app-page.rn-design .is-route .pm-tabs,
+body.pm-app-page.rn-design .is-route .rn-search-row,
+body.pm-app-page.rn-design .is-route .rn-selected-filters,
+body.pm-app-page.rn-design .is-route-origin .rn-search-row,
+body.pm-app-page.rn-design .is-route-origin .rn-selected-filters,
+body.pm-app-page.rn-design .is-map-picker .rn-search-row,
+body.pm-app-page.rn-design .is-map-picker .rn-selected-filters { display: none; }
+@media (min-width: 900px) {
+  body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) .pm-float { max-height: 51%; padding-right: 10px; }
+  body.pm-app-page.rn-design .pm-item:not(.pm-event) .pm-item-main { display: grid; grid-template-columns: minmax(140px, 40%) minmax(0, 1fr); gap: 16px; padding: 12px; }
+  body.pm-app-page.rn-design .pm-item .rn-photo,
+  body.pm-app-page.rn-design .pm-item .rn-no-photo { float: none; width: 100%; max-width: 100%; height: 140px; margin: 0; border-radius: 9px; object-fit: cover; }
+  body.pm-app-page.rn-design .rn-card-info { display: block; min-width: 0; }
+  body.pm-app-page.rn-design .pm-item:not(.pm-event) .pm-acts { padding-left: calc(40% + 22px); }
+}
+@media (max-width: 899px) {
+  body.pm-app-page.rn-design .pm-stage:not(.is-route, .is-route-origin, .is-map-picker) { padding: 12px 16px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .pm-float { display: block; flex: 0 0 auto; max-height: 52%; overflow-y: auto; margin: 0 0 10px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-intro,
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .pm-tabs,
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .pm-searchbar { display: flex; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-intro { display: block; margin-bottom: 8px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-intro h1 { font-size: 25px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-intro p,
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .pm-quick:not(.rn-event-filters),
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-results-toolbar,
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-result-filters { display: none; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-event-filters:not([hidden]) { display: flex; flex-wrap: wrap; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-location-row { margin-top: 9px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .pm-tabs { margin-top: 8px; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view .rn-views { display: flex; position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: auto; padding: 0; background: transparent; z-index: 680; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view #rnMap { display: inline-flex; align-items: center; padding: 0 22px; min-height: 46px; border: 2px solid var(--rn-paper); background: var(--rn-ink); color: white; box-shadow: 0 3px 10px #1b303c33; border-radius: 24px; font-size: 14px; font-weight: 800; }
+  body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view #rnList { display: none; }
+  body.pm-app-page.rn-design .pm-list-view .pm-sheet-body { padding-bottom: 72px; }
+  body.pm-app-page.rn-design .rn-card-info { display: contents; }
+  body.pm-app-page.rn-design .pm-item:not(.pm-event) .pm-item-main { padding: 0 12px 10px; }
+  body.pm-app-page.rn-design .pm-item .rn-photo { width: calc(100% + 24px); max-width: none; height: 150px; margin: 0 -12px 10px; object-fit: cover; }
+  body.pm-app-page.rn-design .pm-item .pm-name { margin-top: 10px; }
+  body.pm-app-page.rn-design .pm-item .pm-meta { font-size: 12px; margin: 4px 0; }
+  body.pm-app-page.rn-design .pm-item .pm-feats { margin-top: 6px; }
+  body.pm-app-page.rn-design .pm-searchbar .pm-search-icon { display: inline-flex; }
+  body.pm-app-page.rn-design .pm-searchbar .pm-mic { width: 32px; min-width: 32px; }
+  body.pm-app-page.rn-design .pm-filters-btn svg { display: none; }
+  body.pm-app-page.rn-design .rn-selected-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 3px; }
+  body.pm-app-page.rn-design .rn-selected-filters .pm-chip { flex-shrink: 0; min-height: 34px; }
+  body.pm-app-page.rn-design .rn-location b { display: block; line-height: 1.25; }
+  body.pm-app-page.rn-design .rn-locate-quick { max-width: 125px; }
+}
+
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 
