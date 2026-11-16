@@ -139,6 +139,7 @@ test('rental managers (2026-10-22): "Things to do around <Town>", for guests of 
   const card = (await get(`/near/${rental.slug}/card`)).text;
   assert.match(card, /<h1 class="hc-h[^"]*">What(&#39;|')s open in [^<]+ right now<\/h1>/);
   assert.ok(card.includes('updated live'));
+  assert.ok(/Map of what(&#39;|')s near you/.test(card), 'rental card lists the map');
   assert.ok(card.includes(`Compliments of ${rental.name}`));
   if (town) assert.ok(card.includes(town));
 });
