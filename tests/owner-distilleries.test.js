@@ -270,7 +270,7 @@ test('wording: spirits words in English and French with French spacing; brewerie
   assert.equal(en.flightQ, 'What does a tasting cost?'); assert.equal(en.noFlights, 'We don’t do tastings'); assert.equal(en.feeFree, 'Free tastings');
   assert.equal(en.knownEx, 'Small-batch gin with Okanagan botanicals');
   assert.match(en.photosLead, /^Your tasting room, your still, your bottles\./);
-  assert.match(en.menuQ, /cocktail or tasting menu/);
+  assert.match(en.menuQ, /menu or cocktail list/); // one name for it (Whistler distillery test 1, 2026-11-16)
   assert.equal(text.en.brewery.igLead, 'Type your Instagram name, like @yourbusiness.');
   assert.match(fr.hiLead, /votre distillerie/);
   assert.equal(fr.flightQ, 'Combien coûte une dégustation ?');
@@ -302,7 +302,7 @@ test('wording: spirits words in English and French with French spacing; brewerie
   assert.match(brew.find((x) => x.key === 'phone').whyEn, /what’s on tap/);
   assert.equal(missing('brewery', 'Cidery').find((x) => x.key === 'menu').en, 'Menu or cider list');
   // The owner home tile.
-  assert.deepEqual(app.breweryListTile({ type: 'distillery', name: 'X' }).en, ['Update my cocktail or tasting menu', 'Snap your cocktail or tasting menu']);
+  assert.deepEqual(app.breweryListTile({ type: 'distillery', name: 'X' }).en, ['Update my menu or cocktail list', 'Snap your cocktail list or menu']);
   assert.equal(app.breweryListTile({ type: 'brewery', name: 'Hop Brewing', place_type: '' }).en[0], 'Update my menu or tap list');
   // The checklist's door line.
   const html = pc.renderCompleteness(pc.scoreCompleteness({ type: 'distillery', address: 'a', latitude: 1, longitude: 1, phone: '1', website: 'x', hasHours: true, hoursCheckedAt: today }, { today }), { fr: false, brewery: true, distillery: true, canDecline: true, noScore: true, menuHref: '/m', setupHref: '/s' });
@@ -829,7 +829,8 @@ test('fe3 #4 Build My Trip says "book ahead" for a tour only from its own words,
   research(d.id, [{ label: 'Groups', text: 'Groups of 8+ please book ahead' }], 'https://example.com/groups');
   assert.match(await line(), /: Distillery tour at 1 PM$/, 'a groups line about booking is not the tour');
   // The help line matches.
-  assert.match(SRV(), /Tours people book ahead\? Say so in the tour’s detail \(“Book ahead online”\), or tap <strong>By appointment<\/strong>\. Build My Trip only says “book ahead” then\./);
+  // Distillery test 1 (Whistler, 2026-11-16): the setup has no detail box, so the answer says "in the tour's name, after a comma".
+  assert.match(SRV(), /Tours people book ahead, or a price\? Say so in the tour’s name, after a comma \(“Distillery tour, \$20, book ahead”\), or tap <strong>By appointment<\/strong>\. Build My Trip only says “book ahead” then\./);
 });
 
 test('fe3 #5 the edit page Plan your visit: the lines the setup writes, one writer, a true count; no food picker for a distillery or a no-kitchen brewery', async () => {

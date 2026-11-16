@@ -1584,7 +1584,7 @@ function renderScript(d) {
     // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
     // Brewery test 2 (Whistler, 2026-11-16): on the French page a kind the planner names ("venues with happy hour") reads
     // in French (« Lieux avec un 5 à 7 »); a word the visitor typed stays as typed.
-    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); if (lang() === 'fr' && Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES, w.toLowerCase())) w = FR_HEADING_NAMES[w.toLowerCase()]; chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
+    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«] *| *[”"»]$/g, ''); /* Distillery test 1 (Whistler, 2026-11-16): this script is a template string, so "\\s" reached the page as "s" and a quoted word lost its last letters (“cocktail class” read "Cocktail cla") */ if (lang() === 'fr' && Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES, w.toLowerCase())) w = FR_HEADING_NAMES[w.toLowerCase()]; chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
     (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
     // No length given (2026-10-19): ask for one, with the same Length control.
     var lengthAsk = '';

@@ -19,6 +19,10 @@
   if (C.distillery) { QUICK_FLIGHTS = [10, 15, 20]; TOGO = ['bottles', 'cans']; }
   // Brewery test 2 (2026-11-13): 3 PM opens and 6 PM closes too (a small taproom's afternoon hours).
   var BQ_OPEN = ['11:00', '12:00', '14:00', '15:00'], BQ_CLOSE = ['18:00', '20:00', '21:00', '22:00', '23:00'];
+  // Distillery test 1 (Whistler, 2026-11-16): a tasting room opens at 1 PM and closes at 7 PM as often as not, and rarely
+  // opens at 3 PM or closes at 11 PM: 1 PM takes 3 PM's place and 7 PM takes 11 PM's, so neither row is any wider (a
+  // fifth opening chip wrapped to a second line on a 390px phone).
+  if (C.distillery) { BQ_OPEN = ['11:00', '12:00', '13:00', '14:00']; BQ_CLOSE = ['18:00', '19:00', '20:00', '21:00', '22:00']; }
   var BREWERY_ITEM_STEP = { brewery_kind: 'taproom', food_here: 'taproom', flight_price: 'flights', to_go: 'flights', happy_hour: 'happy', dogs_kids: 'offer:minors', access: 'offer', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu' };
   // Cocktail lounges (2026-11-13): the pub screens folded like breweries (FOLD: Groups and booking on one screen, the
   // story screen with Known for), the cocktail price on 'spend', and where each checklist item is answered.
@@ -569,7 +573,10 @@
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
   function readBrew(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; }
+    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN;
+      // Distillery test 1 (Whistler, 2026-11-16): a price typed over research's is the owner's own ("Your page says $15
+      // now, from your website, so we picked it" stayed after he typed $15 over $12).
+      if (S.brew.feeGuessed && S.brew.fee !== C.researchFee) S.brew.feeGuessed = false; }
     if ((x = v('suKto')) !== null && C.brewery) S.brew.kcloses = x;
     // Brewery test 2 (Whistler, 2026-11-16): the seasonal kitchen time on the same screen is kept through a redraw too.
     if ((x = v('suKsto')) !== null && C.brewery && S.kitchen && S.kitchen.sea) S.kitchen.sea.closes = x;
@@ -613,7 +620,7 @@
   function readWine(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suRname')) !== null) S.wine.rname = x.trim(); if ((x = v('suRwhen')) !== null) S.wine.rwhen = x.trim();
-    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; }
+    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; if (S.wine.feeGuessed && S.wine.fee !== C.researchFee) S.wine.feeGuessed = false; }
     if ((x = v('suKnown')) !== null) S.wine.known = x.trim();
     // Winery test 2 (2026-11-12): a booking link typed before tapping a group size or bus chip survives the redraw.
     if ((x = v('suBookUrl')) !== null) S.bookUrl = x;
@@ -702,6 +709,16 @@
   // saved (review fix 2026-11-12): the season the page has (CUR), never an unsaved draft one, when saving the holidays.
   function offSeason(date, saved){ var o = saved ? openSeaOf(CUR.open_months) : S.openSea; if (!o || !o.from || !o.to) return false; var md = String(date).slice(5); return o.from <= o.to ? md < o.from || md > o.to : md < o.from && md > o.to; }
   function holCovered(o, saved){ return coveredBy(o.date) || offSeason(o.date, saved); }
+  // Distillery test 1 (Whistler, 2026-11-16): Family Day (always a Monday) was offered to a place closed every Monday. A
+  // holiday that falls on the same weekday every year (never Christmas or Canada Day, which move) on a day the week has
+  // closed (the stretch's week inside a stored stretch) isn't offered: its tile says "You're closed Mondays".
+  function holWeekClosed(o){
+    if (!o || ['family', 'goodFri', 'easterMon', 'victoria', 'bcDay', 'labour', 'thanks'].indexOf(o.key) < 0 || !S.week || !DAYS.some(function(d){ return S.week[d] && S.week[d].length; })) return '';
+    var dt = new Date(o.date + 'T12:00:00'); if (isNaN(dt)) return '';
+    var wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dt.getDay()], md = String(o.date).slice(5), wk = S.week;
+    (S.seaList || []).forEach(function(s){ if (s && s.on && s.src && s.week && mdInRange(md, s.src.from, s.src.to)) wk = s.week; });
+    return wk && !(wk[wd] && wk[wd].length) ? wd : '';
+  }
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
@@ -1067,7 +1084,7 @@
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
-  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
+  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
@@ -1759,7 +1776,7 @@
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         // Café test 4 (2026-11-11): "We're closed part of the year" is asked once, in Hours ("Are these your hours all
         // year?"). This screen only shows a saved open season, with Change.
-        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); return '<button type="button" class="su-tile' + (cov ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2">' + h(T.holidaysH) + '</h2><div class="su-tiles">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); var wkc = !cov && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o) : ''; return '<button type="button" class="su-tile' + (cov || wkc ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + (wkc ? ' disabled data-wkc="' + wkc + '"' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : wkc ? '<span class="su-tile-sub su-covered-note">' + h(fill(T.holClosedDay, { day: longDay(wkc) })) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         // Café test 1 (Whistler, 2026-11-15): a holiday tile is closed all day; an early close is a message to us.
         + (T.holEarly ? '<p class="su-hint" id="suHolEarly">' + h(T.holEarly) + '</p>' : '')
@@ -2138,7 +2155,7 @@
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
@@ -2214,7 +2231,9 @@
         // Greyed until it's earned, with "Reach 100% to earn it" beside it (pub fresh-eyes 2: it looked already won).
         + '<p class="su-badge-line"><span class="su-badge-pill' + (sc.badge === 'earned' ? '' : ' su-badge-off') + '"' + (sc.badge === 'earned' ? '' : ' aria-disabled="true"') + '>' + C.badgeChip + '</span>' + (sc.badge === 'earned' ? '' : ' <span class="su-badge-reach">' + h(Math.max(sc.pct, sc.soon || 0) < 100 || sc.soon < sc.pct ? T.badgeReach : T.badgeSoon) + '</span>') + '</p>'
         + (sc.badge === 'none' ? '' : '<p class="su-badge-text">' + h(sc.badge === 'earned' ? T.badgeEarned : T.badgePaused) + '</p>')
-        + (left.length ? '<h2 class="su-h2">' + h(T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
+        // Distillery test 1 (Whistler, 2026-11-16): "About 100% complete" sat over "To reach 100%" (a cocktail list isn't
+        // part of the score without a kitchen, but its tile was still open). At 100 the open tiles are "You can still add".
+        + (left.length ? '<h2 class="su-h2" id="suLeftH">' + h((sc.soon < sc.pct ? sc.soon : Math.max(sc.pct, sc.soon || 0)) >= 100 && T.stillAdd ? T.stillAdd : T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
         + frOnlyFinish()
         // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
         + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
@@ -2394,6 +2413,10 @@
         var r = monthRun(so.months);
         if (so.exact) { var xo = seaOut({ on: true, exact: so.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
         else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
+        // Distillery test 1 (Whistler, 2026-11-16): every day closed in the stretch is a closure ("we close for two weeks in
+        // spring"), which goes under "Closed for a week or two" on the closures screen. The message says where, and a button
+        // under it drops this empty stretch and carries on (a stretch already saved is kept as stored).
+        if (so.week && T.seasonAllClosed && DAYS.every(function(d){ return !(so.week[d] || []).length; })) { S.nudge = KITCHEN_Q && T.seasonAllClosedSoon ? T.seasonAllClosedSoon : T.seasonAllClosed; S.seaClosedNudge = S.nudge; S.seaI = si; S.sea = so; return render(); }
         if (!so.week || !windowsOk(so.week)) { S.nudge = T.seasonNeedOpenDay; return render(); }
         var sw = {}; DAYS.forEach(function(d){ sw[d] = so.week[d] || []; });
         var pad = function(n){ return ('0' + n).slice(-2); };
@@ -2592,6 +2615,12 @@
       var c = t.indexOf(','), head = c > 0 ? t.slice(0, c).trim().toLowerCase() : '', rest = c > 0 ? t.slice(c + 1).trim() : '';
       var kn = head && rest && kind && kind !== 'other' ? [(T.kinds || {})[kind], (C.nightKindsEn || {})[kind]].filter(Boolean).map(function(x){ return String(x).toLowerCase(); }) : [];
       if (kn.indexOf(head) >= 0) return { title: t.slice(0, c).trim(), detail: rest.charAt(0).toUpperCase() + rest.slice(1), short: true };
+      // Distillery test 1 (Whistler, 2026-11-16): a price straight after the kind's name, then a comma ("Distillery tour
+      // $20, by booking") splits the same way: the name with the time, "$20, by booking" under it.
+      for (var ki = 0; ki < kn.length; ki++) {
+        var tail = head.indexOf(kn[ki] + ' ') === 0 ? t.slice(kn[ki].length, c).trim() : '';
+        if (tail && /^(?:\$\s?\d{1,3}(?:\.\d{2})?|\d{1,3}(?:[.,]\d{2})?\s?\$)$/.test(tail)) return { title: t.slice(0, kn[ki].length).trim(), detail: tail + ', ' + rest, short: true };
+      }
       return { title: t, detail: '' };
     }
     var m = /^(.{2,40}?)(?:[,;:.!?]\s+|\s[–—-]\s+)(\S.*)$/.exec(t);
@@ -2890,6 +2919,16 @@
     if (k === 'hoursSaveAdd') { S.seaAddNext = true; hoursSave(); S.seaAddNext = false; return; }
     if (k === 'seaCopy') { readTimes(); var co = S.seaList[1 - S.seaI]; if (co && co.week) { S.sea.week = clone(co.week); S.sea.open = {}; S.seaTouched = true; S.nudge = ''; mark(); var cy = window.scrollY; render(); window.scrollTo(0, cy); } return; }
     if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; return go('hours:yeardrop'); }
+    // Distillery test 1 (Whistler, 2026-11-16): "Skip these dates and keep going" under the all-closed message. A new
+    // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
+    if (k === 'seaSkipClosed') {
+      var zi = S.seaI, zo = S.seaList[zi]; S.nudge = ''; S.seaClosedNudge = '';
+      if (zo && zo.src) S.seaList[zi] = seaLoad(seaBlank(), zo.src);
+      else if (zi === 1) S.seaList.length = 1;
+      else if (zo) S.seaList[0] = seaBlank();
+      seaUse(S.seaList[zi] ? zi : 0);
+      return hoursSave();
+    }
     if (k === 'seaDropKeep') { S.dropI = null; return goBack(); }
     if (k === 'seaDropYes') { var dz = S.seaList[S.dropI]; S.dropI = null; if (dz) { dz.on = false; S.seaTouched = true; } return hoursSave(); }
     if (k === 'seaStaleFix') return seaStaleFix(+v);
@@ -3654,6 +3693,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-room]'), function(inp){ inp.addEventListener('input', roomRefresh); });
     if (S.step === 'happy:type') roomRefresh();
     var sfe = el('suFee'), sfl = el('suFlightLead'); if (sfe && sfl && C.brewery) sfe.addEventListener('input', function(){ readBrew(); sfl.textContent = flightLeadText(); });
+    // The "from your website, so we picked it" note goes as soon as the price in the box is no longer research's.
+    if (sfe) sfe.addEventListener('input', function(){ if (C.brewery) readBrew(); else if (C.winery) readWine(); var fg = el('suFeeGuess'); if (fg && !((C.brewery ? S.brew : S.wine) || {}).feeGuessed) fg.hidden = true; });
     var cfe = el('suCfee'), cfl = el('suCpLead'); if (cfe && cfl && CK) cfe.addEventListener('input', function(){ readBrew(); cfl.textContent = cpLeadText(); });
     var su = el('suUrl'), usr0 = el('suUseSiteRow'); if (su && usr0) su.addEventListener('input', function(){ usr0.hidden = su.value.trim() === siteUrl(C.website); });
     var dn = el('suDnote'); if (dn) dn.oninput = function(){ S.cafe.diet.note = dn.value; var c = el('suDnoteC'); if (c) { c.textContent = noteRoom(dn.value); c.className = 'su-count' + (dn.value.length > 120 ? ' su-over' : ''); } };
@@ -3682,6 +3723,10 @@
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
       // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
       // replaces it (never her own story, sent or on the page).
+      // Distillery test 1 (Whistler, 2026-11-16): an owner who tapped the end to add a sentence lost the paragraph, and the
+      // hint said "change any words right in the box". The first-tap select stays (an owner writing a new story must not
+      // have it stuck onto research's), and the hint over the box now says so in plain words (T.storyResearchHint: "Type
+      // to replace this text, or tap again to add to it"), shown exactly when this select will happen.
       // Café test 2 (Whistler, 2026-11-15): « Ce texte est en anglais… » goes once she has replaced the text with her own.
       if (inp.id === 'suStory' && T.storyEnglishHint) inp.addEventListener('input', function(){ var hn = el('suStoryEdit'); if (hn && (hn._en || hn.textContent === T.storyEnglishHint)) { hn._en = true; hn.hidden = inp.value !== CUR.description; } });
       var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!storyCur() && inp.value === storyCur();
@@ -3692,7 +3737,14 @@
       // more…") is not selected, so words she adds go after it; research's text still is.
       var chipOwn = !!(S.chipFilled && inp.id && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value);
       var pre = ((inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory || researchLine) && !chipOwn, first = true;
-      inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) inp.select(); else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+      inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+      // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
+      // at the end (most phones do this themselves; where the tap leaves the text selected, this does it). The first
+      // tap's own click, right after the focus, is left alone.
+      if (researchStory) {
+        inp.addEventListener('click', function(){ if (!inp._autoSel || Date.now() - inp._autoSel < 300) return; inp._autoSel = 0; try { var n2 = inp.value.length; if (n2 && inp.selectionStart === 0 && inp.selectionEnd === n2) inp.setSelectionRange(n2, n2); } catch (e) {} });
+        inp.addEventListener('input', function(){ inp._autoSel = 0; });
+      }
     });
   }
   el('suPick').onchange = function(e){ addPhotoFiles(e.target.files); e.target.value = ''; };
@@ -3763,6 +3815,10 @@
     if (!/^\s?[^\s.,;:!?]/.test(added)) return false;
     var low = sibs.map(function(x){ return String(x).toLowerCase(); });
     if (!p0.split(sep.trim()).every(function(x){ return low.indexOf(x.trim().toLowerCase()) >= 0; })) return false;
+    // Distillery test 1 (Whistler, 2026-11-16): words that carry the chip on in lower case ("Patio only" + "in summer, not
+    // inside") join with a space, not a full stop ("Patio only. in summer, not inside"). A new sentence (a capital) and the
+    // takeout chips' comma are as before.
+    if (sep === '. ' && /^\s?[a-zà-ÿ]/.test(added)) sep = ' ';
     var at = box.selectionStart, lead = /^\s/.test(added) ? 1 : 0, nv = (p0 + sep + added.slice(lead)).slice(0, 180);
     box.value = nv; try { if (at != null) box.setSelectionRange(Math.min(nv.length, at + sep.length - lead), Math.min(nv.length, at + sep.length - lead)); } catch (e0) {}
     return true;
