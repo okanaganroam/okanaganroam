@@ -920,7 +920,7 @@ test('winery test 3: a winery’s owner home has no Happy hour or Add an event t
   // The French wording table.
   const f = text.fr, fw = text.fr.winery;
   assert.equal(f.stDayPlural, 'nous les ajouterons d’ici un jour');
-  assert.equal(fw.stStoryKnown, 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour');
+  assert.equal(fw.stStoryKnown, 'Votre spécialité est en ligne ; votre histoire le sera d’ici un jour');
   assert.equal(fw.knownQ, 'Pour quoi êtes-vous reconnu\u202f?');
   assert.match(f.openQ, /Quand êtes-vous ouverts chaque année \?/);
   assert.equal(f.holidays.victoria, 'Fête de Victoria');

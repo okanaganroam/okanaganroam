@@ -572,7 +572,7 @@ test('fe1 small fixes: Who’s welcome pre-picked from research, no repeated kid
   research(d.id, RAJ_ROWS);
   const cfg = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(cfg.suggestKidsAll, true);
-  assert.match(CLIENT(), /else if \(!BIm\.policy && C\.suggestKidsAll\) S\.minors\.policy = 'all_ages';/);
+  assert.match(CLIENT(), /else if \(!BIm\.policy && C\.suggestKidsAll\) \{ S\.minors\.policy = 'all_ages'; S\.kidsGuessed = 'all_ages'; \}/);
   const d2 = mk('distillery'); research(d2.id, [{ label: 'Kids & dogs', text: 'Adults only (19+). Dogs on the patio.' }]);
   assert.equal(cfgOf((await get(`/owner/${tokenFor(d2.id)}/setup`)).text).suggestKidsAll, false);
   // "All ages welcome. All ages with an adult." -> one sentence; a note that adds something stays.

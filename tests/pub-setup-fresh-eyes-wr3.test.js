@@ -218,7 +218,7 @@ test('pubs: research’s "Family friendly" pre-picks All ages (a suggestion); ne
   assert.equal(cfgOf((await get(`/owner/${tokenFor(adults.id)}/setup`)).text).suggestKidsAll, false);
   const lounge = mk('cocktail'); research(lounge.id, [{ label: 'Kids & dogs', text: 'Family friendly' }]);
   assert.ok(!cfgOf((await get(`/owner/${tokenFor(lounge.id)}/setup`)).text).suggestKidsAll);
-  assert.match(CLIENT(), /else if \(C\.pub && !CK && !S\.minors\.policy && C\.suggestKidsAll\) S\.minors\.policy = 'all_ages';/);
+  assert.match(CLIENT(), /else if \(C\.pub && !CK && !S\.minors\.policy && C\.suggestKidsAll\) \{ S\.minors\.policy = 'all_ages'; S\.kidsGuessed = 'all_ages'; \}/);
 });
 
 // ---------- 6. Small fixes ----------
@@ -238,7 +238,9 @@ test('deals: a happy hour on every day reads "Every day: …" (« Tous les jours
     const all = { days: Object.fromEntries(DAYS.map((d) => [d, true])) };
     assert.equal(lib.dayPrefix(all), want);
     for (const stored of [`${want}$6 pints`, 'Mon–Sun: $6 pints', 'Mon, Tue, Wed, Thu, Fri, Sat, Sun: $6 pints']) { const p = lib.prefixOf(all, stored); assert.ok(p, stored); assert.equal(stored.slice(p.length), '$6 pints'); }
-    assert.equal(lib.dayPrefix({ days: { mon: true, tue: true, wed: true, thu: true, fri: true } }), 'Mon–Fri: ');
+    // Brewery test 2 (Whistler, 2026-11-16): the French prefix is lower case after the first day, with a spaced colon.
+    assert.equal(lib.dayPrefix({ days: { mon: true, tue: true, wed: true, thu: true, fri: true } }), lang === 'fr' ? 'Mon–fri\u00a0: ' : 'Mon–Fri: ');
+    if (lang === 'fr') { const wk = { days: { mon: true, tue: true, wed: true, thu: true, fri: true } }; assert.equal(lib.prefixOf(wk, 'Mon–Fri: $5'), 'Mon–Fri: ', 'the earlier form is still recognised'); }
   }
 });
 

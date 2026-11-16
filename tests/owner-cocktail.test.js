@@ -723,8 +723,8 @@ test('French Build My Trip: stop labels by kind, meal names, the date conflict, 
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(v3, /: lang\(\) === 'fr' \? t3FrenchText\(s\.label\) : s\.label; var t = stopTime\(s, key\);/);
   assert.match(v3, /Libérez-le ou modifiez la demande\.' : t3FrenchText\(msg\);/, 'the date conflict error reads in French');
-  assert.match(v3, /'Plateaux à partir de '/); assert.match(v3, /'Dégustations à partir de '/);
-  assert.doesNotMatch(v3, /'(?:Cocktails|Plateaux|Dégustations) dès '/);
+  assert.match(v3, /'Palettes à partir de '/); assert.match(v3, /'Dégustations à partir de '/);
+  assert.doesNotMatch(v3, /'(?:Cocktails|Plateaux|Palettes|Dégustations) dès '/);
 });
 
 test('saved text in her language: « Heures d’été » and French holiday names on the French edit page, stored as they were', async () => {
