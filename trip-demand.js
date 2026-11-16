@@ -40,8 +40,12 @@ function isBot(req) {
 }
 
 // Our own visits: the roam_internal cookie, or an address in INTERNAL_IPS (comma separated), so testing never counts as visitors.
+// Our own scripts too (2026-11-16): they name themselves okanaganroam-apply/1.0, whistlerroam-apply, OkanaganRoam/1.0 ...
+// (the menu publishing run counted ~1,000 "visitors" on missing menu pages before the pages went live).
+const OWN_SCRIPT_RE = /(?:^|[\s;(])(?:okanagan|whistler)roam[-/]/i;
 function isInternal(req, env = process.env) {
   if (/(?:^|;\s*)roam_internal=1(?:;|$)/.test(String(req.headers.cookie || ''))) return true;
+  if (OWN_SCRIPT_RE.test(String(req.headers['user-agent'] || ''))) return true;
   const ip = String(req.headers['x-real-ip'] || '').trim();
   return !!ip && String(env.INTERNAL_IPS || '').split(',').map((x) => x.trim()).includes(ip);
 }
