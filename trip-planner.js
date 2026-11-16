@@ -1791,7 +1791,7 @@ function classifyPlanRequest(intent) {
 // A named time ("tonight", "Saturday afternoon") checked against listed
 // hours: { skip } when the listing proves the venue closed then, otherwise
 // a grounded reason (the stored hours) or an unknown-hours caveat.
-function requestedTimeFit(v, ctx) {
+function requestedTimeFit(v, ctx, opts = {}) {
   const live = liveWindow(ctx, 'evening');
   const weekday = live ? live.weekday : ctx.startWeekday;
   const part = live && ctx.when.now ? null : ctx.whenDaypart;
@@ -1803,6 +1803,23 @@ function requestedTimeFit(v, ctx) {
   const kidsMin = ctx.kids ? kidsUntilMinutes(v) : null, kidsWin = live ? live.win : part ? SLOT_WINDOWS[part] : null;
   if (kidsMin != null && kidsWin && kidsWin.from >= kidsMin) return { skip: true };
   if (kidsMin != null && kidsWin && kidsWin.to > kidsMin) caveats.push(kidsUntilNote(kidsMin, true));
+  // Café test 1 (Whistler, 2026-11-15): a list for a stated time on a named day ("a coffee … at 4:30pm on Wednesday") keeps
+  // the time. A place whose listed hours prove it closed then is left out (it closed at 4, or is closed that day); one
+  // that opens within the next 90 minutes stays, below the places already open ("at 7am": open at 7 before opens at 8).
+  // Only for a list of places (buildRecommendations): a plan of several stops starts at that time and runs on from it.
+  const at = opts.list && !live && weekday && ctx.requirements && Number.isFinite(ctx.requirements.startMinutes) && !ctx.requirements.dinnerAtClock ? ctx.requirements.startMinutes : null;
+  if (at != null && parsed.known) {
+    const open = openAtMinute(parsed, weekday, at);
+    if (open === false) {
+      const next = parsed.days[weekday].status === 'open' ? parsed.days[weekday].ranges.map((r) => r[0]).filter((a) => a > at && a - at <= ASKED_TIME_OPENS_SOON).sort((a, b) => a - b)[0] : null;
+      if (next == null) return { skip: true };
+      score -= 6; caveats.push(`Opens at ${clockText(next)}, after the time you asked for`);
+    } else if (open) {
+      score += 6;
+      const end = parsed.days[weekday].status === 'open' ? parsed.days[weekday].ranges.filter((r) => r[0] <= at && at < r[1]).map((r) => r[1])[0] : null;
+      if (end != null && end - at < 30) { score -= 3; caveats.push(`Its listed hours end at ${clockText(end)} \u2014 check before you go`); }
+    }
+  }
   if (live) {
     // Dropped only when its listing proves it closed for the rest of the
     // time asked about (it already closed, or it does not open again).
@@ -1844,6 +1861,17 @@ function requestedTimeFit(v, ctx) {
     else { score -= 2; caveats.push(UNKNOWN_HOURS_CAVEAT); }
   }
   return { skip: false, score, reasons, caveats };
+}
+
+// Is a place open at a clock minute on a weekday, by its listed hours? true / false, or null when that day isn't known.
+// A close after midnight the night before counts for the small hours.
+const ASKED_TIME_OPENS_SOON = 90;
+function openAtMinute(parsed, weekday, at) {
+  const day = parsed.days[weekday];
+  if (day && day.status === 'open' && day.ranges.some(([a, b]) => a <= at && at < b)) return true;
+  const prev = parsed.days[WEEKDAYS[(WEEKDAYS.indexOf(weekday) + 6) % 7]];
+  if (prev && prev.status === 'open' && prev.ranges.some(([, b]) => b > 1440 && at + 1440 < b)) return true;
+  return !day || day.status === 'unknown' ? null : false;
 }
 
 // "What can we do in Whistler tonight" (2026-10-18): no golf course, beach or daytime tour for an evening, and no
@@ -1893,7 +1921,7 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if (!regionOk(v, ctx) || !eligible(v, ctx, strict) || !tripRequirements.venueAllowed(v, ctx.requirements, 1, ctx.tripDate) || !ctx.ignoreSeason && ctx.requirements && seasonClosedOnTrip(v, { date:ctx.tripDate })) continue;
     if (!ctx.ignoreSeason && (eveningOutOfSeason(v, ctx) || listOutOfSeason(v, ctx))) continue;
     const s = scoreVenue(v, ctx);
-    const t = requestedTimeFit(v, ctx);
+    const t = requestedTimeFit(v, ctx, { list: true });
     if (t && t.skip) continue; // listed hours prove it is closed at the time asked for
     scored.push(t ? { v, score: s.score + t.score, reasons: s.reasons.concat(t.reasons), caveats: t.caveats } : { v, ...s });
   }
@@ -8321,7 +8349,7 @@ module.exports = {
   partAt,
   relabelDayparts,
   // Build My Trip audit fixes (2026-10-27)
-  ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, specialPhraseMatch, afterMidnightTonight, skiOpeningFor,
+  ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, specialPhraseMatch, openAtMinute, afterMidnightTonight, skiOpeningFor,
   withSameEstates, longDayHike, longDayHikeMinutes, oneSpaAsked,
   coolBeachMonth,
   dogOnlyPlace,

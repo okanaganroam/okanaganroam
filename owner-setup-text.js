@@ -1561,6 +1561,34 @@ Object.assign(fr, {
   placeGuess: 'Nous avons choisi « {kind} » d’après votre fiche. Touchez-en un autre s’il ne convient pas. Rien n’est enregistré avant que vous touchiez Enregistrer.',
 });
 
+// Café test 1 on Whistler (2026-11-15; Whistler Roam drafts/fresh-eyes-cafe1-2026-11-15/REPORT.md). Shared by every type:
+// "open but closing early" under the holiday tiles, a time warning that knows the other hours, and the specials box's
+// character count. Cafés: no "Open after midnight?", a second time without "lunch & dinner", and where events go.
+Object.assign(en, {
+  holEarly: 'Open that day but closing early? Leave it unticked and message us the date and time.',
+  outsideNowFine: ' (your hours right now; fine in your {a} – {b} hours)',
+  outsideUsualFine: ' (your usual hours; fine in your {a} – {b} hours)',
+  outsideSeaOnly: ' (in your {a} – {b} hours; fine the rest of the year)',
+  specialCount: '{n} of {max} characters',
+});
+Object.assign(fr, {
+  holEarly: 'Ouvert ce jour-là, mais vous fermez plus tôt ? Ne le cochez pas et écrivez-nous la date et l’heure.',
+  outsideNowFine: ' (vos heures en ce moment; c’est correct selon vos heures du {a} au {b})',
+  outsideUsualFine: ' (vos heures habituelles; c’est correct selon vos heures du {a} au {b})',
+  outsideSeaOnly: ' (selon vos heures du {a} au {b}; c’est correct le reste de l’année)',
+  specialCount: '{n} caractères sur {max}',
+});
+Object.assign(en.cafe, {
+  addSecond: '+ Add a second time',
+  twoTimesMax: 'Up to two times a day.',
+  finishEvents: 'Got a regular event? Add it under Weekly events on your edit page.',
+});
+Object.assign(fr.cafe, {
+  addSecond: '+ Ajouter une deuxième plage',
+  twoTimesMax: 'Jusqu’à deux plages par jour.',
+  finishEvents: 'Un événement régulier ? Ajoutez-le sous Événements de la semaine, sur votre page de modification.',
+});
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.

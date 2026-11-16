@@ -658,7 +658,7 @@ function t3FrenchPlan(plan){
  };
  // Round 7: the When chip ("fall", "January") in French.
  if(p.understood&&p.understood.season&&p.understood.season.label){const l=String(p.understood.season.label),fr=FR_SEASON_WORDS[l.toLowerCase()]||FR_MONTHS_BY_EN[l]||l;p.understood.season={...p.understood.season,label:fr.charAt(0).toUpperCase()+fr.slice(1)};}
- if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(x=>{const q=/^“(.+)”$/.exec(String(x));if(!q)return t3FrenchText(x);const fr=t3FrenchText(q[1]);return fr!==q[1]?fr:'« '+q[1]+' »';});if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
+ if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(x=>{const q=/^“(.+)”$/.exec(String(x));if(!q)return t3FrenchText(x);const fr=t3FrenchText(q[1]);return fr!==q[1]?fr:'« '+q[1]+' »';});if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'').replace(/ at (\d{1,2})(?::(\d{2}))? (AM|PM)$/,(_,h,mm,ap)=>' à '+((Number(h)%12)+(ap==='PM'?12:0))+' h'+(mm?' '+mm:''));}
  const stops=p.days?.length?p.days.flatMap(d=>d.stops||[]):p.itinerary?.stops||p.outing?.stops||p.recommendations||[];
  for(const s of stops)translateStop(s);
  // Restaurant test 2 (Whistler, 2026-11-14): the outing's « Autres bonnes options » cards (and its stops or the list beside
