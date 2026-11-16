@@ -89,7 +89,7 @@ test('pubs: research "Minors until 9 PM" pre-picks 9 PM; the default is an hour 
   assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('pub').id)}/setup`)).text).suggestKidsUntil, '');
   // The client picks it (saved only with the screen) and its default never reaches midnight.
   const src = CLIENT();
-  assert.match(src, /else if \(C\.pub && !S\.minors\.policy && C\.suggestKidsUntil\) \{ S\.minors\.policy = 'minors_until'; S\.minors\.until = C\.suggestKidsUntil; \}/);
+  assert.match(src, /else if \(C\.pub && !S\.minors\.policy && C\.suggestKidsUntil\) \{ S\.minors\.policy = 'minors_until'; S\.minors\.until = C\.suggestKidsUntil; S\.kidsGuessed = 'minors_until'; \}/);
   const fn = /function beforeClose\(\)\{[\s\S]*?\n {2}\}\n/.exec(src)[0] + /function minorsDefault\(\)\{[\s\S]*?\n {2}\}\n/.exec(src)[0] + /function parseWeek\(w\)\{.*\}\n/.exec(src)[0];
   const run = (week, f = 'minorsDefault') => vm.runInNewContext(`var S = { week: ${JSON.stringify(week)} }, CUR = {}, DAYS = ['mon','tue','wed','thu','fri','sat','sun']; ${fn}; ${f}();`);
   assert.match(src, /until: \(S\.pubInfo\.minors \|\| \{\}\)\.until \|\| minorsDefault\(\)/); assert.match(src, /until: BIm\.until \|\| minorsDefault\(\)/);

@@ -236,7 +236,7 @@ test('plan your visit: Flights, Food, To go and Kids & dogs are written from the
   // French lines ride along.
   const info = app.venueVisitInfo(b.id);
   assert.equal(info.owner_fr.Food.fr, 'Camions-restaurants la plupart des jours. Vous pouvez apporter votre pique-nique.' /* distillery test 2 */);
-  assert.equal(info.owner_fr['To go'].fr, 'Canettes, bouteilles et remplissage de growlers pour emporter.');
+  assert.equal(info.owner_fr['To go'].fr, 'Canettes, bouteilles et remplissage de cruchons (growlers) pour emporter.');
   // Owner lines first, never folded under "More".
   const html = app.visitInfoHtml(info, false);
   const open = html.split('<details')[0];
@@ -251,7 +251,7 @@ test('plan your visit: Flights, Food, To go and Kids & dogs are written from the
   const k = mk('brewery'); const tk = tokenFor(k.id);
   assert.equal((await change(tk, { brewery_info: { food: 'kitchen', kitchen: { mode: 'earlier', closes: '21:00' }, outside: 'no', to_go: ['none'] } })).status, 200);
   assert.equal(row(k.id, 'Food').text, 'Our own kitchen; it closes at 9 PM. No outside food, please.');
-  assert.equal(app.venueVisitInfo(k.id).owner_fr.Food.fr, 'Cuisine sur place; elle ferme à 21 h. Pas de nourriture de l’extérieur.');
+  assert.equal(app.venueVisitInfo(k.id).owner_fr.Food.fr, 'Cuisine sur place ; elle ferme à 21 h. Pas de nourriture de l’extérieur.');
   assert.equal(row(k.id, 'To go').text, 'Nothing to go.');
   // Weekly events answered: research's Games line is set aside (Undo brings it back).
   assert.equal((await change(t, { not_offered: ['entertainment'] })).status, 200);
@@ -406,8 +406,8 @@ test('every brewery word has English and French, with French spacing', () => {
   assert.equal(app.PLACE_TYPE_DISPLAY_FR['Taphouse or beer hall'], 'Bar à bières');
   const b = { id: -1, type: 'brewery', dog_friendly: 0 };
   const lines = app.breweryVisitLines(b, { fee: 12.5, to_go: ['crowler'], food: 'snacks' });
-  assert.equal(lines.Flights.fr, '12,50 $ le plateau.');
-  assert.equal(lines['To go'].fr, 'Remplissage de crowlers pour emporter.');
+  assert.equal(lines.Flights.fr, '12,50 $ la palette.');
+  assert.equal(lines['To go'].fr, 'Remplissage de canettes géantes (crowlers) pour emporter.');
   assert.equal(lines.Food.fr, 'Collations seulement.');
 });
 
@@ -439,7 +439,7 @@ test('Build My Trip: a stop shows the owner’s flight price; a brewery closed f
   const b = mk('brewery'); const t = tokenFor(b.id);
   assert.equal((await change(t, { flight_fee: 12 })).status, 200);
   const pv = planner.publicVenue({ id: b.id, type: 'brewery', url: '/kelowna/breweries/x', flightFee: 12, features: {}, collections: [] }, null);
-  assert.deepEqual(pv.cost, { cents: 1200, label: 'Flight', labelFr: 'Plateau de dégustation', source: null });
+  assert.deepEqual(pv.cost, { cents: 1200, label: 'Flight', labelFr: 'Palette de dégustation', source: null });
   // Wineries keep their own tasting fee.
   const pw = planner.publicVenue({ id: 1, type: 'winery', url: '/x', tastingFee: 15, features: {}, collections: [] }, null);
   assert.equal(pw.cost.label, 'Tasting');
@@ -811,7 +811,7 @@ test('test 2 fix 6: Facebook pre-filled from a facebook.com website, one link on
   assert.equal(app.dogsChipSentences('Chiens bienvenus à l’intérieur'), 'Chiens bienvenus à l’intérieur.');
   assert.equal(app.dogsChipSentences('Patio only, on leash'), 'Dogs welcome on the patio only, on leash', 'her own words: as typed');
   // Hours buttons (breweries only).
-  assert.match(s, /BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00'\]/);
+  assert.match(s, /BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00', '23:00'\]/);
   assert.match(s, /function brewQuick\(d, j, y, last\)\{\n    if \(!C\.brewery\) return '';/);
   assert.match(s, /su-laterow su-bqrow/); assert.match(app.OWNER_SETUP_CSS || (await get(`/owner/${tokenFor(mk('brewery').id)}/setup`)).text, /\.su-bqrow \.su-latebtn \{ padding: 0 10px; \}/, 'four times fit one row at 375px');
 });
@@ -1101,7 +1101,7 @@ test('brewery test 4: small fixes (menu path, kids pre-fill, last step, Dogs on 
   assert.equal(cfgOf((await get(`/owner/${tokenFor(b.id)}/setup`)).text).suggestKidsUntil, '20:00');
   assert.equal(app.researchKidsUntil([{ label: 'Hours', text: 'Open until 9 PM' }]), '');
   assert.equal(app.researchKidsUntil([{ label: 'Kids', text: 'Minors welcome until 9:30 p.m.' }]), '21:30');
-  assert.match(s, /if \(!BIm\.policy && C\.suggestKidsUntil\) \{ S\.minors\.policy = 'minors_until'; S\.minors\.until = C\.suggestKidsUntil; \}/);
+  assert.match(s, /if \(!BIm\.policy && C\.suggestKidsUntil\) \{ S\.minors\.policy = 'minors_until'; S\.minors\.until = C\.suggestKidsUntil; S\.kidsGuessed = 'minors_until'; \}/);
   // The checklist names only what's left: photos sent -> the door is the last step.
   const base0 = { address: '1 Main', latitude: 1, longitude: 1, hasHours: true, hoursCheckedAt: today, imageUrl: '/images/x.jpg', photoCount: 1, description: 'x'.repeat(130), cuisine: 'Italian', phone: '1', website: 'https://a.example' };
   assert.match(pc.renderCompleteness(pc.scoreCompleteness(base0, { today }), {}), /Photos and your storefront spot are the last steps/);

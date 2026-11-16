@@ -486,6 +486,7 @@ function frenchWordsFor(text, taxonomy, words) {
 }
 // The foods and drinks « après » can stand before as a happy hour (« après sushi », « après tapas »).
 const APRES_FOOD = new Set('sushi sushis tapas pizza pizzas burger burgers ailes wings tacos nachos huitres oysters poke ramen biere bieres vin vins cocktail cocktails sake bouchees saumon fruits'.split(' '));
+const FR_DATE_MONTHS = { janvier: 'january', fevrier: 'february', mars: 'march', avril: 'april', mai: 'may', juin: 'june', juillet: 'july', aout: 'august', septembre: 'september', octobre: 'october', novembre: 'november', decembre: 'december' };
 function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
   if (typeof text !== 'string') return null;
   const tokens = tokenize(text);
@@ -518,6 +519,18 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
         out.push(`starting at ${hour % 12 || 12}:${departure[2] || '00'} ${hour >= 12 ? 'pm' : 'am'}`);
         i += consumed; continue;
       }
+    }
+    // Brewery test 2 (Whistler, 2026-11-16): a French date (« le lundi 3 mai », « le 1er juin ») is that date in the English
+    // the planner reads ("monday may 3"): it was read as the month alone, and its time was lost. Not inside a « du 3 au
+    // 5 mai » range (handled below).
+    const dm = /^(\d{1,2})(?:er)?$/.exec(w), monthEn = dm ? FR_DATE_MONTHS[tokens[i + 1]] : null;
+    if (dm && monthEn && Number(dm[1]) >= 1 && Number(dm[1]) <= 31 && !keep.has(i + 1) && !(tokens[i - 1] === 'au' && /^\d{1,2}$/.test(tokens[i - 2] || '')) && tokens[i - 1] !== 'du') {
+      if (out[out.length - 1] === 'the') { out.pop(); pieces.pop(); }
+      out.push(`${monthEn} ${Number(dm[1])}`); i += 2; continue;
+    }
+    // « à midi », « vers midi », « midi » alone: noon (« après-midi » is its own phrase and never reaches here).
+    if (w === 'midi' || ((w === 'a' || w === 'vers') && tokens[i + 1] === 'midi' && !keep.has(i + 1))) {
+      out.push(w === 'vers' ? 'around noon' : 'at noon'); i += w === 'midi' ? 1 : 2; continue;
     }
     // Restaurant test 2 (Whistler, 2026-11-14): a meal's French clock (« souper … à 20 h », « vers 19 h », « 20 h 30 »,
     // « à 20h30 ») is that time in the English the planner reads ("at 8:00 pm", "around 7:00 pm"). Only after « à »,

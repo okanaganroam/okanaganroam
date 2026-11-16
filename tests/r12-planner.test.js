@@ -258,7 +258,7 @@ test('Repetition (round 12): the top picks rotate by request, within a small fix
 
 // ---- 2. French copy and parsing ----
 test('French (round 12): « 1er » dates, « à travers », slot labels with « ou », day tabs with « et », « un dernier verre »', () => {
-  assert.equal(fr.tripPlannerText('Kelowna le 1er novembre', TAXONOMY), 'kelowna the 1 november');
+  assert.equal(fr.tripPlannerText('Kelowna le 1er novembre', TAXONOMY), 'kelowna november 1');
   assert.equal(r.tripCalendar(fr.tripPlannerText('Kelowna le 1er novembre', TAXONOMY), '2026-10-19').startDate, '2026-11-01');
   const trip = build('road trip à travers l’Okanagan', { french: true });
   assert.deepEqual(trip.intent.textTerms, []);

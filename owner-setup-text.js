@@ -1179,7 +1179,7 @@ fr.brewery = {
   // Brewery test 3 (2026-11-13): « votre salle de dégustation » or « votre microbrasserie », never a bare « votre salle ».
   hiLead: 'Préparons la page de votre microbrasserie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { hours: 'Heures et jours fériés', taproom: 'Votre salle de dégustation', flights: 'Plateaux et pour emporter', happy: '5 à 7', photos: 'Photos', offer: 'Ce que vous offrez',
+  labels: { hours: 'Heures et jours fériés', taproom: 'Votre salle de dégustation', flights: 'Palettes et pour emporter', happy: '5 à 7', photos: 'Photos', offer: 'Ce que vous offrez',
     story: 'Votre histoire et ce pour quoi vous êtes reconnus', music: 'Événements de la semaine', groups: 'Groupes et réservations', social: 'Instagram et Facebook', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou liste des bières' },
   menuQ: 'Comment ajouter votre menu ou votre liste des bières?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre tableau fonctionne aussi, même si vos bières changent souvent.',
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', music: 'pas d’événements', happy: 'pas de 5 à 7' },
@@ -1197,24 +1197,24 @@ fr.brewery = {
   tkitchenQ: 'Votre cuisine ferme-t-elle avant le bar?', tkitchenOpts: { same: 'Non, on sert à manger jusqu’à la fermeture', earlier: 'Oui, elle ferme plus tôt' }, tkitchenAt: 'La cuisine ferme à',
   tkitchenNeed: 'Choisissez l’heure de fermeture de votre cuisine.', tfoodNeed: 'Touchez la nourriture offerte ici.',
   taproomSaved: 'Vos réponses sont sur votre page maintenant.',
-  flightQ: 'Combien coûte un plateau de dégustation?', flightLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.', flightLeadPick: 'Votre fiche indique « {x} » tout de suite.',
+  flightQ: 'Combien coûte une palette de dégustation?', flightLead: 'Le prix paraît sur votre page et sur votre fiche tout de suite.', flightLeadPick: 'Votre fiche indique « {x} » tout de suite.',
   flightGuess: 'Votre fiche indique {x} maintenant, d’après votre site Web. Touchez un autre prix s’il a changé.', flightGuessVisit: 'Votre page indique {x} maintenant, d’après votre site Web, alors nous l’avons choisi. Touchez un autre prix s’il a changé.', flightWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
   feeOther: 'Autre', feeLabel: 'Prix en dollars', feeOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.',
-  noFlights: 'Nous n’offrons pas de plateaux', noFlightsSub: 'Votre fiche n’affiche aucun prix',
+  noFlights: 'Nous n’offrons pas de palettes', noFlightsSub: 'Votre fiche n’affiche aucun prix',
   togoGuess: 'Nous les avons cochés d’après ce qui est sur votre page. Touchez pour les changer.', dogGuess: 'Nous l’avons rempli d’après ce qui est sur votre page. Changez-le s’il ne convient pas.',
   eventsGuess: 'Nous l’avons rempli d’après ce qui est sur votre page. Vérifiez le jour et ajoutez l’heure.', eventsHint: 'Votre page indique : « {x} »',
-  togoQ: 'Qu’est-ce qu’on peut rapporter?', togoLead: 'Touchez tout ce qui s’applique.', togo: { cans: 'Canettes', bottles: 'Bouteilles', growler: 'Remplissage de growlers', crowler: 'Remplissage de crowlers', none: 'Rien à emporter' },
-  flightNeed: 'Touchez un prix, ou « Nous n’offrons pas de plateaux ».', togoNeed: 'Touchez ce qu’on peut rapporter, ou « Rien à emporter ».', feeNeed: 'Écrivez le prix en dollars, par exemple 12.',
-  flightSavedLive: 'Votre prix de plateau et votre réponse pour emporter sont sur votre page maintenant.', flightSavedDay: 'Votre réponse pour emporter est sur votre page maintenant. Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.',
-  feeCard: 'À partir de {x}', feeCardFree: 'Plateaux gratuits',
+  togoQ: 'Qu’est-ce qu’on peut rapporter?', togoLead: 'Touchez tout ce qui s’applique.', togo: { cans: 'Canettes', bottles: 'Bouteilles', growler: 'Remplissage de cruchons (growlers)', crowler: 'Remplissage de canettes géantes (crowlers)', none: 'Rien à emporter' },
+  flightNeed: 'Touchez un prix, ou « Nous n’offrons pas de palettes ».', togoNeed: 'Touchez ce qu’on peut rapporter, ou « Rien à emporter ».', feeNeed: 'Écrivez le prix en dollars, par exemple 12.',
+  flightSavedLive: 'Votre prix de palette et votre réponse pour emporter sont sur votre page maintenant.', flightSavedDay: 'Votre réponse pour emporter est sur votre page maintenant. Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.',
+  feeCard: 'À partir de {x}', feeCardFree: 'Palettes gratuites',
   happyYes: 'Oui', whatsOnEx: '2 $ de rabais sur les pintes',
-  offerLead: 'Les visiteurs s’en servent pour trouver une salle comme la vôtre.',
+  offerLead: 'Les visiteurs s’en servent pour trouver un endroit comme le vôtre.',
   minorsQ: 'Qui est le bienvenu?', minorsLead: 'Les familles vérifient souvent avant de venir. Dites-nous votre propre règle.',
   minorsOpts: { adults: 'Adultes seulement (19 ans et plus)', minors_until: 'Mineurs bienvenus avec un adulte, jusqu’à une heure donnée', all_ages: 'Tous les âges sont bienvenus' },
   minorsUntil: 'Mineurs bienvenus jusqu’à', minorsNoteLabel: 'Autre chose? (facultatif)', minorsNoteEx: 'Enfants bienvenus à l’intérieur jusqu’à 21 h; terrasse 19 ans et plus.',
   minorsNeed: 'Touchez l’une des trois réponses, pour que les familles le sachent avant de venir.', saveThese: 'Enregistrer', nextPlain: 'Suivant',
   minorsLive: 'C’est sur votre page maintenant, et cela décide de votre mention Enfants bienvenus.',
-  storyQ: 'Parlez de votre microbrasserie aux visiteurs', storyEx: 'Une petite microbrasserie familiale au centre-ville. Nous brassons à l’arrière, servons 12 fûts à l’avant, et la terrasse a le soleil du soir.',
+  storyQ: 'Parlez de votre microbrasserie aux visiteurs', storyEx: 'Une petite microbrasserie familiale au centre-ville. Nous brassons à l’arrière, servons 12 bières en fût à l’avant, et la terrasse a le soleil du soir.',
   knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite ».', knownEx: 'Des IPA troubles et une sure aux mûres',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   groupsQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille. Vous pouvez changer les mots.',
@@ -1570,14 +1570,14 @@ Object.assign(fr, {
 // "open but closing early" under the holiday tiles, a time warning that knows the other hours, and the specials box's
 // character count. Cafés: no "Open after midnight?", a second time without "lunch & dinner", and where events go.
 Object.assign(en, {
-  holEarly: 'Open that day but closing early? Leave it unticked and message us the date and time.',
+  holEarly: 'Open that day but closing early or opening late? Leave it unticked and message us the date and time.',
   outsideNowFine: ' (your hours right now; fine in your {a} – {b} hours)',
   outsideUsualFine: ' (your usual hours; fine in your {a} – {b} hours)',
   outsideSeaOnly: ' (in your {a} – {b} hours; fine the rest of the year)',
   specialCount: '{n} of {max} characters',
 });
 Object.assign(fr, {
-  holEarly: 'Ouvert ce jour-là, mais vous fermez plus tôt ? Ne le cochez pas et écrivez-nous la date et l’heure.',
+  holEarly: 'Ouvert ce jour-là, mais vous fermez plus tôt ou ouvrez plus tard ? Ne le cochez pas et écrivez-nous la date et l’heure.',
   outsideNowFine: ' (vos heures en ce moment; c’est correct selon vos heures du {a} au {b})',
   outsideUsualFine: ' (vos heures habituelles; c’est correct selon vos heures du {a} au {b})',
   outsideSeaOnly: ' (selon vos heures du {a} au {b}; c’est correct le reste de l’année)',
@@ -1648,6 +1648,26 @@ fr.brewery.kindCidery.kinds = Object.assign({}, fr.brewery.kindCidery.kinds, { t
 en.brewery.kindNeutral.kinds = Object.assign({}, en.brewery.kindNeutral.kinds, { tour: 'Tour' });
 fr.brewery.kindNeutral.kinds = Object.assign({}, fr.brewery.kindNeutral.kinds, { tour: 'Visite' });
 
+// Brewery test 2 (Whistler, 2026-11-16; Whistler Roam drafts/fresh-eyes-brewery2-2026-11-16/REPORT.md). Shared by every
+// type: the events screen's closed-day heads-up, the seasonal kitchen question for two stretches of other hours, the
+// kids pre-pick note, "Saturday" beside Sat–Sun, the happy hour count's reason, and the last screen's French-only line.
+Object.assign(en, {
+  closedWarnNight: 'Heads up: you’re closed on {days}{when}. Your page says so beside it, and never shows it as on that day.',
+  kitchenSeasonQ2: 'In your {a} – {b} and {a2} – {b2} hours, when does the kitchen close?',
+  kidsGuess: 'We picked this from what’s on your page. Tap another answer if that’s not right.',
+  copySat: 'Saturday',
+  roomDays: '(the days, “{days}”, go in front on your page)',
+  frOnlyFinish: 'Some of your answers are in French only, so they show on your French page only. To show them on your English page too, add them in English on your edit page.',
+});
+Object.assign(fr, {
+  closedWarnNight: 'Attention : vous êtes fermé le {days}{when}. Votre page le dira à côté, et ne l’affichera jamais comme ayant lieu ce jour-là.',
+  kitchenSeasonQ2: 'Pendant vos heures du {a} au {b} et du {a2} au {b2}, à quelle heure la cuisine ferme-t-elle?',
+  kidsGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez une autre réponse si ce n’est pas juste.',
+  copySat: 'Samedi', dayPrefixFr: true,
+  roomDays: '(les jours, « {days} », s’ajoutent devant sur votre page)',
+  frOnlyFinish: 'Certaines de vos réponses sont en français seulement : elles paraissent sur votre page française seulement. Pour les afficher aussi sur votre page anglaise, ajoutez-les en anglais sur votre page de modification.',
+});
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.
@@ -1655,6 +1675,9 @@ function frSpacing(t) {
   return String(t)
     .replace(/([^\s\u00a0\u202f\d/])[ \u00a0\u202f]?:(?=[\s»”)]|$)/g, '$1\u00a0:')
     .replace(/([^\s\u00a0\u202f?!])[ \u00a0\u202f]?([?!]+)(?=[\s»”)]|$)/g, '$1\u202f$2')
+    // Brewery test 2 (Whistler, 2026-11-16): a narrow no-break space before « ; » too (« … jusqu’à 21 h ; chiens sur la
+    // terrasse »). An HTML entity's own semicolon (&amp;) is left alone.
+    .replace(/(&[a-zA-Z#0-9]{1,8};)|([^\s\u00a0\u202f;])[ \u00a0\u202f]?;(?=[\s»”)]|$)/g, (m, ent, c) => (ent ? ent : `${c}\u202f;`))
     // Distillery test 2 (2026-11-13): « 91 % » never wraps before the sign.
     .replace(/(\d|\})[ \u202f]%/g, '$1\u00a0%')
     // Cocktail test 2 (2026-11-13): « 15 $ » never wraps before the sign either.

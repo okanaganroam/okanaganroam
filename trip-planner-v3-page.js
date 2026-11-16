@@ -1429,7 +1429,7 @@ function renderScript(d) {
     // The label comes from the planner ("Kids until 9 PM"); the page has already written its time in the page's style
     // ("9 PM" / "21 h"), so French only swaps the words around it.
     var kidsUntil = function(b){ var t = String(b.label || '').replace(/^Kids until /, ''); return lang() === 'fr' ? 'Enfants jusqu’à ' + t : 'Kids until ' + t; };
-    var badgeLi = function(b){ return '<li>' + esc(b.key === 'dog_friendly' && v.dogsOutsideOnly ? (lang() === 'fr' ? 'Chiens à l’extérieur seulement' : 'Dogs outside only') : b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    var badgeLi = function(b){ return '<li>' + esc(b.key === 'dog_friendly' && v.dogsPatioOnly ? (lang() === 'fr' ? 'Chiens sur la terrasse' : 'Dogs on patio') : b.key === 'dog_friendly' && v.dogsOutsideOnly ? (lang() === 'fr' ? 'Chiens à l’extérieur seulement' : 'Dogs outside only') : b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));
@@ -1453,7 +1453,7 @@ function renderScript(d) {
       // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
       // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
       // wording, the card's « À partir de », not « dès »).
-      var fromWord = cost.label === 'Flight' ? (french ? 'Plateaux à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : '';
+      var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : '';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
@@ -1582,7 +1582,9 @@ function renderScript(d) {
     if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
     (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
     // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
-    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
+    // Brewery test 2 (Whistler, 2026-11-16): on the French page a kind the planner names ("venues with happy hour") reads
+    // in French (« Lieux avec un 5 à 7 »); a word the visitor typed stays as typed.
+    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); if (lang() === 'fr' && Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES, w.toLowerCase())) w = FR_HEADING_NAMES[w.toLowerCase()]; chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
     (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
     // No length given (2026-10-19): ask for one, with the same Length control.
     var lengthAsk = '';

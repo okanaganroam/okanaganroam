@@ -98,7 +98,7 @@ test('help in a café’s setup answers the café questions plainly, in English 
   assert.match(en.topic('cafe-event-late').a, /That’s fine\. On your edit page, open <strong>Weekly events<\/strong> and add it with its own times/);
   assert.match(en.topic('cafe-order-link').a, /We don’t ask about ordering ahead right now.*<strong>menu link<\/strong> or your <strong>website<\/strong>.*email us/);
   assert.doesNotMatch(en.topic('cafe-order-link').a, /wine list/i);
-  assert.match(en.topic('cafe-early-close').a, /^<p>Open but closing early\? Message us the date and time.*Closed all day\? Tap the holiday right here in setup/);
+  assert.match(en.topic('cafe-early-close').a, /^<p>Open but closing early or opening late\? Message us the date and time.*Closed all day\? Tap the holiday right here in setup/);
   assert.doesNotMatch(en.topic('cafe-early-close').a, /On your edit page/);
   assert.match(en.topic('cafe-laptops').a, /doesn’t ask about laptops any more/, 'the laptops answer is kept');
   // A closed day in the setup is the setup's own screen, not "On your edit page…".
@@ -125,7 +125,7 @@ test('help in a café’s setup answers the café questions plainly, in English 
   assert.match(helpBot((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).topic('hours').a, /\+ Add a second time \(lunch &amp; dinner\)/);
   // "Closed on a holiday" in any setup is that setup's own screen, in its own words, with the early-close line.
   assert.match(pub.topic('closures').a, /^<p>Right here in setup: <strong>Holidays and closures<\/strong> \(tap <strong>Change an answer<\/strong> if it’s done\)\. Tap each holiday you’re closed/);
-  assert.match(pub.topic('closures').a, /Open that day but closing early\? Leave it unticked and message us the date and time\.<\/p>$/);
+  assert.match(pub.topic('closures').a, /Open that day but closing early or opening late\? Leave it unticked and message us the date and time\.<\/p>$/);
   const rest = helpBot((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.equal(rest.best('closed on christmas day').id, 'closures'); assert.doesNotMatch(rest.topic('closures').a, /On your edit page/);
   assert.match(helpBot((await get(`/owner/${tokenFor(mk('restaurant').id)}`)).text).topic('closures').a, /edit page|Special closures/, 'the edit page keeps its own answer');
@@ -133,8 +133,8 @@ test('help in a café’s setup answers the café questions plainly, in English 
 
 // ---------- 2. Holidays screen ----------
 test('the holidays screen says what to do when open but closing early (EN + FR), under the tiles', async () => {
-  assert.equal(text.en.holEarly, 'Open that day but closing early? Leave it unticked and message us the date and time.');
-  assert.equal(text.fr.holEarly, 'Ouvert ce jour-là, mais vous fermez plus tôt ? Ne le cochez pas et écrivez-nous la date et l’heure.');
+  assert.equal(text.en.holEarly, 'Open that day but closing early or opening late? Leave it unticked and message us the date and time.');
+  assert.equal(text.fr.holEarly, 'Ouvert ce jour-là, mais vous fermez plus tôt ou ouvrez plus tard ? Ne le cochez pas et écrivez-nous la date et l’heure.');
   const v = maya();
   assert.equal(cfgOf((await get(`/owner/${tokenFor(v.id)}/setup`)).text).t.holEarly, text.en.holEarly);
   assert.equal(cfgOf((await get(`/fr/owner/${tokenFor(v.id)}/setup`)).text).t.holEarly, text.fr.holEarly);
@@ -328,7 +328,7 @@ test('the time warning knows the other hours: "(your hours right now; fine in yo
   assert.equal(run('2026-11-15T12:00:00', { week: WK('07:00', '16:00'), sea: { on: false, months: {}, exact: null } })(special), 'Heads up: these times are outside your hours on Monday and Tuesday. Check the start and end.');
   assert.equal(run('2026-11-15T12:00:00', S)({ ...special, start: '07:00' }), '');
   // French.
-  assert.equal(run('2026-11-15T12:00:00', S, { ...text.fr, ...text.fr.cafe })(special), 'Attention : ces heures sont en dehors de vos heures d’ouverture le lundi et le mardi (vos heures en ce moment; c’est correct selon vos heures du 27 nov. au 18 avr.). Vérifiez le début et la fin.');
+  assert.equal(run('2026-11-15T12:00:00', S, { ...text.fr, ...text.fr.cafe })(special), 'Attention : ces heures sont en dehors de vos heures d’ouverture le lundi et le mardi (vos heures en ce moment ; c’est correct selon vos heures du 27 nov. au 18 avr.). Vérifiez le début et la fin.');
 });
 
 test('a special is not "Today" once its end time has passed or the place has closed for the day: the page, and the map’s row and script', async () => {

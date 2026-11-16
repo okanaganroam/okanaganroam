@@ -247,7 +247,7 @@ test('6: a seasonal kitchen time is stored in pub_info.kitchen.season and the pa
   assert.match(app.pubInfoLinesHtml(app.getVenue(v.id), false, at('2027-07-12', '12:00')), /Kitchen closes at 9 PM/);
   assert.equal((await change(t, { pub_info: { kitchen: { mode: 'earlier', closes: '20:00', season: { from: '06-01', to: '08-31', closes: '9pm' } } } })).status, 400);
   const s = scriptOf((await get(`/owner/${t}/setup`)).text);
-  assert.match(s, /kv\.season = \{ from: kseason\.from, to: kseason\.to/);
+  assert.match(s, /kv\.season = \{ from: ks\[0\]\.from, to: ks\[0\]\.to, closes: c \};/);
   for (const k of ['kitchenSeasonQ', 'kitchenSeasonSame', 'kitchenSeasonClose', 'kitchenSeasonNeed']) assert.ok(TEXT.en[k] && TEXT.fr[k], k);
 });
 

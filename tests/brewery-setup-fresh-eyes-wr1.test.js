@@ -493,7 +493,7 @@ test('help for breweries: no kitchen, bring your own food, growlers, tours, non-
   assert.match(hb.topic('brewery-food-trucks').a, /<strong>Your menu or tap list<\/strong>/);
   // Asked in the setup: "Right here in setup" (it said "Open Set up your page…" while on that screen).
   assert.match(hb.topic('brewery-price').a, /^<p>Right here in setup: <strong>Flights and to go<\/strong> \(tap <strong>Change an answer<\/strong> if it’s done\)\./);
-  assert.match(hb.topic('brewery-price').aFr, /^<p>Ici même, dans la configuration : <strong>Plateaux et pour emporter<\/strong>/);
+  assert.match(hb.topic('brewery-price').aFr, /^<p>Ici même, dans la configuration : <strong>Palettes et pour emporter<\/strong>/);
   // The edit page keeps the way in.
   const edit = helpBot((await get(`/owner/${t}`)).text);
   assert.match(edit.topic('brewery-price').a, /^<p>Open <strong>Set up your page<\/strong>/);
@@ -653,7 +653,7 @@ test('Build My Trip: “Dogs outside only” for a place whose owner said so (ne
   assert.ok(!out.reasons.includes('Has the Dog-Friendly badge'));
   assert.notEqual(ins.venue.badges.find((b) => b.key === 'dog_friendly').label, 'Dogs outside only');
   // Where the planner gives the badge as a reason, it is the same words.
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /if \(v\.features\.dog_friendly\) add\('feature', 8, v\.dogsOutsideOnly \? 'Dogs outside only' : 'Has the Dog-Friendly badge'\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /if \(v\.features\.dog_friendly\) add\('feature', 8, v\.dogsPatioOnly \? 'Dogs on patio' : v\.dogsOutsideOnly \? 'Dogs outside only' : 'Has the Dog-Friendly badge'\);/);
   assert.equal(frCopy.t3FrenchText('Dogs outside only'), 'Chiens à l’extérieur seulement');
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(v3, /b\.key === 'dog_friendly' && v\.dogsOutsideOnly \? \(lang\(\) === 'fr' \? 'Chiens à l’extérieur seulement' : 'Dogs outside only'\)/);

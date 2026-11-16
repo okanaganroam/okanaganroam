@@ -167,7 +167,9 @@ function renderFoodDrinkVenueLayout(parts) {
   // The tabs: only for sections this page really has, and only when there are at least two to move between.
   const tabs = [];
   if (parts.experienceHtml) tabs.push(['fdTastings', 'Tastings']);
-  if (menu) tabs.push(['fdMenu', 'Menu']);
+  // Brewery test 1 port (2026-11-16): the section tab says "Tap list" too for a brewery with no kitchen (the button and
+  // the card already did).
+  if (menu) tabs.push(['fdMenu', mw && !parts.menuHtml ? mw.label : 'Menu']);
   if (deals) tabs.push(['fdDeals', dealsLabel]);
   if (hours) tabs.push(['venueHours', 'Hours']);
   const nav = tabs.length >= 2

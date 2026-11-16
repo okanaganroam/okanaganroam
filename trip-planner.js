@@ -169,7 +169,16 @@ function kitchenCloseMinutes(v) {
   return n < NIGHT_ENDS_AT_KIDS ? n + 1440 : n;
 }
 function kitchenMealText(v, meal, closes) {
-  return `${meal === 'lunch' ? 'Lunch' : 'Dinner'} at ${v.name}${closes != null ? ` (kitchen until ${kidsClock(closes)})` : ' (its own kitchen)'}`;
+  // A named pub with no kitchen answer of its own: just "Dinner at <pub>" (nothing is claimed about its kitchen).
+  return `${meal === 'lunch' ? 'Lunch' : 'Dinner'} at ${v.name}${closes != null ? ` (kitchen until ${kidsClock(closes)})` : v.ownKitchen ? ' (its own kitchen)' : ''}`;
+}
+// Brewery test 2 (Whistler, 2026-11-16): a place the visitor named can be the meal itself: a brewery, distillery or pub
+// whose owner said it has its own kitchen (within its kitchen hours), or a pub that hasn't said "no food" (open for an
+// hour of the meal's window). A brewery with no kitchen answer is never the meal.
+function namedMealFit(v, win, weekday) {
+  if (!v) return null;
+  if (v.ownKitchen) return kitchenMealFit(v, win, weekday);
+  return v.type === 'pub' && !v.noFood ? kitchenMealFit({ ...v, ownKitchen: {} }, win, weekday) : null;
 }
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
@@ -1186,7 +1195,8 @@ function scoreVenue(v, ctx) {
   for (const f of ctx.features) {
     if (f === 'dog_friendly') {
       // Café test 2 (Whistler, 2026-11-15): the owner said dogs stay outside: never the plain badge line.
-      if (v.features.dog_friendly) add('feature', 8, v.dogsOutsideOnly ? 'Dogs outside only' : 'Has the Dog-Friendly badge');
+      // Brewery test 2 (Whistler, 2026-11-16): and "Dogs on patio" when that is what the owner said.
+      if (v.features.dog_friendly) add('feature', 8, v.dogsPatioOnly ? 'Dogs on patio' : v.dogsOutsideOnly ? 'Dogs outside only' : 'Has the Dog-Friendly badge');
       else if (v.collections.includes('dog_friendly')) add('feature', 8, 'Listed as an official dog-friendly beach area');
     } else if (v.features[f]) add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
     if (f === 'live_music') {
@@ -1454,7 +1464,7 @@ function publicVenue(v, ctx) {
   const cocktail = v.type === 'cocktail' && typeof v.cocktailPrice === 'number' && Number.isFinite(v.cocktailPrice) && v.cocktailPrice > 0 ? v.cocktailPrice : null;
   const cost = cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
-    : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Plateau de dégustation', source: null }) : tripStopPrice(v.url, v.id);
+    : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
   return {
     // Distillery test 2 (2026-11-13): a distillery's or brewery's own "Free tastings" (a price of 0) says "Free tasting"
     // too; it read « Prix par personne à vérifier ».
@@ -1476,7 +1486,7 @@ function publicVenue(v, ctx) {
     // card can show as they are -- the verified badge columns that are set
     // (only on the Food & Drink / winery types, where the badges exist),
     // the curated collections, and the stored weekly hours as listed.
-    badges: BADGE_TYPES.includes(v.type) ? Object.keys(v.features || {}).filter((f) => v.features[f]).map((f) => ({ key: f, label: f === 'kid_friendly' && kidsUntilMinutes(v) != null ? `Kids until ${kidsClock(kidsUntilMinutes(v))}` : f === 'dog_friendly' && v.dogsOutsideOnly ? 'Dogs outside only' : ctx ? featureLabel(ctx, f) : f })) : [],
+    badges: BADGE_TYPES.includes(v.type) ? Object.keys(v.features || {}).filter((f) => v.features[f]).map((f) => ({ key: f, label: f === 'kid_friendly' && kidsUntilMinutes(v) != null ? `Kids until ${kidsClock(kidsUntilMinutes(v))}` : f === 'dog_friendly' && v.dogsPatioOnly ? 'Dogs on patio' : f === 'dog_friendly' && v.dogsOutsideOnly ? 'Dogs outside only' : ctx ? featureLabel(ctx, f) : f })) : [],
     // 'dog_friendly' is the official dog-access list for beaches and outdoor
     // places; on dining venues the Dog-Friendly badge above says it.
     collections: (v.collections || []).filter((c) => PUBLIC_COLLECTION_LABELS[c] && (c !== 'dog_friendly' || OUTSIDE_TYPES.includes(v.type))).map((c) => ({ key: c, label: PUBLIC_COLLECTION_LABELS[c] })),
@@ -1486,6 +1496,7 @@ function publicVenue(v, ctx) {
     ...(v.ownerHours ? { hoursByOwner: true } : {}),
     ...(kidsUntilMinutes(v) != null && v.features && v.features.kid_friendly ? { kidsUntil: v.kidsUntil } : {}),
     ...(v.dogsOutsideOnly && v.features && v.features.dog_friendly ? { dogsOutsideOnly: true } : {}),
+    ...(v.dogsPatioOnly && v.features && v.features.dog_friendly ? { dogsPatioOnly: true } : {}),
     // Round 12 (2026-10-20): the venue's own French notice for its "Advisory on Whistler Roam" caveat, used on /fr/trip.
     ...(v.advisory && v.advisory.note && v.advisory.noteFr ? { advisoryFr: { en: `Advisory on ${SITE.brand}: ${advisoryExcerpt(v.advisory.note)}`, fr: `Avis ${SITE.brandFrOf} : ${advisoryExcerpt(v.advisory.noteFr)}` } } : {}),
   };
@@ -8012,8 +8023,24 @@ function planItinerary(input) {
     // kitchen hours, when no cuisine was asked for. Restaurants are scored as before.
     const kitchenPart = !c.venueId && ['dinner', 'supper', 'lunch'].includes(c.meal) && (c.types || []).includes('restaurant') && !(c.cuisines || []).length;
     const kitchenWin = SLOT_WINDOWS[daypart || (c.meal === 'lunch' ? 'midday' : 'evening')], kitchenDay = anchor?.weekday || ctx.startWeekday || null;
+    // Brewery test 2 (Whistler, 2026-11-16): the places the request names. A named brewpub (or pub) is the dinner or lunch
+    // itself, ahead of any restaurant ("dinner with kids at 6 PM at the brewpub" booked a second dinner elsewhere): when
+    // its own stop is already in the plan that stop is the meal; otherwise it is this part's first choice.
+    // With kids, never at a meal time at or after the place's own time for minors ("dinner with kids at 9:30", kids
+    // until 9 PM): the place is then judged as before.
+    const mealAt = input.requirements && Number.isFinite(input.requirements.startMinutes) ? input.requirements.startMinutes : null;
+    const kidsLate = (v) => { const km = c.kids && v ? kidsUntilMinutes(v) : null; return km != null && mealAt != null && (mealAt < NIGHT_ENDS_AT_KIDS ? mealAt + 1440 : mealAt) >= km; };
+    const namedIds = new Set(parts.filter((q) => q.c.kind === 'venue' && q.c.venueId).map((q) => q.c.venueId).filter((id) => !kidsLate(facts.find((f) => f.id === id))));
+    if (kitchenPart && namedIds.size) {
+      const st = stops.find((s) => s.kind === 'venue' && s.venue && namedIds.has(s.venue.id) && !s.kitchenMeal && namedMealFit(facts.find((f) => f.id === s.venue.id), kitchenWin, kitchenDay)?.ok);
+      if (st) {
+        const f = facts.find((x) => x.id === st.venue.id), kf = namedMealFit(f, kitchenWin, kitchenDay), line = kitchenMealText(f, c.meal, kf.closes);
+        st.kitchenMeal = true; st.reasons = [{ code: 'meal', text: line, weight: 20 }].concat(st.reasons || []); st.why = [line].concat(st.why || []).slice(0, 3);
+        continue;
+      }
+    }
     for (const v of facts) {
-      const kFit = kitchenPart && !(c.types || []).includes(v.type) ? kitchenMealFit(v, kitchenWin, kitchenDay) : null;
+      const kFit = kitchenPart && !(c.types || []).includes(v.type) ? (namedIds.has(v.id) ? namedMealFit(v, kitchenWin, kitchenDay) : kitchenMealFit(v, kitchenWin, kitchenDay)) : null;
       if (kFit && !kFit.ok) continue;
       if (used.has(v.id) || (!(c.venueId && c.venueId === v.id) && !regionOk(v, ctx)) || !eligible(v, c.venueId === v.id ? { ...ctx, types: new Set([v.type]), activities: new Set() } : kFit ? { ...ctx, types: new Set([...ctx.types, v.type]) } : ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue; // a named place counts wherever it is (2026-10-25: Madeley Lake in the Callaghan)
       if (walking && previousVenue && (v.region !== previousVenue.region || kmBetween(previousVenue,v) == null || kmBetween(previousVenue,v) > walkingLimit)) continue;
@@ -8085,7 +8112,7 @@ function planItinerary(input) {
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
       const dogCaveat = dogSeasonCaveat(v, c);
       const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : []);
-      if (kFit) { score -= 10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
+      if (kFit) { score += namedIds.has(v.id) ? 500 : -10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
       scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}) });
     }
     scored.sort(compareScored);
