@@ -24593,6 +24593,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     render(!!me || !!town);
   }
   kindChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-kind'); kinds[k] = !kinds[k]; track('map_filter', { filter: k, on: kinds[k] }); changed(); }); });
+  function positionActivityShortcuts(){
+    var target = WIDE.matches ? $('pmPlaceFilters') : panel.querySelector('.rn-categories');
+    target.appendChild($('rnOutdoorShortcuts'));
+  }
+  positionActivityShortcuts();
+  if (WIDE.addEventListener) WIDE.addEventListener('change', positionActivityShortcuts);
   $('rnOutdoorShortcuts').addEventListener('click', function(e){
     var shortcut = e.target.closest('[data-outdoor-search]');
     if (!shortcut) return;
