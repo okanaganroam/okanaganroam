@@ -64,7 +64,8 @@ test('a Food & Drink page uses the shared layout and says what is recorded', () 
   assert.match(html, /<h1 class="venue-mobile-title">Orchard Row Test Kitchen<\/h1>/);
   assert.match(html, /\$\$\$ \(expensive\)/, 'the price level is explained');
   assert.match(html, /Menu examples \$16–38/);
-  assert.deepEqual(tabs(html).map((t) => t[1]), ['Overview', 'Menu', 'Deals & nights', 'Hours']);
+  // A restaurant's are "events" since 2026-11-16 (pubs keep "Deals & nights").
+  assert.deepEqual(tabs(html).map((t) => t[1]), ['Overview', 'Menu', 'Deals & events', 'Hours']);
   for (const [id] of tabs(html)) assert.match(html, new RegExp(`id="${id}"`), `tab target ${id} exists`);
   assert.match(html, /href="#fdMenu">\S* Menu &amp; prices/);
   assert.match(html, /href="#venueHours">\S* Hours/);
