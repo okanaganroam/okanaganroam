@@ -141,7 +141,7 @@ function renderFoodDrinkVenueLayout(parts) {
       + '<a class="fd-full-menu" href="' + esc(parts.menuLink) + '">See the full menu (' + esc(parts.menuCountText) + ') →</a>' + ownMenuLink
       + fold('More menu details &amp; dietary options', parts.menuHtml) + '</section>';
   } else if (parts.menuOwnUrl) {
-    menu = mw ? '<section class="fd-card" id="fdMenu"><h2>' + esc(mw.label) + ' 🍺</h2><p>The latest ' + esc(mw.lower) + ' is on ' + (short || name) + '’s own page.</p>'
+    menu = mw ? '<section class="fd-card" id="fdMenu"><h2>' + esc(mw.label) + ' ' + (parts.menuIcon || '🍺') + '</h2><p>The latest ' + esc(mw.lower) + ' is on ' + (short || name) + '’s own page.</p>'
       + '<a class="fd-full-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">' + esc(mw.see) + ' ↗</a></section>'
       : '<section class="fd-card" id="fdMenu"><h2>Menu &amp; prices 🍽️</h2><p>The latest menu and prices are on ' + (short || name) + '’s own website.</p>'
       + '<a class="fd-full-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">See the menu ↗</a></section>';
@@ -182,7 +182,7 @@ function renderFoodDrinkVenueLayout(parts) {
   // Main buttons
   const buttons = [];
   if (parts.primaryActionHtml) buttons.push(parts.primaryActionHtml.replace('class="cta secondary"', 'class="cta fd-menu-button"'));
-  if (menu) buttons.push(mw && !parts.menuHtml ? '<a class="cta fd-menu-button" href="#fdMenu">🍺 ' + esc(mw.label) + '</a>' : '<a class="cta fd-menu-button" href="#fdMenu">🍽️ Menu &amp; prices</a>');
+  if (menu) buttons.push(mw && !parts.menuHtml ? '<a class="cta fd-menu-button" href="#fdMenu">' + (parts.menuIcon || '🍺') + ' ' + esc(mw.label) + '</a>' : '<a class="cta fd-menu-button" href="#fdMenu">🍽️ Menu &amp; prices</a>');
   // Directions is the main button unless there is a menu button, which leads.
   if (parts.directionsHtml) buttons.push(menu || parts.primaryActionHtml ? parts.directionsHtml.replace('class="cta"', 'class="cta secondary"') : parts.directionsHtml);
   if (hours) buttons.push('<a class="cta secondary" href="#venueHours">🕒 Hours</a>');

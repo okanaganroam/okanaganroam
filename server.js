@@ -7331,6 +7331,97 @@ function runTripPlan(args, now = new Date()) {
   plan = runTripPlanSkiFallback(plan, args, now);
   try { plan = tripNamedVenuePlan(plan, args, now); } catch (e) { /* keep the plan */ }
   try { plan = tripHappyHourCrawlPlan(plan, args, now); } catch (e) { /* keep the plan */ }
+  try { plan = tripListedEventTidy(plan, args, now); } catch (e) { /* keep the plan */ }
+  return plan;
+}
+// Distillery test 1 (Whistler, 2026-11-16), three things said plainly after planning:
+//  - a class asked for is planned under the one word "masterclass" (runTripPlanCore); the visitor's own words go back
+//    into every line, and the word is never "not part of this plan" when a planned place lists a class that day;
+//  - a dated request for a listed event (a tour, a class, trivia…) that found no place, when a place lists that event
+//    on that day of the week but is closed on the date (a two-week spring break), says so with the reason;
+//  - an outside town's name that sits inside a planned listing's own name ("Lillooet River Distilling") is not a town
+//    "we can't plan around".
+function tripListedEventTidy(plan, args, now = new Date()) {
+  if (!plan || !args) return plan;
+  const text = String(args.text || '');
+  const norm = discoveryIntentModule().normalizeDiscoveryText;
+  const planner = tripPlannerModule();
+  let planText = text;
+  try { planText = tripPlannerFrModule().tripPlannerText(text, buildTripPlannerTaxonomy()); } catch (e) { planText = text; }
+  const stopsOf = (p) => [...(p.days || []).flatMap((d) => d.stops || []), ...((p.itinerary && p.itinerary.stops) || []), ...((p.outing && p.outing.stops) || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
+  const askedDate = plan.season && parseLocalDate(plan.season.date) && plan.season.date !== todayLocal(now) ? plan.season.date : null;
+  const planDate = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null) || askedDate;
+  OWN_CLASS_WORDS_RE.lastIndex = 0; OWN_CLASS_BARE_RE.lastIndex = 0;
+  const classM = OWN_CLASS_WORDS_RE.exec(planText), bareM = classM || !tripAnyClassListed() ? null : OWN_CLASS_BARE_RE.exec(planText);
+  OWN_CLASS_WORDS_RE.lastIndex = 0; OWN_CLASS_BARE_RE.lastIndex = 0;
+  const classWords = classM ? classM[0].toLowerCase() : bareM ? bareM[0].slice((bareM[1] || '').length).toLowerCase() : '';
+  // The kinds of listed event the request asks for by name.
+  const kinds = new Set();
+  if (classWords) kinds.add('class');
+  if (OWN_TOUR_WORDS_RE.test(planText)) kinds.add('tour');
+  for (const ft of (plan.intent && plan.intent.foodTerms) || []) { const k = ft && !ft.cuisine ? planner.nightKindOfTerm(ft.term) : null; if (k) kinds.add(k); }
+  for (const w of norm(planText).split(' ')) { const k = planner.nightKindOfTerm(w); if (k) kinds.add(k); }
+  if (classWords && !/\bmaster ?class/i.test(text)) {
+    // A planned place that lists a class on the plan's day: the word was used.
+    let listed = false;
+    try {
+      const byVenue = allVenueWeeklyNights();
+      listed = stopsOf(plan).some((s) => (byVenue.get(s.venue.id) || []).some((n) => n && n.kind === 'class' && (!planDate || nightOnDate(n, planDate))));
+    } catch (e) { listed = false; }
+    const brandRe = new RegExp(`^Not part of this plan: (.+?) — ${TRIP_SITE.brand} couldn’t match (?:that word|those words) to a kind of place it lists\\.$`);
+    const listWords = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+    if (listed) {
+      plan.warnings = (plan.warnings || []).map((w) => {
+        const m = brandRe.exec(String(w));
+        if (!m) return w;
+        const left = [...m[1].matchAll(/“([^”]+)”/g)].map((q) => q[1]).filter((q) => !/^masterclass(?:es)?$/i.test(q));
+        return left.length ? `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — ${TRIP_SITE.brand} couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.` : null;
+      }).filter(Boolean);
+      plan.unsupported = (plan.unsupported || []).filter((u) => !/^masterclass(?:es)?$/i.test(String(u)));
+      if (plan.understood && Array.isArray(plan.understood.notUsed)) plan.understood.notUsed = plan.understood.notUsed.filter((u) => !/^masterclass(?:es)?$/i.test(String(u)));
+    }
+    const back = (o, depth) => {
+      if (typeof o === 'string') return /masterclass/i.test(o) ? o.replace(/\bmasterclass(?:es)?\b/gi, classWords) : o;
+      if (!o || typeof o !== 'object' || depth > 8) return o;
+      if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) o[i] = back(o[i], depth + 1); return o; }
+      for (const k of Object.keys(o)) { if (k === 'venue' || k === 'event' || k === 'events' || k === 'alternates' || k === 'query') continue; o[k] = back(o[k], depth + 1); }
+      return o;
+    };
+    back(plan, 0);
+  }
+  // A listed event asked for on a date when the place that lists it is closed.
+  if (kinds.size && planDate && !stopsOf(plan).length) {
+    const regions = (plan.intent && plan.intent.regions) || [];
+    const facts = buildTripPlannerFacts(false, planDate).filter((f) => (!regions.length || regions.includes(f.region)) && [...kinds].some((k) => { const nm = planner.venueNight(f, k, planDate); return !!(nm && nm.on); }));
+    const closedOn = (f) => !!(tripOwnerClosureOn(f, planDate) || tripClosedWeekday(f, planDate) || planner.seasonClosedOnTrip(f, { date: planDate }));
+    const said = (f) => (plan.warnings || []).some((w) => String(w).startsWith(`${f.name} `) && /closed/.test(String(w)));
+    const closed = facts.filter((f) => closedOn(f) && !said(f)).slice(0, 3);
+    if (closed.length) {
+      const notes = tripClosedNamedNotes(closed, planDate, true);
+      plan.warnings = notes.concat((plan.warnings || []).filter((w) => !notes.includes(w)));
+      plan.closedNamedVenues = (plan.closedNamedVenues || []).concat(closed.filter((f) => !(plan.closedNamedVenues || []).some((c) => c.id === f.id)).map((f) => ({ id: f.id, name: f.name, region: f.region, reopens: f.seasonReopens || null })));
+    }
+  }
+  // An outside town's name inside a planned (or closed, named) listing's name.
+  const outside = new Set((discoveryIntentModule().OUTSIDE_PLACE_NAMES || []).map((p) => norm(p)));
+  const flagged = (plan.unsupported || []).filter((u) => outside.has(norm(u)));
+  if (flagged.length) {
+    const names = [...stopsOf(plan).map((s) => s.venue.name), ...(plan.closedNamedVenues || []).map((c) => c.name)].map((n) => norm(String(n || '').replace(/['’]/g, '')).split(' ').filter(Boolean));
+    const words = norm(text.replace(/['’]/g, '')).split(' ').filter(Boolean);
+    const inName = (u) => {
+      const uw = norm(u).split(' ');
+      const at = [];
+      for (let i = 0; i + uw.length <= words.length; i++) if (uw.every((w, j) => words[i + j] === w)) at.push(i);
+      // Every time the town is typed, the word after it (or before it) is the listing's own next (or previous) word.
+      return at.length > 0 && at.every((i) => names.some((nw) => { for (let k = 0; k + uw.length <= nw.length; k++) { if (!uw.every((w, j) => nw[k + j] === w)) continue; const after = nw[k + uw.length], before = nw[k - 1]; if ((after && words[i + uw.length] === after) || (before && words[i - 1] === before)) return true; } return false; }));
+    };
+    const drop = new Set(flagged.filter(inName));
+    if (drop.size) {
+      plan.unsupported = plan.unsupported.filter((u) => !drop.has(u));
+      if (plan.understood && Array.isArray(plan.understood.notUsed)) plan.understood.notUsed = plan.understood.notUsed.filter((u) => !drop.has(u));
+      if (plan.intent && Array.isArray(plan.intent.unsupported)) plan.intent.unsupported = plan.intent.unsupported.filter((u) => !drop.has(u));
+    }
+  }
   return plan;
 }
 const TRIP_SPORT_INDOOR_RE = /\b(?:climbing gym|bouldering gym|curling)\b/i;
@@ -7768,7 +7859,10 @@ function tripClosedNamedNotes(list, date, dayDated = false) {
     // Restaurant test 1: a yearly closure of more than a day (a shoulder season) is "closed for the season" on that date,
     // with the owner's own reason when there is one.
     const ocSeason = oc && !tripHolidayName(oc.note) && (oc.yearly || (hoursModule && hoursModule.isYearlyClosure(oc))) && oc.from !== (oc.to || oc.from);
-    if (ocSeason) { const why = String(oc.note || '').replace(/[()]/g, '').trim(); dated.push(`${f.name} is closed for the season on ${monthDay(date)}${why ? ` (${why})` : ''}, so it isn’t in this plan.`); }
+    // Distillery test 1 (Whistler, 2026-11-16): a short yearly break (two weeks in spring, three weeks or less) is "closed
+    // on May 1 (spring break)", not "closed for the season".
+    const ocDays = ocSeason ? (() => { const y = 2027, t = (md) => Date.parse(`${y}-${String(md).slice(-5)}T12:00:00Z`); const a = t(oc.from), b = t(oc.to || oc.from); return Number.isFinite(a) && Number.isFinite(b) ? Math.round(((b >= a ? b : b + 365 * 86400000) - a) / 86400000) + 1 : 99; })() : 0;
+    if (ocSeason) { const why = String(oc.note || '').replace(/[()]/g, '').trim(); dated.push(`${f.name} is closed ${ocDays <= 21 ? 'on' : 'for the season on'} ${monthDay(date)}${why ? ` (${why})` : ''}, so it isn’t in this plan.`); }
     else if (oc) { const hol = tripHolidayName(oc.note); dated.push(`${f.name} is closed on ${monthDay(date)}${hol ? ` for ${hol}` : ''}, so it isn’t in this plan.`); }
     else if (wd && f.hoursSeason && !(Array.isArray(f.hoursSeason.otherOpen) && !f.hoursSeason.otherOpen.includes(wd))) dated.push(`${f.name} is closed ${TRIP_WEEKDAY_NAMES[wd]}s from ${stretchEnd(f.hoursSeason.from, f.hoursSeason, false)} to ${stretchEnd(f.hoursSeason.to, f.hoursSeason, true)}, so it isn’t in this plan.`);
     else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
@@ -7952,6 +8046,13 @@ function runTripPlanSkiFallback(plan, args, now) {
 // Brewery test 1 (Whistler, 2026-11-15): "a brewery tour on Saturday" is still read as a run of breweries (below), and
 // the planner is also told a tour was asked for, so a place whose own tour runs that day is visited at its tour time.
 const OWN_TOUR_WORDS_RE = /\b(?:craft )?(?:beer|brewery|brewpub|brew|cider|cidery|distillery) tours?\b/i;
+const OWN_CLASS_WORDS_RE = /\b(?:cocktails?|mixology|bartending|gin|whisky|whiskey|spirits?|distillery|distilling)[- ](?:making[- ])?(?:class(?:es)?|workshops?|master ?class(?:es)?)\b/gi;
+const OWN_CLASS_BARE_RE = /(^\s*|\b(?:a|an|the|some|any)\s+)class(?:es)?\b(?!\s+(?:act|of|action|reunion|a|b)\b)/gi;
+// Does any listed place have a class among its weekly events?
+function tripAnyClassListed() {
+  try { for (const list of allVenueWeeklyNights().values()) if ((list || []).some((n) => n && n.kind === 'class')) return true; } catch (e) { /* no nights table */ }
+  return false;
+}
 function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
@@ -7963,7 +8064,15 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl')
     // Brewery test 3 (2026-11-13): "cider" (« cidre ») on its own asks for the cideries (not a word in the descriptions);
     // "cider fest" and the like stay as typed, for What's On.
-    .replace(/\b(?:(?:hard|craft) )?ciders?\b(?! (?:fests?|festivals?|events?|days?|weekends?|crawls?|houses?|mills?|makers?|press(?:ing)?))/gi, 'cideries');
+    .replace(/\b(?:(?:hard|craft) )?ciders?\b(?! (?:fests?|festivals?|events?|days?|weekends?|crawls?|houses?|mills?|makers?|press(?:ing)?))/gi, 'cideries')
+    // Distillery test 1 (Whistler, 2026-11-16): "cocktail class" is a class a place lists (a distillery's, a lounge's),
+    // not a request for cocktail lounges; the planner reads it as the one word "masterclass" and looks for places whose
+    // own listing has a class that day. A plain "class" too ("a class in Pemberton on Thursday"); "cooking class",
+    // "yoga class", "first class" and What's On's "workshops" are left as typed.
+    // A plain "class" is read this way only while some place lists a class at all; with none it stays the passing word it was.
+    .replace(OWN_CLASS_WORDS_RE, 'masterclass').replace(OWN_CLASS_BARE_RE, (m, lead) => (tripAnyClassListed() ? `${lead || ''}masterclass` : m))
+    // "Happy hour cocktails" is a happy hour anywhere that has one then (a distillery, a pub), not only cocktail lounges.
+    .replace(/\b(?:happy hour cocktails?|cocktails? (?:at|during|for) (?:a |the )?happy hour|cocktail happy hours?)\b/gi, 'happy hour');
   // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
   // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and
   // lounges, unless wineries are listed or the wine is ruled out.
@@ -9084,7 +9193,7 @@ function getSeasonStates(now = new Date()) {
   try { extras = hoursExtrasMap(); } catch (e) { /* not set up yet (module load): no closure notices */ }
   for (const [id, x] of extras) {
     if (!x.closures.length) continue;
-    const st = tempClosureStateOn(x.closures, today);
+    const st = tempClosureStateOn(x.closures, today, (to) => firstOpenDayAfter(id, to));
     if (!st) continue;
     const cur = map.get(id);
     if (cur && (cur.kind === 'closed' || !st.current)) continue;
@@ -9100,15 +9209,35 @@ function getSeasonStates(now = new Date()) {
 // of two days or more shows from TEMP_CLOSURE_NOTICE_DAYS before it starts; a single day shows on that day only.
 // Back-to-back closures read as one. Each notice expires on its own the day the venue reopens.
 const TEMP_CLOSURE_NOTICE_DAYS = 14;
+// The first date after `to` on which the venue's own week (its seasonal week on that date, else its usual one) has it
+// open, looking a week ahead; null when its hours aren't known (the notice then says the day after, as before).
+function firstOpenDayAfter(venueId, to) {
+  if (!hoursModule || !parseLocalDate(to)) return null;
+  let v = null;
+  try { v = db.prepare('SELECT id, hours FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
+  if (!v || !v.hours) return null;
+  for (let i = 1; i <= 7; i++) {
+    const d = addLocalDays(to, i);
+    let parsed = null;
+    try { parsed = hoursModule.parseHours(weekJsonOn(v, d)); } catch (e) { return null; }
+    if (!parsed || !parsed.known) return null;
+    const day = parsed.days[TRIP_WEEKDAY_KEYS[new Date(`${d}T12:00:00Z`).getUTCDay()]];
+    if (day && day.status !== 'closed') return d;
+  }
+  return null;
+}
 function tempClosureDay(d) { return `${SEASON_TAG_MONTHS[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`; }
-function tempClosureText(from, to, today) {
+// Distillery test 1 (Whistler, 2026-11-16): "reopens May 10" named a Monday the place is always closed, while its status
+// said "Opens Thu, May 13". With the venue's own week (reopenOn), the notice names the first day it is open again.
+function tempClosureText(from, to, today, reopenOn) {
   const range = to === from ? tempClosureDay(from)
     : from.slice(0, 7) === to.slice(0, 7) ? `${tempClosureDay(from)}\u2013${Number(to.slice(8, 10))}` : `${tempClosureDay(from)}\u2013${tempClosureDay(to)}`;
-  const back = addLocalDays(to, 1);
+  let back = addLocalDays(to, 1);
+  if (typeof reopenOn === 'function') { try { const d = reopenOn(to); if (parseLocalDate(d) && d > to) back = d; } catch (e) { /* the day after, as before */ } }
   return `Closed ${range}, reopens ${tempClosureDay(back)}${back.slice(0, 4) !== String(today).slice(0, 4) ? `, ${back.slice(0, 4)}` : ''}.`;
 }
 // -> null | { kind: 'temp_closed', text, note, until: null, from, to, current }
-function tempClosureStateOn(closures, today) {
+function tempClosureStateOn(closures, today, reopenOn) {
   if (!parseLocalDate(today)) return null;
   const list = (closures || []).filter((c) => c && parseLocalDate(c.from))
     .map((c) => ({ from: c.from, to: c.to && parseLocalDate(c.to) && c.to >= c.from ? c.to : c.from }))
@@ -9119,7 +9248,7 @@ function tempClosureStateOn(closures, today) {
     if (today > c.to) continue;
     const showFrom = c.to > c.from ? addLocalDays(c.from, -TEMP_CLOSURE_NOTICE_DAYS) : c.from;
     if (today < showFrom) return null;
-    const text = tempClosureText(c.from, c.to, today);
+    const text = tempClosureText(c.from, c.to, today, reopenOn);
     return { kind: 'temp_closed', text, note: text, until: null, from: c.from, to: c.to, current: today >= c.from };
   }
   return null;
@@ -10362,6 +10491,7 @@ function visitInfoHtml(info, fr = false, opts = {}) {
   // half-swapped, and then dropped from the French page).
   // Brewery test 1 (2026-11-12): the Dogs chips as whole sentences ("Dogs welcome on the patio only", not "Patio only"),
   // and "Kids" for the Kids & dogs line when dogs have their own line and it doesn't speak of dogs.
+  info = visitRowsWithoutEchoedTastingPrice(info);
   info = { ...info, rows: info.rows.map((r) => (r && r.label === 'Dogs' && typeof r.text === 'string' ? { ...r, text: dogsChipSentences(r.text) } : r)) };
   const kidsOnly = info.rows.some((r) => r && r.label === 'Dogs' && r.text) && info.rows.some((r) => r && r.label === 'Kids & dogs' && !/\bdogs?\b|\bchiens?\b/i.test(String(r.text || '')));
   if (fr) {
@@ -21401,6 +21531,23 @@ function breweryAnd(list, fr) { return list.length > 1 ? `${list.slice(0, -1).jo
 // The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
 // answered, and its row is left as research has it.
 const BREWERY_MANAGED_LABELS = ['Flights', 'Food', 'To go', 'Kids & dogs', 'Games'];
+// A flight or tasting price in a line of research: "flights $12", "Tastings from $10", "$10 a tasting", "$12 for a flight".
+const FLIGHT_PRICE_RE = /\b(?:(?:tasting )?flights?|tastings?)\b(?:\s+(?:from|are|at|for|start at|starting at))?\s*:?\s*\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])|\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])\s+(?:for a |per |a )?(?:(?:tasting |beer |cider )?flights?|tastings?)\b/gi;
+// Distillery test 1 (Whistler, 2026-11-16): research's "Prices: Tastings $10" showed beside the owner's own "Tastings:
+// $10 a tasting…". A research Prices line that gives nothing but a tasting (or flight) price is left off the page once the
+// owner's own tasting line is there (display only: the stored row is untouched, and a Prices line with anything else in
+// it, "cocktails $14", stays).
+function visitRowsWithoutEchoedTastingPrice(info) {
+  if (!info || !Array.isArray(info.rows)) return info;
+  const own = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  if (!own.has('Flights') || own.has('Prices') || !info.rows.some((r) => r && r.label === 'Flights' && r.text)) return info;
+  const echo = (r) => {
+    if (!r || r.label !== 'Prices' || typeof r.text !== 'string' || r.url) return false;
+    const rest = r.text.replace(new RegExp(FLIGHT_PRICE_RE.source, 'gi'), ' ');
+    return rest !== r.text && !/\$|\d/.test(rest) && rest.replace(/[^a-zà-ÿ]/gi, '').length <= 3;
+  };
+  return info.rows.some(echo) ? { ...info, rows: info.rows.filter((r) => !echo(r)) } : info;
+}
 // Research's labels for the same line (Distillery test 1, 2026-11-13): a distillery's (or a cidery's) "Tastings" row is
 // what the owner's tasting price replaces.
 const BREWERY_LABEL_ALIASES = { Flights: ['Tastings'] };
@@ -34469,8 +34616,11 @@ function whatsOnWeeklyNightsHtml(now = new Date(), compact = false) {
     <div class="whatson-nights-day" data-day="${weekday}">${kinds.map((k) => {
       const list = groups.get(k).sort((a, b) => (specialMinutes(a.s.start) ?? 1440) - (specialMinutes(b.s.start) ?? 1440) || String(a.v.name).localeCompare(String(b.v.name)));
       const n = list.length;
-      const en = `${dayEn} · ${NIGHT_KIND_LABELS.en[k]} at ${n} place${n === 1 ? '' : 's'}`;
-      const fr = `${dayFr} · ${NIGHT_KIND_LABELS.fr[k]} à ${n} endroit${n === 1 ? '' : 's'}`;
+      // Distillery test 1 (Whistler, 2026-11-16): "Tonight · Tour at 1 place" for a 2 PM tour. A group whose events all
+      // start before 5 PM says "Today" (What's On's own rule for dated events).
+      const daytime = i === 0 && !compact && list.every(({ s }) => { const m = specialMinutes(s.start); return m !== null && m < 17 * 60; });
+      const en = `${daytime ? 'Today' : dayEn} · ${NIGHT_KIND_LABELS.en[k]} at ${n} place${n === 1 ? '' : 's'}`;
+      const fr = `${daytime ? 'Aujourd’hui' : dayFr} · ${NIGHT_KIND_LABELS.fr[k]} à ${n} endroit${n === 1 ? '' : 's'}`;
       return `
       <details class="whatson-nights-group" data-kind="${k}"${compact ? ` data-wo-weekly-label="${escapeHtml(`${dayEn} · ${NIGHT_KIND_LABELS.en[k]}`)}"` : ''}${i === 0 && !compact ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span${compact ? ' data-wo-weekly-summary' : ''}>${two(en, fr)}</span></summary>
         <ul>${list.map(({ v, s }) => {
@@ -37932,7 +38082,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
       menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(venueMenu.items, 'en', menuKind(venue)) : '',
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
-      menuWords: venueTapListWords(venue, false),
+      menuWords: venueTapListWords(venue, false), menuIcon: venueTapListIcon(venue),
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
       weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe', brew: venue.type === 'brewery', tours: venue.type === 'distillery', lounge: venue.type === 'cocktail' }), extraDealsHtml,
@@ -54594,14 +54744,24 @@ function venueTapListWords(venue, fr) {
   try { b = venueBreweryInfo(venue.id); } catch (e) { b = null; }
   if (!b || !b.food || b.food === 'kitchen') return null;
   const k = venue.type === 'distillery' ? 'Distillery' : breweryWordsKind(venue);
+  // Distillery test 1 (Whistler, 2026-11-16): a distillery's is its "Cocktail list" with a cocktail glass (it read
+  // "🍺 Drinks list": "why is there a beer mug on my page?"), the name the setup and the edit page use. A cidery's has an
+  // apple; only beer has the mug (venueTapListIcon).
   if (k === 'Cidery') return fr ? { label: 'Liste des cidres', see: 'Voir la liste des cidres', lower: 'liste des cidres' } : { label: 'Cider list', see: 'See the cider list', lower: 'cider list' };
-  if (k === 'Distillery') return fr ? { label: 'Liste des boissons', see: 'Voir la liste des boissons', lower: 'liste des boissons' } : { label: 'Drinks list', see: 'See the drinks list', lower: 'drinks list' };
+  if (k === 'Distillery') return fr ? { label: 'Carte des cocktails', see: 'Voir la carte des cocktails', lower: 'carte des cocktails' } : { label: 'Cocktail list', see: 'See the cocktail list', lower: 'cocktail list' };
   return fr ? { label: 'Liste des bières', see: 'Voir la liste des bières', lower: 'liste des bières' } : { label: 'Tap list', see: 'See the tap list', lower: 'tap list' };
+}
+// The little picture beside those words on the public page: a cocktail glass, an apple, or the beer mug.
+function venueTapListIcon(venue) {
+  if (!venue) return '🍺';
+  const k = venue.type === 'distillery' ? 'Distillery' : breweryWordsKind(venue);
+  return k === 'Distillery' ? '🍸' : k === 'Cidery' ? '🍏' : '🍺';
 }
 // The menu tile's words on the owner home, by kind: [title, subtitle] in English and French.
 function breweryListTile(venue) {
   // Distilleries (2026-11-13): the cocktail or tasting menu.
-  if (venue && venue.type === 'distillery') return { en: ['Update my cocktail or tasting menu', 'Snap your cocktail or tasting menu'], fr: ['Mettre à jour ma carte des cocktails ou de dégustation', 'Photographiez votre carte des cocktails ou de dégustation'] };
+  // Distillery test 1 (Whistler, 2026-11-16): one name everywhere, the setup tile's ("Your menu or cocktail list").
+  if (venue && venue.type === 'distillery') return { en: ['Update my menu or cocktail list', 'Snap your cocktail list or menu'], fr: ['Mettre à jour mon menu ou ma carte des cocktails', 'Photographiez votre carte des cocktails ou votre menu'] };
   const k = breweryWordsKind(venue);
   if (k === 'Cidery') return { en: ['Update my menu or cider list', 'Snap your chalkboard or cider list'], fr: ['Mettre à jour mon menu ou ma liste des cidres', 'Photographiez votre tableau ou votre liste des cidres'] };
   if (k === 'Brewery' || k === 'Taphouse or beer hall') return { en: ['Update my menu or tap list', 'Snap your chalkboard or tap list'], fr: ['Mettre à jour mon menu ou ma liste des bières', 'Photographiez votre tableau ou votre liste des bières'] };
@@ -54722,7 +54882,8 @@ function breweryCfg(venue, snap, fr) {
     // Brewery test 1 (Whistler, 2026-11-15): a flight price in any research line ("Prices: Pints from $8, flights $12").
     if (!r) for (const x of info.rows || []) {
       if (!x || mine.has(x.label) || typeof x.text !== 'string' || /happy hour|special|deal/i.test(x.text)) continue;
-      const fm = /\bflights?\b(?:\s+(?:from|are|at|for|start at|starting at))?\s*:?\s*\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])|\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])\s+(?:for a |per |a )?(?:tasting |beer |cider )?flights?\b/i.exec(x.text);
+      // Distillery test 1 (Whistler, 2026-11-16): "Tastings $10" too (a distillery's research rarely says "flights").
+      const fm = new RegExp(FLIGHT_PRICE_RE.source, 'i').exec(x.text);
       const n = fm ? Number(fm[1] || fm[2]) : 0;
       if (n > 0 && n <= 30) return n;
     }
@@ -54865,8 +55026,8 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
   { id: 'distillery-tours', pages: ['setup', 'edit'], over: ['nights', 'events', 'weekly-nights'], noRelated: ['weekly-nights'], q: 'Where do I add our tours and classes?', qFr: 'Où ajouter nos visites et nos ateliers?',
     keys: ['tour', 'tours', 'distillery tour', 'class', 'classes', 'cocktail class', 'whisky class', 'whiskey class', 'workshop', 'masterclass', 'events', 'event', 'book a tour'],
     keysFr: ['visite', 'visites', 'visite guidee', 'atelier', 'ateliers', 'cours', 'atelier cocktail', 'evenement', 'evenements'],
-    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Every other week, or only on set weeks like the first Saturday? Pick it under <strong>How often?</strong> on each one (Every other week, 1st of the month…) before you save.</p><p>Tours people book ahead? Say so in the tour’s detail (“Book ahead online”), or tap <strong>By appointment</strong>. Build My Trip only says “book ahead” then. Your booking page goes in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Une semaine sur deux, ou seulement certaines semaines comme le premier samedi? Choisissez-le sous <strong>À quelle fréquence?</strong> pour chacun (Une semaine sur deux, 1er du mois…) avant d’enregistrer.</p><p>Des visites à réserver? Dites-le dans le détail de la visite (« Réservez en ligne »), ou touchez <strong>Sur rendez-vous</strong>. Planifier mon voyage ne dit « réservez » qu’à ce moment-là. Votre page de réservation va dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
+    a: '<p>In <strong>Set up your page</strong>, tap <strong>Tours, classes and events</strong>. Tap <strong>Yes</strong>, then add each one: its name (“Whisky class”), the day or days, and the start time. Tap <strong>Save my events</strong>. They’re on your page right away, and Build My Trip can show them. Every other week, or only on set weeks like the first Saturday? Pick it under <strong>How often?</strong> on each one (Every other week, 1st of the month…) before you save.</p><p>Tours people book ahead, or a price? Say so in the tour’s name, after a comma (“Distillery tour, $20, book ahead”), or tap <strong>By appointment</strong>. Build My Trip only says “book ahead” then. Your booking page goes in <strong>Groups and booking</strong>, under Booking link. A new link is checked first, usually within a day.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, touchez <strong>Visites, ateliers et événements</strong>. Touchez <strong>Oui</strong>, puis ajoutez chacun : son nom (« Atelier whisky »), le ou les jours et l’heure de début. Touchez <strong>Enregistrer mes événements</strong>. Ils sont sur votre page tout de suite, et Planifier mon voyage peut les montrer. Une semaine sur deux, ou seulement certaines semaines comme le premier samedi? Choisissez-le sous <strong>À quelle fréquence?</strong> pour chacun (Une semaine sur deux, 1er du mois…) avant d’enregistrer.</p><p>Des visites à réserver, ou un prix? Dites-le dans le nom de la visite, après une virgule (« Visite de la distillerie, 20 $, réservez »), ou touchez <strong>Sur rendez-vous</strong>. Planifier mon voyage ne dit « réservez » qu’à ce moment-là. Votre page de réservation va dans <strong>Groupes et réservations</strong>, sous Lien de réservation. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</p>' },
   // Distillery test 2 (2026-11-13): "our tours are by appointment" got the hours answer. Tours or visits by appointment
   // point to the "By appointment" choice on Tours, classes and events, ahead of the hours-by-appointment topic.
   { id: 'distillery-tours-appointment', pages: ['setup', 'edit'], over: ['distillery-hours', 'distillery-tours', 'winery-appointment', 'nights', 'events', 'weekly-nights', 'hours'], noRelated: ['weekly-nights'],
@@ -54879,13 +55040,44 @@ const DISTILLERY_SETUP_HELP_TOPICS = [
     q: 'We’re seasonal, or open by appointment', qFr: 'Nous sommes saisonniers, ou ouverts sur rendez-vous',
     keys: withSeasonTalk(['by appointment', 'appointment', 'appointment only', 'call ahead', 'no set hours', 'winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours'], SEASON_TALK_KEYS),
     keysFr: withSeasonTalk(['rendez-vous', 'sur rendez-vous', 'appelez', 'pas d heures fixes', 'hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'changer mes heures'], SEASON_TALK_KEYS_FR),
-    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>.</p><ul><li>By appointment all year, with no set hours? Tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</li><li>Walk-ins part of the year? After your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick your walk-in dates. Outside them your card says “By appointment · call ahead”.</li><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li></ul><p>Hours saved in the setup are on your page right away, and the dates come back every year by themselves.</p>',
-    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>.</p><ul><li>Sur rendez-vous toute l’année, sans heures fixes? Touchez <strong>Nous n’avons pas d’heures fixes. Visites sur rendez-vous</strong>. Vos anciennes heures sont retirées de votre page, qui indique « Sur rendez-vous · appelez avant ».</li><li>Sans réservation une partie de l’année? Après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez vos dates sans réservation. En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».</li><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et les dates reviennent chaque année d’elles-mêmes.</p>' },
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>.</p><ul><li>By appointment all year, with no set hours? Tap <strong>We don’t have set hours. Visits are by appointment</strong>. Your old weekly hours come off your page, and it says “By appointment · call ahead”.</li><li>Walk-ins part of the year? After your hours, tap <strong>In the off-season we’re open by appointment</strong> and pick your walk-in dates. Outside them your card says “By appointment · call ahead”.</li><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li><li>Closed for a week or two (a spring break, renovations)? That’s on the next screen, after your hours: tap <strong>+ Closed for a week or two (or other dates)</strong>, pick the first and last day, and tick <strong>Every year</strong> if it repeats.</li></ul><p>Hours saved in the setup are on your page right away, and the dates come back every year by themselves.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>.</p><ul><li>Sur rendez-vous toute l’année, sans heures fixes? Touchez <strong>Nous n’avons pas d’heures fixes. Visites sur rendez-vous</strong>. Vos anciennes heures sont retirées de votre page, qui indique « Sur rendez-vous · appelez avant ».</li><li>Sans réservation une partie de l’année? Après vos heures, touchez <strong>En basse saison, nous ouvrons sur rendez-vous</strong> et choisissez vos dates sans réservation. En dehors de ces dates, votre fiche indique « Sur rendez-vous · appelez avant ».</li><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li><li>Fermé une semaine ou deux (une pause au printemps, des rénovations)? C’est à l’écran suivant, après vos heures : touchez <strong>+ Fermé une semaine ou deux (ou d’autres dates)</strong>, choisissez le premier et le dernier jour, et cochez <strong>Chaque année</strong> si cela revient.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et les dates reviennent chaque année d’elles-mêmes.</p>' },
   { id: 'distillery-menu', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'menu-import', 'photo-pending', 'brewery-taplist'], q: 'How do I update our spirits or cocktail list?', qFr: 'Comment mettre à jour notre liste de spiritueux ou de cocktails?',
     keys: ['spirits list', 'cocktail list', 'cocktail menu', 'tasting menu', 'cocktails', 'spirits', 'gin', 'vodka', 'whisky', 'whiskey', 'update our list', 'update my menu', 'update the menu', 'new spirits', 'menu'],
     keysFr: ['carte des cocktails', 'liste des cocktails', 'cocktails', 'spiritueux', 'liste de spiritueux', 'carte de degustation', 'mettre a jour le menu', 'menu'],
-    a: '<p>Your spirits and cocktail list lives in your menu. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my cocktail or tasting menu</strong>, then <strong>Take a photo of your menu</strong>. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page where you post it. Your page shows it as “See the menu”. A new link is checked first, usually within a day.</li></ul><p>In the setup, “Your menu” is a step only when you have your own kitchen; you can still add a list any time from your edit page.</p>',
-    aFr: '<p>Votre liste de spiritueux et de cocktails fait partie de votre menu. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour ma carte des cocktails ou de dégustation</strong>, puis <strong>Prendre votre menu en photo</strong>. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page où vous la publiez. Votre page l’affiche comme « Voir le menu ». Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul><p>Dans la configuration, « Votre menu » est une étape seulement si vous avez votre propre cuisine; vous pouvez quand même ajouter une liste en tout temps depuis votre page de modification.</p>' },
+    a: '<p>Your spirits and cocktail list lives in your menu. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or cocktail list</strong>, then <strong>Take a photo of your menu</strong>. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page where you post it. Your page shows it as “See the menu”. A new link is checked first, usually within a day.</li></ul><p>In the setup it’s the <strong>Your menu or cocktail list</strong> step, and you can add or change a list any time from your edit page.</p>',
+    aFr: '<p>Votre liste de spiritueux et de cocktails fait partie de votre menu. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma carte des cocktails</strong>, puis <strong>Prendre votre menu en photo</strong>. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page où vous la publiez. Votre page l’affiche comme « Voir le menu ». Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul><p>Dans la configuration, c’est l’étape <strong>Votre menu ou carte des cocktails</strong>, et vous pouvez ajouter ou changer une liste en tout temps depuis votre page de modification.</p>' },
+  // Distillery test 1 (Whistler, 2026-11-16): six things a first-time distiller asked that got no answer or the wrong one.
+  { id: 'distillery-no-beer', pages: ['setup', 'edit'], over: ['distillery-menu', 'dont-have', 'brewery-taplist', 'menu-add', 'badge-wrong'], q: 'We don’t make beer', qFr: 'Nous ne faisons pas de bière',
+    keys: ['beer', 'dont make beer', 'do not make beer', 'no beer', 'not a brewery', 'brewery', 'pints', 'tap list', 'taps', 'on tap', 'beer mug'],
+    keysFr: ['biere', 'bieres', 'pas de biere', 'pas une brasserie', 'brasserie', 'pintes', 'en fut'],
+    a: '<p>That’s fine. Your page is set up as a <strong>distillery</strong>, so it talks about spirits, tastings and cocktails. It never asks about beer, taps or pints, and there is nothing to switch off.</p><p>Your drinks go under <strong>Your menu or cocktail list</strong> (a link or a photo of your list), and your tasting price under <strong>Tastings and bottles</strong>.</p>',
+    aFr: '<p>Aucun souci. Votre page est configurée comme une <strong>distillerie</strong> : elle parle de spiritueux, de dégustations et de cocktails. Elle ne pose aucune question sur la bière, les fûts ou les pintes, et il n’y a rien à désactiver.</p><p>Vos boissons vont sous <strong>Votre menu ou carte des cocktails</strong> (un lien ou une photo de votre carte), et le prix de votre dégustation sous <strong>Dégustations et bouteilles</strong>.</p>' },
+  { id: 'distillery-snacks', pages: ['setup', 'edit'], over: ['distillery-menu', 'brewery-kitchen', 'brewery-outside-food', 'menu-add', 'dont-have', 'specials'], q: 'We only do snacks or a charcuterie board', qFr: 'Nous servons seulement des collations ou un plateau de charcuteries',
+    keys: ['charcuterie', 'charcuterie board', 'snack board', 'snack boards', 'cheese board', 'cheese plate', 'snacks', 'snack', 'small bites', 'just snacks', 'snacks only', 'no kitchen', 'dont have a kitchen', 'no food', 'we just do'],
+    keysFr: ['charcuteries', 'charcuterie', 'plateau de charcuteries', 'plateau de fromages', 'collations', 'collation', 'bouchees', 'pas de cuisine', 'pas de nourriture'],
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Food here</strong>. Tap <strong>Snacks only</strong> (a charcuterie or snack board counts), then say if people can bring their own food.</p><p>It’s on your page right away, as the Food line in “Plan your visit”. There is no list of snacks to fill in; if you want to name the board, add it to your story.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Nourriture sur place</strong>. Touchez <strong>Collations seulement</strong> (un plateau de charcuteries ou de collations compte), puis dites si on peut apporter sa propre nourriture.</p><p>C’est sur votre page tout de suite, à la ligne Nourriture de « Planifiez votre visite ». Il n’y a pas de liste de collations à remplir; pour nommer le plateau, ajoutez-le à votre histoire.</p>' },
+  { id: 'distillery-bottles', pages: ['setup', 'edit'], over: ['distillery-price', 'distillery-menu', 'menu-add', 'price-range'], q: 'Can I say we sell bottles?', qFr: 'Puis-je dire que nous vendons des bouteilles?',
+    keys: ['sell bottles', 'we sell bottles', 'bottles', 'bottle', 'bottle sales', 'bottle shop', 'buy a bottle', 'bottles to go', 'to go', 'take home', 'canned cocktails', 'cans', 'free with a bottle'],
+    keysFr: ['vendons des bouteilles', 'vendre des bouteilles', 'bouteilles', 'bouteille', 'vente de bouteilles', 'a emporter', 'emporter', 'rapporter', 'cocktails en canette', 'canettes'],
+    a: '<p>Yes. Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Tastings and bottles</strong>. Under <strong>What can people take home?</strong> tap <strong>Bottles</strong> (and <strong>Canned or bottled cocktails</strong> if you sell them), then tap <strong>Save these</strong>.</p><p>Your page says “To go: Bottles to go.” right away. The same screen asks if a tasting is free when people buy a bottle.</p>',
+    aFr: '<p>Oui. Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Dégustations et bouteilles</strong>. Sous <strong>Qu’est-ce qu’on peut rapporter?</strong>, touchez <strong>Bouteilles</strong> (et <strong>Cocktails en canette ou en bouteille</strong> si vous en vendez), puis touchez <strong>Enregistrer</strong>.</p><p>Votre page indique les bouteilles à emporter tout de suite. Le même écran demande si la dégustation est gratuite à l’achat d’une bouteille.</p>' },
+  { id: 'distillery-private', pages: ['setup', 'edit'], over: ['distillery-price', 'brewery-groups', 'distillery-tours-appointment', 'distillery-tours', 'event-add', 'plan-visit', 'booking-link', 'links'], q: 'Private tastings for groups', qFr: 'Dégustations privées pour les groupes',
+    keys: ['private tastings', 'private tasting', 'private tastings for groups', 'group tastings', 'group tasting', 'tastings for groups', 'tasting for groups', 'private events', 'private event', 'private bookings', 'book the tasting room', 'bachelorette', 'staff party'],
+    keysFr: ['degustations privees', 'degustation privee', 'degustations de groupe', 'degustation de groupe', 'degustations pour les groupes', 'evenements prives', 'evenement prive', 'reservations privees'],
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Groups and booking</strong>. Tap the size from which groups should book ahead, or write it in your own words (“Private tastings for groups of 6 or more, book ahead”), and paste your booking link if you have one.</p><p>It shows as the Groups line in “Plan your visit”, on your page right away. A new booking link is checked first, usually within a day.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Groupes et réservations</strong>. Touchez la taille à partir de laquelle les groupes doivent réserver, ou écrivez-le dans vos mots (« Dégustations privées pour les groupes de 6 ou plus, sur réservation »), et collez votre lien de réservation si vous en avez un.</p><p>Cela paraît à la ligne Groupes de « Planifiez votre visite », sur votre page tout de suite. Un nouveau lien de réservation est vérifié d’abord, habituellement d’ici un jour.</p>' },
+  { id: 'distillery-coming-soon', pages: ['setup', 'edit'], over: ['distillery-menu', 'menu-add', 'description', 'story', 'distillery-price'], q: 'Our whisky isn’t out yet', qFr: 'Notre whisky n’est pas encore sorti',
+    keys: ['isnt out yet', 'is not out yet', 'not out yet', 'out yet', 'coming soon', 'not released', 'not ready yet', 'still aging', 'aging', 'ageing', 'in barrels', 'in the barrel', 'new release', 'first release', 'next year', 'new spirit coming'],
+    keysFr: ['pas encore sorti', 'pas encore pret', 'bientot', 'a venir', 'vieillissement', 'en futs', 'en barriques', 'nouvelle cuvee', 'premiere cuvee', 'l an prochain'],
+    a: '<p>Say it in your story. Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Your story</strong>, and add a line like “Our first whisky is in barrels and comes out in 2028.”</p><p>A new story is checked first and shows within a day. There is no separate box for spirits that are coming; when it’s out, add it to your cocktail list or menu.</p>',
+    aFr: '<p>Dites-le dans votre histoire. Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Votre histoire</strong>, et ajoutez une ligne comme « Notre premier whisky vieillit en fûts et sortira en 2028. »</p><p>Une nouvelle histoire est vérifiée d’abord et paraît d’ici un jour. Il n’y a pas de case à part pour les spiritueux à venir; à sa sortie, ajoutez-le à votre carte des cocktails ou à votre menu.</p>' },
+  { id: 'distillery-cocktail-special', pages: ['setup', 'edit'], over: ['dont-have', 'hh-times', 'hh-deals', 'specials', 'features', 'distillery-menu', 'distillery-price'], q: 'We have a cocktail special on some days', qFr: 'Nous avons un spécial cocktails certains jours',
+    keys: ['cocktail special', 'cocktail specials', 'drink special', 'drinks special', 'drink specials', 'apres', 'dont do apres', 'no apres', 'apres ski', 'off cocktails', 'special thursday', 'special friday'],
+    keysFr: ['special cocktails', 'special cocktail', 'special sur les cocktails', 'special boissons', 'apres ski', 'pas d apres ski', 'rabais sur les cocktails'],
+    a: '<p>Yes, that’s the happy hour question. A drink special at set times (Thursday and Friday 3 to 5, $2 off cocktails) is a happy hour, whatever you call it: tap <strong>Yes</strong>, pick the days and times, and add the deals.</p><p>No drink special at set times? Tap <strong>No</strong>. It’s on your page right away, and you can change it any time.</p>',
+    aFr: '<p>Oui, c’est la question du 5 à 7. Un spécial sur les boissons à heures fixes (jeudi et vendredi de 15 h à 17 h, 2 $ de rabais sur les cocktails) est un 5 à 7, peu importe le nom que vous lui donnez : touchez <strong>Oui</strong>, choisissez les jours et les heures, et ajoutez les offres.</p><p>Pas de spécial à heures fixes? Touchez <strong>Non</strong>. C’est sur votre page tout de suite, et vous pouvez le changer en tout temps.</p>' },
   // The shared booking-link answer in tasting-room words (a distillery's page shows "Book a tasting").
   ...BREWERY_SETUP_HELP_TOPICS.filter((x) => ['booking-link', 'brewery-groups', 'brewery-kitchen', 'brewery-outside-food'].includes(x.id)).map((x) => (x.id === 'brewery-kitchen' || x.id === 'brewery-outside-food' ? { ...x, a: x.a.replace('<strong>Your taproom</strong>', '<strong>Food here</strong>'), aFr: x.aFr.replace('<strong>Votre salle de dégustation</strong>', '<strong>Nourriture sur place</strong>') } : x.id !== 'booking-link' ? x
     : { ...x, a: x.a.replace(/walk-in taprooms/g, 'walk-in tasting rooms').replace(/Book a table/g, 'Book a tasting'), aFr: x.aFr.replace(/Réserver une table/g, 'Réserver une dégustation') })),
@@ -55038,10 +55230,42 @@ function setupHereHelpTopics(venue, steps, list) {
   if (steps.includes('offer') && !has('parking-paid')) {
     const winery = venue.type === 'winery';
     out.push({ id: 'parking-paid', pages: ['setup'], over: ['plan-visit', 'cost', 'features', 'badge-wrong'], noRelated: ['cost'], q: 'Our parking is paid (or on the street)', qFr: 'Notre stationnement est payant (ou dans la rue)',
-      keys: ['paid parking', 'pay parking', 'parking', 'parking is not free', 'parking not free', 'pay lot', 'parking lot', 'parkade', 'street parking', 'where to park', 'no parking', 'free parking'],
-      keysFr: ['stationnement payant', 'stationnement', 'parking payant', 'parking', 'parcometre', 'parcometres', 'ou stationner', 'ou se stationner', 'stationnement dans la rue', 'pas de stationnement', 'stationnement gratuit'],
+      keys: ['paid parking', 'pay parking', 'parking', 'parking is not free', 'parking not free', 'pay lot', 'parking lot', 'parkade', 'street parking', 'where to park', 'no parking'],
+      keysFr: ['stationnement payant', 'stationnement', 'parking payant', 'parking', 'parcometre', 'parcometres', 'ou stationner', 'ou se stationner', 'stationnement dans la rue', 'pas de stationnement'],
       a: `<p>${here(en.offer)}: leave <strong>Free parking</strong> unticked (tick it only when parking is free). ${winery ? 'To say where to park, add a line to your story.' : 'To say where to park (a pay lot, the street), write it under <strong>Good to know</strong> in Plan your visit on your edit page.'}</p>`,
       aFr: `<p>${ici(fr.offer)} : laissez <strong>Stationnement gratuit</strong> décoché (cochez-le seulement si le stationnement est gratuit). ${winery ? 'Pour dire où stationner, ajoutez une ligne à votre histoire.' : 'Pour dire où stationner (un stationnement payant, la rue), écrivez-le sous <strong>Bon à savoir</strong>, dans Planifier la visite, sur votre page de modification.'}</p>` });
+  }
+  // Distillery test 1 (Whistler, 2026-11-16): "free parking on site" got the paid-parking answer ("leave Free parking
+  // unticked"). Free parking has its own answer: tick it.
+  if (steps.includes('offer') && !has('parking-free')) {
+    const winery = venue.type === 'winery';
+    out.push({ id: 'parking-free', pages: ['setup'], over: ['parking-paid', 'plan-visit', 'cost', 'features', 'badge-wrong'], noRelated: ['cost'], q: 'We have free parking', qFr: 'Nous avons un stationnement gratuit',
+      keys: ['free parking', 'parking is free', 'free parking on site', 'parking on site', 'free lot', 'our own lot', 'own parking lot', 'we have parking', 'lots of parking', 'plenty of parking'],
+      keysFr: ['stationnement gratuit', 'parking gratuit', 'stationnement sur place', 'stationnement est gratuit', 'notre propre stationnement', 'beaucoup de stationnement'],
+      a: `<p>${here(en.offer)}: tick <strong>Free parking</strong>. ${winery ? 'Paid or street parking? Leave it unticked and add a line to your story.' : 'Paid or street parking goes under <strong>Good to know</strong> (in Plan your visit, on your edit page).'}</p>`,
+      aFr: `<p>${ici(fr.offer)} : cochez <strong>Stationnement gratuit</strong>. ${winery ? 'Stationnement payant ou dans la rue? Laissez-le décoché et ajoutez une ligne à votre histoire.' : 'Un stationnement payant ou dans la rue va sous <strong>Bon à savoir</strong> (dans Planifier la visite, sur votre page de modification).'}</p>` });
+  }
+  // ...and "we close for two weeks in spring" got the seasonal-hours answer for every type (other hours, never the
+  // closures screen's "Closed for a week or two"). A short closure has its own answer: the closures answer, plus "Every
+  // year" and where different hours go instead.
+  const shortClosure = !has('setup-short-closure') ? setupClosuresHelpTopic(venue.type) : null;
+  if (shortClosure && typeof shortClosure.a === 'string') {
+    out.push({ ...shortClosure, id: 'setup-short-closure', pages: ['setup'], over: ['closures', 'seasonal-hours', 'setup-season', 'season', 'hours', 'distillery-hours', 'brewery-seasonal-hours', 'winery-appointment', 'setup-split-hours', 'restaurant-kitchen', 'brewery-kitchen', 'weekly-nights'], noRelated: ['seasonal-hours'],
+      q: 'We close for a week or two each year', qFr: 'Nous fermons une semaine ou deux chaque année',
+      keys: ['close for two weeks', 'closed for two weeks', 'close two weeks', 'closed two weeks', 'closes for two weeks', 'close for a week', 'closed for a week', 'close for a couple of weeks', 'closed for a couple of weeks', 'close for a few weeks', 'closed for a few weeks', 'close for three weeks', 'closed for three weeks', 'closed three weeks', 'week or two', 'spring break', 'fall break', 'close for renovations', 'closed for renovations', 'close for vacation', 'closed for vacation', 'close for holidays', 'staff holiday'],
+      keysFr: ['fermons deux semaines', 'ferme deux semaines', 'fermes deux semaines', 'fermons une semaine', 'ferme une semaine', 'fermons quelques semaines', 'ferme quelques semaines', 'fermons trois semaines', 'semaine ou deux', 'pause du printemps', 'relache', 'fermons pour des renovations', 'ferme pour renovations', 'fermons pour les vacances', 'ferme pour les vacances'],
+      a: `${shortClosure.a}<p>The same dates every year? Tick <strong>Every year</strong> when you add them. Different hours for part of the year (shorter in fall) aren’t a closure: after your hours, tap <strong>No, different for part of the year</strong>.</p>`,
+      aFr: `${shortClosure.aFr}<p>Les mêmes dates chaque année? Cochez <strong>Chaque année</strong> en les ajoutant. D’autres heures une partie de l’année (plus courtes à l’automne) ne sont pas une fermeture : après vos heures, touchez <strong>Non, c’est différent une partie de l’année</strong>.</p>` });
+  }
+  // ...and "how long until it shows" got the setup overview. What is true in the setup: an answer you tap (hours,
+  // closures, what you offer, prices, happy hour, events) is on the page as it saves; photos, a new story and a new link
+  // (website, menu, booking, Instagram, Facebook) are checked first and show within a day.
+  if (!has('setup-live-when')) {
+    out.push({ id: 'setup-live-when', pages: ['setup'], over: ['easy-setup', 'live-speed', 'photos-when', 'photo-pending', 'cost'], noRelated: ['cost'], q: 'How long until my answers show on my page?', qFr: 'Dans combien de temps mes réponses paraîtront-elles sur ma page?',
+      keys: ['how long until it shows', 'how long until', 'how long till', 'until it shows', 'when does it show', 'when will it show', 'when will this show', 'when does this show', 'when is it live', 'when does it go live', 'go live', 'goes live', 'how soon', 'how fast', 'how long does it take to show', 'show up on my page', 'show on my page', 'see it on my page', 'right away', 'is it live'],
+      keysFr: ['dans combien de temps', 'combien de temps avant', 'quand est ce que ca parait', 'quand ca parait', 'quand sera en ligne', 'en ligne quand', 'mis en ligne', 'tout de suite', 'paraitre sur ma page', 'voir sur ma page'],
+      a: '<p><strong>Most answers show right away</strong>, as soon as the screen says Saved: your hours, holidays and closures, what you offer, prices, happy hour and events.</p><p><strong>Within a day</strong> for anything we check first: photos, a new story, and a new link (your website, menu, booking page, Instagram or Facebook). You don’t need to do anything else.</p>',
+      aFr: '<p><strong>La plupart des réponses paraissent tout de suite</strong>, dès que l’écran indique Enregistré : vos heures, vos jours fériés et fermetures, ce que vous offrez, vos prix, votre 5 à 7 et vos événements.</p><p><strong>D’ici un jour</strong> pour ce que nous vérifions d’abord : les photos, une nouvelle histoire et un nouveau lien (votre site Web, votre menu, votre page de réservation, Instagram ou Facebook). Vous n’avez rien d’autre à faire.</p>' });
   }
   return out;
 }
@@ -55313,6 +55537,8 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-preview strong { font-size: 24px; display: block; }
   body.owner-setup .su-preview p { margin: 4px 0 0; color: var(--su-soft); font-size: 16px; }
   body.owner-setup .su-error { background: var(--su-warn-bg); color: var(--su-warn); font-weight: 800; padding: 12px 14px; border-radius: 12px; margin: 0 0 14px; }
+  /* Distillery test 1 (Whistler, 2026-11-16): "Skip these dates and keep going" under the all-closed message. */
+  body.owner-setup .su-seaskip { margin: 0 0 16px; }
   body.owner-setup .su-note { font-size: 16px; font-weight: 800; color: var(--su-good); min-height: 24px; margin: 0 0 12px; }
   body.owner-setup .su-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
   /* Full easy setup (2026-11-09) */
@@ -58796,6 +59022,18 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         if (field === 'brewery_info') {
           const v = value && typeof value === 'object' ? value : {};
           writeVenueBreweryInfo(venue.id, { ...Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => v[k] != null).map((k) => [k, v[k]])), ...(typeof all.fee === 'number' ? { fee: all.fee } : {}) });
+          // Distillery test 1 (Whistler, 2026-11-16): "Adults only (19+)" is the owner's own answer, so research's
+          // Kid-friendly badge goes with it (the stored column stayed 1; what visitors saw was already right). Logged
+          // like any badge change.
+          // An answer taken back (an Undo, or the answer cleared) puts back the badge this rule took off, and only that.
+          {
+            const ADULTS_REF = 'setup: adults only (19+)';
+            let raw = null, last = null;
+            try { raw = db.prepare('SELECT kid_friendly FROM venues WHERE id = ?').get(venue.id); last = db.prepare("SELECT old_value, new_value, source_ref FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'kid_friendly' ORDER BY id DESC LIMIT 1").get(venue.id); } catch (e) { raw = null; }
+            const adults = !!(v.minors && v.minors.policy === 'adults');
+            if (adults && raw && raw.kid_friendly === 1) { updateVenue(venue.id, { kid_friendly: false }); log.run(venue.id, 'kid_friendly', '1', '0', ADULTS_REF, meta.batch_id, reviewer); }
+            else if (!(v.minors && v.minors.policy) && before && before.minors && before.minors.policy === 'adults' && raw && raw.kid_friendly === 0 && last && last.source_ref === ADULTS_REF && last.new_value === '0') { updateVenue(venue.id, { kid_friendly: true }); log.run(venue.id, 'kid_friendly', '0', '1', `${ADULTS_REF} (taken back)`, meta.batch_id, reviewer); }
+          }
         } else {
           const fee = typeof value === 'number' && Number.isFinite(value) ? value : null;
           writeVenueBreweryInfo(venue.id, { ...breweryInfoAnswers(venue.id), ...(fee != null ? { fee } : {}) });
@@ -61280,9 +61518,29 @@ const LOUNGE_HINT_SWAPS = [
   ['« Mercredi des ailes »', '« Lundi martini »'],
 ];
 function loungeHints(html) { let out = html; for (const [a, b] of LOUNGE_HINT_SWAPS) out = out.split(a).join(b); return out; }
+// Distillery test 1 (Whistler, 2026-11-16): a distillery's edit page too ("House pints (20 oz)" and "trivia and karaoke go
+// under Weekly nights" were pub words; its events part is called Tours & events).
+// Each pair is looked for with any kind of space (the French lines carry no-break spaces), the full examples first, then
+// the names on their own (the boxes' placeholders and the help answers on the page).
+const DISTILLERY_HINT_SWAPS = [
+  ['&ldquo;House pints (20 oz)&rdquo; &middot; &ldquo;$6&rdquo;', '&ldquo;Gin and tonic&rdquo; &middot; &ldquo;$10&rdquo;'],
+  ['« Pintes maison (20 oz) » · « 6 $ »', '« Gin tonic » · « 10 $ »'],
+  ['trivia and karaoke go under Weekly nights', 'tours and classes go under Tours &amp; events'],
+  ['les quiz et le karaoké vont sous Soirées de la semaine', 'les visites et les ateliers vont sous Visites et événements'],
+  ['&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;', '&ldquo;Martini Monday&rdquo; &middot; &ldquo;$10 classic martinis&rdquo;'],
+  ['« Mercredi des ailes » · « Ailes à 60 ¢ »', '« Lundi martini » · « Martinis classiques à 10 $ »'],
+  ['60¢ wings, dine-in only', '$10 classic martinis'], ['Ailes à 60 ¢, sur place seulement', 'Martinis classiques à 10 $'],
+  ['House pints (20 oz)', 'Gin and tonic'], ['Pintes maison (20 oz)', 'Gin tonic'],
+  ['Wing Wednesday', 'Martini Monday'], ['Mercredi des ailes', 'Lundi martini'],
+];
+function distilleryHints(html) {
+  let out = html;
+  for (const [a, b] of DISTILLERY_HINT_SWAPS) out = out.replace(new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[ \u00a0\u202f]'), 'g'), () => b);
+  return out;
+}
 function renderOwnerPage(found, token, pending, lang = 'en') {
   const html0 = ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
-  const html = found && found.venue && found.venue.type === 'cocktail' ? loungeHints(html0) : html0;
+  const html = found && found.venue && found.venue.type === 'cocktail' ? loungeHints(html0) : found && found.venue && found.venue.type === 'distillery' ? distilleryHints(html0) : html0;
   return lang === 'fr' ? frTypographyPage(html) : html;
 }
 // Distillery test 2 (2026-11-13): the French owner home through the French spacing (a no-break space before « : » and
@@ -61851,6 +62109,8 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   /* Café test 1 (Whistler, 2026-11-15): a café is not offered Sports TV (its box is marked hidden, but .amenity-check's
      display:flex showed it anyway). */
   body.owner-page #opBadges[data-venue-type="cafe"] .amenity-check[hidden]:has(input[value="sports_tv"]) { display: none; }
+  /* Distillery test 1 (Whistler, 2026-11-16): a distillery's too (the setup never offers Sports TV to a distillery). */
+  body.owner-page #opBadges[data-venue-type="distillery"] .amenity-check[hidden]:has(input[value="sports_tv"]) { display: none; }
   body.owner-page .op-add { background: none; border: 1.5px dashed rgba(31,58,95,0.4); border-radius: 10px; color: var(--ref-navy); font: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer; padding: 6px 12px; min-height: 40px; }
   body.owner-page .op-copy { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.8); margin-top: 6px; }
   body.owner-page .op-copy button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 14px; min-height: 40px; margin: 2px 4px 2px 0; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
@@ -62115,7 +62375,7 @@ ${renderGolfHeaderHtml()}
 ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badges" data-task="more">
       <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { /* Brewery test 3 (Whistler, 2026-11-16): the count is every ticked box in the list below (it said "7 ticked" with 9 ticked: the owner-only boxes were left out). */ const on = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour) && !(venue.type === 'pub' && f === 'kid_friendly')); const extraOn = COMPLETENESS_TYPES.has(venue.type) ? ownerExtraBadgesFor(venue.type).filter((f) => snap.badges[f] && !on.includes(f)) : []; const n = on.length + extraOn.length; const nm = on.map((f) => (fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)).concat(extraOn.map((f) => extraBadgeLabel(f, venue.type, fr))).slice(0, 2).map((x) => escapeHtml(x)); return n ? L(`${n} ticked: ${nm.join(', ')}${n > 2 ? ' and more' : ''}`, `${n} coché${n === 1 ? '' : 's'} : ${nm.join(', ')}${n > 2 ? ' et plus' : ''}`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
       ${saveLine('own', '', 'badges')}<p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
-      <div class="amenity-check-grid" id="opBadges"${venue.type === 'cafe' ? ' data-venue-type="cafe"' : ''}>${badgeChecks}${featureChecks}
+      <div class="amenity-check-grid" id="opBadges"${venue.type === 'cafe' ? ' data-venue-type="cafe"' : venue.type === 'distillery' ? ' data-venue-type="distillery"' : ''}>${badgeChecks}${featureChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
@@ -68281,7 +68541,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Brewery test 1 (Whistler, 2026-11-15).
-  venueTapListWords, helpHereInSetup, betweenSecondTimeWords, OWNER_SEASONS_OVERLAP, breweryMenuAppStrings,
+  venueTapListWords, venueTapListIcon, firstOpenDayAfter, tripAnyClassListed, helpHereInSetup, betweenSecondTimeWords, OWNER_SEASONS_OVERLAP, breweryMenuAppStrings,
   // Cocktail test 2 (2026-11-13).
   // Pub test 3 (Whistler, 2026-11-14).
   NIGHT_FREQUENCY_LABELS, SETUP_NIGHTS_HELP_TOPIC, withSetupNightsTopic, researchKidsAll, wineryVisitTicks,

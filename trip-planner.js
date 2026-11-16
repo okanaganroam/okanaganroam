@@ -671,8 +671,11 @@ function dogOnlyPlace(v) { return ['beach', 'outdoor'].includes(v.type) && (DOG_
 // calendar, honouring the frequency); a place whose listed night of that kind is on another day ranks below.
 const NIGHT_ASK_TERMS = [[/^(?:trivia|trivia nights?|quiz|quizzes|quiz nights?|pub quiz)$/, 'trivia'], [/^(?:karaoke|karaoke nights?)$/, 'karaoke'], [/^(?:bingo|bingo nights?|singo)$/, 'bingo'],
   [/^(?:open mic|open mics|open mike|open mic nights?)$/, 'open_mic'], [/^(?:comedy nights?|stand up|standup)$/, 'comedy'], [/^(?:run club|running club|run clubs)$/, 'run_club'],
-  [/^(?:games? nights?|board games|cribbage|darts)$/, 'games'], [/^(?:paint nights?|paint and sip)$/, 'paint']];
-const NIGHT_KIND_WORDS = { trivia: 'trivia', karaoke: 'karaoke', bingo: 'bingo', open_mic: 'open mic', comedy: 'comedy', run_club: 'run club', games: 'games night', paint: 'paint night', live_music: 'live music' };
+  [/^(?:games? nights?|board games|cribbage|darts)$/, 'games'], [/^(?:paint nights?|paint and sip)$/, 'paint'],
+  // Distillery test 1 (Whistler, 2026-11-16): a class a place lists itself ("cocktail class", read by server.js as the
+  // one word "masterclass" so the cocktail word is not a request for cocktail lounges).
+  [/^(?:masterclass|masterclasses)$/, 'class']];
+const NIGHT_KIND_WORDS = { trivia: 'trivia', karaoke: 'karaoke', bingo: 'bingo', open_mic: 'open mic', comedy: 'comedy', run_club: 'run club', games: 'games night', paint: 'paint night', live_music: 'live music', class: 'a class' };
 // Kinds that run at any time of day (server.js DAYTIME_NIGHT_KINDS): a distillery tour or class, about an hour.
 const DAYTIME_NIGHT_KINDS = ['tour', 'class'];
 const TOUR_ALLOWANCE = 60;
@@ -1237,7 +1240,8 @@ function scoreVenue(v, ctx) {
   for (const ft of ctx.foodTerms) {
     const nk = nightKindOfTerm(ft.term);
     const nm = nk ? venueNight(v, nk, planDate) : null;
-    if (nm && nm.on) { const t = nightClock(nm.on.start); add('night', 45, `${NIGHT_KIND_WORDS[nk].replace(/^./, (c) => c.toUpperCase())} on ${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]]}${t ? ` from ${t}` : ''}, from its listing`); continue; }
+    // A class says its own name and "at" its start ("Cocktail class on Thursday at 6 PM"); a night says "from".
+    if (nm && nm.on) { const t = nightClock(nm.on.start), own = nk === 'class' ? String(nm.on.title || '').split(/\s*[,;:(]/)[0].trim() : ''; add('night', 45, `${(own && own.length <= 40 ? own : NIGHT_KIND_WORDS[nk]).replace(/^./, (c) => c.toUpperCase())} on ${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]]}${t ? ` ${nk === 'class' ? 'at' : 'from'} ${t}` : ''}, from its listing`); continue; }
     if (nm && planDate) add('night_other_day', -30, null);
     else if (nm) add('night', 25, `Hosts ${NIGHT_KIND_WORDS[nk]} on ${listText(nm.other.days.map((d) => `${WEEKDAY_NAMES[d]}s`))}, from its listing`);
     const sp = !nk && !foodMatch(v, ft) ? specialFoodMatch(v, ft, planDate) : null;
@@ -4164,6 +4168,8 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
   const facts=input.facts||[],byId=new Map(facts.map(v=>[v.id,v]));
   const kidsTrip=!!(input.intent&&((input.intent.party&&input.intent.party.kids)||input.intent.occasion==='family'));
   const softPins=swapSoftPins(input);
+  // The kinds of listed event the request asks for by a word ("trivia", "run club", a class), for askedNightStart below.
+  const askedKinds=[...new Set(joinNightTerms(((input.intent&&input.intent.foodTerms)||[]).filter(f=>f&&f.term),input.text||(requirements&&requirements.text)||'').map(f=>f.cuisine?null:nightKindOfTerm(f.term)).filter(Boolean))];
   const groups=plan.days.length?plan.days.map(d=>({day:d.day,date:d.date,stops:d.stops})):[{day:1,stops:plan.itinerary?.stops||plan.outing?.stops||[]}];
   const clock=m=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
   plan.warnings=(plan.warnings||[]).filter(w=>!(plan.scheduleWarnings||[]).includes(w));
@@ -4188,10 +4194,25 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
     }
     // Brewery test 3 (Whistler, 2026-11-16): a stop that is there for the place's own listed music (first Friday, 7 PM)
     // starts when the music does, not at 1 PM; earlier stops lead up to it.
-    let nightLead=null;
+    // Distillery test 1 (Whistler, 2026-11-16): the same for any listed event the request asks for by its kind ("cocktail
+    // class at … on Thursday", "trivia at …", a run club): the stop at the place that lists it that day starts when the
+    // event does (a 6 PM class was planned for 1 PM). It stays a visit to the place, never a What's On event item.
+    const askedNightStart=s=>{
+      if(!s||!s.venue||s.event)return null;
+      if(s.listedNight)return nightMinutes(s.listedNight.start);
+      // Never a breakfast, brunch, lunch or coffee stop that happens to be at a place with a quiz that night.
+      if(!askedKinds.length||/\b(?:lunch|brunch|breakfast|coffee)\b/i.test(s.label||''))return null;
+      const v=byId.get(s.venue.id);
+      for(const k of askedKinds){const nm=v?venueNight(v,k,date):null;if(nm&&nm.on&&nightMinutes(nm.on.start)!=null)return nightMinutes(nm.on.start);}
+      return null;
+    };
+    // One stop a day is timed this way (nightStop: the first that lists it). The day itself starts so as to lead up to
+    // it only when that stop is the place's own music (as before) or one of the day's first two stops; a third or later
+    // stop keeps the day's usual start and is simply held until the event begins.
+    let nightLead=null,nightStop=null;
     if(dayStart==null&&requirements.startMinutes==null&&tourStart==null&&!group.stops.some(s=>s.event)){
-      const at=group.stops.findIndex(s=>s.venue&&s.listedNight&&nightMinutes(s.listedNight.start)!=null);
-      if(at>=0)nightLead=Math.max(540,nightMinutes(group.stops[at].listedNight.start)-at*90);
+      const at=group.stops.findIndex(s=>askedNightStart(s)!=null);
+      if(at>=0){nightStop=group.stops[at];if(nightStop.listedNight||at<=1)nightLead=Math.max(540,askedNightStart(nightStop)-at*90);}
     }
     const assumed=dayStart==null&&requirements.startMinutes==null;
     let dayToConfirm=false;
@@ -4356,7 +4377,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
-        const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0,nightLead!=null&&stop.listedNight&&nightMinutes(stop.listedNight.start)!=null?nightMinutes(stop.listedNight.start):0);
+        const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0,nightStop&&(stop===nightStop||stop.listedNight)&&askedNightStart(stop)!=null?askedNightStart(stop):0);
         let range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
         // Round 9: before a fixed-time event (a 2 PM escape room), lunch or a walk is shortened to fit -- an hour for a
         // meal, 45 minutes for a visit -- rather than a "Timing conflict".

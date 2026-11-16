@@ -202,11 +202,13 @@ test('who’s welcome overrides the Kids badge only for breweries that answered 
   assert.equal(inSql(researched.id), true);
   assert.equal(app.kidFriendlyPublic(kidsRow(none.id)), false);
   assert.equal(inSql(none.id), false);
-  // Adults only turns it off (page, guides, Build My Trip); the stored column is never changed.
+  // Adults only turns it off (page, guides, Build My Trip). Whistler distillery test 1 (2026-11-16): her own "Adults only"
+  // answer now takes research's badge off the stored row too (logged, and put back if the answer is taken back); a
+  // brewery that hasn't answered is still never touched (no bulk change).
   assert.equal((await change(tokenFor(researched.id), { brewery_info: { minors: { policy: 'adults' } } })).status, 200);
   assert.equal(app.kidFriendlyPublic(kidsRow(researched.id)), false);
   assert.equal(inSql(researched.id), false);
-  assert.equal(kidsRow(researched.id).kid_friendly, 1, 'stored badge untouched');
+  assert.equal(kidsRow(researched.id).kid_friendly, 0, 'her own answer takes the researched badge off the stored row');
   assert.equal(app.rowToVenue(kidsRow(researched.id)).kid_friendly, false);
   // All ages, or until a set time, turns it on.
   assert.equal((await change(tokenFor(none.id), { brewery_info: { minors: { policy: 'minors_until', until: '22:00' } } })).status, 200);

@@ -203,7 +203,7 @@ function t3FrenchTextCore(value){
  // restaurant planned in place of a closed one.
  text=text.replace(/^(.+) is closed for the season on (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2})(?: \(([^()]+)\))?, so it isn’t in this plan\.$/,(_,n,m,d,why)=>n+' est fermé pour la saison le '+frDom(d)+' '+FR_MONTHS_BY_EN[m]+(why?' ('+why+')':'')+'; il ne fait donc pas partie de ce plan.');
  text=text.replace(/^(.+) is planned in its place\.$/,(_,n)=>n+' est prévu à sa place.');
- text=text.replace(/^(.+) is closed on (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2})(?: for (.+?))?, so it isn’t in this plan\.$/,(_,n,m,d,h)=>n+' est fermé le '+frDom(d)+' '+FR_MONTHS_BY_EN[m]+(h?' ('+(FR_HOLIDAYS[h]||h).replace(/^(la|le|l’) /,'')+')':'')+'; il ne fait donc pas partie de ce plan.');
+ text=text.replace(/^(.+) is closed on (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2})(?: for (.+?)| \(([^()]+)\))?, so it isn’t in this plan\.$/,(_,n,m,d,h,why)=>n+' est fermé le '+frDom(d)+' '+FR_MONTHS_BY_EN[m]+(h?' ('+(FR_HOLIDAYS[h]||h).replace(/^(la|le|l’) /,'')+')':why?' ('+why+')':'')+'; il ne fait donc pas partie de ce plan.');
  text=text.replace(/^(.+) is closed (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s from (\w{3}) (\d{1,2}) to (\w{3}) (\d{1,2}), so it isn’t in this plan\.$/,(_,n,w,a,da,b,db)=>n+' est fermé le '+FR_HEADING_DAYS[w]+' du '+(da==='1'?'1er':da)+' '+(FR_SHORT_MONTHS_BY_EN[a]||a)+' au '+(db==='1'?'1er':db)+' '+(FR_SHORT_MONTHS_BY_EN[b]||b)+'; il ne fait donc pas partie de ce plan.');
  text=text.replace(/^(.+) is closed (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s from (\w{3}) to (\w{3}), so it isn’t in this plan\.$/,(_,n,w,a,b)=>n+' est fermé le '+FR_HEADING_DAYS[w]+' de '+(FR_SHORT_MONTHS_BY_EN[a]||a)+' à '+(FR_SHORT_MONTHS_BY_EN[b]||b)+'; il ne fait donc pas partie de ce plan.');
  text=text.replace(/^(.+) is closed on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), so it isn’t in this plan\.$/,(_,n,w,m,d)=>n+' est fermé le '+FR_HEADING_DAYS[w]+' '+frDom(d)+' '+FR_MONTHS_BY_EN[m]+'; il ne fait donc pas partie de ce plan.');
@@ -383,6 +383,10 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Its listed live music is on (.+), not this day; check before you go$/,(raw,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Sa musique en direct est annoncée le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', pas ce jour-là; vérifiez avant de partir':raw;});
  text=text.replace(/^Live music at (.+)$/,'Musique en direct : $1');
  text=text.replace(/^Tour on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: at (\d{1,2}(?::\d{2})? [AP]M))?, from its listing$/,(_,d,t)=>'Visite le '+FR_HEADING_DAYS[d]+(t?' à '+frNightClock(t):'')+', selon sa fiche');
+ // Distillery test 1 (Whistler, 2026-11-16): a class the place lists ("Cocktail class on Thursday at 6 PM, from its listing");
+ // the class keeps the name its owner gave it.
+ text=text.replace(/^(.{2,40}) on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) at (\d{1,2}(?::\d{2})? [AP]M), from its listing$/,(raw,n,d,t)=>/^Tour$/.test(n)?raw:(n==='A class'?'Atelier':n)+' le '+FR_HEADING_DAYS[d]+' à '+frNightClock(t)+', selon sa fiche');
+ text=text.replace(/^Hosts a class on (.+), from its listing$/,(raw,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Offre un atelier le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
  text=text.replace(/^Runs a tour on (.+), from its listing$/,(raw,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Offre une visite le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
  text=text.replace(/^Hosts (trivia|karaoke|bingo|open mic|comedy|run club|games night|paint night) on (.+), from its listing$/,(raw,k,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Accueille '+FR_NIGHTS[k]+' le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
  text=text.replace(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) special: (.+)$/,(_,d,t)=>'Spécial du '+FR_HEADING_DAYS[d]+' : '+t);
@@ -590,7 +594,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
  // Cocktail test 3 (2026-11-14): the closed days of the week ("…; closed Mon").
- if(/\d{2}:\d{2}/.test(text))text=text.replace(/; closed (?=(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b)/g,'; fermé ');
+ if(/\d{2}:\d{2}/.test(text))// Distillery test 1 (Whistler, 2026-11-16): a run of closed days already turned to French (« lun.–jeu. ») too.
+ text=text.replace(/; closed (?=(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b|(?:lun|mar|mer|jeu|ven|sam|dim)\.)/g,'; fermé ');
  // Café test 2 (Whistler, 2026-11-15): a narrow no-break space before the « ; » between the groups of hours (« dim. ; 7 h–17 h »).
  if(/\d{2}:\d{2}/.test(text)&&/^(?:Listed hours|Horaires indiqués)/.test(text))text=text.replace(/(\S); /g,'$1\u202f; ');
  // The asked-time caveat (café test 1): « Ouvre à 8 h, après l’heure demandée » (the page writes the clock time).

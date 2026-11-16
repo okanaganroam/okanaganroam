@@ -1292,7 +1292,7 @@ en.brewery.kindDistillery = {
   hiLead: 'Let’s get your distillery’s page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
   labels: { taproom: 'Food here', flights: 'Tastings and bottles', music: 'Tours, classes and events', door: 'Your tasting room door', menu: 'Your menu or cocktail list' },
   noLabels: { music: 'no tours, classes or events' },
-  menuQ: 'How should we add your cocktail or tasting menu?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, even if it changes often.',
+  menuQ: 'How should we add your menu or cocktail list?', menuLead: 'Pick the easiest one for you. A photo of your menu or chalkboard works too, even if it changes often.',
   photosLead: 'Your tasting room, your still, your bottles. Three photos is perfect.', offerLead: 'Visitors use these to find a distillery like yours.',
   storyQ: 'Tell visitors about your distillery', storyEx: 'A small family distillery. We distill in the back, pour tastings up front, and the patio gets the evening sun.',
   knownEx: 'Small-batch gin with Okanagan botanicals',
@@ -1321,7 +1321,7 @@ fr.brewery.kindDistillery = {
   hiLead: 'Préparons la page de votre distillerie, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   labels: { taproom: 'Nourriture sur place', flights: 'Dégustations et bouteilles', music: 'Visites, ateliers et événements', door: 'La porte de votre salle de dégustation', menu: 'Votre menu ou carte des cocktails' },
   noLabels: { music: 'pas de visites, d’ateliers ni d’événements' },
-  menuQ: 'Comment ajouter votre carte des cocktails ou de dégustation?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte ou de votre tableau fonctionne aussi, même si elle change souvent.',
+  menuQ: 'Comment ajouter votre menu ou votre carte des cocktails?', menuLead: 'Choisissez le plus simple pour vous. Une photo de votre carte ou de votre tableau fonctionne aussi, même si elle change souvent.',
   photosLead: 'Votre salle de dégustation, votre alambic, vos bouteilles. Trois photos, c’est parfait.', offerLead: 'Les visiteurs s’en servent pour trouver une distillerie comme la vôtre.',
   storyQ: 'Parlez de votre distillerie aux visiteurs', storyEx: 'Une petite distillerie familiale. Nous distillons à l’arrière, servons les dégustations à l’avant, et la terrasse a le soleil du soir.',
   knownEx: 'Du gin en petits lots aux plantes de l’Okanagan',
@@ -1722,6 +1722,28 @@ en.brewery.tapWords = tapWordsEn('tap list'); fr.brewery.tapWords = tapWordsFr('
 en.brewery.kindCidery.tapWords = tapWordsEn('cider list'); fr.brewery.kindCidery.tapWords = tapWordsFr('liste des cidres');
 en.brewery.kindNeutral.tapWords = tapWordsEn('drinks list'); fr.brewery.kindNeutral.tapWords = tapWordsFr('liste des boissons');
 en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kindDistillery.tapWords = tapWordsFr('carte des cocktails');
+
+// Distillery test 1 (Whistler, 2026-11-16): a stretch with every day closed is a closure, not other hours. The message
+// says where it goes, and the button under it drops the empty stretch and carries on. Pubs and restaurants have the
+// kitchen question in between, so theirs says "a little further on".
+// The story box holding research's text is selected on its first tap: the hint says so (the old one, "Change any words
+// right in the box", stays for an owner's own story, which is never selected).
+// The last screen at 100% with a tile still open (a cocktail list with no kitchen): never "To reach 100%" under "100%".
+en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
+// A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
+en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
+en.storyResearchHint = 'This is what your page says now. Type to replace this text, or tap again to add to it. The ✕ clears it.';
+fr.storyResearchHint = 'Voici ce que dit votre page maintenant. Tapez pour remplacer ce texte, ou touchez une deuxième fois pour y ajouter des mots. Le ✕ l’efface.';
+Object.assign(en, {
+  seasonAllClosed: 'Closed the whole time? That goes on the next screen under “Closed for a week or two”.',
+  seasonAllClosedSoon: 'Closed the whole time? That goes a little further on, under “Closed for a week or two”.',
+  seasonAllClosedBtn: 'Skip these dates and keep going',
+});
+Object.assign(fr, {
+  seasonAllClosed: 'Fermé tout ce temps? Cela va à l’écran suivant, sous « Fermé une semaine ou deux ».',
+  seasonAllClosedSoon: 'Fermé tout ce temps? Cela va un peu plus loin, sous « Fermé une semaine ou deux ».',
+  seasonAllClosedBtn: 'Passer ces dates et continuer',
+});
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
