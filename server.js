@@ -23595,7 +23595,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   $('rnShowResults').addEventListener('click', function(){
     if (timer !== null) { clearTimeout(timer); applyTypedSearch(searchEl.value); }
     setCompactResults(true);
-    $('rnEditSearch').focus();
+    searchEl.blur();
+    $('pmSheetBody').focus({preventScroll:true});
   });
   $('pmSheetBody').addEventListener('scroll', function(){
     if (!WIDE.matches && !route && !pendingRoute && this.scrollTop > 48 &&
@@ -23612,6 +23613,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   $('rnLocation').addEventListener('click',openTownPicker);
   $('rnClear').addEventListener('click',clearAll);
   $('rnUseLocation').addEventListener('click',function(){town='';syncChips();closePanel();nearBtn.click()});
+  $('rnLocateQuick').addEventListener('click', function(){ $('rnUseLocation').click(); });
   $('rnRetryLocation').addEventListener('click',function(){nearBtn.click()});
   $('rnChooseTown').addEventListener('click',openTownPicker);
   $('rnChoosePin').addEventListener('click',chooseMapPoint);
@@ -23673,7 +23675,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     closePanel();
     roamView('list');
     setCompactResults(true);
-    if (!WIDE.matches) $('rnEditSearch').focus();
+    if (!WIDE.matches) $('pmSheetBody').focus({preventScroll:true});
   });
   $('rnBackdrop').addEventListener('click',closePanel);
   document.addEventListener('keydown',function(e){if(panel.hidden)return;if(e.key==='Escape')closePanel();if(e.key==='Tab'){var els=Array.prototype.slice.call(panel.querySelectorAll('button,select,a[href],summary')).filter(function(x){return !x.disabled&&x.offsetParent!==null}),first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
@@ -23916,7 +23918,34 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     return true;
   }
+  function updateSelectionChips(){
+    var holder = $('rnSelectedFilters');
+    var selected = tab === 'events' ? [] : candidates().filter(function(item){
+      return item.id !== 'term' && item.id.split(':')[0] !== 'town';
+    });
+    holder.hidden = !selected.length;
+    holder.innerHTML = selected.map(function(item){
+      return '<button type="button" class="pm-chip" data-rn-remove="' + esc(item.id) + '" aria-label="' + esc(T.removeTag + ' ' + item.label) + '">' + esc(item.label) + ' <span aria-hidden="true">×</span></button>';
+    }).join('');
+  }
+  $('rnSelectedFilters').addEventListener('click', function(e){
+    var button = e.target.closest('[data-rn-remove]');
+    if (!button) return;
+    dropOne(button.getAttribute('data-rn-remove'));
+    // Keep free-text words, while the URL's f= retains the remaining parsed filters.
+    // Replaying the original sentence on Back would restore the removed requirement.
+    searchEl.value = termShown(term);
+    typedWords = searchEl.value;
+    setNameQuery(searchEl.value);
+    dealQuery = searchEl.value;
+    lastSearchSet = null;
+    includeUnlistedHours = false;
+    liveBase = null;
+    changed();
+    filtersBtn.focus({preventScroll:true});
+  });
   function render(fit){
+    updateSelectionChips();
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
     $('rnLocationAction').textContent=town||me?(FR?'Changer de lieu':'Change location'):(FR?'Choisir un lieu':'Choose a location');
@@ -24042,7 +24071,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + (x.st ? statusHtml(x.st) : includeUnlistedHours && openOnly ? '<span class="pm-st">' + esc(FR ? 'Horaires non indiqués' : 'Hours not listed') + '</span>' : '') + featHtml(x) + '</a>'
+        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="rn-card-info"><span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + (x.st ? statusHtml(x.st) : includeUnlistedHours && openOnly ? '<span class="pm-st">' + esc(FR ? 'Horaires non indiqués' : 'Hours not listed') + '</span>' : '') + featHtml(x) + '</span></a>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -25112,7 +25141,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){setStatus('');cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) { closePanel(); setCompactResults(true); if (!WIDE.matches) $('rnEditSearch').focus(); } });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){setStatus('');cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) { closePanel(); setCompactResults(true); if (!WIDE.matches) $('pmSheetBody').focus({preventScroll:true}); } });
   function setTab(t){
     tab = t; limit = 25;
     var eventMode = t === 'events';
@@ -25148,8 +25177,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       chip.setAttribute('aria-pressed', String(filter === 'free' ? freeEventsOnly : eventPeriod === filter));
     });
   }
-  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('places'); });
-  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('events'); });
+  var placeSearchText = '';
+  $('pmTabPlaces').addEventListener('click', function(){
+    if (tab === 'events') searchEl.value = placeSearchText;
+    evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false;
+    setTab('places');
+  });
+  $('pmTabEvents').addEventListener('click', function(){
+    if (tab === 'places') placeSearchText = searchEl.value;
+    searchEl.value = '';
+    evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false;
+    setTab('events');
+  });
   // Map keyboard use (2026-10-19, review pass 5).
   // - A pin opened with Enter moves focus into its place card (the popup); Escape, or its close button, closes the card
   //   and puts focus back on the pin.
@@ -25247,7 +25286,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (initialHash === '#events'||(CONF.dest&&CONF.dest.url.indexOf('/events/')!==-1)) tab = 'events';
     syncChips();
     // A town or a short search in the address opens fitted to its results (Phone map, 2026-10-19, round 7).
-    if (happyEntry && tab === 'places' && !returnContext && !CONF.directionRequested) setCompactResults(true);
+    if (!returnContext && !CONF.directionRequested) setCompactResults(true);
     if (tab === 'events') setTab('events'); else render(true);
     if(returnContext){limit=Math.max(25,Math.min(500,Number(returnContext.limit)||25));drawList();}
     // Near me starts by itself when asked for (#near-me, the home-screen shortcut) or when this browser already allows it.
@@ -25782,7 +25821,7 @@ ${renderAnalyticsHeadHtml('hub')}
 ${MAP_PAGE_STYLE}
 ${ROAM_LAYOUT_STYLE}
 </head>
-<body class="golf-page outdoor-page region-page map-page pm-app-page">
+<body class="golf-page outdoor-page region-page map-page pm-app-page rn-design">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
@@ -25792,7 +25831,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','5 à 7 en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les 5 à 7 en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span></button></div>
+      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','5 à 7 en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les 5 à 7 en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Roam Now','Roam Now')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Find places and events near you.','Trouvez des lieux et événements près de vous.')}</p></div><div class="rn-location-row"><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span><span aria-hidden="true">⌄</span></button><button type="button" id="rnLocateQuick" class="rn-locate-quick">${uiIcon('pin', 16, true)} ${R('Use my location','Utiliser ma position')}</button></div></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
@@ -25806,11 +25845,14 @@ ${renderGolfHeaderHtml()}
           <button type="button" role="tab" class="pm-tab" id="pmTabPlaces" aria-selected="true" aria-controls="pmList">Places</button>
           <button type="button" role="tab" class="pm-tab" id="pmTabEvents" aria-selected="false" aria-controls="pmList">Events</button>
         </div>
-      <div class="pm-searchbar">
+      <div class="rn-search-row">
+        <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" id="rnSearchLabel" for="pmSearch">${R('Search places','Chercher un lieu')}</label>
         <input type="search" id="pmSearch" class="pm-search" placeholder="${R('Search places','Chercher un lieu')}" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+
+      </div>
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="pm-badge" id="pmBadge" hidden></span><span id="rnFilterLabel">${R('Filters','Filtres')}</span></button>
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
@@ -25854,6 +25896,7 @@ ${renderGolfHeaderHtml()}
         <button type="button" class="pm-chip" data-event-filter="weekend" aria-pressed="false"><span aria-hidden="true">🎉</span> ${R('This weekend','Cette fin de semaine')}</button>
         <button type="button" class="pm-chip" data-event-filter="free" aria-pressed="false"><span aria-hidden="true">🎟️</span> ${R('Free','Gratuit')}</button>
       </div>
+      <div id="rnSelectedFilters" class="rn-selected-filters" role="group" aria-label="${R('Selected filters','Filtres sélectionnés')}" hidden></div>
       <div class="rn-location-help" id="rnLocationHelp" hidden><p id="rnLocationMessage" role="status"></p><div><button type="button" id="rnRetryLocation">${R('Try my location','Réessayer ma position')}</button><button type="button" id="rnChooseTown">${R('Choose a town','Choisir une ville')}</button><button type="button" id="rnChoosePin">${R('Choose on map','Choisir sur la carte')}</button></div></div>
       <div class="rn-views" role="group" aria-label="Results view"><button type="button" id="rnList" aria-pressed="true">${R('List','Liste')}</button><button type="button" id="rnMap" aria-pressed="false">${R('Map','Carte')}</button></div>
       <div class="rn-results-toolbar">
