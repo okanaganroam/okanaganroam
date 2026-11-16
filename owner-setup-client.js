@@ -367,7 +367,7 @@
   var CI = clone(CUR.cafe_info || {}), CL = CUR.cafe_links || {}, CIs = CI.stay || {}, CId = CI.diet || {}, CIc = CI.coffee || {}, CIo = CI.order || {};
   S.cafe = {
     serves: {}, stay: { laptops: CIs.laptops || '', seats: CIs.seats || '', outlets: !!CIs.outlets, quiet: !!CIs.quiet },
-    diet: { milks: {}, milk_extra: CId.milk_extra || '', gf_kitchen: CId.gf_kitchen || '', vegan_baking: !!CId.vegan_baking, nut_free: !!CId.nut_free, note: CId.note || '' },
+    diet: { milks: {}, milk_extra: CId.milk_extra || '', gf_kitchen: CId.gf_kitchen || '', vegan_baking: !!CId.vegan_baking, nut_free: !!CId.nut_free, note: noteIn(CId) },
     order: { online: !!CL.order_url, url: CL.order_url || '', preorder: !!(CIo.preorder || CL.preorder_url), how: CIo.preorder_how || '', purl: CL.preorder_url || '', counter: (CUR.not_offered || []).indexOf('ordering') >= 0 },
     coffee: { roast_own: !!CIc.roast_own, source: CIc.source || '', beans: !!CIc.beans }, sellout: CI.sellout || ''
   };
@@ -928,7 +928,8 @@
     var line = S.savedLine[step] || (how === 'day' ? (many ? T.savedDayMany : T.savedDay) : how === 'email' ? T.savedEmail : how === 'later' ? T.savedLater : how === 'no' ? T.savedNo : T.savedLive);
     // The first "Sent" says what it means (pub fresh-eyes 2), once.
     if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
-    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line;
+    // Café test 2 (Whistler, 2026-11-15): a French-only special or event says where it shows (once; frOnlyTell).
+    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line + (S.frOnlyNote === step && T.frPageOnly ? ' ' + T.frPageOnly : '');
   }
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);
@@ -1023,9 +1024,29 @@
   // their telling words, so for a sentence both could stand for, a chip counts only when the sentence has its own
   // difference word ("only", "welcome", « seulement »…). "Patio only" still counts for "Dogs welcome on the patio",
   // which no other dogs chip could stand for.
+  // Café test 2 (Whistler, 2026-11-15): a part of the sentence that says no (« Pas de chiens à l’intérieur », "No dogs
+  // inside", "not inside", « aucun »…) never counts as the chip « Chiens bienvenus à l’intérieur ». A part is what sits
+  // between commas or "but" / « mais »; the no-word must come before the chip's telling word.
   function saysIt(v, t, sibs){
+    var QUICK_NEG = { no: 1, not: 1, never: 1, cannot: 1, don: 1, doesn: 1, aren: 1, isn: 1, pas: 1, aucun: 1, aucune: 1, jamais: 1, non: 1, ni: 1, interdit: 1, interdits: 1 };
+    function negatesIt(part, w){
+      var rs = rawWords(part), first = -1, i;
+      for (i = 0; i < rs.length; i++) if (w.indexOf(rs[i]) >= 0) { first = i; break; }
+      if (first < 0) return false;
+      for (i = 0; i < first; i++) if (QUICK_NEG[rs[i]] === 1) return true;
+      return false;
+    }
+    function withoutNo(v, w){
+      var hit = false, out = String(v || '').split(/([.;!?]+)/).map(function(sn, i){
+        if (i % 2) return sn;
+        return sn.split(/(,|\bbut\b|\bmais\b)/i).filter(function(p, j){ if (j % 2) return true; if (negatesIt(p, w)) { hit = true; return false; } return true; }).join('');
+      }).join('');
+      return hit ? out : v;
+    }
+    var w = quickWords(t);
+    if (w.length) v = withoutNo(v, w);
     if (has(v, t)) return true;
-    var w = quickWords(t); if (!w.length) return false;
+    if (!w.length) return false;
     var twins = (sibs || []).filter(function(o){ if (o === t) return false; var ow = quickWords(o); return w.every(function(x){ return ow.indexOf(x) >= 0; }) || ow.every(function(x){ return w.indexOf(x) >= 0; }); });
     if (twins.some(function(o){ return has(v, o); })) return false;
     return String(v || '').split(/[.;!?]+/).some(function(sn){
@@ -1469,7 +1490,7 @@
       // No sports, but the description still talks about them (pub test 5): one tap to fix it in "Your story". Never changed
       // for them: they edit it, and it's checked first like any description.
       var sb = p[1] === 'offer' && !S.badges.sports_tv && !S.storyFixed ? sportsBit() : '';
-      x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead"' + (explain ? ' id="suSentMeans"' : '') + '>' + h(line) + '</p></div>'
+      x = '<div class="su-saved"><div class="su-check" aria-hidden="true">' + (how === 'email' ? '✉' : how === 'later' ? '🕓' : '✓') + '</div><h1>' + h(title) + '</h1><p class="su-lead"' + (explain ? ' id="suSentMeans"' : '') + '>' + h(line) + '</p>' + (S.frOnlyNote === p[1] && T.frPageOnly ? '<p class="su-hint" id="suFrOnly">' + h(T.frPageOnly) + '</p>' : '') + '</div>'
         // Brewery test 1 (2026-11-12): the description exactly as it was sent (with any join fixed), so she sees the words.
         + (p[1] === 'story' && S.storySent && T.storySentAs ? '<div class="su-day" id="suStorySent"><p class="su-q" style="margin:0 0 6px">' + h(T.storySentAs) + '</p><p class="su-hint" style="margin:0;white-space:pre-wrap">' + h(S.storySent) + '</p></div>' : '')
         + (sb ? '<div class="su-day su-sportsfix" id="suSportsFix"><p class="su-q" style="margin:0 0 6px">' + h(T.storySportsQ) + '</p><p class="su-hint" style="margin:0 0 12px">' + h(fill(T.storySportsLead, { bit: sb })) + '</p>' + big('✎', T.storySportsBtn, '', true, 'storyFix') + '</div>' : '')
@@ -1552,7 +1573,8 @@
       if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
       var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
-      x = (seas ? q(seaTitle(), T.seasonEditLead) + '<p class="su-q">' + h(T.whichMonths) + '</p>'
+      // Café test 2 (Whistler, 2026-11-15): no « Quels mois ? » heading left over the exact dates (it has no month chips then).
+      x = (seas ? q(seaTitle(), T.seasonEditLead) + (S.sea.exact ? '' : '<p class="su-q">' + h(T.whichMonths) + '</p>')
           + (S.sea.exact ? seaExactHtml('hours', S.sea) : monthChips(S.sea.months, 'sea') + '<p class="su-hint"><button type="button" class="su-link" data-sea="hours:exact">' + h(T.seasonExactLink) + '</button></p>') + '<h2 class="su-h2" id="suSeaDaysH">' + h(S.sea.exact ? T.seasonDaysHDates : T.seasonDaysH) + '</h2>'
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
@@ -1913,16 +1935,16 @@
       x = doneLine('diet') + q(T.dietQ, T.dietLead) + msgs() + '<h2 class="su-h2">' + h(T.iceDfQ) + '</h2><div class="su-tiles">' + ctile('diet.df_sorbet', '🍧', T.dfSorbet) + ctile('diet.vegan_ice', '🌱', T.veganIce) + '</div>'
         + '<h2 class="su-h2">' + h(T.gfConesQ) + '</h2>' + radios('diet.gf_cones', ['cups', 'cones'], T.gfCones)
         + '<h2 class="su-h2">' + h(T.dietMore) + '</h2><div class="su-tiles">' + ctile('diet.nut_free', '🥜', T.nutFreeIce) + '</div>'
-        + field('suDnote', T.dietNoteLabel, di.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(di.note)) + '</p>' + ex(T.dietNoteExIce)
+        + (C.lang !== 'fr' && !di.note && CId.note_fr ? frOnlyHint('suDnoteFr') : '') + field('suDnote', T.dietNoteLabel, di.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(di.note)) + '</p>' + ex(T.dietNoteExIce)
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'dietSave') + '</div>' + skip('diet');
     } else if (s === 'diet') {
       var dt = S.cafe.diet, anyMilk = Object.keys(dt.milks).some(function(m){ return dt.milks[m]; });
       x = doneLine('diet') + q(T.dietQ, T.dietLead) + msgs() + '<h2 class="su-h2">' + h(T.milksQ) + '</h2><div class="su-chips" role="group" aria-label="' + h(T.milksQ) + '">' + C.milks.map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (dt.milks[o.k] ? 'true' : 'false') + '" data-ctog="milks:' + o.k + '">' + h(o.t) + '</button>'; }).join('') + '</div>'
         + (anyMilk ? '<p class="su-q">' + h(T.milkExtraQ) + '</p>' + radios('diet.milk_extra', ['no', 'yes'], T.milkExtra) : '')
-        + '<h2 class="su-h2">' + h(T.gfQ) + '</h2>' + radios('diet.gf_kitchen', ['dedicated', 'shared'], T.gf)
+        + '<h2 class="su-h2">' + h(T.gfQ) + '</h2>' + radios('diet.gf_kitchen', ['dedicated', 'shared', 'none'], T.gf)
         + '<h2 class="su-h2">' + h(T.dietMore) + '</h2><div class="su-tiles">' + ctile('diet.vegan_baking', '🌱', T.veganBaking) + ctile('diet.nut_free', '🥜', T.nutFree) + '</div>'
         // Café test 1 (2026-11-11): a short note in her words ("Oat & almond milk +50¢ · Gluten-free: macarons only"), with a live count.
-        + field('suDnote', T.dietNoteLabel, dt.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(dt.note)) + '</p>' + ex(T.dietNoteEx)
+        + (C.lang !== 'fr' && !dt.note && CId.note_fr ? frOnlyHint('suDnoteFr') : '') + field('suDnote', T.dietNoteLabel, dt.note, { max: 120, data: 'aria-describedby="suDnoteC"' }) + '<p class="su-count" id="suDnoteC" aria-live="polite">' + h(noteRoom(dt.note)) + '</p>' + ex(T.dietNoteEx)
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'dietSave') + '</div>' + skip('diet');
     } else if (s === 'coffee') {
       var cf = S.cafe.coffee;
@@ -2371,7 +2393,14 @@
     out = out.concat(S.specialsFr || []);
     if (out.length > 7) { S.nudge = T.specialsMany || T.dealsMany; return render(); }
     var list = []; if (S.notOffered.indexOf('specials') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'specials'; }) });
+    frOnlyTell('specials', out);
     list.push({ specials: out }); saveAll('specials', list);
+  }
+  // Café test 2 (Whistler, 2026-11-15): a special or event with French words only shows on the French page only; the
+  // saved screen says so, once (the first time she saves one).
+  function frOnlyTell(step, out){
+    var any = (out || []).some(function(x){ return !x.title && x.title_fr; });
+    if (any && !S.frOnlyTold) { S.frOnlyTold = true; S.frOnlyNote = step; } else if (S.frOnlyNote === step) S.frOnlyNote = '';
   }
   function apptKind(k){ return k === 'tour' || k === 'class'; }
   function nightAppt(e){ return !!(e && e.appt && apptKind(e.kind)); }
@@ -2397,6 +2426,7 @@
     }
     out = out.concat(S.nightsFr || []);
     var list = []; if (S.notOffered.indexOf('entertainment') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'entertainment'; }) });
+    frOnlyTell('music', out);
     list.push({ weekly_nights: out }); saveAll('music', list, null, null, function(){ CUR.weekly_nights_waiting = false; S.nightsSaved = out; });
   }
   // "No" answers: clear what the page shows, then say "we don't have one" where the checklist has one.
@@ -2918,13 +2948,18 @@
       var dv = { milks: mk, milk_extra: mk.length ? dt2.milk_extra : '', gf_kitchen: dt2.gf_kitchen, vegan_baking: !!dt2.vegan_baking, nut_free: !!dt2.nut_free };
       // Café test 2 (2026-11-11): the gelato answers ride along (kept as they are for other kinds).
       if (dt2.df_sorbet) dv.df_sorbet = true; if (dt2.vegan_ice) dv.vegan_ice = true; if (dt2.gf_cones) dv.gf_cones = dt2.gf_cones;
-      if (dnote) dv.note = dnote;
+      // Café test 2 (Whistler, 2026-11-15): the note is saved in the language of the setup (note / note_fr), so an allergy
+      // warning typed in French shows on the French page and never as English on the English page.
+      noteOut(CId, dnote, dv); if (!dv.note) delete dv.note;
       if (!mk.length && !dv.gf_kitchen && !dv.vegan_baking && !dv.nut_free && !dv.df_sorbet && !dv.vegan_ice && !dv.gf_cones && !dnote) { S.nudge = T.dietNeed; return render(); }
       var dl = [{ cafe_info: { diet: dv } }];
       // Dairy-free milks named here tick the "Dairy-free milks" tile too (never untick it).
       // Review fix (2026-11-12): the tiles are marked ticked only once the save went through, so a retry sends them again.
       var dfMilk = mk.length && !S.badges.dairy_free_milk;
       if (dfMilk) dl.push({ badges: { dairy_free_milk: true } });
+      // "No, nothing gluten-free" (2026-11-15) takes the Gluten-free options badge off, so no list, card or trip offers it.
+      var gfNone = dv.gf_kitchen === 'none' && !!S.badges.gluten_free;
+      if (gfNone) dl.push({ badges: { gluten_free: false } });
       // Bug-check (2026-11-12): vegan gelato or ice cream ticks "Vegan options" too (never unticks it), taking back an
       // earlier "None of these" for dietary options.
       var veganIce = dv.vegan_ice && !S.badges.vegan, dietNone = veganIce && S.notOffered.indexOf('dietary') >= 0;
@@ -2934,6 +2969,8 @@
       }
       return saveAll('diet', dl, null, null, function(){
         if (dfMilk) S.badges.dairy_free_milk = true;
+        if (gfNone) S.badges.gluten_free = false;
+        CId = dv;
         if (dietNone) S.notOffered = S.notOffered.filter(function(z){ return z !== 'dietary'; });
         if (veganIce) { S.badges.vegan = true; S.noDiet = false; }
       });
@@ -3381,6 +3418,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('input[type=text], input[type=tel], input[type=search], textarea'), function(inp){
       // Brewery test 4 (2026-11-13): the story box with research's text in it is selected on its first tap too, so typing
       // replaces it (never her own story, sent or on the page).
+      // Café test 2 (Whistler, 2026-11-15): « Ce texte est en anglais… » goes once she has replaced the text with her own.
+      if (inp.id === 'suStory' && T.storyEnglishHint) inp.addEventListener('input', function(){ var hn = el('suStoryEdit'); if (hn && (hn._en || hn.textContent === T.storyEnglishHint)) { hn._en = true; hn.hidden = inp.value !== CUR.description; } });
       var researchStory = inp.id === 'suStory' && C.storyResearch && !C.storyPending && !!storyCur() && inp.value === storyCur();
       // Pub test 3 (Whistler, 2026-11-14): a Known for, booking or groups line still holding research's words is selected on
       // its first tap too ("Locals' pub with house-brewed beerHouse-brewed beer…" was typed onto the end of it).

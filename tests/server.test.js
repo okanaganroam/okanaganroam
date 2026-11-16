@@ -25353,7 +25353,7 @@ test('French gaps (2026-10-18): every newly translated event description resolve
 test('French gaps (2026-10-18): trip planner French copy uses French numbers and hours', () => {
   const { t3FrenchText } = require('../trip-french-copy');
   assert.equal(t3FrenchText('Rated 4.7 from 1,234 reviews'), 'Note de 4,7 selon 1\u00a0234 avis');
-  assert.equal(t3FrenchText('Listed hours: 07:00–17:00 Mon–Fri; 10:30–22:00 Sat'), 'Horaires indiqués : 7 h–17 h lun.–ven.; 10 h 30–22 h sam.');
+  assert.equal(t3FrenchText('Listed hours: 07:00–17:00 Mon–Fri; 10:30–22:00 Sat'), 'Horaires indiqués : 7 h–17 h lun.–ven.\u202f; 10 h 30–22 h sam.');
   const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(page, /\? '\/fr\/trip' : '\/trip'/, 'a plan made on /fr/trip keeps its French address');
   assert.match(page, /\^\(Listed hours\|Horaires indiqu/, 'the hours line is not repeated in the French reasons');
@@ -26237,7 +26237,7 @@ test('Seasonal hours and special closures (2026-10-18): hours.js applies them by
   const fr = require('../french-text.js');
   assert.ok(fr);
   assert.equal(app.frStatusText('Closed today (holiday) · Opens tomorrow 9 AM'), 'Fermé aujourd’hui (jour férié) · ouvre demain à 9 h');
-  assert.equal(app.frStatusText('Closed today (Thanksgiving) · Opens Mon 10 AM'), 'Fermé aujourd’hui (Thanksgiving) · ouvre lun. à 10 h');
+  assert.equal(app.frStatusText('Closed today (Thanksgiving) · Opens Mon 10 AM'), 'Fermé aujourd’hui (Action de grâce) · ouvre lun. à 10 h');
 });
 
 test('Seasonal hours and closures (2026-10-18): owners set them; the venue page (EN and FR), cards, map and trip facts respect them', () => withOwnerPortalServer(async ({ post, get }) => {
@@ -26283,7 +26283,7 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   assert.match(en, /<summary>Winter hours \(Nov 1 – Apr 30\)<\/summary>/);
   assert.match(en, /Special closures:<\/strong> Oct 12 \(Thanksgiving\)/);
   const frPage = app.renderVenuePage(fresh, [], [], [], { now, lang: 'fr' });
-  assert.match(frPage, /Fermé aujourd’hui \(Thanksgiving\) · ouvre demain à 9 h/);
+  assert.match(frPage, /Fermé aujourd’hui \(Action de grâce\) · ouvre demain à 9 h/);
   // Round 10: the owner's English note stays off the French hours list (no French for it in the list).
   assert.match(frPage, /<span>Fermé<\/span>/);
   assert.doesNotMatch(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);

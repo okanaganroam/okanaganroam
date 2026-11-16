@@ -334,7 +334,8 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   assert.ok(html.indexOf('data-pm-feat="specials"') < html.indexOf('data-pm-feat="patio"'), 'beside Happy hour now, at the front of the row');
   assert.ok(html.includes('"specials":32768'));
   assert.ok(html.includes("if (a[17] && a[17][1]) { p.spDay = a[17][0]; p.sp = FR && a[17][2] ? a[17][2] : a[17][1]; p.spEn = !!(FR && !a[17][2]);"));
-  assert.ok(html.includes("p.spOn = !!(p.sp && p.spDay === wd);"));
+  // Café test 1 (Whistler, #879): a special is not "Today" once its end time has passed (spOver).
+  assert.ok(html.includes("p.spOn = !!(p.sp && p.spDay === wd && !spOver(p, ck));"));
   assert.ok(html.includes(`if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';`));
   assert.ok(html.includes("k === 'specials' ? !p.spOn :"));
   assert.ok(html.includes("spToday: 'Today:'") && html.includes("spToday: 'Aujourd’hui :'"));
