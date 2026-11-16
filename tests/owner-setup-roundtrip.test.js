@@ -213,7 +213,7 @@ test('the page script: typed answers are never cut or joined, one number on the 
   assert.match(s, /S\.savedLine\.cuisine = T\.savedCuisine/); assert.equal(cfg.t.savedCuisine, 'Your food types and kind of place are on your page now.');
   assert.match(s, /step === 'spend' && d === 'live' && !C\.spendPublic && !CK \? T\.stSoon/); assert.equal(cfg.t.stSoon, 'saved (prices aren’t on pages yet)'); // café test 1: no "soon" while prices aren't public
   assert.equal(cfg.t.sentTitle, 'Sent');
-  assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just the patio)');
+  assert.equal(cfg.offerLabels.dog_friendly, 'Dogs welcome (even just outside or on the patio)');
   assert.equal(cfg.t.tooSmall, 'This one would look blurry. Pick a different one.');
   assert.equal(cfg.t.backSettings, 'Back to my edit page'); assert.ok(!/page settings/.test(JSON.stringify(cfg.t)), 'one name for the edit page');
   assert.ok(!/réglages/.test(JSON.stringify(strings.fr)));

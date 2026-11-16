@@ -284,7 +284,8 @@ test('spend: "Rolls from $9" never sets $9; mains lead; side items only guess fr
   const d = mk('restaurant'); research(d.id, [{ label: 'Prices', text: 'Appetizers $8, pints $7' }]);
   assert.equal(cfgOf((await get(`/owner/${tokenFor(d.id)}/setup`)).text).suggestSpend, 0, 'side items and no price range: no guess');
   assert.equal(text.en.spendGuessed, 'We guessed from your listing: “{x}”.');
-  assert.equal(text.fr.spendGuessed, 'Estimation d’après votre fiche : « {x} ».');
+  // Whistler café test 2 (2026-11-15): the French line no longer quotes research's English line.
+  assert.equal(text.fr.spendGuessed, 'Estimation d’après les prix trouvés en ligne.');
   assert.match(CLIENT(), /\(!CUR\.avg_spend && C\.suggestSpend && C\.suggestSpendFrom && T\.spendGuessed \? '<p class="su-hint" id="suSpendGuessed">'/);
 });
 

@@ -130,7 +130,9 @@ test('3: the dietary note saves (120 max), shows with the details in English, an
   const en = page(v, 'en');
   assert.match(en, /gluten-free baking \(made in a shared kitchen\)\. Oat &amp; almond milk \+50¢ · Gluten-free: macarons only/);
   assert.match(en, /Gluten-free options \(shared kitchen\)/, 'the top chip carries the hint');
-  assert.ok(!/macarons only/.test(page(v, 'fr')), 'her own words stay off the French page, like the other notes');
+  // Whistler café test 2 (2026-11-15): an English note shows on the French page too when there is no French one (it is
+  // often an allergy warning); a note typed in the French setup (note_fr) is the French page's.
+  assert.ok(/macarons only/.test(page(v, 'fr')), 'the French page falls back to her English note');
   const long = await change(t, { cafe_info: { diet: { note: 'x'.repeat(121) } } });
   assert.equal(long.status, 400);
   // A note alone is an answer too.

@@ -10735,7 +10735,8 @@ function validateWeeklyNights(list, opts = {}, now = new Date()) {
       if (!f.ok) return f;
       item[k] = f.value;
     }
-    if (item.detail_fr && !item.detail) return { ok: false, detail: `night ${n}: a French detail needs the English detail too` };
+    // Café test 2 (Whistler, 2026-11-15): a French-only event may carry its French detail alone.
+    if (item.detail_fr && !item.detail && !frOnly) return { ok: false, detail: `night ${n}: a French detail needs the English detail too` };
     if (frOnly) { if (!item.title_fr) return { ok: false, detail: `night ${n}: title is empty` }; item.title = ''; }
     const start = s.start == null || s.start === '' ? null : s.start;
     const end = s.end == null || s.end === '' ? null : s.end;
@@ -10967,6 +10968,7 @@ const NIGHT_FILLER_WORDS = new Set(['weekly', 'week', 'every', 'two', 'three', '
 // A night as its row shows it: { kind (the label, '' when the title already says it), detail ('' when it only restates
 // the title, kind, days, frequency or host) }. Strip-and-check like the specials: fewer than 2 meaningful words left
 // hides the detail ("Karaoke two nights a week", "Weekly open mic for local performers", "Live music every Friday").
+const NIGHT_SHORT_FACT_RE = /r[ée]serv|\bbook|\brsvp\b|sign[- ]?up|inscri|regist|ticket|billet|\bfree\b|gratuit|\bcover\b|limited|limit[ée]e?s?\b|drop[- ]in|all ages|tous âges|sold out|complet\b/i;
 function nightShownText(s, title, detail, fr) {
   const kind = s.kind !== 'other' ? NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind] : '';
   const kindShown = kind && !nightTitleSaysKind(title, s.kind) && !nightTitleSaysKind(s.title, s.kind) ? kind : '';
@@ -10975,7 +10977,9 @@ function nightShownText(s, title, detail, fr) {
     const timed = cardTidy(stripShownTime(d, s.start, s.end));
     const shown = new Set([...cardWords(title), ...cardWords(s.title), ...nightKindWords(s.kind), ...cardWords(s.host), ...cardWords(s.cost)]);
     const left = cardMeaningfulWords(timed, shown).filter((w) => !NIGHT_FILLER_WORDS.has(w));
-    d = left.length < 2 ? '' : timed;
+    // Café test 2 (Whistler, 2026-11-15): a short detail that says how to get in ("By reservation", « Sur réservation »,
+    // "Sign up ahead", "Free") is a fact, not a restating of the row: it stays when a word of it is new.
+    d = left.length < 2 && !(left.length === 1 && NIGHT_SHORT_FACT_RE.test(timed)) ? '' : timed;
   }
   return { kind: kindShown, detail: d };
 }
@@ -19926,7 +19930,7 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label0] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
-      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || (f === 'dog_friendly' && dogsPatioOnly(venue) ? 'Dogs on patio' : '') || label0;
+      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || (f === 'dog_friendly' && (dogsPatioOnly(venue) ? 'Dogs on patio' : dogsOutsideOnly(venue) ? 'Dogs outside only' : '')) || label0;
       return `<span class="chip chip-feat${f === 'free_entry' ? ' chip-price' : ''}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, false, () => 'chip chip-feat') || [])
@@ -19945,6 +19949,23 @@ function dogsPatioOnly(venue) {
   const patio = new Set([en.quick.dogs[0], en.quickDogsFull[0], fr.quick.dogs[0], fr.quickDogsFull[0]].map(presetAnswerNorm));
   const segs = presetAnswerParts(r.text).filter((seg, i) => !(i % 2)).map((seg) => presetAnswerNorm(seg.replace(/\.$/, ''))).filter(Boolean);
   return segs.some((x) => patio.has(x));
+}
+// Café test 2 (Whistler, 2026-11-15): the owner's own Dogs line (English or from the French setup) says dogs stay outside
+// ("Dogs outside only", "not inside", « Pas de chiens à l’intérieur »): cards and the page say "Dogs outside only"
+// (« Chiens à l’extérieur seulement »), never a plain "Dogs OK" / "Dog-friendly" that reads as dogs inside.
+const DOGS_OUTSIDE_RE = /\b(?:outside only|outdoors? only|only (?:outside|outdoors)|not (?:allowed |permitted |welcome )?(?:inside|indoors)|no dogs (?:allowed |permitted )?(?:inside|indoors))\b|(?:à l[’']extérieur|dehors) seulement|seulement (?:à l[’']extérieur|dehors)|pas (?:de chiens? |admis |permis )?(?:à l[’']intérieur|en dedans)|aucun chien (?:à l[’']intérieur|en dedans)|chiens? (?:interdits?|non admis) à l[’']intérieur/i;
+function dogsOutsideOnly(venue) {
+  if (!venue || !venue.id || !venue.dog_friendly) return false;
+  const info = venueVisitInfo(venue.id);
+  if (!info) return false;
+  const texts = [];
+  if (Array.isArray(info.rows) && (info.owner_labels || []).includes('Dogs')) {
+    const r = info.rows.find((x) => x && x.label === 'Dogs' && typeof x.text === 'string');
+    if (r) texts.push(r.text);
+  }
+  const frLine = ownerVisitFrLines(info).dogs;
+  if (frLine) texts.push(frLine);
+  return texts.some((t) => DOGS_OUTSIDE_RE.test(t));
 }
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
   return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
@@ -20328,6 +20349,9 @@ function heatedPatioHighlight(venue, profile = {}) {
 function foodDrinkHighlights(venue, dogNote, profile = {}) {
   const kl = kidsChipLabel(venue, false);
   if (kl) profile = { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), kid: kl } };
+  // Café test 2 (Whistler, 2026-11-15): her own Dogs line says outside only / not inside, so the highlight says that,
+  // not a plain "Dog-friendly" (a dog note, when the page has one, is shown as before).
+  if (!dogNote && dogsOutsideOnly(venue)) profile = { ...profile, highlightLabels: { ...(profile.highlightLabels || {}), dog: 'Dogs outside only' } };
   const [v, pr] = heatedPatioHighlight(venue, profile);
   return require('./food-drink-venue-layout').highlightsFor(v, dogNote, pr);
 }
@@ -20353,7 +20377,9 @@ function pubSportsText(venue, fr) {
 // Owner-only, never researched (memory badge-rules). Stored in venue_cafe_info as one JSON object; each part optional:
 //   serves  [CAFE_SERVES keys]                      what you serve (Espresso drinks, Baked fresh here, Beer & wine...)
 //   diet    { milks: [oat|almond|soy|coconut], milk_extra: 'yes'|'no', gf_kitchen: 'shared'|'dedicated', vegan_baking, nut_free,
-//             note: 'one line' (café test 1, 2026-11-11: "Oat & almond milk +50¢ · Gluten-free: macarons only"; optional) }
+//             note: 'one line' (café test 1, 2026-11-11: "Oat & almond milk +50¢ · Gluten-free: macarons only"; optional),
+//             note_fr: the note as typed in the French setup (Whistler café test 2, 2026-11-15); gf_kitchen 'none' is
+//             the owner's "No, nothing gluten-free" }
 //   stay    { laptops: 'all_day'|'not_busy'|'none', seats: 'takeout'|'few'|'lots', outlets, quiet }
 //   order   { preorder: bool, preorder_how: 'one line' }
 //   coffee  { roast_own: bool, source: 'a name', beans: bool }
@@ -20482,15 +20508,16 @@ function cleanCafeInfoPart(key, x) {
   }
   if (key === 'diet') {
     // Café test 2 (2026-11-11): ice cream and gelato answers too: dairy-free sorbet, vegan gelato, gluten-free cups or cones.
-    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note', 'df_sorbet', 'vegan_ice', 'gf_cones'])) return { error: CAFE_INFO_ERROR };
+    if (!obj(x, ['milks', 'milk_extra', 'gf_kitchen', 'vegan_baking', 'nut_free', 'note', 'note_fr', 'df_sorbet', 'vegan_ice', 'gf_cones'])) return { error: CAFE_INFO_ERROR };
     if (!bool(x.df_sorbet) || !bool(x.vegan_ice) || !pick(x.gf_cones, ['cups', 'cones'])) return { error: CAFE_INFO_ERROR };
     const dn = text(x.note, CAFE_TEXT_MAX); if (dn.error) return dn;
+    const dnFr = text(x.note_fr, CAFE_TEXT_MAX); if (dnFr.error) return dnFr;
     const milks = x.milks === undefined ? [] : x.milks;
     if (!Array.isArray(milks) || milks.some((m) => !CAFE_MILKS.includes(m)) || new Set(milks).size !== milks.length) return { error: CAFE_INFO_ERROR };
-    if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
+    if (!pick(x.milk_extra, ['yes', 'no']) || !pick(x.gf_kitchen, ['shared', 'dedicated', 'none']) || !bool(x.vegan_baking) || !bool(x.nut_free)) return { error: CAFE_INFO_ERROR };
     const v = { ...(milks.length ? { milks: CAFE_MILKS.filter((m) => milks.includes(m)) } : {}), ...(milks.length && x.milk_extra ? { milk_extra: x.milk_extra } : {}),
       ...(x.gf_kitchen ? { gf_kitchen: x.gf_kitchen } : {}), ...(x.vegan_baking ? { vegan_baking: true } : {}), ...(x.nut_free ? { nut_free: true } : {}),
-      ...(x.df_sorbet ? { df_sorbet: true } : {}), ...(x.vegan_ice ? { vegan_ice: true } : {}), ...(x.gf_cones ? { gf_cones: x.gf_cones } : {}), ...(dn.text ? { note: dn.text } : {}) };
+      ...(x.df_sorbet ? { df_sorbet: true } : {}), ...(x.vegan_ice ? { vegan_ice: true } : {}), ...(x.gf_cones ? { gf_cones: x.gf_cones } : {}), ...(dn.text ? { note: dn.text } : {}), ...(dnFr.text ? { note_fr: dnFr.text } : {}) };
     return { value: Object.keys(v).length ? v : null };
   }
   if (key === 'stay') {
@@ -20560,7 +20587,9 @@ function cafeInfoLinesHtml(venue, fr) {
   const d = info.diet || {};
   const dBits = [];
   if ((d.milks || []).length) dBits.push(`${L('Dairy-free milks', 'Laits végétaux')}: ${d.milks.map((m) => (CAFE_MILK_LABELS[m] || [m, m])[fr ? 1 : 0].toLowerCase()).join(', ')}${d.milk_extra === 'no' ? L(' (no extra charge)', ' (sans frais)') : d.milk_extra === 'yes' ? L(' (extra charge)', ' (en supplément)') : ''}`.replace(': ', fr ? '\u00a0: ' : ': '));
-  if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'options sans gluten d’une cuisine réservée'));
+  // "No, nothing gluten-free" (Whistler café test 2, 2026-11-15) leads the line: it is an allergy warning.
+  if (d.gf_kitchen === 'none') dBits.unshift(L('nothing gluten-free', 'rien sans gluten'));
+  else if (d.gf_kitchen === 'dedicated') dBits.push(L('gluten-free baking from a dedicated kitchen', 'options sans gluten d’une cuisine réservée'));
   else if (d.gf_kitchen === 'shared') dBits.push(L('gluten-free baking (made in a shared kitchen)', 'options sans gluten (cuisine partagée)'));
   if (d.vegan_baking) dBits.push(L('vegan baking', 'pâtisseries véganes'));
   if (d.df_sorbet) dBits.push(L('dairy-free sorbet', 'sorbet sans produits laitiers'));
@@ -20568,8 +20597,10 @@ function cafeInfoLinesHtml(venue, fr) {
   if (d.gf_cones === 'cups') dBits.push(L('gluten-free in a cup (cones have gluten)', 'sans gluten dans une coupe (les cornets contiennent du gluten)'));
   else if (d.gf_cones === 'cones') dBits.push(L('gluten-free cones', 'cornets sans gluten'));
   if (d.nut_free) dBits.push(L('nut-free options', 'options sans noix'));
-  // The owner's own note (her words, usually English) follows the details; the French page shows the details only.
-  const dNote = d.note && !fr ? d.note : '';
+  // The owner's own note follows the details, in the language it was written in (Whistler café test 2, 2026-11-15): a
+  // note typed in the French setup (note_fr) shows on the French page only; the French page falls back to her English
+  // note when there is no French one (it is often an allergy warning, so it is never left out).
+  const dNote = fr ? (d.note_fr || d.note || '') : (d.note || '');
   if (dBits.length || dNote) lines.push(['diet', '🌱', [dBits.length ? cafeCap(dBits.join(' · ')) : '', dNote].filter(Boolean).join(dBits.length ? '. ' : '')]);
   const c = info.coffee || {};
   const cBits = [];
@@ -20635,8 +20666,11 @@ function cafePageProfile(venue, profile, { hasHappyDeals = false, hasSpecials = 
   if (!venue || venue.type !== 'cafe') return profile;
   const out = { ...profile };
   if (hasSpecials && !hasHappyDeals) out.dealsLabel = hasNights ? 'Specials & events' : 'Specials';
+  // Café test 2 (Whistler, 2026-11-15): with events only, the jump chip says what the card's heading says ("Weekly
+  // events"; "Weekly nights" is a pub word).
+  else if (!hasHappyDeals && hasNights) out.dealsLabel = 'Weekly events';
   const gf = (venueCafeInfo(venue.id).diet || {}).gf_kitchen;
-  if (venue.gluten_free && gf) out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
+  if (venue.gluten_free && gf && gf !== 'none') out.highlightLabels = { ...(profile.highlightLabels || {}), gluten: gf === 'shared' ? 'Gluten-free options (shared kitchen)' : 'Gluten-free (dedicated kitchen)' };
   // Café test 5 (2026-11-12): vegan (or else vegetarian) options lead a café's top highlights; the four-chip limit cut
   // them, though they're often what a café is chosen for. The badges themselves are unchanged.
   // Café test 6 (2026-11-12): every dietary option leads (vegan, vegetarian, then gluten-free) ahead of dogs, kids and
@@ -20677,7 +20711,7 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
     .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place'))
     .map((f) => {
       const icon = (CARD_BADGE_SHORT[f] || [])[0];
-      const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (f === 'kid_friendly' && kidsChipLabel(venue, fr)) || (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
+      const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (f === 'kid_friendly' && kidsChipLabel(venue, fr)) || (f === 'dog_friendly' && dogsOutsideOnly(venue) && (fr ? 'Chiens à l’extérieur seulement' : 'Dogs outside only')) || (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
       return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, fr, (g) => `chip chip-vb chip-vb-${g}`) || [])
@@ -20700,7 +20734,7 @@ function cafeFrChipsHtml(venue, dogNote, { skipHappyHour = false } = {}) {
     const f = HIGHLIGHT_BADGE_FIELD[k];
     if (!f || (k === 'dog' && dogNote !== undefined)) return '';
     const label = k === 'gluten' && gf === 'shared' ? 'Options sans gluten (cuisine partagée)' : k === 'gluten' && gf === 'dedicated' ? 'Sans gluten (cuisine réservée)'
-      : k === 'patio' && feats.heated_patio ? OWNER_EXTRA_BADGE_LABELS.heated_patio.fr : frBadgeLabel(f);
+      : k === 'patio' && feats.heated_patio ? OWNER_EXTRA_BADGE_LABELS.heated_patio.fr : k === 'dog' && dogsOutsideOnly(venue) ? 'Chiens à l’extérieur seulement' : frBadgeLabel(f);
     const icon = (CARD_BADGE_SHORT[f] || [])[0];
     return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
   }).filter(Boolean);
@@ -35861,7 +35895,9 @@ function frStatusText(text) {
     ? `Ferm\u00e9 du ${day1(d1)} ${FR_STATUS_MONTHS[m1]} au ${day1(d2)} ${FR_STATUS_MONTHS[m2]}`
     : `Ferm\u00e9 du ${day1(d1)} au ${day1(d2)} ${FR_STATUS_MONTHS[m1]}`));
   // Any other closure note the French list has (an owner's "(Renovations)") in French too.
-  text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { const fr = /^(holiday|temporary closure)$/.test(note) ? null : frText(note); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : m; });
+  // Café test 2 (Whistler, 2026-11-15): and a holiday tapped in the setup, stored by its English name ("Christmas Day"),
+  // as the French hours block already says it: « Fermé aujourd’hui (Noël) ».
+  text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { const fr = /^(holiday|temporary closure)$/.test(note) ? null : closureNoteFor(note, true); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : m; });
   // "midnight" (pub fresh-eyes, 2026-11-10: English never says "12 AM" now) is "minuit".
   const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; }).replace(/\bmidnight\b/g, 'minuit');
   return time(text
@@ -48708,7 +48744,7 @@ function ownerValueText(field, value) {
     const parts = [];
     if (o.serves) parts.push(`Serves: ${o.serves.map((k) => (CAFE_SERVE_LABELS[k] || {}).en || k).join(', ')}`);
     if (o.stay) parts.push(`Stay: ${['laptops', 'seats'].filter((k) => o.stay[k]).map((k) => `${k} ${o.stay[k]}`).concat(o.stay.outlets ? ['outlets'] : [], o.stay.quiet ? ['quiet'] : []).join(', ')}`);
-    if (o.diet) parts.push(`Dietary: ${[(o.diet.milks || []).join('/'), o.diet.milk_extra ? `milk extra ${o.diet.milk_extra}` : '', o.diet.gf_kitchen ? `GF ${o.diet.gf_kitchen}` : '', o.diet.vegan_baking ? 'vegan baking' : '', o.diet.nut_free ? 'nut-free' : '', o.diet.note ? `note “${o.diet.note}”` : ''].filter(Boolean).join(', ')}`);
+    if (o.diet) parts.push(`Dietary: ${[(o.diet.milks || []).join('/'), o.diet.milk_extra ? `milk extra ${o.diet.milk_extra}` : '', o.diet.gf_kitchen ? `GF ${o.diet.gf_kitchen}` : '', o.diet.vegan_baking ? 'vegan baking' : '', o.diet.nut_free ? 'nut-free' : '', o.diet.note ? `note “${o.diet.note}”` : '', o.diet.note_fr ? `French note “${o.diet.note_fr}”` : ''].filter(Boolean).join(', ')}`);
     if (o.order) parts.push(`Pre-orders${o.order.preorder_how ? `: ${o.order.preorder_how}` : ''}`);
     if (o.coffee) parts.push(`Coffee: ${[o.coffee.roast_own ? 'roasts its own' : o.coffee.source ? `beans from ${o.coffee.source}` : '', o.coffee.beans ? 'beans for sale' : ''].filter(Boolean).join(', ')}`);
     if (o.sellout) parts.push(`Sells out: ${o.sellout}`);
@@ -53860,7 +53896,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -53980,12 +54016,29 @@ function cafeHelpTopics(page) {
       keys: ['event after we close', 'event is after we close', 'event after closing', 'event after close', 'event after hours', 'after we close', 'after closing', 'after close', 'after hours', 'after hours event', 'evening event', 'event in the evening', 'event at night', 'latte art night', 'event outside our hours', 'event outside my hours'],
       keysFr: ['evenement apres la fermeture', 'apres la fermeture', 'apres les heures', 'evenement en soiree', 'evenement le soir', 'en dehors de nos heures', 'soiree d art latte'],
       a: '<p>That’s fine. On your edit page, open <strong>Weekly events</strong> and add it with its own times (like 6 PM to 8 PM). Your page shows the event with those times; your opening hours stay as they are.</p>',
-      aFr: '<p>Aucun problème. Sur votre page de modification, ouvrez <strong>Événements de la semaine</strong> et ajoutez-le avec ses propres heures (par exemple de 18 h à 20 h). Votre page affiche l’événement avec ces heures; vos heures d’ouverture restent telles quelles.</p>' },
+      aFr: '<p>Aucun problème. Sur votre page de modification, ouvrez <strong>Événements de la semaine</strong> et ajoutez-le avec ses propres heures (par exemple de 18 h à 20 h). Votre page affiche l’événement avec ces heures ; vos heures d’ouverture restent telles quelles.</p>' },
     { id: 'cafe-early-close', pages, over: ['closures', 'hours', 'seasonal-hours', 'setup-season', 'hours-right'], noRelated: ['seasonal-hours'], q: 'We close early on a holiday (like Christmas Eve)', qFr: 'Nous fermons plus tôt un jour férié (comme la veille de Noël)',
       keys: ['close early', 'closes early', 'closing early', 'closed early', 'early close', 'early closing', 'close early on christmas eve', 'close early on a holiday', 'close early on new years eve', 'close at 2', 'close at noon', 'half day', 'short day', 'shorter hours on', 'reduced hours', 'open but closing early', 'early on christmas eve'],
       keysFr: ['fermer plus tot', 'fermons plus tot', 'ferme plus tot', 'fermeture hative', 'fermons tot', 'fermer tot', 'demi journee', 'heures reduites', 'plus tot la veille de noel', 'veille de noel', 'veille du jour de l an'],
       a: `<p>Open but closing early? Message us the date and time (tap <strong>Message us</strong> below) and we’ll look after it. Leave that holiday unticked.</p><p>Closed all day? ${setup ? 'Tap the holiday right here in setup, under <strong>Hours and holidays</strong>.' : 'Tap the holiday in <strong>Set up your page</strong>, under <strong>Hours and holidays</strong>, or add it here under <strong>Special closures</strong>.'}</p>`,
       aFr: `<p>Ouvert, mais vous fermez plus tôt? Écrivez-nous la date et l’heure (touchez <strong>Écrivez-nous</strong> ci-dessous) et nous nous en occupons. Ne cochez pas ce jour férié.</p><p>Fermé toute la journée? ${setup ? 'Touchez le jour férié ici même, dans la configuration, sous <strong>Heures et jours fériés</strong>.' : 'Touchez le jour férié dans <strong>Configurez votre page</strong>, sous <strong>Heures et jours fériés</strong>, ou ajoutez-le ici sous <strong>Fermetures spéciales</strong>.'}</p>` },
+    // Café test 2 (Whistler, 2026-11-15): "we have nothing gluten-free" got the Badges answer (with a happy hour sentence);
+    // "we do takeout" got "I'm not sure"; "where do I add my workshop" got the one-off event steps.
+    { id: 'cafe-no-gluten-free', pages, over: ['features', 'dont-have', 'none', 'cafe-milks', 'page-complete'], noRelated: ['dont-have'], q: 'We have nothing gluten-free. Where do I say so?', qFr: 'Nous n’avons rien sans gluten. Où l’indiquer?',
+      keys: ['nothing gluten free', 'nothing is gluten free', 'no gluten free', 'no gluten free options', 'not gluten free', 'have nothing gluten free', 'dont have gluten free', 'dont have anything gluten free', 'none of it is gluten free', 'celiac', 'coeliac', 'flour everywhere'],
+      keysFr: ['rien sans gluten', 'on n a rien sans gluten', 'nous n avons rien sans gluten', 'pas de sans gluten', 'pas d options sans gluten', 'aucune option sans gluten', 'rien de sans gluten', 'coeliaque', 'farine partout'],
+      a: `<p>${here}: leave <strong>Gluten-free options</strong> unticked on <strong>What you offer</strong>, then say so under <strong>Dietary details</strong>: tap <strong>No, nothing gluten-free</strong>, and add a line in your own words if you like (“Flour everywhere in our kitchen”). Your page then says <strong>Nothing gluten-free</strong>.</p>`,
+      aFr: `<p>${ici} : laissez <strong>Options sans gluten</strong> décoché sous <strong>Ce que vous offrez</strong>, puis écrivez-le sous <strong>Détails alimentaires</strong> : touchez <strong>Non, rien sans gluten</strong> et ajoutez une ligne dans vos mots si vous voulez (« Farine partout dans la cuisine »). Votre page indique alors <strong>Rien sans gluten</strong>.</p>` },
+    { id: 'cafe-takeout', pages, over: ['features', 'cafe-order-link', 'menu-add', 'page-complete'], q: 'We do takeout. Where do I say so?', qFr: 'Nous faisons du pour emporter. Où l’indiquer?',
+      keys: ['takeout', 'take out', 'we do takeout', 'do takeout', 'takeaway', 'take away', 'to go', 'coffee to go', 'grab and go'],
+      keysFr: ['pour emporter', 'du pour emporter', 'on fait du pour emporter', 'a emporter', 'emporter', 'plats a emporter', 'cafe a emporter'],
+      a: `<p>${setup ? 'On your edit page' : 'On this page'}, open <strong>Badges</strong> and tick <strong>Takeout</strong>.</p>`,
+      aFr: `<p>${setup ? 'Sur votre page de modification' : 'Sur cette page'}, ouvrez <strong>Caractéristiques</strong> et cochez <strong>Pour emporter</strong>.</p>` },
+    { id: 'cafe-events', pages, over: ['event-add', 'event-repeat', 'event-change', 'event-partners', 'event-picture', 'features'], q: 'Where do I add our workshop or event?', qFr: 'Où ajouter notre atelier ou notre événement?',
+      keys: ['workshop', 'workshops', 'add my workshop', 'add our workshop', 'where do i add my workshop', 'class', 'classes', 'add an event', 'add event', 'add my event', 'event', 'events', 'tasting', 'cupping', 'baking class'],
+      keysFr: ['atelier', 'ateliers', 'ajouter mon atelier', 'j ajoute mon atelier', 'ajouter notre atelier', 'evenement', 'evenements', 'ajouter un evenement', 'ajouter mon evenement', 'cours', 'degustation'],
+      a: `<p>Is it on every week or every month? ${setup ? 'On your edit page' : 'On this page'}, open <strong>Weekly events</strong>, add it with its day and times, and pick <strong>How often?</strong> (every week, every other week, 1st of the month and so on). Your page shows it on those days.</p><p>A one-off event on a single date? ${setup ? 'On your edit page' : 'On this page'}, scroll to <strong>Add an event</strong>. We check those first, usually within a day.</p>`,
+      aFr: `<p>Il revient chaque semaine ou chaque mois? ${setup ? 'Sur votre page de modification' : 'Sur cette page'}, ouvrez <strong>Événements de la semaine</strong>, ajoutez-le avec son jour et ses heures, et choisissez <strong>À quelle fréquence?</strong> (chaque semaine, une semaine sur deux, 1er du mois, etc.). Votre page l’affiche ces jours-là.</p><p>Un événement unique, à une seule date? ${setup ? 'Sur votre page de modification' : 'Sur cette page'}, descendez jusqu’à <strong>Ajouter un événement</strong>. Nous les vérifions d’abord, en général d’ici un jour.</p>` },
   ];
   return CAFE_SETUP_HELP_TOPICS.concat(extra);
 }
@@ -56240,7 +56293,7 @@ const OWNER_HELP_SCRIPT = String.raw`
   function say(html, cls){ var d = document.createElement('div'); d.className = 'ohb-msg ' + (cls || 'ohb-bot'); if (!cls || cls.indexOf('ohb-bot') === 0) d.lang = curLang; d.innerHTML = html; log.appendChild(d); scroll(); return d; }
   function chips(ids, human){
     var d = document.createElement('div'); d.className = 'ohb-chips';
-    ids.forEach(function(id){ var t = byId[id]; if (!t) return; var label = curLang === 'fr' ? t.qFr : t.q; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = label; b.addEventListener('click', function(){ answer(id, label); }); d.appendChild(b); });
+    ids.forEach(function(id){ var t = byId[id]; if (!t || (cfg.noChip || []).indexOf(id) >= 0) return; var label = curLang === 'fr' ? t.qFr : t.q; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = label; b.addEventListener('click', function(){ answer(id, label); }); d.appendChild(b); });
     if (human !== false) { var h = document.createElement('button'); h.type = 'button'; h.className = 'ohb-chip ohb-human'; h.textContent = ui('human'); h.addEventListener('click', contact); d.appendChild(h); }
     log.appendChild(d); scroll();
   }
@@ -56462,6 +56515,16 @@ function ownerHelpMode(page, signedIn) {
 // Distillery test 3 (2026-11-13): "{EDIT}#tours-events" in an answer links to the edit page (the setup passes its edit
 // page; on the edit page itself the link is just "#tours-events").
 function helpEditHref(html, editHref) { return String(html || '').replace(/\{EDIT\}/g, escapeHtml(editHref || '')); }
+const HELP_HAPPY_RE = /happy hour|5 à 7/i;
+// An answer without its happy hour words: the item of a list ("…, features, happy hour, price range…"), else the whole
+// sentence ("If you serve alcohol you can also add your happy hour days and times.").
+function helpWithoutHappyHour(html) {
+  if (typeof html !== 'string' || !HELP_HAPPY_RE.test(html)) return html;
+  return html
+    .replace(/,\s*(?:<strong>)?(?:happy hour|5 à 7)(?:<\/strong>)?(?=\s*(?:[,.;:)]| and | et | or | ou ))/gi, '')
+    .replace(/(?:[^.!?<>]|<\/?(?:strong|em)>)*(?:happy hour|5 à 7)(?:[^.!?<>]|<\/?(?:strong|em)>)*[.!?]?\s*/gi, (m) => (/^\s/.test(m) ? ' ' : ''))
+    .replace(/<(li|p)>\s*<\/\1>/g, '').replace(/[ \u00a0\u202f]+(<\/(?:p|li)>)/g, '$1').replace(/ {2,}/g, ' ');
+}
 function ownerHelpWidgetHtml(page, opts = {}) {
   if (!OWNER_HELP_START[page]) return '';
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
@@ -56488,6 +56551,14 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
     ui: OWNER_HELP_UI_SPACED,
   };
+  // Café test 2 (Whistler, 2026-11-15): a place that can't have a happy hour (a café that serves no alcohol…) is never
+  // offered a happy hour topic as a next thing to read, and no other answer brings happy hour up. Asking about happy hour
+  // itself still gets its answer.
+  if (opts.noHappyHour) {
+    const isHh = (t) => HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`);
+    cfg.noChip = cfg.topics.filter(isHh).map((t) => t.id);
+    cfg.topics = cfg.topics.map((t) => (isHh(t) ? t : { ...t, a: helpWithoutHappyHour(t.a), aFr: helpWithoutHappyHour(t.aFr) }));
+  }
   const u = OWNER_HELP_UI[lang];
   return `<style>${OWNER_HELP_CSS}</style>
 <button type="button" class="ohb-btn" id="ohbBtn" aria-controls="ohbPanel" aria-expanded="false"><span class="ohb-q" aria-hidden="true">?</span>${escapeHtml(u.button)}</button>
@@ -60905,6 +60976,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const W = dist || lounge || cafeEv ? { en: 'Event', fr: 'Événement', kindEn: 'kind of event', kindFr: 'genre d’événement' } : { en: 'Night', fr: 'Soirée', kindEn: 'kind of night', kindFr: 'genre de soirée' };
     const kindOrder = dist ? [...DAYTIME_NIGHT_KINDS, ...NIGHT_KINDS.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k))] : lounge ? ['dj', 'live_music', ...NIGHT_KINDS.filter((k) => k !== 'dj' && k !== 'live_music')]
       : cafeEv ? [...CAFE_NIGHT_KINDS_FIRST, ...NIGHT_KINDS.filter((k) => !CAFE_NIGHT_KINDS_FIRST.includes(k))] : NIGHT_KINDS;
+    // Café test 2 (Whistler, 2026-11-15): on the French edit page the first boxes are labelled « En anglais » (with English
+    // examples) and the French boxes are open with the French examples: a title typed only in French goes in the French
+    // box and never shows as English on the English page. French alone is accepted (title '', title_fr; a detail too).
     return Array.from({ length: NIGHTS_MAX }, (_, i) => {
       const x = nightsNow[i] || { days: [], kind: dist ? 'tour' : lounge ? 'dj' : cafeEv ? 'other' : 'trivia', frequency: 'weekly' };
       const n = i + 1;
@@ -60919,13 +60993,14 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
           <p class="op-hint op-wn-season">${escapeHtml(L(`Only ${wnSeason}. This stays when you send.`, `Seulement ${wnSeason}${/\.$/.test(wnSeason) ? '' : '.'} Cela reste quand vous envoyez.`))}</p>` : ''}
           <div class="op-sp-days" role="group" aria-label="${L(`${W.en} ${n}: days`, `${W.fr} ${n} : jours`)}">${days}</div>
           <span class="op-sp-line">${kinds}<label class="op-wn-freq-l"><span class="op-wn-freq-t">${L('How often?', 'À quelle fréquence?')}</span> ${freq}</label></span>
-          <input type="text" class="op-wn-title" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`${W.en} ${n}: name`, `${W.fr} ${n} : nom`)}" placeholder="${i === 0 ? (dist ? L('Saturday distillery tour', 'Visite de la distillerie du samedi') : lounge ? L('DJ Fridays', 'DJ le vendredi') : cafeEv ? L('Latte art night', 'Soirée d’art latté') : L('Trivia Tuesday', 'Quiz du mardi')) : ''}">
+          ${lang === 'fr' ? `<span class="op-hint op-wn-en-label">${escapeHtml(OWNER_SETUP_STRINGS.frSpacing('En anglais (pour votre page anglaise) :'))}</span>` : ''}
+          <input type="text" class="op-wn-title"${lang === 'fr' ? ' lang="en"' : ''} maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`${W.en} ${n}: name`, `${W.fr} ${n} : nom en anglais`)}" placeholder="${i === 0 ? (dist ? 'Saturday distillery tour' : lounge ? 'DJ Fridays' : cafeEv ? 'Latte art night' : 'Trivia Tuesday') : ''}">
           <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-wn-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`${W.en} ${n}: starts at (optional)`, `${W.fr} ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-wn-end" value="${escapeHtml(x.end || '')}" aria-label="${L(`${W.en} ${n}: ends at (optional)`, `${W.fr} ${n} : se termine à (facultatif)`)}"></span>
-          <input type="text" class="op-wn-detail" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail || '')}" aria-label="${L(`${W.en} ${n}: detail (optional)`, `${W.fr} ${n} : détail (facultatif)`)}" placeholder="${i === 0 ? (dist ? L('Meet at the bar; about 45 minutes', 'Rendez-vous au bar; environ 45 minutes') : lounge ? L('Local DJs from 10 PM', 'DJ locaux dès 22 h') : cafeEv ? L('All welcome, no need to sign up', 'Ouvert à tous, sans inscription') : L('Teams up to 6, prizes for the top 3', 'Équipes de 6 au plus, prix pour les 3 premières')) : ''}">
+          <input type="text" class="op-wn-detail"${lang === 'fr' ? ' lang="en"' : ''} maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail || '')}" aria-label="${L(`${W.en} ${n}: detail (optional)`, `${W.fr} ${n} : détail en anglais (facultatif)`)}" placeholder="${i === 0 ? (dist ? 'Meet at the bar; about 45 minutes' : lounge ? 'Local DJs from 10 PM' : cafeEv ? 'All welcome, no need to sign up' : 'Teams up to 6, prizes for the top 3') : ''}">
           <span class="op-sp-line"><input type="text" class="op-wn-host" maxlength="${NIGHT_HOST_MAX}" value="${escapeHtml(x.host || '')}" aria-label="${L(`${W.en} ${n}: host (optional)`, `${W.fr} ${n} : animateur (facultatif)`)}" placeholder="${i === 0 ? L('Host (optional)', 'Animateur (facultatif)') : ''}"><input type="text" class="op-wn-cost" maxlength="${NIGHT_COST_MAX}" value="${escapeHtml(x.cost || '')}" aria-label="${L(`${W.en} ${n}: cost (optional)`, `${W.fr} ${n} : prix (facultatif)`)}" placeholder="${i === 0 ? L('Free', 'Gratuit') : ''}"></span>
-          <details class="op-sp-fr"${x.title_fr || x.detail_fr ? ' open' : ''}><summary>${dist || lounge ? L('In French (optional, you can skip this)', 'En français (facultatif)') : L('In French (optional)', 'En français (facultatif)')}</summary>
-            <input type="text" class="op-wn-title-fr" lang="fr" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`${W.en} ${n}: name in French`, `${W.fr} ${n} : nom en français`)}">
-            <input type="text" class="op-wn-detail-fr" lang="fr" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail_fr || '')}" aria-label="${L(`${W.en} ${n}: detail in French`, `${W.fr} ${n} : détail en français`)}">
+          <details class="op-sp-fr"${x.title_fr || x.detail_fr || lang === 'fr' ? ' open' : ''}><summary>${dist || lounge ? L('In French (optional, you can skip this)', 'En français (pour votre page française)') : L('In French (optional)', 'En français (pour votre page française)')}</summary>
+            <input type="text" class="op-wn-title-fr" lang="fr" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`${W.en} ${n}: name in French`, `${W.fr} ${n} : nom en français`)}"${lang === 'fr' && i === 0 ? ` placeholder="${dist ? 'Visite de la distillerie du samedi' : lounge ? 'DJ le vendredi' : cafeEv ? 'Soirée d’art latté' : 'Quiz du mardi'}"` : ''}>
+            <input type="text" class="op-wn-detail-fr" lang="fr" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail_fr || '')}" aria-label="${L(`${W.en} ${n}: detail in French`, `${W.fr} ${n} : détail en français`)}"${lang === 'fr' && i === 0 ? ` placeholder="${dist ? 'Rendez-vous au bar ; environ 45 minutes' : lounge ? 'DJ locaux dès 22 h' : cafeEv ? 'Ouvert à tous, sans inscription' : 'Équipes de 6 au plus, prix pour les 3 premières'}"` : ''}>
           </details>
         </fieldset>`;
     }).join('') + `<button type="button" class="op-add op-wn-add" data-wn-add${shown >= NIGHTS_MAX ? ' hidden' : ''}>${dist || lounge || cafeEv ? L('+ Add an event', '+ Ajouter un événement') : L('+ Add a night', '+ Ajouter une soirée')}</button>`;
@@ -61459,7 +61534,7 @@ ${priceFieldHtml}      </details>` : ''}
       </details>` : ''}
       ${showNights ? `
       <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
-      <summary id="tours-events"><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'distillery' ? L('Tours &amp; events', 'Visites et événements') : venue.type === 'cocktail' ? L('Events', 'Événements') : venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' || venue.type === 'distillery' || venue.type === 'cocktail' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      <summary id="tours-events"><span class="lyv-section-label" id="opNightsLabel">${venue.type === 'distillery' ? L('Tours &amp; events', 'Visites et événements') : venue.type === 'cocktail' ? L('Events', 'Événements') : venue.type === 'cafe' ? L('Weekly events', 'Événements de la semaine') : L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? (venue.type === 'cafe' || venue.type === 'distillery' || venue.type === 'cocktail' ? L(`${nightsNow.length} event${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} événement${nightsNow.length === 1 ? '' : 's'}`) : L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`)) : L('None yet', venue.type === 'cafe' || venue.type === 'distillery' || venue.type === 'cocktail' ? 'Aucun pour l’instant' : 'Aucune pour l’instant')}</span></summary>
       ${saveLine('own', '', 'weekly_nights')}${completeOn ? `<p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, like a distillery tour on Saturdays. Tick the days, pick how often (like Every other week), and fill in each box.`, `Vos visites, ateliers et événements réguliers, comme une visite de la distillerie le samedi. Cochez les jours, choisissez la fréquence (comme Une semaine sur deux) et remplissez chaque case.`) : venue.type === 'cocktail' ? L(`Your regular events, like a DJ on Fridays or jazz once a month. Tick the days, pick how often (like 1st of the month), and fill in each box.`, `Vos événements réguliers, comme un DJ le vendredi ou du jazz une fois par mois. Cochez les jours, choisissez la fréquence (comme 1er du mois) et remplissez chaque case.`) : venue.type === 'cafe' ? L(`Your regular events, like a latte art night. Tick the days, pick how often (like Last of the month), and fill in each box.`, `Vos événements réguliers, comme une soirée d’art latté. Cochez les jours, choisissez la fréquence (comme Dernier du mois) et remplissez chaque case.`) : L(`Your regular nights, like trivia on Tuesdays. Tick the days and fill in each box.`, `Vos soirées régulières, comme le quiz du mardi. Cochez les jours et remplissez chaque case.`)}</p><details class="op-tips"><summary>${L('Tips', 'Conseils')}</summary><p class="op-hint">${venue.type === 'distillery' ? L(`Your regular tours, classes and events, up to ${NIGHTS_MAX}: a distillery tour, a cocktail or whisky class, live music (&ldquo;Saturday distillery tour&rdquo;, Saturdays 1 PM). Tick the days, pick the kind and how often (every week, every other week, once a month or by appointment), and add the time. We show today&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off event goes under Add an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos visites, ateliers et événements réguliers, jusqu’à ${NIGHTS_MAX} : une visite de la distillerie, un atelier de cocktails ou de whisky, de la musique live (« Visite de la distillerie du samedi », le samedi à 13 h). Cochez les jours, choisissez le genre et la fréquence (chaque semaine, une semaine sur deux, une fois par mois ou sur rendez-vous), et ajoutez l’heure. Nous affichons celui du jour sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous Ajouter un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`) : venue.type === 'cocktail' ? L(`Your regular events, up to ${NIGHTS_MAX}: a DJ, live music, jazz, comedy (&ldquo;DJ Fridays&rdquo;, Fridays 10 PM). Tick the days, pick the kind and how often (every week, every other week or once a month), and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show goes under Add an event (on your list) instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos événements réguliers, jusqu’à ${NIGHTS_MAX} : un DJ, de la musique live, du jazz, de l’humour (« DJ le vendredi », le vendredi à 22 h). Cochez les jours, choisissez le genre et la fréquence (chaque semaine, une semaine sur deux ou une fois par mois), et ajoutez l’heure. Nous affichons celui du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique va plutôt sous Ajouter un événement (dans votre liste). N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`) : (venue.type === 'cafe' ? L(`Your regular events, up to ${NIGHTS_MAX}: an open mic, live music, a paint night, a latte art night (&ldquo;Latte art night&rdquo;, last Thursday, 6 PM to 8 PM). Tick the days, pick the kind and how often, and add the times. An event after you close is fine. We show today&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off event goes under Add an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos événements réguliers, jusqu’à ${NIGHTS_MAX} : scène ouverte, musique live, soirée peinture, soirée d’art latté (« Soirée d’art latté », le dernier jeudi, de 18 h à 20 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez les heures. Un événement après la fermeture ne pose aucun problème. Nous affichons celui du jour sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous Ajouter un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`) : L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`))}</p></details>` : `<p class="op-hint">${(venue.type === 'cafe' ? L(`Your regular events, up to ${NIGHTS_MAX}: an open mic, live music, a paint night, a latte art night (&ldquo;Latte art night&rdquo;, last Thursday, 6 PM to 8 PM). Tick the days, pick the kind and how often, and add the times. An event after you close is fine. We show today&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off event goes under Add an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos événements réguliers, jusqu’à ${NIGHTS_MAX} : scène ouverte, musique live, soirée peinture, soirée d’art latté (« Soirée d’art latté », le dernier jeudi, de 18 h à 20 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez les heures. Un événement après la fermeture ne pose aucun problème. Nous affichons celui du jour sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un événement unique va plutôt sous Ajouter un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`) : L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`))}</p>`}
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
@@ -62522,7 +62597,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }
@@ -67758,7 +67833,7 @@ module.exports = {
   // Full easy setup (2026-11-09).
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
-  websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
+  websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,
   PUB_SETUP_PART1, PUB_SETUP_PART2, PUB_SETUP_HELP_TOPICS, HH_TIMES_HELP_TOPIC, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
@@ -68333,7 +68408,7 @@ module.exports = {
   navHappyHourTowns,
   HAPPY_HOUR_MAP_HREF,
   happyHourLiveText,
-  frStatusText,
+  frStatusText, helpWithoutHappyHour, cafePageProfile,
   venueDistanceKm,
   FD_HUB_FILTER_CLIENT_PREDICATE_SRC,
   canonicalOutdoorRegionOrder,

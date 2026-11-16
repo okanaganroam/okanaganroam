@@ -286,7 +286,8 @@ Object.assign(en, {
   savedLater: 'We’ll remind you next time. You can do it any time from your edit page.', backSettings: 'Back to my edit page',
   helpTail: 'Photos, your menu and your description show on your page within a day. So does a new address or phone number, if you changed it. Everything else is on your page right away.',
 });
-en.offers.dog_friendly = 'Dogs welcome (even just the patio)';
+// Café test 2 (Whistler, 2026-11-15): the tile covers a hook and a water bowl outside too.
+en.offers.dog_friendly = 'Dogs welcome (even just outside or on the patio)';
 Object.assign(fr, {
   dealLong: '5 à 7 nº {n} : c’est un peu long. Gardez « Qu’est-ce qui est en spécial? » à {max} caractères.', dealsMany: 'C’est plus d’offres que votre page peut en afficher (6 au plus). Retirez-en une.',
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
@@ -305,7 +306,7 @@ Object.assign(fr, {
   savedLater: 'Nous vous le rappellerons la prochaine fois. Vous pouvez le faire à tout moment depuis votre page de modification.', backSettings: 'Retour à ma page de modification',
   helpTail: 'Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau numéro de téléphone si vous les avez modifiés. Tout le reste est en ligne tout de suite.',
 });
-fr.offers.dog_friendly = 'Chiens bienvenus (même juste sur la terrasse)';
+fr.offers.dog_friendly = 'Chiens bienvenus (même juste dehors ou sur la terrasse)';
 
 // Pubs (Dayton, 2026-11-10; mockup drafts/pub-portal-2026-11-10/pub-setup.html): pub examples and the pub-only screens,
 // laid over the words above for a pub's setup (server.js renderOwnerSetupPage). Restaurants never see these.
@@ -666,7 +667,7 @@ en.cafe = {
   orderUrlNeed: 'Please type your ordering link, or untick “Order online”.', badLink: 'Please check the link, for example yourcafe.com/order.',
   dietQ: 'Dietary details', dietLead: 'Visitors with allergies or diets check this before they come.',
   milksQ: 'Dairy-free milks?', milkExtraQ: 'Do they cost extra?', milkExtra: { no: 'No extra charge', yes: 'Yes, extra' },
-  gfQ: 'Gluten-free baking?', gf: { dedicated: 'Yes, from a gluten-free kitchen', shared: 'Yes, made in a shared kitchen' },
+  gfQ: 'Gluten-free baking?', gf: { dedicated: 'Yes, from a gluten-free kitchen', shared: 'Yes, made in a shared kitchen', none: 'No, nothing gluten-free' },
   dietMore: 'Also true?', veganBaking: 'Vegan baking', nutFree: 'Nut-free options', dietNeed: 'Please tap at least one, or tap Skip.',
   coffeeQ: 'Your coffee', coffeeLead: 'Coffee lovers like to know where the beans come from.', roastOwn: 'We roast our own beans',
   sourceLabel: 'Our beans come from… (optional)', sourceEx: 'A local roaster’s name', beansForSale: 'Beans for sale', coffeeNeed: 'Please tap an answer or type where your beans come from, or tap Skip.',
@@ -705,7 +706,7 @@ fr.cafe = {
   orderUrlNeed: 'Écrivez votre lien de commande, ou décochez « Commande en ligne ».', badLink: 'Vérifiez le lien, par exemple votrecafe.com/commande.',
   dietQ: 'Détails alimentaires', dietLead: 'Les visiteurs qui ont des allergies ou un régime vérifient ceci avant de venir.',
   milksQ: 'Laits sans produits laitiers?', milkExtraQ: 'Coûtent-ils plus cher?', milkExtra: { no: 'Sans frais', yes: 'Oui, en supplément' },
-  gfQ: 'Options sans gluten?', gf: { dedicated: 'Oui, d’une cuisine sans gluten', shared: 'Oui, faites dans une cuisine partagée' },
+  gfQ: 'Options sans gluten?', gf: { dedicated: 'Oui, d’une cuisine sans gluten', shared: 'Oui, faites dans une cuisine partagée', none: 'Non, rien sans gluten' },
   dietMore: 'Aussi vrai?', veganBaking: 'Pâtisseries véganes', nutFree: 'Options sans noix', dietNeed: 'Touchez au moins une réponse, ou touchez Passer.',
   coffeeQ: 'Votre café', coffeeLead: 'Les amateurs de café aiment savoir d’où viennent les grains.', roastOwn: 'Nous torréfions nos propres grains',
   sourceLabel: 'Nos grains viennent de… (facultatif)', sourceEx: 'Le nom d’un torréfacteur local', beansForSale: 'Grains en vente', coffeeNeed: 'Touchez une réponse ou écrivez d’où viennent vos grains, ou touchez Passer.',
@@ -875,7 +876,7 @@ Object.assign(fr, { centsLabel: 'Cents', centsLess: '25 cents de moins', centsMo
 
 // Fourth first-time café test (Dayton, 2026-11-11): café words that fit a takeout window or a café with no patio.
 Object.assign(en.cafe, {
-  quickDogsWindow: ['Dogs welcome at the window', 'Dog treats at the window'], quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
+  quickDogsWindow: ['Dogs welcome at the window', 'Dog treats at the window'], quickDogsNoPatio: ['Dogs welcome inside', 'Dogs outside only', 'Water bowls at the door'],
   photosTakeout: 'Your window, your coffee, your sign. Three photos is perfect.',
   // One name for a café's specials (the tile said "Weekly specials", the question "Any daily specials?").
   specialsQ: 'Any specials?',
@@ -883,7 +884,7 @@ Object.assign(en.cafe, {
 en.cafe.labels = Object.assign({}, en.cafe.labels, { specials: 'Specials' });
 en.cafe.noLabels = Object.assign({}, en.cafe.noLabels, { specials: 'no specials' });
 Object.assign(fr.cafe, {
-  quickDogsWindow: ['Chiens bienvenus au comptoir', 'Gâteries pour chiens au comptoir'], quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
+  quickDogsWindow: ['Chiens bienvenus au comptoir', 'Gâteries pour chiens au comptoir'], quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Chiens à l’extérieur seulement', 'Bols d’eau à l’entrée'],
   photosTakeout: 'Votre comptoir extérieur, votre café, votre enseigne. Trois photos, c’est parfait.',
   specialsQ: 'Des spéciaux?',
 });
@@ -1158,7 +1159,7 @@ en.brewery = {
   groupsNeed: 'Please tap a size or type a line, or tap “We can’t take big groups”.',
   bookLinkLabel: 'Booking link (optional, e.g. for groups)', bookLinkEx: 'your website’s booking page', bookLinkBad: 'Please check the booking link, for example yourbusiness.com/book.',
   groupsNoLink: 'Please leave links out of the Groups line. Your booking link has its own box below.', bqOpens: 'Opens', bqCloses: 'Closes',
-  quickDogsNoPatio: ['Dogs welcome inside', 'Water bowls at the door'],
+  quickDogsNoPatio: ['Dogs welcome inside', 'Dogs outside only', 'Water bowls at the door'],
   groupsSavedLink: 'Your Groups line is on your page now. We check a new booking link first, usually within a day.',
   // Instagram and Facebook on one screen, and the hours line on the holidays screen (as for cafés and wineries)
   socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.',
@@ -1221,7 +1222,7 @@ fr.brewery = {
   groupsNeed: 'Touchez une taille ou écrivez une ligne, ou touchez « Nous ne pouvons pas accueillir de grands groupes ».',
   bookLinkLabel: 'Lien de réservation (facultatif, p. ex. pour les groupes)', bookLinkEx: 'la page de réservation de votre site', bookLinkBad: 'Vérifiez le lien de réservation, par exemple votrecommerce.com/reserver.',
   groupsNoLink: 'Gardez les liens hors de la ligne Groupes. Votre lien de réservation a sa propre case plus bas.', bqOpens: 'Ouvre', bqCloses: 'Ferme',
-  quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Bols d’eau à l’entrée'],
+  quickDogsNoPatio: ['Chiens bienvenus à l’intérieur', 'Chiens à l’extérieur seulement', 'Bols d’eau à l’entrée'],
   groupsSavedLink: 'Votre ligne Groupes est sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.',
   socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
@@ -1526,6 +1527,7 @@ fr.whatsOnEx = 'Vin à 8 $ et petites assiettes à moitié prix';
 // guess's source, the tasting event and the restaurant events lead.
 Object.assign(en, {
   frOnlyHint: 'Your French version is on your French page. Write it in English here to show it on your English page too.',
+  frPageOnly: 'Written in French, so it shows on your French page only. For your English page, add it in English on your edit page.',
   happySplit: 'Is the bar open between lunch and dinner? Change your hours so they run through.',
   happySplitBtn: 'Change my hours',
   kitchenKeep: 'Keep {t}', kitchenKeepIt: 'Keep this answer',
@@ -1535,10 +1537,12 @@ Object.assign(en, {
 });
 Object.assign(fr, {
   frOnlyHint: 'Votre version française est sur votre page française. Écrivez-la en anglais ici pour l’afficher aussi sur votre page anglaise.',
+  frPageOnly: 'Écrit en français : visible sur votre page française seulement. Pour votre page anglaise, ajoutez-le en anglais sur votre page de modification.',
   happySplit: 'Le bar reste ouvert entre le dîner et le souper ? Changez vos heures pour qu’elles se suivent.',
   happySplitBtn: 'Changer mes heures',
   kitchenKeep: 'Garder {t}', kitchenKeepIt: 'Garder cette réponse',
-  spendGuessed: 'Estimation d’après votre fiche : « {x} ».',
+  // Café test 2 (Whistler, 2026-11-15): the French line doesn't quote research's English line.
+  spendGuessed: 'Estimation d’après les prix trouvés en ligne.',
   musicLeadRestaurant: 'Comme de la musique en direct, une dégustation (vin, saké ou whisky), un quiz, une table du chef ou une soirée peinture.',
   specialsMany: 'Jusqu’à 7 spéciaux, s’il vous plaît. Retirez-en un pour en ajouter un autre.',
 });

@@ -33,11 +33,14 @@ const FR_HEADING_WHEN_RE='(?: (on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Sa
 // Distillery test 2 (2026-11-13): the plan's summary sentence (trip-planner.js buildSummary) in French. It stayed in English
 // (« A one-day plan around Naramata, focused on distilleries… ») whenever the plan had no stop to name.
 function frSummaryItems(list){
- const items=String(list).split(/, | and /).map(x=>x.trim()).filter(Boolean).map(x=>{const k=x.toLowerCase();if(Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES,k))return FR_HEADING_NAMES[k];const q=/^“(.+)”$/.exec(x);return q?'« '+q[1]+' »':x;});
+ const items=String(list).split(/, | and /).map(x=>x.trim()).filter(Boolean).map(x=>{const k=x.toLowerCase();if(Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES,k))return FR_HEADING_NAMES[k];const q=/^“(.+)”$/.exec(x);
+  // Café test 2 (Whistler, 2026-11-15): a meal word reads in French, without quotes (« Lieux qui mentionnent le déjeuner »).
+  const meal=q&&{breakfast:'le déjeuner',brunch:'le brunch',lunch:'le dîner',dinner:'le souper',supper:'le souper',dessert:'le dessert',coffee:'le café'}[q[1].toLowerCase()];
+  return meal?meal:q?'« '+q[1]+' »':x;});
  return items.length>1?items.slice(0,-1).join(', ')+' et '+items[items.length-1]:items[0]||'';
 }
 // « axée sur les distilleries et « adultes » »: the article before a plain list (not before a quoted typed word).
-function frSummaryList(list){const t=frSummaryItems(list);return /^«/.test(t)?t:'les '+t;}
+function frSummaryList(list){const t=frSummaryItems(list);return /^(?:«|le |la |l’|les )/.test(t)?t:'les '+t;}
 function frSummaryAround(w){
  if(w==='@AREA@'||w===FR_SITE.area)return FR_SITE.inArea;
  const towns=w.split(/, | and /);
@@ -549,7 +552,7 @@ function t3FrenchTextCore(value){
  const frStop=(n,w)=>{const one={winery:'vignoble',brewery:'microbrasserie',restaurant:'restaurant',cafe:'café',distillery:'distillerie'}[w]||w;return n+' '+(n==='1'?one:one+'s');};
  text=text.replace(/Requested (\d+) (\w+) stops? a day; scheduled ([\d, ]+) \(day by day\)\.( (\d+) a day is more than one day holds, so the plan uses (\d+)\.)?/g,(_,n,w,list,x,r,u)=>'Demandé : '+frStop(n,w)+' par jour; prévu : '+list.trim()+' (jour par jour).'+(x?' '+r+' par jour, c’est plus qu’une journée ne peut contenir; le plan en prévoit '+u+'.':''));
  text=text.replace(/Requested (\d+) (\w+) stops?; scheduled (\d+)\./g,(_,n,w,m)=>'Demandé : '+frStop(n,w)+'; prévu : '+m+'.');
- text=text.replace(/^Places that mention (.+) in (.+?)(?:, ranked by how closely they match and by their ratings)?\.$/,(_,w,t)=>'Lieux qui mentionnent '+w.replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+(t==='@AREA@'?' @IN_AREA@':' à '+t.replace(/ and (?!.* and )/,' et '))+'.');
+ text=text.replace(/^Places that mention (.+) in (.+?)(?:, ranked by how closely they match and by their ratings)?\.$/,(_,w,t)=>'Lieux qui mentionnent '+w.replace(/“(breakfast|brunch|lunch|dinner|supper|dessert|coffee)”/gi,(q,k)=>({breakfast:'le déjeuner',brunch:'le brunch',lunch:'le dîner',dinner:'le souper',supper:'le souper',dessert:'le dessert',coffee:'le café'}[k.toLowerCase()])).replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+(t==='@AREA@'?' @IN_AREA@':' à '+t.replace(/ and (?!.* and )/,' et '))+'.');
  // Time windows (2026-10-20, round 11): "Saturday evening in Whistler: drinks, dinner and a nightcap."
  const FR_WINDOW_PARTS={drinks:'un verre',dinner:'un souper','a nightcap':'un dernier verre',coffee:'un café','a walk or a sight':'une promenade ou une visite',lunch:'un dîner','a tasting':'une dégustation','coffee or a treat':'un café ou une gâterie'};
  const FR_WINDOW_DAYS={Monday:'Lundi',Tuesday:'Mardi',Wednesday:'Mercredi',Thursday:'Jeudi',Friday:'Vendredi',Saturday:'Samedi',Sunday:'Dimanche',Tomorrow:'Demain'};
@@ -578,6 +581,10 @@ function t3FrenchTextCore(value){
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
  // Cocktail test 3 (2026-11-14): the closed days of the week ("…; closed Mon").
  if(/\d{2}:\d{2}/.test(text))text=text.replace(/; closed (?=(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b)/g,'; fermé ');
+ // Café test 2 (Whistler, 2026-11-15): a narrow no-break space before the « ; » between the groups of hours (« dim. ; 7 h–17 h »).
+ if(/\d{2}:\d{2}/.test(text)&&/^(?:Listed hours|Horaires indiqués)/.test(text))text=text.replace(/(\S); /g,'$1\u202f; ');
+ // The asked-time caveat (café test 1): « Ouvre à 8 h, après l’heure demandée » (the page writes the clock time).
+ text=text.replace(/^Opens at (\d{1,2}:\d{2}), after the time you asked for$/,'Ouvre à $1, après l’heure demandée');
  if(/\d{2}:\d{2}/.test(text))text=text.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
  // Hour ranges read like the place pages (2026-10-18): "07:00–17:00" -> "7 h–17 h", "10:30–22:00" -> "10 h 30–22 h".
  // French typography (round 11, 2026-10-20): a space before the colon after a translated label (town names here start
