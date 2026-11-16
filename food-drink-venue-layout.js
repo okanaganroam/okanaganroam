@@ -102,8 +102,8 @@ function dealsWording(hasDeals, hasNights, nightKinds, type) {
   const trivia = nightKinds.includes('trivia');
   const onlyTrivia = hasNights && nightKinds.length > 0 && nightKinds.every((k) => k === 'trivia');
   // Brewery test 3 (Whistler, 2026-11-16): a brewery's are events (a run club, a tour, a release), the card's own word;
-  // pubs and restaurants keep "nights".
-  const ev = type === 'brewery';
+  // pubs keep "nights". Restaurants (2026-11-16) say events too, like their setup and edit page.
+  const ev = type === 'brewery' || type === 'restaurant';
   if (hasDeals) return { tab: trivia ? 'Deals & trivia' : hasNights ? (ev ? 'Deals & events' : 'Deals & nights') : 'Deals', heading: hasNights ? 'Deals & good times 🍻' : 'Deals 🍻' };
   if (hasNights) return { tab: onlyTrivia ? 'Trivia' : ev ? 'Weekly events' : 'Weekly nights', heading: '' };
   return { tab: '', heading: '' };

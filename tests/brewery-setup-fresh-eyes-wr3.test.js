@@ -286,7 +286,7 @@ test('edit page: "Add your tap list" for a taproom with no kitchen, gone once a 
 });
 
 // ====================== 7. "Weekly events" ======================
-test('a brewery’s edit page, venue page and tab say events; a pub’s and a restaurant’s keep "nights"', async () => {
+test('a brewery’s edit page, venue page and tab say events; a pub’s keeps "nights"', async () => {
   const { v, t } = await priya();
   const edit = plain((await get(`/owner/${t}`)).text);
   assert.match(edit, /Weekly events: days and how often/); assert.match(edit, /Weekly events\s+2 events/); assert.match(edit, /\+ Add an event/);
@@ -305,9 +305,9 @@ test('a brewery’s edit page, venue page and tab say events; a pub’s and a re
   assert.equal(layout.dealsWording(true, true, ['live_music'], 'brewery').tab, 'Deals & events');
   assert.equal(layout.dealsWording(false, true, ['live_music'], 'brewery').tab, 'Weekly events');
   assert.equal(layout.dealsWording(true, true, ['trivia'], 'brewery').tab, 'Deals & trivia');
-  // Pubs and restaurants: as they were.
+  // Pubs: as they were. Restaurants say events too since 2026-11-16 (tests/restaurant-weekly-events.test.js).
   assert.equal(layout.dealsWording(true, true, ['live_music'], 'pub').tab, 'Deals & nights');
-  assert.equal(layout.dealsWording(false, true, ['live_music'], 'restaurant').tab, 'Weekly nights');
+  assert.equal(layout.dealsWording(false, true, ['live_music'], 'restaurant').tab, 'Weekly events');
   const pub = mk('pub'); const pt = tokenFor(pub.id);
   ok(await change(pt, { weekly_nights: [{ days: ['thu'], kind: 'trivia', title: 'Trivia', start: '19:30', frequency: 'weekly' }] }));
   const pedit = plain((await get(`/owner/${pt}`)).text);
