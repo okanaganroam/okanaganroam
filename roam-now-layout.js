@@ -520,6 +520,7 @@ body.pm-app-page.rn-design .is-map-picker .rn-selected-filters { display: none; 
   body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view #rnMap { display: inline-flex; align-items: center; padding: 0 22px; min-height: 46px; border: 2px solid var(--rn-paper); background: var(--rn-ink); color: white; box-shadow: 0 3px 10px #1b303c33; border-radius: 24px; font-size: 14px; font-weight: 800; }
   body.pm-app-page.rn-design .pm-stage.rn-results-compact.pm-list-view #rnList { display: none; }
   body.pm-app-page.rn-design .pm-list-view .pm-sheet-body { padding-bottom: 72px; }
+  body.pm-app-page.rn-design .pm-panel .rn-outdoor-shortcuts { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 0; }
   body.pm-app-page.rn-design .rn-card-info { display: contents; }
   body.pm-app-page.rn-design .pm-item:not(.pm-event) .pm-item-main { padding: 0 12px 10px; }
   body.pm-app-page.rn-design .pm-item .rn-photo { width: calc(100% + 24px); max-width: none; height: 150px; margin: 0 -12px 10px; object-fit: cover; }
