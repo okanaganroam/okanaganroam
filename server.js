@@ -26395,7 +26395,7 @@ function renderHotelCard(hotel) {
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>What's open right now</li><li>Restaurants, wineries &amp; things to do</li><li>Events this week · Build My Trip</li></ul>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open right now"}</li><li>Restaurants, wineries &amp; things to do</li><li>Events this week · Build My Trip</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
