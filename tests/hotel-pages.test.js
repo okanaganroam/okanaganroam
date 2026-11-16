@@ -133,11 +133,12 @@ test('rental managers (2026-10-22): "Things to do around <Town>", for guests of 
   assert.equal(app.hotelHeadline({ name: 'Hotel X', region: 'kelowna' }), 'near Hotel X');
   const r = await get(`/near/${rental.slug}`);
   assert.equal(r.status, 200);
-  assert.match(r.text, /<h1>Things to do around [^<]+<\/h1>/);
+  assert.match(r.text, /<h1>What&#39;s open in [^<]+ right now<\/h1>|<h1>What's open in [^<]+ right now<\/h1>/);
   assert.ok(r.text.includes(`for guests of ${rental.name}`));
   assert.ok(!/min walk|min drive/.test(r.text), 'no walk/drive times from one door');
   const card = (await get(`/near/${rental.slug}/card`)).text;
-  assert.match(card, /<h1 class="hc-h[^"]*">Things to do around /);
+  assert.match(card, /<h1 class="hc-h[^"]*">What(&#39;|')s open in [^<]+ right now<\/h1>/);
+  assert.ok(card.includes('updated live'));
   assert.ok(card.includes(`Compliments of ${rental.name}`));
   if (town) assert.ok(card.includes(town));
 });

@@ -26181,6 +26181,12 @@ function hotelHeadline(hotel) {
   const town = REGION_LABELS[hotel.region] || hotel.region;
   return hotelIsRental(hotel) ? `around ${town}` : `near ${hotel.name}`;
 }
+// The page and card heading (2026-11-16, Dayton): rentals lead with what only we do, "What's open in <Town> right now";
+// hotels keep "Things to do near <Hotel>".
+function hotelTitleLine(hotel) {
+  const town = REGION_LABELS[hotel.region] || hotel.region;
+  return hotelIsRental(hotel) ? `What's open in ${town} right now` : `Things to do ${hotelHeadline(hotel)}`;
+}
 function findHotel(slug) {
   return hotelList().find((h) => h.slug === slug) || null;
 }
@@ -26301,7 +26307,7 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
   <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
-  <h1>Things to do ${escapeHtml(hotelHeadline(hotel))}</h1>
+  <h1>${escapeHtml(hotelTitleLine(hotel))}</h1>
   <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
@@ -26384,8 +26390,8 @@ function renderHotelCard(hotel) {
 <div class="hc-card${hotelLogo(hotel) ? ' hc-has-logo' : ''}">
   <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
   <div class="hc-rule"></div>
-  <h1 class="hc-h${hotelHeadline(hotel).length > 35 ? ' hc-h-xl' : hotelHeadline(hotel).length > 27 ? ' hc-h-l' : ''}">Things to do ${escapeHtml(hotelHeadline(hotel))}</h1>
-  <p class="hc-sub">Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.</p>
+  <h1 class="hc-h${hotelTitleLine(hotel).length > 48 ? ' hc-h-xl' : hotelTitleLine(hotel).length > 40 ? ' hc-h-l' : ''}">${escapeHtml(hotelTitleLine(hotel))}</h1>
+  <p class="hc-sub">${hotelIsRental(hotel) ? 'Places to eat, things to do and this week\'s events, updated live.' : `Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.`}</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
@@ -68603,7 +68609,7 @@ module.exports = {
   // Card badges (2026-10-29)
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
-  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
