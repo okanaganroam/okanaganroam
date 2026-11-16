@@ -139,3 +139,15 @@ test('the homepage reports through its own event, and sent-on counts can never c
   assert.deepEqual([home.views, home.to_business, home.rate], [12, 1, 8]);
   assert.equal(typeof c.watch, 'undefined');
 });
+
+test('our own scripts are internal (2026-11-16): okanaganroam-apply, whistlerroam-apply, OkanaganRoam/1.0; real browsers are not', () => {
+  const { isInternal } = require('../trip-demand');
+  const ua = (s) => ({ headers: { 'user-agent': s } });
+  for (const s of ['okanaganroam-apply/1.0', 'okanaganroam-dashboard', 'whistlerroam-apply/1.0', 'WhistlerRoam-check', 'Mozilla/5.0 (compatible; OkanaganRoam/1.0; +https://okanaganroam.com)']) {
+    assert.equal(isInternal(ua(s), {}), true, s);
+  }
+  for (const s of ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36 Instagram 350.0', 'okanaganroamfan', '']) {
+    assert.equal(isInternal(ua(s), {}), false, s || '(empty)');
+  }
+});
