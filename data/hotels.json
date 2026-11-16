@@ -739,6 +739,42 @@
       "longitude": -119.271816
     },
     {
+      "slug": "okanagan-lodging-kelowna",
+      "name": "Okanagan Lodging Company",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "okanagan-lodging-lake-country",
+      "name": "Okanagan Lodging Company",
+      "kind": "rental",
+      "region": "lake-country",
+      "address": "Vacation rentals around lake-country",
+      "latitude": 50.030236,
+      "longitude": -119.402331
+    },
+    {
+      "slug": "goodstay-penticton",
+      "name": "GoodStay Property Co",
+      "kind": "rental",
+      "region": "penticton",
+      "address": "Vacation rentals around penticton",
+      "latitude": 49.500327,
+      "longitude": -119.593249
+    },
+    {
+      "slug": "lake-life-kelowna",
+      "name": "Lake Life Property Management",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
       "slug": "hi-kelowna",
       "name": "HI Kelowna",
       "region": "kelowna",
