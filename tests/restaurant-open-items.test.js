@@ -107,6 +107,16 @@ test('map version changes when an owner feature changes', () => {
   assert.notEqual(app.mapDataVersion(), v1);
 });
 
+test('map version changes when a season notice replaces an advisory (same number of notices)', () => {
+  const g = mk('golf');
+  const meta = { reason: 'map notice fixture', batch_id: 'test-map-notice' };
+  assert.equal(app.guardedCollectionMembershipUpdate('advisory', g.id, 'add', 'The course has not posted its closing day. https://example.com/golf', meta).ok, true);
+  const v1 = app.mapDataVersion();
+  db.prepare('INSERT INTO venue_seasons (venue_id, status, until_date, reopens_date, source_url, checked_at) VALUES (?, ?, ?, ?, ?, ?)').run(g.id, 'closed', null, null, 'https://example.com/golf', app.todayLocal());
+  assert.equal(app.guardedCollectionMembershipUpdate('advisory', g.id, 'remove', null, meta).ok, true);
+  assert.notEqual(app.mapDataVersion(), v1, 'one notice before and after, but its text changed');
+});
+
 test('SEO: sitemap and robots identical with and without place types and owner features; no new routes', async () => {
   const a = [await get('/sitemap.xml'), await get('/robots.txt')].map((x) => x.text);
   const v = mk('restaurant', { cuisine: 'Mexican' });

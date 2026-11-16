@@ -24953,6 +24953,12 @@ const MAP_EVENT_DAYS = 7;
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
 const MAP_DATA_FORMAT = 24; // 24: café Wi-Fi 2^30, Laptop friendly 2^32 and Drive-thru 2^33 (2026-11-10). // 23 appends optional event photos at row index 14. // 22: pub games and local beer bits 2^23-2^24, and a pub's Kids bit from its own answer (2026-11-10); 21: the six owner-only restaurant features as bits 2^17-2^22 (2026-11-10); 20: activity shortcut tags; 18: arrival points; 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
+// The notices' text, not just how many there are (2026-11-15): a season notice that replaced an older advisory left
+// the count the same, so the map kept showing Penticton Golf & Country Club as open after it closed for the season.
+function advisoryNotesKey(now = new Date()) {
+  const notes = [...getAdvisoryNotes(now)].sort((a, b) => a[0] - b[0]).map(([id, note]) => `${id}:${note}`).join('\n');
+  return crypto.createHash('md5').update(notes).digest('hex');
+}
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
   const e = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM events').get();
@@ -24979,7 +24985,7 @@ function mapDataVersion(now = new Date()) {
   // Cider and Brewery searches.
   try { const bi = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_brewery_info').get(); const vc = db.prepare("SELECT MAX(c.updated_at) AS u, COUNT(*) AS n FROM venue_cuisines c JOIN venues v ON v.id = c.venue_id WHERE v.type = 'brewery'").get(); of = { u: `${of.u}|${bi.u}|${vc.u}`, n: `${of.n}|${bi.n}|${vc.n}` }; } catch (err) { /* an older database */ }
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${advisoryNotesKey(now)}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
