@@ -1746,7 +1746,7 @@ function venueOwnerContentIds() {
     const version = venueOwnerContentVersionStmt.get().n;
     if (venueOwnerContentCache && venueOwnerContentCache.version === version) return venueOwnerContentCache.ids;
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
-      UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
+      UNION SELECT venue_id FROM venue_menus WHERE status = 'published' AND (source IS NULL OR source <> 'research' OR owner_confirmed_at IS NOT NULL)
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
         AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
@@ -51194,6 +51194,94 @@ function setupSocialNotes(venueId) {
 function setupSheetDraft(venueId, sheet) {
   return db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status = 'draft' ORDER BY id DESC LIMIT 1").get(venueId, sheet) || null;
 }
+// Researched menus (Dayton, 2026-11-16): a venue's menu typed up from its own website, for POST /admin/set-researched-menu.
+// Only for a venue with no owner menu that hasn't been claimed: never over the owner's own menu, never on a "Verified by the
+// business" listing. Logged as 'research' (not 'venue_owner'), so the venue does not become verified. Compare-and-set on
+// the id of the live menu (expected_current, null when there is none) from GET /admin/venue-menu/:id.
+function researchedMenuStatus(id) {
+  const v = db.prepare('SELECT id, name, type, region, slug, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!v) return null;
+  const pub = publishedMenuRow(id);
+  const draft = activeMenuDraft(id);
+  return {
+    id: v.id, name: v.name, type: v.type, region: v.region, slug: v.slug, redirect_to: v.redirect_to == null ? null : v.redirect_to,
+    claimed: venueIsClaimed(id), menu_type: !!portalFields(v.type).menu,
+    menu: pub ? { id: pub.id, source: pub.source === 'research' ? 'research' : 'owner', items: menuItemCount(parseMenuData(pub.data)), source_url: pub.source_url || null, checked_at: pub.source_checked_at || null, owner_confirmed_at: pub.owner_confirmed_at || null } : null,
+    owner_draft: draft ? { id: draft.id, status: draft.status } : null,
+  };
+}
+function guardedResearchedMenuSet(body) {
+  const b = body || {};
+  if (typeof b.reason !== 'string' || !b.reason.trim() || typeof b.batch_id !== 'string' || !b.batch_id.trim()) return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  if (!Number.isInteger(b.id) || b.id <= 0) return { ok: false, reason: 'invalid_id', detail: 'id must be a positive integer' };
+  if (!('expected_current' in b) || (b.expected_current !== null && !(Number.isInteger(b.expected_current) && b.expected_current > 0))) {
+    return { ok: false, reason: 'invalid_expected', detail: 'expected_current is the id of the live menu from GET /admin/venue-menu/:id, or null' };
+  }
+  const remove = b.remove === true;
+  if ('remove' in b && typeof b.remove !== 'boolean') return { ok: false, reason: 'invalid_remove', detail: 'remove must be true or false' };
+  let data = null;
+  if (!remove) {
+    if (!b.data || typeof b.data !== 'object' || Array.isArray(b.data) || !Array.isArray(b.data.sections)) return { ok: false, reason: 'invalid_data', detail: 'data must be { sections: [{ name, note, items: [{ name, price, description, dietary }] }] }' };
+    data = normalizeMenuData(b.data);
+    delete data.partial;
+    for (const sec of data.sections) for (const it of sec.items) { it.check = false; delete it.src; }
+    if (!menuItemCount(data)) return { ok: false, reason: 'invalid_data', detail: 'the menu has no dishes' };
+    if (typeof b.source_url !== 'string' || !researchLinkValid(b.source_url)) return { ok: false, reason: 'invalid_source_url', detail: 'source_url must be the http(s) address of the menu on the venue website' };
+    if (typeof b.checked_at !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.checked_at) || Number.isNaN(Date.parse(`${b.checked_at}T12:00:00Z`)) || b.checked_at > todayLocal()) {
+      return { ok: false, reason: 'invalid_checked_at', detail: 'checked_at must be a YYYY-MM-DD date, not in the future' };
+    }
+  }
+  const st = researchedMenuStatus(b.id);
+  if (!st) return { ok: false, reason: 'venue_not_found' };
+  if (st.redirect_to !== null) return { ok: false, reason: 'venue_redirected' };
+  if (!st.menu_type) return { ok: false, reason: 'not_menu_type', detail: `a ${st.type} has no menu page` };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const fail = (reason, detail) => { db.exec('ROLLBACK'); txOpen = false; return { ok: false, reason, detail, live: researchedMenuStatus(b.id) }; };
+    const live = researchedMenuStatus(b.id);
+    const liveId = live.menu ? live.menu.id : null;
+    if (liveId !== b.expected_current) return fail('mismatch', `the live menu is ${liveId === null ? 'none' : `#${liveId}`}`);
+    if (live.menu && live.menu.source !== 'research') return fail('owner_menu', 'the venue has its own menu');
+    if (live.menu && live.menu.owner_confirmed_at) return fail('owner_confirmed', 'the owner confirmed this menu; it is theirs now');
+    if (!remove && live.claimed) return fail('owner_verified', 'the venue is claimed ("Verified by the business")');
+    if (!remove && live.owner_draft) return fail('owner_draft', 'the owner is working on a menu');
+    const ref = `${b.reason.trim()}${b.source_url ? ` | ${b.source_url}` : ''}`;
+    const log = (oldV, newV) => db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'menu', ?, ?, 'research', ?, 'medium', ?, 0, 'Dayton')`).run(b.id, oldV, newV, ref, b.batch_id.trim());
+    if (remove) {
+      if (!live.menu) { db.exec('COMMIT'); txOpen = false; return { ok: true, changed: false, menu_id: null }; }
+      db.prepare("UPDATE venue_menus SET status = 'removed', rejection_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND source = 'research'").run(b.reason.trim(), live.menu.id);
+      db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(b.id);
+      log(`menu #${live.menu.id} (${live.menu.items} items)`, null);
+      db.exec('COMMIT'); txOpen = false;
+      return { ok: true, changed: true, menu_id: null };
+    }
+    if (live.menu) db.prepare("UPDATE venue_menus SET status = 'superseded', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(live.menu.id);
+    const newId = Number(db.prepare(`INSERT INTO venue_menus (venue_id, status, data, submitted_by, source, source_url, source_checked_at, submitted_at, published_at, reviewed_at, reviewed_by)
+      VALUES (?, 'published', ?, 'research', 'research', ?, ?, datetime('now'), datetime('now'), datetime('now'), 'Dayton')`).run(b.id, JSON.stringify(data), b.source_url, b.checked_at).lastInsertRowid);
+    db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(b.id);
+    log(live.menu ? `menu #${live.menu.id} (${live.menu.items} items)` : null, `menu #${newId} (${menuItemCount(data)} items)`);
+    db.exec('COMMIT'); txOpen = false;
+    return { ok: true, changed: true, menu_id: newId, items: menuItemCount(data) };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left */ } }
+    throw err;
+  }
+}
+// The owner's one tap "This is right" on a researched menu: it becomes theirs (indexable like any owner menu). Logged
+// as 'venue_owner'.
+function confirmResearchedMenu(venueId, actor) {
+  const row = publishedMenuRow(venueId);
+  if (!row || row.source !== 'research') return { ok: false, reason: 'no_research_menu' };
+  if (row.owner_confirmed_at) return { ok: true, changed: false };
+  db.prepare("UPDATE venue_menus SET owner_confirmed_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_confirmed_at IS NULL").run(row.id);
+  db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venueId);
+  db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, 'menu_confirmed', NULL, ?, 'venue_owner', ?, 'high', NULL, 1, NULL)`).run(venueId, `menu #${row.id}`, String(actor || 'owner').slice(0, 120));
+  return { ok: true, changed: true };
+}
 // The menu the owner is working on: the newest one not yet published or closed.
 function activeMenuDraft(venueId) {
   return db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND help_kind IS NULL AND status IN ('draft', 'reading', 'ready', 'pending', 'help') ORDER BY id DESC LIMIT 1").get(venueId) || null;
@@ -51207,8 +51295,11 @@ function publishedMenu(venueId) {
   if (!row) return null;
   const data = parseMenuData(row.data);
   const items = menuItemCount(data);
-  return items ? { id: row.id, data, items, publishedAt: row.published_at } : null;
+  return items ? { id: row.id, data, items, publishedAt: row.published_at,
+    source: row.source === 'research' ? 'research' : 'owner', sourceUrl: row.source_url || null, checkedAt: row.source_checked_at || null, ownerConfirmedAt: row.owner_confirmed_at || null } : null;
 }
+// Researched menus (2026-11-16): typed up by us from the venue's website and not yet confirmed by the owner.
+function menuIsUnconfirmedResearch(menu) { return !!menu && menu.source === 'research' && !menu.ownerConfirmedAt; }
 function menuStateJson(venue, menu) {
   const pub = publishedMenu(venue.id);
   let m = null;
@@ -51586,6 +51677,12 @@ async function handleMenuApi(req, res, ctx, action, arg) {
   if (action === 'state') return send(200, { ok: true, ...menuStateJson(venue, current()) });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: generic });
   const ip = requestClientIp(req);
+  if (action === 'confirm') {
+    // "This is right" on a menu we typed up from their website (2026-11-16).
+    const r = confirmResearchedMenu(venue.id, ctx.actor);
+    if (!r.ok) return send(409, { ok: false, error: generic });
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  }
   if (action === 'pages') {
     if (menuUploadRateLimited(ip)) return send(429, { ok: false, error: 'Lots of pages at once! Please wait a few minutes and try again.' });
     let body;
@@ -53221,6 +53318,21 @@ function frenchHeaderFragment(html) {
   return localizeStaticFr(localizeHtml(html, 'fr')).split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/)
     .map((part, i) => (i % 2 ? part : frMarkup(part))).join('');
 }
+// Owner menu screen (2026-11-16): a menu we typed up from their website, waiting for their "This is right". One big
+// button; editing it with the normal tools below and publishing makes it their own menu.
+function researchedMenuOwnerCard(venue, pub, base, lang = 'en') {
+  if (!menuIsUnconfirmedResearch(pub)) return '';
+  const fr = lang === 'fr';
+  const checked = researchedMenuCheckedLabel(pub.checkedAt || pub.publishedAt, lang);
+  const url = `${String(base || '')}/confirm`;
+  return `<div class="mn-card mn-warn" id="mnResearch">
+      <p>${fr ? `Nous avons ajouté votre menu à partir de votre site Web${checked ? ` (vérifié en ${escapeHtml(checked)})` : ''}. Est-il exact?` : `We added your menu from your website${checked ? ` (checked ${escapeHtml(checked)})` : ''}. Is it right?`}
+      <a href="${escapeHtml(menuPagePath(venue, lang))}" target="_blank" rel="noopener">${fr ? 'Voir la page' : 'See the page'} ↗</a></p>
+      <button type="button" class="mn-btn mn-go" id="mnResearchOk">${fr ? 'C’est exact' : 'This is right'}</button>
+      <p class="mn-sub">${fr ? 'Sinon, modifiez-le ci-dessous et publiez : il devient votre menu. Google ne l’affichera qu’après votre confirmation.' : 'If not, change it below and publish: it becomes your own menu. Google won’t show it until you confirm.'}</p>
+    </div>
+    <script>(function(){var b=document.getElementById('mnResearchOk');if(!b)return;b.addEventListener('click',function(){b.disabled=true;fetch(${JSON.stringify(url).replace(/</g, '\\u003c')},{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){var c=document.getElementById('mnResearch');if(j&&j.ok){c.className='mn-card mn-ok';c.innerHTML='<p>${fr ? 'Merci! Votre menu est confirmé.' : 'Thank you! Your menu is confirmed.'}</p>';}else{b.disabled=false;}}).catch(function(){b.disabled=false;});});})();</script>`;
+}
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
@@ -53329,6 +53441,7 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}${lang === '
 ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="mn-wrap">
     ${switcher}
+    ${opts.mode === 'admin' ? '' : researchedMenuOwnerCard(venue, pub, opts.base, lang)}
     <div id="mnApp"><p class="mn-lead">${t.adding}</p></div>
     <noscript><p class="mn-card mn-warn">${lang === 'fr' ? 'Activez JavaScript, ou envoyez votre menu par courriel à' : 'Please turn on JavaScript, or email your menu to'} <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
   </div></main>
@@ -53359,8 +53472,8 @@ async function handleMenuRoute(req, res, method, sub, ctx) {
   if (method !== 'POST') return sendSubmissionResponse(res, 405, { ok: false, error: 'Not allowed.' });
   const rp = /^\/pages\/(\d+)\/remove$/.exec(sub);
   if (rp) return handleMenuApi(req, res, ctx, 'remove-page', Number(rp[1]));
-  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import', '/manual': 'manual' }[sub];
-  if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit', 'manual'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
+  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import', '/manual': 'manual', '/confirm': 'confirm' }[sub];
+  if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit', 'manual', 'confirm'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
   const out = await handleMenuApi(req, res, ctx, action);
   // Sent from the French menu screen (2026-10-18): the decision email is French.
   if (res.ownerLang === 'fr' && ['publish', 'help'].includes(action) && ctx.found && ctx.found.venue) {
@@ -55145,7 +55258,8 @@ function menuNoun(venue, lang = 'en') {
   return w ? (lang === 'fr' ? w.fr.noun : w.en.noun) : 'Menu';
 }
 function menuMenuUrl(venue, lang = 'en') { return `https://okanaganroam.com${menuPagePath(venue, lang)}`; }
-function menuIndexable(menu, venue) { return !!menu && menu.items >= (isPriceList(venue) ? TOURS_INDEX_MIN_ITEMS : MENU_INDEX_MIN_ITEMS); }
+// A researched menu the owner hasn't confirmed is never indexable (noindex, not in the sitemap) -- Dayton, 2026-11-16.
+function menuIndexable(menu, venue) { return !!menu && !menuIsUnconfirmedResearch(menu) && menu.items >= (isPriceList(venue) ? TOURS_INDEX_MIN_ITEMS : MENU_INDEX_MIN_ITEMS); }
 
 // schema.org Menu for a published menu: sections, dishes, prices in CAD, and the diets the menu itself marks.
 function menuSchema(venue, menu, lang) {
@@ -55322,6 +55436,7 @@ ${VENUE_MENU_CSS}
   <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><p style="margin:0 0 14px"><a href="${venuePagePath(venue, lang)}">&larr; ${escapeHtml(venue.name)}</a></p>${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${menuPagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${menuPagePath(venue, 'fr')}" hreflang="fr" lang="fr">Français</a>`}</p>` : ''}</div>
   <h1>${tours ? (fr ? `${escapeHtml(kindWords.fr.noun)} ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} ${escapeHtml(kindWords.en.title)}`) : fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
   <p class="vm-meta">${escapeHtml(label.singular)} ${fr ? 'à' : 'in'} ${escapeHtml(regionLabel)}, ${fr ? 'C.-B.' : 'BC'} &middot; ${count} &middot; ${updatedText} ${escapeHtml(updated)}</p>
+  ${researchedMenuSourceHtml(venue, menu, lang)}
   ${sections}
   <div class="vm-note-box">${tours ? (fr
     ? `Les prix, horaires et disponibilités peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant de réserver.`
@@ -55343,6 +55458,25 @@ ${VENUE_MENU_CSS}
 </body>
 </html>`;
   return fr ? frPageLinks(frNativePage(localizeStaticFr(localizeHtml(page, 'fr')))) : page;
+}
+
+// "From <Venue>'s website, checked <Month YYYY>. Prices can change. See their menu ↗" under a researched menu's title,
+// until the owner confirms it (2026-11-16). Owner menus and confirmed ones show nothing extra.
+function researchedMenuCheckedLabel(date, lang = 'en') {
+  const m = /^(\d{4})-(\d{2})/.exec(String(date || ''));
+  if (!m) return '';
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 15)).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+}
+function researchedMenuSourceHtml(venue, menu, lang = 'en') {
+  if (!menuIsUnconfirmedResearch(menu)) return '';
+  const fr = lang === 'fr';
+  const checked = researchedMenuCheckedLabel(menu.checkedAt || menu.publishedAt, lang);
+  const link = menu.sourceUrl && /^https?:\/\//i.test(menu.sourceUrl)
+    ? ` <a href="${escapeHtml(menu.sourceUrl)}" rel="nofollow noopener" target="_blank" data-track="menu-source">${fr ? 'Voir leur menu' : 'See their menu'} ↗</a>` : '';
+  const text = fr
+    ? `Tiré du site Web ${escapeHtml(frDe(venue.name))}${checked ? `, vérifié en ${escapeHtml(checked)}` : ''}. Les prix peuvent changer.`
+    : `From ${escapeHtml(venue.name)}’s website${checked ? `, checked ${escapeHtml(checked)}` : ''}. Prices can change.`;
+  return `<p class="vm-meta vm-source" data-menu-source="research">${text}${link}</p>`;
 }
 
 function listIndexableMenusForSitemap() {
@@ -59480,7 +59614,7 @@ function ownerSignupStats(now = new Date()) {
   const active = new Set();
   for (const sql of [`SELECT DISTINCT venue_id AS v FROM owner_change_requests WHERE ${live}`, `SELECT DISTINCT venue_id AS v FROM owner_photos WHERE ${live}`,
     'SELECT DISTINCT owner_venue_id AS v FROM event_submissions WHERE owner_venue_id IN (SELECT id FROM venues WHERE redirect_to IS NULL)',
-    `SELECT DISTINCT venue_id AS v FROM venue_menus WHERE ${live}`]) {
+    `SELECT DISTINCT venue_id AS v FROM venue_menus WHERE ${live} AND (source IS NULL OR source <> 'research' OR owner_confirmed_at IS NOT NULL)`]) {
     try { for (const r of db.prepare(sql).all()) active.add(r.v); } catch (e) { /* table missing on an old copy */ }
   }
   let list = [];
@@ -65133,6 +65267,37 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, field: body.field, changedFields: result.changedFields, value: result.value });
     }
 
+    // GET /admin/venue-menu/:id + POST /admin/set-researched-menu (2026-11-16) -- researched menus, see
+    // guardedResearchedMenuSet(). Body: { id, expected_current, data, source_url, checked_at, reason, batch_id } or
+    // { id, expected_current, remove: true, reason, batch_id }. Same bearer token as the other admin writes.
+    {
+      const rmRead = /^\/admin\/venue-menu\/(\d+)$/.exec(pathname);
+      if ((rmRead && method === 'GET') || (pathname === '/admin/set-researched-menu' && method === 'POST')) {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Researched menu endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        res.setHeader('Cache-Control', 'no-store');
+        if (rmRead) {
+          const st = researchedMenuStatus(Number(rmRead[1]));
+          return st ? sendJSON(res, 200, st) : sendJSON(res, 404, { error: 'venue_not_found' });
+        }
+        let body;
+        try { body = await readLimitedJsonBody(req, MENU_MAX_BODY); } catch (err) { return sendJSON(res, err.status === 413 ? 413 : 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const unexpected = Object.keys(body).filter((k) => !['id', 'expected_current', 'data', 'source_url', 'checked_at', 'reason', 'batch_id', 'remove'].includes(k));
+        if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+        let result;
+        try { result = guardedResearchedMenuSet(body); } catch (err) {
+          return sendJSON(res, 500, { error: 'Researched menu update failed and was rolled back.', detail: String(err.message || err) });
+        }
+        if (!result.ok) {
+          const statusMap = { venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_menu: 409, owner_confirmed: 409, owner_verified: 409, owner_draft: 409 };
+          return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+        }
+        return sendJSON(res, 200, { id: body.id, ...result });
+      }
+    }
+
     if (pathname === '/admin/set-cuisine' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-cuisine endpoint is not configured.' });
@@ -67930,7 +68095,7 @@ module.exports = {
   normalizeMenuData,
   menuPriceLabel,
   menuPriceNumber,
-  publishedMenu,
+  publishedMenu, renderVenueMenuPage,
   MENU_DIR,
   // Derived hours badges (Open Early / Open Late)
   RESEARCHED_BOOL_FIELDS,
