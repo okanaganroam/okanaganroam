@@ -902,7 +902,9 @@ function buildPhraseTable(taxonomy) {
   if (t.types.includes('restaurant')) { add('dinner date', 'type', 'restaurant'); }
   // "food and drink" is the whole Food & Drink family; "drinks" the bar side of it.
   for (const type of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']) if (t.types.includes(type)) { add('food and drink', 'type', type); add('food and drinks', 'type', type); }
-  for (const type of ['pub', 'cocktail']) if (t.types.includes(type)) { add('drinks', 'type', type); add('a drink', 'type', type); }
+  // Distillery test 2 (Whistler, 2026-11-16): a distillery pours cocktails in its own lounge, so "dog-friendly drinks" plans
+  // one too (hers was only an optional "Another listing" under pubs and cocktail lounges).
+  for (const type of ['pub', 'cocktail', 'distillery']) if (t.types.includes(type)) { add('drinks', 'type', type); add('a drink', 'type', type); }
 
   // Stage 3.1 (2026-09-29): plural-tolerant aliases. A single-word alias for a
   // type, feature, collection, activity or cuisine also matches its plural
