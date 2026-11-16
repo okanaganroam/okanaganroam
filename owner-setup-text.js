@@ -1745,6 +1745,21 @@ Object.assign(fr, {
   seasonAllClosedBtn: 'Passer ces dates et continuer',
 });
 
+// Distillery test 2 (Whistler, 2026-11-16; Whistler Roam drafts/fresh-eyes-distillery2-2026-11-16/REPORT.md). Every type:
+// each happy hour's own "All year / Only some months" with two or more; a deal's room counter with no days picked yet and
+// « 0 caractère »; the Events row names every event with its days.
+Object.assign(en, {
+  happySeasonEach: 'Is happy hour {n} all year?',
+  roomDaysNone: '(the days go in front on your page)',
+  stEvents: '{n} events: {list}', stEvents1: '1 event: {list}', evDaily: 'daily', evAppt: 'by appointment', evBiweekly: 'every other {days}',
+});
+Object.assign(fr, {
+  happySeasonEach: 'Le 5 à 7 nº {n} est-il offert toute l’année?',
+  roomDaysNone: '(les jours s’ajoutent devant sur votre page)',
+  charLeft0: 'Il reste 0 caractère',
+  stEvents: '{n} événements : {list}', stEvents1: '1 événement : {list}', evDaily: 'tous les jours', evAppt: 'sur rendez-vous', evBiweekly: '{days}, une semaine sur deux',
+});
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.

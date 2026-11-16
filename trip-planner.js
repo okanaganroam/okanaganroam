@@ -116,6 +116,17 @@ const KIDS_EXCLUDED_TYPES = ['cocktail', 'pub', 'distillery'];
 // or distillery; a pub or a brewery only when it has the Kid-Friendly badge as the public sees it (features.kid_friendly,
 // built by the server's kidFriendlyPublic: for a pub that is the business's own "Who's welcome?" answer, so an adults-only
 // (19+) pub, or one that hasn't answered, is never planned for a family).
+// Distillery test 2 (Whistler, 2026-11-16): a family meal ("kids dinner at 6 PM") may be at a place with its own kitchen
+// whose owner said "minors with an adult until 8 PM", when the time asked for is before then (8:30 PM still leaves it out).
+function kidsKitchenMeal(v, ctx) {
+  if (!ctx || !ctx.kids || !ctx.types || !ctx.types.has('restaurant') || !v || !v.ownKitchen || !kidsAllowed(v)) return false;
+  const until = kidsUntilMinutes(v);
+  if (until == null) return false;
+  const m = /\b(?:at|around|by|for)\s+(\d{1,2})(?:[: ](\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)(?![a-z])/i.exec(ctx.queryText || '');
+  if (!m) return true;
+  const at = ((Number(m[1]) % 12) + (/^p/i.test(m[3]) ? 12 : 0)) * 60 + Number(m[2] || 0);
+  return at < until;
+}
 function kidsAllowed(v) {
   if (!v) return false;
   if (v.type === 'pub' || v.type === 'brewery') return !!(v.features && v.features.kid_friendly);
@@ -788,7 +799,23 @@ function listedMatch(v, ft, ctx) {
   const kind = nightKindOfTerm(ft && ft.term);
   const date = ctxPlanDate(ctx);
   if (kind) { const m = venueNight(v, kind, date); return !!(m && (m.on || !date)); }
-  return !!specialFoodMatch(v, ft, date);
+  return !!specialFoodMatch(v, ft, date) || !!nightTitleMatch(v, ft, date);
+}
+// Distillery test 2 (Whistler, 2026-11-16): a word asked for in the name of an event the place lists ("brunch" or "jazz" in
+// her Sunday « Brunch jazz », its English or French name) on the plan's day (any day when undated). -> { n, title } | null
+function nightTitleMatch(v, ft, date) {
+  const list = (v && v.nights) || [];
+  if (!list.length || !ft || ft.cuisine) return null;
+  const term = normWords(ft.term || ''), stem = term.replace(/(?:es|s)$/, '');
+  if (term.length < 3) return null;
+  for (const n of list) {
+    if (date && !nightOnPlanDate(n, date)) continue;
+    for (const t of [n.title, n.titleFr]) {
+      const w = normWords(t || '');
+      if (w && (textHas(w, term) || (stem.length >= 4 && textHas(w, stem)))) return { n, title: String(t).split(/\s*[,;:(]/)[0].trim() };
+    }
+  }
+  return null;
 }
 // Specialist outdoor places (Sea to Sky, 2026-10-25): crags, backcountry huts and routes, ski touring, campgrounds,
 // snowmobile club areas, bike trail networks, kite beaches and big summit or alpine hikes are only planned when the
@@ -980,7 +1007,8 @@ function eligible(v, ctx, strict) {
   if (v.isShop && !SHOP_ASKED_RE.test(ctx.queryText || '')) return false;
   if (spaPlace(v) && /\bnospa\b/.test(ctx.queryText || '')) return false; // "skip the spa" (2026-10-25)
   // A brewery, distillery or bar is not a stop on a trip with young kids unless asked for (2026-10-25: a toddler day had a brewery).
-  if (ctx.kids && ['brewery', 'distillery', 'cocktail'].includes(v.type) && !ctx.types.has(v.type) && !/\b(?:brewer\w*|beers?|distiller\w*|cocktails?|bars?|drinks?)\b/.test(ctx.queryText || '')) return false;
+  // Distillery test 2 (Whistler, 2026-11-16): unless it's a family meal at its own kitchen before its kids-until time.
+  if (ctx.kids && ['brewery', 'distillery', 'cocktail'].includes(v.type) && !ctx.types.has(v.type) && !/\b(?:brewer\w*|beers?|distiller\w*|cocktails?|bars?|drinks?)\b/.test(ctx.queryText || '') && !kidsKitchenMeal(v, ctx)) return false;
   // "Snow but no skiing" (2026-10-25) keeps the ski hill out.
   if (/\bski resort\b/.test(normWords(v.cuisine || '')) && SKI_NEG_RE.test(ctx.queryText || '')) return false;
   // A public library is a rainy-day or kids' stop, never a filler on a visitor's day (2026-10-25: Pemberton hiking trip).
@@ -1041,7 +1069,7 @@ function eligible(v, ctx, strict) {
     // Audit fix (2026-10-27): a live music night the place lists on the plan's day counts like the badge.
     if (f === 'live_music' && ((venueNight(v, 'live_music', ctxPlanDate(ctx)) || {}).on)) continue;
     if (f === 'kid_friendly') {
-      if (BADGE_TYPES.includes(v.type) && !v.features.kid_friendly) return false;
+      if (BADGE_TYPES.includes(v.type) && !v.features.kid_friendly && !kidsKitchenMeal(v, ctx)) return false;
       continue; // outdoor/beach/golf: family heuristic, never claimed as a badge
     }
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
@@ -1050,7 +1078,7 @@ function eligible(v, ctx, strict) {
   if (strict) {
     const kindMatch = ctx.plannerKinds.some(k => (v.plannerKinds || []).includes(k));
     if (ctx.plannerKinds.length && (!ctx.types.size || ['indoor','tour','outdoor','sport'].some(t=>ctx.types.has(t))) && !kindMatch) return false;
-    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t)))) return false;
+    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t))) && !kidsKitchenMeal(v, ctx)) return false;
     // An asked-for kind of place to eat or drink ("hiking, craft beer and good food") does not need the activity's tag
     // (2026-10-25: no brewery met "hiking", so none was planned).
     if (ctx.activities.size && !v.activities.some((a) => ctx.activities.has(a)) && !(ctx.types.has(v.type) && !['outdoor', 'beach', 'tour', 'sport'].includes(v.type))) return false;
@@ -1246,6 +1274,9 @@ function scoreVenue(v, ctx) {
     else if (nm) add('night', 25, `Hosts ${NIGHT_KIND_WORDS[nk]} on ${listText(nm.other.days.map((d) => `${WEEKDAY_NAMES[d]}s`))}, from its listing`);
     const sp = !nk && !foodMatch(v, ft) ? specialFoodMatch(v, ft, planDate) : null;
     if (sp) { add('food', 14, `${planDate ? `${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]]} special` : 'Weekly special'}: ${sp.title}`); continue; }
+    // Distillery test 2: the word in a listed event's name on the day ("Brunch jazz on Sunday at 11 AM, from its listing").
+    const nt = !nk && !foodMatch(v, ft) ? nightTitleMatch(v, ft, planDate) : null;
+    if (nt) { const t = nightClock(nt.n.start), dn = planDate ? WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]] : null; add('night', 30, dn && t && nt.title.length <= 40 ? `${nt.title} on ${dn} at ${t}, from its listing` : null); continue; }
     const m = foodMatch(v, ft);
     if (!m) continue;
     if (m.cuisine) add('food', 18, `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
@@ -4200,6 +4231,14 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
     const askedNightStart=s=>{
       if(!s||!s.venue||s.event)return null;
       if(s.listedNight)return nightMinutes(s.listedNight.start);
+      // Distillery test 2 (Whistler, 2026-11-16): a place the request names, on a day it lists an event (her Sunday « Brunch
+      // jazz » at 11 AM, her first-Saturday class at 2 PM), is visited for it: the stop starts when the event does (it was
+      // 12:35 PM). Daytime events only (before 5 PM): an evening quiz or show is planned for when it's asked for by name, as
+      // before. Never a lunch, dinner or coffee stop there.
+      if(requirements&&(requirements.items||[]).some(i=>i.kind==='venue'&&i.value===s.venue.id)&&!/\b(?:lunch|dinner|supper|coffee)\b/i.test(s.label||'')){
+        const nv=byId.get(s.venue.id),first=nv?((nv.nights||[]).filter(n=>n&&n.frequency!=='appointment'&&nightOnPlanDate(n,date)&&nightMinutes(n.start)!=null&&nightMinutes(n.start)<17*60).sort((a,b)=>nightMinutes(a.start)-nightMinutes(b.start))[0]):null;
+        if(first)return nightMinutes(first.start);
+      }
       // Never a breakfast, brunch, lunch or coffee stop that happens to be at a place with a quiz that night.
       if(!askedKinds.length||/\b(?:lunch|brunch|breakfast|coffee)\b/i.test(s.label||''))return null;
       const v=byId.get(s.venue.id);

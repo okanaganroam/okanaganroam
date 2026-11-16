@@ -410,7 +410,7 @@ test('tasting price: "from your website, so we picked it" goes once the price in
 });
 
 // ====================== 7. Research's tasting price ======================
-test('research "Tastings $10" pre-picks $10; once the owner gives a price, research\'s "Prices: Tastings $10" is left off the page (other prices stay)', async () => {
+test('research "Tastings $10" pre-picks $10; once the owner gives a price, research\'s "Prices: Tastings $10" is left off the page (other prices stay, without the tasting part)', async () => {
   const R2 = RESEARCH.map((r) => (r.label === 'Prices' ? { label: 'Prices', text: 'Tastings $10' } : r));
   const { v, t } = await graham({}, { bare: true, research: R2, region: 'penticton' });
   assert.equal((await setupCfg(t)).researchFee, 10, '"Tastings $10" is read');
@@ -426,14 +426,15 @@ test('research "Tastings $10" pre-picks $10; once the owner gives a price, resea
   const after = plain(page(v));
   assert.match(after, /Tastings\s+\$10 a tasting/); assert.ok(!/Prices\s+Tastings \$10/.test(after), 'not said twice');
   assert.ok(app.venueVisitInfo(v.id).rows.some((r) => r.label === 'Prices' && r.text === 'Tastings $10'), 'the stored research row is untouched');
-  // A Prices line with something else in it stays beside his tasting line.
+  // A Prices line with something else in it keeps the rest beside his tasting line (distillery test 2, Whistler,
+  // 2026-11-16: its tasting part goes too, so "$12" never sits beside his own price).
   const g = await graham({}, { region: 'penticton' });
-  assert.match(plain(page(g.v)), /Prices\s+Tasting flights from \$12, cocktails \$14/);
-  // A brewery's "Pints from $8, flights $13" stays too.
+  assert.match(plain(page(g.v)), /Prices\s+Cocktails \$14\./);
+  // A brewery's "Pints from $8, flights $13" keeps "Pints from $8".
   const b = mk('brewery', { name: 'Flight Line Brewing Fixture', region: 'penticton' });
   research(b.id, [{ label: 'Prices', text: 'Pints from $8, flights $13' }]);
   ok(await change(tokenFor(b.id), { flight_fee: 13 }));
-  assert.match(plain(page(b)), /Prices\s+Pints from \$8, flights \$13/);
+  assert.match(plain(page(b)), /Prices\s+Pints from \$8\./);
 });
 
 // ====================== 8. The last screen ======================
@@ -465,10 +466,11 @@ test('edit page: a distillery\'s tips give distillery examples and "Tours & even
   assert.ok(ph.includes('House pints (20 oz)') && ph.includes('trivia and karaoke go under Weekly nights'));
 });
 
-test('hours chips: a distillery gets 1 PM to open and 7 PM to close (no more chips than a brewery has); breweries keep theirs; "Open after midnight?" is as it was', () => {
+test('hours chips: a distillery gets 1 PM and 10 AM to open and 7 PM and 11 PM to close (no more chips than a brewery has); breweries keep theirs; "Open after midnight?" is as it was', () => {
   const s = CLIENT();
   assert.match(s, /var BQ_OPEN = \['11:00', '12:00', '14:00', '15:00'\], BQ_CLOSE = \['18:00', '20:00', '21:00', '22:00', '23:00'\];/);
-  assert.match(s, /if \(C\.distillery\) \{ BQ_OPEN = \['11:00', '12:00', '13:00', '14:00'\]; BQ_CLOSE = \['18:00', '19:00', '20:00', '21:00', '22:00'\]; \}/);
+  // Distillery test 2 (Whistler, 2026-11-16): 10 AM and 11 PM in place of 11 AM and 6 PM (tests/distillery-setup-fresh-eyes-wr2.test.js).
+  assert.match(s, /if \(C\.distillery\) \{ BQ_OPEN = \['10:00', '12:00', '13:00', '14:00'\]; BQ_CLOSE = \['19:00', '20:00', '21:00', '22:00', '23:00'\]; \}/);
   // Wineries (the other tasting-room type) show the midnight row, so a distillery's stays: only cafés hide it.
   assert.match(s, /function lateBtns\(d, j, y\)\{\s+\/\/[^\n]+\n\s+if \(C\.cafe\) return '';/);
 });

@@ -326,7 +326,9 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   if(calendar.trimmed)conflicts.push(`Your dates cover ${calendar.trimmed} days; the planner covers up to seven at a time, so this plan is for the first seven (${calendar.startDate} to ${calendar.endDate}).`);
   const add=(kind,value,clause,extra={})=>{
     const sc=scope(clause),strength=/\b(?:prefer|preferably|ideally|if possible)\b/.test(clause)?'prefer':'must';
-    if (!items.some(i=>i.kind===kind&&i.value===value&&i.dayIndex===sc.dayIndex&&i.weekday===sc.weekday)) items.push({id:`r${items.length+1}`,kind,value,strength,sourceText:clause,...sc,...extra});
+    // Distillery test 2 (Whistler, 2026-11-16): a family meal says so, so a kitchen that welcomes kids until a set time counts.
+    const kidsMeal=kind==='type'&&value==='restaurant'&&/\b(?:kids?|children|child|family|families|toddlers?)\b/.test(normalizedText)?{kids:true}:{};
+    if (!items.some(i=>i.kind===kind&&i.value===value&&i.dayIndex===sc.dayIndex&&i.weekday===sc.weekday)) items.push({id:`r${items.length+1}`,kind,value,strength,sourceText:clause,...sc,...kidsMeal,...extra});
   };
   // Keep sentence/semicolon boundaries and carry explicit day headers across
   // comma-separated clauses. Negation applies within its clause, never across a sentence.
@@ -458,9 +460,12 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // 2026-11-05: a place named by the front of its name -- "Waterfront Wines" for Waterfront Wines Restaurant, "Home Block" for
   // Home Block at CedarCreek Estate Winery -- is that place when no other listing shares those words (never a guess between two).
   const matchedIds=new Set([...names.values()].flatMap(vs=>vs.map(v=>v.id)));
+  // Distillery test 2 (Whistler, 2026-11-16): "Howe Sound Spirits" is not Howe Sound Brewing's "Howe Sound": an alias whose
+  // words run on, in the request, into the next word of another listing's name names that other listing, not this one.
+  const longer=(alias,v,c)=>(taxonomy.venues||[]).some(o=>{if(o.id===v.id||o.redirect_to||!o.name)return false;const on=venueName(o.name);if(!on.startsWith(alias+' '))return false;const nx=on.slice(alias.length+1).split(' ')[0];return !!nx&&` ${c} `.includes(` ${alias} ${nx} `);});
   for(const [alias,v] of venueAliases(taxonomy.venues||[])) {
     if(matchedIds.has(v.id)||names.has(alias))continue;
-    const mention=clauses.find(({c})=>` ${c} `.includes(` ${alias} `)&&!/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,c.indexOf(alias))));
+    const mention=clauses.find(({c})=>` ${c} `.includes(` ${alias} `)&&!/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,c.indexOf(alias)))&&!longer(alias,v,c));
     if(!mention)continue;
     names.set(alias,[{...v,scopeText:mention.scopeText}]);
   }
@@ -725,6 +730,13 @@ function coffeeEvidence(v){
   if(/\b(?:no coffee|without coffee|does not serve coffee|do not serve coffee|coffee free)\b/.test(text))return false;
   return /\b(?:coffee|espresso|cappuccino|latte|americano|flat white|cortado)\b/.test(text);
 }
+// Distillery test 2: its own kitchen, minors welcome with an adult until a set time, and no time asked at or after it.
+function kidsKitchenOk(v,text){
+  const u=/^(\d{2}):(\d{2})$/.exec(String(v&&v.kidsUntil||''));if(!u||!v.ownKitchen)return false;
+  const m=/\b(?:at|around|by|for)\s+(\d{1,2})(?:[: ](\d{2}))?\s*(am|pm|a m|p m)\b/i.exec(String(text||''));
+  if(!m)return true;
+  return ((Number(m[1])%12)+(/^p/i.test(m[3])?12:0))*60+Number(m[2]||0)<Number(u[1])*60+Number(u[2]);
+}
 function matches(v,i){
   // "Lunch at a winery restaurant" (2026-10-19): a winery that serves lunch is that restaurant.
   if(i.wineryLunch&&i.kind==='type'&&v.type==='winery')return true;
@@ -733,6 +745,9 @@ function matches(v,i){
   if(i.lakeside&&i.kind==='venue_kind')return lakeWalk(v);
   if(i.kind==='venue_kind'||i.kind==='excluded_kind')return (v.plannerKinds||inferPlannerKinds(v)).includes(i.value);
   if(i.kind==='venue')return v.id===i.value;
+  // Distillery test 2 (Whistler, 2026-11-16): a place with its own kitchen that lists a brunch (« Brunch jazz » on Sundays) is a brunch spot too.
+  if(i.kind==='type'&&i.value==='restaurant'&&i.kids&&kidsKitchenOk(v,i.sourceText))return true;
+  if(i.kind==='type'&&i.value==='breakfast'&&v.ownKitchen&&(v.nights||[]).some(n=>/\b(?:brunch|breakfast)\b/i.test(`${n.title||''} ${n.titleFr||''}`)))return true;
   if(i.kind==='type'||i.kind==='type_count'||i.kind==='excluded_type')return i.value==='breakfast'?['cafe','restaurant'].includes(v.type):v.type===i.value||(v.fdTypes||[]).includes(i.value)||i.value==='tour'&&(v.plannerKinds||inferPlannerKinds(v)).some(k=>['boat_tour','wine_tour','guided_hike','snow_tour','cooking'].includes(k));
   if(i.kind==='activity')return (v.activities||[]).includes(i.value);
   if(i.kind==='excluded_activity')return i.value==='hiking'&&hikingPlace(v);

@@ -185,7 +185,8 @@ test('scorer: pendingHelp marks menu / happy hour / specials / Facebook / Instag
   const plain = pc.renderCompleteness(b, { plainWaiting: true });
   assert.match(plain, /sent\. We’ll add them within a day\./);
   assert.doesNotMatch(plain.slice(0, plain.indexOf('op-cb-panel')), /3 waiting for our check/);
-  assert.match(pc.renderCompleteness(b, { plainWaiting: true, fr: true }), /envoyé\. Nous l’ajouterons d’ici un jour\./);
+  // Distillery test 2 (Whistler, 2026-11-16): the French agrees with what was sent (menu, happy hour and Facebook: plural).
+  assert.match(pc.renderCompleteness(b, { plainWaiting: true, fr: true }), /envoyés\. Nous les ajouterons d’ici un jour\./);
 });
 
 test('reservations, takeout and groups: saying how sets the feature; only an explicit No clears it; No then Yes restores it', async () => {

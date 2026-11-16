@@ -844,7 +844,8 @@ test('fe3 #5 the edit page Plan your visit: the lines the setup writes, one writ
   assert.match(box, /placeholder="e\.g\. Small-batch gin and craft cocktails"/);
   assert.match(box, /<strong>Tastings:<\/strong> \$16 a tasting\./);
   assert.match(box, /<strong>To go:<\/strong> Bottles to go\./);
-  assert.match(box, /<strong>Food:<\/strong> Small plates from our own kitchen; it closes at 8 PM\./);
+  // Distillery test 2 (Whistler, 2026-11-16): research's dish word is no longer added to her Food line.
+  assert.match(box, /<strong>Food:<\/strong> Our own kitchen; it closes at 8 PM\./);
   assert.match(box, /<strong>Kids:<\/strong> Minors welcome with an adult until 7 PM\./);
   assert.match(box, new RegExp(`open <a href="/owner/${t}/setup">Set up your page</a> and tap Change an answer`));
   assert.match(box, /6 of 7 lines filled in/);
@@ -901,12 +902,13 @@ test('fe3 #7 small fixes: happy hour example, 🍸, time defaults from closing, 
   assert.equal(run(null), '');
 });
 
-test('fe3 #7b research "Small plates" pre-picks Our own kitchen and stays in her Food line; BMT "1 stop" and the Monday line', async () => {
+test('fe3 #7b research "Small plates" pre-picks Our own kitchen (not added to her Food line since distillery test 2); BMT "1 stop" and the Monday line', async () => {
   const d = mk('distillery'); const t = tokenFor(d.id);
   research(d.id, [{ label: 'Food', text: 'Small plates' }]);
   assert.equal(cfgOf((await get(`/owner/${t}/setup`)).text).suggestFood, 'kitchen');
   await change(t, { brewery_info: { food: 'kitchen', kitchen: { mode: 'same' } } });
-  assert.equal(row(d.id, 'Food').text, 'Small plates from our own kitchen, food until close.');
+  // Distillery test 2 (Whistler, 2026-11-16): research's dish word is no longer added to her Food line.
+  assert.equal(row(d.id, 'Food').text, 'Our own kitchen, food until close.');
   assert.equal(app.venueVisitInfo(d.id).owner_fr.Food.fr, 'Cuisine sur place, jusqu’à la fermeture.');
   const d2 = mk('distillery'); await change(tokenFor(d2.id), { brewery_info: { food: 'kitchen' } });
   assert.equal(row(d2.id, 'Food').text, 'Our own kitchen.', 'no research: as before');

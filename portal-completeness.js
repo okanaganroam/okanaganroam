@@ -767,7 +767,13 @@ function renderCompleteness(result, opts) {
   }
   const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
   const sentList = sentNames.length > 1 ? sentNames.slice(0, -1).join(', ') + L(' and ', ' et ') + sentNames[sentNames.length - 1] : sentNames[0] || '';
-  const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : envoyé. Nous l’ajouterons d’ici un jour.`) : '';
+  // Distillery test 2 (Whistler, 2026-11-16): the French agrees with what was sent (« Photos : envoyées. Nous les ajouterons
+  // d’ici un jour. », « Menu : envoyé. Nous l’ajouterons… », « Photos, menu et Facebook : envoyés. Nous les ajouterons… »).
+  const FR_FEM = new Set(['photos', 'votre histoire', 'adresse', 'photo de la porte de la salle de dégustation', 'photo de la porte de la salle', 'photo de la devanture', 'caractéristiques']);
+  const FR_PLURAL = new Set(['photos', 'spéciaux', 'caractéristiques']);
+  const frMany = sentNames.length > 1 || FR_PLURAL.has(sentNames[0]), frFem = sentNames.length > 0 && sentNames.every((x) => FR_FEM.has(x));
+  const frSent = `envoy${frFem ? 'ée' : 'é'}${frMany ? 's' : ''}`;
+  const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : ${frSent}. Nous ${frMany ? 'les ajouterons' : 'l’ajouterons'} d’ici un jour.`) : '';
   const sub0 = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
     : nq

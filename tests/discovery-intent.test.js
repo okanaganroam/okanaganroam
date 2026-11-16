@@ -609,7 +609,8 @@ test('Stage 3.1 plural-tolerant aliases: dinner/dinners, lunch/lunches, pizza/pi
   assert.deepEqual(I('italians').cuisines, [], 'a nationality plural is not a cuisine request');
   assert.deepEqual(I('spirit').types, [], '"spirits" is not singularised');
   assert.deepEqual(I('bars in Kelowna').types, ['pub']);
-  assert.deepEqual(I('drinks in Kelowna').types, ['pub', 'cocktail']);
+  // Distillery test 2 (Whistler, 2026-11-16): a distillery pours cocktails in its own lounge, so "drinks" includes it.
+  assert.deepEqual(I('drinks in Kelowna').types, ['pub', 'cocktail', 'distillery']);
   assert.deepEqual(I('golf courses').types, ['golf']);
   assert.deepEqual(I('wines').types, ['winery']);
   assert.deepEqual(I('parks').types, ['outdoor']);

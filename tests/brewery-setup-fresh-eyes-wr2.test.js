@@ -311,7 +311,7 @@ test('a pub’s (and a restaurant’s) kitchen time covers two stretches: stored
   assert.deepEqual(app.pubKitchenOn({ mode: 'earlier', closes: '22:00' }, '2027-07-01'), { mode: 'earlier', closes: '22:00', note: undefined });
 });
 
-test('the setup asks the seasonal kitchen time on the taproom screen and on the pub’s kitchen screen, once for both stretches', () => {
+test('the setup asks the seasonal kitchen time on the taproom screen and on the pub’s kitchen screen, for each stretch', () => {
   const s = CLIENT();
   // The same block on both screens; a brewery sees it once a kitchen answer is picked.
   assert.match(s, /\+ kseaBlock\(\)\n\s+\+ \(C\.lang !== 'fr' && !S\.kitchen\.note/);
@@ -330,7 +330,9 @@ test('the setup asks the seasonal kitchen time on the taproom screen and on the 
   };
   const two = [{ from: '10-13', to: '11-26', hours: {} }, { from: '04-19', to: '05-29', hours: {} }];
   let c = mk2(two, { mode: 'time', closes: '21:00' });
-  assert.match(c.kseaBlock(), /In your 10-13 – 11-26 and 04-19 – 05-29 hours, when does the kitchen close\?/);
+  // Distillery test 2 (Whistler, 2026-11-16): one question per stretch now, each with its own time
+  // (tests/distillery-setup-fresh-eyes-wr2.test.js); an answer for the second one not given yet follows the first.
+  assert.match(c.kseaBlock(), /In your 10-13 – 11-26 hours, when does the kitchen close\?[\s\S]*In your 04-19 – 05-29 hours, when does the kitchen close\?/);
   let kv = { mode: 'earlier', closes: '22:00' };
   assert.equal(c.kseaInto(kv, false), true);
   assert.deepEqual(JSON.parse(JSON.stringify(kv)), { mode: 'earlier', closes: '22:00', season: { from: '10-13', to: '11-26', closes: '21:00' }, season2: { from: '04-19', to: '05-29', closes: '21:00' } });
@@ -366,12 +368,14 @@ test('help in a brewery’s setup: off-seasons, the kitchen off-season, no cover
   for (const lang of ['en', 'fr']) for (const [qs, id] of want) for (const q of qs) assert.equal(bots[lang].best(q).id, id, `${lang}: ${q}`);
   const A = (id, lang) => bare(bots[lang].topic(id)[lang === 'fr' ? 'aFr' : 'a']);
   assert.match(A('brewery-kitchen', 'en'), /^Right here in setup: Your taproom \(tap Change an answer if it’s done\)\. With Our own kitchen picked, answer Does your kitchen close before the bar\? and pick the time\./);
-  assert.match(A('brewery-kitchen', 'en'), /With two stretches, one time covers both\./);
+  // Distillery test 2 (Whistler, 2026-11-16): each stretch has its own kitchen time now.
+  assert.match(A('brewery-kitchen', 'en'), /With two stretches, it asks for each one, so each can have its own time\./);
   assert.match(A('brewery-kitchen', 'fr'), /^Ici même, dans la configuration : Votre salle de dégustation \(touchez Modifier une réponse si c’est fait\)\. Avec Notre cuisine choisi/);
   assert.match(A('event-cover', 'en'), /^Right here in setup: Weekly events \(tap Change an answer if it’s done\): write it after the event’s name, with a comma, like Live music, no cover\./);
   assert.match(A('event-cover', 'fr'), /^Ici même, dans la configuration : Événements de la semaine .* : écrivez-le après le nom, avec une virgule, comme Musique en direct, sans frais d’entrée\./);
-  assert.match(A('parking-paid', 'en'), /^Right here in setup: What you offer .*: leave Free parking unticked .* write it under Good to know in Plan your visit on your edit page\./);
-  assert.match(A('parking-paid', 'fr'), /laissez Stationnement gratuit décoché .* écrivez-le sous Bon à savoir/);
+  // Distillery test 2 (Whistler, 2026-11-16): the answer leads with what to do, then where.
+  assert.match(A('parking-paid', 'en'), /^Paid or street parking\? Leave Free parking unticked and write it under Good to know\. Right here in setup: What you offer /);
+  assert.match(A('parking-paid', 'fr'), /Laissez Stationnement gratuit décoché et écrivez-le sous Bon à savoir/);
   assert.match(A('brewery-groups', 'en'), /^Right here in setup: Groups and booking /); assert.doesNotMatch(A('brewery-groups', 'en'), /^No\./);
   assert.match(A('brewery-groups', 'fr'), /^Ici même, dans la configuration : Groupes et réservations /); assert.doesNotMatch(A('brewery-groups', 'fr'), /^Non\./);
   assert.match(A('closures', 'en'), /Open that day but closing early or opening late\? Leave it unticked and message us the date and time\.$/);
@@ -392,8 +396,8 @@ test('help for the other types: the kitchen off-season for pubs and restaurants,
   const bot = async (type, o = {}) => { const v = mk(type, o); return helpBot((await get(`/owner/${tokenFor(v.id)}/setup`)).text); };
   const pub = await bot('pub', { happy_hour: 1 }), rest = await bot('restaurant', { happy_hour: 1 }), cafe = await bot('cafe'), winery = await bot('winery'), dist = await bot('distillery');
   for (const q of ['the kitchen closes earlier in the off season', 'la cuisine ferme plus tôt hors saison']) { assert.equal(pub.best(q).id, 'pub-kitchen', q); assert.equal(rest.best(q).id, 'restaurant-kitchen', q); assert.equal(dist.best(q).id, 'brewery-kitchen', q); }
-  assert.match(pub.topic('pub-kitchen').a, /with two stretches, one time covers both/);
-  assert.match(rest.topic('restaurant-kitchen').a, /with two stretches, one time covers both/);
+  assert.match(pub.topic('pub-kitchen').a, /with two stretches, each gets its own time/);
+  assert.match(rest.topic('restaurant-kitchen').a, /with two stretches, each gets its own time/);
   assert.match(bare(dist.topic('brewery-kitchen').a), /^Right here in setup: Food here /);
   for (const b of [pub, rest, cafe, winery, dist]) assert.equal(b.best('paid parking').id, 'parking-paid');
   assert.match(winery.topic('parking-paid').a, /add a line to your story/);

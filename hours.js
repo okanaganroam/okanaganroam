@@ -440,6 +440,29 @@ function happyHourUntilClose(hh, placeDays) {
   });
   return out;
 }
+// Distillery test 2 (Whistler, 2026-11-16): each happy hour may run only some months of its own ("an apres deal in winter
+// only"). A window's own months ride along in the stored week as "_slot_seasons": { sat: { '14:00': { from, to } } }
+// ('MM-DD', by the window's start, like "_close"); a week without it (every week stored before) reads as it always did,
+// its one "_season" covering every window. -> the week with each such window kept only when the date that weekday falls
+// on (in the 7 days from `date`, 'YYYY-MM-DD') is inside its months; a day left with none is closed. `hh` unchanged
+// when it has no window months or no date is given.
+function happyHourSlotsOn(hh, date) {
+  var raw = hh;
+  if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { return hh; } }
+  if (!raw || typeof raw !== 'object' || !raw._slot_seasons || typeof raw._slot_seasons !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return hh;
+  var out = Object.assign({}, raw);
+  delete out._slot_seasons;
+  var base = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  var wd0 = (new Date(base).getUTCDay() + 6) % 7;
+  WEEKDAYS.forEach(function (d, i) {
+    var ss = raw._slot_seasons[d];
+    if (!ss || typeof ss !== 'object' || !Array.isArray(raw[d])) return;
+    var md = new Date(base + ((i - wd0 + 7) % 7) * 86400000).toISOString().slice(5, 10);
+    var kept = raw[d].filter(function (w) { var z = Array.isArray(w) ? ss[w[0]] : null; return !z || !z.from || !z.to || mdInRange(md, z.from, z.to); });
+    out[d] = kept.length ? kept : null;
+  });
+  return out;
+}
 function happyHourState(hh, clock, placeClosedNow, closures, opts) {
   const o = Object.assign({}, opts || {});
   // Until close (pub test 9): those windows end at the place's own closing time for that day.
@@ -450,6 +473,8 @@ function happyHourState(hh, clock, placeClosedNow, closures, opts) {
       if (pd) hh = happyHourUntilClose(hh, pd.days);
     } catch (e) { /* the stored ends stand */ }
   }
+  // Distillery test 2: a window with months of its own only on the dates inside them.
+  if (clock && clock.date) hh = happyHourSlotsOn(hh, clock.date);
   let parsed = parseHours(hh);
   // The happy hour's own season rides along in its stored week ("_season": { from, to }, 'MM-DD', pub test 7).
   if (!o.season) {
@@ -550,10 +575,11 @@ const HOURS_CLIENT_SRC = [
   // without it here every happy hour threw in the browser and Roam Now's Happy hour filter showed 0 places.
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES}; var OPEN_SEASON_LAST = ${JSON.stringify(OPEN_SEASON_LAST)};`,
   ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
-    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose, parseOpenSeason].map((fn) => fn.toString()),
+    validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose, happyHourSlotsOn, parseOpenSeason].map((fn) => fn.toString()),
 ].join('\n');
 
 module.exports = {
+  happyHourSlotsOn,
   HOURS_WEEKDAYS: WEEKDAYS,
   HOURS_CLIENT_SRC,
   hoursTimeToMinutes,
