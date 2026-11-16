@@ -52563,6 +52563,19 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     return toks.length > 0 && toks.every(function(w){ return w.length >= 3 && /[aeiouy]/.test(w); }) && toks.some(function(w){ return MENU_WORDS[fixWord(w)] || MENU_WORDS[w]; });
   }
   var SIZE_RE = /^\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb|lbs|pc|pcs|pieces?|inch|in|cm)\b/i; // "8 oz striploin", "6 pc"
+  // (2026-11-16) A restaurant website's own buttons, links and footers, read along with its menu ("Get directions",
+  // "Powered by Weebly", "Choose a location", "Filters (applied 0)", "Legend spicy vegetarian"), and a chain's nutrition
+  // panel under each dish ("1770 Cals", "Calories 1770", "Sodium 3710 mg"). Whole lines only, so a dish is never cut.
+  var SITE_JUNK_RE = /^(?:get directions|directions|view (?:on )?map|(?:our )?locations?|(?:choose|select|change|find) (?:a |your )?location|(?:our |opening )?hours(?: of operation)?|privacy(?: policy)?|terms(?: of (?:use|service))?|terms (?:&|and) conditions|cookie (?:policy|settings)|(?:site )?powered by\b.*|skip to (?:main )?content|search by typing\b.*|view all|view (?:the |our )?full menu|(?:tap|click) here\b.*|download (?:the |our )?(?:menu|pdf)\b.*|filters?(?:\s*\(.*\))?|categories|clear (?:all|filters)|order (?:online|now|here)|back to top|toggle navigation|sign in|log ?in|share|print|new|popular|best ?seller|sold out|closed|nutrition(?:al)?(?: info(?:rmation)?| facts)?)$/i;
+  var LEGEND_RE = /^legend\b[:\s]*(?:(?:spicy|hot|mild|vegetarian|vegan|gluten[- ]free|dairy[- ]free|halal|nuts?|contains nuts|gf|df|vg|v|ve)[\s,|\u00b7\u2022\/]*)*$/i;
+  var NUTRITION_RE = /^(?:(?:\d[\d,]*|\.\d+)(?:\.\d+)?(?:\s*[-\u2013]\s*\d[\d,]*)?\s*(?:k?cals?|calories)|(?:calories|cals?|total fats?|fats?|saturated(?: fats?)?|trans(?: fats?)?|cholesterol|sodium|carbohydrates?|carbs|fib(?:re|er)|sugars?|protein)\s*:?\s*(?:\d[\d,]*|\.\d+)(?:\.\d+)?(?:\s*[-\u2013]\s*\d[\d,]*)?\s*(?:k?cals?|g|mg|%)?)$/i;
+  var STREET_RE = /^(?:address:?\s*)?\d{1,6}[a-z]?\s+[A-Za-z0-9 .'\-]{2,40}?\b(?:st(?:reet)?|ave(?:nue)?|rd|road|blvd|boulevard|dr(?:ive)?|hwy|highway|way|cres(?:cent)?|lane|ln|pl(?:ace)?|ct|court)\b\.?/i;
+  var WEEKDAYS_RE = /^(?:mon(?:day)?|tues?(?:day)?|wed(?:nesday)?|thu(?:rs?)?(?:day)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)s?\.?(?:\s*(?:-|\u2013|to|&|,|and)\s*(?:mon(?:day)?|tues?(?:day)?|wed(?:nesday)?|thu(?:rs?)?(?:day)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)s?\.?)*\s*:?\s*(?:closed)?$/i;
+  function siteJunk(t){
+    if (SITE_JUNK_RE.test(t) || LEGEND_RE.test(t) || NUTRITION_RE.test(t) || WEEKDAYS_RE.test(t)) return true;
+    // A street address: a number and a street, then a town, "BC" or a postcode.
+    return STREET_RE.test(t) && /,\s*[A-Z][a-z]|\bB\.?C\.?\b|\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/.test(t);
+  }
   function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t) || SIZE_RE.test(t); }
   // ----- Headings vs dishes (2026-10-18) -----
   // A website's "Our Menu" title over an h2 "Breakfast" came in as a section "Our Menu" with a $9.50 dish called
@@ -52725,7 +52738,27 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       if ((own && /[A-Za-z]{2}/.test(t0.slice(0, own.index))) || (np && (!/[A-Za-z]{2}/.test(nRest) || SIZE_NAME_RE.test(nRest)))
         || (nl && !(nl.mark >= 1 && nl.mark <= 7) && !np && (/^[a-z(]/.test(nraw) || /[.!?]$/.test(nraw)))) dishLevel[mk] = 1;
     });
-    split.forEach(function(ln){
+    // (2026-11-16) Pages that print each dish's name on its own line, then its description with the price ("Pomodoro",
+    // "San Marzano tomato sauce $20"), or the description and then the price on a line of its own. Seen often
+    // enough on one page, a short line before such a description is the dish's name, not a section heading.
+    var bare = function(x){ return plain(x).replace(/(\s?[.\u00b7\u2022\u2026]){2,}\s?/g, ' ').trim(); };
+    var lettersOf = function(x){ return x.replace(/[^A-Za-z\u00c0-\u00ff]/g, '').length; };
+    var priceOnly = function(x){ var q = PRICE_RE.exec(x); return !!q && lettersOf(x.slice(0, q.index)) < 2; };
+    var nameOk = function(x){ return lettersOf(x) >= 2 && words(x) <= 6 && !PRICE_RE.test(x) && !isCapsHeading(x) && !headWord(x) && !JUNK_RE.test(x) && x.indexOf(',') < 0 && !/[.!?:]$/.test(x); };
+    var namesAbove = 0, pricedRun = 0, threeLine = 0, twoLine = 0;
+    split.forEach(function(ln, k){
+      var t0 = bare(ln.text), nl = split[k + 1], n0 = nl ? bare(nl.text) : '', q = PRICE_RE.exec(n0);
+      if (q && lettersOf(n0.slice(0, q.index)) >= 2) { if (nameOk(t0)) namesAbove++; else if (PRICE_RE.test(t0)) pricedRun++; }
+      var n2 = split[k + 2] ? bare(split[k + 2].text) : '';
+      if (nameOk(t0) && n0 && !PRICE_RE.test(n0) && lettersOf(n0) >= 2 && priceOnly(n2)) threeLine++;
+      if (nameOk(t0) && priceOnly(n0)) twoLine++;
+    });
+    var nameLines = namesAbove >= 4 && namesAbove >= pricedRun, nameDescPrice = threeLine >= 3 && threeLine > twoLine;
+    // ...or where the next two lines repeat the pattern (a pizza list above a long wine list).
+    var pairNext = function(k){ var a1 = split[k + 1], a2 = split[k + 2]; if (!a1 || !a2) return false; var x2 = bare(a2.text), q2 = PRICE_RE.exec(x2); return nameOk(bare(a1.text)) && !!q2 && lettersOf(x2.slice(0, q2.index)) >= 2; };
+    var byName = false;
+    var nextPriceOnly = function(k){ var nl = split[k + 1]; return !!nl && priceOnly(bare(nl.text)); };
+    split.forEach(function(ln, idx){
       // Fix (2026-10-18): "For One$14.95" (a web page's price in its own tag) reads as "For One $14.95".
       var rawT = String(ln.text || '').replace(/([A-Za-z\u00c0-\u00ff)])\$(?=\d)/g, '$1 $');
       var t = rawT.replace(/[|_]/g, ' ').replace(/(\s?[.·•…]){2,}\s?/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim();
@@ -52735,8 +52768,16 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       // the section's note.
       var hh = headingWithHours(rawT);
       if (hh) { flush(); section(hh.name); cur.note = hh.note; return; }
-      if (t.length < 2 || JUNK_RE.test(t)) return;
+      if (t.length < 2 || JUNK_RE.test(t) || siteJunk(t)) return;
       // Dietary marks a website prints on their own line under a dish ("Dairy free", "Gluten free").
+      // (2026-11-16) Short marks on their own line ("G.F", "VG", "GFO"): kept on the dish being read, never a dish.
+      var mark2 = /^(g\.?\s?f\.?|d\.?\s?f\.?|v\.?\s?g\.?|v|ve|g\.?\s?f\.?\s?o\.?|gf option)$/i.exec(t);
+      if (mark2 && (pending || last)) {
+        var mk2 = mark2[1].replace(/[.\s]/g, '').toUpperCase(), dk = mk2 === 'GF' ? 'GF' : mk2 === 'DF' ? 'DF' : mk2 === 'VG' || mk2 === 'VE' ? 'VG' : null;
+        if (dk && pending) pending.text += ' ' + dk;
+        else if (dk && last) { var d2 = DIET[dk]; if (d2 && last.dietary.indexOf(d2) < 0) last.dietary.push(d2); }
+        return;
+      }
       var tag = /^(dairy[- ]free|lactose[- ]free|gluten[- ]free|contains dairy|mild|med|medium)$/i.exec(t);
       if (tag && last && !pending) {
         var tk = tag[1].toLowerCase().replace(' ', '-');
@@ -52768,17 +52809,36 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         var promote = deeper;
         if (!promote && !nextHead && pRest.replace(/[^A-Za-z\u00c0-\u00ff]/g, '').length >= 2 && !SIZE_NAME_RE.test(pRest) && !NOTE_START_RE.test(pRest) && !JUNK_RE.test(pRest)) {
           promote = pk ? !/^[a-z(]/.test(pRest) && (titleName(pRest) || !looksDesc(pRest)) : titleName(pRest) && looksDesc(pRest);
+          // (2026-11-16) A menu printed all in small letters ("breakfast", then "smashed avocado toast 16"): a course word
+          // above a priced dish still heads it.
+          if (!promote && pk && headWord(pending.text) && pending.text === pending.text.toLowerCase() && pRest === pRest.toLowerCase() && words(pRest) <= 8) promote = true;
         }
         if (promote) { section(pending.text); pending = null; }
       }
       var m = PRICE_RE.exec(t);
       // Fix (2026-10-18): a number after a month is a date, not a price ("Begins Monday, December 1").
       if (m && !/\$/.test(m[2]) && MONTH_END_RE.test(t.slice(0, m.index).trim())) m = null;
+      // (2026-11-16) "Combo 1", "No. 3", "Option 2": a number, not a price.
+      if (m && !/\$/.test(m[2]) && !m[3] && /^\d$/.test(m[2]) && /\b(?:combo|no\.?|number|#|option|step|set|meal|size|item|level)\s*$/i.test(t.slice(0, m.index))) m = null;
+      // (2026-11-16) A heading followed by a lone price that the next dish repeats ("SIMPLE STARTS", "$15", "Yogurt &
+      // Granola Parfait", its description, "$15"): the page shows each price twice, so the first one is dropped.
+      if (m && pending && (pending.caps || pending.hd) && t.replace(/[^A-Za-z]/g, '').length < 2) {
+        var n1 = split[idx + 1] ? bare(split[idx + 1].text) : '';
+        if (n1 && !PRICE_RE.test(n1) && lettersOf(n1) >= 2) {
+          for (var j = idx + 2; j <= idx + 3 && j < split.length; j++) {
+            var qj = PRICE_RE.exec(bare(split[j].text));
+            if (qj && lettersOf(bare(split[j].text).slice(0, qj.index)) < 2) { if (qj[2].replace(/[^\d.]/g, '') === m[2].replace(/[^\d.]/g, '')) { section(pending.text); pending = null; return; } break; }
+          }
+        }
+      }
       if (m) {
         var unit = m[4] ? ' ' + m[4].trim().replace(/\s+/g, ' ').replace(/^\/\s*/, 'per ') : '';
         var price = (m[2] + (m[3] || '')).replace(/[S$\s]/gi, '').replace(/[\/|]/g, ' / ');
         if (m[1] || unit) price = (m[1] ? 'From ' : '') + '$' + price + unit;
         var rest = t.slice(0, m.index).trim();
+        // (2026-11-16) Two sizes on one line ("classic benny half 13 full 17", "Caesar small 10 large 14"): one dish, both prices.
+        var two = /^(.*\S)\s+(half|small|sm|regular|reg|single|cup|glass|6\s?oz|5\s?oz)\s+\$?(\d{1,3}(?:[.,]\d{2})?)\s+(full|large|lg|double|bowl|bottle|9\s?oz|8\s?oz)$/i.exec(rest);
+        if (two && !m[3] && !unit) { rest = two[1]; price = two[3] + ' / ' + price.replace(/^\$/, ''); }
         if (NOTE_START_RE.test(rest) && last && !pending) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
         // "$16 single, $22 double. Add: beef 6" / "add bacon 2": the price at the end is an add-on's. The line is
         // more description, and the dish's own price is the first dollar amount before the "add" (if any).
@@ -52799,6 +52859,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         var ownDish = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.test(rest) && words(rest) > 6;
         // Under a capitals line, a short "18 holes, weekday 72" is its own item; a description is longer.
         var shortItem = pending && pending.caps && words(rest) < 5 && !/^[a-z(]/.test(rest);
+        if (pending && (nameLines || (namesAbove >= 4 && (byName || pairNext(idx)))) && !pending.caps && !pending.hd && nameOk(pending.text) && titleName(pending.text) && !isCapsName(rest) && !SIZE_NAME_RE.test(rest) && !NOTE_START_RE.test(rest) && words(rest) >= 2) { item(pending.text, rest, price, Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; byName = true; return; }
+        byName = false;
         if (pending && looksDesc(rest) && !(pending.caps && ownDish) && !shortItem) { item(pending.text, rest, price, Math.min(conf, pending.conf), [pending.ln, ln]); if (pending.caps) last._caps = true; pending = null; return; }
         // The price at the end of a dish's description that ran over several lines ("... house made tortilla chips 12").
         // (Unless it repeats the dish's own name, "PACHOS" ... "Pachos For One 14.95": that's a size of it.)
@@ -52841,6 +52903,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         if (cur && !cur.items.length) { cur.note = (cur.note ? cur.note + ' ' : '') + t; }
         return;
       }
+      // (2026-11-16) Name, then a short description, then the price on its own line ("Oeufs Mimosa", "Mimosa Eggs", "$13").
+      if (pending && nameDescPrice && !pending.caps && !pending.hd && nameOk(pending.text) && nextPriceOnly(idx)) { item(pending.text, t, '', Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; return; }
       flush(true);
       pending = { text: t, conf: conf, ln: ln };
     });
