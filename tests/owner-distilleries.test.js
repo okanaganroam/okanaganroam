@@ -473,11 +473,11 @@ test('fe1 wording: “Tours & events” on a distillery’s page, edit page and 
   const tours = app.DISTILLERY_SETUP_HELP_TOPICS.find((x) => x.id === 'distillery-tours');
   assert.match(tours.a, /Tours, classes and events/); assert.doesNotMatch(tours.a, /Weekly nights/);
   assert.match(tours.aFr, /Visites, ateliers et événements/); assert.doesNotMatch(tours.aFr, /Soirées de la semaine/);
-  // A brewery's page and list keep "Weekly nights" and "Your taproom answers".
+  // A brewery's page says "Weekly events" (brewery test 3 on Whistler) and its list keeps "Your taproom answers".
   const b = mk('brewery'); const tb = tokenFor(b.id);
   await change(tb, { brewery_info: { to_go: ['cans'] }, flight_fee: 10 });
   await change(tb, { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', start: '19:00' }] });
-  assert.match((await get(`/kelowna/breweries/${b.slug}`)).text, /<h2 id="venueNightsTitle">Weekly nights<\/h2>/);
+  assert.match((await get(`/kelowna/breweries/${b.slug}`)).text, /<h2 id="venueNightsTitle">Weekly events<\/h2>/);
   assert.match(app.ownerVenueActivity(b.id, 12, 'en').map((x) => x.title).join(' | '), /your taproom answers.*flight price|flight price.*your taproom answers/i);
 });
 
@@ -839,12 +839,12 @@ test('fe3 #5 the edit page Plan your visit: the lines the setup writes, one writ
   await change(t, { visit_rows: { known_for: 'Small-batch gin and craft cocktails', dogs: 'Dogs welcome on the patio' } });
   let html = await editPage(t);
   const box = /<details class="op-fold op-sec" id="visit"[\s\S]*?<\/details>/.exec(html)[0];
-  assert.deepEqual([...box.matchAll(/<label for="(opVisit\w+)">([^<]*)<\/label>/g)].map((m) => `${m[1]}=${m[2]}`), ['opVisitKnown=Known for', 'opVisitGroups=Good to know', 'opVisitDogs=Dogs']);
+  assert.deepEqual([...box.matchAll(/<label for="(opVisit\w+)">([^<]*)<\/label>/g)].map((m) => `${m[1]}=${m[2]}`), ['opVisitKnown=Known for', 'opVisitGroups=Groups and good to know', 'opVisitDogs=Dogs']);
   assert.match(box, /placeholder="e\.g\. Small-batch gin and craft cocktails"/);
   assert.match(box, /<strong>Tastings:<\/strong> \$16 a tasting\./);
   assert.match(box, /<strong>To go:<\/strong> Bottles to go\./);
   assert.match(box, /<strong>Food:<\/strong> Small plates from our own kitchen; it closes at 8 PM\./);
-  assert.match(box, /<strong>Kids &amp; dogs:<\/strong> Minors welcome with an adult until 7 PM\./);
+  assert.match(box, /<strong>Kids:<\/strong> Minors welcome with an adult until 7 PM\./);
   assert.match(box, new RegExp(`open <a href="/owner/${t}/setup">Set up your page</a> and tap Change an answer`));
   assert.match(box, /6 of 7 lines filled in/);
   assert.doesNotMatch(box, /Reservations|Takeout and delivery|Dietary note/);

@@ -214,7 +214,9 @@ test('a happy hour on a day closed only in a short second period says “(when o
   ok(await change(t, { hours_seasons: [SPRING] }));
   const row = db.prepare('SELECT hours, happy_hour_times FROM venues WHERE id = ?').get(v.id);
   assert.equal(app.happyHourOnClosedDay(v.id, row.hours, row.happy_hour_times), true);
-  assert.match(plain(page(v, 'en', at('2027-01-11'))), /\(when open\)/);
+  // Brewery test 3 (Whistler): the page says it only inside that period (it said "(when open)" all year).
+  assert.doesNotMatch(plain(page(v, 'en', at('2027-01-11'))), /\(when open\)/);
+  assert.match(plain(page(v, 'en', at('2027-04-28'))), /\(when open\)/);
   // Monday 3 PM in the spring period: closed, and no happy hour claimed (it read "Open now · Closes 9 PM · Happy hour on now").
   const mon = plain(page(v, 'en', at('2027-04-26')));
   assert.doesNotMatch(mon, /Happy hour on now/);
@@ -458,7 +460,8 @@ test('a “Tour” kind for breweries; Build My Trip plans the stop around the t
 test('“Weekly events” over a daytime item; “Weekly nights” stays for evening-only lists', async () => {
   const v = dan(); const t = tokenFor(v.id);
   ok(await change(t, { weekly_nights: [{ days: ['wed'], kind: 'trivia', title: 'Trivia', start: '19:00' }] }));
-  assert.match(page(v), /<h2 id="venueNightsTitle">Weekly nights<\/h2>/);
+  // Brewery test 3 (Whistler): a brewery's card is "Weekly events" whatever the time; pubs keep "Weekly nights" for evenings.
+  assert.match(page(v), /<h2 id="venueNightsTitle">Weekly events<\/h2>/);
   ok(await change(t, { weekly_nights: [{ days: ['wed'], kind: 'trivia', title: 'Trivia', start: '19:00' }, { days: ['sat'], kind: 'tour', title: 'Brewery tour', start: '13:00' }] }));
   assert.match(page(v), /<h2 id="venueNightsTitle">Weekly events<\/h2>/);
   assert.match(page(v, 'fr'), /<h2 id="venueNightsTitle">Événements de la semaine<\/h2>/);
@@ -473,13 +476,13 @@ test('help for breweries: no kitchen, bring your own food, growlers, tours, non-
   const v = dan(); const t = tokenFor(v.id);
   const hb = helpBot((await get(`/owner/${t}/setup`)).text);
   const want = [
-    ['we don\'t have a kitchen, food truck on weekends', 'brewery-food-trucks'], ['can people bring their own food', 'brewery-food-trucks'], ['outside food', 'brewery-food-trucks'],
+    ['we don\'t have a kitchen, food truck on weekends', 'brewery-food-trucks'], ['can people bring their own food', 'brewery-outside-food'], ['outside food', 'brewery-outside-food'],
     ['growler fills', 'brewery-togo'], ['cans to go', 'brewery-togo'],
     ['tours are saturday only', 'brewery-tours'], ['where do I put our brewery tour', 'brewery-tours'],
     ['hop water and kombucha on tap, no alcohol', 'brewery-na'], ['non-alcoholic beer', 'brewery-na'],
     ['we do flights', 'brewery-price'], ['how do I update our tap list', 'brewery-taplist'], ['run club', 'weekly-nights'], ['we close early on christmas eve', 'closures'],
     // French.
-    ['nous n avons pas de cuisine, camion la fin de semaine', 'brewery-food-trucks'], ['peut-on apporter sa propre nourriture', 'brewery-food-trucks'], ['remplissage de growlers', 'brewery-togo'],
+    ['nous n avons pas de cuisine, camion la fin de semaine', 'brewery-food-trucks'], ['peut-on apporter sa propre nourriture', 'brewery-outside-food'], ['remplissage de growlers', 'brewery-togo'],
     ['où mettre la visite de la brasserie', 'brewery-tours'], ['eau houblonnée et kombucha, sans alcool', 'brewery-na'], ['deux intersaisons avec des heures différentes', 'brewery-seasonal-hours'],
   ];
   for (const [q, id] of want) assert.equal(hb.best(q).id, id, q);

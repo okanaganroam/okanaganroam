@@ -427,7 +427,7 @@ test('answers in French only: the score says so, and the last screen and the Sav
   assert.match(text.en.frOnlyFinish, /in French only, so they show on your French page only\. To show them on your English page too, add them in English on your edit page\./);
   assert.match(text.fr.frOnlyFinish.replace(/[  ]/g, ' '), /en français seulement : elles paraissent sur votre page française seulement\. .* ajoutez-les en anglais sur votre page de modification\./);
   const s = CLIENT();
-  assert.match(s, /function frOnlyFinish\(\)\{ return T\.frOnlyFinish && frOnlyAny\(\) \? '<p class="su-hint" id="suFrOnlyFinish">'/);
+  assert.match(s, /function frOnlyFinish\(\)\{ var noFr = !CUR\.description_fr && T\.frOnlyFinishNoStory; return T\.frOnlyFinish && frOnlyAny\(\) \? '<p class="su-hint" id="suFrOnlyFinish"'/);
   assert.equal((s.match(/\+ frOnlyFinish\(\)/g) || []).length, 2, 'on both forms of the last screen');
   // The Saved message says it once for a French detail too.
   assert.match(s, /var any = \(out \|\| \[\]\)\.some\(function\(x\)\{ return \(!x\.title && x\.title_fr\) \|\| \(x\.detail_fr && !x\.detail\); \}\);/);
@@ -454,7 +454,7 @@ test('an event on a day closed in a stretch: the setup warns and names the stret
   assert.doesNotMatch(card(page(one, 'en', at('2026-11-17', '18:00'))), /venue-wn-shut/);
   // The setup: the events screen gets the happy hour screen's season-aware heads-up, in its own words.
   const s = CLIENT();
-  assert.match(s, /return closedWarn\(e\.days, e\.sea\) \|\| \(key === 'nights' && T\.closedWarnNight && !nightAppt\(e\) \? closedWarnAny\(e\.days, e\.sea, T\.closedWarnNight\) : ''\);/);
+  assert.match(s, /return closedWarn\(e\.days, e\.sea\) \|\| \(nAny \? closedWarnAny\(e\.days, e\.sea, T\.closedWarnNight\) : ''\);/);
   assert.match(s, /return fill\(tpl \|\| T\.closedWarnHappy, \{ days: daysInFull\(all\), when: when \}\);/);
   assert.match(text.en.closedWarnNight, /^Heads up: you’re closed on \{days\}\{when\}\. Your page says so beside it/);
   assert.match(text.fr.closedWarnNight.replace(/[  ]/g, ' '), /^Attention : vous êtes fermé le \{days\}\{when\}\. Votre page le dira à côté/);
@@ -643,10 +643,13 @@ test('venue page: "Tap list" on the section tab for a brewery with no kitchen; "
   ok(await change(k.t, { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', title_fr: 'Quiz', start: '19:30' }, { days: ['thu'], kind: 'other', title: 'Beer release', title_fr: 'Lancement de bière', start: '17:00', frequency: 'monthly-1st' }, { days: ['fri', 'sat'], kind: 'live_music', title: 'Live music', start: '21:00' }] }));
   assert.match(page(k.v, 'en', jan), /<h2 id="venueNightsTitle">Weekly events<\/h2>/);
   assert.match(page(k.v, 'fr', jan), /<h2 id="venueNightsTitle">Événements réguliers<\/h2>/);
-  // Evening-only lists keep "Weekly nights" / « Soirées de la semaine », even with one every other week.
+  // Brewery test 3 (Whistler): a brewery's evening-only list is "Weekly events" too (« Événements réguliers » with one
+  // every other week); a pub's keeps "Weekly nights" / « Soirées de la semaine ».
   ok(await change(k.t, { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', start: '19:30' }, { days: ['wed'], kind: 'bingo', title: 'Bingo', start: '18:00', frequency: 'biweekly' }] }));
-  assert.match(page(k.v, 'en', jan), /<h2 id="venueNightsTitle">Weekly nights<\/h2>/);
-  assert.match(page(k.v, 'fr', jan), /<h2 id="venueNightsTitle">Soirées de la semaine<\/h2>/);
+  assert.match(page(k.v, 'en', jan), /<h2 id="venueNightsTitle">Weekly events<\/h2>/);
+  assert.match(page(k.v, 'fr', jan), /<h2 id="venueNightsTitle">Événements réguliers<\/h2>/);
+  { const pb = mk('pub'); ok(await change(tokenFor(pb.id), { weekly_nights: [{ days: ['tue'], kind: 'trivia', title: 'Trivia', start: '19:30' }, { days: ['wed'], kind: 'bingo', title: 'Bingo', start: '18:00', frequency: 'biweekly' }] }));
+    assert.match(page(pb, 'en', jan), /<h2 id="venueNightsTitle">Weekly nights<\/h2>/); assert.match(page(pb, 'fr', jan), /<h2 id="venueNightsTitle">Soirées de la semaine<\/h2>/); }
   // A weekly 5 PM event alone: "Weekly events" / « Événements de la semaine ».
   ok(await change(k.t, { weekly_nights: [{ days: ['thu'], kind: 'other', title: 'Cask night', start: '17:00' }] }));
   assert.match(page(k.v, 'en', jan), /<h2 id="venueNightsTitle">Weekly events<\/h2>/);

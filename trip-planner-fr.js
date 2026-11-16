@@ -385,9 +385,13 @@ function placesFor(taxonomy) {
   const venues = Array.isArray(taxonomy.venues) ? taxonomy.venues : [];
   const key = JSON.stringify([taxonomy.regions, taxonomy.regionLabels, venues.map((v) => v && v.name)]);
   if (PLACES_CACHE.has(key)) return PLACES_CACHE.get(key);
+  // Brewery test 3 (Whistler, 2026-11-16): each name without its bracket part too ("Microbrasserie du Lac Vert" for
+  // "Microbrasserie du Lac Vert (test)": « lac » was translated to "lake" inside the name).
+  const seenNames = new Set();
   const names = venues
-    .map((v) => di.normalizeDiscoveryText(v && v.name).split(' ').filter(Boolean))
-    .filter((w) => w.length >= 2);
+    .flatMap((v) => { const n = String((v && v.name) || ''), bare = n.replace(/\s*\([^)]*\)/g, ' '); return bare !== n ? [n, bare] : [n]; })
+    .map((n) => di.normalizeDiscoveryText(n).split(' ').filter(Boolean))
+    .filter((w) => w.length >= 2 && !seenNames.has(w.join(' ')) && seenNames.add(w.join(' ')));
   const regions = new Set();
   for (const slug of Array.isArray(taxonomy.regions) ? taxonomy.regions : []) regions.add(String(slug).replace(/-/g, ' '));
   for (const label of Object.values(taxonomy.regionLabels || {})) regions.add(di.normalizeDiscoveryText(String(label)));

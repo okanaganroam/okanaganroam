@@ -188,7 +188,10 @@
     if (key === 'specials') return [closedWarn(e.days, e.sea), specialHoursWarn(e)].filter(Boolean).join(' ');
     // Brewery test 2 (Whistler, 2026-11-16): an event on a day closed in the usual week or in a stretch of other hours gets
     // the happy hour screen's heads-up (it names the stretch); the page marks the event "(not Oct 13 – Nov 26)" meanwhile.
-    return closedWarn(e.days, e.sea) || (key === 'nights' && T.closedWarnNight && !nightAppt(e) ? closedWarnAny(e.days, e.sea, T.closedWarnNight) : '');
+    // Brewery test 3: an event on a day closed all year and on another closed only in a stretch names both, apart.
+    var nAny = key === 'nights' && T.closedWarnNight && !nightAppt(e);
+    if (nAny && closedWarnAny(e.days, e.sea, T.closedWarnNight, true)) return closedWarnAny(e.days, e.sea, T.closedWarnNight);
+    return closedWarn(e.days, e.sea) || (nAny ? closedWarnAny(e.days, e.sea, T.closedWarnNight) : '');
   }
   // True when the happy hour falls in the break between two times of a day it runs (the usual week).
   function happySplitGap(e){
@@ -282,18 +285,26 @@
     var n = list.map(longDay); if (n.length < 2) return n.join('');
     return C.lang === 'fr' ? n.slice(0, -1).join(', le ') + ' et le ' + n[n.length - 1] : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
   }
-  function closedWarnAny(days, sea, tpl){
-    if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return '';
+  function closedWarnAny(days, sea, tpl, wantMixed){
+    if (!S.week || !DAYS.some(function(d){ return S.week[d]; })) return wantMixed ? false : '';
     var M = seaMonths(sea), P = (S.seaList || [S.sea]).filter(function(o){ return o && o.on && o.week; }), hasSea = P.length > 0, usual = false, hit = [];
     for (var i = 1; i <= 12; i++) if (M[i]) { var inP = false; P.forEach(function(o){ if (o.months[i]) { inP = true; if (hit.indexOf(o) < 0) hit.push(o); } }); if (!inP) usual = true; }
     var seas = hit.length > 0;
     var inUsual = DAYS.filter(function(d){ return days[d] && usual && !S.week[d]; }), inSea = DAYS.filter(function(d){ return days[d] && hit.some(function(o){ return !o.week[d]; }); });
     var all = DAYS.filter(function(d){ return inUsual.indexOf(d) >= 0 || inSea.indexOf(d) >= 0; });
-    if (!all.length) return '';
+    if (!all.length) return wantMixed ? false : '';
     var onlyUsual = all.every(function(d){ return inSea.indexOf(d) < 0; }), onlySea = all.every(function(d){ return inUsual.indexOf(d) < 0; });
     // The period(s) that close one of those days ("closed on Monday (from Oct 13 to Nov 26 and from Apr 19 to May 14)").
     var shutIn = hit.filter(function(o){ return all.some(function(d){ return !o.week[d]; }); });
     var when = hasSea && seas && usual ? (onlyUsual ? T.closedWarnUsual : onlySea ? seaWhenList(shutIn) : '') : '';
+    // Brewery test 3 (Whistler, 2026-11-16): days closed all year mixed with days closed only in a stretch are named apart
+    // ("closed on Monday and Tuesday, and on Wednesday from Apr 13 to May 20"), never as one flat list.
+    var seaOnly = all.filter(function(d){ return inUsual.indexOf(d) < 0; });
+    if (wantMixed) return !!(inUsual.length && seaOnly.length);
+    if (inUsual.length && seaOnly.length && T.closedWarnMix) {
+      var wl = seaWhenList(hit.filter(function(o){ return seaOnly.some(function(d){ return !o.week[d]; }); })).replace(/^\s*\(/, '').replace(/\)$/, '');
+      return fill(tpl || T.closedWarnHappy, { days: daysInFull(inUsual) + fill(T.closedWarnMix, { days: daysInFull(seaOnly), when: wl }), when: '' });
+    }
     return fill(tpl || T.closedWarnHappy, { days: daysInFull(all), when: when });
   }
   // Cocktail test 3 (2026-11-14): a kitchen time later than a day's closing (Sunday closes at 10 PM, kitchen 11 PM) gets
@@ -451,15 +462,21 @@
   // Brewery test 3 (2026-11-13): a cidery reads cider words, and a distillery or a place that hasn't picked its kind yet
   // reads neutral ones (T.kindCidery / T.kindNeutral over the brewery words); a brewery or a taphouse keeps the beer words.
   var T0 = T;
+  // Brewery test 3 (Whistler, 2026-11-16): an address pasted into the pre-filled box ("https://a.com/https://a.com/on-tap")
+  // keeps the last one. One inside a query (…?u=https://…) is left alone.
+  function lastHttp(u){ u = String(u || ''); var re = /https?:\/\//gi, m, last = -1, n = 0; while ((m = re.exec(u))) { n++; last = m.index; } return n > 1 && last > 0 && !/[=?&]$/.test(u.slice(0, last)) ? u.slice(last) : u; }
   function kindWords(){
     if (!C.brewery) return;
     var k = S.place || CUR.place_type || '';
     // Distilleries (2026-11-13): spirits words (T.kindDistillery). A brewery whose kind is Distillery keeps the neutral ones.
     var ov = C.distillery && T0.kindDistillery ? T0.kindDistillery : k === 'Cidery' ? T0.kindCidery : (k === 'Brewery' || k === 'Taphouse or beer hall') ? null : T0.kindNeutral;
-    if (!ov) { T = T0; return; }
+    // Brewery test 3 (Whistler, 2026-11-16): once the owner has said there is no kitchen of their own, the menu step says
+    // "tap list" (cider list, drinks list, cocktail list) on its buttons and sub-screens, never "menu" (T.tapWords).
+    var tw = BI.food && BI.food !== 'kitchen' ? (ov ? ov.tapWords : T0.tapWords) || null : null;
+    if (!ov && !tw) { T = T0; return; }
     var t = {};
     Object.keys(T0).forEach(function(key){ t[key] = T0[key]; });
-    Object.keys(ov).forEach(function(key){ var a = T0[key], b = ov[key]; t[key] = b && typeof b === 'object' && a && typeof a === 'object' ? Object.assign({}, a, b) : b; });
+    [ov, tw].forEach(function(o2){ if (o2) Object.keys(o2).forEach(function(key){ var a = t[key], b = o2[key]; t[key] = b && typeof b === 'object' && !Array.isArray(b) && a && typeof a === 'object' ? Object.assign({}, a, b) : b; }); });
     T = t;
   }
   // Restaurant test 2 (Whistler, 2026-11-14): "sushi", "izakaya" or "ramen" finds Japanese (C.cuisineAliases), from 3 letters.
@@ -564,7 +581,9 @@
   }
   // A brewery's one-of-a-few answers (data-bpick="food:trucks") and on/off chips (data-btogo).
   // `after`: html shown right under one choice (the food-truck chips under "Food trucks").
-  function bpicks(key, keys, labels, subs, after){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>' + (after && after[k] ? after[k] : ''); }).join('') + '</div>'; }
+  // Brewery test 3 (Whistler, 2026-11-16): subsOn: a choice's small line shows only while it is the one picked (the
+  // Food trucks line sat open under the unpicked option).
+  function bpicks(key, keys, labels, subs, after, subsOn){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] && (!subsOn || on) ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>' + (after && after[k] ? after[k] : ''); }).join('') + '</div>'; }
   function bchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.brew[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   // "$12" / "12 $".
   function flightText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
@@ -996,7 +1015,7 @@
   function go(step, replace){
     var sv = /^saved:(.+)$/.exec(step);
     if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); S.flashStory = sv[1] === 'story' ? S.storySent || '' : ''; return after(sv[1]); }
-    var fl = S.flash || ''; S.flash = '';
+    var fl = S.flash || ''; S.flash = ''; S.nightUndo = null;
     step = entry(step); S.fresh = false;
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
     // not back on the screen just saved.
@@ -1351,7 +1370,9 @@
   function frOnlyAny(){
     return !!(S.score && S.score.frOnly) || (CUR.specials || []).some(function(x){ return x && !x.title && x.title_fr; }) || (S.nightsSaved || CUR.weekly_nights || []).some(function(x){ return x && ((!x.title && x.title_fr) || (x.detail_fr && !x.detail)); });
   }
-  function frOnlyFinish(){ return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish">' + h(T.frOnlyFinish) + '</p>' : ''; }
+  // Brewery test 3 (Whistler, 2026-11-16): with no French story on the page there is no French page yet (/fr goes to the
+  // English one), so the line says what really happens instead of "they show on your French page only".
+  function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
     var out = [], seen = {};
     // Never an item she already answered or sent (pub fresh-eyes, 2026-11-10: Takeout ticked on "What you offer" and a
@@ -1609,7 +1630,9 @@
       x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + (sea2 && seaSpan(sea2) ? '<p class="su-sent su-seasonnow" id="suSeasonNow2">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea2) })) + '</p>' : '') + msgs()
         // Pub test 3 (Whistler, 2026-11-14): with a season stored, "Change my Apr 20 – Jun 30 hours" opens it with its own
         // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
-        + '<div class="su-stack">' + big('✓', T.allYearYes, '', false, 'yearAll') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
+        // Brewery test 3 (Whistler, 2026-11-16): back to change one day with stretches stored, the first button keeps them
+        // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
+        + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), the same screen again.
           + (stS.length < 2 && S.seaList.length < 2 && T.seaAdd ? big('🍂', T.seaAdd, T.seaAddSub, true, 'yearSeasonAdd') : '') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
@@ -1793,7 +1816,7 @@
         + '<h2 class="su-h2">' + h(T.tfoodQ) + '</h2><p class="su-hint">' + h(T.tfoodLead) + '</p>') + (S.foodGuessed && bw.food === S.foodGuessed && !BI.food ? '<p class="su-sent su-research" id="suFoodGuess">' + h(T.foodGuess) + '</p>' : '')
         // Brewery test 2 (2026-11-13): "Most days" / "Weekends only" right under Food trucks, the only food-truck detail.
         + bpicks('food', ['kitchen', 'trucks', 'snacks', 'none'], T.tfoods, T.tfoodSubs, bw.food === 'trucks' && T.ttrucks ? { trucks: '<div class="su-day" id="suTrucksQ" style="margin:2px 0 6px"><p class="su-q" style="margin-top:0">' + h(T.ttrucksQ) + '</p>'
-          + (S.trucksGuessed && bw.trucks === S.trucksGuessed && !BI.trucks ? '<p class="su-sent su-research" id="suTrucksGuess">' + h(T.trucksGuess) + '</p>' : '') + bchips('trucks', ['most_days', 'weekends'], T.ttrucks, T.ttrucksQ) + '</div>' } : null)
+          + (S.trucksGuessed && bw.trucks === S.trucksGuessed && !BI.trucks ? '<p class="su-sent su-research" id="suTrucksGuess">' + h(T.trucksGuess) + '</p>' : '') + bchips('trucks', ['most_days', 'weekends'], T.ttrucks, T.ttrucksQ) + '</div>' } : null, true)
         + (bw.food === 'kitchen' ? '<div class="su-day" id="suKitchenQ" style="margin-top:12px"><p class="su-q" style="margin-top:0">' + h(T.tkitchenQ) + '</p>' + bchips('kmode', ['same', 'earlier'], T.tkitchenOpts, T.tkitchenQ)
           + (bw.kmode === 'earlier' ? '<div class="su-times" style="margin-top:10px"><label class="su-q" for="suKto" style="margin:0">' + h(T.tkitchenAt) + '</label> <input type="time" id="suKto" value="' + h(bw.kcloses || beforeClose()) + '"></div>' : '') + '</div>'
           // Brewery test 2 (Whistler, 2026-11-16): with a stretch of other hours on file, the pub's seasonal kitchen
@@ -2089,7 +2112,8 @@
       // A plainly stated weekly event ("Trivia Tuesdays") is filled in as a suggestion; nothing is saved until Save.
       if (C.brewery && !S.nights.length && !S.done.music && !S.nightsGuessSet && (C.suggestNights || []).length) { S.nightsGuessSet = true; S.nightsGuessed = true; C.suggestNights.forEach(function(g){ var dd = {}; g.days.forEach(function(d){ dd[d] = true; }); S.nights.push({ days: dd, kind: g.kind, what: (T.kinds || {})[g.kind] || '', start: g.start || '' }); }); }
       if (!S.nights.length) S.nights.push({ days: {}, kind: '', what: '', start: '' });
-      x = q(T.musicTypeQ, T.upTo7) + msgs() + ((S.nightsFr || []).length ? frOnlyHint('suNightsFr') : '') + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
+      var nuT = S.nightUndo && T.nightUndoBtn ? String(S.nightUndo.e.what || (T.kinds || {})[S.nightUndo.e.kind] || '').split(',')[0].trim() : '';
+      x = q(T.musicTypeQ, T.upTo7) + msgs() + (S.nightUndo && T.nightUndoBtn ? '<p class="su-sent su-undo" id="suNightUndo" role="status">' + h(nuT ? fill(T.nightUndo, { title: nuT }) : T.nightUndoNoName) + ' <button type="button" class="su-link" data-act="nightUndo">' + h(T.nightUndoBtn) + '</button></p>' : '') + ((S.nightsFr || []).length ? frOnlyHint('suNightsFr') : '') + (S.nightsGuessed && T.eventsGuess ? '<p class="su-sent su-research" id="suEventsGuess">' + h(T.eventsGuess) + '</p>' : (C.brewery && C.researchEvents && !S.done.music && T.eventsHint ? '<p class="su-sent su-research" id="suEventsHint">' + h(fill(T.eventsHint, { x: C.researchEvents })) + '</p>' : '')) + S.nights.map(function(e, i){
         return '<div class="su-day"><div class="su-dh"><span>' + h(fill(T.eventN, { n: i + 1 })) + '</span>' + (S.nights.length > 1 ? '<button type="button" class="su-toggle" data-rm="nights:' + i + '">' + h(T.remove) + '</button>' : '') + '</div>'
           // Cocktail test 1 (2026-11-13): a how often sent from the edit page that we are still checking says so. Pub test 3
           // (Whistler, 2026-11-14): otherwise "How often?" below shows it, so the "it stays when you save" line is gone.
@@ -2103,7 +2127,7 @@
               + (rest.length ? '<details class="su-kinds"' + (rest.indexOf(e.kind) >= 0 ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + rest.map(chip).join('') + '</div></details>' : '');
           })()
           + '<input class="su-field" id="nt' + i + '" data-nt="' + i + '" type="text" maxlength="' + (NT_MAX + NT_DETAIL_MAX + 4) + '" aria-labelledby="ntq' + i + '" value="' + h(e.what) + '"' + (e.kind === 'other' ? ' placeholder="' + h(T.otherPh) + '"' : '') + '>'
-          + '<p class="su-hint su-count" id="nth' + i + '" aria-live="polite"' + (ntHint(e.what) ? '' : ' hidden') + '>' + h(ntHint(e.what)) + '</p>' + (i === 0 ? ex(T.eventEx) : '')
+          + '<p class="su-hint su-count" id="nth' + i + '" aria-live="polite"' + (ntHint(e.what, e.kind) ? '' : ' hidden') + '>' + h(ntHint(e.what, e.kind)) + '</p>' + (i === 0 ? ex(T.eventEx) : '')
           // Distillery test 2 (2026-11-13): a tour or class may be "By appointment" (no day): next to the day chips.
           + '<p class="su-q">' + h(T.whichNights) + '</p>' + (nightAppt(e) ? '' : dayChips(e.days, 'nights.' + i))
           + (apptKind(e.kind) ? '<div class="su-samerow" style="margin:8px 0 0"><button type="button" class="su-toggle" id="suAppt' + i + '" aria-pressed="' + (nightAppt(e) ? 'true' : 'false') + '" data-act="ntAppt:' + i + '">' + h(T.byAppt) + '</button></div>' : '')
@@ -2559,15 +2583,24 @@
   // name, as before; longer text is the name up to its first comma (or . ; : –) and the rest is kept as the event's detail
   // (the edit page's own box, 80 letters), shown under the name. A counter says how much room is left.
   var NT_MAX = 40, NT_DETAIL_MAX = 80, NT_COUNT_FROM = 28;
-  function ntSplit(text){
+  // Brewery test 3 (Whistler, 2026-11-16): "Live music, local bands, no cover" (33 letters) stayed one long name. A
+  // shorter text is split too, but only at its first comma and only when what comes before it is the name of the kind
+  // picked on that event ("Live music", "Trivia"); any other name with a comma ("Tacos, trivia and tunes") stays whole.
+  function ntSplit(text, kind){
     var t = String(text || '').trim().replace(/\s+/g, ' ');
-    if (t.length <= NT_MAX) return { title: t, detail: '' };
+    if (t.length <= NT_MAX) {
+      var c = t.indexOf(','), head = c > 0 ? t.slice(0, c).trim().toLowerCase() : '', rest = c > 0 ? t.slice(c + 1).trim() : '';
+      var kn = head && rest && kind && kind !== 'other' ? [(T.kinds || {})[kind], (C.nightKindsEn || {})[kind]].filter(Boolean).map(function(x){ return String(x).toLowerCase(); }) : [];
+      if (kn.indexOf(head) >= 0) return { title: t.slice(0, c).trim(), detail: rest.charAt(0).toUpperCase() + rest.slice(1), short: true };
+      return { title: t, detail: '' };
+    }
     var m = /^(.{2,40}?)(?:[,;:.!?]\s+|\s[–—-]\s+)(\S.*)$/.exec(t);
     if (!m) return { title: t, detail: '', long: true };
     var d = m[2].trim(); return { title: m[1].trim(), detail: d.charAt(0).toUpperCase() + d.slice(1) };
   }
-  function ntHint(text){
+  function ntHint(text, kind){
     var t = String(text || '').trim().replace(/\s+/g, ' '), n = t.length;
+    if (n <= NT_MAX && kind && ntSplit(t, kind).short) return fill(T.eventSplit || '', ntSplit(t, kind));
     if (n <= NT_MAX) return n >= NT_COUNT_FROM && T.eventLeft ? fill(NT_MAX - n === 1 ? T.eventLeft1 : T.eventLeft, { n: NT_MAX - n }) : '';
     var sp = ntSplit(t); if (sp.long) return T.eventLong || '';
     return sp.detail.length > NT_DETAIL_MAX ? T.eventDetailLong || '' : fill(T.eventSplit || '', sp);
@@ -2585,7 +2618,7 @@
       if (!title) { S.nudge = T.needText; return render(); }
       var ns = seaOut(e.sea); if (!ns.ok) { S.nudge = ns.why; return render(); }
       if (e.orig && e.was === nightKey(e)) { out.push(e.orig); continue; }
-      var sp = ntSplit(title);
+      var sp = ntSplit(title, e.kind);
       if (sp.long) { S.nudge = T.eventLong || fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
       if (sp.detail.length > NT_DETAIL_MAX) { S.nudge = T.eventDetailLong || fill(T.textLong, { n: i + 1, max: 40 }); return render(); }
       title = sp.title;
@@ -2850,7 +2883,7 @@
     // Pub test 2 (Whistler, 2026-11-14): with other hours stored, "Yes, all year" first says which dates would go and asks
     // (one tap removed Marc's Oct 15 – Nov 25 hours without a word). "No, keep them" saves the usual hours and keeps them.
     if (k === 'yearAll' && storedSeas().length) { S.dropI = null; return go('hours:yeardrop'); }
-    if (k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
+    if (k === 'yearKeep' || k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
     if (k === 'yearDropYes') k = 'yearAll';
     // Brewery test 1 (Whistler, 2026-11-15): a second period; "Copy the hours from …"; removing one of two (asked first).
     if (k === 'yearSeasonAdd') { seaAddStart(); return go('hours:season2'); }
@@ -3027,7 +3060,7 @@
     if (k === 'menuCam') return el('suMenuCam').click();
     if (k === 'sendMenuFiles') return sendPages(S.menuFiles, null, 'menu', T.menuNote);
     if (k === 'sendMenuPages') return sendPages(S.menuPages, null, 'menu', T.menuNote);
-    if (k === 'menuWebSave') { var u = el('suUrl').value.trim(); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
+    if (k === 'menuWebSave') { var u = lastHttp(el('suUrl').value.trim()); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
     if (k === 'menuEmailDone') return record('menu', 'email');
     if (k === 'menuDaily') {
       // Café test 2 (2026-11-11): saved as the café's answer (cafe_info.menu_daily), live at once; never the type-up queue.
@@ -3055,7 +3088,7 @@
     if (k === 'sheetCamGo') { S.sheetFiles = []; S.hist.push(S.step); S.step = v + ':sheet'; render(); return el('suSheetCam').click(); }
     if (k === 'sendSheet') { var what = v === 'happy' ? T.whatHappy : T.whatSpecials; return sendPages(S.sheetFiles, v === 'happy' ? 'happy_hour' : 'specials', v, fill(T.sheetNote, { what: what })); }
     if (k === 'sheetWebSave') {
-      var url = el('suUrl').value.trim(); S.webUrl = url; if (!url) { S.nudge = T.webEmpty; return render(); }
+      var url = lastHttp(el('suUrl').value.trim()); S.webUrl = url; if (!url) { S.nudge = T.webEmpty; return render(); }
       if (S.busy) return; S.busy = true; S.error = ''; render();
       return post(C.base + '/menu/help', { note: fill(T.sheetWebNote, { what: v === 'happy' ? T.whatHappy : T.whatSpecials, url: url }), sheet: v === 'happy' ? 'happy_hour' : 'specials', contact_email: '', contact_phone: '' })
         .then(function(j){ if (j && j.ok) return progress(v, 'day').then(function(ok){ S.busy = false; if (!ok) return render(); S.webUrl = null; go('saved:' + v); }); S.busy = false; S.error = why(j); render(); });
@@ -3197,6 +3230,7 @@
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
       return saveAll('offer', [{ visit_rows: { dogs: S.dogNote } }], null, offerNext('offer:dogs'), function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.dogs = S.dogNote; S.dogGuessed = false; C.visitResearch = (C.visitResearch || []).filter(function(k){ return k !== 'dogs'; }); });
     }
+    if (k === 'nightUndo') { readEntries(); var nu = S.nightUndo; S.nightUndo = null; if (nu && S.nights.length < 7) S.nights.splice(Math.min(nu.i, S.nights.length), 0, nu.e); return render(); }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
     if (k === 'specialsSave') return specialsSave();
@@ -3591,14 +3625,25 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-zoom]'), function(im){ im.onclick = function(){ var bx = im.parentNode; bx.className = bx.className === 'su-zoomed' ? '' : 'su-zoomed'; }; });
     // A kind fills in its name while the box is empty or still holds another kind's name. "Something else" (pub test 6)
     // empties the box and puts the cursor in it, with "Type the name, e.g. Meat draw" (it used to type "Something else").
-    Array.prototype.forEach.call(screen.querySelectorAll('input[data-nt]'), function(inp){ inp.addEventListener('input', function(){ var c = el('nth' + inp.getAttribute('data-nt')); if (!c) return; var t = ntHint(inp.value); c.textContent = t; c.hidden = !t; }); });
+    // Brewery test 3 (Whistler, 2026-11-16): « Ce texte est en anglais… » goes as soon as she types over the English line
+    // (it stayed under Known for after French was typed); it comes back if she puts the stored line back.
+    Array.prototype.forEach.call(screen.querySelectorAll('p.su-enhint'), function(hint){
+      var f = hint.nextElementSibling, n = 0;
+      while (f && n++ < 8 && !(f.matches && f.matches('input.su-field, textarea.su-field'))) { var inner = f.querySelector ? f.querySelector('input.su-field, textarea.su-field') : null; if (inner) { f = inner; break; } f = f.nextElementSibling; }
+      if (!f || !f.addEventListener || !(f.matches && f.matches('input.su-field, textarea.su-field'))) return;
+      var was = f.value; f.addEventListener('input', function(){ hint.hidden = f.value !== was; });
+    });
+    Array.prototype.forEach.call(screen.querySelectorAll('input[data-nt]'), function(inp){ inp.addEventListener('input', function(){ var c = el('nth' + inp.getAttribute('data-nt')); if (!c) return; var t = ntHint(inp.value, (S.nights[+inp.getAttribute('data-nt')] || {}).kind); c.textContent = t; c.hidden = !t; }); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-kind]'), function(b){ b.onclick = function(){
       readEntries(); var q2 = b.getAttribute('data-kind').split(':'), e = S.nights[+q2[0]], kindName = false;
       for (var kk in T.kinds) if (Object.prototype.hasOwnProperty.call(T.kinds, kk) && T.kinds[kk] === (e.what || '').trim()) kindName = true;
       e.kind = q2[1];
       if (q2[1] === 'other') { if (kindName) e.what = ''; render(); var nb = el('nt' + q2[0]); if (nb) { try { nb.focus({ preventScroll: true }); } catch (x) { nb.focus(); } nb.scrollIntoView({ block: 'center' }); } return; }
       if (!e.what || kindName) { e.what = T.kinds[q2[1]]; (S.chipFilled = S.chipFilled || {})['nt' + q2[0]] = e.what; } render(); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-rm]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-rm').split(':'); S[q2[0]].splice(+q2[1], 1); render(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-rm]'), function(b){ b.onclick = function(){ readEntries(); var q2 = b.getAttribute('data-rm').split(':'), gone = S[q2[0]].splice(+q2[1], 1);
+      // Brewery test 3 (Whistler, 2026-11-16): "Remove" on an event deleted at once; one line with Undo puts it back.
+      if (q2[0] === 'nights' && gone.length) S.nightUndo = { i: +q2[1], e: gone[0] };
+      render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-del]'), function(b){ b.onclick = function(){ S.photos.splice(+b.getAttribute('data-del'), 1); S.error = ''; if (!S.photos.length) { S.step = 'photos'; } render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-pmove]'), function(b){ b.onclick = function(){ var q2 = b.getAttribute('data-pmove').split(':'), i = +q2[0], j = i + +q2[1]; if (j < 0 || j >= S.photos.length) return; var t = S.photos[i]; S.photos[i] = S.photos[j]; S.photos[j] = t; render(); var nb = screen.querySelector('[data-pmove="' + j + ':' + q2[1] + '"]'); if (nb && !nb.disabled) nb.focus(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-main]'), function(b){ b.onclick = function(){ var k = +b.getAttribute('data-main'); S.photos.forEach(function(ph, i){ ph.main = i === k; }); S.keepMain = false; render(); }; });

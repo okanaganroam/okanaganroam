@@ -1668,6 +1668,61 @@ Object.assign(fr, {
   frOnlyFinish: 'Certaines de vos réponses sont en français seulement : elles paraissent sur votre page française seulement. Pour les afficher aussi sur votre page anglaise, ajoutez-les en anglais sur votre page de modification.',
 });
 
+// Brewery test 3 (Whistler, 2026-11-16; Whistler Roam drafts/fresh-eyes-brewery3-2026-11-16/REPORT.md).
+// Every type: back on the year question with stretches of other hours stored, the first button keeps them; the happy
+// hour and events heads-up names days closed only in a stretch apart from days closed all year; an inline Undo after
+// "Remove" on an event; the last screen's French-only line when the place has no French story (its French page isn't
+// up yet, so the events show on the English page in short form).
+Object.assign(en, {
+  yearKeep: 'No change, keep my other hours',
+  closedWarnMix: ', and on {days} {when}',
+  nightUndo: 'Removed “{title}”.', nightUndoBtn: 'Undo', nightUndoNoName: 'Event removed.',
+  frOnlyFinishNoStory: 'Some of your answers are in French only. Your French page goes up once your story in French is on your page. Until then, an event shows on your English page in short form (its kind and time, like “Live music 8 PM”), and your other French-only answers don’t show yet. Add your story in French, or add these answers in English, on your edit page.',
+});
+Object.assign(fr, {
+  yearKeep: 'Aucun changement, garder mes autres heures',
+  closedWarnMix: ', et le {days} {when}',
+  nightUndo: '« {title} » retiré.', nightUndoBtn: 'Annuler', nightUndoNoName: 'Événement retiré.',
+  frOnlyFinishNoStory: 'Certaines de vos réponses sont en français seulement. Votre page française paraîtra dès que votre histoire en français sera sur votre page. D’ici là, un événement paraît sur votre page anglaise en version courte (son genre et son heure, comme « Live music 8 PM »), et vos autres réponses en français ne paraissent pas encore. Écrivez votre histoire en français à l’étape « {story} », ou ajoutez ces réponses en anglais sur votre page de modification.',
+});
+// A taproom with no kitchen of its own: the menu step's buttons, sub-screens and "sent" screen say "tap list" (a cidery
+// "cider list", a distillery "cocktail list", a kind not picked yet "drinks list"); owner-setup-client.js kindWords lays
+// these over the words once the food answer is saved and isn't "our own kitchen". All four French names are feminine.
+function tapWordsEn(x) {
+  const X = x.charAt(0).toUpperCase() + x.slice(1);
+  return {
+    menuQ: `How should we add your ${x}?`, snap: `Take photos of my ${x}`, snapSub: 'Snap your chalkboard, or each page', upload: `Upload my ${x} (a file or photos)`, web: `My ${x} is on my website`,
+    menuSocial: `My ${x} is on Facebook or Instagram`, emailQ: `Email your ${x} to us`, emailLead: `Send a photo or a file of your ${x}. Put “{name}” in the subject.`,
+    mailSubject: `${X} for {name}`, menuSentEmail: `✓ You said you’ll email your ${x}.`, menuNote: `Sent from the easy setup. Please add our ${x} to our page.`,
+    menuSentQ: `Your ${x} is sent ✓`, menuNewer: 'Want to send a newer one?', menuSent: `✓ Your ${x} is sent.`,
+    webQ: `Is this where your ${x} is?`, webLead: `We filled in your website’s address. If your ${x} has its own page, type its name after the last /.`,
+    webQEmpty: `Where is your ${x} online?`, webLabel: `${X} web address`, webEmpty: `Please type the address of your ${x}, like www.yourplace.com/menu.`,
+    upQ: `Upload your ${x}`, upQSome: `Your ${x}`, upLead: `Pick the file your ${x} is in. A file or photos both work.`, upPick: `Choose my ${x} file`, sendMenu: `Send my ${x}`,
+    camLead: `Hold your phone over the ${x} or chalkboard so it all fits.`,
+    menuSocialQ: `Where is your ${x}?`, menuSocialLead: `Paste the link to your Facebook or Instagram page or post with the ${x}. Or type the page name and we’ll find it.`,
+    savedMenuSocialName: `We’ll find your ${x} on that page and add it within a day.`,
+  };
+}
+function tapWordsFr(x) { // x: « liste des bières » (feminine)
+  const X = x.charAt(0).toUpperCase() + x.slice(1);
+  return {
+    menuQ: `Comment ajouter votre ${x}?`, snap: `Photographier ma ${x}`, snapSub: 'Votre tableau, ou chaque page', upload: `Téléverser ma ${x} (un fichier ou des photos)`, web: `Ma ${x} est sur mon site Web`,
+    menuSocial: `Ma ${x} est sur Facebook ou Instagram`, emailQ: `Envoyez-nous votre ${x} par courriel`, emailLead: `Envoyez une photo ou un fichier de votre ${x}. Indiquez « {name} » dans l’objet.`,
+    mailSubject: `${X} de {name}`, menuSentEmail: `✓ Vous avez dit que vous enverrez votre ${x} par courriel.`, menuNote: `Envoyé depuis la configuration simple. Merci d’ajouter notre ${x} à notre page.`,
+    menuSentQ: `Votre ${x} est envoyée ✓`, menuNewer: 'Voulez-vous en envoyer une plus récente?', menuSent: `✓ Votre ${x} est envoyée.`,
+    webQ: `Votre ${x} est-elle à cette adresse?`, webLead: `Nous avons inscrit l’adresse de votre site Web. Si votre ${x} a sa propre page, tapez son nom après le dernier /.`,
+    webQEmpty: `Où est votre ${x} en ligne?`, webLabel: `Adresse Web de la ${x}`, webEmpty: `Écrivez l’adresse de votre ${x}, comme www.votreendroit.com/menu.`,
+    upQ: `Téléversez votre ${x}`, upQSome: `Votre ${x}`, upLead: `Choisissez le fichier de votre ${x}. Un fichier ou des photos, les deux fonctionnent.`, upPick: `Choisir le fichier de ma ${x}`, sendMenu: `Envoyer ma ${x}`,
+    camLead: `Tenez votre téléphone au-dessus de la ${x} ou du tableau pour que tout soit visible.`,
+    menuSocialQ: `Où est votre ${x}?`, menuSocialLead: `Collez le lien de votre page ou publication Facebook ou Instagram avec la ${x}. Ou tapez le nom de la page et nous la trouverons.`,
+    savedMenuSocialName: `Nous trouverons votre ${x} sur cette page et l’ajouterons d’ici un jour.`,
+  };
+}
+en.brewery.tapWords = tapWordsEn('tap list'); fr.brewery.tapWords = tapWordsFr('liste des bières');
+en.brewery.kindCidery.tapWords = tapWordsEn('cider list'); fr.brewery.kindCidery.tapWords = tapWordsFr('liste des cidres');
+en.brewery.kindNeutral.tapWords = tapWordsEn('drinks list'); fr.brewery.kindNeutral.tapWords = tapWordsFr('liste des boissons');
+en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kindDistillery.tapWords = tapWordsFr('carte des cocktails');
+
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the
 // word before it. Times (7:00), addresses (https://) and anything not followed by a space or the end are left alone.

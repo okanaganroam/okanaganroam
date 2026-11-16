@@ -124,7 +124,7 @@ test('all year: with a stored season, "Yes, all year" names the dates and asks; 
   assert.match(src, /big\('✓', T\.yearAllDropKeep, T\.yearAllDropKeepSub, false, 'yearDropKeep'\) \+ big\('✕', T\.yearAllDropYes, T\.yearAllDropYesSub, true, 'yearDropYes'\)/);
   assert.match(src, /if \(k === 'yearDropYes'\) k = 'yearAll';/);
   // Keep: the stored season is put back as it is and left untouched by the save.
-  assert.match(src, /if \(k === 'yearDropKeep'\) \{[^\n]*S\.seaTouched = false; return hoursSave\(\); \}/);
+  assert.match(src, /if \(k === 'yearKeep' \|\| k === 'yearDropKeep'\) \{[^\n]*S\.seaTouched = false; return hoursSave\(\); \}/);
   assert.match(src, /'hours:yeardrop': 'yearDropKeep'/);
   assert.equal(text.fr.yearAllDropLead.replace('{span}.', 'du 15 oct. au 25 nov.'), 'Votre page a aussi d’autres heures du 15 oct. au 25 nov. Avec « Oui, toute l’année », elles sont retirées.');
   assert.match(text.en.yearAllDropLead, /\{span\}/);

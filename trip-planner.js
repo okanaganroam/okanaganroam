@@ -399,7 +399,7 @@ function buildContext(intent, labels, options) {
     collections: new Set(intent.collections || []),
     features: (intent.features || []).slice(),
     // A refused concept's own words are never a search focus, whatever produced them.
-    foodTerms: withoutConceptStrays((intent.foodTerms || []).slice(), intent.excluded),
+    foodTerms: joinNightTerms(withoutConceptStrays((intent.foodTerms || []).slice(), intent.excluded), opts.text),
     occasion,
     // Mentioning kids applies the family heuristic to ranking (labelled as a
     // heuristic in the notes) without claiming the visitor chose "family".
@@ -689,6 +689,19 @@ function ownTourTimes(v, date) {
   if (!v || !date) return [];
   return ((v.nights) || []).filter((n) => n && n.kind === 'tour' && nightOnPlanDate(n, date)).map((n) => { const m = /^(\d{2}):(\d{2})$/.exec(n.start || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }).filter((t) => t != null).sort((a, b) => a - b);
 }
+// Brewery test 3 (Whistler, 2026-11-16): "run club" was read as two words (“run” and “club”). Two request words that
+// together name a listed kind of night ("run club", "open mic", "paint night"), side by side in the request, are one term.
+function joinNightTerms(terms, text) {
+  const q = ` ${normWords(text || '')} `;
+  const out = terms.slice();
+  for (let i = 0; i < out.length; i++) for (let j = 0; j < out.length; j++) {
+    if (i === j || !out[i] || !out[j] || out[i].cuisine || out[j].cuisine) continue;
+    const both = `${out[i].term} ${out[j].term}`;
+    if (/ /.test(out[i].term) || / /.test(out[j].term) || !NIGHT_ASK_TERMS.some(([re]) => re.test(both)) || NIGHT_ASK_TERMS.some(([re]) => re.test(out[i].term)) || !q.includes(` ${both} `)) continue;
+    out[i] = { ...out[i], term: both }; out[j] = null;
+  }
+  return out.filter(Boolean);
+}
 function nightKindOfTerm(term) { const t = normWords(term || ''); const hit = NIGHT_ASK_TERMS.find(([re]) => re.test(t)); return hit ? hit[1] : null; }
 // The plan's own day ('YYYY-MM-DD') when the request named one ("tonight", "Tuesday", "tomorrow"); null otherwise.
 function ctxPlanDate(ctx) {
@@ -719,6 +732,7 @@ function venueNight(v, kind, date) {
   const on = date ? list.find((n) => nightOnPlanDate(n, date)) || null : null;
   return { on, other: on ? null : list[0] };
 }
+function nightMinutes(hhmm) { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
 function nightClock(hhmm) {
   const m = /^(\d{2}):(\d{2})$/.exec(hhmm || '');
   if (!m) return '';
@@ -1198,7 +1212,13 @@ function scoreVenue(v, ctx) {
       // Brewery test 2 (Whistler, 2026-11-16): and "Dogs on patio" when that is what the owner said.
       if (v.features.dog_friendly) add('feature', 8, v.dogsPatioOnly ? 'Dogs on patio' : v.dogsOutsideOnly ? 'Dogs outside only' : 'Has the Dog-Friendly badge');
       else if (v.collections.includes('dog_friendly')) add('feature', 8, 'Listed as an official dog-friendly beach area');
-    } else if (v.features[f]) add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
+    } else if (v.features[f]) {
+      // Brewery test 3 (Whistler, 2026-11-16): on a dated request, a place whose own listed music is on another day isn't
+      // offered for "Has the Live Music badge" (her second Friday read that way; her music is the first Friday).
+      const nmOther = f === 'live_music' && ctxPlanDate(ctx) ? venueNight(v, 'live_music', ctxPlanDate(ctx)) : null;
+      if (nmOther && !nmOther.on) add('night_other_day', -20, null);
+      else add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
+    }
     if (f === 'live_music') {
       const nm = venueNight(v, 'live_music', ctxPlanDate(ctx));
       if (nm && nm.on) { const t = nightClock(nm.on.start); add('night', 30, `Live music on ${WEEKDAY_NAMES[WEEKDAYS[(new Date(`${ctxPlanDate(ctx)}T12:00:00Z`).getUTCDay() + 6) % 7]]}${t ? ` from ${t}` : ''}, from its listing`); }
@@ -4166,10 +4186,17 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         tourStart=Math.max(0,t-15);
       }
     }
+    // Brewery test 3 (Whistler, 2026-11-16): a stop that is there for the place's own listed music (first Friday, 7 PM)
+    // starts when the music does, not at 1 PM; earlier stops lead up to it.
+    let nightLead=null;
+    if(dayStart==null&&requirements.startMinutes==null&&tourStart==null&&!group.stops.some(s=>s.event)){
+      const at=group.stops.findIndex(s=>s.venue&&s.listedNight&&nightMinutes(s.listedNight.start)!=null);
+      if(at>=0)nightLead=Math.max(540,nightMinutes(group.stops[at].listedNight.start)-at*90);
+    }
     const assumed=dayStart==null&&requirements.startMinutes==null;
     let dayToConfirm=false;
     let skiWindow=null;
-    let cursor=dayStart??options.startMinutes??requirements.startMinutes??tourStart??({morning:540,midday:720,afternoon:780,evening:1080}[first?.daypart]||({morning:540,afternoon:780,evening:1080}[requirements.daypart])||540),previous=null,provisional=false;
+    let cursor=dayStart??options.startMinutes??requirements.startMinutes??tourStart??nightLead??({morning:540,midday:720,afternoon:780,evening:1080}[first?.daypart]||({morning:540,afternoon:780,evening:1080}[requirements.daypart])||540),previous=null,provisional=false;
     // Round 7 (2026-10-19): a road trip's day that opens with a long drive leaves around 9 AM and starts its first stop
     // after the drive ("leave about 6:33 AM" for a 9 AM hike in Mount Currie after Pemberton).
     const driveIn=plan.days.find(d=>d.day===group.day)?.driveIn;
@@ -4329,7 +4356,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
-        const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0);
+        const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0,nightLead!=null&&stop.listedNight&&nightMinutes(stop.listedNight.start)!=null?nightMinutes(stop.listedNight.start):0);
         let range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
         // Round 9: before a fixed-time event (a 2 PM escape room), lunch or a walk is shortened to fit -- an hour for a
         // meal, 45 minutes for a visit -- rather than a "Timing conflict".
@@ -7931,6 +7958,10 @@ function planItinerary(input) {
   if (tripKids) for (const p of parts) p.c.kids = true;
   const stops = [];
   let anchor = null;
+  // The places in the plan's towns whose own listing has live music on the plan's date (null date: none).
+  const musicDate = (input.requirements && input.requirements.startDate) || ctxPlanDate(baseCtx) || null;
+  const musicNightOn = (v) => { const nm = musicDate ? venueNight(v, 'live_music', musicDate) : null; return nm && nm.on ? nm.on : null; };
+  const listedMusicOn = (part) => (musicDate ? facts.filter((v) => (!regions.length || regions.includes(v.region)) && LIVE_MUSIC_VENUE_TYPES.includes(v.type) && musicNightOn(v) && (nightMinutes(musicNightOn(v).start) == null || startFitsPart(nightMinutes(musicNightOn(v).start), part, !!input.requirements))) : []);
   for (const p of parts) {
     if (p.c.kind !== 'event') continue;
     const wantPart = p.c.daypart || (trip.when && trip.when.daypart) || null;
@@ -7955,10 +7986,18 @@ function planItinerary(input) {
         const date = eventAttendanceDate(e, input.tripDate);
         anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(date), daypart, date, start, location:e.location };
       }
-    } else if (p.c.event.venueFeature) {
+    } else if (p.c.event.venueFeature || (p.c.event.kind === 'live-music' && listedMusicOn(wantPart).length)) {
       // No listed event: the verified venue badge stands in, when places have it.
-      p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: [p.c.event.venueFeature], activities: [], collections: [], cuisines: [], liveMusicFallback: true };
-      result.notes.push('No live-music event is listed for those dates, so places with a verified Live Music badge are suggested instead.');
+      // Brewery test 3 (Whistler, 2026-11-16): a place whose own listing has live music on the plan's date (weekly, or
+      // "1st of the month") comes first, and is the only kind offered when there is one: the stop is planned at the
+      // music's start time and the note says where it comes from. A request with a time of day or a clock time gets
+      // this too (it said "No live-music is listed on What's On for the evening" and dropped the music).
+      const listed = listedMusicOn(wantPart);
+      const lateStart = listed.length && listed.every((v) => { const t = nightMinutes(musicNightOn(v).start); return t != null && t >= 17 * 60; });
+      p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: ['live_music'], activities: [], collections: [], cuisines: [], liveMusicFallback: true,
+        ...(listed.length ? { listedNightOnly: true, ...(p.c.daypart || !lateStart ? {} : { daypart: 'evening' }) } : {}) };
+      result.notes.push(listed.length ? 'No one-off live-music event is on What’s On for that date, so this is a place that lists live music that night on its own page.'
+        : 'No live-music event is listed for those dates, so places with a verified Live Music badge are suggested instead.');
     } else {
       const when = wantPart === 'evening' ? ' for the evening' : wantPart ? ' for the daytime' : '';
       const trackedByRequirement = input.requirements?.items?.some(i =>
@@ -7969,6 +8008,17 @@ function planItinerary(input) {
     }
   }
 
+  // Brewery test 3: "live music at a brewery" / "a brewery with live music" is one stop when a place of that kind lists
+  // music that night (it was the music at 1 PM and then a second brewery).
+  {
+    const fb = parts.find((x) => x.c.kind === 'venue' && x.c.liveMusicFallback && x.c.listedNightOnly);
+    const tied = /\b(?:live music|live bands?)\s+(?:at|in)\s+(?:an?|the|some)\s+\w+|\b(?:with|that has|that have|having|featuring)\s+(?:some\s+)?live (?:music|bands?)\b/.test(normWords((input.requirements && input.requirements.text) || input.text || ''));
+    const other = fb && tied ? parts.find((x) => x !== fb && x.c.kind === 'venue' && !x.c.meal && !x.c.venueId && !x.c.liveMusicFallback && (x.c.types || []).length && (x.c.types || []).every((t) => LIVE_MUSIC_VENUE_TYPES.includes(t))) : null;
+    if (other && listedMusicOn(fb.c.daypart || null).some((v) => other.c.types.includes(v.type))) {
+      fb.c = { ...fb.c, types: other.c.types.slice(), dog: fb.c.dog || other.c.dog, kids: fb.c.kids || other.c.kids };
+      parts.splice(parts.indexOf(other), 1);
+    }
+  }
   // The season of the trip: the chosen event's own date, else the trip date.
   const season = tripSeason((anchor && anchor.date) || input.tripDate);
   let seasonRanked = false;
@@ -8055,6 +8105,7 @@ function planItinerary(input) {
       if (c.meal && !c.venueId && notAMeal(v) && !(c.cuisines || []).length) continue; // round 12: a dessert stand is not dinner
       // Round 14 (2026-10-20): a café hop is coffee houses and bakeries, not a sub shop, juice bar or ice-cream counter.
       if (trip.crawl && v.type === 'cafe' && !c.venueId && !['coffee', 'unclear'].includes(cafeRole(v))) continue;
+      if (c.listedNightOnly && !musicNightOn(v)) continue;
       const lunchCafe = c.meal === 'lunch' && v.type === 'cafe' && !c.types.includes('cafe');
       if (lunchCafe && !['coffee', 'unclear'].includes(cafeRole(v))) continue; // a lunch café serves food, not just treats
       const s = scoreVenue(v, ctx);
@@ -8109,11 +8160,22 @@ function planItinerary(input) {
         const w = onShore ? 45 : shore ? 25 : v.features.lake_view ? 10 : 0;
         if (w) { score += w; reasons.push({ code: 'lake', text: shore ? 'By the lake' : 'Has the Lake View badge', weight: w }); }
       }
-      if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
+      // Brewery test 3: the music stop's reasons are honest about what the listing says. Music that night: the night's own
+      // line only. Dated, music listed on other days: ranked down, with its days said. Dated, the badge with no nights
+      // listed: the badge, and "check before you go". Undated: as before.
+      const fbCaveats = [];
+      if (c.liveMusicFallback) {
+        const nmAll = musicDate ? venueNight(v, 'live_music', musicDate) : null;
+        const dropBadge = () => { for (let k = reasons.length - 1; k >= 0; k--) if (reasons[k].code === 'feature' && /Live Music badge/.test(reasons[k].text || '')) reasons.splice(k, 1); };
+        if (musicNightOn(v)) { dropBadge(); score += 40; }
+        else if (nmAll && nmAll.other) { dropBadge(); score -= 40; fbCaveats.push(`Its listed live music is on ${listText((nmAll.other.days || []).map((d) => `${WEEKDAY_NAMES[d]}s`))}, not this day; check before you go`); }
+        else if (musicDate) { dropBadge(); reasons.push({ code: 'live_music', text: 'Has the Live Music badge; no music nights are listed, so check before you go', weight: 8 }); }
+        else reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
+      }
       const dogCaveat = dogSeasonCaveat(v, c);
-      const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : []);
+      const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : [], fbCaveats);
       if (kFit) { score += namedIds.has(v.id) ? 500 : -10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
-      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}) });
+      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}), ...(c.liveMusicFallback && musicNightOn(v) ? { nightOn: musicNightOn(v) } : {}) });
     }
     scored.sort(compareScored);
     // A walk by the lake is on the shore when the town has one listed.
@@ -8231,6 +8293,8 @@ function planItinerary(input) {
       activity: (c.activities || []).find((a) => (pick.v.activities || []).includes(a))
         || (pick.v.type === 'outdoor' ? (pick.v.activities || []).find((a) => ITIN_ACTIVITY_VERB[a]) : null) || null,
       ...stopFrom(pick.v, pick, extra, ctx), ...(pick.kitchenMeal ? { kitchenMeal: true } : {}),
+      // Brewery test 3: the stop is there for the place's own music that night; the schedule starts it then.
+      ...(pick.nightOn ? { listedNight: { kind: 'live_music', start: pick.nightOn.start || null } } : {}),
       alternates: alternates.map((a) => stopFrom(a.v, a, [], ctx)),
       seasonFlags: pick.seasonFlags || {}, advisory: pick.advisory, swimPart: partSeasonIntent(c).swim,
     });
@@ -8327,7 +8391,7 @@ function planItinerary(input) {
     }
   }
   const publicStop = (s) => {
-    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}), ...(s.kitchenMeal ? { kitchenMeal: true } : {}) };
+    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index, ...(s.wineryLunch ? { wineryLunch: true } : {}), ...(s.kitchenMeal ? { kitchenMeal: true } : {}), ...(s.listedNight ? { listedNight: s.listedNight } : {}) };
     if (s.kind === 'event') return { ...base, event: s.event, timeKnown: s.timeKnown, caveats: s.caveats, why: eventWhy(s.event, { id: 'part', eventKind: s.component && s.component.event ? s.component.event.kind : null, value: s.component && s.component.event && s.component.event.kind === 'live-music' ? 'live-music' : 'any' }, holidayTheme(input.text || input.requirements?.text || '')) };
     // (timed / start are internal ordering hints and stay server-side.)
     return { ...base, venue: s.venue, reasons: s.reasons, why: s.why, caveats: s.caveats, alternates: s.alternates };
