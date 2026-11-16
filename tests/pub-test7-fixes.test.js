@@ -226,8 +226,8 @@ test('5: a season from May 20 to Sep 6 is stored as days and the open status fol
   assert.equal(status('2027-05-18', '23:30').state, 'closed', 'Tue May 18: winter (closed Tuesdays)');
   assert.equal(status('2026-09-05', '23:30').state, 'open', 'Sat Sep 5, 11:30 PM');
   const s = scriptOf((await get(`/owner/${t}/setup`)).text);
-  assert.match(s, /if \(sf\.exact\) S\.sea\.exact = sf\.exact/);
-  assert.match(s, /from: S\.sea\.exact \? S\.sea\.exact\.from/);
+  assert.match(s, /var sf = seaFrom\(s\.from, s\.to\); o\.exact = sf\.exact \|\| null;/);
+  assert.match(s, /from: so\.exact \? so\.exact\.from/);
 });
 
 // ---------- 6: seasonal kitchen time ----------

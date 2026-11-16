@@ -82,7 +82,7 @@ test('A: every translated Plan your visit line still shows on French pages; Engl
 
 test('B: the setup address follows the step on screen, and a reload or language switch lands on it with the same way forward', () => {
   // Kept in step as she moves (no stale #closures from a language switch).
-  assert.match(CLIENT, /function navSync\(\)\{[\s\S]*?history\.replaceState\(\{ suNav: r \}, '', url\)/);
+  assert.match(CLIENT, /function navSync\(\)\{[\s\S]*?history\.replaceState\(S\.trap \? \{ suNav: r, suTrap: 1 \} : \{ suNav: r \}, '', url\)/);
   assert.match(CLIENT, /screen\.innerHTML = x;\n    wire\(\);\n    navSync\(\);/);
   // Screens with no step of their own (Welcome back, the end) clear the hash, so a reload shows the Welcome back list.
   assert.match(CLIENT, /url = location\.pathname \+ location\.search \+ \(r\.h \? '#' \+ r\.h : ''\)/);
@@ -97,7 +97,7 @@ test('B: the setup address follows the step on screen, and a reload or language 
 });
 
 test('C: a language switch mid-edit reopens the edit screen with the draft; unsaved answers are never shown as saved', () => {
-  assert.match(CLIENT, /if \(s0 === 'hours:edit' \|\| s0 === 'hours:season'\) return 'hours:edit';/);
+  assert.match(CLIENT, /if \(s0 === 'hours:edit' \|\| seaIsStep\(s0\)\) return 'hours:edit';/);
   assert.match(CLIENT, /if \(s0 === 'basics:edit'\) return s0;/);
   assert.match(CLIENT, /function pending\(step\)\{ return S\.dirty === step && !!DR\.restored\[step\]; \}/);
   // No "✓ Saved" line and no "Next" (which sent nothing) over a restored draft: only the screen's own Save moves on.

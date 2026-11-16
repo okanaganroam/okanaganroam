@@ -6840,6 +6840,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // trip names the time and isn't planned there after it; and hours the business saved or confirmed in the last
       // 180 days, so a stop doesn't say "check before you go" about them.
       ...(plannerKidsUntil(v) ? { kidsUntil: plannerKidsUntil(v) } : {}),
+      // Café test 2 (Whistler, 2026-11-15): the owner's own "Dogs outside only", so a trip card never says plain "Dog-friendly".
+      ...(v.dog_friendly && dogsOutsideOnly(v) ? { dogsOutsideOnly: true } : {}),
       // Brewery test 4 (2026-11-13): a brewery whose owner answered "Our own kitchen" (or a pub with a kitchen answer), with
       // its kitchen close time when earlier, so a dinner slot can be there within its kitchen hours.
       ...(plannerOwnKitchen(v, hoursDate) ? { ownKitchen: plannerOwnKitchen(v, hoursDate) } : {}),
@@ -7882,6 +7884,9 @@ function runTripPlanSkiFallback(plan, args, now) {
     return moved;
   } catch (e) { return plan; }
 }
+// Brewery test 1 (Whistler, 2026-11-15): "a brewery tour on Saturday" is still read as a run of breweries (below), and
+// the planner is also told a tour was asked for, so a place whose own tour runs that day is visited at its tour time.
+const OWN_TOUR_WORDS_RE = /\b(?:craft )?(?:beer|brewery|brewpub|brew|cider|cidery|distillery) tours?\b/i;
 function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
@@ -8337,7 +8342,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       return selectedNamedEvent ? sel.items.filter(e => e.id === selectedNamedEvent.id) : sel.items;
     });
     const plan = planner.planTrip({
-      intent, trip, tripEvents, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
+      intent, trip, tripEvents, requirements, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode,
       facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
       labels: tripPlannerLabels(),
       seed,
@@ -8385,7 +8390,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
   const plan = tripPlannerModule().planTrip({
-    intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
+    intent, requirements, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
     labels: tripPlannerLabels(),
     seed,
@@ -11016,11 +11021,14 @@ function nightOftenText(s, fr) {
 // Distillery test 1 (2026-11-13): a tour or class the place books ahead says so ("Tour at 2 PM, book ahead").
 // Distillery test 2 (2026-11-13): a tour or class reads as its event ("Distillery tour", « Visite de la distillerie »), not
 // only its kind (« Visite »): a distillery tour by its words, a plain kind name by the kind, its own title otherwise.
-const GENERIC_DAYTIME_TITLES = new Set(['tour', 'visite', 'class', 'atelier', 'distillery tour', 'visite de la distillerie']);
+const GENERIC_DAYTIME_TITLES = new Set(['tour', 'visite', 'class', 'atelier', 'distillery tour', 'visite de la distillerie', 'brewery tour', 'visite de la brasserie', 'cidery tour', 'visite de la cidrerie']);
 function daytimeTripLabel(s, fr) {
   const t = String(s.title || '').trim().toLowerCase();
   if (!GENERIC_DAYTIME_TITLES.has(t)) return nightLabel({ ...s, kind: 'other' }, fr);
   if (s.kind === 'tour' && /distill/.test(t)) return { text: fr ? 'Visite de la distillerie' : 'Distillery tour', english: false };
+  // Brewery test 1 (Whistler, 2026-11-15): a brewery's (or cidery's) tour chip reads in the page's language too.
+  if (s.kind === 'tour' && /brewery|brasserie/.test(t)) return { text: fr ? 'Visite de la brasserie' : 'Brewery tour', english: false };
+  if (s.kind === 'tour' && /cid(?:e)?r/.test(t)) return { text: fr ? 'Visite de la cidrerie' : 'Cidery tour', english: false };
   return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
 }
 // A stop's line for a place whose tours or classes are by appointment only (no day to plan them on).
@@ -20603,6 +20611,9 @@ function cafeInfoLinesHtml(venue, fr) {
   // note typed in the French setup (note_fr) shows on the French page only; the French page falls back to her English
   // note when there is no French one (it is often an allergy warning, so it is never left out).
   const dNote = fr ? (d.note_fr || d.note || '') : (d.note || '');
+  // Café test 2 leftover (Whistler, 2026-11-15): her own note that starts with the same words isn't said twice
+  // (« Rien sans gluten. Rien sans gluten : farine partout… »): the note alone says it.
+  if (d.gf_kitchen === 'none' && /^(?:rien (?:de )?sans gluten|nothing (?:is )?gluten[- ]free|no gluten[- ]free|aucune option sans gluten)(?![a-zà-ÿ])/i.test(String(dNote).trim())) dBits.shift();
   if (dBits.length || dNote) lines.push(['diet', '🌱', [dBits.length ? cafeCap(dBits.join(' · ')) : '', dNote].filter(Boolean).join(dBits.length ? '. ' : '')]);
   const c = info.coffee || {};
   const cBits = [];
@@ -36225,8 +36236,10 @@ function happyHourOnClosedDay(venueId, hoursJson, hhJson) {
     // against the summer week alone.
     const seasons = ((hoursExtrasMap().get(venueId) || {}).seasons || []).filter((p) => p && p.hours && /^\d{2}-\d{2}$/.test(p.from || '') && /^\d{2}-\d{2}$/.test(p.to || ''));
     const hs = happyHourSeasonOf(hhJson), weeks = new Set();
-    for (let m = 1; m <= 12; m++) {
-      const md = `${String(m).padStart(2, '0')}-15`;
+    const samples = []; for (let m = 1; m <= 12; m++) samples.push(`${String(m).padStart(2, '0')}-15`);
+    // Brewery test 1 (Whistler, 2026-11-15): and each set's own first and last day (Apr 19 – May 14 holds no 15th).
+    for (const p of seasons) samples.push(p.from, p.to);
+    for (const md of samples) {
       if (hs && !hoursModule.mdInRange(md, hs.from, hs.to)) continue;
       const sea = seasons.find((p) => hoursModule.mdInRange(md, p.from, p.to));
       weeks.add(sea ? JSON.stringify(sea.hours) : hoursJson);
@@ -36245,6 +36258,10 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   // Deals (2026-10-26): only with the happy_hour badge and a check from the last HH_DEALS_STALE_DAYS days.
   const deals = happyHourDealsShown(row, now) || (fr ? happyHourDealsFrenchOnly(row, now) : null);
   if (!row || (!row.happy_hour_times && !deals)) return null;
+  // Brewery test 1 (Whistler, 2026-11-15): deals on file but hidden because their check is too old: the status line doesn't
+  // claim "Happy hour on now" either (the page said it was on while the deals block had gone). The times row stays.
+  const dealsHidden = !deals && !!Number(row.happy_hour) && !!row.happy_hour_deals && !!(parseHappyHourDealsJson(row.happy_hour_deals) || parseHappyHourDealsJson(row.happy_hour_deals_fr))
+    && happyHourDealsStale(row.happy_hour_deals_checked_at, now, seasonOfHappyHour(row.happy_hour_times));
   if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
   // Brewery test 4 (2026-11-13): happy hour on a day the place is closed (all year or in a season): "(when open)".
   const week = happyHourWeekText(row.happy_hour_times, fr) + (happyHourOnClosedDay(venue.id, row.hours, row.happy_hour_times) ? (fr ? ' (les jours d’ouverture)' : ' (when open)') : '');
@@ -36264,7 +36281,7 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if (h && h.state === 'later' && ((place && place.closedToday) || happyHourOffOn(vh, clock.date, now))) h = null;
   // Countdown (2026-10-26): "Happy hour on now · ends in 1 hr 20 min" while it is on (worked out when the page is made).
   const text = h ? (happyHourOnNowText(h, clock, fr) || happyHourLiveText(h, fr, clock)) : '';
-  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), checkedAt: row.happy_hour_checked_at || null, live: h ? { state: h.state, text } : null, deals: dealsOut };
+  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), checkedAt: row.happy_hour_checked_at || null, live: h && !dealsHidden ? { state: h.state, text } : null, deals: dealsOut };
 }
 // The deals inside the Happy hour row (2026-10-26, tidied the same day): a menu-style list, the price in its own bold
 // column and the item beside it; the first HH_DEALS_VISIBLE show, the rest behind "2 more deals". One checked date at the
@@ -36502,7 +36519,10 @@ function venueWeeklyNightsHtml(wn, fr, opts = {}) {
   };
   // Distillery test 1 (2026-11-13): a distillery's are tours and classes, not nights.
   // Cocktail test 1 (2026-11-13): a lounge's are events (DJ, live music), not pub nights.
-  const label = opts.tours ? (fr ? 'Visites et événements' : 'Tours &amp; events') : opts.lounge ? (fr ? 'Événements' : 'Events') : opts.events ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
+  // Brewery test 1 (Whistler, 2026-11-15): "Weekly nights" over a 1 PM brewery tour. With a tour, a class, a run club or
+  // anything that starts before 4 PM (the "Tonight" rule above) the card says "Weekly events"; only evening items keep "Weekly nights".
+  const daytime = wn.rows.some(({ s }) => DAYTIME_NIGHT_KINDS.includes(s.kind) || s.kind === 'run_club' || (specialMinutes(s.start) !== null && specialMinutes(s.start) < 16 * 60));
+  const label = opts.tours ? (fr ? 'Visites et événements' : 'Tours &amp; events') : opts.lounge ? (fr ? 'Événements' : 'Events') : opts.events || daytime ? (fr ? 'Événements de la semaine' : 'Weekly events') : fr ? 'Soirées de la semaine' : 'Weekly nights';
   return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
 }
 // ---------- Happy hour access (2026-10-26) ----------
@@ -37266,6 +37286,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
   // (a winery's "Menu" was its restaurant's menu, also behind the Restaurant row's "More").
   const urlKey = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  const tapWords = venueTapListWords(venue, fr);
   const menuInVisitBox = !!(visitInfo && venueLinkRow.menu_url && visitInfo.rows.some((r) => r.url && urlKey(r.url) === urlKey(venueLinkRow.menu_url)));
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
@@ -37292,7 +37313,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Website and Book are the buttons above the card (cleanup, 2026-11-01); they were repeated here.
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
-    venueLinkRow.menu_url && !menuInVisitBox ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
+    // Brewery test 1 (Whistler, 2026-11-15): a brewery with no kitchen of its own has a tap list, not a food menu.
+    venueLinkRow.menu_url && !menuInVisitBox ? [tapWords ? tapWords.label : L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${tapWords ? tapWords.see : L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     (venueLinkRow.instagram_url || venueLinkRow.facebook_url || venueLinkRow.tiktok_url) ? [L('Social', 'R\u00e9seaux'), [
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
       // TikTok (pub test 9, 2026-11-10): the owner's profile, beside Instagram and Facebook.
@@ -37746,6 +37768,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
       menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(venueMenu.items, 'en', menuKind(venue)) : '',
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
+      menuWords: venueTapListWords(venue, false),
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
       weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
       weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe', tours: venue.type === 'distillery', lounge: venue.type === 'cocktail' }), extraDealsHtml,
@@ -47157,6 +47180,7 @@ function venueLinks(venueId) {
 // map, the venue page, Build My Trip, the classic browse cards) applies them on the right dates. Read once a minute
 // from the small table and dropped on every write, like venueSocialLinks.
 const HOURS_SEASON_MAX = 2;
+const OWNER_SEASONS_OVERLAP = 'Your two sets of other hours share some dates. Please pick dates that don’t overlap.';
 const HOURS_CLOSURE_MAX = 20;
 const HOURS_EXTRA_NOTE_MAX = 60;
 let hoursExtraCache = null;
@@ -48464,6 +48488,12 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         const w = ownerWeekJson(x.hours, 'Seasonal hours', { allowEmptyWeek: false });
         if (!w.ok) { errors.hours_seasons = w.detail; break; }
         out.push({ from, to, label, hours: JSON.parse(w.json) });
+      }
+      // Brewery test 1 (Whistler, 2026-11-15): two sets (a spring and a fall shoulder season) may not share a day; the engine
+      // would only ever use the first.
+      if (!errors.hours_seasons && out.length > 1 && hoursModule) {
+        const hit = (a, b) => hoursModule.mdInRange(a.from, b.from, b.to) || hoursModule.mdInRange(a.to, b.from, b.to) || hoursModule.mdInRange(b.from, a.from, a.to) || hoursModule.mdInRange(b.to, a.from, a.to);
+        for (let i = 0; i < out.length && !errors.hours_seasons; i++) for (let j = i + 1; j < out.length; j++) if (hit(out[i], out[j])) { errors.hours_seasons = OWNER_SEASONS_OVERLAP; break; }
       }
       if (!errors.hours_seasons && JSON.stringify(out) !== JSON.stringify(current.hours_seasons || [])) changes.hours_seasons = out;
     }
@@ -51722,6 +51752,27 @@ async function handleMenuApi(req, res, ctx, action, arg) {
   return send(404, { ok: false, error: generic });
 }
 
+// Brewery test 1 (Whistler, 2026-11-15): a brewery's menu screen says "menu or tap list" and "searching for your beer"
+// (it read "Add your menu … searching for your food" to an owner with no kitchen). By kind, like the owner home's tile.
+function breweryMenuAppStrings(venue, lang) {
+  const k = venue.type === 'distillery' ? 'Distillery' : breweryWordsKind(venue);
+  const tap = venueTapListWords(venue, lang === 'fr');
+  const W = k === 'Cidery' ? { en: ['cider list', 'cider'], fr: ['liste des cidres', 'vos cidres'] }
+    : k === 'Distillery' ? { en: ['cocktail list', 'cocktails and spirits'], fr: ['carte des cocktails', 'vos cocktails et spiritueux'] }
+    : { en: ['tap list', 'beer'], fr: ['liste des bi&egrave;res', 'vos bi&egrave;res'] };
+  if (lang === 'fr') {
+    const [list, what] = W.fr;
+    return { title: `Ajoutez votre menu ou votre ${list}`,
+      intro: `Prenez votre menu ou votre ${list} en photo et nous en faisons du texte sur votre page, pour que les gens qui cherchent ${what} vous trouvent. Environ 2&nbsp;minutes.`,
+      linkButton: MENU_ICON_LINK + `&nbsp;Ajouter seulement un lien vers votre menu ou votre ${list}`, linkTitle: `Ajouter un lien vers votre menu ou votre ${list}`,
+      linkIntro: `Collez l&rsquo;adresse de la page o&ugrave; se trouve votre menu ou votre ${list}. Elle s&rsquo;affiche comme &laquo;&nbsp;${tap ? escapeHtml(tap.see) : 'Voir le menu'}&nbsp;&raquo; sur votre fiche.` };
+  }
+  const [list, what] = W.en;
+  return { title: `Add your menu or ${list}`,
+    intro: `Take a photo of your menu or ${list} and we&rsquo;ll turn it into text on your page, so people searching for your ${what} can find you. It takes about 2 minutes.`,
+    linkButton: MENU_ICON_LINK + `&nbsp;Just add a link to your menu or ${list}`, linkTitle: `Add a link to your menu or ${list}`,
+    linkIntro: `Paste the address of the page your menu or ${list} is on. It shows as &ldquo;${tap ? escapeHtml(tap.see) : 'See the menu'}&rdquo; on your page.` };
+}
 // The owner's menu screen: one step at a time, big buttons, plain words. Owners use it on a phone, often in a
 // hurry, so every screen has the "Can you do it for me?" way out and nothing they type is ever lost (the draft is
 // saved on the server as they go and the page picks up where they left off). Dayton finishes "do it for me" and
@@ -53109,7 +53160,7 @@ function frenchHeaderFragment(html) {
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}) };
+  const t = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}) };
   const plain = (s) => String(s).replace(/&amp;/g, '&').replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
   const pub = publishedMenu(venue.id);
   const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
@@ -53646,7 +53697,7 @@ function renderOwnerSetupPage(found, opts) {
   const distillery = venue.type === 'distillery';
   const over = pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : '';
   const S0 = OWNER_SETUP_STRINGS[lang];
-  const t0 = over ? { ...S0, ...S0[over], labels: { ...S0.labels, ...(S0[over].labels || {}) }, offers: { ...S0.offers, ...(S0[over].offers || {}) }, noLabels: { ...S0.noLabels, ...(S0[over].noLabels || {}) } } : S0;
+  const t0 = over ? { ...S0, ...S0[over], labels: { ...S0.labels, ...(S0[over].labels || {}) }, offers: { ...S0.offers, ...(S0[over].offers || {}) }, noLabels: { ...S0.noLabels, ...(S0[over].noLabels || {}) }, kinds: { ...S0.kinds, ...(S0[over].kinds || {}) } } : S0;
   const CK = cocktail ? S0.pub.cocktail : null;
   const t = CK ? { ...t0, ...CK, labels: { ...t0.labels, ...(CK.labels || {}) }, offers: { ...t0.offers, ...(CK.offers || {}) }, noLabels: { ...t0.noLabels, ...(CK.noLabels || {}) }, kinds: { ...t0.kinds, ...(CK.kinds || {}) } } : t0;
   const steps = setupStepsFor(venue.type, venue.id);
@@ -53835,7 +53886,8 @@ function renderOwnerSetupPage(found, opts) {
       // Distillery test 1 (2026-11-13): a distillery tour and a class first; the pub kinds wait under "More kinds".
       : venue.type === 'distillery' ? ['tour', 'class', 'live_music', 'other', 'trivia', 'games', 'open_mic', 'comedy', 'paint', 'karaoke', 'bingo', 'run_club', 'dj', 'sports']
       // Breweries (2026-11-12): trivia, live music, bingo and run club first.
-      : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
+      // Brewery test 1 (Whistler, 2026-11-15): a brewery tour too (it was a distillery-only kind).
+      : brewery ? ['trivia', 'live_music', 'bingo', 'run_club', 'tour', 'open_mic', 'games', 'comedy', 'karaoke', 'paint', 'dj', 'sports', 'other']
       // Restaurant test 2 (Whistler, 2026-11-14): restaurants lead with live music and a tasting (« Dégustation de saké »).
       : venue.type === 'restaurant' ? ['live_music', 'tasting', 'trivia', 'paint', 'comedy', 'open_mic', 'karaoke', 'bingo', 'run_club', 'dj', 'games', 'sports', 'other']
       : ['trivia', 'live_music', 'karaoke', 'open_mic', 'comedy', 'bingo', 'paint', 'run_club', 'dj', 'games', 'sports', 'other'],
@@ -53898,7 +53950,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), extraTopics: withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : [])) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -54117,6 +54169,7 @@ function ownerFlightFeeWaiting(venueId) {
 // (from research's Food line) and the flight price (the card's researched "From $X" when it is a flight price, or
 // research's Flights line) as suggestions: nothing is saved until she taps Save (SPEC "Rules kept").
 const BREWERY_EVENT_KINDS = [['trivia', /\b(?:trivia|quiz)\b/i], ['bingo', /\bbingo\b/i], ['karaoke', /\bkaraoke\b/i], ['live_music', /\blive music\b/i], ['open_mic', /\bopen mic\b/i], ['run_club', /\brun club\b/i], ['comedy', /\bcomedy\b/i]];
+const BREWERY_TOUR_EVENT_KINDS = [['tour', /\btours?\b/i], ...BREWERY_EVENT_KINDS];
 const DISTILLERY_EVENT_KINDS = [['tour', /\btours?\b/i], ['class', /\b(?:class|classes|workshops?|masterclass(?:es)?)\b/i], ...BREWERY_EVENT_KINDS];
 const BREWERY_EVENT_DAYS = { mon: /\bmondays?\b/i, tue: /\btuesdays?\b/i, wed: /\bwednesdays?\b/i, thu: /\bthursdays?\b/i, fri: /\bfridays?\b/i, sat: /\bsaturdays?\b/i, sun: /\bsundays?\b/i };
 function breweryResearchSuggestions(researchRow, info, mine, spirits = false) {
@@ -54136,10 +54189,10 @@ function breweryResearchSuggestions(researchRow, info, mine, spirits = false) {
   // A weekly event only when the line is plainly one kind on named days ("Trivia Tuesdays"); otherwise the line itself is
   // shown as a hint on the Weekly events screen.
   // Distilleries (2026-11-13): research's Tours line too ("Distillery tours on Saturdays; book online"), as the hint.
-  const g = (info.rows || []).find((r) => r && (spirits ? /^(?:games|events|weekly events|entertainment|tours|classes)$/i : /^(?:games|events|weekly events|entertainment)$/i).test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
+  const g = (info.rows || []).find((r) => r && (spirits ? /^(?:games|events|weekly events|entertainment|tours|classes)$/i : /^(?:games|events|weekly events|entertainment|tours)$/i).test(r.label) && !mine.has(r.label) && typeof r.text === 'string');
   if (g) {
     // Distillery test 1 (2026-11-13): "Distillery tours Saturdays at 2 PM, book ahead" is Tour · Saturday · 2 PM.
-    const kinds = (spirits ? DISTILLERY_EVENT_KINDS : BREWERY_EVENT_KINDS).filter(([, re]) => re.test(g.text)).map(([k]) => k);
+    const kinds = (spirits ? DISTILLERY_EVENT_KINDS : BREWERY_TOUR_EVENT_KINDS).filter(([, re]) => re.test(g.text)).map(([k]) => k);
     const days = Object.keys(BREWERY_EVENT_DAYS).filter((d) => BREWERY_EVENT_DAYS[d].test(g.text));
     const at = /\bat\s+(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s?m\b/i.exec(g.text);
     const start = at && Number(at[1]) >= 1 && Number(at[1]) <= 12 ? `${String(Number(at[1]) % 12 + (/p/i.test(at[3]) ? 12 : 0)).padStart(2, '0')}:${at[2] || '00'}` : '';
@@ -54158,6 +54211,19 @@ function breweryKindGuess(name) {
 // (neutral words). 'Cidery' reads cider words, 'Brewery' and 'Taphouse or beer hall' beer words, the rest neutral ones.
 function breweryWordsKind(venue) {
   return brewSetupKind(venue) || breweryKindGuess(venue && venue.name);
+}
+// Brewery test 1 (Whistler, 2026-11-15): the public page's words for the menu link of a brewery (cidery, distillery) whose
+// owner said it has no kitchen of its own: "Tap list" / "See the tap list" (it read "Menu & prices … See the menu" over a
+// link to the taps). null for every other place: the menu words as before.
+function venueTapListWords(venue, fr) {
+  if (!venue || !brewSetupType(venue.type)) return null;
+  let b = null;
+  try { b = venueBreweryInfo(venue.id); } catch (e) { b = null; }
+  if (!b || !b.food || b.food === 'kitchen') return null;
+  const k = venue.type === 'distillery' ? 'Distillery' : breweryWordsKind(venue);
+  if (k === 'Cidery') return fr ? { label: 'Liste des cidres', see: 'Voir la liste des cidres', lower: 'liste des cidres' } : { label: 'Cider list', see: 'See the cider list', lower: 'cider list' };
+  if (k === 'Distillery') return fr ? { label: 'Liste des boissons', see: 'Voir la liste des boissons', lower: 'liste des boissons' } : { label: 'Drinks list', see: 'See the drinks list', lower: 'drinks list' };
+  return fr ? { label: 'Liste des bières', see: 'Voir la liste des bières', lower: 'liste des bières' } : { label: 'Tap list', see: 'See the tap list', lower: 'tap list' };
 }
 // The menu tile's words on the owner home, by kind: [title, subtitle] in English and French.
 function breweryListTile(venue) {
@@ -54251,7 +54317,7 @@ function researchKidsUntil(rows) {
 function researchKidsAll(rows) {
   const txt = (rows || []).filter((r) => r && typeof r.text === 'string' && /\b(?:kids?|children|minors|famil(?:y|ies)|all ages|ages)\b/i.test(`${r.label || ''} ${r.text}`)).map((r) => r.text).join(' ');
   if (!txt || researchKidsUntil(rows) || /\b(?:19\s?\+|adults? only|no (?:kids|minors|children)|19 and over|must be 19)\b/i.test(txt)) return false;
-  return /\b(?:(?:kids?|children|minors|families)\b[^.;]{0,30}\bwelcome|all ages|family[- ]friendly)\b/i.test(txt);
+  return /\b(?:(?:kids?|children|minors|families)\b[^.;]{0,30}\bwelcome|all ages|family[- ]friendly|family,? and (?:dog|pet)[- ]friendly|(?:kid|child)[- ]friendly)\b/i.test(txt);
 }
 function breweryCfg(venue, snap, fr) {
   const info = venueVisitInfo(venue.id) || {};
@@ -54264,17 +54330,30 @@ function breweryCfg(venue, snap, fr) {
   const suggestKind = venue.type === 'distillery' ? 'Distillery' : breweryKindGuess(name) || 'Brewery';
   const foodRow = researchRow('Food');
   const ft = foodRow ? foodRow.text : '';
-  const suggestFood = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|menu|pub fare|burgers?|pizzas?|wings|bistro|eatery|small plates?|sharing plates?|share plates?|tapas|charcuterie|appetizers|flatbreads?)\b/i.test(ft) ? 'kitchen' : '';
+  // Brewery test 1 (Whistler, 2026-11-15): "food truck on weekends" in any research line (Good to know: "Free parking, food
+  // truck on weekends") pre-picks Food trucks the same way, unless the Food line already says something else.
+  const truckBit = (info.rows || []).filter((x) => x && !mine.has(x.label) && typeof x.text === 'string').flatMap((x) => x.text.split(/[.;,]/)).find((seg) => /\bfood trucks?\b/i.test(seg) && !/\b(?:no|without)\s+food trucks?\b/i.test(seg)) || '';
+  const suggestFood0 = /\bfood trucks?\b/i.test(ft) ? 'trucks' : /\bsnacks?\b/i.test(ft) && !/\b(?:kitchen|menu|restaurant)\b/i.test(ft) ? 'snacks' : /\b(?:kitchen|restaurant|full menu|menu|pub fare|burgers?|pizzas?|wings|bistro|eatery|small plates?|sharing plates?|share plates?|tapas|charcuterie|appetizers|flatbreads?)\b/i.test(ft) ? 'kitchen' : '';
   // Brewery test 2 (2026-11-13): research's food-truck line pre-picks when the trucks are here, only when it plainly says
   // weekends (or most days), so a saved answer never makes the line less accurate than research had it.
-  const suggestTrucks = suggestFood !== 'trucks' ? '' : BREWERY_TRUCKS_WEEKENDS_RE.test(ft) ? 'weekends' : /\b(?:most days|daily|every day|7 days)\b|tous les jours|la plupart des jours/i.test(ft) ? 'most_days' : '';
+  const suggestFood = suggestFood0 || (truckBit ? 'trucks' : '');
+  const tt = /\bfood trucks?\b/i.test(ft) ? ft : truckBit;
+  const suggestTrucks = suggestFood !== 'trucks' ? '' : BREWERY_TRUCKS_WEEKENDS_RE.test(tt) ? 'weekends' : /\b(?:most days|daily|every day|7 days)\b|tous les jours|la plupart des jours/i.test(tt) ? 'most_days' : '';
   // The researched card price, only when it is a drink price (not bowling lanes or a beer school), else research's Flights line.
   const cardFlight = (() => { const e = CARD_PRICES[String(venue.id)]; return e && !e.owner && Number(e.from) > 0 && Number(e.from) <= 30 && !/\b(?:bowl|lane|school|class|tour|course|hour)\b/i.test(`${e.basis || ''} ${e.per || ''} ${e.label || ''}`) ? Number(e.from) : null; })();
   const researchFee = (() => {
     if (cardFlight != null) return cardFlight;
     const r = researchRow('Flights') || researchRow('Tastings');
     const m = r && /\$\s?(\d{1,2}(?:\.\d{2})?)(?!\d)/.exec(r.text);
-    return m && Number(m[1]) > 0 && Number(m[1]) <= 30 ? Number(m[1]) : null;
+    if (m && Number(m[1]) > 0 && Number(m[1]) <= 30) return Number(m[1]);
+    // Brewery test 1 (Whistler, 2026-11-15): a flight price in any research line ("Prices: Pints from $8, flights $12").
+    if (!r) for (const x of info.rows || []) {
+      if (!x || mine.has(x.label) || typeof x.text !== 'string' || /happy hour|special|deal/i.test(x.text)) continue;
+      const fm = /\bflights?\b(?:\s+(?:from|are|at|for|start at|starting at))?\s*:?\s*\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])|\$\s?(\d{1,2}(?:\.\d{2})?)(?![\d.])\s+(?:for a |per |a )?(?:tasting |beer |cider )?flights?\b/i.exec(x.text);
+      const n = fm ? Number(fm[1] || fm[2]) : 0;
+      if (n > 0 && n <= 30) return n;
+    }
+    return null;
   })();
   return {
     allSteps: BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2), feeLiveMax: FLIGHT_FEE_LIVE_MAX, suggestKind, suggestFood, suggestTrucks, researchFee,
@@ -54282,7 +54361,9 @@ function breweryCfg(venue, snap, fr) {
     // 8 PM on Who's welcome (a suggestion, saved only with the screen).
     suggestKidsUntil: researchKidsUntil((info.rows || []).filter((x) => x && !mine.has(x.label))),
     // Distillery test 1 (2026-11-13): "Minors welcome with an adult" (no time) or "all ages" pre-picks All ages.
-    suggestKidsAll: venue.type === 'distillery' && researchKidsAll((info.rows || []).filter((x) => x && !mine.has(x.label))),
+    // Brewery test 1 (Whistler, 2026-11-15): breweries too ("Family and dog friendly"); a suggestion, saved only with the screen.
+    menuKnown: !!snap.menu_url || (() => { try { return !!publishedMenuRow(venue.id); } catch (e) { return false; } })(),
+    suggestKidsAll: researchKidsAll((info.rows || []).filter((x) => x && !mine.has(x.label))),
     // Where it came from: the card's price ("Your card shows $12 now") or only research's Flights line ("Your page says $10").
     researchFeeFrom: cardFlight != null ? 'card' : 'visit',
     placeShow: Object.fromEntries(placeTypesFor('brewery').map((p) => [p, (fr ? PLACE_TYPE_DISPLAY_FR : PLACE_TYPE_DISPLAY)[p] || p])),
@@ -54317,19 +54398,39 @@ const BREWERY_SETUP_HELP_TOPICS = [
   { id: 'brewery-taplist', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'menu-import', 'photo-pending'], q: 'How do I keep our tap list up to date?', qFr: 'Comment garder notre liste des bières à jour?',
     keys: ['tap list', 'taplist', 'taps', 'on tap', 'beer list', 'beers', 'beer menu', 'draft', 'draught', 'drafts', 'whats on tap', 'tap list changes', 'update our tap list', 'update my tap list', 'update the tap list', 'chalkboard', 'rotating taps', 'new beers', 'seasonal beers', 'cider list', 'ciders'],
     keysFr: ['liste des bieres', 'liste de bieres', 'nos bieres', 'bieres', 'en fut', 'fut', 'futs', 'pression', 'biere en fut', 'bieres en fut', 'tableau', 'ardoise', 'liste des cidres'],
-    a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the menu”, so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
-    aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir le menu », pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
-  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], q: 'We have food trucks', qFr: 'Nous avons des camions-restaurants',
-    keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'bring your own food', 'outside food', 'food here'],
-    keysFr: ['camion', 'camions', 'camions restaurants', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'apporter sa nourriture', 'nourriture de l exterieur'],
-    a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, there’s no menu step to do in the setup. If you also pour from a tap list, you can still add it any time with <strong>Update my menu or tap list</strong>.</p>',
-    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions-restaurants</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions-restaurants la plupart des jours » ou « Camions-restaurants la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, il n’y a pas d’étape pour le menu dans la configuration. Si vous avez une liste des bières, vous pouvez quand même l’ajouter en tout temps avec <strong>Mettre à jour mon menu ou ma liste des bières</strong>.</p>' },
+    a: '<p>Your tap list lives in your menu; there’s no separate tap list. Update it as often as you like, two ways:</p><ul><li>On your edit page, tap <strong>Update my menu or tap list</strong>, then <strong>Take a photo of your menu</strong> and snap your chalkboard or tap list. Check any yellow lines, then publish it.</li><li>Or tap <strong>Just add a link to your menu or tap list</strong> and paste the page or Instagram where you post your taps. Your page shows it as “See the tap list” (“See the menu” with your own kitchen), so visitors always find the latest list. A new link is checked first, usually within a day.</li></ul>',
+    aFr: '<p>Votre liste des bières fait partie de votre menu; il n’y a pas de liste séparée. Mettez-la à jour aussi souvent que vous le voulez, de deux façons :</p><ul><li>Sur votre page de modification, touchez <strong>Mettre à jour mon menu ou ma liste des bières</strong>, puis <strong>Prendre votre menu en photo</strong> et photographiez votre tableau ou votre liste des bières. Vérifiez les lignes en jaune, puis publiez.</li><li>Ou touchez <strong>Ajouter seulement un lien vers votre menu ou votre liste des bières</strong> et collez la page ou le compte Instagram où vous publiez vos bières en fût. Votre page l’affiche comme « Voir la liste des bières » (« Voir le menu » si vous avez une cuisine), pour que les visiteurs trouvent toujours la dernière liste. Un nouveau lien est vérifié d’abord, habituellement d’ici un jour.</li></ul>' },
+  // Brewery test 1 (Whistler, 2026-11-15): "we don't have a kitchen, food truck on weekends" got the "We don't have a
+  // happy hour (or Instagram…)" answer, and "can people bring their own food" got "I'm not sure".
+  { id: 'brewery-food-trucks', pages: ['setup', 'edit'], over: ['dont-have'], q: 'No kitchen, food trucks, or bring your own food', qFr: 'Pas de cuisine, camions-restaurants ou nourriture de l’extérieur',
+    keys: ['food truck', 'food trucks', 'truck', 'trucks', 'no kitchen', 'kitchen', 'dont have a kitchen', 'we dont have a kitchen', 'have a kitchen', 'bring your own food', 'bring their own food', 'bring own food', 'bring food', 'own food', 'outside food', 'food here', 'no food', 'snacks', 'snacks only'],
+    keysFr: ['camion', 'camions', 'camions restaurants', 'cuisine de rue', 'bouffe de rue', 'pique nique', 'pas de cuisine', 'cuisine', 'apporter sa nourriture', 'apporter leur nourriture', 'sa propre nourriture', 'nourriture de l exterieur', 'collations', 'pas de nourriture'],
+    a: '<p>On <strong>Your taproom</strong>, tap <strong>Food trucks</strong>, then <strong>Most days</strong> or <strong>Weekends only</strong>, and say whether people can bring their own food. Your page says “Food trucks most days” or “Food trucks on weekends”, never a truck’s name, because the trucks change too often. It’s on your page right away. No kitchen and no trucks? Tap <strong>Snacks only</strong> or <strong>No food</strong>; the same screen asks <strong>Can people bring their own food?</strong> Trucks in summer only? Pick Snacks only and mention the trucks in your story.</p><p>Post the week’s trucks on Instagram or Facebook: your page links to them. Without your own kitchen, your tap list is the optional tile <strong>Your menu or tap list</strong> under More about your place: a link or a photo of the chalkboard.</p>',
+    aFr: '<p>À <strong>Votre salle de dégustation</strong>, touchez <strong>Camions-restaurants</strong>, puis <strong>La plupart des jours</strong> ou <strong>La fin de semaine seulement</strong>, et dites si l’on peut apporter sa nourriture. Votre page indique « Camions-restaurants la plupart des jours » ou « Camions-restaurants la fin de semaine », jamais le nom d’un camion, parce que les camions changent trop souvent. C’est sur votre page tout de suite. Ni cuisine ni camions? Touchez <strong>Collations seulement</strong> ou <strong>Pas de nourriture</strong>; le même écran demande <strong>Peut-on apporter sa propre nourriture?</strong> Des camions l’été seulement? Choisissez Collations seulement et parlez des camions dans votre histoire.</p><p>Publiez les camions de la semaine sur Instagram ou Facebook : votre page y mène. Sans cuisine sur place, votre liste des bières est la tuile facultative <strong>Votre menu ou liste des bières</strong>, sous Plus de détails : un lien ou une photo du tableau.</p>' },
+  // Growler fills, cans and bottles to go ("growler fills" got "I'm not sure").
+  { id: 'brewery-togo', pages: ['setup', 'edit'], q: 'Growler fills, cans and bottles to go', qFr: 'Growlers, canettes et bouteilles pour emporter',
+    keys: ['growler', 'growlers', 'growler fill', 'growler fills', 'crowler', 'crowlers', 'crowler fills', 'fills', 'cans', 'cans to go', 'bottles', 'bottles to go', 'to go', 'beer to go', 'take home', 'off sales', 'four packs'],
+    keysFr: ['growler', 'growlers', 'crowler', 'crowlers', 'cruchon', 'cruchons', 'remplissage', 'canettes', 'bouteilles', 'pour emporter', 'a emporter', 'rapporter'],
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Flights and to go</strong>. At <strong>What can people take home?</strong> tap all that apply: Cans, Bottles, Growler fills, Crowler fills (or Nothing to go), then <strong>Save these</strong>.</p><p>It’s on your page right away, in “Plan your visit”.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Plateaux et pour emporter</strong>. À <strong>Qu’est-ce qu’on peut rapporter?</strong>, touchez tout ce qui s’applique : Canettes, Bouteilles, Remplissage de growlers, Remplissage de crowlers (ou Rien à emporter), puis <strong>Enregistrer</strong>.</p><p>C’est sur votre page tout de suite, dans « Planifiez votre visite ».</p>' },
+  // A brewery tour ("tours are Saturday only", "where do I put our brewery tour" got "I'm not sure").
+  { id: 'brewery-tours', pages: ['setup', 'edit'], over: ['weekly-nights'], q: 'Where do I put our brewery tour?', qFr: 'Où mettre la visite de notre brasserie?',
+    keys: ['tour', 'tours', 'brewery tour', 'brewery tours', 'our tour', 'our tours', 'guided tour', 'tour times', 'book a tour', 'tours are', 'tour is'],
+    keysFr: ['visite', 'visites', 'visite guidee', 'visite de la brasserie', 'visites de la brasserie', 'tour', 'tours'],
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Weekly events</strong>. Tap <strong>Brewery tour</strong>, tick the day or days it runs (Saturdays only? Tick Saturday), add the start time and pick <strong>How often?</strong> By appointment only? Tap <strong>By appointment</strong> instead of a day.</p><p>The price or how to book goes after the name, with a comma: <em>Brewery tour, $15 with a flight. Book by email</em>. The name shows with the time, and the rest under it. Tap <strong>Save my events</strong>: it’s on your page right away, and Build My Trip plans a visit around the tour on the days it runs.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Événements de la semaine</strong>. Touchez <strong>Visite de la brasserie</strong>, cochez le ou les jours (le samedi seulement? Cochez samedi), ajoutez l’heure de début et choisissez <strong>À quelle fréquence?</strong> Sur rendez-vous seulement? Touchez <strong>Sur rendez-vous</strong> au lieu d’un jour.</p><p>Le prix ou la façon de réserver va après le nom, avec une virgule : <em>Visite de la brasserie, 15 $ avec un plateau. Réservez par courriel</em>. Le nom s’affiche avec l’heure, et le reste dessous. Touchez <strong>Enregistrer mes événements</strong> : c’est sur votre page tout de suite, et Planifier mon voyage prévoit une visite autour de celle-ci les jours où elle a lieu.</p>' },
+  // Non-alcoholic on tap ("hop water and kombucha on tap, no alcohol" got the tap list answer).
+  { id: 'brewery-na', pages: ['setup', 'edit'], over: ['brewery-taplist', 'menu-add'], q: 'We pour non-alcoholic drinks too', qFr: 'Nous servons aussi des boissons sans alcool',
+    keys: ['non alcoholic', 'nonalcoholic', 'non alc', 'no alcohol', 'alcohol free', 'hop water', 'kombucha', 'na beer', 'zero proof', 'mocktail', 'mocktails', 'sober', 'craft soda', 'root beer'],
+    keysFr: ['sans alcool', 'non alcoolise', 'non alcoolisee', 'eau houblonnee', 'kombucha', 'mocktail', 'mocktails', 'biere sans alcool'],
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>What you offer</strong>. Tick <strong>Non-alcoholic drinks</strong> and tap <strong>Save these</strong>. It’s on your page right away, and Build My Trip offers your taproom to people who ask for non-alcoholic options.</p><p>Say what they are (hop water, kombucha) in your Known for line or your story; your tap list can list them too.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Ce que vous offrez</strong>. Cochez <strong>Boissons sans alcool</strong> et touchez <strong>Enregistrer</strong>. C’est sur votre page tout de suite, et Planifier mon voyage propose votre salle aux gens qui demandent des options sans alcool.</p><p>Dites lesquelles (eau houblonnée, kombucha) dans votre ligne Connu pour ou dans votre histoire; votre liste des bières peut les indiquer aussi.</p>' },
   { id: 'brewery-seasonal-hours', pages: ['setup', 'edit'], over: ['seasonal-hours', 'setup-season', 'hours', 'closures'],
     q: 'We close for winter, or have winter hours', qFr: 'Nous fermons l’hiver, ou avons des heures d’hiver',
-    keys: withSeasonTalk(['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours'], SEASON_TALK_KEYS),
-    keysFr: withSeasonTalk(['hiver', 'heures d hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'reouverture', 'changer mes heures', 'heures d ete'], SEASON_TALK_KEYS_FR),
-    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. After your hours:</p><ul><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day. Outside them your card and page say “Closed for the season” and when you reopen.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li></ul><p>Hours saved in the setup are on your page right away, and they come back every year by themselves.</p>',
-    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Après vos heures :</p><ul><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture. En dehors de ces dates, votre fiche et votre page indiquent « Fermé pour la saison » et la date de réouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et elles reviennent chaque année d’elles-mêmes.</p>' },
+    keys: withSeasonTalk(['winter', 'winter hours', 'closed for the season', 'closed in winter', 'seasonal', 'seasonal hours', 'reopen', 'change hours', 'change my hours', 'change our hours', 'hours later', 'summer hours', 'shoulder season', 'shoulder seasons', 'two shoulder seasons', 'second season', 'spring and fall', 'part of the year', 'different hours'], SEASON_TALK_KEYS),
+    keysFr: withSeasonTalk(['hiver', 'heures d hiver', 'ferme pour la saison', 'saison', 'saisonnier', 'reouverture', 'changer mes heures', 'heures d ete', 'intersaison', 'intersaisons', 'deux intersaisons', 'printemps et automne', 'une partie de l annee', 'heures differentes'], SEASON_TALK_KEYS_FR),
+    a: '<p>Open <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Hours and holidays</strong>. After your hours:</p><ul><li>Closed for part of the year? Tap <strong>We’re closed part of the year</strong> and pick your first and last open day. Outside them your card and page say “Closed for the season” and when you reopen.</li><li>Different winter hours? Tap <strong>No, different in winter</strong> and set them.</li><li>Different hours for a few weeks, like a shoulder season with Mondays closed? Tap <strong>No, different for part of the year</strong>, pick the first and last day, and set those days. A spring and a fall shoulder season? Save the first, then tap <strong>+ Add a second stretch with different hours</strong>; “Copy the hours from…” fills it in one tap.</li></ul><p>Hours saved in the setup are on your page right away, and they come back every year by themselves.</p>',
+    aFr: '<p>Ouvrez <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>Heures et jours fériés</strong>. Après vos heures :</p><ul><li>Fermé une partie de l’année? Touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture. En dehors de ces dates, votre fiche et votre page indiquent « Fermé pour la saison » et la date de réouverture.</li><li>D’autres heures l’hiver? Touchez <strong>Non, elles changent en hiver</strong> et indiquez-les.</li><li>D’autres heures pendant quelques semaines, comme une intersaison où vous fermez le lundi? Touchez <strong>Non, c’est différent une partie de l’année</strong>, choisissez le premier et le dernier jour, et indiquez ces journées. Une intersaison au printemps et une autre à l’automne? Enregistrez la première, puis touchez <strong>+ Ajouter une deuxième période aux heures différentes</strong>; « Copier les heures du… » la remplit d’un seul geste.</li></ul><p>Les heures enregistrées dans la configuration sont sur votre page tout de suite, et elles reviennent chaque année d’elles-mêmes.</p>' },
   { id: 'booking-link', over: ['links'], q: 'Where do I put our booking link?', qFr: 'Où mettre notre lien de réservation?', pages: ['edit', 'setup'],
     keys: ['booking link', 'book button', 'reservation link', 'reservations link', 'link to book', 'booking url', 'online booking', 'book online', 'put our booking link', 'add our booking link', 'group booking', 'booking page', 'book a table'],
     keysFr: ['lien de reservation', 'bouton reserver', 'reserver en ligne', 'reservation en ligne', 'lien pour reserver', 'reservation de groupe'],
@@ -54342,8 +54443,8 @@ const BREWERY_SETUP_HELP_TOPICS = [
   { id: 'easy-setup', completenessOnly: true, over: ['photo-add', 'menu-add'], q: 'How does “Set up your page” work?', qFr: 'Comment fonctionne « Configurez votre page »?', pages: ['setup', 'edit'],
     keys: ['easy setup', 'set up your page', 'set up my page', 'setup', 'step by step', 'one at a time', 'saved', 'how long', 'essentials', 'more about your place', 'carry on'],
     keysFr: ['configuration simple', 'configurez votre page', 'configurer ma page', 'etape par etape', 'combien de temps', 'l essentiel'],
-    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts. About 10 to 20 minutes. You can stop any time and carry on later.</p><ul><li><strong>The essentials</strong> (7 steps): address and phone, hours (with holidays and closures), your taproom and food, flights and to go, happy hour, photos and what you offer (with who’s welcome).</li><li><strong>More about your place</strong> (optional, any order): your story and Known for, weekly events, groups and booking, Instagram and Facebook, your taproom door, and your menu if you have your own kitchen.</li><li>Every question has <strong>Skip this for now</strong>. <strong>Change an answer</strong> opens any of them again.</li></ul><p>Most answers are on your page right away. Photos, your description, your menu and a new website or booking link show within a day.</p>',
-    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.</p><ul><li><strong>L’essentiel</strong> (7 étapes) : adresse et téléphone, heures (avec les jours fériés et fermetures), votre salle et la nourriture, plateaux et pour emporter, 5 à 7, photos et ce que vous offrez (avec qui est le bienvenu).</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : votre histoire et ce pour quoi on vous connaît, événements de la semaine, groupes et réservations, Instagram et Facebook, la porte de votre salle, et votre menu si vous avez une cuisine sur place.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. <strong>Modifier une réponse</strong> rouvre n’importe laquelle.</li></ul><p>La plupart des réponses sont sur votre page tout de suite. Les photos, votre description, votre menu et un nouveau site Web ou lien de réservation s’affichent d’ici un jour.</p>' },
+    a: '<p>Tap <strong>Set up your page</strong> at the top of your edit page. It asks one thing at a time, in two parts. About 10 to 20 minutes. You can stop any time and carry on later.</p><ul><li><strong>The essentials</strong> (7 steps): address and phone, hours (with holidays and closures), your taproom and food, flights and to go, happy hour, photos and what you offer (with who’s welcome).</li><li><strong>More about your place</strong> (optional, any order): your story and Known for, weekly events, groups and booking, Instagram and Facebook, your taproom door, and your menu or tap list.</li><li>Every question has <strong>Skip this for now</strong>. <strong>Change an answer</strong> opens any of them again.</li></ul><p>Most answers are on your page right away. Photos, your description, your menu and a new website or booking link show within a day.</p>',
+    aFr: '<p>Touchez <strong>Configurez votre page</strong> en haut de votre page de modification. Une seule question à la fois, en deux parties. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.</p><ul><li><strong>L’essentiel</strong> (7 étapes) : adresse et téléphone, heures (avec les jours fériés et fermetures), votre salle et la nourriture, plateaux et pour emporter, 5 à 7, photos et ce que vous offrez (avec qui est le bienvenu).</li><li><strong>Plus de détails</strong> (facultatif, dans l’ordre que vous voulez) : votre histoire et ce pour quoi on vous connaît, événements de la semaine, groupes et réservations, Instagram et Facebook, la porte de votre salle, et votre menu ou votre liste des bières.</li><li>Chaque question a <strong>Passer pour l’instant</strong>. <strong>Modifier une réponse</strong> rouvre n’importe laquelle.</li></ul><p>La plupart des réponses sont sur votre page tout de suite. Les photos, votre description, votre menu et un nouveau site Web ou lien de réservation s’affichent d’ici un jour.</p>' },
 ];
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md): what distillery owners ask, in their words: the tasting price,
 // the kids rule, tours and classes, seasonal or by-appointment hours, and the cocktail or tasting menu. Every answer says
@@ -54477,6 +54578,18 @@ function withSetupNightsTopic(type, list) {
   return [...list, SETUP_NIGHTS_HELP_TOPIC];
 }
 function brewHelpTopics(type) { return type === 'distillery' ? DISTILLERY_SETUP_HELP_TOPICS : BREWERY_SETUP_HELP_TOPICS; }
+// Brewery test 1 (Whistler, 2026-11-15): asked inside the setup, an answer that began "Open Set up your page, tap Change an
+// answer, then Flights and to go" says "Right here in setup: Flights and to go (tap Change an answer if it's done)".
+function helpHereInSetup(t) {
+  const en = (x) => (typeof x === 'string' ? x.replace(/^<p>Open <strong>Set up your page<\/strong>, tap <strong>Change an answer<\/strong>, then <strong>([^<]+)<\/strong>\./, '<p>Right here in setup: <strong>$1</strong> (tap <strong>Change an answer</strong> if it’s done).') : x);
+  const fr = (x) => (typeof x === 'string' ? x.replace(/^<p>Ouvrez <strong>Configurez votre page<\/strong>, touchez <strong>Modifier une réponse<\/strong>, puis <strong>([^<]+)<\/strong>\./, '<p>Ici même, dans la configuration : <strong>$1</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait).') : x);
+  return { ...t, a: en(t.a), aFr: fr(t.aFr) };
+}
+// A taproom's, pub's or lounge's day card says "+ Add a second time (if you close in between)".
+function betweenSecondTimeWords(t) {
+  const fix = (x) => (typeof x === 'string' ? x.replace(/\+ Add a second time \(lunch (?:&amp;|&) dinner\)/g, '+ Add a second time (if you close in between)').replace(/\+ Ajouter une deuxième plage \(midi et soir\)/g, '+ Ajouter une deuxième plage (si vous fermez entre les deux)') : x);
+  return { ...t, a: fix(t.a), aFr: fix(t.aFr) };
+}
 // A tasting fee over $75 the owner sent that is still waiting for our check (a number), or null.
 function ownerTastingFeeWaiting(venueId) {
   try {
@@ -54505,8 +54618,8 @@ const SETUP_SEASON_HELP_TOPIC = { id: 'setup-season', pages: ['setup'], q: 'We c
     // Restaurant test 1 (Whistler, 2026-11-14): two closures a year.
     'closed twice a year', 'close twice a year', 'twice a year', 'two closures', 'two shoulder seasons', 'both shoulder seasons', 'spring and fall closures', 'closed in spring and fall'],
   keysFr: ['saison', 'saisonnier', 'fermé pour la saison', 'fermé l hiver', 'réouverture', 'chaque année', 'deux fois par année', 'deux fois par an', 'fermé deux fois', 'deux fermetures', 'printemps et automne'],
-  a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p>',
-  aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture (par exemple du 25 avril au 12 octobre). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture. D’autres heures l’été aussi? Touchez <strong>Enregistrer et ajouter des heures d’été différentes</strong>.</p><p>Fermé une semaine ou deux aussi, chaque année? Ajoutez-le sous Jours fériés et fermetures et cochez <strong>Chaque année</strong>.</p>' };
+  a: '<p>In the Hours step, after your hours, tap <strong>We’re closed part of the year</strong> and pick the first and last day you’re open (for example April 25 to October 12). The dates repeat every year. Outside them your page says “Closed for the season” and when you reopen. Different hours in summer too? Tap <strong>Save, and add different summer hours</strong>.</p><p>Closed for a week or two as well, every year? Add it under Holidays &amp; closures and tick <strong>Every year</strong>.</p><p>Open in a shoulder season, but with different hours? Tap <strong>No, different for part of the year</strong> and pick the first and last day. For a second one (spring and fall), save the first, then tap <strong>+ Add a second stretch with different hours</strong>.</p>',
+  aFr: '<p>À l’étape des heures, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez le premier et le dernier jour d’ouverture (par exemple du 25 avril au 12 octobre). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture. D’autres heures l’été aussi? Touchez <strong>Enregistrer et ajouter des heures d’été différentes</strong>.</p><p>Fermé une semaine ou deux aussi, chaque année? Ajoutez-le sous Jours fériés et fermetures et cochez <strong>Chaque année</strong>.</p><p>Ouvert pendant l’intersaison, mais avec d’autres heures? Touchez <strong>Non, c’est différent une partie de l’année</strong> et choisissez le premier et le dernier jour. Pour une deuxième période (printemps et automne), enregistrez la première, puis touchez <strong>+ Ajouter une deuxième période aux heures différentes</strong>.</p>' };
 // Cocktail test 2 (2026-11-13): "How do I change my winter hours?" from a place that already has seasonal hours (her
 // winter hours were her usual ones, summer the season) was told to add « Heures d’hiver » Nov 1–Apr 30, an overlapping
 // second season, and that changes are checked first. Such a place gets an answer about its own two sets: which are the
@@ -54625,23 +54738,38 @@ function ownerSeasonHelpTopic(venueId) {
   if (!s0 || !/^\d{2}-\d{2}$/.test(s0.from || '') || !/^\d{2}-\d{2}$/.test(s0.to || '')) {
     return { ...base, pages: ['edit', 'setup'],
       a: '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Set your <strong>usual hours</strong>, then at “Are these your hours all year?” tap <strong>No, different in summer</strong> (or winter, or for a shoulder season or any other dates: <strong>No, different for part of the year</strong>).</li>'
-        + '<li>Pick the first and last day of those other hours (like the day the lifts close), and set them. Hours saved in the setup go live straight away, and every year your page switches between the two by itself.</li></ol>'
+        + '<li>Pick the first and last day of those other hours (like the day the lifts close), and set them. Hours saved in the setup go live straight away, and every year your page switches between the two by itself.</li>'
+        + '<li>A second stretch with different hours, like a spring and a fall shoulder season? Save the first, then tap <strong>+ Add a second stretch with different hours</strong>.</li></ol>'
         + '<p>Or on your edit page, under <strong>Seasonal hours</strong>, then {SEND}. {LIVE} Closed for the whole off-season? Tap <strong>We’re closed part of the year</strong> after your hours instead.</p>',
       aFr: '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Indiquez vos <strong>heures habituelles</strong>, puis à « Ces heures sont-elles les mêmes toute l’année? », touchez <strong>Non, elles changent en été</strong> (ou en hiver, ou pour l’intersaison et d’autres dates : <strong>Non, c’est différent une partie de l’année</strong>).</li>'
-        + '<li>Choisissez le premier et le dernier jour de ces autres heures (comme le jour où les remontées ferment) et indiquez-les. Les heures enregistrées dans la configuration sont en ligne tout de suite, et chaque année votre page passe de l’un à l’autre d’elle-même.</li></ol>'
+        + '<li>Choisissez le premier et le dernier jour de ces autres heures (comme le jour où les remontées ferment) et indiquez-les. Les heures enregistrées dans la configuration sont en ligne tout de suite, et chaque année votre page passe de l’un à l’autre d’elle-même.</li>'
+        + '<li>Une deuxième période aux heures différentes, comme une intersaison au printemps et une autre à l’automne? Enregistrez la première, puis touchez <strong>+ Ajouter une deuxième période aux heures différentes</strong>.</li></ol>'
         + '<p>Ou sur votre page de modification, sous <strong>Heures saisonnières</strong>, puis {SEND}. {LIVE} Fermé toute la basse saison? Touchez plutôt <strong>Nous fermons une partie de l’année</strong> après vos heures.</p>' };
   }
   const sea = (fr) => seasonRangeShort(s0.from, s0.to, fr), rest = (fr) => seasonRangeShort(mdShift(s0.to, 1), mdShift(s0.from, -1), fr);
+  // Brewery test 1 (Whistler, 2026-11-15): two stretches of other hours (a spring and a fall shoulder season) are both named,
+  // and with one the answer says a second can be added (it said there was no need for another).
+  let s1 = null;
+  try { s1 = (venueHoursExtras(venueId).seasons || [])[1] || null; } catch (e) { s1 = null; }
+  if (s1 && !(/^\d{2}-\d{2}$/.test(s1.from || '') && /^\d{2}-\d{2}$/.test(s1.to || ''))) s1 = null;
+  if (s1) {
+    const sea1 = (fr) => seasonRangeShort(s1.from, s1.to, fr);
+    return { ...base, pages: ['edit', 'setup'],
+      a: `<p>Your page has your <strong>usual hours</strong> and two stretches of <strong>other hours</strong>: ${escapeHtml(sea(false))} and ${escapeHtml(sea1(false))}. Every year each one takes over between its dates, then your page switches back to the usual hours by itself.</p>`
+        + '<p>To change any of them: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. After your usual hours, each stretch has its own button (“Change my … hours”), and <strong>Remove these hours</strong> is on its screen. Hours you save in the setup go live straight away.</p>',
+      aFr: `<p>Votre page a vos <strong>heures habituelles</strong> et deux périodes d’<strong>autres heures</strong> : ${escapeHtml(sea(true))} et ${escapeHtml(sea1(true))}. Chaque année, chacune s’applique entre ses dates, puis votre page revient d’elle-même aux heures habituelles.</p>`
+        + '<p>Pour changer l’une ou l’autre : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Après vos heures habituelles, chaque période a son bouton (« Modifier mes heures du… »), et <strong>Retirer ces heures</strong> se trouve sur son écran. Les heures enregistrées dans la configuration sont en ligne tout de suite.</p>' };
+  }
   const nameEn = escapeHtml(seasonLabelText(s0.label, false)), nameFr = escapeHtml(seasonLabelText(s0.label, true));
   return { ...base, pages: ['edit', 'setup'],
     a: `<p>Your page has two sets of hours: your <strong>usual hours</strong> (${escapeHtml(rest(false))}) and your <strong>other hours</strong> (${escapeHtml(sea(false))}${nameEn ? `, “${nameEn}”` : ''}). Every year the other hours take over between those dates, then your page switches back to the usual ones by itself.</p>`
       + '<ol><li>Easiest: <strong>Set up your page</strong> \u2192 <strong>Change an answer</strong> \u2192 <strong>Hours</strong>. Change either set of hours or the dates there. Hours you save in the setup go live straight away.</li>'
       + '<li>Or on your edit page: <strong>Opening hours</strong> are your usual hours, and <strong>Seasonal hours</strong> are the other hours. Tap {SEND}. {LIVE}</li></ol>'
-      + '<p>Your usual hours already cover the rest of the year, so there’s no need to add another season for it.</p>',
+      + '<p>Your usual hours already cover the rest of the year, so there’s no need to add another season for it. A second stretch with different hours (a spring and a fall shoulder season)? In the setup’s Hours step, tap <strong>+ Add a second stretch with different hours</strong>.</p>',
     aFr: `<p>Votre page a deux horaires : vos <strong>heures habituelles</strong> (${escapeHtml(rest(true))}) et votre <strong>autre horaire</strong> (${escapeHtml(sea(true))}${nameFr ? `, « ${nameFr} »` : ''}). Chaque année, l’autre horaire s’applique entre ces dates, puis votre page revient d’elle-même aux heures habituelles.</p>`
       + '<ol><li>Le plus simple : <strong>Configurez votre page</strong> \u2192 <strong>Modifier une réponse</strong> \u2192 <strong>Heures</strong>. Vous y changez l’un ou l’autre horaire, ou les dates. Les heures enregistrées dans la configuration sont en ligne tout de suite.</li>'
       + '<li>Ou sur votre page de modification : <strong>Heures d’ouverture</strong>, ce sont vos heures habituelles, et <strong>Heures saisonnières</strong>, l’autre horaire. Touchez {SEND}. {LIVE}</li></ol>'
-      + '<p>Vos heures habituelles couvrent déjà le reste de l’année : inutile d’ajouter une autre saison.</p>' };
+      + '<p>Vos heures habituelles couvrent déjà le reste de l’année : inutile d’ajouter une autre saison pour cela. Une deuxième période aux heures différentes (une intersaison au printemps et une autre à l’automne)? À l’étape Heures de la configuration, touchez <strong>+ Ajouter une deuxième période aux heures différentes</strong>.</p>' };
 }
 // Food styles a café may add under "Show more" (optional; what they serve is its own screen).
 const CAFE_CUISINES_POPULAR = ['Breakfast & Brunch', 'Sandwiches', 'Dessert', 'French', 'Italian', 'Japanese', 'Korean', 'Ukrainian', 'Polish', 'Mediterranean'];
@@ -56799,6 +56927,7 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'The seasonal hours could not be read. Please reload the page and try again.': 'Les heures saisonnières sont illisibles. Rechargez la page et réessayez.',
   'Please pick the first and last day of your seasonal hours.': 'Choisissez le premier et le dernier jour de vos heures saisonnières.',
   'Please pick two different days for your seasonal hours.': 'Choisissez deux jours différents pour vos heures saisonnières.',
+  [OWNER_SEASONS_OVERLAP]: 'Vos deux périodes d’autres heures ont des dates en commun. Choisissez des dates qui ne se chevauchent pas.',
   'Please keep the name of your seasonal hours short (up to 40 characters), without < > or &.': 'Gardez un nom court pour vos heures saisonnières (40 caractères au plus), sans < > ni &.',
   [`You can list up to ${HOURS_CLOSURE_MAX} closures.`]: `Vous pouvez inscrire jusqu’à ${HOURS_CLOSURE_MAX} fermetures.`,
   'Please pick a date for each closure.': 'Choisissez une date pour chaque fermeture.',
@@ -59993,8 +60122,11 @@ function ownerClosuresSummary(closures, lang = 'en', today = todayLocal()) {
 }
 // Seasonal hours on the owner page (2026-10-18): one second week of hours for part of every year. `dayRows` is the
 // page's own day-row builder, so the rows look and work like the usual hours.
-function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
+function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en', second = null) {
   const L = (en, f) => (lang === 'fr' ? f : en);
+  // Brewery test 1 (Whistler, 2026-11-15): a second set (added in Set up your page) is kept as it is; this box edits the first.
+  const also = second && /^\d{2}-\d{2}$/.test(second.from || '') && /^\d{2}-\d{2}$/.test(second.to || '')
+    ? `<p class="op-hint" id="opSeasonalSecond">${L(`You also have other hours ${escapeHtml(hoursExtraRangeText(second.from, second.to))}. They stay as they are; to change them, open <strong>Set up your page</strong> → <strong>Change an answer</strong> → <strong>Hours</strong>.`, `Vous avez aussi d’autres heures du ${escapeHtml(hoursExtraDayText(second.from, true))} au ${escapeHtml(hoursExtraDayText(second.to, true))}. Elles restent comme elles sont; pour les changer, ouvrez <strong>Configurez votre page</strong> → <strong>Modifier une réponse</strong> → <strong>Heures</strong>.`)}</p>` : '';
   const from = season ? season.from : '11-01', to = season ? season.to : '04-30';
   const monthOpts = (sel) => MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'].map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}"${sel === String(i + 1).padStart(2, '0') ? ' selected' : ''}>${n}</option>`).join('');
   const dayOpts = (sel) => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => `<option value="${d}"${sel === d ? ' selected' : ''}>${Number(d)}</option>`).join('');
@@ -60011,7 +60143,7 @@ function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
           <strong>${L('to', 'au')}</strong> ${pair('opSeasonalToM', 'opSeasonalToD', to, L('Seasonal hours last month', 'Dernier mois des heures saisonnières'), L('Seasonal hours last day', 'Dernier jour des heures saisonnières'))}
           <p class="op-hint">${L('Every year between these days (both included), your page shows the hours below instead of your usual hours.', 'Chaque année entre ces deux jours (inclusivement), votre page affiche les heures ci-dessous au lieu de vos heures habituelles.')}</p></div>
         <div id="opSeasonHours">${dayRows('season', season ? season.hours : {}, true, !!season)}</div>
-      </div>
+      </div>${also}
       <p class="lyv-error" id="opSeasonalError" hidden></p>
     </details>`;
 }
@@ -60985,7 +61117,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const x = nightsNow[i] || { days: [], kind: dist ? 'tour' : lounge ? 'dj' : cafeEv ? 'other' : 'trivia', frequency: 'weekly' };
       const n = i + 1;
       const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
-      const kinds = `<select class="op-wn-kind" aria-label="${L(`${W.en} ${n}: ${W.kindEn}`, `${W.fr} ${n} : ${W.kindFr}`)}">${kindOrder.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
+      const kinds = `<select class="op-wn-kind" aria-label="${L(`${W.en} ${n}: ${W.kindEn}`, `${W.fr} ${n} : ${W.kindFr}`)}">${kindOrder.filter((k) => !DAYTIME_NIGHT_KINDS.includes(k) || venue.type === 'distillery' || (k === 'tour' && venue.type === 'brewery') || x.kind === k).map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
       const freq = `<select class="op-wn-freq" aria-label="${L(`${W.en} ${n}: how often`, `${W.fr} ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.filter((f) => f !== NIGHT_APPOINTMENT || venue.type === 'distillery' || x.frequency === f).map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
       // Cocktail test 2 (2026-11-13): the event's season rides along like a special's (it was dropped on send, and a
       // summer-only night went live all year), and the box says it ("Only Jun–Sep").
@@ -61439,7 +61571,7 @@ ${renderGolfHeaderHtml()}
         <p class="op-hint">${L('Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.', 'Hors saison, votre page indique « Fermé pour la saison » et la date de réouverture, au lieu de « Ouvert maintenant ».')}</p>
       </div>`;
       })()}
-      ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'), lang)}
+      ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'), lang, (snap.hours_seasons || [])[1] || null)}
       ${ownerClosuresHtml(snap.closures || [], waitChip('closures'), lang)}
       </details>
 
@@ -67612,6 +67744,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Brewery test 1 (Whistler, 2026-11-15).
+  venueTapListWords, helpHereInSetup, betweenSecondTimeWords, OWNER_SEASONS_OVERLAP, breweryMenuAppStrings,
   // Cocktail test 2 (2026-11-13).
   // Pub test 3 (Whistler, 2026-11-14).
   NIGHT_FREQUENCY_LABELS, SETUP_NIGHTS_HELP_TOPIC, withSetupNightsTopic, researchKidsAll, wineryVisitTicks,

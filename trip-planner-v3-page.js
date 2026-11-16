@@ -1429,7 +1429,7 @@ function renderScript(d) {
     // The label comes from the planner ("Kids until 9 PM"); the page has already written its time in the page's style
     // ("9 PM" / "21 h"), so French only swaps the words around it.
     var kidsUntil = function(b){ var t = String(b.label || '').replace(/^Kids until /, ''); return lang() === 'fr' ? 'Enfants jusqu’à ' + t : 'Kids until ' + t; };
-    var badgeLi = function(b){ return '<li>' + esc(b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    var badgeLi = function(b){ return '<li>' + esc(b.key === 'dog_friendly' && v.dogsOutsideOnly ? (lang() === 'fr' ? 'Chiens à l’extérieur seulement' : 'Dogs outside only') : b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));

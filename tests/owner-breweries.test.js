@@ -603,7 +603,7 @@ test('fix 5: minors until a time shows “Kids until 9 PM” on the page and car
 });
 
 test('fix 6: wording: food trucks, the guess line, the door lead, Kids label, dog sentences, Flights from, owner hours, 12 PM', async () => {
-  assert.equal(text.en.brewery.tfoodSubs.trucks, 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often)');
+  assert.equal(text.en.brewery.tfoodSubs.trucks, 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often). Summer only? Pick Snacks only and mention the trucks in your story.');
   assert.equal(text.en.brewery.foodGuess, 'We picked this from what’s on your page. Tap another if it’s changed.');
   assert.doesNotMatch(text.en.brewery.doorLead, /orchard/i); assert.doesNotMatch(text.fr.brewery.doorLead, /verger/i);
   assert.match(text.en.brewery.doorLeadCidery, /orchard/);
@@ -1121,7 +1121,7 @@ test('brewery test 4: small fixes (menu path, kids pre-fill, last step, Dogs on 
   assert.ok((await change(tokenFor(c.id), { visit_rows: { dogs: 'Inside and patio' } })).status < 300);
   assert.equal(app.dogsPatioOnly(app.getVenue(c.id)), false);
   // "More about your place" status lines start with a capital.
-  assert.match(s, /'<span class="su-tile-sub">' \+ h\(capFirst\(stText\(k, d\)\)\)/);
+  assert.match(s, /'<span class="su-tile-sub">' \+ h\(capFirst\(stText\(k, nowSt\(k, d\)\)\)\)/);
   // The help answer starts with "Yes, any time."
   const tp = app.WINERY_SETUP_HELP_TOPICS.find((x) => x.id === 'winery-change-hours');
   assert.match(tp.a, /^<p>Yes, any time\. In either place:<\/p>/);

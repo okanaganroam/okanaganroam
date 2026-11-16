@@ -105,9 +105,9 @@ test('1: the setup asks "Are these your hours all year?" and gives the other sea
     assert.match(s, /'yearSeason:summer'/); assert.match(s, /'yearSeason:winter'/);
     // The season's own week starts from the usual week, every day (closed ones too), and any day can be opened.
     assert.match(s, /S\.sea\.week = clone\(S\.week\)/);
-    assert.match(s, /function W\(\)\{ return S\.step === 'hours:season' \? S\.sea\.week : S\.week; \}/);
+    assert.match(s, /function W\(\)\{ return seaIsStep\(S\.step\) \? S\.sea\.week : S\.week; \}/);
     assert.match(s, /data-copyevery="/, '"Every day" opens closed days in the season list');
-    assert.match(s, /var sw = \{\}; DAYS\.forEach\(function\(d\)\{ sw\[d\] = S\.sea\.week\[d\] \|\| \[\]; \}\);/);
+    assert.match(s, /var sw = \{\}; DAYS\.forEach\(function\(d\)\{ sw\[d\] = so\.week\[d\] \|\| \[\]; \}\);/);
     assert.doesNotMatch(s, /S\.week\[d\] \? \[\[S\.winter\.from, S\.winter\.to\]\] : \[\]/, 'never only the usual open days');
     // Midnight / 1 AM / 2 AM come with the same editor.
     assert.match(s, /lateBtns\(d, j, y\)/);

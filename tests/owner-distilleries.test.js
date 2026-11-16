@@ -498,11 +498,12 @@ test('fe1 tours screen: Distillery tour and Class first, research’s tour pre-f
   assert.match(s, /start: g\.start \|\| ''/);
   assert.match(s, /nTop = C\.nightKindsTop \|\| 6/);
   assert.match(s, /if \(C\.distillery\) \{ P2_ICONS\.happy = '🍹'; P2_ICONS\.music = '🥃'; \}/);
-  // A brewery: the pub chips, six on top; research isn't read as a tour.
+  // A brewery: the pub chips, six on top. Brewery test 1 (Whistler, 2026-11-15): a brewery has the Tour kind too, so
+  // research's plainly stated tour is suggested the same way.
   const b = mk('brewery'); research(b.id, [{ label: 'Events', text: 'Brewery tours Saturdays at 2 PM' }]);
   const cb = cfgOf((await get(`/owner/${tokenFor(b.id)}/setup`)).text);
-  assert.equal(cb.nightKindsTop, 6); assert.ok(!cb.nightKinds.includes('tour'));
-  assert.equal(cb.suggestNights, undefined);
+  assert.equal(cb.nightKindsTop, 6); assert.ok(cb.nightKinds.slice(0, 6).includes('tour')); assert.ok(!cb.nightKinds.includes('class'));
+  assert.deepEqual(cb.suggestNights, [{ kind: 'tour', days: ['sat'], start: '14:00' }]);
   // Two kinds or two times: shown as a hint only.
   const d2 = mk('distillery'); research(d2.id, [{ label: 'Tours', text: 'Tours and gin classes Saturdays at 2 PM' }]);
   const c2 = cfgOf((await get(`/owner/${tokenFor(d2.id)}/setup`)).text);
@@ -512,7 +513,9 @@ test('fe1 tours screen: Distillery tour and Class first, research’s tour pre-f
   assert.equal((await change(t, { weekly_nights: [{ days: ['sun'], kind: 'class', title: 'Gin class', start: '13:00', frequency: 'monthly-1st' }] })).status, 200);
   assert.equal(app.venueWeeklyNightsList(d.id)[0].kind, 'class');
   assert.match((await get(`/owner/${t}`)).text, /<option value="tour"/);
-  assert.doesNotMatch((await get(`/owner/${tokenFor(b.id)}`)).text, /<option value="tour"/);
+  // Brewery test 1 (Whistler, 2026-11-15): a brewery's list has Tour too; Class stays a distillery kind.
+  assert.match((await get(`/owner/${tokenFor(b.id)}`)).text, /<option value="tour"/);
+  assert.doesNotMatch((await get(`/owner/${tokenFor(b.id)}`)).text, /<option value="class"/);
 });
 
 test('fe1 Build My Trip: her Saturday 2 PM tour shows on the stop (“Tour at 2 PM, book ahead”), the visit includes it; “tasting” is used; Monday says only why', async () => {

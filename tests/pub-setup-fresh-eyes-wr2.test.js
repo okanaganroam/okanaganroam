@@ -83,7 +83,7 @@ const seasonCtx = (lang) => {
 };
 test('season: a season he set is named by its dates (EN + FR) on every setup screen; research’s named season keeps its name', () => {
   const src = CLIENT();
-  for (const f of ['seaTitle()', 'seaWhen()', 'T.seasonNowSpan', 'T.seasonHoursLineSpan', 'T.seasonDaysHDates']) assert.ok(src.includes(f), f);
+  for (const f of ['seaTitle()', 'seaWhen(', 'T.seasonNowSpan', 'T.seasonHoursLineSpan', 'T.seasonDaysHDates']) assert.ok(src.includes(f), f);
   assert.doesNotMatch(src, /q\(T\.seasonEditQ\[S\.sea\.kind\] \|\| T\.seasonEditQ\.summer, /, 'the title no longer guesses the season');
   assert.equal((src.match(/fill\(T\.closedWarnSeason/g) || []).length, 1, 'only research’s named season says "summer"/"winter"');
   const fr = seasonCtx('fr');
@@ -119,7 +119,7 @@ test('season: a season he set is named by its dates (EN + FR) on every setup scr
 // ---------- 3. "Yes, all year" with a season stored asks first ----------
 test('all year: with a stored season, "Yes, all year" names the dates and asks; "No, keep them" keeps the season', () => {
   const src = CLIENT();
-  assert.match(src, /if \(k === 'yearAll' && S\.sea\.on && \(CUR\.hours_seasons \|\| \[\]\)\.length && seaSpan\(S\.sea\)\) return go\('hours:yeardrop'\);/);
+  assert.match(src, /if \(k === 'yearAll' && storedSeas\(\)\.length\) \{ S\.dropI = null; return go\('hours:yeardrop'\); \}/);
   assert.match(src, /\} else if \(s === 'hours:yeardrop'\) \{/);
   assert.match(src, /big\('✓', T\.yearAllDropKeep, T\.yearAllDropKeepSub, false, 'yearDropKeep'\) \+ big\('✕', T\.yearAllDropYes, T\.yearAllDropYesSub, true, 'yearDropYes'\)/);
   assert.match(src, /if \(k === 'yearDropYes'\) k = 'yearAll';/);

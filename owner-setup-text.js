@@ -1117,7 +1117,7 @@ en.brewery = {
   tkindSubs: { Brewery: 'We brew here', Cidery: 'We make cider here', 'Taphouse or beer hall': 'We pour other brewers’ beer', Distillery: 'We make spirits here' },
   kindGuess: 'We picked “{kind}”. Tap another if it’s not right.',
   tfoodQ: 'Food here?', tfoodLead: 'Pick the main one.', tfoods: { kitchen: 'Our own kitchen', trucks: 'Food trucks', snacks: 'Snacks only', none: 'No food' },
-  tfoodSubs: { trucks: 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often)' },
+  tfoodSubs: { trucks: 'We’ll show “Food trucks most days” or “on weekends” (truck names change too often). Summer only? Pick Snacks only and mention the trucks in your story.' },
   // Brewery test 2 (2026-11-13): when the trucks are here, the only food-truck detail.
   ttrucksQ: 'When are the trucks here?', ttrucks: { most_days: 'Most days', weekends: 'Weekends only' }, ttrucksNeed: 'Please tap Most days or Weekends only.',
   trucksGuess: 'Your page says weekends now, so we picked it.',
@@ -1137,8 +1137,9 @@ en.brewery = {
   flightNeed: 'Please tap a price, or “We don’t do flights”.', togoNeed: 'Please tap what people can take home, or “Nothing to go”.', feeNeed: 'Please type the price in dollars, like 12.',
   flightSavedLive: 'Your flight price and to-go answer are on your page now.', flightSavedDay: 'Your to-go answer is on your page now. We check prices over $40 first; it’ll show within a day.',
   feeCard: 'From {x}', feeCardFree: 'Free flights',
-  // Happy hour: as for pubs.
-  happyQ: 'Do you have a happy hour?',
+  // Happy hour: as for pubs. The question itself is the shared one (en.happyQ), so a site's own wording of it applies to
+  // breweries too (brewery test 1 on Whistler, 2026-11-15); the example fits a taproom.
+  whatsOnEx: '$2 off pints',
   // What you offer, then who's welcome (the pub answer)
   offerLead: 'Visitors use these to find a taproom like yours.',
   minorsQ: 'Who’s welcome?', minorsLead: 'Families often check this before they come. Tell us your own rule.',
@@ -1188,7 +1189,7 @@ fr.brewery = {
   tkindSubs: { Brewery: 'Nous brassons ici', Cidery: 'Nous faisons du cidre ici', 'Taphouse or beer hall': 'Nous servons la bière d’autres brasseurs', Distillery: 'Nous distillons ici' },
   kindGuess: 'Nous avons choisi « {kind} ». Touchez-en un autre s’il ne convient pas.',
   tfoodQ: 'Nourriture sur place?', tfoodLead: 'Choisissez le principal.', tfoods: { kitchen: 'Notre cuisine', trucks: 'Camions-restaurants', snacks: 'Collations seulement', none: 'Pas de nourriture' },
-  tfoodSubs: { trucks: 'Nous indiquerons « Camions-restaurants la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent)' },
+  tfoodSubs: { trucks: 'Nous indiquerons « Camions-restaurants la plupart des jours » ou « la fin de semaine » (les camions changent trop souvent). L’été seulement? Choisissez Collations seulement et parlez des camions dans votre histoire.' },
   ttrucksQ: 'Quand les camions sont-ils là?', ttrucks: { most_days: 'La plupart des jours', weekends: 'La fin de semaine seulement' }, ttrucksNeed: 'Touchez La plupart des jours ou La fin de semaine seulement.',
   trucksGuess: 'Votre page indique la fin de semaine, alors nous l’avons choisi.',
   foodGuess: 'Nous l’avons choisi d’après ce qui est sur votre page. Touchez-en un autre si ça a changé.',
@@ -1206,7 +1207,7 @@ fr.brewery = {
   flightNeed: 'Touchez un prix, ou « Nous n’offrons pas de plateaux ».', togoNeed: 'Touchez ce qu’on peut rapporter, ou « Rien à emporter ».', feeNeed: 'Écrivez le prix en dollars, par exemple 12.',
   flightSavedLive: 'Votre prix de plateau et votre réponse pour emporter sont sur votre page maintenant.', flightSavedDay: 'Votre réponse pour emporter est sur votre page maintenant. Nous vérifions d’abord les prix de plus de 40 $; il s’affichera d’ici un jour.',
   feeCard: 'À partir de {x}', feeCardFree: 'Plateaux gratuits',
-  happyQ: 'Avez-vous un 5 à 7?', happyYes: 'Oui',
+  happyYes: 'Oui', whatsOnEx: '2 $ de rabais sur les pintes',
   offerLead: 'Les visiteurs s’en servent pour trouver une salle comme la vôtre.',
   minorsQ: 'Qui est le bienvenu?', minorsLead: 'Les familles vérifient souvent avant de venir. Dites-nous votre propre règle.',
   minorsOpts: { adults: 'Adultes seulement (19 ans et plus)', minors_until: 'Mineurs bienvenus avec un adulte, jusqu’à une heure donnée', all_ages: 'Tous les âges sont bienvenus' },
@@ -1592,6 +1593,60 @@ Object.assign(fr.cafe, {
   twoTimesMax: 'Jusqu’à deux plages par jour.',
   finishEvents: 'Un événement régulier ? Ajoutez-le sous Événements de la semaine, sur votre page de modification.',
 });
+
+// Brewery test 1 on Whistler (2026-11-15; Whistler Roam drafts/fresh-eyes-brewery1-2026-11-15/REPORT.md). Shared by every
+// type: a second "other hours" period (a spring and a fall shoulder season), named by its dates like the first; "Copy the
+// hours from …"; removing one of two; dates that overlap; a usual day changed while a period still has its old time; the
+// event box's counter and "name, then the rest". Breweries, pubs and lounges: a second time "if you close in between".
+Object.assign(en, {
+  seasonEditQSecond: 'Your second stretch of other hours',
+  seasonEditLeadDates: 'Pick the first and last day, then tap Change beside any day that’s different. Any day can be open, even one that’s closed the rest of the year.',
+  seaAdd: '+ Add a second stretch with different hours', seaAddSub: 'Like a spring and a fall shoulder season. You pick the dates next',
+  seaAddLink: 'A second stretch with different hours too? Save these and add it',
+  seaCopy: 'Copy the hours from {a} – {b}', seaRemove: 'Remove these hours',
+  seaDropQ: 'Remove your hours {span}?', seaDropLead: 'Only these hours are removed. Your usual hours and your other stretch stay as they are.', seaDropYes: 'Yes, remove them',
+  seasonOverlap: 'These dates overlap your {a} – {b} hours. Please pick dates that don’t overlap.',
+  seaStale: 'Your {a} – {b} hours still say {what}. Change them too?', seaStaleYes: 'Yes, change them too', seaStaleDone: '✓ Your {a} – {b} hours are changed too.',
+  eventLeft: '{n} characters left', eventLeft1: '1 character left',
+  eventSplit: 'Name: “{title}”. The rest shows under it: “{detail}”.',
+  eventLong: 'Please keep the name to 40 characters. Put a comma after the name, and the rest shows under it.',
+  eventDetailLong: 'That’s a little long. Please keep what comes after the name to 80 characters.',
+});
+Object.assign(fr, {
+  seasonEditQSecond: 'Votre deuxième période d’autres heures',
+  seasonEditLeadDates: 'Choisissez le premier et le dernier jour, puis touchez Modifier à côté d’une journée différente. Toute journée peut être ouverte, même une qui est fermée le reste de l’année.',
+  seaAdd: '+ Ajouter une deuxième période aux heures différentes', seaAddSub: 'Comme une intersaison au printemps et une autre à l’automne. Vous choisissez les dates ensuite',
+  seaAddLink: 'Une deuxième période aux heures différentes aussi? Enregistrez celles-ci et ajoutez-la',
+  seaCopy: 'Copier les heures du {a} au {b}', seaRemove: 'Retirer ces heures',
+  seaDropQ: 'Retirer vos heures {span}?', seaDropLead: 'Seules ces heures sont retirées. Vos heures habituelles et votre autre période restent comme elles sont.', seaDropYes: 'Oui, les retirer',
+  seasonOverlap: 'Ces dates chevauchent vos heures du {a} au {b}. Choisissez des dates qui ne se chevauchent pas.',
+  seaStale: 'Vos heures du {a} au {b} indiquent encore {what}. Les changer aussi?', seaStaleYes: 'Oui, les changer aussi', seaStaleDone: '✓ Vos heures du {a} au {b} sont changées aussi.',
+  eventLeft: 'Il reste {n} caractères', eventLeft1: 'Il reste 1 caractère',
+  eventSplit: 'Nom : « {title} ». Le reste s’affiche dessous : « {detail} ».',
+  eventLong: 'Gardez le nom à 40 caractères au plus. Mettez une virgule après le nom, et le reste s’affichera dessous.',
+  eventDetailLong: 'C’est un peu long. Gardez ce qui suit le nom à 80 caractères au plus.',
+});
+// A second time for a place with no lunch and dinner services (a taproom, a pub, a lounge): "if you close in between".
+for (const k of ['brewery', 'pub']) {
+  Object.assign(en[k], { addSecond: '+ Add a second time (if you close in between)', twoTimesMax: 'Up to two times a day.' });
+  Object.assign(fr[k], { addSecond: '+ Ajouter une deuxième plage (si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.' });
+}
+// No-kitchen breweries: the tap list stays an optional tile, and the finish screen names it while there is no menu link.
+Object.assign(en.brewery, { finishTap: 'Add your tap list' });
+Object.assign(fr.brewery, { finishTap: 'Ajouter votre liste des bières' });
+Object.assign(en.brewery.kindCidery, { finishTap: 'Add your cider list' });
+Object.assign(fr.brewery.kindCidery, { finishTap: 'Ajouter votre liste des cidres' });
+Object.assign(en.brewery.kindNeutral, { finishTap: 'Add your drinks list' });
+Object.assign(fr.brewery.kindNeutral, { finishTap: 'Ajouter votre liste des boissons' });
+Object.assign(en.brewery.kindDistillery, { finishTap: 'Add your cocktail list' });
+Object.assign(fr.brewery.kindDistillery, { finishTap: 'Ajouter votre carte des cocktails' });
+// A brewery tour (it was a distillery-only kind); the chip names it.
+en.brewery.kinds = Object.assign({}, en.brewery.kinds, { tour: 'Brewery tour' });
+fr.brewery.kinds = Object.assign({}, fr.brewery.kinds, { tour: 'Visite de la brasserie' });
+en.brewery.kindCidery.kinds = Object.assign({}, en.brewery.kindCidery.kinds, { tour: 'Cidery tour' });
+fr.brewery.kindCidery.kinds = Object.assign({}, fr.brewery.kindCidery.kinds, { tour: 'Visite de la cidrerie' });
+en.brewery.kindNeutral.kinds = Object.assign({}, en.brewery.kindNeutral.kinds, { tour: 'Tour' });
+fr.brewery.kindNeutral.kinds = Object.assign({}, fr.brewery.kindNeutral.kinds, { tour: 'Visite' });
 
 // Café test 6 (2026-11-12): French spacing in every French setup string: a no-break space before « : » and a narrow
 // no-break space before « ? » and « ! » ("Noël : …", "Facultatif : …", "Options sans gluten ?"), never split from the

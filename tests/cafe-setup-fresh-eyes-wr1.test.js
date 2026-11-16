@@ -120,7 +120,9 @@ test('help in a café’s setup answers the café questions plainly, in English 
   const pub = helpBot((await get(`/owner/${tokenFor(mk('pub').id)}/setup`)).text);
   assert.ok(pub.topics.some((x) => /Right here in setup: <strong>Weekly events<\/strong>/.test(String(x.a))));
   assert.equal(pub.topic('cafe-wifi'), undefined);
-  assert.match(pub.topic('hours').a, /\+ Add a second time \(lunch &amp; dinner\)/);
+  // Brewery test 1 (Whistler, 2026-11-15): a pub's day card says "(if you close in between)"; a restaurant's keeps lunch & dinner.
+  assert.match(pub.topic('hours').a, /\+ Add a second time \(if you close in between\)/);
+  assert.match(helpBot((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).topic('hours').a, /\+ Add a second time \(lunch &amp; dinner\)/);
   // "Closed on a holiday" in any setup is that setup's own screen, in its own words, with the early-close line.
   assert.match(pub.topic('closures').a, /^<p>Right here in setup: <strong>Holidays and closures<\/strong> \(tap <strong>Change an answer<\/strong> if it’s done\)\. Tap each holiday you’re closed/);
   assert.match(pub.topic('closures').a, /Open that day but closing early\? Leave it unticked and message us the date and time\.<\/p>$/);
