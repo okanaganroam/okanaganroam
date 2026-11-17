@@ -160,23 +160,19 @@ test('help: "we close for two weeks in spring" names "Closed for a week or two" 
 });
 
 // ====================== 2. The story box ======================
-test('story box: research text is still selected on the first tap, and the hint over it says so (EN + FR); her own story keeps the old hint', async () => {
-  assert.equal(text.en.storyResearchHint, 'This is what your page says now. Type to replace this text, or tap again to add to it. The ✕ clears it.');
-  assert.match(text.fr.storyResearchHint, /Tapez pour remplacer ce texte, ou touchez une deuxième fois pour y ajouter des mots\. Le ✕ l’efface\.$/);
+// Tour test 5 (Whistler, 2026-11-17) changed this: one tap and typing wiped an owner's description, so the story box is
+// never selected now; typing adds to the end, and replacing it is an explicit link ("Clear it and write my own") or the ✕.
+test('story box: research text is never selected on a tap (typing adds to it), and the hint over it says so (EN + FR); her own story keeps the old hint', async () => {
+  assert.equal(text.en.storyResearchHint, 'This is what your page says now. Typing adds to the end of it.');
+  assert.match(text.fr.storyResearchHint, /Ce que vous tapez s’ajoute à la fin\.$/);
   assert.match(text.en.storyEditHint, /Change any words right in the box/, 'her own story: as before');
   const s = CLIENT();
-  // The hint is shown on exactly the condition the first-tap select uses (research's text, nothing of hers waiting, unchanged).
   assert.match(s, /C\.storyResearch && !C\.storyPending && S\.story === storyCur\(\) && T\.storyResearchHint \? T\.storyResearchHint : T\.storyEditHint/);
-  assert.match(s, /var researchStory = inp\.id === 'suStory' && C\.storyResearch && !C\.storyPending && !!storyCur\(\) && inp\.value === storyCur\(\);/);
-  assert.match(s, /\|\| researchStory \|\| researchLine\) && !chipOwn, first = true;/);
-  // "…or tap again to add to it" is kept on every phone: a second tap while our own select is still on the box puts the
-  // cursor at the end (the first tap's own click, right after the focus, is left alone; typing ends it).
-  assert.match(s, /if \(sel\) \{ inp\.select\(\); inp\._autoSel = Date\.now\(\); \} else inp\.setSelectionRange\(n, n\);/);
-  assert.match(s, /if \(researchStory\) \{\s+inp\.addEventListener\('click', function\(\)\{ if \(!inp\._autoSel \|\| Date\.now\(\) - inp\._autoSel < 300\) return; inp\._autoSel = 0; try \{ var n2 = inp\.value\.length; if \(n2 && inp\.selectionStart === 0 && inp\.selectionEnd === n2\) inp\.setSelectionRange\(n2, n2\); \} catch \(e\) \{\} \}\);\s+inp\.addEventListener\('input', function\(\)\{ inp\._autoSel = 0; \}\);/);
-  // Every type that has the box gets the words.
+  assert.match(s, /\|\| researchLine\) && !chipOwn, first = true;/);
+  assert.doesNotMatch(s, /\|\| researchStory \|\| researchLine\)/);
   for (const [type, fr] of [['distillery', false], ['brewery', true], ['pub', false], ['winery', false], ['restaurant', false], ['cafe', true], ['cocktail', false]]) {
     const v = mk(type); const html = (await get(`${fr ? '/fr' : ''}/owner/${tokenFor(v.id)}/setup`)).text;
-    assert.ok(html.includes(fr ? 'Tapez pour remplacer ce texte' : 'Type to replace this text, or tap again to add to it'), type);
+    assert.ok(html.includes(fr ? 'Ce que vous tapez s’ajoute à la fin' : 'Typing adds to the end of it'), type);
     assert.equal(cfgOf(html).storyResearch, true, `${type}: a fixture description nobody wrote is research's`);
   }
 });
@@ -400,7 +396,8 @@ test('tasting price: "from your website, so we picked it" goes once the price in
   assert.match(s, /if \(sfe\) sfe\.addEventListener\('input', function\(\)\{ if \(C\.brewery\) readBrew\(\); else if \(C\.winery\) readWine\(\); var fg = el\('suFeeGuess'\); if \(fg && !\(\(C\.brewery \? S\.brew : S\.wine\) \|\| \{\}\)\.feeGuessed\) fg\.hidden = true; \}\);/);
   // readBrew itself, run on its own: $15 typed over research's $12 is his; research's own $12 left in the box is still a guess.
   const run = (typed) => {
-    const ctx = { C: { brewery: true, researchFee: 12 }, S: { brew: { fee: 12, feeGuessed: true }, kitchen: null }, FOLD: false, CK: false, el: (id) => (id === 'suFee' ? { value: typed } : null) };
+    // Tour test 5: the flight box also refuses a trip length first (feeHours).
+    const ctx = { C: { brewery: true, researchFee: 12 }, S: { brew: { fee: 12, feeGuessed: true }, kitchen: null }, FOLD: false, CK: false, el: (id) => (id === 'suFee' ? { value: typed } : null), feeHours: () => false };
     clientPart('  function readBrew(){', '    if ((x = v(\'suKto\'))', ctx, '}');
     vm.runInNewContext('readBrew()', ctx); return ctx.S.brew;
   };

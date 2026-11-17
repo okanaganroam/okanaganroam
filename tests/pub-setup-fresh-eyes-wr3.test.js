@@ -205,7 +205,7 @@ test('Known for, booking and groups boxes: research text is selected on the firs
   assert.match(s, /textarea\.su-area, textarea\.su-line'\), function\(inp\)\{/);
   assert.match(s, /b\.setAttribute\('aria-label', area && !line \? T\.storyClear : T\.clearField\);/);
   assert.match(s, /var vk = inp\.getAttribute\('data-vk'\), researchLine = !!vk && !!inp\.value && \(C\.visitResearch \|\| \[\]\)\.indexOf\(vk\) >= 0 && inp\.value === \(\(CUR\.visit_rows \|\| \{\}\)\[vk\] \|\| ''\);/);
-  assert.match(s, /\|\| researchStory \|\| researchLine\) && !chipOwn, first = true;/);
+  assert.match(s, /\|\| researchLine\) && !chipOwn, first = true;/); // tour test 5: the story box is never selected now, the one-line research boxes still are
 });
 
 // ---------- 5. All ages from research's "Family friendly" ----------

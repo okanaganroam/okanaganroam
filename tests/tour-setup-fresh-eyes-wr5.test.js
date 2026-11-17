@@ -245,7 +245,7 @@ test('10. the card never pairs one trip’s price with another’s length: a lis
   assert.equal(app.tourLengthRange([120, 120]), null);
   assert.equal(app.tourLengthRange([90]), null);
   const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  assert.match(src, /if \(tourFacts && tourFacts\.time && venue\.type === 'tour'\) \{ const lv = tourListVaries\(venue\.id\); if \(lv\.length\) tourFacts\.time = tourLengthRange\(lv\.mins\); \}/);
+  assert.match(src, /if \(tourFacts && tourFacts\.time && venue\.type === 'tour'\) \{ const lv = tourListInfo\(venue\.id\); if \(lv\.length\) tourFacts\.time = tourLengthRange\(lv\.mins\); \}/);
   // From whistlerroam #186: the list item's own "How long" box is read first.
   assert.match(src, /const t = `\$\{it\.duration \|\| ''\} \$\{it\.name \|\| ''\} \$\{it\.description \|\| ''\}`\.toLowerCase\(\);/);
   // The planner's slot for a tour is its own trip length.

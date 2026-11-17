@@ -21881,7 +21881,9 @@ function visitRowsWithoutEchoedTastingPrice(info) {
 // list has more than one trip and its lines name different lengths (or different ages), the page's Time needed and
 // Booking (or Ages) lines add "Varies by tour: see Tours & prices." and Build My Trip adds one note. Only on a clean
 // signal (two or more trips that each name a length, not all the same); a research list not yet confirmed never counts.
-function tourListVaries(venueId) {
+function tourListVaries(venueId) { const x = tourListInfo(venueId); return { length: x.length, ages: x.ages }; }
+// Tour test 5: the same reading with the trip lengths in minutes (for the card's range).
+function tourListInfo(venueId) {
   const out = { length: false, ages: false, mins: [] };
   try {
     const m = publishedMenu(venueId);
@@ -22797,7 +22799,7 @@ function venueCardHtml(venue, opts = {}) {
   // Tour test 5 (Whistler, 2026-11-17): "From $95 · 4 hr" paired the 2-hour cruise's price with the half-day charter's
   // length. When the published list's trips run different lengths, the card shows their range ("2–8 hr"), never one
   // length beside a price that may be another trip's.
-  if (tourFacts && tourFacts.time && venue.type === 'tour') { const lv = tourListVaries(venue.id); if (lv.length) tourFacts.time = tourLengthRange(lv.mins); }
+  if (tourFacts && tourFacts.time && venue.type === 'tour') { const lv = tourListInfo(venue.id); if (lv.length) tourFacts.time = tourLengthRange(lv.mins); }
   const tourFactChips = isTourCard
     ? [tourFacts.price ? `<span class="chip chip-feat chip-price">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
