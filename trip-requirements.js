@@ -30,7 +30,7 @@ const KINDS = {
   bungee: /\b(?:bungee|bungy)(?: jumps?| jumping)?\b/,
   rafting: /\b(?:rafting|white ?water rafting|river rafts?|raft trips?|raft tours?)\b/,
   // Tour test 3 (Whistler, 2026-11-17): a tour's own words "Scenic or helicopter flights" / "Helicopter & scenic flights".
-  scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic flights?|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|sightseeing)|heli tours?|flightseeing|glacier landings?)\b/,
+  scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic flights?|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|sightseeing)|heli (?:tours?|sightseeing)|flightseeing|glacier landings?)\b/,
   // Tour test 3 (Whistler, 2026-11-17): heli-hiking is its own kind of tour (it read as Hiking & Trails plus the word
   // "heli"): a tour whose own words say heli-hiking. The request's "heli-hiking", "heli hike" and « héli-randonnée »
   // become the one word "helihiking" (REQUEST_SYNONYMS) so no hike is planned beside it.
