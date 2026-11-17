@@ -2085,6 +2085,17 @@ Object.assign(fr.tour, {
   tpriceOne: 'Un seul prix ici : votre plus bas pour une personne, par exemple 95. Les autres prix et les extras vont dans « Vos sorties et tarifs ».',
   tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas.',
 });
+// Tour test 5: by-booking tours' Groups question (everyone books), the meeting-spot examples with a dock or marina.
+Object.assign(en.tour, {
+  groupsQBooked: 'Groups and private bookings: how big can a group be?', groupsLeadBooked: 'Tap the most people you take, then add private trips or team outings in your own words.',
+  groupsLineBooked: 'Groups of up to {n}', groupsChipBooked: 'Up to {n}',
+  doorPhotoLead: 'Stand where people meet you (the dock or marina, the trailhead, the office), with your sign, boat or vehicle in the picture if you can. Your device will ask to share your location, so visitors get directions to this spot.',
+});
+Object.assign(fr.tour, {
+  groupsQBooked: 'Groupes et réservations privées : quelle taille peut avoir un groupe?', groupsLeadBooked: 'Touchez le plus grand nombre de personnes que vous prenez, puis ajoutez les sorties privées ou d’équipe dans vos mots.',
+  groupsLineBooked: 'Groupes jusqu’à {n} personnes', groupsChipBooked: 'Jusqu’à {n}',
+  doorPhotoLead: 'Placez-vous là où l’on vous rejoint (le quai ou la marina, le départ du sentier, le bureau), avec votre enseigne, votre bateau ou votre véhicule dans la photo si possible. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’à ce point.',
+});
 // All types: a line of the owner's that the page folds under "More" says so after the save.
 Object.assign(en, { hoursBack: 'We put back the hours you had before. Check them, then tap Next.', foldedMore: 'Look for it under “More” in your Plan your visit box.' });
 Object.assign(fr, { hoursBack: 'Nous avons remis les heures que vous aviez. Vérifiez-les, puis touchez Suivant.', foldedMore: 'Elle se trouve sous « Plus » dans l’encadré Planifiez votre visite.' });

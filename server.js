@@ -6893,6 +6893,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(v.dog_friendly && dogsOutsideOnly(v) ? { dogsOutsideOnly: true } : {}),
       // Brewery test 2 (Whistler, 2026-11-16): and her own "Patio only".
       ...(v.dog_friendly && dogsPatioOnly(v) ? { dogsPatioOnly: true } : {}),
+      ...(v.dog_friendly && v.type === 'tour' && dogsSomeTrips(v) ? { dogsSomeTrips: true } : {}),
       // Brewery test 4 (2026-11-13): a brewery whose owner answered "Our own kitchen" (or a pub with a kitchen answer), with
       // its kitchen close time when earlier, so a dinner slot can be there within its kitchen hours.
       ...(plannerOwnKitchen(v, hoursDate) ? { ownKitchen: plannerOwnKitchen(v, hoursDate) } : {}),
@@ -10590,6 +10591,9 @@ function visitDropRepeatedKnownFor(info, description) {
 }
 // "Patio only" -> "Dogs welcome on the patio only" (and "Inside and patio"), part by part, in the line's own language.
 function dogsChipSentences(text) {
+  // Tour test 5 (Whistler, 2026-11-17): the "On some trips (say which)" chip and her words read "On some trips private
+  // charters only"; they join with ": " ("On some trips: private charters only").
+  text = String(text == null ? '' : text).replace(/^(\s*(?:On some trips|On every trip|À certaines sorties|À toutes les sorties))\s+(?=[^\s.,:;!?(])/i, '$1: ');
   // Café test 1 (Whistler, 2026-11-15): a chip followed by her own sentence stays as typed ("Patio only. Dogs welcome on
   // the patio, water bowl out front"), for every type: expanding the chip said it twice ("Dogs welcome on the patio only.
   // Dogs welcome on the patio, water bowl out front"). A few words added after a comma ("Patio only, on leash") still
@@ -20394,7 +20398,7 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label0] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
-      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || (f === 'dog_friendly' && (dogsPatioOnly(venue) ? 'Dogs on patio' : dogsOutsideOnly(venue) ? 'Dogs outside only' : '')) || label0;
+      const label = (f === 'kid_friendly' && kidsChipLabel(venue, false)) || (f === 'dog_friendly' && (dogsPatioOnly(venue) ? 'Dogs on patio' : dogsOutsideOnly(venue) ? 'Dogs outside only' : dogsSomeTrips(venue) ? 'Dogs on some trips' : '')) || label0;
       return `<span class="chip chip-feat${f === 'free_entry' ? ' chip-price' : ''}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .concat(ownerFeatureChipsHtml(venue, false, () => 'chip chip-feat') || [])
@@ -20403,6 +20407,16 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
 
 // Brewery test 4 (2026-11-13): the owner's own Dogs answer is "Patio only" (any type): the card chip says "Dogs on
 // patio" (« Chiens sur la terrasse »), not "Dogs OK".
+// Tour test 5 (Whistler, 2026-11-17): a tour whose owner said dogs come on some trips only ("On some trips: private
+// charters only"): the card, the planner and its stop say "Dogs on some trips", not a plain Dog-Friendly.
+function dogsSomeTrips(venue) {
+  if (!venue || !venue.id || !venue.dog_friendly || venue.type !== 'tour') return false;
+  const info = venueVisitInfo(venue.id);
+  if (!info || !(info.owner_labels || []).includes('Dogs')) return false;
+  const r = Array.isArray(info.rows) ? info.rows.find((x) => x && x.label === 'Dogs' && typeof x.text === 'string') : null;
+  const texts = [r && r.text, ownerVisitFrLines(info).dogs].filter(Boolean);
+  return texts.some((t) => /^\s*(?:dogs welcome )?on some (?:trips|tours)\b|^\s*(?:chiens bienvenus )?[àa] certaines sorties\b/i.test(String(t)));
+}
 function dogsPatioOnly(venue) {
   if (!venue || !venue.id || !venue.dog_friendly) return false;
   const info = venueVisitInfo(venue.id);
@@ -21868,7 +21882,7 @@ function visitRowsWithoutEchoedTastingPrice(info) {
 // Booking (or Ages) lines add "Varies by tour: see Tours & prices." and Build My Trip adds one note. Only on a clean
 // signal (two or more trips that each name a length, not all the same); a research list not yet confirmed never counts.
 function tourListVaries(venueId) {
-  const out = { length: false, ages: false };
+  const out = { length: false, ages: false, mins: [] };
   try {
     const m = publishedMenu(venueId);
     if (!m || menuIsUnconfirmedResearch(m)) return out;
@@ -21876,7 +21890,9 @@ function tourListVaries(venueId) {
     if (items.length < 2) return out;
     const mins = [], ages = [];
     for (const it of items) {
-      const t = `${it.name || ''} ${it.description || ''}`.toLowerCase();
+      // From whistlerroam #186: a tour's own "How long" box on the list (it.duration, "3 hours") is read first; the lengths
+      // were missed when they were typed there instead of in the description.
+      const t = `${it.duration || ''} ${it.name || ''} ${it.description || ''}`.toLowerCase();
       const d = /(\d+(?:[.,]\d)?)\s*(hours?|hrs?|heures?|minutes?|mins?\b|min\b|h\b)/.exec(t);
       if (d) mins.push(Math.round(Number(d[1].replace(',', '.')) * (/^h/.test(d[2]) ? 60 : 1)));
       else if (/\bhalf[- ]day\b|\bdemi[- ]journ[ée]e\b/.test(t)) mins.push(240);
@@ -21886,6 +21902,7 @@ function tourListVaries(venueId) {
     }
     out.length = mins.length >= 2 && new Set(mins).size >= 2;
     out.ages = ages.length >= 2 && new Set(ages).size >= 2;
+    out.mins = mins;
   } catch (e) { /* no list */ }
   return out;
 }
@@ -22597,6 +22614,16 @@ const priceCheck = require('./price-check').createPriceCheck({
   db, prices: CARD_PRICES,
   venueName: (id) => { try { const r = db.prepare('SELECT name FROM venues WHERE id = ?').get(Number(id)); return r ? r.name : null; } catch (e) { return null; } },
 });
+// "2–8 hr" / "45 min–3 hr" from a list's trip lengths in minutes (null with fewer than two different lengths).
+function tourLengthRange(mins) {
+  const m = (mins || []).filter((x) => Number.isFinite(x) && x > 0);
+  if (m.length < 2) return null;
+  const lo = Math.min(...m), hi = Math.max(...m);
+  if (lo === hi) return null;
+  const hr = (x) => String(Math.round((x / 60) * 10) / 10);
+  if (lo >= 60) return `${hr(lo)}\u2013${hr(hi)} hr`;
+  return `${lo} min\u2013${hi >= 60 ? `${hr(hi)} hr` : `${hi} min`}`;
+}
 function tourCardFacts(info) {
   const out = { price: null, time: null };
   if (!info || !Array.isArray(info.rows)) return out;
@@ -22767,6 +22794,10 @@ function venueCardHtml(venue, opts = {}) {
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
   const photoTagChips = cvCardChip + (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   const tourFacts = isTourCard ? { ...tourCardFacts(tourInfo), price: cardPriceFor(venue.id) } : null;
+  // Tour test 5 (Whistler, 2026-11-17): "From $95 · 4 hr" paired the 2-hour cruise's price with the half-day charter's
+  // length. When the published list's trips run different lengths, the card shows their range ("2–8 hr"), never one
+  // length beside a price that may be another trip's.
+  if (tourFacts && tourFacts.time && venue.type === 'tour') { const lv = tourListVaries(venue.id); if (lv.length) tourFacts.time = tourLengthRange(lv.mins); }
   const tourFactChips = isTourCard
     ? [tourFacts.price ? `<span class="chip chip-feat chip-price">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
@@ -48450,7 +48481,10 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => !(r && r.owned && slotLabels.has(r.label)));
   const badgeOk = visitBadgeConfirmedLabels(venueId, rows.concat(stash));
   let capType = ''; try { capType = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { capType = ''; }
-  const dropped = visitCapRows(rows, (r) => slotLabels.has(r.label) || owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label), capType);
+  // Tour test 5 (Whistler, 2026-11-17): a research row is not hers just because its label is one of the answer slots
+  // (research's "Good to know: Free parking at the marina…" kept the box while Rob's own Dogs line was set aside, until he
+  // typed his own Good to know). Her lines (owned) come first; research fills what is left (all types).
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label), capType);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
@@ -57182,6 +57216,9 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-logo { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 18px; letter-spacing: .04em; text-transform: uppercase; color: #1B2B3A; }
   body.owner-setup .su-logo b { color: #A07A1B; }
   body.owner-setup .su-exit { display: inline-flex; align-items: center; min-height: 48px; padding: 0 6px; color: #1E4F4C; font-weight: 800; font-size: 17px; }
+  /* Tour test 5 (Whistler, 2026-11-17): at 360 px the header wrapped ("WHISTLER / ROAM", "Exit / setup"): each piece stays on one line and a phone gets smaller header words. */
+  body.owner-setup .su-logo, body.owner-setup .su-exit, body.owner-setup .su-head .su-lang { white-space: nowrap; }
+  @media (max-width: 400px) { body.owner-setup .su-head { gap: 6px; } body.owner-setup .su-logo { font-size: 15px; letter-spacing: 0; } body.owner-setup .su-exit, body.owner-setup .su-head .su-lang { font-size: 15px; padding: 0 4px; } }
   body.owner-setup .su-main { padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   body.owner-setup .su-h2 { font-size: 22px; margin: 22px 0 10px; }
   body.owner-setup .su-box { background: var(--su-card); border: 2px solid var(--su-line); border-radius: 18px; padding: 12px 16px; margin-bottom: 20px; font-size: 19px; font-weight: 800; }
@@ -57490,6 +57527,7 @@ function priceListOfferCatalog(venue, menu, lang) {
   };
 }
 
+const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|people|guest|guests|passenger|passengers|rider|riders|adult|child|kid)s?\b|add[- ]?ons?\b|(?:rod|gear|equipment|wetsuit|bike|helmet) rentals?\b|rentals?\b|(?:fishing )?licen[cs]es?\b|personnes? suppl[ée]mentaires?\b|location\b|permis\b)/i;
 // The short menu on the place page: the first few dishes and a link to the full menu page.
 function venueMenuPreviewHtml(venue, menu, lang) {
   if (!menu) return '';
@@ -57502,7 +57540,10 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   for (const s of menu.data.sections) { let first = true; for (const it of s.items) if (picks.length < 5) { picks.push(it); if (first && venue.type === 'tour' && s.name && menu.data.sections.length > 1) secOf.set(it, String(s.name)); first = false; } }
   const tours = isPriceList(venue);
   const w = PRICE_LIST_WORDS[menuKind(venue)];
-  const count = menuDishCountText(menu.items, lang, menuKind(venue));
+  // Tour test 5 (Whistler, 2026-11-17): "See all tours & prices (4 tours)" counted "Extra person $75" as a tour. Add-on
+  // lines (an extra person, rentals, a licence, add-ons) are not trips.
+  const tripCount = venue.type === 'tour' ? (menu.data.sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length : 0;
+  const count = menuDishCountText(venue.type === 'tour' && tripCount ? tripCount : menu.items, lang, menuKind(venue));
   const see = tours ? (fr ? (venue.type === 'tour' ? `Voir toutes les sorties et tarifs (${count})` : `Voir tous les tarifs (${count})`) : `See all ${w.en.list} (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
   // Golf pages also carry the researched green-fee table, so the course's own list says where it came from.
   const heading = menuKind(venue) === 'golf' ? (fr ? 'Tarifs de golf, selon le terrain' : 'Green fees & rates from the course') : menuNoun(venue, lang);
@@ -62030,6 +62071,8 @@ function renderAdminReviewPage() {
     var nd = card.querySelector('input[name=notdup]'); if (nd && nd.checked) body.reviewed_duplicates = nd.getAttribute('data-ids').split(',').map(Number);
     var ad = card.querySelector('input[name=allowdup]'); if (ad) body.allow_duplicate = ad.checked;
     var am = card.querySelector('input[name=amenities]'); if (am) body.include_amenities = am.checked;
+    // Tour test 5: a storefront spot far from the phone's reading says which of the two is right.
+    if (card.querySelector('input[name=use]')) { var useBox = card.querySelector('input[name=use]:checked'); body.use = useBox ? useBox.value : ''; }
     // Fix (2026-10-19): Reject acts at once and emails them, so an empty reason now asks first.
     if (act === 'reject' && !String(body.reason).trim() && !window.confirm('Reject with no reason? They will still be emailed that it was turned down.' + (kind === 'photo' ? ' To turn it down without emailing them, use Dismiss quietly.' : ''))) return;
     if (act === 'approve') {
@@ -64107,7 +64150,11 @@ ${renderGolfHeaderHtml()}
       <details class="op-fold op-sec" id="hours" data-task="hours" open>
       <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
       ${saveLine('own', '', 'hours open_months hours_seasons closures')}<p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${venue.type === 'tour' ? '' : L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
-      <div id="opHours">${dayRows('hours', hours, true)}</div>
+      ${venue.type === 'tour' && wineryApptOnly && OWNER_DAYS.every((d) => !(hours[d] && hours[d].length)) && !waitingFields.has('hours')
+        // Tour test 5 (Whistler, 2026-11-17): a by-booking tour's edit page showed Mon–Sun "Closed". It says what the page
+        // says, and the week stays folded under "Add set hours" (nothing changes until she saves).
+        ? `<p class="op-hint op-no-set-hours-now" id="opNoSetHoursTour">${L('No set hours: trips are by booking. Your page says “Book ahead · tours by reservation”.', 'Pas d’heures fixes : sorties sur réservation. Votre page indique « Réservez à l’avance · sorties sur réservation ».')}</p><details class="op-fold" id="opHoursSetFold"><summary>${L('Add set hours', 'Ajouter des heures fixes')}</summary><div id="opHours">${dayRows('hours', hours, true)}</div></details>`
+        : `<div id="opHours">${dayRows('hours', hours, true)}</div>`}
       <p class="lyv-error" id="opHoursError" hidden></p>${hoursOkHtml()}${noSetHoursHtml()}
       ${(() => {
         // Seasonal businesses (tours, golf, patios): the months they open every year.
@@ -64159,7 +64206,7 @@ ${renderGolfHeaderHtml()}
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">${L(`A few sentences about what makes your ${venue.type === 'tour' ? 'trips worth booking' : 'place worth a visit'}. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui ${venue.type === 'tour' ? 'donne envie de réserver vos sorties' : 'rend votre endroit intéressant'}. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>${completeOn ? `
-        <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('{n}/{min} ✓ long enough for your score', '{n}/{min} ✓ assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
+        <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('✓ Long enough for your score', '✓ Assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 

@@ -1720,7 +1720,12 @@
   }
   function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; delete DR.restored[step]; if (DR.last === step) DR.last = ''; }
   // ---------- Screens ----------
+  // Tour test 5 (Whistler, 2026-11-17): a tour that runs by booking only is asked "Groups and private bookings: how big can
+  // a group be?" ("from what size should they book ahead?" when everyone books), and its size chips say "Up to 12".
+  var GROUPS_T = TOUR ? { q: T.groupsQ, lead: T.groupsLead, line: T.groupsLine } : null;
+  function groupsWordsNow(){ if (!GROUPS_T || !T.groupsQBooked) return; var bk = AI.visit === 'appointment'; S.groupsBooked = bk; T.groupsQ = bk ? T.groupsQBooked : GROUPS_T.q; T.groupsLead = bk ? T.groupsLeadBooked : GROUPS_T.lead; T.groupsLine = bk ? T.groupsLineBooked : GROUPS_T.line; }
   function render(){
+    groupsWordsNow();
     // Tour test 1 (Whistler, 2026-11-16): a price box that was turned down ("$189pp") keeps what she typed under the nudge
     // (all types: the tour price, the private tour price, the cocktail, flight and tasting prices).
     if (S.rawBox) (PRICE_BOXES || []).forEach(function(id){ var n = el(id); if (n) S.rawBox[id] = n.value; });
@@ -2415,7 +2420,7 @@
       // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
-        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
         + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.

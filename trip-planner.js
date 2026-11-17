@@ -1322,7 +1322,7 @@ function scoreVenue(v, ctx) {
     if (f === 'dog_friendly') {
       // Café test 2 (Whistler, 2026-11-15): the owner said dogs stay outside: never the plain badge line.
       // Brewery test 2 (Whistler, 2026-11-16): and "Dogs on patio" when that is what the owner said.
-      if (v.features.dog_friendly) add('feature', 8, v.dogsPatioOnly ? 'Dogs on patio' : v.dogsOutsideOnly ? 'Dogs outside only' : 'Has the Dog-Friendly badge');
+      if (v.features.dog_friendly) add('feature', 8, v.dogsPatioOnly ? 'Dogs on patio' : v.dogsOutsideOnly ? 'Dogs outside only' : v.dogsSomeTrips ? 'Dogs on some trips' : 'Has the Dog-Friendly badge');
       else if (v.collections.includes('dog_friendly')) add('feature', 8, 'Listed as an official dog-friendly beach area');
     } else if (v.features[f]) {
       // Brewery test 3 (Whistler, 2026-11-16): on a dated request, a place whose own listed music is on another day isn't
@@ -1641,6 +1641,7 @@ function publicVenue(v, ctx) {
     ...(kidsUntilMinutes(v) != null && v.features && v.features.kid_friendly ? { kidsUntil: v.kidsUntil } : {}),
     ...(v.dogsOutsideOnly && v.features && v.features.dog_friendly ? { dogsOutsideOnly: true } : {}),
     ...(v.dogsPatioOnly && v.features && v.features.dog_friendly ? { dogsPatioOnly: true } : {}),
+    ...(v.dogsSomeTrips && v.features && v.features.dog_friendly ? { dogsSomeTrips: true } : {}),
     // Round 12 (2026-10-20): the venue's own French notice for its "Advisory on Whistler Roam" caveat, used on /fr/trip.
     ...(v.advisory && v.advisory.note && v.advisory.noteFr ? { advisoryFr: { en: `Advisory on ${SITE.brand}: ${advisoryExcerpt(v.advisory.note)}`, fr: `Avis ${SITE.brandFrOf} : ${advisoryExcerpt(v.advisory.noteFr)}` } } : {}),
   };
@@ -4486,7 +4487,10 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const trailTime=(hiking||candidate.type==='outdoor')&&one?.visits?.[0]?.durationSource!=='listing'?trailMinutes(candidate):null;
         // 2026-10-28: a long day hike is timed as one (Rainbow Lake was 8-11 AM, then lunch at 11:30).
         const longHike=!trailTime&&one?.visits?.[0]?.durationSource!=='listing'?longDayHikeMinutes(candidate):null;
-        let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
+        // Tour test 5 (Whistler, 2026-11-17): a tour's own trip length (the operator's answer: half a day) sets its slot (a named
+        // fishing charter was planned for 2 hours).
+        const ownTourMin=candidate.type==='tour'?TOUR_LENGTH_MINUTES[candidate.tourLength]||null:null;
+        let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||ownTourMin||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Setting up camp (2026-10-25) is about 45 minutes, not a three-hour outdoor visit.
         if(stop.campBase)duration=45;
         // A waterfall viewpoint with no trail length on its listing is about an hour, not a three-hour outing (2026-10-25:
@@ -5484,6 +5488,8 @@ function trailMinutes(v) {
   return Math.max(45, Math.min(240, Math.round((km * 20 + 15) / 15) * 15));
 }
 // Planning allowances (minutes) for a visit with no estimate of its own (2026-10-19).
+// The operator's own trip length answer (server.js TOUR_LENGTHS) in minutes; 'multi' (several days) is a full day here.
+const TOUR_LENGTH_MINUTES = { '1h': 60, '2-3h': 150, half: 240, full: 480, multi: 480 };
 const VISIT_ALLOWANCE = { outdoor: 90, beach: 120, indoor: 90, tour: 120, sport: 90, golf: 240, cafe: 40, restaurant: 90, pub: 90, brewery: 60, winery: 75, distillery: 60, cocktail: 60 };
 // An evening meal (2026-10-19): a stop labelled dinner, or a restaurant or pub in the evening slot. Its time is never
 // pulled forward into the afternoon.
