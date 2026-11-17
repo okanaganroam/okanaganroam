@@ -926,6 +926,19 @@ function plannerExcludedPlace(v) {
 const GENERAL_STOP_RE = /\b(?:museums?|galler(?:y|ies)|art centre|cultural centre|heritage|nordic spa|spa|viewpoints?|lookouts?|waterfalls?|falls|gondola|provincial park|lake park|town park)\b/;
 const GENERAL_STOP_CAVEAT = 'Nothing matching that part of your request fits this time, so this is one of the area’s general things to do.';
 function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`); }
+// Tour test 2 (2026-11-16): the owner's own season wins over the snow words in a name or kind. A tour named "Coast Range
+// Heli-Skiing" whose owner set "We only run part of the year" (open_months, e.g. Dec 1 to Sep 30) runs summer tours too:
+// on a date inside that season, and not in one of their closures, the winter-only rules below do not drop it. Outside
+// the season (or with no owner season) nothing changes.
+const OWNER_SEASON_RE = /^(?:\d{2}-\d{2}:\d{2}-\d{2}|\d{1,2}-\d{1,2})$/;
+function ownerSeasonOpenOn(v, ctx) {
+  if (!v || !OWNER_SEASON_RE.test(String(v.openMonths || ''))) return false;
+  const iso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
+  const base = iso(ctx.requirements && ctx.requirements.startDate) || iso(ctx.tripDate);
+  if (!base) return false;
+  const date = !iso(ctx.requirements && ctx.requirements.startDate) && ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, base) : base;
+  return !seasonClosedOnTrip(v, { date });
+}
 function offSeasonBlocked(v, ctx) {
   if (namedInRequest(v, ctx) || (ctx.pinnedIds && ctx.pinnedIds.has(v.id))) return false;
   const m = tripMonthOf(ctx);
@@ -940,7 +953,7 @@ function offSeasonBlocked(v, ctx) {
     if (!inRange && !/\byear round\b/.test(sub)) return true;
   }
   // Winter-only tours: heli-skiing, cat-skiing, snowmobile, dog-sled and sleigh tours, ice fishing, ski touring courses.
-  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text)) return true;
+  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx)) return true;
   // Summer-only tours: bike, rafting, sailing, paddling, kite and horseback tours, unless they say winter or year-round.
   if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m)) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;
@@ -2447,7 +2460,7 @@ function offSeasonSkip(v, ctx) {
   // 2026-10-25: most of November is off too -- outdoor rinks open in December and the ski hills in late November; a
   // weekend plan dated Oct 31 put Stuart Park's rink on its Sunday, November 1.
   const earlyNovember = month === 11 && Number((ctx.tripDate || '').slice(8, 10)) < 25;
-  if (month && (SKI_OFF_MONTHS.includes(month) || earlyNovember) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter'))) return true;
+  if (month && (SKI_OFF_MONTHS.includes(month) || earlyNovember) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter')) && !ownerSeasonOpenOn(v, ctx)) return true;
   if (month && SHOULDER_MONTHS.includes(month)) {
     const w = SHOULDER_CLOSED_RE.exec(v.textName || normWords(v.name));
     if (w && !normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes(w[0].split(' ')[0])) return true;
@@ -6474,7 +6487,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6508,7 +6521,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};

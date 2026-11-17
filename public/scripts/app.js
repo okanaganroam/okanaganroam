@@ -319,6 +319,7 @@ var TRANSLATIONS = {
 
     'card.getDirections': '\ud83d\udccd Get directions',
     'card.findMenu': '\ud83d\udccb Find menu',
+    'card.findTours': '\ud83c\udf9f\ufe0f Tours & prices',
     'card.checkBooking': '\ud83d\udcc5 Check for online booking',
     'card.favorite': 'Favorite',
     'card.favorited': 'Favorited',
@@ -805,6 +806,7 @@ var TRANSLATIONS = {
 
     'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
     'card.findMenu': '\ud83d\udccb Voir le menu',
+    'card.findTours': '\ud83c\udf9f\ufe0f Visites et tarifs',
     'card.checkBooking': '\ud83d\udcc5 V\u00e9rifier la r\u00e9servation en ligne',
     'card.favorite': 'Favori',
     'card.favorited': 'Ajout\u00e9 aux favoris',
@@ -2154,7 +2156,9 @@ function initBlock11(){
     // Menu link searches for the venue's menu rather than linking a specific
     // page — we don't have a verified menu URL for every venue, and a search
     // is honest about that while still being useful.
-    var menuQuery = name + ' ' + regionLabel + ' menu';
+    // A tour has tours and prices, not a menu (2026-11-16).
+    var isTour = card.dataset.type === 'tour';
+    var menuQuery = name + ' ' + regionLabel + (isTour ? ' tours prices' : ' menu');
     var menuUrl = 'https://www.google.com/search?q=' + encodeURIComponent(menuQuery);
 
     var menuLink = document.createElement('a');
@@ -2162,7 +2166,7 @@ function initBlock11(){
     menuLink.href = menuUrl;
     menuLink.target = '_blank';
     menuLink.rel = 'noopener';
-    menuLink.textContent = t('card.findMenu');
+    menuLink.textContent = t(isTour ? 'card.findTours' : 'card.findMenu');
 
     // Same honest approach as the menu link: we don't have a verified booking
     // system for every venue, so this searches rather than claiming one exists.
