@@ -33,7 +33,7 @@
   var CK = !!C.cocktail, FOLD = !!(C.brewery || C.cocktail || TOUR);
   var COCKTAIL_ITEM_STEP = { cocktail_price: 'spend', kitchen: 'hours:kitchen', minors: 'offer:minors', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu', happy_hour: 'happy' };
   // The checklist item -> the screen that answers it, for this type.
-  var TOUR_ITEM_STEP = { tour_kind: 'tour', tour_length: 'tour', tour_price: 'price', booking_link: 'booking', book_ahead: 'booking', tour_ages: 'offer', access: 'offer', pyv_known: 'story', pyv_groups: 'groups', arrival: 'door', season: 'hours:year' };
+  var TOUR_ITEM_STEP = { menu: 'menu', tour_kind: 'tour', tour_length: 'tour', tour_price: 'price', booking_link: 'booking', book_ahead: 'booking', tour_ages: 'offer', access: 'offer', pyv_known: 'story', pyv_groups: 'groups', arrival: 'door', season: 'hours:year' };
   function itemStep(k){ return (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   var el = function(id){ return document.getElementById(id); };
@@ -615,6 +615,10 @@
   // One-of-a-few answers and chips on S.tour (data-tpick="length:half"); the kinds are on/off chips (data-tkind).
   function tchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   function tbig(key, keys, labels, subs){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'; }
+  var PRICE_BOXES = ['suTprice', 'suTpriv', 'suCfee', 'suFee'];
+  S.rawBox = {};
+  // A price box's text: the number, or (when it couldn't be read) exactly what was typed.
+  function boxVal(id, n){ return n == null ? '' : isNaN(n) ? (S.rawBox[id] || '') : String(n); }
   function tourKindName(k){ var o = (C.tourKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
   // The card's price line as she types it ("Your card will say “From $129”").
   function tourPriceLead(){ var n = S.tour.price; return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
@@ -1265,6 +1269,8 @@
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
+    // Tour test 1 (Whistler, 2026-11-16): nor on a tour's (trips don't run past midnight).
+    if (C.tour) return '';
     var c = y[1] === '24:00' ? '00:00' : y[1];
     return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(fill(T.lateQ, { day: dayName(d) })) + '"><span class="su-latelbl">' + h(T.lateLbl) + '</span>' + LATE.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (c === t ? 'true' : 'false') + '" data-late="' + d + ':' + j + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>';
   }
@@ -1358,7 +1364,8 @@
   // Cocktail lounges (2026-11-13): music and DJs.
   if (CK) P2_ICONS.music = '🎶';
   // Tours (2026-11-16): a backpack for Good to know (what to bring), a pin for the meeting spot.
-  if (TOUR) { P2_ICONS.bring = '🎒'; P2_ICONS.door = '📍'; }
+  // Tour test 1 (2026-11-16): a ticket for "Your tours and prices" (never the plate or the mug).
+  if (TOUR) { P2_ICONS.bring = '🎒'; P2_ICONS.door = '📍'; P2_ICONS.menu = '🎟️'; }
   // "87 %" in French, as the line beside it says (café test 6).
   function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
@@ -1414,6 +1421,12 @@
     var per = '';
     if (APPT && S.wine && S.wine.year === 'appointment' && S.wine.season && S.wine.season.from && S.wine.season.to) per = ' ' + fill(T.recapAppt, { a: mdLabel(S.wine.season.from), b: mdLabel(S.wine.season.to) });
     else if (S.openSea && S.openSea.from && S.openSea.to && /^\d{2}-\d{2}$/.test(S.openSea.from) && /^\d{2}-\d{2}$/.test(S.openSea.to)) per = ' ' + fill(T.recapOpen, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) });
+    // Tour test 1 (Whistler, 2026-11-16): "Rest of the year: … (Dec 15 – Sep 3) · From June to September: …" read as
+    // two years. With an open season and other hours, the season comes first and the week is the usual hours.
+    if (kinds.length && !other && per && T.recapSeason && S.openSea && S.openSea.from && !(APPT && S.wine && S.wine.year === 'appointment')) {
+      parts.unshift(fill(T.recapSeason, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) }), T.recapUsual + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', '));
+      return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
+    }
     parts.unshift(lead + (C.lang === 'fr' ? '\u00a0: ' : ': ') + weekShort(w, ', ') + per);
     return '<p class="su-hint" id="suHoursRecap">' + h(parts.join(' · ')) + '</p>';
   }
@@ -1642,6 +1655,9 @@
   function drSaved(step){ drDrop(step); delete DR.base[step]; DR.s[step] = true; delete DR.restored[step]; if (DR.last === step) DR.last = ''; }
   // ---------- Screens ----------
   function render(){
+    // Tour test 1 (Whistler, 2026-11-16): a price box that was turned down ("$189pp") keeps what she typed under the nudge
+    // (all types: the tour price, the private tour price, the cocktail, flight and tasting prices).
+    if (S.rawBox) (PRICE_BOXES || []).forEach(function(id){ var n = el(id); if (n) S.rawBox[id] = n.value; });
     kindWords();
     // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
     if (C.cafe && T.spendLabel) T.labels.spend = fill(T.spendLabel, { words: cafeWords() });
@@ -1784,7 +1800,7 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + msgs() + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + msgs() + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
@@ -1891,7 +1907,7 @@
         + (CUR.cocktail_price_waiting != null ? '<p class="su-sent" id="suCpWaiting">' + h(fill(T.cpriceWaiting, { x: cpText(CUR.cocktail_price_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.cpriceQ) + '" id="suCpChips">' + CQ.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (cpOn(n) ? 'true' : 'false') + '" data-cfee="' + n + '">' + h(cpText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (cp.other && !cp.none ? 'true' : 'false') + '" data-cfee="other">' + h(T.feeOther) + '</button></div>'
-        + (cp.other && !cp.none ? field('suCfee', T.feeLabel, cp.fee == null || isNaN(cp.fee) ? '' : String(cp.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
+        + (cp.other && !cp.none ? field('suCfee', T.feeLabel, boxVal('suCfee', cp.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
         // Cocktail test 1 (2026-11-13): no "We don't serve cocktails" for a lounge (only while it is the stored answer).
         + (cp.none ? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">✓</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'cpriceSave') + '</div>' + skip('spend');
@@ -1933,7 +1949,7 @@
         + '<button type="button" class="su-chip" aria-pressed="' + (bf.feeOther && !bf.noFlights ? 'true' : 'false') + '" data-bfee="other">' + h(T.feeOther) + '</button>'
         // Distilleries (Decided 2): "Free tastings" is its own button (the card says "Free tasting").
         + (C.distillery && T.feeFree ? '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (feeOn(0) ? 'true' : 'false') + '" data-bfee="0">' + h(T.feeFree) + '</button>' : '') + '</div>'
-        + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, bf.fee == null || isNaN(bf.fee) ? '' : String(bf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
+        + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, boxVal('suFee', bf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (bf.noFlights ? '' : ' su-alt') + '" aria-pressed="' + (bf.noFlights ? 'true' : 'false') + '" data-bfee="none"><span class="su-ico" aria-hidden="true">' + (bf.noFlights ? '✓' : '○') + '</span><span>' + h(T.noFlights) + '<small>' + h(T.noFlightsSub) + '</small></span></button></div>'
         // Distillery test 1 (2026-11-13): the winery's "free with a bottle" question (not for free tastings or none).
         + (C.distillery && T.waivedQ && !bf.noFlights && !(bf.fee === 0 && !bf.feeOther) ? '<h2 class="su-h2" id="suWaivedQ">' + h(T.waivedQ) + '</h2>' + bpicks('waived', ['yes', 'two', 'no'], T.waivedOpts) : '')
@@ -1958,8 +1974,8 @@
       x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
-        + field('suTprice', T.tpriceLabel, tp.price == null || isNaN(tp.price) ? '' : String(tp.price), { mode: 'decimal', max: 10 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: C.lang === 'fr' ? '1\u00a0000' : '1,000' })) + '</p>'
-        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, tp.priv == null || isNaN(tp.priv) ? '' : String(tp.priv), { mode: 'decimal', max: 10 })
+        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { mode: 'decimal', max: 10 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: C.lang === 'fr' ? '1\u00a0000' : '1,000' })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
+        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 10 })
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking') {
       // Tours (2026-11-16): the booking link (the edit page's same field), and "Do people need to book ahead?" with how far.
@@ -1973,7 +1989,9 @@
     } else if (s === 'bring') {
       // Tours (2026-11-16): what to bring or wear and the weather calls, in the "Good to know" line (no new field).
       var bv = S.tour.bring != null ? S.tour.bring : ((CUR.visit_rows || {}).good_to_know || '');
-      x = doneLine('bring') + q(T.bringQ, T.bringLead) + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
+      // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it).
+      var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
+      x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
         + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="180" rows="3">' + h(bv) + '</textarea>' + ex(T.bringEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
@@ -1992,7 +2010,7 @@
         + (CUR.tasting_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.feeWaiting, { x: feeText(CUR.tasting_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.feeQ) + '" id="suFeeChips">' + QUICK_FEES.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-fee="' + n + '">' + h(feeText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (wf.feeOther ? 'true' : 'false') + '" data-fee="other">' + h(T.feeOther) + '</button></div>'
-        + (wf.feeOther ? field('suFee', T.feeLabel, wf.fee == null || isNaN(wf.fee) ? '' : String(wf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
+        + (wf.feeOther ? field('suFee', T.feeLabel, boxVal('suFee', wf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + (wf.fee === 0 && !wf.feeOther ? '' : '<h2 class="su-h2">' + h(T.waivedQ) + '</h2>' + wpicks('waived', ['yes', 'two', 'no'], T.waivedOpts))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tastingsSave') + '</div>' + skip('tastings');
     } else if (s === 'visit') {
@@ -2312,7 +2330,9 @@
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
         + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
-        + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
+        // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
+        + (TOUR && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
+          : '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {
@@ -3301,6 +3321,9 @@
       // Distillery test 2 (Whistler, 2026-11-16): a distillery's screen never shows Sports on TV (a tasting room isn't a sports
       // bar), so a Sports TV badge from research could never be taken off here: saving this screen takes it off.
       if (C.distillery && (S.savedBadges.sports_tv || (CUR.badges || {}).sports_tv) && C.offerGroups.every(function(g){ return g.keys.indexOf('sports_tv') < 0; })) sendB.sports_tv = false;
+      // Tour test 1 (Whistler, 2026-11-16): Patio, Live music and Sports on TV are food and drink badges a tour's page never
+      // offers (research ticked them on a snowmobile outfitter): saving "Who can come" takes them off, on this save only.
+      if (TOUR) ['patio', 'live_music', 'sports_tv'].forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
       if (Object.keys(sendB).length) list.push({ badges: sendB });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
@@ -3705,6 +3728,11 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-addtime]'), function(b){ b.onclick = function(){
       readTimes(); var d = b.getAttribute('data-addtime'), wk = W(), w = wk[d]; if (!w || !w.length || w.length >= 2) return;
       var a = w[0][0], z = w[0][1], late = z <= a;
+      // Tour test 1 (Whistler, 2026-11-16): a tour's second time splits its day with an hour between (9 – 5 becomes
+      // 9 – 1 and 2 – 5), never lunch and a 6 – 10 PM dinner.
+      if (TOUR && !late) { var tm = function(x){ var q = x.split(':'); return +q[0] * 60 + +q[1]; }, ts = function(n){ n = Math.max(0, Math.min(23 * 60 + 30, n)); return ('0' + Math.floor(n / 60)).slice(-2) + ':' + ('0' + n % 60).slice(-2); };
+        var ma = tm(a), mz = tm(z); if (mz - ma >= 180) { var mid = ma + Math.floor((mz - ma - 60) / 2 / 60) * 60; wk[d] = [[a, ts(mid)], [ts(mid + 60), z]]; } else w.push([ts(mz + 60), ts(mz + 180)]);
+        mark(); var yT = window.scrollY; render(); window.scrollTo(0, yT); var fT = el('o' + d + '1'); if (fT) try { fT.focus({ preventScroll: true }); } catch (e) {} return; }
       var first = a >= '14:00';
       if (a >= '15:00') w.unshift(['11:30', '14:30']);
       else if (first) w.unshift(['11:00', '13:30']);
@@ -3781,7 +3809,8 @@
       if (k === 'wifi' && !S.badges.wifi) { S.noWifi = false; press('no_wifi', false); }
       if (k === 'no_sports') { S.noSports = !S.noSports; press('no_sports', S.noSports); if (S.noSports) { S.badges.sports_tv = false; press('sports_tv', false); sportsNote(); } return; }
       // Distillery test 1 (2026-11-13): the service-dogs tile shows right under No dogs, scrolled into view.
-      var sdog = function(){ var tk = el('suSdogTicked'); if (tk) tk.hidden = !(S.sdogAuto && S.noDogs && S.badges.service_dogs); var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
+      // Tour test 1 (Whistler, 2026-11-16): "Service dogs welcome" isn't ticked for a tour when No dogs is tapped (still there to tick).
+      var sdog = function(){ if (TOUR && S.noDogs && S.sdogAuto) { S.badges.service_dogs = false; S.sdogAuto = false; press('service_dogs', false); } var tk = el('suSdogTicked'); if (tk) tk.hidden = !(S.sdogAuto && S.noDogs && S.badges.service_dogs); var n = el('suServiceDogs'); if (n) { n.hidden = !S.noDogs; if (S.noDogs && n.scrollIntoView) { try { n.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { n.scrollIntoView(false); } } } };
       // Cocktail test 3 (2026-11-14): "Service dogs welcome" starts ticked under "No dogs allowed" (she can untick it; it
       // is saved only with the screen).
       if (k === 'no_dogs') { S.noDogs = !S.noDogs; press('no_dogs', S.noDogs); if (S.noDogs) { S.badges.dog_friendly = false; press('dog_friendly', false); if (C.offerLabels.service_dogs) { S.badges.service_dogs = true; S.sdogAuto = true; press('service_dogs', true); } } else { S.badges.service_dogs = false; press('service_dogs', false); } sdog(); return; }

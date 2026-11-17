@@ -67,9 +67,15 @@ function ownerStats(db, venueId, now = new Date()) {
 }
 
 // The panel on the edit page (and, short, at the end of the setup). Plain words; honest when the numbers are small.
+// Tour test 1 (Whistler, 2026-11-16): opts.listKind 'tours' or 'prices' names the list a tour or another priced place
+// has ("booking and tours & prices", "booking and prices"), never "menu".
+const LIST_WORDS = { tours: { en: ['menu', 'tours & prices', 'Menu views', 'Tours & prices views'], fr: ['le menu', 'les visites et tarifs', 'Vues du menu', 'Vues des visites et tarifs'] },
+  prices: { en: ['menu', 'prices', 'Menu views', 'Price list views'], fr: ['le menu', 'les tarifs', 'Vues du menu', 'Vues des tarifs'] } };
 function ownerStatsHtml(st, lang = 'en', opts = {}) {
   if (!st) return '';
-  const W = WORDS[lang === 'fr' ? 'fr' : 'en'];
+  const W0 = WORDS[lang === 'fr' ? 'fr' : 'en'];
+  const lw = opts.listKind && LIST_WORDS[opts.listKind] ? LIST_WORDS[opts.listKind][lang === 'fr' ? 'fr' : 'en'] : null;
+  const W = lw ? { ...W0, menu: lw[3], clicksLine: W0.clicksLine.replace(new RegExp(`${lw[0]}$`), lw[1]), clicksLine1: W0.clicksLine1.replace(new RegExp(`${lw[0]}$`), lw[1]) } : W0;
   const num = (n) => (lang === 'fr' ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
   const row = (label, n, p) => `<li><span class="os-n">${num(n)}</span><span class="os-l">${esc(label)}${p != null ? `<small>${esc(fill(W.before, { n: num(p) }))}</small>` : ''}</span></li>`;
   const prev = st.prev;

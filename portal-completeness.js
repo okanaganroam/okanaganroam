@@ -293,25 +293,25 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // Tours and guided experiences (Dayton, 2026-11-16: "build the tours setup"): the same engine with their own 100 points.
 // New items: the kind of tour, how long it runs, the price per person, book ahead, and who can come (minimum age). The
 // season is the Hours step's "closed part of the year" (or "By booking only" with no set hours, which answers the hours,
-// their check and the season, as for a winery by appointment). Happy hour, menu, specials and events are never asked of
-// tours. Every answer is the operator's own (venue_tour_info, never researched).
+// their check and the season, as for a winery by appointment). Happy hour, specials and events are never asked of
+// tours; the menu is "Your tours and prices" (tour test 1, 2026-11-16). Every answer is the operator's own (venue_tour_info, never researched).
 // The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
 const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'snowshoe', 'paddle', 'raft', 'adventure', 'flight', 'food', 'farm', 'rentals', 'other'];
 const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
 const TOUR_BOOK = ['same_day', 'day', 'week', 'no'];
 const TOUR_AGES = ['all', '6', '12', '16', '19'];
 const TOUR_ITEMS = [
-  R('address_pin', { w: 4, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
+  R('address_pin', { w: 3, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
   R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),
   R('website', { w: 3 }),
-  { key: 'tour_kind', group: 'tour', w: 4, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
+  { key: 'tour_kind', group: 'tour', w: 3, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
     en: 'What kind of tour', fr: 'Quel genre d’activité', whyEn: 'Snowmobile, jet boat, horseback, fishing, wine tour and so on. Pick up to 3.', whyFr: 'Motoneige, bateau rapide, équitation, pêche, tournée des vignobles, etc. Choisissez-en jusqu’à 3.', btnEn: 'Pick them', btnFr: 'Choisir', icon: '🧭' },
-  R('hours', { w: 8, en: 'When you run', fr: 'Quand vous partez', whyEn: 'Your hours or departure times, or “By booking only”.', whyFr: 'Vos heures ou vos départs, ou « Sur réservation seulement ».' }),
+  R('hours', { w: 8, en: 'When you run', fr: 'Vos heures et votre saison', whyEn: 'Your hours or departure times, or “By booking only”.', whyFr: 'Vos heures ou vos départs, ou « Sur réservation seulement ».' }),
   R('hours_fresh', { w: 4 }),
   { key: 'season', group: 'hours', w: 7, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'tour_info'],
     en: 'Your season', fr: 'Votre saison', whyEn: 'All year, or only part of the year (winter, summer)? Say so, so nobody books a closed season.', whyFr: 'Toute l’année, ou une partie de l’année seulement (hiver, été)? Dites-le, pour que personne ne réserve hors saison.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
-  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you or your guides. Your trips, your gear, your guests.', whyFr: 'De vraies photos seulement, prises par vous ou vos guides. Vos sorties, votre équipement, vos clients.' }),
-  R('photo_extra', { w: 7, whyEn: 'Your trips, your gear, the views on the way.', whyFr: 'Vos sorties, votre équipement, les paysages en chemin.' }),
+  R('photo_main', { w: 8, whyEn: 'Real photos only, taken by you or your guides. Your trips, your gear, your guests.', whyFr: 'De vraies photos seulement, prises par vous ou vos guides. Vos sorties, votre équipement, vos clients.' }),
+  R('photo_extra', { w: 6, whyEn: 'Your trips, your gear, the views on the way.', whyFr: 'Vos sorties, votre équipement, les paysages en chemin.' }),
   { key: 'tour_length', group: 'tour', w: 4, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
     en: 'How long it takes', fr: 'La durée', whyEn: 'An hour, half a day, a full day or several days.', whyFr: 'Une heure, une demi-journée, une journée ou plusieurs jours.', btnEn: 'Answer', btnFr: 'Répondre', icon: '⏱️' },
   { key: 'tour_price', group: 'tour', w: 8, fix: true, target: { setup: 'price' }, fields: ['tour_price'],
@@ -324,6 +324,9 @@ const TOUR_ITEMS = [
     en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (6+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (6+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
     en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible or Free parking on “Who can come”.', whyFr: 'Cochez Accessible en fauteuil roulant ou Stationnement gratuit dans « Qui peut venir ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
+  // Tour test 1 (Whistler, 2026-11-16; Dayton approved "Your tours and prices"): the menu feature in tour words, 4 points
+  // (one each from the meeting spot, the kind of tour and the two photo items).
+  R('menu', { group: 'tour', w: 4, target: { setup: 'menu' }, en: 'Your tours and prices', fr: 'Vos visites et tarifs', whyEn: 'Every trip and what it costs. A photo of your rates sheet or a link to your prices page is fine.', whyFr: 'Chaque sortie et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix suffit.', btnEn: 'Add them', btnFr: 'Ajouter', icon: '🎟️' }),
   R('description', { w: 5 }),
   R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on your trips, e.g. Small groups, local guides, hot chocolate at the top.', whyFr: 'Une ligne sur vos sorties, p. ex. petits groupes, guides d’ici, chocolat chaud au sommet.' }),
   R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups and private trips', fr: 'Groupes et sorties privées', whyEn: 'Private tours? From what size should groups call ahead?', whyFr: 'Sorties privées? À partir de quelle taille les groupes doivent-ils appeler?', target: { setup: 'groups' } }),

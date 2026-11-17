@@ -1453,7 +1453,7 @@ function renderScript(d) {
       // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
       // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
       // wording, the card's « À partir de », not « dès »).
-      var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : '';
+      var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : cost.label === 'Tour' ? (french ? 'À partir de ' : 'From ') : '';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';

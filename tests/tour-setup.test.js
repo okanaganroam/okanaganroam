@@ -67,13 +67,14 @@ test('a tour gets its own setup: 7 essentials, 5 optional screens, tour words, a
   const v = mk('tour', { name: 'Silver Snowmobile Tours', cuisine: 'Snowmobile tours' });
   const t = tokenFor(v.id);
   assert.deepEqual(app.setupParts('tour').part1, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos']);
-  assert.deepEqual(app.setupParts('tour').part2, ['story', 'bring', 'groups', 'social', 'door']);
+  // Tour test 1 (2026-11-16): "Your tours and prices" (the menu feature in tour words) leads the optional screens.
+  assert.deepEqual(app.setupParts('tour').part2, ['menu', 'story', 'bring', 'groups', 'social', 'door']);
   const r = await get(`/owner/${t}/setup`);
   assert.equal(r.status, 200);
   const c = cfgOf(r.text);
   assert.equal(c.tour, true);
   assert.equal(c.combo, true);
-  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'story', 'bring', 'groups', 'social', 'door']);
+  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'menu', 'story', 'bring', 'groups', 'social', 'door']);
   assert.equal(c.t.labels.hours, 'When you run');
   assert.equal(c.t.labels.door, 'Where do people meet you?');
   assert.equal(c.t.noSetHours, 'We don’t have set hours. Trips are by booking only');
@@ -84,11 +85,11 @@ test('a tour gets its own setup: 7 essentials, 5 optional screens, tour words, a
   const keys = c.offerGroups.flatMap((g) => g.keys);
   assert.deepEqual(keys.sort(), ['dog_friendly', 'free_parking', 'locally_owned', 'wheelchair_accessible']);
   // No happy hour, menu, specials or events for tours.
-  for (const s of ['happy', 'menu', 'specials', 'music', 'cuisine', 'spend']) assert.ok(!c.steps.includes(s), s);
+  for (const s of ['happy', 'specials', 'music', 'cuisine', 'spend']) assert.ok(!c.steps.includes(s), s);
   // French
   const f = await get(`/fr/owner/${t}/setup`);
   const cf = cfgOf(f.text);
-  assert.equal(cf.t.labels.hours, 'Quand vous partez');
+  assert.equal(cf.t.labels.hours, 'Vos heures et votre saison');
   assert.match(cf.t.tkindQ, /^Qu’offrez-vous[\u00a0\u202f]\?$/, 'French spacing before ?');
   assert.ok(cf.tourKinds.some((k) => k.t === 'Traîneau à chiens'));
   // The edit page offers the setup card.
@@ -225,8 +226,8 @@ test('% complete: tour items, and By booking only answers the hours and season',
   const t = tokenFor(v.id);
   const items = pc.itemsFor('tour');
   assert.equal(items.reduce((a, i) => a + i.w, 0), 100);
-  for (const k of ['tour_kind', 'tour_length', 'tour_price', 'book_ahead', 'tour_ages', 'season', 'booking_link']) assert.ok(items.some((i) => i.key === k), k);
-  for (const k of ['menu', 'happy_hour', 'specials', 'entertainment', 'avg_spend', 'cuisine', 'dietary']) assert.ok(!items.some((i) => i.key === k), k);
+  for (const k of ['tour_kind', 'tour_length', 'tour_price', 'book_ahead', 'tour_ages', 'season', 'booking_link', 'menu']) assert.ok(items.some((i) => i.key === k), k);
+  for (const k of ['happy_hour', 'specials', 'entertainment', 'avg_spend', 'cuisine', 'dietary']) assert.ok(!items.some((i) => i.key === k), k);
   const left0 = (await get(`/owner/${t}/setup/progress`)).text;
   const s0 = JSON.parse(left0).score;
   const keys0 = s0.left.map((x) => x.k);
@@ -277,7 +278,7 @@ test('Build My Trip: the season, the minimum age with kids, and the operator’s
   assert.match(famNotes, /Ages 6 and up \(the operator’s own answer\)\./);
   assert.match(famNotes, /Same-day bookings are often fine/);
   // The planner's facts for a tour, and the kids rule itself.
-  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h' });
+  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189 });
   const tp = require('../trip-planner.js');
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '16' }), false);
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '12' }), false);
