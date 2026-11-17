@@ -16608,7 +16608,8 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     // Cocktail test 2 (2026-11-13): app.js changed on purpose (« Que recherchez-vous ? » with its narrow no-break space).
     // French public side (2026-11-14): app.js changed on purpose (French « 5 à 7 » badge, stamp, results note and Build My Trip copy).
     // Tour types (2026-11-16): app.js changed on purpose (a tour card's link says "Tours & prices", not "Find menu").
-    assert.equal(md5('public/scripts/app.js'), '37afc93eabbd2f506d2ee34e0914ff01', 'app.js is unchanged by the classic Open Now page');
+    // Tour test 2 (2026-11-16): app.js changed on purpose again (the French tour card link says « Sorties et tarifs »).
+    assert.equal(md5('public/scripts/app.js'), 'eb1d8999c5a459a2d1133383524e79ae', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 

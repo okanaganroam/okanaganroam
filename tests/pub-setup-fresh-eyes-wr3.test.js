@@ -152,7 +152,7 @@ test('help: on the setup, "how often" and "first Thursday" are answered from the
 // ---------- 2. The reopened year question with a stored season ----------
 test('year question: with a stored season it offers "Change my Apr 20 – Jun 30 hours" (EN and FR), never summer/winter that would reset its days', () => {
   const s = CLIENT();
-  assert.match(s, /\(stS\.length \? stS\.map\(function\(st\)\{ return big\('✎', fill\(T\.seaChange, st\), T\.seaChangeSub, true, 'yearSeasonEdit:' \+ st\.i\); \}\)\.join\(''\)[\s\S]{0,400}? : big\('☀️', T\.allYearSummer/);
+  assert.match(s, /\(stS\.length \? stS\.map\(function\(st\)\{ return big\('✎', fill\(T\.seaChange, st\), T\.seaChangeSub, true, 'yearSeasonEdit:' \+ st\.i\); \}\)\.join\(''\)[\s\S]{0,400}? : (?:\(TOUR \? big\('🗓️', T\.allYearClosed, T\.allYearClosedSub, true, 'yearClosed'\) : ''\) \+ )?big\('☀️', T\.allYearSummer/);
   assert.match(s, /if \(k === 'yearSeasonEdit'\) \{ seaUse\(\+v === 1 && S\.seaList\[1\] \? 1 : 0\); if \(APPT\) S\.wYearPick = 'all'; S\.sea\.on = true; S\.sea\.open = \{\}; S\.sea\.dirty = true; S\.seaTouched = true; S\.dirty = 'hours'; return go\(S\.seaI === 1 \? 'hours:season2' : 'hours:season'\); \}/);
   // Never over a stored season's dates and day hours.
   assert.match(s, /var keepStored = !!\(S\.sea\.week && \(CUR\.hours_seasons \|\| \[\]\)\.length\);\n\s+S\.sea\.kind = v; if \(!keepStored\) \{/);

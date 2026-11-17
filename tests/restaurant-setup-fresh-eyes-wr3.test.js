@@ -198,7 +198,7 @@ test('quick answers: "Patio only" then her own sentence reads "Patio only. Dogs 
   const c = clientSlice('  var quickJoin = function(', "  screen.addEventListener('focusin'", {}, 'this.f = quickJoin;');
   assert.equal(c.f(box, 'Patio only', ['Patio only'], '. '), false); assert.equal(box.value, 'Dogs welcome', 'replaced text is hers');
   // Wired to the box: the value before her typing is remembered on focus and after each chip tap.
-  assert.match(CLIENT(), /box\.value = v\.slice\(0, 180\); box\._qPrev = box\.value; mark\(\);/);
+  assert.match(CLIENT(), /box\.value = v\.slice\(0, (?:box\.maxLength > 0 \? box\.maxLength : )?180\); box\._qPrev = box\.value; (?:countUpdate\(box\); )?mark\(\);/);
   assert.match(CLIENT(), /screen\.addEventListener\('focusin', function\(e\)\{ if \(e\.target && e\.target\.id && screen\.querySelector\('\[data-quick\]\[data-box="' \+ e\.target\.id \+ '"\]'\)\) e\.target\._qPrev = e\.target\.value; \}\);/);
 });
 

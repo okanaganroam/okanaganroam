@@ -1813,17 +1813,17 @@ en.tour = {
   bookLinkLabel: 'Booking link', bookLinkEx: 'your website’s booking page, or your FareHarbor or Rezdy page', noBookLink: 'We don’t take bookings online',
   bookLinkBad: 'Please check the booking link, for example yourtours.com/book.',
   taheadQ: 'Do people need to book ahead?', taheadYesNo: { yes: 'Yes', no: 'No, people can just come by' }, taheadHow: 'How far ahead?',
-  taheads: { same_day: 'Same day is fine', day: 'A day ahead', week: 'A week ahead' },
+  taheads: { same_day: 'Same day is fine', day: 'A day ahead', '48h': '48 hours ahead', week: 'A week ahead' },
   taheadNeed: 'Please tap how far ahead people should book.', tbookNeed: 'Please add your booking link, or answer “Do people need to book ahead?”.',
   tbookSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Who can come
   offerQ: 'Who can come?', offerLead: 'Families and dog owners check this before they book.',
-  tageQ: 'From what age?', tages: { all: 'All ages', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
   tageNeed: 'Please tap the youngest age you take (or All ages).',
   // Good to know
-  bringQ: 'Good to know', bringLead: 'What should people bring or wear? Anything about the weather? One or two lines.',
+  bringQ: 'Good to know', bringLead: 'What should people bring or wear? Anything about the weather? Two or three short lines.',
   bringEx: 'Dress warm: we supply helmets and gloves. We call you if the weather cancels a trip.',
-  bringNeed: 'Please type a line, or tap one of the answers above.', bringNoLink: 'Please leave links out of this line. Your booking link has its own box on Booking.',
+  bringNeed: 'Please type a line, or tap one of the answers below.', bringNoLink: 'Please leave links out of this line. Your booking link has its own box on Booking.',
   // Your story and Known for
   storyQ: 'Tell visitors about your tours', storyEx: 'A family-run outfitter since 1998. Small groups, local guides, and hot chocolate at the top.',
   knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit” and on your card.', knownEx: 'Small groups and the best views of the valley',
@@ -1849,12 +1849,12 @@ fr.tour = {
     story: 'Votre histoire et ce pour quoi vous êtes connus', bring: 'Bon à savoir', groups: 'Groupes et réservations privées', social: 'Instagram et Facebook', door: 'Où vous rejoint-on?' },
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', booking: 'pas de réservations en ligne' },
   stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
-  basicsQ: 'Est-ce là qu’on vous rejoint, et sont-ce vos téléphone et site Web?',
+  basicsQ: 'Est-ce bien ici qu’on vous rejoint? Votre téléphone et votre site Web sont-ils exacts?',
   photosLead: 'Vos sorties, vos guides, vos clients qui s’amusent. Trois photos, c’est parfait.', photosNoMore: 'Non, j’ai fini les photos',
   allYearClosed: 'Nous ne partons qu’une partie de l’année', allYearClosedSub: 'Par exemple une saison d’hiver, de décembre à avril. Vous choisissez les dates.',
   hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour où vous partez. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
   noSetHours: 'Nous n’avons pas d’heures fixes. Sorties sur réservation seulement', noSetHoursNow: 'Pas d’heures fixes. Sorties sur réservation seulement ✓',
-  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Réservez à l’avance · visites sur réservation ».',
+  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Réservez à l’avance · sorties sur réservation ».',
   tkindQ: 'Qu’offrez-vous?', tkindLead: 'Choisissez-en jusqu’à 3. Ils paraissent sur votre fiche et aident Planifier mon voyage à vous trouver.',
   tkindNeed: 'Touchez le genre d’activité que vous offrez (jusqu’à 3).', tkindMax: 'Jusqu’à 3. Touchez d’abord un choix pour le retirer.',
   tlengthQ: 'Combien de temps dure une sortie?', tlengths: { '1h': 'Environ 1 heure', '2-3h': '2 à 3 heures', half: 'Une demi-journée', full: 'Une journée complète', multi: 'Plusieurs jours' },
@@ -1863,22 +1863,22 @@ fr.tour = {
   kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et écrivez le nouveau prix s’il a changé.',
   tpriceQ: 'Combien coûte-t-elle par personne?', tpriceLead: 'Votre prix le plus bas pour un adulte. Il paraît sur votre fiche : « À partir de X $ ».', tpriceLeadPick: 'Votre fiche indiquera « À partir de {x} ».',
   tpriceLabel: 'Prix par personne, en dollars', tpriceOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.', tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
-  tprivQ: 'Visites privées? (facultatif)', tprivLead: 'Le prix d’une sortie privée, pour tout le groupe. Laissez vide si vous n’en offrez pas.', tprivLabel: 'Visites privées à partir de, en dollars',
-  tpriceNeed: 'Écrivez votre prix par personne en dollars, par exemple 129.', tprivNeed: 'Écrivez le prix d’une visite privée en dollars, par exemple 900, ou laissez vide.',
+  tprivQ: 'Sorties privées? (facultatif)', tprivLead: 'Le prix d’une sortie privée, pour tout le groupe. Laissez vide si vous n’en offrez pas.', tprivLabel: 'Sorties privées à partir de, en dollars',
+  tpriceNeed: 'Écrivez votre prix par personne en dollars, par exemple 129.', tprivNeed: 'Écrivez le prix d’une sortie privée en dollars, par exemple 900, ou laissez vide.',
   tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions d’abord les prix de plus de 1 000 $. Il s’affichera d’ici un jour.', tpriceCard: 'À partir de {x}',
   tbookQ: 'Comment réserve-t-on?', tbookLead: 'Votre lien de réservation ajoute un bouton Réserver à votre page.',
   bookLinkLabel: 'Lien de réservation', bookLinkEx: 'la page de réservation de votre site, ou votre page FareHarbor ou Rezdy', noBookLink: 'Nous ne prenons pas de réservations en ligne',
   bookLinkBad: 'Vérifiez le lien de réservation, par exemple vosactivites.com/reserver.',
   taheadQ: 'Faut-il réserver à l’avance?', taheadYesNo: { yes: 'Oui', no: 'Non, on peut simplement passer' }, taheadHow: 'Combien de temps à l’avance?',
-  taheads: { same_day: 'Le jour même, c’est correct', day: 'La veille', week: 'Une semaine à l’avance' },
+  taheads: { same_day: 'Le jour même, c’est correct', day: 'La veille', '48h': '48 heures à l’avance', week: 'Une semaine à l’avance' },
   taheadNeed: 'Touchez combien de temps à l’avance réserver.', tbookNeed: 'Ajoutez votre lien de réservation, ou répondez à « Faut-il réserver à l’avance? ».',
   tbookSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   offerQ: 'Qui peut venir?', offerLead: 'Les familles et les propriétaires de chiens le vérifient avant de réserver.',
-  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
   tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
-  bringQ: 'Bon à savoir', bringLead: 'Quoi apporter ou porter? Quelque chose à savoir sur la météo? Une ou deux lignes.',
+  bringQ: 'Bon à savoir', bringLead: 'Quoi apporter ou porter? Quelque chose à savoir sur la météo? Deux ou trois courtes lignes.',
   bringEx: 'Habillez-vous chaudement : nous fournissons casques et gants. Nous vous appelons si la météo annule une sortie.',
-  bringNeed: 'Écrivez une ligne, ou touchez une des réponses plus haut.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre lien de réservation a sa propre case dans Réservations.',
+  bringNeed: 'Écrivez une ligne, ou touchez une des réponses ci-dessous.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre lien de réservation a sa propre case dans Réservations.',
   storyQ: 'Parlez de vos activités aux visiteurs', storyEx: 'Une entreprise familiale depuis 1998. Petits groupes, guides d’ici, et chocolat chaud au sommet.',
   knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite » et sur votre fiche.', knownEx: 'Petits groupes et les plus belles vues de la vallée',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
@@ -1900,8 +1900,8 @@ en.tour.quick = Object.assign({}, en.quick, {
   groups: ['Private tours available', 'Team outings on request', 'Call ahead for 10 or more'],
 });
 fr.tour.quick = Object.assign({}, fr.quick, {
-  good_to_know: ['Habillez-vous selon la météo', 'Apportez de l’eau et de la crème solaire', 'Portez des chaussures fermées', 'Nous fournissons l’équipement', 'Nous partons beau temps, mauvais temps', 'Nous vous appelons si la météo annule une sortie', 'Cueillette à l’hôtel offerte'],
-  groups: ['Visites privées offertes', 'Sorties d’équipe sur demande', 'Appelez à l’avance pour 10 personnes ou plus'],
+  good_to_know: ['Habillez-vous selon la météo', 'Apportez de l’eau et de la crème solaire', 'Portez des chaussures fermées', 'Nous fournissons l’équipement', 'Nous partons beau temps, mauvais temps', 'Nous vous appelons si la météo annule une sortie', 'Navette depuis l’hôtel offerte'],
+  groups: ['Sorties privées offertes', 'Sorties d’équipe sur demande', 'Appelez à l’avance pour 10 personnes ou plus'],
 });
 // Tour test 1 (Whistler, 2026-11-16). "Your tours and prices" (Dayton approved): the menu feature (a photo, a file or a
 // link, typed up for them) is a tour's first optional screen, and every word of it says "tours and prices" / « visites et
@@ -1931,36 +1931,69 @@ Object.assign(en.tour, {
   addSecond: '+ Add a second time (only if you close in between)', twoTimesMax: 'Up to two times a day.',
   departHint: 'Departures at set times? Set one time from your first departure to when the last trip gets back (like 9 AM – 5 PM), and list the departure times in your story.',
   noDogsSub: 'Not on any trip', noDogsSubInside: 'Not on any trip',
-  bringGuess: 'We found this online. Check it: change any words, or tap the answers above to use them instead.',
+  bringGuess: 'We found this online. Check it: change any words, or tap the answers below to use them instead.',
 });
 Object.assign(fr.tour, {
-  labels: Object.assign({}, fr.tour.labels, { menu: 'Vos visites et tarifs', hours: 'Vos heures et votre saison' }),
-  menuQ: 'Comment ajouter vos visites et tarifs?', menuLead: 'Vos sorties et le prix de chacune. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  labels: Object.assign({}, fr.tour.labels, { menu: 'Vos sorties et tarifs', hours: 'Vos heures et votre saison' }),
+  menuQ: 'Comment ajouter vos sorties et tarifs?', menuLead: 'Vos sorties et le prix de chacune. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
   snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
-  web: 'Mes visites et tarifs sont sur mon site Web', menuSocial: 'Mes visites et tarifs sont sur Facebook ou Instagram',
-  emailQ: 'Envoyez-nous vos visites et tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Visites et tarifs de {name}',
-  menuSentEmail: '✓ Vous avez dit que vous enverrez vos visites et tarifs par courriel.', menuNote: 'Envoyé depuis la configuration simple. Merci d’ajouter nos visites et tarifs à notre page.',
-  menuSentQ: 'Vos visites et tarifs sont envoyés ✓', menuNewer: 'Voulez-vous envoyer une liste plus récente?', menuSent: '✓ Vos visites et tarifs sont envoyés.',
-  webQ: 'Vos visites et tarifs sont-ils à cette adresse?', webLead: 'Nous avons inscrit l’adresse de votre site Web. Si vos prix ont leur propre page, tapez son nom après le dernier /, comme /tarifs.',
-  webQEmpty: 'Où sont vos visites et tarifs en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouvent vos prix.', webLabel: 'Adresse Web de la page des prix',
+  web: 'Mes sorties et tarifs sont sur mon site Web', menuSocial: 'Mes sorties et tarifs sont sur Facebook ou Instagram',
+  emailQ: 'Envoyez-nous vos sorties et tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Sorties et tarifs de {name}',
+  menuSentEmail: '✓ Vous avez dit que vous enverrez vos sorties et tarifs par courriel.', menuNote: 'Envoyé depuis la configuration simple. Merci d’ajouter nos sorties et tarifs à notre page.',
+  menuSentQ: 'Vos sorties et tarifs sont envoyés ✓', menuNewer: 'Voulez-vous envoyer une liste plus récente?', menuSent: '✓ Vos sorties et tarifs sont envoyés.',
+  webQ: 'Vos sorties et tarifs sont-ils à cette adresse?', webLead: 'Nous avons inscrit l’adresse de votre site Web. Si vos prix ont leur propre page, tapez son nom après le dernier /, comme /tarifs.',
+  webQEmpty: 'Où sont vos sorties et tarifs en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouvent vos prix.', webLabel: 'Adresse Web de la page des prix',
   webEmpty: 'Écrivez l’adresse de votre page de prix, comme www.vosactivites.com/tarifs.',
-  upQ: 'Téléversez votre liste de prix', upQSome: 'Votre liste de prix', upLead: 'Choisissez le fichier de vos visites et tarifs. Un fichier ou des photos, les deux fonctionnent.', upPick: 'Choisir le fichier de ma liste de prix', sendMenu: 'Envoyer mes visites et tarifs',
+  upQ: 'Téléversez votre liste de prix', upQSome: 'Votre liste de prix', upLead: 'Choisissez le fichier de vos sorties et tarifs. Un fichier ou des photos, les deux fonctionnent.', upPick: 'Choisir le fichier de ma liste de prix', sendMenu: 'Envoyer mes sorties et tarifs',
   camQ: 'Photographiez votre grille tarifaire', camLead: 'Tenez votre téléphone au-dessus de la grille tarifaire pour que toute la page soit visible.', page: 'Page {n} de la liste de prix',
-  menuSocialQ: 'Où sont vos visites et tarifs?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec vos prix. Ou tapez le nom de la page et nous la trouverons.',
-  menuSocialNote: 'Nos visites et tarifs sont sur notre page Facebook ou Instagram : « {name} ». Merci de les trouver et de les ajouter comme lien de nos prix.',
-  savedMenuSocialName: 'Nous trouverons vos visites et tarifs sur cette page et les ajouterons d’ici un jour.',
-  helpTail: 'Les photos, vos visites et tarifs et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
-  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos visites et tarifs », le premier des détails facultatifs.',
+  menuSocialQ: 'Où sont vos sorties et tarifs?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec vos prix. Ou tapez le nom de la page et nous la trouverons.',
+  menuSocialNote: 'Nos sorties et tarifs sont sur notre page Facebook ou Instagram : « {name} ». Merci de les trouver et de les ajouter comme lien de nos prix.',
+  savedMenuSocialName: 'Nous trouverons vos sorties et tarifs sur cette page et les ajouterons d’ici un jour.',
+  helpTail: 'Les photos, vos sorties et tarifs et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs.',
   addSecond: '+ Ajouter une deuxième plage (seulement si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.',
   departHint: 'Des départs à heures fixes? Indiquez une seule plage, de votre premier départ jusqu’au retour de la dernière sortie (comme 9 h – 17 h), et nommez les heures de départ dans votre histoire.',
   noDogsSub: 'Sur aucune sortie', noDogsSubInside: 'Sur aucune sortie',
-  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le : changez les mots, ou touchez les réponses plus haut pour les utiliser à la place.',
+  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le : changez les mots, ou touchez les réponses ci-dessous pour les utiliser à la place.',
   // The French wording table (tour test 1).
   allYearClosed: 'Nous offrons des sorties une partie de l’année seulement',
   tpriceQ: 'Combien coûte une sortie par personne?',
   knownQ: 'Pour quoi êtes-vous connus?',
 });
 
+// Tour test 2 (Whistler, 2026-11-16; Marc-André, French, by booking only, summer-only rafting). The season question on the
+// by-booking path (asked right after "by booking only", without hours words), the Good to know counter, and the French
+// wording table: « sorties » for a tour's trips everywhere (« Vos sorties et tarifs », « Sorties privées »; the category
+// keeps its name, « Visites et expériences »), the photos and Part 2 titles, the meeting photo's permission line.
+// The quick answers reworded here keep their old wording readable (quickOld: a line saved with it still pairs up).
+Object.assign(en.tour, {
+  yearNoSetQ: 'Do you run trips all year?', yearNoSetLead: 'If you only run for a season, like May to September, tap it and pick your dates.',
+  yearNoSetYes: 'Yes, all year', yearNoSetKeep: 'Yes, that’s my season', yearNoSetChange: 'Change my season dates',
+  openQ: 'When do you run each year?', openLead: 'Your first and last day of the season. Outside these dates your page says “Closed for the season”, and when you start again.',
+  openFrom: 'First day', openTo: 'Last day', allYearBtn: 'We run all year',
+  countOf: '{n} / {max}', countFull: 'That’s the limit ({max} characters). Shorten a line to add more.',
+  quickOld: { good_to_know: ['Hotel pickup available'], groups: ['Private tours available'] },
+  doorRights: 'I took this photo or have permission to share it, and Okanagan Roam may show it to help visitors find your meeting spot.',
+});
+Object.assign(fr.tour, {
+  yearNoSetQ: 'Offrez-vous des sorties toute l’année?', yearNoSetLead: 'Si vous partez seulement une saison, par exemple de mai à septembre, touchez ce choix et indiquez vos dates.',
+  yearNoSetYes: 'Oui, toute l’année', yearNoSetKeep: 'Oui, c’est ma saison', yearNoSetChange: 'Modifier les dates de ma saison',
+  openQ: 'Quand offrez-vous des sorties chaque année?', openLead: 'Le premier et le dernier jour de votre saison. En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de reprise.',
+  openFrom: 'Premier jour', openTo: 'Dernier jour', allYearBtn: 'Nous offrons des sorties toute l’année',
+  countOf: '{n} / {max}', countFull: 'C’est la limite ({max} caractères). Raccourcissez une ligne pour en ajouter.',
+  quickOld: { good_to_know: ['Cueillette à l’hôtel offerte'], groups: ['Visites privées offertes'] },
+  photosQ: 'Ajoutez des photos de vos sorties', moreQ: 'Plus de détails sur votre entreprise',
+  doorRights: 'J’ai pris cette photo ou j’ai la permission de la partager, et Okanagan Roam peut l’afficher pour aider les visiteurs à trouver votre point de rencontre.',
+});
+// The same season question for a winery or a distillery that is by appointment only (it had the same hole).
+Object.assign(en, {
+  yearNoSetQ: 'Do you take appointments all year?', yearNoSetLead: 'If you close for part of the year, tap it and pick your dates.',
+  yearNoSetYes: 'Yes, all year', yearNoSetKeep: 'Yes, those are my dates', yearNoSetChange: 'Change my dates',
+});
+Object.assign(fr, {
+  yearNoSetQ: 'Recevez-vous sur rendez-vous toute l’année?', yearNoSetLead: 'Si vous fermez une partie de l’année, touchez ce choix et indiquez vos dates.',
+  yearNoSetYes: 'Oui, toute l’année', yearNoSetKeep: 'Oui, ce sont mes dates', yearNoSetChange: 'Modifier mes dates',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

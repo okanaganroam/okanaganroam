@@ -69,7 +69,7 @@ function ownerStats(db, venueId, now = new Date()) {
 // The panel on the edit page (and, short, at the end of the setup). Plain words; honest when the numbers are small.
 // Tour test 1 (Whistler, 2026-11-16): opts.listKind 'tours' or 'prices' names the list a tour or another priced place
 // has ("booking and tours & prices", "booking and prices"), never "menu".
-const LIST_WORDS = { tours: { en: ['menu', 'tours & prices', 'Menu views', 'Tours & prices views'], fr: ['le menu', 'les visites et tarifs', 'Vues du menu', 'Vues des visites et tarifs'] },
+const LIST_WORDS = { tours: { en: ['menu', 'tours & prices', 'Menu views', 'Tours & prices views'], fr: ['le menu', 'les sorties et tarifs', 'Vues du menu', 'Vues des sorties et tarifs'] },
   prices: { en: ['menu', 'prices', 'Menu views', 'Price list views'], fr: ['le menu', 'les tarifs', 'Vues du menu', 'Vues des tarifs'] } };
 function ownerStatsHtml(st, lang = 'en', opts = {}) {
   if (!st) return '';

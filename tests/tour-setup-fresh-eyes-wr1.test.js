@@ -98,8 +98,8 @@ test('A. "Your tours and prices": the menu step leads Part 2, every word says to
   assert.equal(c.t.menuSentQ, 'Your tours and prices are sent ✓');
   for (const k of MENU_KEYS) assert.doesNotMatch(String(c.t[k]), /\bmenus?\b/i, `${k}: ${c.t[k]}`);
   const f = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
-  assert.equal(f.t.labels.menu, 'Vos visites et tarifs');
-  assert.match(f.t.web, /^Mes visites et tarifs sont sur mon site Web$/);
+  assert.equal(f.t.labels.menu, 'Vos sorties et tarifs');
+  assert.match(f.t.web, /^Mes sorties et tarifs sont sur mon site Web$/);
   for (const k of MENU_KEYS) assert.doesNotMatch(String(f.t[k]), /\bmenus?\b/i, `fr ${k}: ${f.t[k]}`);
   // The price step points to it; a ticket on its tile, never the plate or the mug.
   assert.match(c.t.tpriceMore, /Your tours and prices/);
@@ -110,7 +110,7 @@ test('A. "Your tours and prices": the menu step leads Part 2, every word says to
   // The % checklist item.
   const item = pc.itemsFor('tour').find((i) => i.key === 'menu');
   assert.equal(item.en, 'Your tours and prices');
-  assert.equal(item.fr, 'Vos visites et tarifs');
+  assert.equal(item.fr, 'Vos sorties et tarifs');
   assert.equal(pc.itemsFor('tour').reduce((a, i) => a + i.w, 0), 100);
   // Sent from the setup (a link): the step is answered "within a day".
   ok(await change(t, { menu_url: 'https://example.com/rates' }));
@@ -122,7 +122,7 @@ test('A. "Your tours and prices": the menu step leads Part 2, every word says to
   assert.equal(hb.best('can I send a photo of our rates sheet').id, 'menu-add');
 });
 
-test('A. the edit page, the venue page and the list page say "Tours & prices" / « Visites et tarifs », with a ticket', async () => {
+test('A. the edit page, the venue page and the list page say "Tours & prices" / « Sorties et tarifs », with a ticket', async () => {
   const v = mk('tour', { name: 'Okanagan Lake Cruises', cuisine: 'Boat tours', region: 'vernon' });
   const t = tokenFor(v.id);
   const e = (await get(`/owner/${t}`)).text;
@@ -131,19 +131,19 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
   assert.match(e, /<a href="#opMenuCard">Tours &amp; prices<\/a>/);
   assert.doesNotMatch(e.split('id="opTasks"')[1].split('</section>')[0], /&#127869;/, 'no plate on the tours tile');
   const ef = (await get(`/fr/owner/${t}`)).text;
-  assert.match(ef, /Mettre à jour mes visites et tarifs/);
+  assert.match(ef, /Mettre à jour mes sorties et tarifs/);
   // A published list: the venue page section and its button, and the list page title.
   db.prepare("INSERT INTO venue_menus (venue_id, status, data, published_at) VALUES (?, 'published', ?, '2026-11-01')").run(v.id, JSON.stringify({ sections: [{ name: 'Cruises', items: [{ name: 'Sunset cruise', price: '$79' }, { name: 'Two-hour lake tour', price: '$59' }, { name: 'Private charter', price: '$900' }] }] }));
   const en = page(v, 'en');
   assert.match(en, /<h2><span aria-hidden="true">🎟️<\/span> Tours &amp; prices<\/h2>/);
   assert.match(en, /See all tours &amp; prices \(3/);
   const fr = page(v, 'fr');
-  assert.match(fr, /<h2><span aria-hidden="true">🎟️<\/span> Visites et tarifs<\/h2>/);
-  assert.match(fr, /Voir toutes les visites et tarifs \(3/);
+  assert.match(fr, /<h2><span aria-hidden="true">🎟️<\/span> Sorties et tarifs<\/h2>/);
+  assert.match(fr, /Voir toutes les sorties et tarifs \(3/);
   assert.doesNotMatch(plain(en), /🍽|🍺/);
   // A link instead (from the setup's "on my website"): the row says Tours & prices.
   assert.deepEqual(app.venueTapListWords(app.getVenue(v.id), false), { label: 'Tours & prices', see: 'See tours & prices', lower: 'tours & prices' });
-  assert.equal(app.venueTapListWords(app.getVenue(v.id), true).label, 'Visites et tarifs');
+  assert.equal(app.venueTapListWords(app.getVenue(v.id), true).label, 'Sorties et tarifs');
   const lp = await get(`${app.venuePagePath ? app.venuePagePath(app.getVenue(v.id)) : '/vernon/tours/' + v.slug}/prices`);
   if (lp.status === 200) assert.match(lp.text, /Tours &amp; Prices|Tours &amp; prices/);
 });

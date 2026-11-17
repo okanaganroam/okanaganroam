@@ -1106,7 +1106,7 @@ const FR_PATTERNS = [
   }],
   // Card status lines for places with a notice (2026-11-02).
   [/^By appointment \u00b7 call ahead$/, () => 'Sur rendez-vous \u00b7 appelez avant'],
-  [/^Book ahead \u00b7 tours by reservation$/, () => 'R\u00e9servez \u00e0 l\u2019avance \u00b7 visites sur r\u00e9servation'],
+  [/^Book ahead \u00b7 tours by reservation$/, () => 'R\u00e9servez \u00e0 l\u2019avance \u00b7 sorties sur r\u00e9servation'],
   [/^Open to the public \u00b7 no set hours$/, () => 'Ouvert au public \u00b7 sans horaire fixe'],
   [/^Open to the public$/, () => 'Ouvert au public'],
   [/^Open year-round$/, () => 'Ouvert toute l\u2019ann\u00e9e'],

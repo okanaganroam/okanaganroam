@@ -233,7 +233,20 @@ const PHRASES = [
   // and « VTT » (véhicule tout-terrain) are ATV tours.
   ['randonnee en motoneige', 'snowmobile tour'], ['randonnees en motoneige', 'snowmobile tours'], ['balade en motoneige', 'snowmobile tour'], ['excursion en motoneige', 'snowmobile tour'],
   ['tour de motoneige', 'snowmobile tour'], ['sortie en motoneige', 'snowmobile tour'], ['motoneige', 'snowmobile'], ['motoneiges', 'snowmobiles'],
-  ['randonnee en quad', 'ATV tour'], ['balade en quad', 'ATV tour'], ['randonnee en vtt', 'ATV tour'], ['balade en vtt', 'ATV tour'], ['quad', 'ATV'], ['quads', 'ATVs'], ['vtt', 'ATV'],
+  ['randonnee en quad', 'ATV tour'], ['balade en quad', 'ATV tour'], ['sortie en quad', 'ATV tour'], ['sortie en vtt', 'ATV tour'], ['randonnee en vtt', 'ATV tour'], ['balade en vtt', 'ATV tour'], ['quad', 'ATV'], ['quads', 'ATVs'], ['vtt', 'ATV'],
+  // Tour test 2 (Whistler, 2026-11-16): « observation des ours » and « observation de la faune » are wildlife tours (they
+  // read as a search for "observation"); « sortie », « excursion » and « descente de rivière » are tour words, never
+  // search words (« Lieux qui mentionnent "sortie" »); « une sortie en famille » is a family-friendly tour.
+  ['observation des ours', 'bear viewing tour'], ['observation d ours', 'bear viewing tour'], ['observation de l ours', 'bear viewing tour'], ['observer les ours', 'bear viewing tour'], ['observer des ours', 'bear viewing tour'],
+  ['voir des ours', 'bear viewing tour'], ['voir les ours', 'bear viewing tour'], ['excursion d observation des ours', 'bear viewing tour'], ['sortie d observation des ours', 'bear viewing tour'],
+  ['observation de la faune', 'wildlife viewing tour'], ['observation de la faune et des ours', 'wildlife and bear viewing tour'], ['observation faunique', 'wildlife viewing tour'], ['observer la faune', 'wildlife viewing tour'],
+  ['excursion d observation de la faune', 'wildlife viewing tour'], ['sortie d observation de la faune', 'wildlife viewing tour'],
+  ['sortie en famille', 'family friendly tour'], ['sorties en famille', 'family friendly tours'], ['excursion en famille', 'family friendly tour'], ['excursions en famille', 'family friendly tours'],
+  ['sortie familiale', 'family friendly tour'], ['sorties familiales', 'family friendly tours'], ['excursion familiale', 'family friendly tour'],
+  ['descente de riviere', 'rafting'], ['descentes de riviere', 'rafting'], ['descente de rivieres', 'rafting'], ['descente de la riviere', 'rafting'], ['descente en rafting', 'rafting'], ['descente en eau vive', 'whitewater rafting'],
+  ['descentes en eau vive', 'whitewater rafting'], ['rafting en eau vive', 'whitewater rafting'], ['eau vive', 'whitewater'], ['ski de descente', 'downhill skiing'], ['velo de descente', 'downhill mountain biking'],
+  ['sortie guidee', 'guided tour'], ['sorties guidees', 'guided tours'], ['excursion guidee', 'guided tour'], ['excursions guidees', 'guided tours'],
+  ['sortie', 'tour'], ['sorties', 'tours'], ['excursion', 'tour'], ['excursions', 'tours'],
   ['camper', 'camping'], ['observation des oiseaux', 'birdwatching'], ['ornithologie', 'birdwatching'], ['faune', 'wildlife'],
   ['milieux humides', 'wetlands'], ['planche a pagaie', 'paddleboarding'], ['surf a pagaie', 'paddleboarding'],
   ['pagaie', 'paddling'], ['canot', 'canoe'], ['location de bateau', 'boat rental'], ['bateau', 'boating'],
@@ -536,6 +549,12 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
     if (dm && monthEn && Number(dm[1]) >= 1 && Number(dm[1]) <= 31 && !keep.has(i + 1) && !(tokens[i - 1] === 'au' && /^\d{1,2}$/.test(tokens[i - 2] || '')) && tokens[i - 1] !== 'du') {
       if (out[out.length - 1] === 'the') { out.pop(); pieces.pop(); }
       out.push(`${monthEn} ${Number(dm[1])}`); i += 2; continue;
+    }
+    // Tour test 2 (Whistler, 2026-11-16): an age (« un enfant de 6 ans », « mon fils de 10 ans ») is "6 year old" in the
+    // English the planner reads; « ans » was read as a search word (« Lieux qui mentionnent "ans" »).
+    if (/^\d{1,2}$/.test(w) && (tokens[i + 1] === 'ans' || tokens[i + 1] === 'an') && !keep.has(i + 1)) {
+      if (out[out.length - 1] === 'of') { out.pop(); pieces.pop(); }
+      out.push(`${Number(w)} year old`); i += 2; continue;
     }
     // « à midi », « vers midi », « midi » alone: noon (« après-midi » is its own phrase and never reaches here).
     if (w === 'midi' || ((w === 'a' || w === 'vers') && tokens[i + 1] === 'midi' && !keep.has(i + 1))) {

@@ -298,8 +298,9 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
 const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'snowshoe', 'paddle', 'raft', 'adventure', 'flight', 'food', 'farm', 'rentals', 'other'];
 const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
-const TOUR_BOOK = ['same_day', 'day', 'week', 'no'];
-const TOUR_AGES = ['all', '6', '12', '16', '19'];
+// Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
+const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
+const TOUR_AGES = ['all', '5', '6', '12', '16', '19'];
 const TOUR_ITEMS = [
   R('address_pin', { w: 3, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
   R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),
@@ -319,14 +320,14 @@ const TOUR_ITEMS = [
   { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'tour', w: 5, fix: true, target: { setup: 'booking' }, fields: ['booking_url'],
     en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book a trip.', whyFr: 'La page où l’on réserve une sortie.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
   { key: 'book_ahead', group: 'tour', w: 4, fix: true, target: { setup: 'booking' }, fields: ['tour_info'],
-    en: 'How far ahead to book', fr: 'Combien de temps à l’avance réserver', whyEn: 'Same day is fine, a day ahead, or a week ahead.', whyFr: 'Le jour même, la veille, ou une semaine à l’avance.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🗓️' },
+    en: 'How far ahead to book', fr: 'Combien de temps à l’avance réserver', whyEn: 'Same day is fine, a day ahead, 48 hours ahead, or a week ahead.', whyFr: 'Le jour même, la veille, 48 heures à l’avance, ou une semaine à l’avance.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🗓️' },
   { key: 'tour_ages', group: 'yourvisit', w: 5, fix: true, target: { setup: 'offer' }, fields: ['tour_info'],
-    en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (6+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (6+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
+    en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (5+, 6+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (5+, 6+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
     en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible or Free parking on “Who can come”.', whyFr: 'Cochez Accessible en fauteuil roulant ou Stationnement gratuit dans « Qui peut venir ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
   // Tour test 1 (Whistler, 2026-11-16; Dayton approved "Your tours and prices"): the menu feature in tour words, 4 points
   // (one each from the meeting spot, the kind of tour and the two photo items).
-  R('menu', { group: 'tour', w: 4, target: { setup: 'menu' }, en: 'Your tours and prices', fr: 'Vos visites et tarifs', whyEn: 'Every trip and what it costs. A photo of your rates sheet or a link to your prices page is fine.', whyFr: 'Chaque sortie et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix suffit.', btnEn: 'Add them', btnFr: 'Ajouter', icon: '🎟️' }),
+  R('menu', { group: 'tour', w: 4, target: { setup: 'menu' }, en: 'Your tours and prices', fr: 'Vos sorties et tarifs', whyEn: 'Every trip and what it costs. A photo of your rates sheet or a link to your prices page is fine.', whyFr: 'Chaque sortie et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix suffit.', btnEn: 'Add them', btnFr: 'Ajouter', icon: '🎟️' }),
   R('description', { w: 5 }),
   R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on your trips, e.g. Small groups, local guides, hot chocolate at the top.', whyFr: 'Une ligne sur vos sorties, p. ex. petits groupes, guides d’ici, chocolat chaud au sommet.' }),
   R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups and private trips', fr: 'Groupes et sorties privées', whyEn: 'Private tours? From what size should groups call ahead?', whyFr: 'Sorties privées? À partir de quelle taille les groupes doivent-ils appeler?', target: { setup: 'groups' } }),
@@ -824,8 +825,9 @@ function renderCompleteness(result, opts) {
   const extraFields = (Array.isArray(o.pendingFields) ? o.pendingFields : []).filter((k) => fieldNames[k]);
   const photosSent = Math.max(0, Number(o.pendingPhotos) || 0);
   if (o.plainWaiting && (nw || extraFields.length || photosSent)) {
-    const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
-      website: ['website', 'site Web'], arrival: o.winery || o.distillery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : o.brewery ? ['taproom door photo', 'photo de la porte de la salle'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
+    // Tour test 2 (Whistler, 2026-11-16): a tour's are its tours and prices and its meeting spot photo (o.tour).
+    const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: o.tour ? ['tours and prices', 'sorties et tarifs'] : ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
+      website: ['website', 'site Web'], arrival: o.tour ? ['meeting spot photo', 'photo du point de rencontre'] : o.winery || o.distillery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : o.brewery ? ['taproom door photo', 'photo de la porte de la salle'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     // Every pending item is named, photos included (pub test 6: "Menu, website and address sent" left out the photo).
@@ -836,8 +838,8 @@ function renderCompleteness(result, opts) {
   const sentList = sentNames.length > 1 ? sentNames.slice(0, -1).join(', ') + L(' and ', ' et ') + sentNames[sentNames.length - 1] : sentNames[0] || '';
   // Distillery test 2 (Whistler, 2026-11-16): the French agrees with what was sent (« Photos : envoyées. Nous les ajouterons
   // d’ici un jour. », « Menu : envoyé. Nous l’ajouterons… », « Photos, menu et Facebook : envoyés. Nous les ajouterons… »).
-  const FR_FEM = new Set(['photos', 'votre histoire', 'adresse', 'photo de la porte de la salle de dégustation', 'photo de la porte de la salle', 'photo de la devanture', 'caractéristiques']);
-  const FR_PLURAL = new Set(['photos', 'spéciaux', 'caractéristiques']);
+  const FR_FEM = new Set(['photos', 'votre histoire', 'adresse', 'photo de la porte de la salle de dégustation', 'photo de la porte de la salle', 'photo de la devanture', 'photo du point de rencontre', 'caractéristiques']);
+  const FR_PLURAL = new Set(['photos', 'spéciaux', 'caractéristiques', 'sorties et tarifs']);
   const frMany = sentNames.length > 1 || FR_PLURAL.has(sentNames[0]), frFem = sentNames.length > 0 && sentNames.every((x) => FR_FEM.has(x));
   const frSent = `envoy${frFem ? 'ée' : 'é'}${frMany ? 's' : ''}`;
   const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : ${frSent}. Nous ${frMany ? 'les ajouterons' : 'l’ajouterons'} d’ici un jour.`) : '';
@@ -960,7 +962,7 @@ function renderCompleteness(result, opts) {
   const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
   const chip = badgeChipHtml(fr);
   const badgeBlock = bState === 'earned'
-    ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
+    ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${o.tour && o.apptOnly ? L('It shows on your page, in search and on the Roam Now map. Keep it by confirming your season and booking details at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en confirmant votre saison et vos réservations au moins tous les 30 jours. Nous vous enverrons un rappel.') : L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
     : bState === 'paused'
     ? `<div class="op-cb-badge op-cb-badge-paused" id="opCbBadge"><p><span aria-hidden="true">⏰</span> ${L('Your', 'Votre badge')} ${chip} ${L('badge is paused. Are your hours still right?', 'est en pause. Vos heures sont-elles toujours exactes?')}</p><button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify({ hours_checked: true }))}" data-cb-done="${esc(L('Thanks! Your badge is back.', 'Merci! Votre badge est de retour.'))}">${L('Yes, these are right', 'Oui, elles sont exactes')}</button></div>`
     : bState === 'none' && !noScore

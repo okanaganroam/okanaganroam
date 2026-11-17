@@ -9,7 +9,7 @@ const FR_SEASON_WORDS={winter:'hiver',spring:'printemps',summer:'été',fall:'au
 const FR_HEADING_NAMES={wineries:'vignobles',breweries:'microbrasseries',cideries:'cidreries',cafes:'cafés','cocktail lounges':'bars à cocktails',distilleries:'distilleries','golf courses':'terrains de golf','indoor & rainy day spots':'lieux pour les jours de pluie','outdoor destinations':'lieux de plein air',pubs:'pubs',restaurants:'restaurants','sports & recreation':'sports et loisirs','tours & experiences':'visites et expériences',beaches:'plages','art galleries':'galeries d’art',museums:'musées','museums & galleries':'musées et galeries',shops:'boutiques',spas:'spas','yoga studios':'studios de yoga',
  'dog-friendly spots':'endroits qui acceptent les chiens','vegan-friendly venues':'lieux avec options véganes','vegetarian-friendly venues':'lieux avec options végétariennes','venues with a patio':'lieux avec terrasse','kid-friendly spots':'endroits adaptés aux enfants','venues with gluten-free options':'lieux avec options sans gluten','venues with a lake view':'lieux avec vue sur le lac','venues with non-alcoholic options':'lieux avec options sans alcool','spots to watch the game':'endroits pour regarder le match','venues with live music':'lieux avec musique en direct','venues that are great for groups':'lieux parfaits pour les groupes','venues with happy hour':'lieux avec un 5 à 7','free things to do':'activités gratuites','arts and culture spots':'lieux d’art et de culture','spots open early for breakfast & brunch':'endroits ouverts tôt pour le déjeuner et le brunch','late-night spots':'endroits ouverts tard',
  'hiking & trails':'randonnées et sentiers','cycling & biking':'vélo','winter':'activités d’hiver','camping':'camping','nature & wildlife':'nature et faune','water activities':'activités nautiques','viewpoints':'points de vue','adventure':'aventure','fishing':'pêche',
- 'waterfalls & canyons':'chutes et canyons','huts & cabins':'refuges et cabanes','parks & picnic spots':'parcs et aires de pique-nique','off-leash dog areas':'aires sans laisse pour chiens',lakes:'lacs','shopping':'magasins','zipline':'tyrolienne','ziplining':'tyrolienne','bungee jumping':'saut à l’élastique','rafting':'rafting','scenic flight':'vol panoramique','farm':'fermes',
+ 'waterfalls & canyons':'chutes et canyons','huts & cabins':'refuges et cabanes','parks & picnic spots':'parcs et aires de pique-nique','off-leash dog areas':'aires sans laisse pour chiens',lakes:'lacs','shopping':'magasins','zipline':'tyrolienne','ziplining':'tyrolienne','bungee jumping':'saut à l’élastique','rafting':'rafting','scenic flight':'vol panoramique','wildlife tour':'observation de la faune','wildlife tours':'observation de la faune','farm':'fermes',
  'hidden gems':'trésors cachés','local favourites':'coups de cœur locaux','dog-friendly beaches':'plages qui acceptent les chiens','lake time':'temps au bord du lac',
  // Cocktail test 2 (2026-11-13): meals and drinks, for « Aucun lieu (souper) ne correspond… » (it read « (dinner) »).
  dinner:'souper',supper:'souper',lunch:'dîner',breakfast:'déjeuner',brunch:'brunch',drinks:'verres',drink:'verre','a drink':'un verre',coffee:'café',dessert:'dessert','happy hour':'5 à 7','après':'après-ski',apres:'après-ski','late-night food':'repas tard le soir',tasting:'dégustation',tastings:'dégustations',cocktails:'cocktails'};
@@ -126,7 +126,9 @@ function t3FrenchText(value){
 function t3FrenchTextCore(value){
  let text=String(value||'');
  const heading=t3FrenchHeading(text);if(heading)return heading;
- const directLabels={market:'marché',festival:'festival',event:'événement',walks:'promenades','easy walk':'promenade facile','easy walks':'promenades faciles','Kid-friendly spots':'Endroits adaptés aux enfants'};
+ const directLabels={market:'marché',festival:'festival',event:'événement',walks:'promenades','easy walk':'promenade facile','easy walks':'promenades faciles','Kid-friendly spots':'Endroits adaptés aux enfants',
+  // Tour test 2 (Whistler, 2026-11-16): a tour stop's heading on a French plan (« VISITES ET EXPÉRIENCES · 13 h–15 h »).
+  'Tours & experiences':'Visites et expériences','Tours & Experiences':'Visites et expériences'};
  if(Object.prototype.hasOwnProperty.call(directLabels,text))return directLabels[text];
  // Cocktail test 2 (2026-11-13): the date and request conflicts (trip-requirements.js), which stayed in English.
  const conflictFr={'The calendar date conflicts with the named weekday; confirm the travel date.':'La date ne correspond pas au jour de la semaine indiqué; vérifiez la date du voyage.',
@@ -403,9 +405,10 @@ function t3FrenchTextCore(value){
  // Tours (2026-11-16): the operator's own book-ahead and age answers.
  text=text.replace(/^Same-day bookings are often fine \(the operator’s own answer\)\. Call ahead for the times\.$/,'Réserver le jour même convient souvent (réponse de l’entreprise). Appelez pour connaître les heures.');
  text=text.replace(/^Book at least a day ahead \(the operator’s own answer\)\.$/,'Réservez au moins la veille (réponse de l’entreprise).');
+ text=text.replace(/^Book at least 48 hours ahead \(the operator’s own answer\)\.$/,'Réservez au moins 48 heures à l’avance (réponse de l’entreprise).');
  text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
- text=text.replace(/^Ages 6 and up \(the operator’s own answer\)\.$/,'À partir de 6 ans (réponse de l’entreprise).');
+ text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.
  text=text.replace(/^Kids are welcome until (\d{1,2}(?::\d{2})? [AP]M|midnight) only$/,(_,t)=>'Enfants bienvenus jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+' seulement');
  text=text.replace(/^Kids welcome with an adult until (\d{1,2}(?::\d{2})? [AP]M|midnight)(, so plan to leave by then)?$/,(_,t,late)=>'Enfants bienvenus avec un adulte jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+(late?'; prévoyez de partir avant':''));

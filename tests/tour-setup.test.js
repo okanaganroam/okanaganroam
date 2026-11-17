@@ -244,7 +244,7 @@ test('% complete: tour items, and By booking only answers the hours and season',
   const en = plain(page(v, 'en'));
   assert.match(en, /Book ahead · tours by reservation/);
   const fr = plain(page(v, 'fr'));
-  assert.match(fr, /Réservez à l’avance · visites sur réservation/);
+  assert.match(fr, /Réservez à l’avance · sorties sur réservation/);
   // Hours typed in again take "By booking only" back.
   ok(await change(t, { hours: WK('10:00', '16:00'), tour_info: { visit: null } }));
   assert.equal(app.venueTourInfo(v.id).visit, undefined);
