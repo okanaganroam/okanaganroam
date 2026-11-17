@@ -28,10 +28,13 @@
   var BREWERY_ITEM_STEP = { brewery_kind: 'taproom', food_here: 'taproom', flight_price: 'flights', to_go: 'flights', happy_hour: 'happy', dogs_kids: 'offer:minors', access: 'offer', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu' };
   // Cocktail lounges (2026-11-13): the pub screens folded like breweries (FOLD: Groups and booking on one screen, the
   // story screen with Known for), the cocktail price on 'spend', and where each checklist item is answered.
-  var CK = !!C.cocktail, FOLD = !!(C.brewery || C.cocktail);
+  // Tours (2026-11-16): the story screen with Known for and the Groups screen with the booking link box, as for breweries.
+  var TOUR = !!C.tour;
+  var CK = !!C.cocktail, FOLD = !!(C.brewery || C.cocktail || TOUR);
   var COCKTAIL_ITEM_STEP = { cocktail_price: 'spend', kitchen: 'hours:kitchen', minors: 'offer:minors', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu', happy_hour: 'happy' };
   // The checklist item -> the screen that answers it, for this type.
-  function itemStep(k){ return (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
+  var TOUR_ITEM_STEP = { tour_kind: 'tour', tour_length: 'tour', tour_price: 'price', booking_link: 'booking', book_ahead: 'booking', tour_ages: 'offer', access: 'offer', pyv_known: 'story', pyv_groups: 'groups', arrival: 'door', season: 'hours:year' };
+  function itemStep(k){ return (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   var el = function(id){ return document.getElementById(id); };
   var screen = el('suScreen');
@@ -539,6 +542,8 @@
   // The winery's own answers (venue_winery_info) and its tasting fee, as stored. A price from our research (the card's
   // "From $X") is offered as a starting point only; nothing is saved until she taps Save.
   var WI = clone(CUR.winery_info || {});
+  // Tours (2026-11-16): their own answers (venue_tour_info), read here so the Hours step's "By booking only" can use them.
+  var TI = clone(CUR.tour_info || {});
   S.wine = {
     food: WI.food || '', rname: (WI.restaurant || {}).name || '', rwhen: (WI.restaurant || {}).when || '',
     fee: CUR.tasting_fee == null ? null : CUR.tasting_fee, feeOther: false, waived: WI.waived || '',
@@ -562,8 +567,11 @@
   if (C.distillery) { S.place = 'Distillery'; CUR.place_type = 'Distillery'; }
   // Distilleries (Decided 5, 2026-11-13): the winery's "By appointment" answers on Hours (no set hours; or walk-ins in a
   // season, by appointment the rest of the year), stored with their brewery answers. AI: the answers it reads.
+  // Tours (2026-11-16): "We don't have set hours. Trips are by booking only" is the same path, stored with their tour answers.
   var APPT = !!(C.winery || C.distillery), AI = C.distillery ? BI : WI;
-  function apptPart(o){ return C.distillery ? { brewery_info: o } : { winery_info: o }; }
+  if (TOUR) { APPT = true; AI = TI; }
+  function apptPart(o){ return C.distillery ? { brewery_info: o } : TOUR ? { tour_info: o } : { winery_info: o }; }
+  if (TOUR) { S.wine.visit = TI.visit || ''; S.wine.year = TI.year || ''; S.wine.season = null; S.savedWYear = TI.year || ''; }
   if (C.distillery) { S.wine.visit = BI.visit || ''; S.wine.year = BI.year || ''; S.wine.season = BI.season || null; S.savedWYear = BI.year || ''; }
   if (C.brewery) {
     S.savedYear = BI.year || '';
@@ -584,6 +592,32 @@
   S.cp = { fee: typeof S.savedCp === 'number' ? S.savedCp : null, none: S.savedCp === 'none', other: false, guessed: false };
   if (CK && S.cp.fee == null && !S.cp.none && typeof C.researchCocktail === 'number') { S.cp.fee = C.researchCocktail; S.cp.guessed = true; }
   if (CK && S.cp.fee != null && CQ.indexOf(S.cp.fee) < 0) S.cp.other = true;
+  // ---------- Tours (2026-11-16) ----------
+  // The operator's own answers (venue_tour_info) and the price per person, as stored. Research's price and trip length are
+  // offered as a starting point only ("We picked this from your page — check it"); nothing is saved until she taps Save.
+  S.tour = { kinds: (TI.kinds || []).slice(), length: TI.length || '', book: TI.book || '', bookYes: TI.book ? (TI.book === 'no' ? 'no' : 'yes') : '', age: TI.age || '', adult: TI.adult === true,
+    price: CUR.tour_price == null ? null : CUR.tour_price, priv: typeof TI.private === 'number' ? TI.private : null, noBook: (CUR.not_offered || []).indexOf('booking_link') >= 0 };
+  S.savedTourPrice = CUR.tour_price == null ? null : CUR.tour_price;
+  if (TOUR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
+  if (TOUR && !S.tour.length && C.researchLength) { S.tour.length = C.researchLength; S.tour.lengthGuessed = true; }
+  if (TOUR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
+  // "$129" / "129 $", "$1,500" / "1 500 $".
+  function tourMoney(n){ var t = Math.round(n) === n ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, C.lang === 'fr' ? '\u00a0' : ',') : n.toFixed(2); return C.lang === 'fr' ? t.replace('.', ',') + '\u00a0$' : '$' + t; }
+  // A typed price: "129", "$129", "129 $", "1,500", "1 500", "12.50" / "12,50". -> number, null (empty) or NaN.
+  function tourPriceRead(x){ var t = String(x == null ? '' : x).trim().replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  function readTour(){
+    var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
+    if ((x = v('suTprice')) !== null) { var np = tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; }
+    if ((x = v('suTpriv')) !== null) S.tour.priv = tourPriceRead(x);
+    if ((x = v('suBookUrl')) !== null && TOUR) S.bookUrl = x;
+    if ((x = v('suBring')) !== null) S.tour.bring = x;
+  }
+  // One-of-a-few answers and chips on S.tour (data-tpick="length:half"); the kinds are on/off chips (data-tkind).
+  function tchips(key, keys, labels, aria){ return '<div class="su-chips" role="group" aria-label="' + h(aria) + '">' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
+  function tbig(key, keys, labels, subs){ return '<div class="su-stack" role="group">' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'; }
+  function tourKindName(k){ var o = (C.tourKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
+  // The card's price line as she types it ("Your card will say “From $129”").
+  function tourPriceLead(){ var n = S.tour.price; return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1323,6 +1357,8 @@
   if (C.brewery) P2_ICONS.menu = '📖';
   // Cocktail lounges (2026-11-13): music and DJs.
   if (CK) P2_ICONS.music = '🎶';
+  // Tours (2026-11-16): a backpack for Good to know (what to bring), a pin for the meeting spot.
+  if (TOUR) { P2_ICONS.bring = '🎒'; P2_ICONS.door = '📍'; }
   // "87 %" in French, as the line beside it says (café test 6).
   function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
@@ -1338,6 +1374,9 @@
       + h(sc.pct >= 100 ? T.pctDone : raise ? T.pctRaise : T.niceWork) + '</span></div></div>';
   }
   function preview(){
+    // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
+    if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
+      + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -1413,7 +1452,7 @@
     var open = P2.filter(function(k){ return !answered(k) && !(C.pub && (k === 'book' || k === 'takeout')); });
     var social = open.filter(function(k){ return k === 'facebook' || k === 'instagram'; }), other = open.filter(function(k){ return social.indexOf(k) < 0; });
     // A café's one Instagram and Facebook screen keeps its capitals too.
-    if ((C.cafe || C.winery || C.brewery || C.cocktail) && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
+    if ((C.cafe || C.winery || C.brewery || C.cocktail || C.tour) && other.indexOf('social') >= 0) { social.push('social'); other = other.filter(function(k){ return k !== 'social'; }); }
     var shown = other.slice(0, Math.max(1, 3 - social.length)), open2 = shown.map(function(k){ return String(T.labels[k]).toLowerCase().replace(/\bdj(s?)\b/g, 'DJ$1'); }).concat(social.map(function(k){ return T.labels[k]; }));
     if (!open2.length) return '';
     return cl(T.optional) + open2.join(', ') + (open.length > shown.length + social.length ? ' ' + T.andMore : '');
@@ -1485,6 +1524,7 @@
       'hours:kitchentime': 'kitchenSave', 'offer:sports': 'sportsSave', 'offer:minors': 'minorsSave',
       winery: 'winerySave', tastings: 'tastingsSave', visit: 'visitSave', experiences: 'expSave', 'hours:appt': 'apptSave',
       taproom: 'taproomSave', flights: 'flightsSave', groups: FOLD ? 'brewGroupsSave' : undefined,
+      tour: 'tourSave', price: 'priceSave', booking: 'bookingSave', bring: 'bringSave',
       'cuisine:serve': 'serveSave', 'offer:laptops': 'laptopSave', stay: 'staySave', order: 'orderSave', diet: 'dietSave', coffee: 'coffeeSave', sellout: 'selloutSave' }[st];
     if (here) return here;
     var d = S.dirty || b;
@@ -1526,7 +1566,7 @@
   // has changed since (saved from another screen or the edit page), that answer is left as the page has it. Typed
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
-    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp'];
+    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour'];
   var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
   // True while answers kept on this device (not saved yet) are shown on the step's screens.
   function pending(step){ return S.dirty === step && !!DR.restored[step]; }
@@ -1565,7 +1605,7 @@
     if (S.leaving) return;
     var b = base(S.step); if (!isStep(b) || !DR.base[b]) return;
     // What's typed in the time and deal boxes, as the screen's own Save reads it (so "Are these your hours?" shows them).
-    try { if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); } catch (e) {}
+    try { if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); if (TOUR) { readTour(); readBrew(); } } catch (e) {}
     var d = drGet(b) || { s: {}, boxes: {} };
     d.s = drDiff(DR.base[b]);
     var bx = {}; Array.prototype.forEach.call(drBoxes(), function(inp){ if (inp.id === 'suCq' || !drChanged(inp)) return; var sel = drSel(inp); if (sel) bx[sel] = inp.value; });
@@ -1900,6 +1940,42 @@
         + '<h2 class="su-h2">' + h(T.togoQ) + '</h2><p class="su-hint">' + h(T.togoLead) + '</p>' + (S.togoGuessed && T.togoGuess ? '<p class="su-sent su-research" id="suToGoGuess">' + h(T.togoGuess) + '</p>' : '') + '<div class="su-chips" role="group" aria-label="' + h(T.togoQ) + '" id="suToGo">'
         + TOGO.concat(['none']).map(function(k){ return '<button type="button" class="su-chip' + (String(T.togo[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (bf.togo[k] ? 'true' : 'false') + '" data-btogo="' + k + '">' + h(T.togo[k]) + '</button>'; }).join('') + '</div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'flightsSave') + '</div>' + skip('flights');
+    } else if (s === 'tour') {
+      // Tours (2026-11-16): "What do you offer?" (up to 3 kinds; the 12 most common open, the rest under "More kinds") and
+      // "How long does a trip take?" on one screen.
+      var tk = C.tourKinds || [], tTop = tk.slice(0, C.tourKindsTop || 12), tRest = tk.slice(C.tourKindsTop || 12);
+      var kchip = function(o){ var on = S.tour.kinds.indexOf(o.k) >= 0; return '<button type="button" class="su-chip' + (o.t.length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tkind="' + h(o.k) + '">' + h(o.t) + '</button>'; };
+      x = doneLine('tour') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess ? '<p class="su-sent su-research" id="suKindsGuess">' + h(T.kindsGuess) + '</p>' : '') + msgs()
+        + '<div class="su-chips su-kinds" role="group" aria-label="' + h(T.tkindQ) + '" id="suTourKinds">' + tTop.map(kchip).join('') + '</div>'
+        + (tRest.length ? '<details class="su-kinds"' + (tRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + tRest.map(kchip).join('') + '</div></details>' : '')
+        + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '')
+        + '<h2 class="su-h2">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length === C.researchLength && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
+        + tchips('length', ['1h', '2-3h', 'half', 'full', 'multi'], T.tlengths, T.tlengthQ)
+        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tourSave') + '</div>' + skip('tour');
+    } else if (s === 'price') {
+      // Tours (2026-11-16): "From $__ per person" in one box ("$129", "129 $" or "1,500" all work), and private tours.
+      var tp = S.tour;
+      x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
+        + (tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
+        + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
+        + field('suTprice', T.tpriceLabel, tp.price == null || isNaN(tp.price) ? '' : String(tp.price), { mode: 'decimal', max: 10 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: C.lang === 'fr' ? '1\u00a0000' : '1,000' })) + '</p>'
+        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, tp.priv == null || isNaN(tp.priv) ? '' : String(tp.priv), { mode: 'decimal', max: 10 })
+        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'priceSave') + '</div>' + skip('price');
+    } else if (s === 'booking') {
+      // Tours (2026-11-16): the booking link (the edit page's same field), and "Do people need to book ahead?" with how far.
+      var tb = S.tour, bkNow = S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '';
+      x = doneLine('booking') + q(T.tbookQ, T.tbookLead) + msgs()
+        + (tb.noBook ? '' : field('suBookUrl', T.bookLinkLabel, bkNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p>')
+        + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-label="' + h(T.bookLinkLabel) + '"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (tb.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
+        + '<h2 class="su-h2">' + h(T.taheadQ) + '</h2>' + tbig('bookYes', ['yes', 'no'], T.taheadYesNo)
+        + (tb.bookYes === 'yes' ? '<p class="su-q">' + h(T.taheadHow) + '</p>' + tchips('book', ['same_day', 'day', 'week'], T.taheads, T.taheadHow) : '')
+        + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'bookingSave') + '</div>' + skip('booking');
+    } else if (s === 'bring') {
+      // Tours (2026-11-16): what to bring or wear and the weather calls, in the "Good to know" line (no new field).
+      var bv = S.tour.bring != null ? S.tour.bring : ((CUR.visit_rows || {}).good_to_know || '');
+      x = doneLine('bring') + q(T.bringQ, T.bringLead) + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
+        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="180" rows="3">' + h(bv) + '</textarea>' + ex(T.bringEx)
+        + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
       // Wineries (2026-11-12): "What kind of winery?" (one of five) and "Food here?" on one screen. A restaurant on the estate
       // with its own page is only pointed to (Decided 3): its hours and menu are updated there.
@@ -2067,7 +2143,10 @@
       if (C.cafe && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'wifi' && S.noWifi)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
-      x = doneLine('offer') + q(T.offerQ, T.offerLead) + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
+      // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
+      var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '6', '12', '16', '19'], T.tages, T.tageQ)
+        + (S.tour.age && S.tour.age !== '19' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
+      x = doneLine('offer') + q(T.offerQ, T.offerLead) + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
         + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.filter(tileShown).map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 && !C.brewery ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
@@ -2231,7 +2310,7 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + n + '+</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !(CK && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
@@ -2426,7 +2505,7 @@
   function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }
   function noSetHoursSave(){
     var none = {}; DAYS.forEach(function(d){ none[d] = []; });
-    var ch = { hours: none, hours_checked: true }; if (AI.visit !== 'appointment') { if (C.distillery) ch.brewery_info = { visit: 'appointment' }; else ch.winery_info = { visit: 'appointment' }; }
+    var ch = { hours: none, hours_checked: true }; if (AI.visit !== 'appointment') { if (C.distillery) ch.brewery_info = { visit: 'appointment' }; else if (TOUR) ch.tour_info = { visit: 'appointment' }; else ch.winery_info = { visit: 'appointment' }; }
     saveAll('hours', [ch], null, COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
       AI.visit = 'appointment'; S.wine.visit = 'appointment'; var nw = {}; DAYS.forEach(function(d){ nw[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw : JSON.stringify(nw);
@@ -2484,11 +2563,15 @@
     // Wineries (2026-11-12): the off-season answer (all year, closed part of the year, or by appointment).
     var wyNew = APPT && S.wYearPick ? (S.wYearPick === 'appointment' ? 'appointment' : openVal(S.openSea) ? 'seasonal' : 'all') : '';
     if (wyNew && (wyNew !== S.savedWYear || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(AI.season || null)))) listH.push(apptPart(wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew }));
+    // Tours (2026-11-16): set hours saved again take "By booking only" back (its own screen is this one).
+    var tourApptOff = TOUR && AI.visit === 'appointment';
+    if (tourApptOff) listH.push({ tour_info: { visit: null } });
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
     saveAll('hours', listH, null, addNext ? 'hours:season2' : KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
+      if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
       if (wyNew) { S.savedWYear = wyNew; S.wine.year = wyNew; AI.year = wyNew; if (C.distillery) S.savedYear = wyNew; if (wyNew === 'appointment') AI.season = S.wine.season; else { delete AI.season; S.wine.season = null; } S.wYearPick = ''; }
       if (ch.hours_seasons) {
         CUR.hours_seasons = ch.hours_seasons;
@@ -3252,6 +3335,17 @@
         // The seats answer from this screen (café test 2): takeout only, or taken back.
         if (S.cafe.stay.seats !== S.seatsWas && (S.cafe.stay.seats === 'takeout' || S.seatsWas === 'takeout')) { var cs2 = cafeStay(); list.push({ cafe_info: { stay: Object.keys(cs2).length ? cs2 : null } }); S.seatsWas = S.cafe.stay.seats; }
       }
+      // Tours (2026-11-16): the minimum age (and "under 18s with an adult") is this screen's first answer. All ages or 6+
+      // ticks Kids welcome; 12+ and up takes it off, so a family filter never shows a 16+ tour.
+      if (TOUR) {
+        if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
+        var ta = {}; if (S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
+        var adult0 = S.tour.age !== '19' && S.tour.adult; if (adult0 !== (TI.adult === true)) ta.adult = adult0 ? true : null;
+        if (Object.keys(ta).length) list.unshift({ tour_info: ta });
+        var kidsOn = S.tour.age === 'all' || S.tour.age === '6';
+        if (kidsOn !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: kidsOn } });
+        return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = kidsOn; });
+      }
       return saveAll('offer', list, null, offerNext('offer'));
     }
     // ---------- Cafés (2026-11-10) ----------
@@ -3410,6 +3504,49 @@
       if (bKnownCh && S.brew.known) bsl.push({ visit_rows: { known_for: S.brew.known } }); else if (bKnownCh) bsl.push({ visit_rows: { known_for: '' } });
       S.savedLine.story = bStoryCh && bKnownCh ? T.storyKnownSaved : '';
       return saveAll('story', bsl, null, null, function(){ storyWaiting(); CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.known_for = S.brew.known; S.visit.known_for = S.brew.known; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'known_for'; }); });
+    }
+    // ---------- Tours (2026-11-16) ----------
+    if (k === 'tourSave') {
+      var tk0 = S.tour.kinds.slice(), tl0 = S.tour.length;
+      if (!tk0.length) { S.nudge = T.tkindNeed; return render(); }
+      if (!tl0) { S.nudge = T.tlengthNeed; return render(); }
+      var ti0 = {};
+      if (JSON.stringify(tk0) !== JSON.stringify(TI.kinds || [])) ti0.kinds = tk0;
+      if (tl0 !== (TI.length || '')) ti0.length = tl0;
+      return saveAll('tour', Object.keys(ti0).length ? [{ tour_info: ti0 }] : [], null, null, function(){ Object.keys(ti0).forEach(function(kk){ TI[kk] = ti0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false; });
+    }
+    if (k === 'priceSave') {
+      readTour(); var pp = S.tour.price, pv = S.tour.priv;
+      if (pp == null || isNaN(pp)) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
+      if (pv != null && isNaN(pv)) { S.nudge = T.tprivNeed; S.badField = 'suTpriv'; return render(); }
+      var pl = [];
+      if (pp !== S.savedTourPrice) pl.push({ tour_price: pp });
+      if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
+      S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? T.tpriceSavedDay : T.tpriceSavedLive;
+      return saveAll('price', pl, null, null, function(){ if (pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
+    }
+    if (k === 'bookingSave') {
+      readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu1 !== null) S.bookUrl = bu1;
+      var bk0 = tb0.bookYes === 'no' ? 'no' : tb0.bookYes === 'yes' ? tb0.book : '';
+      if (tb0.bookYes === 'yes' && !tb0.book) { S.nudge = T.taheadNeed; return render(); }
+      if (!bk0 && !bu1 && !tb0.noBook) { S.nudge = T.tbookNeed; return render(); }
+      if (bu1 && !siteOk(bu1)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
+      var bl = [];
+      if (bk0 && bk0 !== (TI.book || '')) bl.push({ tour_info: { book: bk0 } });
+      var blinkCh = bu1 !== null && !!bu1 && !tb0.noBook && bu1 !== (CUR.booking_url || C.bookingKnown || '');
+      if (blinkCh) bl.push({ booking_url: bu1 });
+      var bNone = tb0.noBook && !bu1;
+      if (bNone && S.notOffered.indexOf('booking_link') < 0) bl.push({ not_offered: { add: ['booking_link'] } });
+      if (!bNone && S.notOffered.indexOf('booking_link') >= 0) bl.push({ not_offered: { remove: ['booking_link'] } });
+      S.savedLine.booking = blinkCh ? T.tbookSavedLink : '';
+      return saveAll('booking', bl, null, null, function(){ if (bk0) TI.book = bk0; if (blinkCh) CUR.booking_url = bu1; });
+    }
+    if (k === 'bringSave') {
+      readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').trim();
+      if (!br) { S.nudge = T.bringNeed; return render(); }
+      if (linkIn(br)) { S.nudge = T.bringNoLink; return render(); }
+      var brSame = br === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') < 0;
+      return saveAll('bring', brSame ? [] : [{ visit_rows: { good_to_know: br } }], null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.good_to_know = br; S.visit.good_to_know = br; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'good_to_know'; }); });
     }
     // ---------- Wineries (2026-11-12) ----------
     if (k === 'yearAppt') { S.apptDraft = null; return go('hours:appt'); }
@@ -3689,6 +3826,23 @@
       // ("Private room for 20. Groups of 10 or more: please book ahead").
       readBrew(); S.brew.groups = groupsKeep(S.brew.groups).concat([fill(T.groupsLine, { n: +b.getAttribute('data-bgroup') })]).join('. '); (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tpick]'), function(b){ b.onclick = function(){
+      readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
+      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' ? '' : vt;
+      if (kt === 'length') S.tour.lengthGuessed = false;
+      if (kt === 'bookYes' && vt === 'no') S.tour.book = '';
+      redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tkind]'), function(b){ b.onclick = function(){
+      var kk = b.getAttribute('data-tkind'), i = S.tour.kinds.indexOf(kk);
+      S.tour.kindsGuessed = false;
+      if (i >= 0) S.tour.kinds.splice(i, 1);
+      else if (S.tour.kinds.length >= 3) { S.nudge = T.tkindMax; mark(); var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
+      else S.tour.kinds.push(kk);
+      redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
+    var tpi = el('suTprice'); if (tpi && TOUR) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
       S.wine[key8] = String(S.wine[key8]) === String(val8) ? (key8 === 'groups' ? 0 : '') : val8; redraw(); }; });
@@ -3908,7 +4062,7 @@
   screen.addEventListener('input', quickTyped);
   var kitchenTyped = function(e){ if (!e.target || e.target.id !== 'suKto') return; var n = el('suKitchenWarn'); if (!n) return; var t = kitchenWarn(e.target.value); n.textContent = t; n.hidden = !t; };
   screen.addEventListener('input', kitchenTyped); screen.addEventListener('change', kitchenTyped);
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq],[data-tpick],[data-tkind],[data-tadult],[data-tnobook]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });

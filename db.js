@@ -1624,6 +1624,16 @@ CREATE TABLE IF NOT EXISTS venue_brewery_info (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+// Tour answers only the operator gives (Dayton, 2026-11-16: "build the tours setup"; never researched): the kinds of tour,
+// how long, how far ahead to book, who can come, a private tour price, the season answer and the price per person.
+// info: JSON (keys optional). Additive: a tour with no row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_tour_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
 // Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
 // set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.
 if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name === 'time_tbc')) {
