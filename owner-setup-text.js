@@ -1734,8 +1734,11 @@ en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kin
 en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
 // A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
 en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
-en.storyResearchHint = 'This is what your page says now. Type to replace this text, or tap again to add to it. The ✕ clears it.';
-fr.storyResearchHint = 'Voici ce que dit votre page maintenant. Tapez pour remplacer ce texte, ou touchez une deuxième fois pour y ajouter des mots. Le ✕ l’efface.';
+// Tour test 5 (Whistler, 2026-11-17): the box is no longer selected on its first tap (one tap and typing wiped Rob's
+// description): typing adds to the end, and replacing it is the link under the hint (or the ✕).
+en.storyResearchHint = 'This is what your page says now. Typing adds to the end of it.';
+fr.storyResearchHint = 'Voici ce que dit votre page maintenant. Ce que vous tapez s’ajoute à la fin.';
+en.storyReplaceLink = 'Clear it and write my own'; fr.storyReplaceLink = 'L’effacer et écrire le mien';
 Object.assign(en, {
   seasonAllClosed: 'Closed the whole time? That goes on the next screen under “Closed for a week or two”.',
   seasonAllClosedSoon: 'Closed the whole time? That goes a little further on, under “Closed for a week or two”.',

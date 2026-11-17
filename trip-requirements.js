@@ -57,7 +57,7 @@ const KINDS = {
   snowmobile_tour: /\b(?:snowmobil\w*)\b/,
   // Tour test 2 (Whistler, 2026-11-16): "bear viewing", "bear tour" and "wildlife tour" are the wildlife tours (a tour whose
   // own words say so: "Wildlife and bear viewing"). "Wildlife viewing" alone stays the Nature & Wildlife activity.
-  wildlife_tour: /\b(?:bears?|grizzly|grizzlies) (?:viewing|watching|spotting)\b|\b(?:bears?|grizzly|wildlife) (?:viewing |watching )?(?:tours?|safaris?)\b|\bwildlife and bear viewing\b/,
+  wildlife_tour: /\b(?:bears?|grizzly|grizzlies) (?:viewing|watching|spotting)\b|\b(?:bears?|grizzly|wildlife) (?:viewing |watching )?(?:tours?|safaris?)\b|\bwildlife(?:,)? (?:whale )?and bear viewing\b|\bwhale (?:watching|tours?|viewing|spotting)\b|\bwhale and wildlife (?:tours?|cruises?)\b/,
   // Tour test 4 (Whistler, 2026-11-17): food tours and walking tours are their own kinds of tour: a tour whose operator
   // picked that kind (v.tourKinds: 'food', 'walking') or whose own words say so ("Food tour", "Walking & history tours").
   // "Food tour" used to plan restaurants even with a food-tour company in town, and a "lights walk" Hiking & Trails.

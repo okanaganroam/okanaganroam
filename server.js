@@ -22182,7 +22182,7 @@ const TOUR_KIND_LABELS_OWNER = {
   heli: ['Heli-skiing', 'Héliski'], snowmobile: ['Snowmobile tours', 'Motoneige'], dogsled: ['Dog sledding', 'Traîneau à chiens'],
   snowshoe: ['Snowshoe or ski touring', 'Raquette ou ski de randonnée'], jetboat: ['Jet boat tours', 'Bateau à propulsion (jet boat)'],
   boat: ['Boat tours and charters', 'Croisières et bateaux nolisés'], paddle: ['Kayak, canoe or SUP', 'Kayak, canot ou planche à pagaie'], raft: ['Rafting', 'Rafting'],
-  fishing: ['Fishing', 'Pêche'], wildlife: ['Wildlife and bear viewing', 'Observation de la faune et des ours'], horseback: ['Horseback riding', 'Équitation'],
+  fishing: ['Fishing', 'Pêche'], wildlife: ['Wildlife, whale and bear viewing', 'Observation de la faune, des baleines et des ours'], horseback: ['Horseback riding', 'Équitation'],
   bike: ['Bike and e-bike tours', 'Vélo et vélo électrique'], zipline: ['Ziplines', 'Tyrolienne'], adventure: ['ATV, bungee, climbing or canyoning', 'VTT, saut à l’élastique, escalade ou canyonisme'],
   flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm visits and u-pick', 'Visites de ferme et autocueillette'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
@@ -22251,6 +22251,9 @@ const TOUR_KIND_PUBLIC = {
     sides: [[/snowshoe/, 'Snowshoeing', 'Raquette'], [/ski touring|backcountry (?:ski|guiding)|splitboard|heli-touring/, 'Ski touring', 'Ski de randonnée'], [/snowcat(?! ski| access)/, 'Snowcat tours', 'Sorties en chenillette']] },
   paddle: { words: ['Kayak, canoe & SUP', 'Kayak, canot et planche à pagaie'], sides: [[/kayak/, 'Kayaking', 'Kayak'], [/canoe/, 'Canoeing', 'Canot'], [/\bsup\b|paddle ?board/, 'Paddleboarding', 'Planche à pagaie']] },
   walking: { words: ['Walking & history tours', 'Visites à pied et historiques'], sides: [[/walking|ghost/, 'Walking tours', 'Visites à pied'], [/histor|heritage|indigenous cultur/, 'History tours', 'Visites historiques']] },
+  // Tour test 5 (Whistler, 2026-11-17): the chip says "Wildlife, whale and bear viewing" (whales had no chip); the page
+  // keeps its short words, and a listing's own "Whale watching" now stays (the chip's name has "whale").
+  wildlife: { words: ['Wildlife and bear viewing', 'Observation de la faune et des ours'] },
   adventure: { sides: [[/\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|off[- ]?road|\bjeeps?\b|\brzr\b/, 'ATV tours', 'Sorties en quad (VTT)'], [/bungee/, 'Bungee jumping', 'Saut à l’élastique'],
     [/climb|via ferrata/, 'Climbing', 'Escalade'], [/canyon/, 'Canyoning', 'Canyonisme'], [/paraglid|skydiv/, 'Paragliding and skydiving', 'Parapente et parachutisme']] },
 };
@@ -22263,8 +22266,12 @@ function tourKindPublic(k, fr, mine) {
   const hit = pub.sides.filter(([re]) => re.test(said));
   return hit.length && hit.length < pub.sides.length ? hit.map((x) => x[fr ? 2 : 1]) : [whole];
 }
+// Tour test 5 (Whistler, 2026-11-17): the order of the kinds on the page is the setup's list order, never the order they
+// were tapped (Rob untick-and-retick read "Wildlife and bear viewing · Fishing charters · Fishing"). Whistler: its chip
+// order (TOUR_KINDS_SHOWN).
+const TOUR_KIND_ORDER = TOUR_KINDS;
 function tourKindsText(kinds, fr = false, was = '') {
-  const picked = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]);
+  const picked = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).sort((a, b) => TOUR_KIND_ORDER.indexOf(a) - TOUR_KIND_ORDER.indexOf(b));
   // No kind of ours picked (nothing, or only "Something else"): the listing keeps its own words exactly.
   if (!picked.length) return '';
   // Tour test 3: the French words use the listing's own words too (which side of a chip they name, and the parts no kind
@@ -22280,8 +22287,12 @@ function tourKindsText(kinds, fr = false, was = '') {
   const namesKind = (k, p) => { const words = TOUR_KIND_LABELS_OWNER[k][0].toLowerCase().split(/[^a-z-]+/).filter((w) => w && !/^(?:and|or)$/.test(w) && !TOUR_WORDS_GENERIC.test(w)); return p.toLowerCase().split(/\s+/).some((w) => words.includes(w) || words.includes(w.replace(/s$/, ''))); };
   const l = [];
   const push = (x) => { if (x && !l.some((y) => y.toLowerCase() === x.toLowerCase())) l.push(x); };
+  // Tour test 5: a part two picked kinds cover goes to the kind its first own word names ("Fishing charters" is Fishing,
+  // not "Boat tours and charters"); then the earlier kind in the list.
+  const namePos = (k, p) => { const words = TOUR_KIND_LABELS_OWNER[k][0].toLowerCase().split(/[^a-z-]+/).filter((w) => w && !/^(?:and|or)$/.test(w) && !TOUR_WORDS_GENERIC.test(w)); const i = p.toLowerCase().split(/\s+/).findIndex((w) => words.includes(w) || words.includes(w.replace(/s$/, ''))); return i < 0 ? 99 : i; };
+  const before = (k2, k, p) => namePos(k2, p) < namePos(k, p) || (namePos(k2, p) === namePos(k, p) && picked.indexOf(k2) < picked.indexOf(k));
   for (const k of picked) {
-    const mine = parts.filter((p) => tourKindCovers(k, p) && !picked.some((k2) => k2 !== k && picked.indexOf(k2) < picked.indexOf(k) && tourKindCovers(k2, p)));
+    const mine = parts.filter((p) => tourKindCovers(k, p) && !picked.some((k2) => k2 !== k && tourKindCovers(k2, p) && before(k2, k, p)));
     const own = fr ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     (own.length ? own : tourKindPublic(k, fr, mine)).forEach(push);
   }
@@ -28873,6 +28884,16 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
   'Tiki Time Tours': 'lake',
   'Luxury Lake Tours': 'lake',
 });
+// Tour test 5 (Whistler, 2026-11-17; Whistler's tourInActivity, made general): a tour is in its one filter by its name
+// and words (tourActivityOf), and ALSO under a filter when its operator picked a kind of that filter in the setup (a
+// fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
+const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
+  zipline: 'adventure', adventure: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
+function tourInActivity(venue, slug) {
+  if (tourActivityOf(venue) === slug) return true;
+  if (!venue || venue.type !== 'tour' || !slug) return false;
+  try { const k = venueTourInfo(venue.id).kinds; return Array.isArray(k) && k.some((x) => TOUR_KIND_ACTIVITY[x] === slug); } catch (e) { return false; }
+}
 function tourActivityOf(venue) {
   if (TOUR_ACTIVITY_OVERRIDES[venue.name]) return TOUR_ACTIVITY_OVERRIDES[venue.name];
   const rules = TOUR_ACTIVITY_ORDER.map((slug) => TOUR_ACTIVITIES.find((a) => a.slug === slug));
@@ -28892,7 +28913,7 @@ const TOUR_ACTIVITY_STYLE = `<style>
 function renderTourActivityHtml(venues, selected) {
   const choices = [{ slug: '', label: 'All' }, ...TOUR_ACTIVITIES];
   const links = choices.map((c) => {
-    const count = c.slug ? venues.filter((v) => tourActivityOf(v) === c.slug).length : venues.length;
+    const count = c.slug ? venues.filter((v) => tourInActivity(v, c.slug)).length : venues.length;
     return `<a href="/tours${c.slug ? '/' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
   }).join('\n    ');
   return `${TOUR_ACTIVITY_STYLE}
@@ -29074,8 +29095,8 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const tourUniverse = type === 'tour' ? [...venues, ...(opts.toursAlso || [])] : [];
   const tourContent = tourActivity ? TOUR_ACTIVITIES.find((a) => a.slug === tourActivity) : null;
   if (tourActivity) {
-    venues = venues.filter((v) => tourActivityOf(v) === tourActivity);
-    opts = { ...opts, toursAlso: (opts.toursAlso || []).filter((v) => tourActivityOf(v) === tourActivity) };
+    venues = venues.filter((v) => tourInActivity(v, tourActivity));
+    opts = { ...opts, toursAlso: (opts.toursAlso || []).filter((v) => tourInActivity(v, tourActivity)) };
   }
   const sportActivity = type === 'sport' && SPORT_ACTIVITIES.some((a) => a.slug === opts.sportActivity) ? opts.sportActivity : '';
   const sportNotes = type === 'sport' ? getSportsAlsoNotes() : null;
@@ -33949,7 +33970,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     path: activity ? `/tours/${activity.slug}` : '/tours',
     name: activity ? activity.label : 'Tours & Experiences',
     crumbs: activity ? [{ name: 'Tours & Experiences', href: '/tours' }] : [],
-    schemaFilter: activity ? (v) => tourActivityOf(v) === activity.slug : null,
+    schemaFilter: activity ? (v) => tourInActivity(v, activity.slug) : null,
     title: activity ? `${activity.heading || `${activity.label} in the Okanagan`} | Okanagan Roam` : 'Tours & Experiences in the Okanagan | Okanagan Roam',
     description: activity && activity.intro ? activity.intro
       : town.townLabel ? (all.length === 1 ? `1 tour or experience in ${town.townLabel}, BC: wine tours, boat rentals, bike tours, farm visits and more, booked with local operators.` : `${all.length} tours and experiences in ${town.townLabel}, BC: wine tours, boat rentals, bike tours, farm visits and more, booked with local operators.`)
@@ -33958,7 +33979,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     surface: 'tours',
     legacyTypesParam: 'activity', // older single-choice ?activity= links
     types: TOUR_ACTIVITIES.map((a) => ({ type: a.slug, label: a.label })),
-    catsFor: (v) => { const a = tourActivityOf(v); return a ? [a] : []; },
+    catsFor: (v) => { const a = tourActivityOf(v); return [...(a ? [a] : []), ...TOUR_ACTIVITIES.map((x) => x.slug).filter((x) => x !== a && tourInActivity(v, x))]; },
     photoKeyFor: (v) => { const a = tourActivityOf(v); return curatedPhotoKey(v, a ? `tour${a}` : 'tour'); },
     cardNotes: getToursAlsoNotes(),
     cardNoteLabel: 'Experience:',
@@ -38546,16 +38567,26 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Tour test 2 (Whistler, 2026-11-16): out of season (or during a closure), a place that is by booking or by appointment
   // only has no week of hours to show: its season says "Book ahead · tours by reservation", never "Daily Closed" and
   // seven "Closed" rows under "Usual hours when open". Wineries and distilleries by appointment only read the same way.
-  if (!wineryApptBox && !venue.redirect_to && apptType(venue.type) && hoursHtml && hoursHtml.includes('<details class="venue-hours-usual">') && apptAnswers(venue.id, venue.type).visit === 'appointment') {
+  // Tour test 5 (Whistler, 2026-11-17): an all-year by-booking tour during its yearly closure takes the "Hours through
+  // the year" path (no "Usual hours" fold): it read "Every day · Closed" and "Jan 6 – Dec 19 · Daily Closed". The same
+  // fix covers it: the year list keeps its closure lines, the rest of the year says "Book ahead · tours by reservation".
+  if (!wineryApptBox && !venue.redirect_to && apptType(venue.type) && hoursHtml && (hoursHtml.includes('<details class="venue-hours-usual">') || hoursHtml.includes('<div class="venue-hours-year">')) && apptAnswers(venue.id, venue.type).visit === 'appointment') {
     const apptText = venue.type === 'tour' ? L(TOUR_APPOINTMENT_LINE, TOUR_APPOINTMENT_LINE_FR) : L('By appointment · call ahead', 'Sur rendez-vous · appelez avant');
     let om0 = null; try { om0 = venueLinks(venue.id).open_months; } catch (e) { om0 = null; }
     const os0 = om0 && hoursModule ? hoursModule.parseOpenSeason(om0) : null;
     const parts0 = os0 ? (openSeasonStretches(venue.id, om0) || [os0]) : null;
     const when0 = parts0 ? parts0.map((r) => hoursExtraRangeText(r.from, r.to, fr)).join(fr ? ' et ' : ' and ') : '';
+    const yearM = /<div class="venue-hours-year">[\s\S]*?<\/ul><\/div>/.exec(hoursHtml);
     const block = when0
       ? `<div class="venue-hours-year venue-hours-year-appt"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list"><li><span>${escapeHtml(when0)}</span><span>${escapeHtml(apptText)}</span></li></ul></div>`
+      : yearM
+      ? yearM[0].replace('class="venue-hours-year"', 'class="venue-hours-year venue-hours-year-appt"').replace(/<li><span>([^<]*)<\/span><span>(?!Closed every year|Fermé chaque année)[^<]*<\/span><\/li>/g, (m0, w0) => `<li><span>${w0}</span><span>${escapeHtml(apptText)}</span></li>`)
       : `<p class="venue-hours-season venue-hours-appt">${escapeHtml(apptText)}</p>`;
-    hoursHtml = hoursHtml.replace(/<div class="venue-hours-year">[\s\S]*?<\/ul><\/div>/, '').replace(/<details class="venue-hours-usual">[\s\S]*?<\/details>/, () => block);
+    const hadUsual = hoursHtml.includes('<details class="venue-hours-usual">');
+    hoursHtml = hoursHtml.replace(/<div class="venue-hours-year">[\s\S]*?<\/ul><\/div>/, '');
+    // With no "Usual hours" fold, the week of stored rows (all "Closed" for a by-booking place) gives way to the block.
+    hoursHtml = hadUsual ? hoursHtml.replace(/<details class="venue-hours-usual">[\s\S]*?<\/details>/, () => block)
+      : hoursHtml.replace(/<p class="venue-hours-daily">[\s\S]*?<\/p><details class="venue-hours-days">[\s\S]*?<\/details>|<ul class="hours-list" data-today="[^"]*">[\s\S]*?<\/ul>/, () => block);
   }
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
@@ -55895,8 +55926,8 @@ const TOUR_SETUP_HELP_TOPICS = [
     q: 'Which kinds do I pick? We do more than one', qFr: 'Quels genres choisir? Nous en faisons plusieurs',
     keys: ['fishing or boat', 'fishing and boat', 'boat or fishing', 'boat and fishing', 'we do both', 'do both', 'both kinds', 'two kinds', 'more than one kind', 'several kinds', 'which kind', 'which kinds', 'what kind do i pick', 'what kinds do i pick', 'whale', 'whales', 'whale watching', 'whale watching too', 'orca', 'orcas', 'seals', 'sea lions', 'bear viewing', 'kinds', 'three kinds', '4th kind', 'fourth kind', 'more kinds'],
     keysFr: ['baleine', 'baleines', 'observation des baleines', 'epaulards', 'phoques', 'les deux genres', 'on fait les deux', 'nous faisons les deux', 'deux genres', 'plusieurs genres', 'quel genre', 'quels genres', 'genres', 'plus de genres'],
-    a: '<p>In <strong>What you offer</strong>, tick up to <strong>3 kinds</strong>: fishing and boat tours together is fine. Whale watching is <strong>Wildlife, whale and bear viewing</strong>. Not in the first row? Tap <strong>More kinds</strong>. The first kind leads on your card.</p><p>Something not on the list? Tap <strong>Something else</strong> and say exactly what you run in your story.</p>',
-    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, cochez jusqu’à <strong>3 genres</strong> : la pêche et les croisières ensemble, c’est correct. L’observation des baleines est sous <strong>Observation de la faune, des baleines et des ours</strong>. Pas dans la première rangée? Touchez <strong>Plus de genres</strong>. Le premier genre paraît en tête sur votre fiche.</p><p>Rien dans la liste? Touchez <strong>Autre chose</strong> et dites exactement ce que vous offrez dans votre histoire.</p>' },
+    a: '<p>In <strong>What you offer</strong>, tick up to <strong>3 kinds</strong>: fishing and boat tours together is fine. Whale watching is <strong>Wildlife, whale and bear viewing</strong>. Not in the first row? Tap <strong>More kinds</strong>.</p><p>Something not on the list? Tap <strong>Something else</strong> and say exactly what you run in your story.</p>',
+    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, cochez jusqu’à <strong>3 genres</strong> : la pêche et les croisières ensemble, c’est correct. L’observation des baleines est sous <strong>Observation de la faune, des baleines et des ours</strong>. Pas dans la première rangée? Touchez <strong>Autres genres</strong>.</p><p>Rien dans la liste? Touchez <strong>Autre chose</strong> et dites exactement ce que vous offrez dans votre histoire.</p>' },
   // Tour test 4 (Whistler, 2026-11-17; Dev, a solo walking and food tour guide). Help missed 11 of 27 questions.
   // Tour times: "my tours go at different times" and "where do the times go" got the restaurant hours answer ("+ Add a
   // second time (lunch & dinner)… Open past midnight?").
@@ -61645,6 +61676,12 @@ function adminEditBox(key, value, opts = {}) {
     : `<input type="text" class="rv-edit" name="${key}" value="${v}" maxlength="${opts.max || 300}" data-orig="${v}">`;
 }
 
+// Tour test 5 (Whistler, 2026-11-17): one tap and typing left Rob's description as only his price line, and the review
+// card didn't say. A description that loses more than half its length (from at least 80 characters) is flagged.
+function descriptionShrank(before, after) {
+  const a = String(before || '').trim().length, b = String(after == null ? '' : after).trim().length;
+  return a >= 80 && b < a / 2;
+}
 function renderAdminChangeCard(r) {
   const rows = Object.keys(r.changes).map((f) => {
     const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
@@ -61661,6 +61698,7 @@ function renderAdminChangeCard(r) {
       ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically).</div>' : ''}
       ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? `<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…)${FRENCH_INDEXABLE ? ', listed in the sitemap with hreflang links' : ' (kept out of search like every French page for now: noindex, no hreflang, not in the sitemap)'}. Untick it to keep the English page only.</div>` : ''}
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
+      ${['description', 'description_fr'].filter((f) => f in r.changes && descriptionShrank(r.previous[f], r.changes[f])).map((f) => `<div class="rv-warn rv-shrank">${f === 'description_fr' ? 'French description: the' : 'The'} new text is much shorter than the old one (${String(r.changes[f] || '').trim().length} characters, was ${String(r.previous[f] || '').trim().length}). Check it wasn’t typed over by mistake.</div>`).join('')}
       ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
     </article>`;

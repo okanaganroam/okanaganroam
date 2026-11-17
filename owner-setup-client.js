@@ -2040,7 +2040,9 @@
       var kchip = function(o){ var on = S.tour.kinds.indexOf(o.k) >= 0; return '<button type="button" class="su-chip' + (o.t.length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tkind="' + h(o.k) + '">' + h(o.t) + '</button>'; };
       x = doneLine('tour') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess ? '<p class="su-sent su-research" id="suKindsGuess">' + h(T.kindsGuess) + '</p>' : '') + msgs()
         + '<div class="su-chips su-kinds" role="group" aria-label="' + h(T.tkindQ) + '" id="suTourKinds">' + tTop.map(kchip).join('') + '</div>'
-        + (tRest.length ? '<details class="su-kinds"' + (tRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + tRest.map(kchip).join('') + '</div></details>' : '')
+        // Tour test 5 (Whistler, 2026-11-17): "More kinds" stays open once opened or used (unticking Boat closed it, and he
+        // couldn't find Boat to tick it again).
+        + (tRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || tRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + tRest.map(kchip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length === C.researchLength && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
         + tchips('length', ['1h', '2-3h', 'half', 'full', 'multi'], T.tlengths, T.tlengthQ)
@@ -2382,7 +2384,7 @@
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' + (C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyReplaceLink ? '<p class="su-hint" id="suStoryReplaceRow"><button type="button" class="su-link" id="suStoryReplace">' + h(T.storyReplaceLink) + '</button></p>' : '') : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
@@ -4107,6 +4109,9 @@
     // ("…at the bar.Strongly recommended") gets the missing space, as the story box does.
     var ln = el('suLine'); if (ln && ln.getAttribute('data-vk')) ln.addEventListener('blur', function(){ var fx = storyJoinFix(ln.value, (CUR.visit_rows || {})[ln.getAttribute('data-vk')] || ''); if (fx !== ln.value) { ln.value = fx; try { ln.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} } });
     var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
+    var kmo = el('suKindsMore'); if (kmo) { if (kmo.open) S.tourMoreOpen = true; kmo.addEventListener('toggle', function(){ S.tourMoreOpen = kmo.open; }); }
+    var srp = el('suStoryReplace');
+    if (srp && st) srp.onclick = function(){ st.value = ''; S.story = ''; try { st.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} var row = el('suStoryReplaceRow'); if (row) row.hidden = true; var hn = el('suStoryEdit'); if (hn) hn.hidden = true; try { st.focus({ preventScroll: true }); } catch (e) { st.focus(); } };
     if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.
@@ -4141,7 +4146,11 @@
       // Brewery test 1 (Whistler, 2026-11-15): text her own chip tap put there on this visit ("Trivia", "Groups of 10 or
       // more…") is not selected, so words she adds go after it; research's text still is.
       var chipOwn = !!(S.chipFilled && inp.id && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value);
-      var pre = ((inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchStory || researchLine) && !chipOwn, first = true;
+      // Tour test 5 (Whistler, 2026-11-17): one tap and typing replaced Rob's whole description with his price line, and
+      // nothing said so. The story box is never selected now (all types): a tap puts the cursor at the end, so typing adds
+      // to it. Writing a new story is an explicit choice: the ✕ or "Clear it and write my own" under the hint (the owner
+      // sees research's text above what she types, and the reviewer sees both before it goes live).
+      var pre = ((inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchLine) && !chipOwn, first = true;
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
       // at the end (most phones do this themselves; where the tap leaves the text selected, this does it). The first
