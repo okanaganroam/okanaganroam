@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05c",
+  "update": [
+    {
+      "id": 1037,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/bigwhite-fireworks-2611.jpg"
+      },
+      "why": "Real photo of the host place (Big White Ski Resort)"
+    },
+    {
+      "id": 670,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/kvsr-christmas-express-2611.jpg"
+      },
+      "why": "Real photo of the host place (Kettle Valley Steam Railway)"
+    },
+    {
+      "id": 3,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/rotary-centre-2611.jpg"
+      },
+      "why": "Real photo of the host place (Rotary Centre for the Arts)"
+    },
+    {
+      "id": 822,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/see-ya-later-ranch-2611.jpg"
+      },
+      "why": "Real photo of the host place (See Ya Later Ranch)"
+    },
+    {
+      "id": 827,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/see-ya-later-ranch-2611.jpg"
+      },
+      "why": "Real photo of the host place (See Ya Later Ranch)"
+    }
+  ]
+}

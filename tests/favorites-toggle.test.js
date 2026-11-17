@@ -8,6 +8,7 @@
 // between its own section markers) runs in a vm against a small mock DOM.
 // No server, no database, no network.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

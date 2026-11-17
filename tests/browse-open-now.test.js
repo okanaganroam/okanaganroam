@@ -12,6 +12,7 @@
 // applyFilters() writes inline display, writes the count (a DOM mutation),
 // the observer schedules apply() on the next animation frame.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

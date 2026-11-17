@@ -1,5 +1,6 @@
 // okanaganroam.com/links (2026-10-19): the Instagram bio link page. Pure tests of the post list, plus source checks.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -32,7 +33,7 @@ test('links: the data file is valid and every post has a date, title and site pa
     assert.match(p.path, /^\/[a-z0-9\-/]*$/, p.path);
     assert.ok(p.title && p.title.trim());
   }
-  assert.equal(linksForDay(data.posts, '2026-11-02', 50).length, data.posts.length);
+  assert.equal(linksForDay(data.posts, '2099-01-01', 500).length, data.posts.length);
 });
 
 test('links: /links is noindex, briefly cached, uses plain internal links and counts clicks', () => {
@@ -59,7 +60,7 @@ test('links (2026-10-19): /links lists Instagram, TikTok and Facebook so visitor
   const body = src.slice(start, src.indexOf('\nfunction ', start + 10));
   assert.ok(body.includes("url: 'https://www.tiktok.com/@okanaganroam'"));
   assert.ok(body.includes("url: 'https://www.instagram.com/okanaganroam'"));
-  assert.ok(body.includes("url: 'https://www.facebook.com/profile.php?id=61595021770981'"));
+  assert.ok(body.includes("url: 'https://www.facebook.com/okanaganroam'"));
   assert.ok(body.includes('<h2>Follow along</h2>'));
   assert.ok(body.includes('target="_blank" rel="noopener" data-post-date="social"'));
   assert.ok(body.includes('Instagram, TikTok and Facebook posts'));

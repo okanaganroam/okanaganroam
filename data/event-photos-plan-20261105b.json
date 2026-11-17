@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05b",
+  "update": [
+    {
+      "id": 676,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/ottercrest-sleigh-2611.jpg"
+      },
+      "why": "Real photo of the host place (Horse Drawn Okanagan, the sleigh operator hosted at Ottercrest Farms)"
+    },
+    {
+      "id": 830,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/miradoro-2611.jpg"
+      },
+      "why": "Real photo of the host place (Miradoro at Tinhorn Creek)"
+    }
+  ]
+}

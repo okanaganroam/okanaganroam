@@ -1,0 +1,100 @@
+{
+ "town": "lake-country",
+ "name": "Lake Country",
+ "hero": "/images/venues/gray-monk-estate-winery-2610.jpg",
+ "category": "lake",
+ "sub": "Lakes, vineyards and views from Wood to Okanagan Lake.",
+ "placeholder": "Search Lake Country… wineries, beaches, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=lake-country",
+   "img": "/images/venues/pane-vino-pizzeria-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=lake-country",
+   "img": "/images/venues/ex-nihilo-vineyards-tasting-room-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=lake-country",
+   "img": "/images/beaches/venues/lake-country-kaloya-regional-park-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=lake-country",
+   "img": "/images/hiking/venues/spion-kop-recreation-reserve-20261016-viewpoint-update-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/lake-country/events",
+   "img": "/images/venues/creekside-theatre-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=lake-country",
+   "img": "/images/beaches/venues/lake-country-gable-beach-park-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "lookout-restaurant",
+   "name": "Lookout Restaurant",
+   "tag": "Dinner above the lake",
+   "copy": "A fine-dining patio perched above Okanagan Lake.",
+   "href": "/lake-country/restaurants/lookout-restaurant",
+   "img": "/images/venues/lookout-restaurant-2610-w480.jpg"
+  },
+  {
+   "slug": "okanagan-stables",
+   "name": "Okanagan Stables",
+   "tag": "Trail rides with views",
+   "copy": "Guided rides in Oyama’s hills above two lakes.",
+   "href": "/lake-country/outdoors/okanagan-stables",
+   "img": "/images/venues/okanagan-stables-2610-w480.jpg"
+  },
+  {
+   "slug": "pedego-electric-bikes-oyama",
+   "name": "Pedego Oyama",
+   "tag": "E-bike the rail trail",
+   "copy": "Rent e-bikes beside the Okanagan Rail Trail.",
+   "href": "/lake-country/tours/pedego-electric-bikes-oyama",
+   "img": "/images/venues/pedego-electric-bikes-oyama-20261017-w480.jpg"
+  },
+  {
+   "slug": "marno-s-woodfire-pizza",
+   "name": "Marno’s Woodfire Pizza",
+   "tag": "Pizza with a vineyard view",
+   "copy": "Family-friendly pizza with a play area and lake views.",
+   "href": "/lake-country/restaurants/marno-s-woodfire-pizza",
+   "img": "/images/venues/marno-s-woodfire-pizza-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Open the map to see what is near you, and check hours before you head out.",
+   "href": "/map",
+   "label": "Open the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Check beach, trail and park access by season before you go.",
+   "href": "/beaches?regions=lake-country",
+   "label": "Beaches & lake"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each place for kid and dog rules before you go, since they vary.",
+   "href": "/guide/lake-country/kid_friendly",
+   "label": "Kid-friendly picks"
+  }
+ ]
+}

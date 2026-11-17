@@ -319,6 +319,7 @@ var TRANSLATIONS = {
 
     'card.getDirections': '\ud83d\udccd Get directions',
     'card.findMenu': '\ud83d\udccb Find menu',
+    'card.findTours': '\ud83c\udf9f\ufe0f Tours & prices',
     'card.checkBooking': '\ud83d\udcc5 Check for online booking',
     'card.favorite': 'Favorite',
     'card.favorited': 'Favorited',
@@ -342,6 +343,14 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Follow Along',
     'footer.listVenue': 'List your venue',
     'footer.contact': 'Contact',
+    // Café test 6 (2026-11-12): footer links that stayed English on French pages.
+    'footer.dogFriendly': 'Dog Friendly Finds',
+    'footer.aboutSite': 'About Okanagan Roam',
+    'footer.listEvent': 'List an Event',
+    'footer.businessLogin': 'Business login',
+    'footer.allDestinations': 'See all destinations \u2192',
+    'footer.privacy': 'Privacy',
+    'footer.terms': 'Terms',
 
     // New homepage-only footer (2026-09-17): footer.directory/
     // footer.followAlong above are left untouched -- /browse still serves
@@ -355,25 +364,27 @@ var TRANSLATIONS = {
     'tripv3.crumbHome': 'Home',
     'tripv3.name': 'Build My Trip',
     'tripv3.title': 'Tell us the trip. We\u2019ll map it out.',
-    'tripv3.lead': 'Describe your Okanagan trip in your own words \u2014 how long, who\u2019s coming, what you love. We\u2019ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.',
+    'tripv3.lead': 'Say what you want. We\u2019ll plan it day by day from real places that are open, and tell you why each one fits.',
     'tripv3.inputLabel': 'Describe the trip you want',
     'tripv3.placeholder': 'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food.',
-    'tripv3.hint': 'Real Okanagan Roam places only \u2014 no invented details.',
+    'tripv3.hint': 'Checks each place\u2019s hours, seasons and happy hours.',
+    'tripv3.sampleLabel': 'Example plan:',
+    'tripv3.cardTitle': 'A happy hour crawl in Penticton',
+    'tripv3.cardButton': 'Plan this trip',
+    'tripv3.sampleText': 'ask for \u201ca happy hour crawl in Penticton\u201d and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.',
     'tripv3.submit': 'Plan my trip',
     'tripv3.examplesLabel': 'Or start from one of these:',
-    'tripv3.example1': 'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
-    'tripv3.example2': '2 days in Penticton with the kids \u2014 museums, parks and easy food',
-    'tripv3.example3': 'A romantic autumn weekend in Naramata with wineries and a great dinner',
-    'tripv3.example4': 'A dog-friendly autumn weekend in Vernon',
-    'tripv3.example5': 'Coffee, an autumn hike, a winery and dinner in Kelowna',
-    'tripv3.example6': 'What can we do around Penticton if it rains?',
-    'tripv3.howTitle': 'How it works',
-    'tripv3.how1Title': 'Say it your way',
-    'tripv3.how1Text': '\u201cThree days, wineries and a cozy dinner, plus an autumn walk.\u201d Days, dates, kids, dogs and occasions all count.',
-    'tripv3.how2Title': 'Real places, real reasons',
-    'tripv3.how2Text': 'Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it \u2014 and we tell you why.',
-    'tripv3.how3Title': 'Make it yours',
-    'tripv3.how3Text': 'Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.',
+    'tripv3.example1': '3 days in Kelowna: wineries, easy walks and great food',
+    'tripv3.example2': '2 days in Penticton with the kids',
+    'tripv3.example3': 'A romantic weekend in Naramata',
+    'tripv3.example4': 'What can we do around Penticton if it rains?',
+    'tripv3.howTitle': 'What we check for you',
+    'tripv3.how1Title': 'Open, and in season',
+    'tripv3.how1Text': 'Each stop fits its opening hours. Places closed that day or out of season are left out.',
+    'tripv3.how2Title': 'Happy hours and what\u2019s on',
+    'tripv3.how2Text': 'Happy hour stops land inside happy hour, with the deals, weekly specials and nights like trivia or live music.',
+    'tripv3.how3Title': 'A plan you can use',
+    'tripv3.how3Text': 'Keep, swap or remove stops, see it on the map, get a Google Maps route and share it with a link.',
     'tripv3.planning': 'Planning your trip\u2026',
     'tripv3.error': 'Something went wrong. Please try again.',
     'tripv3.emptyRequest': 'Tell us a little about the trip you\u2019d like \u2014 where, how long, what you love.',
@@ -391,7 +402,8 @@ var TRANSLATIONS = {
     'tripv3.map.marker': 'Day {day}, stop {n}: {name}',
     'tripv3.map.showInPlan': 'Show in plan',
     'tripv3.day': 'Day {n}',
-    'tripv3.from': 'from',
+    // Pub test 3 (Whistler, 2026-11-14): read aloud "4.5 out of 5 (188 reviews)", never "4.5 from (188 reviews)".
+    'tripv3.from': 'out of 5',
     'tripv3.reviews': '({n} reviews)',
     'tripv3.priceLevel': 'Price level {n} of 4',
     'tripv3.verified': 'Verified on Okanagan Roam',
@@ -581,7 +593,7 @@ var TRANSLATIONS = {
     'trip.lead': 'Dites-nous ce que vous recherchez. On vous aide \u00e0 planifier votre aventure.',
     'trip.example': '\u00ab\u00a0Je suis \u00e0 Kelowna pour 3 jours. Je veux du golf, des vignobles, de bons repas et des terrasses, une plage, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
     'trip.exampleFall': '\u00ab\u00a0Je suis \u00e0 Kelowna pour une fin de semaine d\u2019automne. Je veux des vignobles en pleine r\u00e9colte, un souper r\u00e9confortant, une randonn\u00e9e d\u2019automne, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
-    'trip.buildMyTrip': 'Planifiez mon voyage',
+    'trip.buildMyTrip': 'Planifier mon voyage',
     'trip.openMap': 'Ouvrir la carte interactive',
 
     'homeFooter.taglineFull': 'Vall\u00e9e de l\u2019Okanagan, Colombie-Britannique',
@@ -592,7 +604,7 @@ var TRANSLATIONS = {
     'homeFooter.facebookAria': 'Okanagan Roam sur Facebook',
     'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Con\u00e7u pour toute la bande, chien inclus.',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
-    'search.mainLine': 'Que recherchez-vous?',
+    'search.mainLine': 'Que recherchez-vous\u202f?',
     'search.subLine': 'Vignobles, restaurants, randonn\u00e9es, plages, tr\u00e9sors cach\u00e9s\u2026',
     'search.button': 'Rechercher',
 
@@ -647,7 +659,7 @@ var TRANSLATIONS = {
     'stamp.liveMusic': 'Musique en direct',
     'stamp.nonAlcoholicOptions': 'Options sans alcool',
     'stamp.greatForGroups': 'Id\u00e9al pour les groupes',
-    'stamp.happyHour': 'Offre l\u2019happy hour',
+    'stamp.happyHour': 'Offre un 5 \u00e0 7',
     'stamp.myFavorites': 'Mes favoris',
 
     'badge.dogFriendly': 'Accepte les chiens',
@@ -661,7 +673,7 @@ var TRANSLATIONS = {
     'badge.sportsTv': 'Sports \u00e0 la t\u00e9l\u00e9',
     'badge.liveMusic': 'Musique en direct',
     'badge.greatGroups': 'Id\u00e9al pour les groupes',
-    'badge.happyHour': 'Happy hour',
+    'badge.happyHour': '5 \u00e0 7',
     'badge.freeEntry': 'Gratuit',
     'badge.artsCulture': 'Arts et culture',
     'badge.openEarly': 'Ouvert t\u00f4t',
@@ -732,7 +744,7 @@ var TRANSLATIONS = {
     'trip.toastAdded': 'Ajout\u00e9 \u00e0 Mon voyage.',
     'trip.toastView': 'Voir Mon voyage',
 
-    'trip.planner.title': 'Planifiez mon voyage',
+    'trip.planner.title': 'Planifier mon voyage',
     'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
     'trip.planner.step1.label': 'O\u00f9 allez-vous?',
     'trip.planner.regionPlaceholder': 'Choisissez une r\u00e9gion\u2026',
@@ -794,6 +806,7 @@ var TRANSLATIONS = {
 
     'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
     'card.findMenu': '\ud83d\udccb Voir le menu',
+    'card.findTours': '\ud83c\udf9f\ufe0f Sorties et tarifs',
     'card.checkBooking': '\ud83d\udcc5 V\u00e9rifier la r\u00e9servation en ligne',
     'card.favorite': 'Favori',
     'card.favorited': 'Ajout\u00e9 aux favoris',
@@ -808,7 +821,7 @@ var TRANSLATIONS = {
     'results.sortFeatured': 'Trier\u00a0: ordre vedette',
     'results.sortRating': 'Trier\u00a0: mieux not\u00e9s',
     'results.sortAz': 'Trier\u00a0: A\u2013Z',
-    'results.disclaimer': 'Chaque endroit ci-dessous est un vrai \u00e9tablissement de l\u2019Okanagan, extrait des donn\u00e9es Google Places en direct et v\u00e9rifi\u00e9 dans les avis pour les indices chien, terrasse, vegan, enfant, sans gluten et happy hour (signal\u00e9 uniquement lorsqu\u2019un avis le mentionnait explicitement, jamais devin\u00e9). Couvre le Centre, le Sud et le Nord de l\u2019Okanagan ainsi que Big White, SilverStar, Apex et Mount Baldy \u2014 1 069 \u00e9tablissements \u00e0 ce jour, dont 195 des plus de 200 vignobles de la r\u00e9gion. Ce n\u2019est pas encore tous les \u00e9tablissements de la vall\u00e9e. Les commodit\u00e9s changent selon la saison, le happy hour est confirm\u00e9 pour un nombre croissant d\u2019\u00e9tablissements (ce filtre ne renverra donc qu\u2019un ensemble limit\u00e9 de r\u00e9sultats pour l\u2019instant), et le niveau de prix ($/$$/$$$) est confirm\u00e9 pour environ un tiers des \u00e9tablissements, avec plus \u00e0 venir r\u00e9guli\u00e8rement. V\u00e9rifiez avant de vous d\u00e9placer.',
+    'results.disclaimer': 'Chaque endroit ci-dessous est un vrai \u00e9tablissement de l\u2019Okanagan, extrait des donn\u00e9es Google Places en direct et v\u00e9rifi\u00e9 dans les avis pour les indices chien, terrasse, vegan, enfant, sans gluten et 5 \u00e0 7 (signal\u00e9 uniquement lorsqu\u2019un avis le mentionnait explicitement, jamais devin\u00e9). Couvre le Centre, le Sud et le Nord de l\u2019Okanagan ainsi que Big White, SilverStar, Apex et Mount Baldy \u2014 1 069 \u00e9tablissements \u00e0 ce jour, dont 195 des plus de 200 vignobles de la r\u00e9gion. Ce n\u2019est pas encore tous les \u00e9tablissements de la vall\u00e9e. Les commodit\u00e9s changent selon la saison, le 5 \u00e0 7 est confirm\u00e9 pour un nombre croissant d\u2019\u00e9tablissements (ce filtre ne renverra donc qu\u2019un ensemble limit\u00e9 de r\u00e9sultats pour l\u2019instant), et le niveau de prix ($/$$/$$$) est confirm\u00e9 pour environ un tiers des \u00e9tablissements, avec plus \u00e0 venir r\u00e9guli\u00e8rement. V\u00e9rifiez avant de vous d\u00e9placer.',
     'results.noResults': 'Rien ne correspond \u00e0 cette combinaison pour l\u2019instant, essayez de retirer un filtre et trouvons-vous un bon endroit.',
 
     'footer.directory': 'R\u00e9pertoire',
@@ -817,32 +830,41 @@ var TRANSLATIONS = {
     'footer.followAlong': 'Suivez-nous',
     'footer.listVenue': 'Inscrire votre \u00e9tablissement',
     'footer.contact': 'Contact',
+    'footer.dogFriendly': 'Trouvailles pour chiens',
+    'footer.aboutSite': '\u00c0 propos d\u2019Okanagan Roam',
+    'footer.listEvent': 'Inscrire un \u00e9v\u00e9nement',
+    'footer.businessLogin': 'Espace entreprises',
+    'footer.allDestinations': 'Voir toutes les destinations \u2192',
+    'footer.privacy': 'Confidentialit\u00e9',
+    'footer.terms': 'Conditions',
 
     'homeFooter.explore': 'Explorer',
     'homeFooter.socialMedia': 'Réseaux sociaux',
     // Build My Trip V3 interface (2026-10-04): French for the keys above.
     'tripv3.crumbHome': 'Accueil',
-    'tripv3.name': 'Planifiez mon voyage',
+    'tripv3.name': 'Planifier mon voyage',
     'tripv3.title': 'D\u00e9crivez le voyage. On s\u2019occupe du plan.',
-    'tripv3.lead': 'D\u00e9crivez votre voyage dans l\u2019Okanagan dans vos mots \u2014 combien de temps, qui vient, ce que vous aimez. Nous le planifions jour par jour avec de vrais endroits d\u2019Okanagan Roam, et nous vous disons pourquoi chacun vous convient.',
+    'tripv3.lead': 'Dites ce que vous voulez. Nous le planifions jour par jour avec de vrais endroits ouverts, et nous vous disons pourquoi chacun vous convient.',
     'tripv3.inputLabel': 'D\u00e9crivez le voyage que vous voulez',
     'tripv3.placeholder': 'Planifiez 3 jours à Kelowna cet automne avec des vignobles, des promenades faciles et de la bonne bouffe.',
-    'tripv3.hint': 'Uniquement de vrais endroits d\u2019Okanagan Roam \u2014 aucun d\u00e9tail invent\u00e9.',
+    'tripv3.hint': 'V\u00e9rifie les heures, les saisons et les 5 \u00e0 7 de chaque endroit.',
+    'tripv3.sampleLabel': 'Exemple de plan\u00a0:',
+    'tripv3.cardTitle': 'Une tourn\u00e9e des 5 \u00e0 7 \u00e0 Penticton',
+    'tripv3.cardButton': 'Planifier ce voyage',
+    'tripv3.sampleText': 'demandez \u00ab\u00a0une tourn\u00e9e des 5 \u00e0 7 \u00e0 Penticton\u00a0\u00bb et vous obtenez des arr\u00eats comme Yellow Dog Brewing et BNA Brewing, chacun pendant son 5 \u00e0 7, avec les aubaines.',
     'tripv3.submit': 'Planifier mon voyage',
     'tripv3.examplesLabel': 'Ou partez de l\u2019une de ces id\u00e9es\u00a0:',
-    'tripv3.example1': 'Planifiez 3 jours à Kelowna cet automne avec des vignobles, des promenades faciles et de la bonne bouffe',
-    'tripv3.example2': '2 jours à Penticton avec les enfants \u2014 musées, parcs et bouffe simple',
-    'tripv3.example3': 'Une fin de semaine romantique d’automne à Naramata avec des vignobles et un excellent souper',
-    'tripv3.example4': 'Une fin de semaine d’automne à Vernon avec mon chien',
-    'tripv3.example5': 'Café, randonnée d’automne, vignoble et souper à Kelowna',
-    'tripv3.example6': 'Que peut-on faire autour de Penticton s’il pleut?',
-    'tripv3.howTitle': 'Comment \u00e7a marche',
-    'tripv3.how1Title': 'Dites-le \u00e0 votre fa\u00e7on',
-    'tripv3.how1Text': '\u00ab\u00a0Trois jours, des vignobles et un bon souper, avec une promenade d’automne.\u00a0\u00bb Les jours, les dates, les enfants, les chiens et les occasions comptent tous.',
-    'tripv3.how2Title': 'De vrais endroits, de vraies raisons',
-    'tripv3.how2Text': 'Chaque arr\u00eat est un endroit r\u00e9pertori\u00e9 sur Okanagan Roam, choisi d\u2019apr\u00e8s ce que nous savons vraiment de lui \u2014 et nous vous disons pourquoi.',
-    'tripv3.how3Title': '\u00c0 votre go\u00fbt',
-    'tripv3.how3Text': 'Gardez les arr\u00eats que vous aimez, remplacez ou retirez les autres, r\u00e9g\u00e9n\u00e9rez une journ\u00e9e et ajoutez le tout \u00e0 Mon voyage.',
+    'tripv3.example1': '3 jours à Kelowna\u00a0: vignobles, promenades faciles et bonne bouffe',
+    'tripv3.example2': '2 jours à Penticton avec les enfants',
+    'tripv3.example3': 'Une fin de semaine romantique à Naramata',
+    'tripv3.example4': 'Que peut-on faire autour de Penticton s’il pleut ?',
+    'tripv3.howTitle': 'Ce que nous v\u00e9rifions pour vous',
+    'tripv3.how1Title': 'Ouvert, et en saison',
+    'tripv3.how1Text': 'Chaque arr\u00eat respecte ses heures d\u2019ouverture. Les endroits ferm\u00e9s ce jour-l\u00e0 ou hors saison sont laiss\u00e9s de c\u00f4t\u00e9.',
+    'tripv3.how2Title': '5 \u00e0 7 et soir\u00e9es',
+    'tripv3.how2Text': 'Chaque arr\u00eat 5 \u00e0 7 tombe pendant le 5 \u00e0 7 de l\u2019endroit, avec les aubaines, les sp\u00e9ciaux de la semaine et les soir\u00e9es comme les quiz ou la musique live.',
+    'tripv3.how3Title': 'Un plan pr\u00eat \u00e0 suivre',
+    'tripv3.how3Text': 'Gardez, remplacez ou retirez des arr\u00eats, voyez-les sur la carte, obtenez un itin\u00e9raire Google Maps et partagez-le avec un lien.',
     'tripv3.planning': 'Planification de votre voyage\u2026',
     'tripv3.error': 'Un probl\u00e8me est survenu. Veuillez r\u00e9essayer.',
     'tripv3.emptyRequest': 'Parlez-nous un peu du voyage que vous aimeriez \u2014 o\u00f9, combien de temps, ce que vous aimez.',
@@ -1071,6 +1093,13 @@ function setLanguage(lang){
     window.location.assign(twin.getAttribute('href').replace(/^https:\/\/okanaganroam\.com/, ''));
     return;
   }
+  // A private page with a twin but no hreflang (the business portal: noindex, never in a sitemap) names its other
+  // language's address in data-twin-path (café test 6, 2026-11-12). The query and #step come along.
+  var twinPath = document.documentElement.getAttribute('data-twin-path');
+  if (twinPath && /^\//.test(twinPath) && (document.documentElement.lang || '').slice(0, 2) !== lang) {
+    window.location.assign(twinPath + window.location.search + window.location.hash);
+    return;
+  }
   applyTranslations();
   // Update existing venue cards in place rather than rebuilding them.
   // renderVenueCards() would destroy and recreate every .venue-card, but
@@ -1099,7 +1128,7 @@ function setLanguage(lang){
       if (badgeRow) {
         badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }
@@ -1116,7 +1145,7 @@ function setLanguage(lang){
       if (badgeRow) {
         badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }
@@ -1262,6 +1291,16 @@ var CARD_BADGES = [
   { field: 'open_late', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>', label: 'badge.openLate' }
 ];
 
+// Brewery test 1 (2026-11-12): a brewery whose owner said "minors with an adult until 9 PM" shows "Kids until 9 PM"
+// (« Enfants jusqu’à 21 h ») on its kids badge, not a plain "Kid-friendly" (v.kids_until from the API).
+function badgeLabelFor(b, v){
+  if (b.field === 'kid_friendly' && v && /^\d{2}:\d{2}$/.test(v.kids_until || '')) {
+    if (getCurrentLang() === 'fr') { var p = v.kids_until.split(':'); return 'Enfants jusqu\u2019\u00e0 ' + parseInt(p[0], 10) + '\u00a0h' + (p[1] === '00' ? '' : '\u00a0' + p[1]); }
+    return 'Kids until ' + formatTime12h(v.kids_until);
+  }
+  return t(b.label);
+}
+
 function formatTime12h(t){
   var parts = t.split(':');
   var h = parseInt(parts[0]);
@@ -1318,7 +1357,7 @@ function venueCardHtml(v){
 
   var badgesHtml = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
     var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-    var label = escapeAttr(t(b.label));
+    var label = escapeAttr(badgeLabelFor(b, v));
     return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
   }).join('');
 
@@ -2117,7 +2156,9 @@ function initBlock11(){
     // Menu link searches for the venue's menu rather than linking a specific
     // page — we don't have a verified menu URL for every venue, and a search
     // is honest about that while still being useful.
-    var menuQuery = name + ' ' + regionLabel + ' menu';
+    // A tour has tours and prices, not a menu (2026-11-16).
+    var isTour = card.dataset.type === 'tour';
+    var menuQuery = name + ' ' + regionLabel + (isTour ? ' tours prices' : ' menu');
     var menuUrl = 'https://www.google.com/search?q=' + encodeURIComponent(menuQuery);
 
     var menuLink = document.createElement('a');
@@ -2125,7 +2166,7 @@ function initBlock11(){
     menuLink.href = menuUrl;
     menuLink.target = '_blank';
     menuLink.rel = 'noopener';
-    menuLink.textContent = t('card.findMenu');
+    menuLink.textContent = t(isTour ? 'card.findTours' : 'card.findMenu');
 
     // Same honest approach as the menu link: we don't have a verified booking
     // system for every venue, so this searches rather than claiming one exists.
@@ -4275,7 +4316,7 @@ window.__scrollToVenueCard = function(name){
       if (window.CARD_BADGES) {
         badgesEl.innerHTML = window.CARD_BADGES.filter(function(b){ return v[b.field]; }).slice(0, 4).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
+          var label = escapeAttr(badgeLabelFor(b, v));
           return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }

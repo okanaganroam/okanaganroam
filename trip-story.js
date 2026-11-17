@@ -1,6 +1,7 @@
 'use strict';
+const SITE = require('./trip-site.js');
 // Build My Trip, round 15 (2026-10-20): the plan's summary as a local friend would say it -- the places in order, each
-// with what you do there, and one plain reason for a key stop -- in English and French, built only from what Okanagan
+// with what you do there, and one plain reason for a key stop -- in English and French, built only from what the site's
 // Roam stores about each place (its kind, cuisine, badges, lists, activities, town) and each event (name, start time).
 // Nothing is claimed that the data does not hold: no "best", no dishes, no prices. Notes about hours, closures and
 // timing stay in the plan's own notes.
@@ -20,8 +21,10 @@ function action(stop, v, ctx) {
   const acts = (v && v.activities) || [];
   const evening = part === 'evening' || part === 'night';
   if (stop.skiDay || (t === 'outdoor' && has(name, /\bski\b/))) return { en: ['ski at', ''], fr: ['skiez à', ''] };
+  if (stop.campBase) return { en: ['set up camp at', ''], fr: ['installez le camp à', ''] };
+  if (/\b(?:night walk|light show)\b/i.test(String((v && v.cuisine) || ''))) return { en: ['take the night walk at', ''], fr: ['faites la promenade nocturne de', ''] };
   // Round 15b (2026-10-20): a pub (or bar, brewpub) planned as the day's dinner or lunch is that meal, not "end with a
-  // drink at Naramata Pub & Grill".
+  // drink at the pub".
   const mealLabel = /\b(?:dinner|supper|lunch|brunch|breakfast)\b/i.test(label);
   if (t === 'restaurant' || (t === 'cafe' && /\b(?:lunch|brunch|breakfast)\b/i.test(label)) || stop.wineryLunch || (['pub', 'cocktail', 'brewery'].includes(t) && mealLabel)) {
     if (/\bbrunch\b/i.test(label)) return { en: ['have brunch at', ''], fr: ['prenez le brunch à', ''] };
@@ -48,6 +51,14 @@ function action(stop, v, ctx) {
     return { en: ['visit', ''], fr: ['visitez', ''] };
   }
   if (t === 'outdoor') {
+    // Sub-types (2026-10-25): a crag is climbed, the ski hill skied, a gondola ridden, a waterfall walked to.
+    const sub = norm(v && v.cuisineLabel || '');
+    if (/\b(?:crags?|bouldering|climbing|alpine rock)\b/.test(sub)) return { en: ['climb at', ''], fr: ['grimpez à', ''], outdoors: true };
+    if (/\b(?:ski resort|nordic ski area|nordic trails)\b/.test(sub)) return { en: ['ski at', ''], fr: ['skiez à', ''], outdoors: true };
+    if (/\btube park\b/.test(sub)) return { en: ['go tubing at', ''], fr: ['faites de la glissade sur chambre à air à', ''], outdoors: true };
+    if (/\bskating rink\b/.test(sub)) return { en: ['skate at', ''], fr: ['patinez à', ''], outdoors: true };
+    if (/\bgondola\b/.test(sub) || has(name, /\bgondola\b/)) return { en: ['ride the', ''], fr: ['montez à bord de', ''], outdoors: true, view: true };
+    if (/\bwaterfall\b/.test(sub) && has(name, /\bfalls\b/)) return { en: ['walk to', ''], fr: ['marchez jusqu’à', ''], outdoors: true, view: true };
     if (acts.includes('hiking') || has(name, /\btrail|trails\b/)) return { en: ['walk the trails at', ''], fr: ['marchez les sentiers de', ''], outdoors: true };
     if (acts.includes('viewpoints') || has(name, /\blookout|viewpoint\b/)) return { en: ['take in the view from', ''], fr: ['profitez de la vue depuis', ''], outdoors: true, view: true };
     return { en: ['spend time outside at', ''], fr: ['profitez du plein air à', ''], outdoors: true };
@@ -63,7 +74,8 @@ function reason(stop, v, ctx, a) {
   const name = norm(v.name);
   if (ctx.dog && (f.dog_friendly || c.includes('dog_friendly'))) return { en: 'where dogs are welcome', fr: 'où les chiens sont acceptés' };
   if (ctx.kids && f.kid_friendly) return { en: 'listed as kid-friendly', fr: 'indiqué comme adapté aux enfants' };
-  if (f.lake_view && !(a && a.view)) return LAKE[v.id % LAKE.length];
+  // Where the lake_view badge also covers ocean and river views (SITE.lakeViewMeansLake false), "the lake" is said only for a lake.
+  if (f.lake_view && !(a && a.view)) return SITE.lakeViewMeansLake || /\blake\b/.test(`${name} ${norm(v.cuisineLabel || '')}`) ? LAKE[v.id % LAKE.length] : { en: 'with views over the water', fr: 'avec vue sur l’eau' };
   if (f.live_music) return { en: 'which has live music', fr: 'avec musique en direct' };
   if (f.patio && ['restaurant', 'pub', 'brewery', 'winery', 'cocktail', 'cafe'].includes(v.type)) return { en: 'which has a patio', fr: 'qui a une terrasse' };
   if (f.free_entry) return { en: 'free to visit', fr: 'à entrée gratuite' };
@@ -137,7 +149,7 @@ const CONNECT = {
   en: { morning: 'Next, ', midday: 'Next, ', afternoon: 'In the afternoon, ', late: 'Later, ', evening: 'In the evening, ', night: 'Later, ' },
   fr: { morning: 'Ensuite, ', midday: 'Ensuite, ', afternoon: 'L’après-midi, ', late: 'Plus tard, ', evening: 'En soirée, ', night: 'Plus tard, ' },
 };
-// Two phrases a sentence: "Walk the trails at Knox Mountain Park, which looks out over the lake, then have lunch at JOEY."
+// Two phrases a sentence: "Walk the trails at Lost Lake Park, which looks out over the lake, then have lunch at the café."
 function sentences(phrases, lang) {
   const out = [];
   for (let i = 0; i < phrases.length; i += 2) {

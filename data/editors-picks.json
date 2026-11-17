@@ -1,69 +1,61 @@
 {
-  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
-  "updated": "2026-10-28",
+  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 4 usable picks show (four a week since 2026-11-09); the rest are backups that step in, in order, when a pick is skipped (closed for the season or by a dated closure, not operating, or without its own photo). The row always shows 4 cards and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
+  "updated": "2026-11-09",
   "picks": [
     {
-      "id": 1038,
-      "why": "Standout gluten-free baking, from cakes to macarons",
-      "why_fr": "Une pâtisserie sans gluten remarquable, des gâteaux aux macarons"
+      "id": 344,
+      "why": "Family-run Sicilian-inspired Italian in Lake Country",
+      "why_fr": "Cuisine italienne familiale d’inspiration sicilienne à Lake Country"
     },
     {
-      "id": 1413,
-      "why": "Independent brewery with a full kitchen and Friday trivia",
-      "why_fr": "Brasserie indépendante, cuisine complète et quiz le vendredi",
-      "photo": "/images/owner/7be2648870550c524e73b055.jpg"
+      "id": 515,
+      "why": "Penticton pizzeria from well-known Okanagan restaurateurs",
+      "why_fr": "Une pizzeria de Penticton signée par des restaurateurs réputés de l’Okanagan"
     },
     {
-      "id": 289,
-      "why": "Elegant Italian with a deep wine cellar",
-      "why_fr": "Une cuisine italienne raffinée et une belle cave à vin"
+      "id": 839,
+      "why": "Organic West Kelowna winery best known for its ice wine",
+      "why_fr": "Un vignoble biologique de West Kelowna, réputé pour son vin de glace"
     },
     {
-      "id": 1497,
-      "why": "A hot-cold spa circuit for a grey fall day",
-      "why_fr": "Un circuit chaud-froid pour une journée grise d’automne"
+      "id": 1494,
+      "why": "The Interior’s oldest commercial art gallery, since 1963",
+      "why_fr": "La plus ancienne galerie d’art commerciale de l’Intérieur, depuis 1963"
     },
     {
-      "id": 616,
-      "why": "A fully vegan brunch bistro that wins over everyone",
-      "why_fr": "Un bistro de brunch 100 % végétalien qui plaît à tous"
+      "id": 948,
+      "why": "Generous, veggie-packed sandwiches in Vernon",
+      "why_fr": "De généreux sandwichs aux légumes à Vernon"
     },
     {
-      "id": 717,
-      "why": "Wine and cider in a 1922 packinghouse",
-      "why_fr": "Vin et cidre dans un entrepôt fruitier de 1922",
-      "photo": "/images/owner/0716cf30fed7dc93ee0a374b.jpg"
+      "id": 847,
+      "why": "A design-forward winery and bistro in Okanagan Falls",
+      "why_fr": "Un vignoble-bistro au design soigné à Okanagan Falls"
     },
     {
-      "id": 854,
-      "why": "Small-batch wines on a working family farm",
-      "why_fr": "Des vins en petits lots sur une ferme familiale",
-      "photo": "/images/owner/5d6acf63c1b740e4184c8d7d.jpg"
+      "id": 907,
+      "why": "A Kelowna coffee house that’s also a used bookstore",
+      "why_fr": "Un café de Kelowna qui est aussi une librairie d’occasion"
     },
     {
-      "id": 1532,
-      "why": "Concerts, comedy and family shows all season",
-      "why_fr": "Concerts, humour et spectacles familiaux toute la saison"
+      "id": 897,
+      "why": "Downtown Kelowna’s soup and sandwich stop since the 1970s",
+      "why_fr": "La halte soupes et sandwichs du centre-ville de Kelowna depuis les années 1970"
     },
     {
-      "id": 326,
-      "why": "Indigenous-owned café famous for bannock tacos",
-      "why_fr": "Café autochtone réputé pour ses tacos à la bannique"
+      "id": 1551,
+      "why": "An indoor playground for ages 1 to 12 in West Kelowna",
+      "why_fr": "Une aire de jeux intérieure à West Kelowna pour les 1 à 12 ans"
     },
     {
-      "id": 918,
-      "why": "All-day breakfast on West Kelowna’s Main Street",
-      "why_fr": "Déjeuners toute la journée sur la rue Main de West Kelowna"
+      "id": 246,
+      "why": "Fresh bread and local coffee on the Summerland wine trail",
+      "why_fr": "Pain frais et café local sur la route des vins de Summerland"
     },
     {
-      "id": 992,
-      "why": "Cozy Italian deli with pasta made from scratch",
-      "why_fr": "Un petit traiteur italien aux pâtes faites maison"
-    },
-    {
-      "id": 994,
-      "why": "A Parisian-style bakery on Penticton’s Main Street",
-      "why_fr": "Une boulangerie à la parisienne sur la rue Main de Penticton"
+      "id": 1032,
+      "why": "A local café with homemade bread in Okanagan Falls",
+      "why_fr": "Un café local d’Okanagan Falls, avec pain fait maison"
     }
   ]
 }

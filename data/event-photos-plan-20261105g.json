@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05g",
+  "update": [
+    {
+      "id": 639,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/summerland-jets-2611.jpg"
+      },
+      "why": "Real photo of the host place or team"
+    },
+    {
+      "id": 695,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/enderby-icemen-2611.jpg"
+      },
+      "why": "Real photo of the host place or team"
+    },
+    {
+      "id": 539,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/kelowna-actors-studio-2611.jpg"
+      },
+      "why": "Real photo of the host place or team"
+    },
+    {
+      "id": 849,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/riding-4-life-2611.jpg"
+      },
+      "why": "Real photo of the host place or team"
+    },
+    {
+      "id": 238,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/penticton-farmers-market-2611.jpg"
+      },
+      "why": "Real photo of the host place or team"
+    }
+  ]
+}

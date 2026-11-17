@@ -254,8 +254,12 @@ CREATE INDEX IF NOT EXISTS idx_events_venue ON events(venue_id);
 // currently filters or sorts by event type, so an index would be
 // speculative rather than justified by an actual read pattern.
 const existingEventCols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+// Event prices (2026-10-29): price_kind is 'free', 'donation' or 'paid' (null = the listing doesn't say); price_text
+// is what a paid event costs, as shown ("$25", "$15–$40").
 const newEventColumns = [
   ['type', 'TEXT'],
+  ['price_kind', 'TEXT'],
+  ['price_text', 'TEXT'],
 ];
 for (const [col, colType] of newEventColumns) {
   if (!existingEventCols.includes(col)) {
@@ -717,7 +721,9 @@ CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(sta
 // notification email and the admin list); none is published automatically.
 for (const [table, cols] of [
   ['venue_submissions', ['hours_text TEXT', 'happy_hour_text TEXT', 'social_url TEXT', 'submitter_role TEXT']],
-  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER', 'partner_venue_ids TEXT']],
+  // Pub test 9 (2026-11-10): an owner's event picture, uploaded like an owner photo (image_file on the photo volume,
+  // image_key its private preview id), reviewed with the event and used as the event's image once it is approved.
+  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER', 'partner_venue_ids TEXT', 'image_file TEXT', 'image_key TEXT']],
 ]) {
   const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
   for (const col of cols) if (!have.has(col.split(' ')[0])) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
@@ -820,6 +826,22 @@ CREATE TABLE IF NOT EXISTS venue_weekly_nights (
 );
 CREATE INDEX IF NOT EXISTS idx_venue_weekly_nights_venue ON venue_weekly_nights(venue_id);
 `);
+// Pub test 7 (2026-11-10): a weekly night may run only part of the year, like a special: season_from / season_to
+// 'MM-DD' (every year, may run over New Year), both NULL for all year. Additive.
+for (const col of ['season_from', 'season_to']) {
+  if (!db.prepare('PRAGMA table_info(venue_weekly_nights)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE venue_weekly_nights ADD COLUMN ${col} TEXT`);
+}
+
+// Full easy setup (2026-11-09): which steps a restaurant's owner has answered, sent, skipped or left for later, so the
+// setup can say "Welcome back" and start at the first open step. One row per venue; state is a small JSON object
+// { done: { step: 'live'|'day'|'email'|'skip'|'later' } }. Holds no personal data.
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_setup_progress (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  state TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
 
 try {
   require('./golf-data.js').initGolfData(db);
@@ -900,6 +922,35 @@ CREATE TABLE IF NOT EXISTS owner_photos (
   rejection_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_owner_photos_venue ON owner_photos (venue_id, status);
+`);
+
+// Owner videos (2026-11-05): short clips from owners that Dayton edits into social reels. The file lives in Cloudflare R2
+// (object_key), uploaded straight from the owner's browser; this row is the paperwork. status: uploading (permission
+// given, file not confirmed yet) -> pending (file is in the bucket, waiting for Dayton) -> approved (OK to use) or
+// rejected / removed (file deleted from the bucket).
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_videos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  object_key TEXT NOT NULL UNIQUE,
+  original_name TEXT,
+  content_type TEXT,
+  bytes INTEGER,
+  duration_s INTEGER,
+  credit TEXT NOT NULL,
+  contact_name TEXT,
+  contact_email TEXT,
+  note TEXT,
+  rights_confirmed_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'uploading' CHECK (status IN ('uploading', 'pending', 'approved', 'rejected', 'removed')),
+  ip_hash TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  uploaded_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_owner_videos_venue ON owner_videos (venue_id, status);
 `);
 
 // Menus (2026-10-17): an owner photographs their printed menu (or sends a PDF), the server has it read into text,
@@ -1008,6 +1059,9 @@ for (const table of ['owner_change_requests', 'owner_photos']) {
 {
   const cols = db.prepare('PRAGMA table_info(owner_photos)').all().map((c) => c.name);
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE owner_photos ADD COLUMN sort_order INTEGER');
+  // Easy setup (2026-11-09): an owner on the edit link picked this photo as their main one ("Make main photo"). It
+  // stays a wish until the photo is approved; approving it then makes it the main photo unless the reviewer says no.
+  if (!cols.includes('main_requested')) db.exec('ALTER TABLE owner_photos ADD COLUMN main_requested INTEGER NOT NULL DEFAULT 0');
 }
 // Event partners (2026-10-19, JoieFarm asked): other listed businesses an owner tagged on their event. The event
 // also shows on their venue pages. No foreign keys, so deleting an event or a venue never fails on this table
@@ -1055,6 +1109,40 @@ CREATE TABLE IF NOT EXISTS owner_event_changes (
 CREATE INDEX IF NOT EXISTS idx_owner_event_changes_status ON owner_event_changes (status, submitted_at);
 `);
 
+// Restaurant cuisines (2026-11-09): up to 3 food labels and one "kind of place" for a restaurant. venues.cuisine keeps
+// the first label (every existing reader keeps working); cuisines is a JSON list of 1-3 labels, the first equal to
+// venues.cuisine. Kept off the venues table so the venue API and every list that reads venues stay as they are.
+// Written only by server.js writeVenueCuisines() (owner saves) and guardedCuisinesUpdate() (research), both logged.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_cuisines (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  cuisines TEXT,
+  place_type TEXT,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Complete & Verified reminders (2026-11-09): one email per business address per hours-check cycle (cycle_key is the
+// hours_checked_at date the reminder was about), so a reminder never goes twice. token_hash is the private one-tap
+// "my hours are right" link (only its hash stored), good for 14 days. Opt-outs: addresses that said "no more reminders".
+db.exec(`
+CREATE TABLE IF NOT EXISTS badge_reminders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  cycle_key TEXT NOT NULL,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  UNIQUE (venue_id, cycle_key, email)
+);
+CREATE TABLE IF NOT EXISTS badge_reminder_optout (
+  email TEXT PRIMARY KEY,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Venue links (2026-10-15): menu, booking and social links an owner sends
 // (approved like every owner change). Kept off the venues table so the
 // venue API and every list that reads venues stay exactly as they are.
@@ -1072,6 +1160,23 @@ CREATE TABLE IF NOT EXISTS venue_links (
 // Set by the owner (2026-10-17); server.js turns it into the same season notes as venue_seasons.
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'open_months')) {
   db.exec('ALTER TABLE venue_links ADD COLUMN open_months TEXT');
+}
+// Brewery test 3 (2026-11-13): the owner's own season wins over a researched one. When an owner saves their season
+// (open_months, from setup or the portal), the researched venue_seasons row is kept but marked superseded_at, so it
+// stops showing; an Undo back to no season clears the mark, and a later POST /admin/set-season writes a fresh row.
+// Added once: a row the owner already overrode (their own logged season save, still the one in use, made after the
+// row was last set) is marked the same way. Other researched rows are untouched.
+if (!db.prepare('PRAGMA table_info(venue_seasons)').all().some((c) => c.name === 'superseded_at')) {
+  db.exec('ALTER TABLE venue_seasons ADD COLUMN superseded_at TEXT');
+  db.exec(`UPDATE venue_seasons SET superseded_at = CURRENT_TIMESTAMP WHERE venue_id IN (
+    SELECT l.venue_id FROM venue_links l JOIN venue_enrichment_log e ON e.venue_id = l.venue_id
+    WHERE l.open_months IS NOT NULL AND e.field_name = 'open_months' AND e.source = 'venue_owner' AND e.new_value = l.open_months
+      AND e.created_at >= COALESCE(venue_seasons.updated_at, ''))`);
+}
+// TikTok (pub test 9, 2026-11-10): the owner's TikTok profile, https://www.tiktok.com/@handle. Live straight away like
+// Instagram; NULL = none. Additive: older rows read as no TikTok.
+if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'tiktok_url')) {
+  db.exec('ALTER TABLE venue_links ADD COLUMN tiktok_url TEXT');
 }
 
 // Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a
@@ -1143,6 +1248,10 @@ CREATE INDEX IF NOT EXISTS idx_visitor_contribution_notes_contribution ON visito
   const cols = db.prepare('PRAGMA table_info(venue_owner_links)').all().map((c) => c.name);
   if (!cols.includes('prev_token_hash')) db.exec('ALTER TABLE venue_owner_links ADD COLUMN prev_token_hash TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_venue_owner_links_prev ON venue_owner_links (prev_token_hash)');
+  // Portal opens (2026-11-09): when a business first and last opened its private link, and how many times.
+  for (const [col, def] of [['first_opened_at', 'TEXT'], ['last_opened_at', 'TEXT'], ['open_count', 'INTEGER NOT NULL DEFAULT 0']]) {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE venue_owner_links ADD COLUMN ${col} ${def}`);
+  }
 }
 
 // Claim this listing (2026-10-18): a business owner with no edit link (no
@@ -1188,6 +1297,43 @@ CREATE TABLE IF NOT EXISTS venue_hours_extra (
   seasons TEXT,
   closures TEXT,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Plan your visit (2026-10-29): what a visitor needs before driving out, from the venue's own site -- for a winery its
+// tastings (price, booking), extras, group rule, on-site restaurant and winter hours. info: canonical JSON
+// { rows: [{ label, text, venue_id?, url? }], booking_url, source_url, checked_at }; server.js guardedVisitInfoUpdate.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_visit_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Average spend per person (2026-11-08): one main + one non-alcoholic drink, whole dollars. Stored only; nothing shows
+// it publicly until AVG_SPEND_PUBLIC=1. source 'research' (menu price research) or 'owner' (the owner's own number,
+// which research never overwrites). info: canonical JSON { amount, source, source_url, basis, checked_at };
+// server.js guardedAvgSpendUpdate.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_avg_spend (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  amount INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  info TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// "We don't have one" (2026-11-08): items of the owner portal's completeness list that the owner told us their place
+// does not offer (no happy hour, no Instagram, no takeout...). Owner portal only: nothing public reads it. It counts the
+// item as done in their score, and our research never adds that item back while it is here. server.js venueNotOffered.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_not_offered (
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  item TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (venue_id, item)
 );
 `);
 
@@ -1256,5 +1402,272 @@ CREATE TABLE IF NOT EXISTS removed_venues (
     ['kelowna', 'restaurant', 'misato-s-kitchen', "Misato's Kitchen", 49.885222, -119.493323, 901],
   ]) seed.run(...r, '2026-10-19');
 }
+
+// Build My Trip demand log (Stage 1, 2026-11-05). Anonymous: one row per
+// day + rotating visitor hash + venue + kind, so we can count how many
+// different visitors were shown / added a business. No IP, name or email.
+db.exec(`
+CREATE TABLE IF NOT EXISTS trip_demand_events (
+  day TEXT NOT NULL,
+  visitor TEXT NOT NULL,
+  venue_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (day, visitor, venue_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_trip_demand_venue ON trip_demand_events (venue_id, kind, day);
+`);
+
+// Site event counts (2026-11-05): per day, how often each fixed-list feature event happened. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS site_event_counts (
+  day TEXT NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, name)
+);
+`);
+
+// Business activity counts (2026-11-05): per day and business, page views and link clicks. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_event_counts (
+  day TEXT NOT NULL,
+  venue_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, venue_id, name)
+);
+`);
+
+// Event click sheet (2026-11-05): per day and event, page views and clicks by item. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS event_click_counts (
+  day TEXT NOT NULL,
+  event_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event_id, name)
+);
+`);
+
+// The Monday "what changed" email (2026-11-06): one row per Monday so it is sent once.
+db.exec(`
+CREATE TABLE IF NOT EXISTS digest_log (
+  week TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  result TEXT NOT NULL DEFAULT 'pending',
+  sent_at TEXT
+);
+`);
+
+// Daily tracking-health check (2026-11-06): one row per day so an outage email is sent once.
+db.exec(`
+CREATE TABLE IF NOT EXISTS health_alert_log (
+  day TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  result TEXT NOT NULL DEFAULT 'pending',
+  signature TEXT
+);
+`);
+
+// Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_arrival_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  file TEXT NOT NULL,
+  preview_key TEXT NOT NULL UNIQUE,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  device_lat REAL,
+  device_lng REAL,
+  accuracy_m REAL,
+  distance_m INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'replaced')),
+  review_reasons TEXT,
+  submitted_by TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_arrival_venue ON venue_arrival_points (venue_id, status);
+`);
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS page_counts (
+  day TEXT NOT NULL,
+  page TEXT NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, page, name)
+);
+`);
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS not_found_counts (
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  path TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, kind, path, ref)
+);
+`);
+
+// What people search for on our own site (2026-11-06): per day, where (site / trip), cleaned words and found-or-not. Counts only.
+db.exec(`
+CREATE TABLE IF NOT EXISTS search_term_counts (
+  day TEXT NOT NULL,
+  source TEXT NOT NULL,
+  term TEXT NOT NULL,
+  found INTEGER NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, source, term, found)
+);
+`);
+
+// How people find us (2026-11-06): per day, kind (visit / ai_fetch / crawl), source and page. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS referral_counts (
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  page TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, kind, source, page)
+);
+`);
+
+// Restore missing public visitor pins from the venues' official directions.
+const fillVisitorPin = db.prepare(`
+  UPDATE venues
+  SET address = ?, latitude = ?, longitude = ?, updated_at = CURRENT_TIMESTAMP
+  WHERE region = ? AND slug = ? AND redirect_to IS NULL
+    AND (latitude IS NULL OR longitude IS NULL OR (latitude = 0 AND longitude = 0))
+`);
+// https://roomandpillarspa.com/pages/contact-us
+fillVisitorPin.run('Unit 100, 1546 Harvey Ave', 49.8822793, -119.464409, 'kelowna', 'room-and-pillar-spa');
+// https://okanaganwarriors.ca/qa/
+fillVisitorPin.run('Marron Valley Road', 49.3943595, -119.6916885, 'penticton', 'okanagan-warriors-adventure');
+
+// "Type it up for me" for more than menus (2026-11-09): happy hour and weekly specials sent from the setup as a file,
+// a photo or a website address are kept as their own venue_menus row (help_kind 'happy_hour' | 'specials'), so they
+// never mix with the venue's menu pages. NULL = a menu, as before.
+if (!db.prepare('PRAGMA table_info(venue_menus)').all().some((c) => c.name === 'help_kind')) {
+  db.exec('ALTER TABLE venue_menus ADD COLUMN help_kind TEXT');
+}
+
+// Researched menus (Dayton, 2026-11-16): a menu typed up from the venue's own website by us, not the owner. source
+// 'owner' (default, every menu before this) | 'research'; source_url = the venue's menu page; source_checked_at = the
+// day we checked it; owner_confirmed_at = when the owner tapped "This is right". A research menu that the owner has not
+// confirmed is noindex and left out of the sitemap, and never makes the venue "Verified by the business".
+{
+  const cols = db.prepare('PRAGMA table_info(venue_menus)').all().map((c) => c.name);
+  if (!cols.includes('source')) db.exec("ALTER TABLE venue_menus ADD COLUMN source TEXT NOT NULL DEFAULT 'owner'");
+  if (!cols.includes('source_url')) db.exec('ALTER TABLE venue_menus ADD COLUMN source_url TEXT');
+  if (!cols.includes('source_checked_at')) db.exec('ALTER TABLE venue_menus ADD COLUMN source_checked_at TEXT');
+  if (!cols.includes('owner_confirmed_at')) db.exec('ALTER TABLE venue_menus ADD COLUMN owner_confirmed_at TEXT');
+}
+
+// Owner-only restaurant features (Dayton, 2026-11-09): six yes/no answers only the business gives (never researched):
+// local_drinks, heated_patio, wheelchair_accessible, locally_owned, takes_reservations, takeout. Kept in their own table
+// so the venues row, the public API and the badge guide pages don't change. features: JSON { key: true }.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_owner_features (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  features TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Pub answers only the business gives (Dayton, 2026-11-10; never researched): when the kitchen closes, who's welcome
+// (adults only / minors with an adult until a time / all ages) and which sports are shown on how many TVs.
+// info: JSON { kitchen: { mode, closes, note }, minors: { policy, until, note }, sports: { list, tvs } } (keys optional).
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_pub_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Café answers only the business gives (Dayton, 2026-11-10; never researched): what they serve, dietary details,
+// staying a while (seats, laptops, outlets, quiet), ordering (online link, pre-orders), coffee, and the "sells out
+// early" tip. info: JSON { serves, diet, stay, order, coffee, sellout, year } (keys optional). Additive: a café with no
+// row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_cafe_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+// Winery answers only the business gives (Dayton, 2026-11-12; never researched): food here (and a restaurant with no page
+// of its own), tasting fee and whether it is waived with a purchase, how people visit, groups and tour buses, the
+// off-season answer (all year / seasonal / by appointment, with the walk-in season) and up to two experiences.
+// info: JSON (keys optional). Additive: a winery with no row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_winery_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+// Brewery answers only the business gives (Dayton, 2026-11-12; drafts/brewery-portal-2026-11-12/SPEC-breweries.md; never
+// researched): food here, outside food, the kitchen close time, the flight price and "no flights", the to-go chips and
+// who's welcome (the pub answer's shape). info: JSON (keys optional). Additive: a brewery with no row reads as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_brewery_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+// Tour answers only the operator gives (Dayton, 2026-11-16: "build the tours setup"; never researched): the kinds of tour,
+// how long, how far ahead to book, who can come, a private tour price, the season answer and the price per person.
+// info: JSON (keys optional). Additive: a tour with no row reads and shows exactly as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_tour_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+// Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
+// set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.
+if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name === 'time_tbc')) {
+  db.exec('ALTER TABLE event_occurrences ADD COLUMN time_tbc INTEGER NOT NULL DEFAULT 0');
+}
+
+// "This weekend" email list (2026-11-16, weekend-email.js): one row per address (stored lower-case). Double opt-in: an
+// address gets the digest only after confirmed_at is set from the emailed link; unsubscribed_at stops it for good (a new
+// sign-up must confirm again). weekend_email_sends has one row per weekend (its Friday) and subscriber, written before
+// the email goes out, so nobody gets the same weekend twice.
+db.exec(`
+CREATE TABLE IF NOT EXISTS weekend_email_subscribers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  lang TEXT NOT NULL DEFAULT 'en',
+  source TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  confirm_token TEXT UNIQUE,
+  confirm_sent_at TEXT,
+  confirmed_at TEXT,
+  unsubscribe_token TEXT NOT NULL UNIQUE,
+  unsubscribed_at TEXT,
+  last_sent_at TEXT,
+  last_sent_weekend TEXT
+);
+CREATE TABLE IF NOT EXISTS weekend_email_sends (
+  weekend TEXT NOT NULL,
+  subscriber_id INTEGER NOT NULL REFERENCES weekend_email_subscribers(id),
+  status TEXT NOT NULL,
+  error TEXT,
+  attempted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  sent_at TEXT,
+  PRIMARY KEY (weekend, subscriber_id)
+);
+`);
 
 module.exports = db;

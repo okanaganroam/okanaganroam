@@ -5,6 +5,7 @@
 // and "Other options" that never repeat a stop. Fixes from drafts/site-review-2026-10-20-pass12.md (items 2 and 5) and
 // scripts/trip-battery.js. PURE tests on a small fixture valley (no server.js, no database), like r12-planner.test.js.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

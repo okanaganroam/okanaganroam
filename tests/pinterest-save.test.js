@@ -1,5 +1,6 @@
 // Save to Pinterest on guide pages (2026-10-19): a plain link added by app.js on /guides/<slug> only.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

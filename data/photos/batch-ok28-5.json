@@ -1,0 +1,222 @@
+{
+ "reason": "Venue photos ok28-5",
+ "batch_id": "photos-ok28-5-2026-10-28",
+ "venues": [
+  {
+   "id": 772,
+   "name": "Ward's Wine Country Kitchen",
+   "region": "oliver",
+   "slug": "ward-s-wine-country-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ward-s-wine-country-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1034,
+   "name": "The Sumac Ridge Restaurant & Lounge",
+   "region": "summerland",
+   "slug": "sumac-ridge-golf-country-club",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sumac-ridge-golf-country-club-g28-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 166,
+   "name": "DCS CHICKEN",
+   "region": "penticton",
+   "slug": "dcs-chicken",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/dcs-chicken-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 3,
+   "name": "1862 Social House",
+   "region": "armstrong",
+   "slug": "1862-social-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/1862-social-house-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1845,
+   "name": "BEEPS – Peachland Bat Colony & BatCam",
+   "region": "peachland",
+   "slug": "beeps-peachland-bat-colony-batcam",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/beeps-peachland-bat-colony-batcam-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1866,
+   "name": "BX Ranch Trail",
+   "region": "vernon",
+   "slug": "bx-ranch-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bx-ranch-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1913,
+   "name": "Cougar Canyon Trail (Kalamalka Lake Provincial Park)",
+   "region": "coldstream",
+   "slug": "cougar-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cougar-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1914,
+   "name": "Fur Brigade Trail Viewpoint (Garnet Valley Trails)",
+   "region": "peachland",
+   "slug": "fur-brigade-trail-viewpoint",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fur-brigade-trail-viewpoint-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1858,
+   "name": "Gladstone Trail",
+   "region": "peachland",
+   "slug": "gladstone-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gladstone-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1895,
+   "name": "Jordan Nature Reserve (Swan Lake)",
+   "region": "vernon",
+   "slug": "jordan-nature-reserve-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jordan-nature-reserve-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1850,
+   "name": "Lochview Trail (to Paul's Tomb)",
+   "region": "kelowna",
+   "slug": "lochview-trail-pauls-tomb",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lochview-trail-pauls-tomb-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1864,
+   "name": "Mount Keogan (Dogtown Trail)",
+   "region": "okanagan-falls",
+   "slug": "mount-keogan-dogtown-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-keogan-dogtown-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1854,
+   "name": "Okanagan Centre Beach Trail",
+   "region": "lake-country",
+   "slug": "okanagan-centre-beach-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-centre-beach-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1906,
+   "name": "Pinnacle Lake Trail",
+   "region": "lumby",
+   "slug": "pinnacle-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pinnacle-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1852,
+   "name": "Shorts Creek Canyon Trail (Fintry Provincial Park)",
+   "region": "west-kelowna",
+   "slug": "shorts-creek-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/shorts-creek-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1904,
+   "name": "Twin Lakes Trail (Monashees)",
+   "region": "lumby",
+   "slug": "twin-lakes-trail-monashee",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/twin-lakes-trail-monashee-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1924,
+   "name": "Wilden Ridge Trails",
+   "region": "kelowna",
+   "slug": "wilden-ridge-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wilden-ridge-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1857,
+   "name": "Big White Summer Hiking Trails",
+   "region": "big-white",
+   "slug": "big-white-summer-hiking-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/big-white-summer-hiking-trails-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

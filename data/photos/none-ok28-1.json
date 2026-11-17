@@ -1,0 +1,32 @@
+[
+ {
+  "id": 29,
+  "name": "Apni Rasoi Taste of India",
+  "reason": "All 13 Google Maps photos are food/takeout close-ups (no storefront or room); website (home + location pages) has only menu dish shots on white backgrounds, max 1000px, mostly stock-style"
+ },
+ {
+  "id": 1078,
+  "name": "Okanagan Vintners Exchange",
+  "reason": "No Google Maps place of its own (search matches Okanagan Estate Wine Cellar shop and Vintners liquor store, both different businesses); YLW airport place photos show only the neighbouring Ellison Field Taphouse; no website; operator SSP's press photos are ribbon-cuttings with people filling the frame; castanet page 403"
+ },
+ {
+  "id": 1882,
+  "name": "Pretty-Newene Trail",
+  "reason": "Google has only an intersection pin 'Pretty Rd & Pretty-Newene Trl' with 0 photos; searches for the trail, Newene Rd and nearby parks return other places; no web page or photo of this short neighbourhood connector found (website is the Lake Country trail-map PDF)"
+ },
+ {
+  "id": 1881,
+  "name": "The Lakes Trails (Lake Country)",
+  "reason": "Google 'The Lakes' place has 3 photos, all of the subdivision (houses, a balcony railing); 'Apex Park' nearby is a playground; no trailhead place for Upper Lakes/Lake Hill; website is the Lake Country trail-map PDF (no photos)"
+ },
+ {
+  "id": 786,
+  "name": "Winfield Chinese Restaurant",
+  "reason": "Google Maps has 4 photos: a koi-pond painting (owner) and three plates of food on tables; website shows only the same koi painting as its header; no storefront or dining-room photo"
+ },
+ {
+  "id": 1723,
+  "name": "Tiki Water Bikes (Peachland)",
+  "reason": "Google Maps has only the Penticton (Skaha Lake, 124 S Beach Dr) location; no Google place for the Peachland spot; all ~50 photos on tikiwaterbikes.ca (home + gallery) are of the Skaha Lake / Penticton location (file names say penticton/skaha), none of Peachland"
+ }
+]

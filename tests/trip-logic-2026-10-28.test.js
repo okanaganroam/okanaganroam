@@ -2,6 +2,7 @@
 // tasting room and lunch at Home Block at CedarCreek), "cozy" is not a sports bar, a date night's drink is a lounge or a
 // winery before a pub, and a long day hike is timed and ranked as one.
 // PURE, like tests/trip-golden.test.js: the production snapshot in tests/fixtures/trip-golden-inputs.json.gz.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

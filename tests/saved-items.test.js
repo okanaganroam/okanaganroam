@@ -1,6 +1,7 @@
 'use strict';
 
 // Stage 4.3 (2026-10-01): saved-item identity -- the pure rules (saved-items.js).
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('../saved-items');

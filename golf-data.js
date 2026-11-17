@@ -344,9 +344,10 @@ function golfCardFeeHtml(detail, today = todayIso()) {
   if (!detail || !detail.feeSet || detail.feeSet.status === 'not_applicable') return '';
   const r = comparisonRate(detail, today);
   if (r) {
-    const bits = [holesText(r.holes), includesText(r), TAX_TEXT[detail.feeSet.tax] && detail.feeSet.tax !== 'unstated' ? TAX_TEXT[detail.feeSet.tax] : null].filter(Boolean);
     const when = [r.season_label, r.time_window].filter(Boolean).join(', ');
-    return `<p class="golf-fee"><span class="golf-fee-price">${esc(priceText(r))}</span> <span class="golf-fee-detail">· ${esc(bits.join(' · '))}</span></p>
+    // A card shows one thing about price: where it starts (2026-11-01). Holes, cart, range and tax are on the course page.
+    const start = priceText(r).replace(/^from /, '');
+    return `<p class="golf-fee"><span class="golf-fee-price">From ${esc(start)}</span></p>
         <p class="golf-fee-note">Standard adult rate${when ? ` · ${esc(when)}` : ''} · ${esc(seasonNote(detail.feeSet, today))}</p>`;
   }
   const fresh = feeFreshness(detail.feeSet, today);

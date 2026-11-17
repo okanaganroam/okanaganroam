@@ -20,6 +20,24 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 
+// Isolated child-process tests start a copy of the server in a temp folder. The server now needs most of the
+// project's top-level modules and its data folder (a child that cannot load them exits at once, and the old
+// copy-three-files setup left those tests failing or hanging), so stage everything except the databases:
+// top-level files are copied, data/ is copied (the server may write there) and public/ is linked (read-only, 1.5 GB).
+function stageProject(tempDir) {
+  const projectRoot = path.join(__dirname, '..');
+  for (const entry of fs.readdirSync(projectRoot, { withFileTypes: true })) {
+    const n = entry.name;
+    if (n.startsWith('.') || /\.db(-wal|-shm)?$/.test(n) || n.startsWith('venue-updates-backup') || n.endsWith('.zip')) continue;
+    if (entry.isDirectory()) {
+      if (n === 'data') fs.cpSync(path.join(projectRoot, n), path.join(tempDir, n), { recursive: true });
+      else if (n === 'public') fs.symlinkSync(path.join(projectRoot, n), path.join(tempDir, n), 'dir');
+    } else {
+      fs.copyFileSync(path.join(projectRoot, n), path.join(tempDir, n));
+    }
+  }
+}
+
 const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 // Guarantee a clean slate every run.
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
@@ -43,6 +61,8 @@ const SUMMER_NOW = new Date('2026-07-15T19:00:00Z');
 const noImgV = (html) => String(html).replace(/(\/images\/[\w\/.-]+\.(?:jpe?g|png|webp))\?v=[0-9a-f]{10}/gi, '$1');
 
 const app = require('../server.js');
+// The verified-prices file holds real venue ids; fixtures reuse small ids, so tests start with no prices on file.
+for (const k of Object.keys(app.CARD_PRICES)) delete app.CARD_PRICES[k];
 const db = require('../db.js');
 
 // ---- seed a handful of fixture venues -------------------------------
@@ -1916,7 +1936,7 @@ test('Kin & Folk page: Penticton dining information reaches search, visible copy
   assert.match(html, /<title>Kin &amp; Folk Penticton: Menu &amp; Reservations \| Okanagan Roam<\/title>/);
   assert.match(html, /<meta name="description" content="Visit Kin &amp; Folk in Penticton at 557 Main Street/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/penticton\/restaurants\/kin-folk"/);
-  assert.match(html, /<h1>Kin &amp; Folk<\/h1>/);
+  assert.match(html, /<h1[^>]*>Kin &amp; Folk<\/h1>/);
   assert.match(html, /Asian-inspired food/);
   const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
   const restaurant = schemas.find((s) => s['@type'] === 'Restaurant');
@@ -1958,7 +1978,7 @@ test('Elora page: search and visible copy answer dining intent without altering 
   assert.match(html, /<title>Elora Restaurant &amp; Bar Vernon: Menu &amp; Dining Info \| Okanagan Roam<\/title>/);
   assert.match(html, /<meta name="description" content="Find Elora Restaurant &amp; Bar in Vernon at 5350 Anderson Way\./);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/vernon\/restaurants\/elora-restaurant-bar"/);
-  assert.match(html, /<h1>Elora Restaurant &amp; Bar<\/h1>/);
+  assert.match(html, /<h1[^>]*>Elora Restaurant &amp; Bar<\/h1>/);
   assert.match(html, /inside the Best Western Premier Route 97/);
   assert.doesNotMatch(html, /Expect the chef to visit every table/);
   const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
@@ -1989,28 +2009,30 @@ test('Elora page: editorial copy is limited to the active Vernon restaurant', ()
 test('renderVenuePage produces a page with the venue name as H1 and a canonical link', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.match(html, /<h1>Test Trattoria<\/h1>/);
+  assert.match(html, /<h1[^>]*>Test Trattoria<\/h1>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/restaurant/);
   assert.match(html, /BreadcrumbList/); // JSON-LD present
 });
 
-test('venue hero fallbacks use the Okanagan illustration while supplied photos remain untouched', () => {
+test('venue hero fallbacks are a plain colour panel (no landscape photo) while supplied photos remain untouched', () => {
+  // Real photos only (Dayton, 2026-10-28): a place without its own photo never shows a photo of somewhere else.
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const fallback = app.renderVenuePage(venue, [], [], []);
-  assert.match(fallback, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg\?v=a01552e12e24['"]?\)/);
-  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'venue-hero-okanagan.a01552e12e24.jpg')));
+  assert.doesNotMatch(fallback, /venue-hero-okanagan/);
+  assert.match(fallback, /\.venue-hero-fallback \{\s*background-color: #1C2A2E;/);
   assert.match(fallback, /venue-hero-fallback/);
+  assert.doesNotMatch(fallback, /<div class="venue-hero[^"]*venue-hero-has-photo"|<span class="venue-hero-example">|<img class="venue-hero-img"/);
 
   const withPhoto = app.renderVenuePage({ ...venue, image_url: 'https:\/\/example.com/venue.jpg' }, [], [], []);
   assert.match(withPhoto, /<div class="venue-hero venue-hero-photo"><img src="https:\/\/example\.com\/venue\.jpg"/);
   assert.doesNotMatch(withPhoto, /class="venue-hero venue-hero-fallback/);
 });
 
-test('shared venue listing cards get an illustrated header while event cards are excluded', () => {
+test('shared venue listing cards get a plain colour header (no landscape photo) while event cards are excluded', () => {
   const page = app.renderCategoryPage('kelowna', 'restaurant', [app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria')], []);
   assert.match(page, /li\.venue-card:not\(\.whatson-event-card\)\s*\{[\s\S]*?padding-top:\s*112px\s*!important/);
-  assert.match(page, /linear-gradient\(100deg, rgba\(25,53,57,0\.76\), rgba\(25,53,57,0\.18\)\)/);
-  assert.match(page, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg\?v=a01552e12e24['"]?\)/);
+  assert.match(page, /linear-gradient\(100deg, #2A6B67, #3E7F7A\) !important/);
+  assert.doesNotMatch(page, /venue-hero-okanagan/);
   assert.match(page, /background-size:\s*100% 92px\s*!important/);
 });
 
@@ -2044,7 +2066,7 @@ test('render404Page: mobile viewport, themed site shell, landmarks, search box, 
   assert.doesNotMatch(html, /og:url/);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, 'the approved homepage stylesheet');
   assert.match(html, /<body class="golf-page not-found-page">/);
-  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main">/);
+  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main" tabindex="-1">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
   assert.match(html, /<h1>We couldn\u2019t find that page<\/h1>/);
   // 2026-10-14: a search box to /browse, prefilled from the address.
@@ -2530,7 +2552,7 @@ test('Wine engagement: winery region and venue pages carry Favorite / Add to Tri
   const venuePage = app.renderVenuePage(first, [], [], []);
   assert.match(venuePage, /class="card-action fav-btn"/, 'winery venue pages must render Favorite');
   assert.match(venuePage, /class="card-action trip-btn"/, 'winery venue pages must render Add to Trip');
-  assert.match(venuePage, /<div class="venue-cta-row" data-venue-id=/, 'the CTA row needs its engagement attributes');
+  assert.match(venuePage, /<div class="fd-actions fd-save-actions" data-venue-id=/, 'the Favorite / Add to trip row needs its engagement attributes (winery layout, 2026-11-08)');
 
   // 3. the controls are wired: the standalone script needs no app.js
   assert.match(regionPage, /var HOLDER = '\[data-venue-category="winery"\]'/, 'region page must bind the engagement script to winery cards');
@@ -2815,6 +2837,8 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
   assert.match(html, /data-i18n="gems\.heading">Hidden Gems</);
   assert.match(html, /data-i18n-aria="homeFooter\.instagramAria"/);
   assert.match(html, /data-i18n-aria="homeFooter\.tiktokAria"/);
+  assert.match(html, /icon-youtube" href="https:\/\/www\.youtube\.com\/@OkanaganRoam"/);
+  assert.match(html, /icon-pinterest" href="https:\/\/www\.pinterest\.com\/okanaganroam\/"/);
   assert.match(html, /data-i18n-aria="homeFooter\.facebookAria"/);
   assert.match(html, /class="home-footer-copyright" data-i18n="homeFooter\.copyright"/);
   assert.match(html, /class="home-footer-logo" href="\/" aria-label="Okanagan Roam home" data-i18n-aria="nav\.homeAriaLabel"/);
@@ -2833,7 +2857,7 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 
 test('Home footer: Explore column lists the site\'s sections, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
-  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
+  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul class="home-footer-list-2col">([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
@@ -2872,13 +2896,15 @@ test('Home footer: Regions renders as two explicit subcolumns -- Central+South, 
   assert.equal(app.FOOTER_REGION_GROUPS.reduce((n, g) => n + g.regions.length, 0), 20);
 });
 
-test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) all live inside the same .home-footer-cols row, in that DOM order -- Regions is NOT a separate full-width band', () => {
+test('Home footer: exactly THREE columns (Explore, About, Regions) all live inside the same .home-footer-cols row, in that DOM order -- Regions is NOT a separate full-width band', () => {
   const html = app.renderHomeFooterHTML();
   const colsMatch = html.match(/<div class="home-footer-cols">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="wrap-wide home-footer-bottom">/);
   assert.ok(colsMatch, 'expected to find the single .home-footer-cols row, immediately followed by the bottom/copyright row (nothing else in between)');
   const colsHtml = colsMatch[1];
   const headings = Array.from(colsHtml.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)).map((m) => m[1]);
-  assert.deepEqual(headings, ['Explore', 'About', 'Regions', 'Social Media'], 'expected exactly these 4 column headings, in this order, all inside one row');
+  // Footer polish 2 (2026-10-29): Social Media moved under the logo in .home-footer-brand.
+  assert.deepEqual(headings, ['Explore', 'About', 'Regions'], 'expected exactly these 3 column headings, in this order, all inside one row');
+  assert.match(html, /<div class="home-footer-brand">[\s\S]*<div class="home-footer-col home-footer-social">\s*<h2 data-i18n="homeFooter\.socialMedia">Social Media<\/h2>[\s\S]*<\/div>\s*<div class="home-footer-cols">/, 'Social Media sits in the brand block, before the columns');
   assert.doesNotMatch(html, /class="home-footer-regions"/, 'the old separate full-width Regions band must be gone');
   // Regions' own region-groups grid must be nested inside the 4th column, not a sibling of .home-footer-cols.
   const regionsColPos = colsHtml.indexOf('home-footer-col-regions');
@@ -2916,7 +2942,7 @@ test('Home footer: About and Social Media (renamed from Follow) column links/ico
   assert.match(html, /<a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
-  assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
+  assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
   assert.doesNotMatch(html, /Facebook, coming soon|icon-facebook[^>]*data-tooltip/);
 });
 
@@ -2994,10 +3020,13 @@ test('getRegionCategoryCounts includes golf once a golf venue exists in the regi
 });
 
 test('renderRegionPage lists the golf category card for a region with a golf venue', () => {
-  const counts = app.getRegionCategoryCounts('kelowna');
-  const html = app.renderRegionPage('kelowna', counts, []);
-  assert.match(html, /href="\/kelowna\/golf"/);
-  assert.match(html, /Golf Courses/);
+  // The towns use the compact town layout now, so check the category tile data the region pages are built from. A
+  // category page is only linked once the region has enough venues of that type (MIN_CATEGORY_VENUES, the thin-page
+  // rule): a one-course fixture region gets no golf link, a region with enough courses does.
+  const golf = (counts) => app.destinationCategories('kelowna', counts).find((c) => c.key === 'golf');
+  assert.equal(golf({ ...app.getRegionCategoryCounts('kelowna'), golf: 99 }).href, '/kelowna/golf');
+  assert.equal(golf({ golf: 99 }).label, 'Golf Courses');
+  assert.equal(golf({ golf: 0 }).href, null, 'no courses -> no link');
 });
 
 test('venueCardHtml links correctly for a golf venue', () => {
@@ -3590,7 +3619,7 @@ test('S3 #22: every write is logged; updates record old/new; result rows carry t
   assert.deepEqual({ ...card, id: undefined }, {
     id: undefined, name: 'S3 Harvest Dinner', slug: 's3-harvest-dinner', region: 'kelowna', valleyWide: false,
     categories: ['food-drink-events', 'wineries-wine-events'], description: 'Updated description', image: null,
-    startDate: '2030-10-03', endDate: '2030-10-03', dateLabel: 'Thu Oct 3', time: '6:30 pm', occurrenceCount: 1,
+    startDate: '2030-10-03', endDate: '2030-10-03', dateLabel: 'Thu Oct 3', time: '6:30 pm', occurrenceCount: 1, priceKind: null, priceLabel: null,
     venueName: 'Test Trattoria', venueId: s3venue.id, sourceType: 'official_venue', sourceName: 'Test Trattoria', attribution: null, status: 'scheduled',
   });
   const series = app.queryWhatsOnEvents({ from: '2030-10-01', to: '2030-10-31' }).find((e) => e.slug === 's3-jazz-jam');
@@ -3649,7 +3678,7 @@ const s4event = (over = {}) => ({
   occurrences: [{ start_date: '2031-10-04', start_time: '19:05', label: 'vs Kamloops Blazers', source_ref: 'g1' }, { start_date: '2031-10-11', start_time: '18:05', label: 'vs Vees', source_ref: 'g2' }],
   ...s4meta, ...over,
 });
-const S4_PUBLIC_KEYS = ['id', 'name', 'slug', 'region', 'valleyWide', 'categories', 'description', 'image', 'startDate', 'endDate', 'dateLabel', 'time', 'occurrenceCount', 'venueName', 'attribution'];
+const S4_PUBLIC_KEYS = ['id', 'name', 'slug', 'region', 'valleyWide', 'categories', 'description', 'image', 'startDate', 'endDate', 'dateLabel', 'time', 'occurrenceCount', 'venueName', 'attribution', 'priceKind', 'priceLabel'];
 
 test('S4 #1/#2: event writes without a token or with a wrong token are 401 and write nothing', async () => {
   const before = db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
@@ -3715,11 +3744,7 @@ test('S4 #3: a valid token reaches the guarded writer -- create, update, categor
 test('S4 #4: with ENRICHMENT_ADMIN_TOKEN unset the event write API fails closed with 503 while public reads still work (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-events-503-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3097';
   const childEnv = { ...process.env };
   delete childEnv.ENRICHMENT_ADMIN_TOKEN;
@@ -3759,7 +3784,7 @@ test('S4 #5: public event reads need no auth and ignore a wrong bearer', async (
   const id = list.json.events[0].id;
   const one = await s4request('GET', `/api/events/${id}`);
   assert.equal(one.status, 200);
-  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
+  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'priceKind', 'priceLabel', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
   assert.equal(one.json.occurrences.length, 2, 'cancelled occurrence not exposed publicly');
   assert.deepEqual(Object.keys(one.json.occurrences[0]).sort(), ['allDay', 'endDate', 'endsNextDay', 'endTime', 'id', 'label', 'startDate', 'startTime'].sort());
   const occs = await s4request('GET', `/api/events/${id}/occurrences`);
@@ -3779,15 +3804,16 @@ test('sports listings show a matched local photo on the valley hub, region categ
     const api = await s4request('GET', '/api/venues?region=kelowna&type=sport');
     assert.equal(api.status, 200);
     const venue = api.json.venues.find((item) => item.id === Number(result.lastInsertRowid));
-    assert.equal(venue?.image_url, '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-1');
+    assert.equal(venue?.image_url, '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-2');
 
     const hub = await s4request('GET', '/sports');
     assert.equal(hub.status, 200);
-    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+    // (Nov 2026) cards carry resized 480/960 px copies of the photo, each cache-busted by a content hash.
+    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)(?:;--fd-ph-2x:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w960\.jpg\?v=[0-9a-f]{10}'\))?"/);
 
     const region = await s4request('GET', '/kelowna/sports');
     assert.equal(region.status, 200);
-    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
   }
@@ -3940,11 +3966,11 @@ function s5create(over) {
   assert.equal(r.ok, true, JSON.stringify(r));
   return r.event;
 }
-async function s5get(urlPath) {
+async function s5get(urlPath, opts) {
   return new Promise((resolve, reject) => {
     const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
     tmp.listen(0, '127.0.0.1', async () => {
-      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`); resolve({ status: res.status, text: await res.text() }); }
+      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`, opts); resolve({ status: res.status, text: await res.text(), location: res.headers.get('location') }); }
       catch (err) { reject(err); } finally { tmp.close(); }
     });
   });
@@ -3965,7 +3991,10 @@ test('S5 #1-#4: canonical detail URL renders a valid event; missing slug, wrong 
   assert.equal((await s5get('/kelowna/events/does-not-exist')).status, 404);
   assert.equal((await s5get('/vernon/events/s5-patio-concert')).status, 404, 'valid slug under the wrong region');
   assert.equal((await s5get('/shuswap/events/s5-patio-concert')).status, 404, 'unknown region');
-  assert.equal((await s5get('/kelowna/events/S5-Patio-Concert')).status, 404, 'slugs are exact');
+  // A differently-cased slug is not a second page: it 301s to the lowercase address (case-canonical redirect).
+  const upper = await s5get('/kelowna/events/S5-Patio-Concert', { redirect: 'manual' });
+  assert.equal(upper.status, 301, 'upper-case slug redirects');
+  assert.match(upper.location || '', /\/kelowna\/events\/s5-patio-concert$/, 'to the lowercase slug');
   assert.equal(ev.region, 'kelowna');
 });
 
@@ -4294,7 +4323,14 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
     return r.event;
   };
 
-  // 2. One event -> still no block.
+  // 1b. (2026-10-29) One event with several dates still to come (a theatre's run of a play) shows on its own.
+  const run = mk('Footlight Run', { categories: ['arts-culture'], occurrences: [{ start_date: '2033-05-13' }, { start_date: '2033-05-14' }, { start_date: '2033-05-15' }] });
+  assert.deepEqual(app.listUpcomingEventsAtVenue(venue.id).map((e) => e.slug), [run.slug], 'a single multi-date run is listed');
+  assert.deepEqual(cardsOf(html()), [`/kelowna/events/${run.slug}`], 'a single multi-date run -> one card');
+  for (const tbl of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${tbl} WHERE event_id = ?`).run(run.id);
+  db.prepare('DELETE FROM events WHERE id = ?').run(run.id);
+
+  // 2. One single-date event -> still no block.
   const a = mk('Cellarwork Nocturne', { occurrences: [{ start_date: '2033-05-02' }] });
   assert.equal(app.listUpcomingEventsAtVenue(venue.id).length, 0, 'one event is below the threshold');
   assert.doesNotMatch(html(), /Events at /, 'one event -> still no block');
@@ -4355,68 +4391,37 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
   assert.doesNotMatch(html(), /Events at /, 'page back to its original shape');
 });
 
-test('H1 Step 2: region pages link the next publishable events, omit the block below the threshold, and never link an unpublishable event', () => {
-  const counts = app.getRegionCategoryCounts('kelowna');
-  const regionHtml = (region) => app.renderRegionPage(region, app.getRegionCategoryCounts(region) || counts, []);
-  const eventLinksOf = (html) => {
-    const m = html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/);
-    return m ? [...m[0].matchAll(/<a href="(\/[a-z-]+\/events\/[a-z0-9-]+)">/g)].map((x) => x[1]) : [];
-  };
-
-  // 1. A region with plenty of publishable events links exactly 3, all direct
-  //    canonical event-detail URLs in that region (never a /whats-on?... URL).
-  const kelowna = regionHtml('kelowna');
-  const kelownaLinks = eventLinksOf(kelowna);
-  assert.equal(kelownaLinks.length, 3, 'a well-stocked region links exactly 3 events');
-  for (const href of kelownaLinks) assert.match(href, /^\/kelowna\/events\/[a-z0-9-]+$/, `canonical event URL: ${href}`);
-  assert.match(kelowna, /<h2>Upcoming events in Kelowna<\/h2>/);
-  // 6. The secondary link exists alongside the block, and only as a secondary link.
-  assert.match(kelowna, /<a href="\/kelowna\/events">See what&rsquo;s on in Kelowna &rarr;<\/a>/);
-  assert.equal(kelownaLinks.filter((h) => h.includes('whats-on')).length, 0, 'no filtered URL is used as a primary event link');
-
-  // 7. The pre-existing region page is otherwise intact.
-  assert.match(kelowna, /<h1>Kelowna, BC<\/h1>/);
-  assert.match(kelowna, /<ul class="card-grid region-photo-grid">/);
-  assert.match(kelowna, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna">/);
-  assert.doesNotMatch(kelowna, /<meta name="robots"/, 'region pages stay indexable');
-  assert.equal(app.listUpcomingEventsForRegion('kelowna', { limit: 3 }).length, 3);
-
-  // 2/3/4. Threshold behaviour, driven by real fixture data rather than counts.
-  const twoRegion = 'peachland';
-  const before = app.listUpcomingEventsForRegion(twoRegion).length;
-  assert.equal(before, 0, 'fixture DB starts with no peachland events');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'zero publishable events -> no block');
-  const pvenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
-  const mk = (name, over) => {
+test('H1 Step 2: the regions\' next publishable events (the list region pages link from) need the threshold, are ordered by next occurrence, and never include an unpublishable event', () => {
+  // Every region page now uses a compact layout without the old "Upcoming events in {Region}" block (towns, Kelowna and the ski
+  // hills all have their own), so this checks the data helper that block was built from, which the rest of the site still uses.
+  const mk = (region, name, over) => {
     const r = app.createEvent({
-      region: twoRegion, name, description: 'H1 Step 2 fixture.', source_type: 'official_organizer', source_name: `H1S2 ${name}`,
+      region, name, description: 'H1 Step 2 fixture.', source_type: 'official_organizer', source_name: `H1S2 ${name}`,
       source_url: `https://example.com/h1s2/${app.slugify(name)}`, venue_name_text: `H1S2 Hall ${name}`, categories: ['community-events'],
       occurrences: [{ start_date: '2032-08-01' }], ...over,
     }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
     assert.equal(r.ok, true, JSON.stringify(r));
     return r.event;
   };
-  const one = mk('H1S2 Lantern Walk', { occurrences: [{ start_date: '2032-08-01' }] });
-  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'one publishable event is below the threshold');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'one event -> still no block');
+  const region = 'baldy';
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'fixture DB starts with no baldy events');
+  const one = mk(region, 'H1S2 Lantern Walk', { occurrences: [{ start_date: '2032-08-01' }] });
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'one publishable event is below the threshold');
 
-  const two = mk('H1S2 Harbour Recital', { categories: ['live-music'], occurrences: [{ start_date: '2032-08-08' }] });
-  const twoHtml = regionHtml(twoRegion);
-  const twoLinks = eventLinksOf(twoHtml);
-  assert.equal(twoLinks.length, 2, 'a two-event region links exactly 2');
-  assert.deepEqual(twoLinks, [`/${twoRegion}/events/${one.slug}`, `/${twoRegion}/events/${two.slug}`], 'ordered by next scheduled occurrence');
-  assert.match(twoHtml, /<h2>Upcoming events in Peachland<\/h2>/);
+  const two = mk(region, 'H1S2 Harbour Recital', { categories: ['live-music'], occurrences: [{ start_date: '2032-08-08' }] });
+  const links = app.listUpcomingEventsForRegion(region).map((e) => `/${e.region}/events/${e.slug}`);
+  assert.deepEqual(links, [`/${region}/events/${one.slug}`, `/${region}/events/${two.slug}`], 'two events link as direct canonical URLs, ordered by next scheduled occurrence');
 
-  // 5. Cancelled, postponed and expired events are never linked.
-  const cancelled = mk('H1S2 Toolshare Meetup', { categories: ['workshops-classes'], occurrences: [{ start_date: '2032-07-01' }] });
+  // Cancelled, postponed and expired events are never listed.
+  const cancelled = mk(region, 'H1S2 Toolshare Meetup', { categories: ['workshops-classes'], occurrences: [{ start_date: '2032-07-01' }] });
   app.updateEvent(cancelled.id, { status: 'cancelled' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
-  const postponed = mk('H1S2 Almanac Reading', { categories: ['arts-culture'], occurrences: [{ start_date: '2032-07-02' }] });
+  const postponed = mk(region, 'H1S2 Almanac Reading', { categories: ['arts-culture'], occurrences: [{ start_date: '2032-07-02' }] });
   app.updateEvent(postponed.id, { status: 'postponed' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
-  const expired = mk('H1S2 Bellows Social', { categories: ['nightlife'], occurrences: [{ start_date: '2020-07-03' }] });
-  const slugs = app.listUpcomingEventsForRegion(twoRegion, { limit: 20 }).map((e) => e.slug);
-  assert.ok(!slugs.includes(cancelled.slug), 'cancelled event never linked');
-  assert.ok(!slugs.includes(postponed.slug), 'postponed event never linked');
-  assert.ok(!slugs.includes(expired.slug), 'expired event never linked');
+  const expired = mk(region, 'H1S2 Bellows Social', { categories: ['nightlife'], occurrences: [{ start_date: '2020-07-03' }] });
+  const slugs = app.listUpcomingEventsForRegion(region, { limit: 20 }).map((e) => e.slug);
+  assert.ok(!slugs.includes(cancelled.slug), 'cancelled event never listed');
+  assert.ok(!slugs.includes(postponed.slug), 'postponed event never listed');
+  assert.ok(!slugs.includes(expired.slug), 'expired event never listed');
   assert.deepEqual(slugs, [one.slug, two.slug], 'only the publishable pair remains');
 
   // Cleanup: leave the shared fixture DB exactly as this test found it.
@@ -4426,18 +4431,13 @@ test('H1 Step 2: region pages link the next publishable events, omit the block b
     db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
     db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
   }
-  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'fixture rows removed');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'page back to its original shape');
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'fixture rows removed');
 });
 
 test('S5 #24: with zero events the sitemap carries no event URLs and is unaffected by the event tables (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-sitemap-zero-events-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3096';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT };
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -4504,11 +4504,7 @@ test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the appro
   assert.equal(app.whatsOnInventoryExists(new Date('2200-01-01T00:00:00Z')), false, 'evaluated after every fixture has ended -> no inventory');
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-whatson-zero-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3095';
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT }, stdio: ['ignore', 'pipe', 'pipe'] });
   let text;
@@ -4627,7 +4623,7 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   const both = s6markup((await s6get('/whats-on?regions=kelowna,vernon&categories=live-music,markets-fairs')).text);
   assert.match(both, /data-region="kelowna" aria-pressed="true"/); assert.match(both, /data-region="vernon" aria-pressed="true"/);
   assert.match(both, /data-category="live-music" aria-pressed="true"/); assert.match(both, /data-category="markets-fairs" aria-pressed="true"/);
-  assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between');
+  assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between ' + (both.match(/aria-live="polite">[^<]*/g) || []).join('|'));
   assert.match(both, /id="whatsOnResultsSummary" aria-live="polite">2 of \d+ events</, 'the compact count reports the filtered total');
   assert.match(both, /id="whatsOnSelectedClear">Clear all</, 'Clear all now lives with the removable filter chips');
   const regionOnly = s6markup((await s6get('/whats-on?regions=peachland')).text);
@@ -4638,8 +4634,14 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   assert.match(noMatch, /<p class="outdoor-no-results" id="whatsOnNoResults">No events match that combination yet\./, 'no-match state, not the empty-inventory state');
   assert.match(noMatch, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
   assert.match(noMatch, /<ul class="card-grid" id="whatsOnResults" hidden>/);
-  assert.equal((noMatch.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 4, 'all four window cards are rendered hidden, so unselecting a chip can reveal them client-side');
+  // (Oct 2026, rest links) cards that are not shown are not rendered as hidden cards: they ride in the "rest" template and
+  // the crawlable "View a simple list" list, and the client builds the card when a chip reveals it.
+  const restLinks = (html) => (html.match(/<li hidden><a data-href="[^"]+">/g) || []).length;
+  const shownCards = (html) => (html.match(/<li class="venue-card whatson-event-card"(?![^>]*hidden)/g) || []).length;
+  assert.equal(shownCards(noMatch), 0, 'no card is shown');
+  assert.equal(restLinks(noMatch), 4, 'all four window events are kept as rest entries, so unselecting a chip can reveal them client-side');
   assert.equal((both.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 2, 'pre-filtered render: 2 shown, 2 hidden');
+  assert.equal(shownCards(both), 2, 'pre-filtered render: 2 shown');
 });
 
 test('S6 #12/#13/#19: the client script keeps the date window on chip pushState, reloads on Back/Forward date changes, clears all, and keeps Favorite/Add to Trip wiring', () => {
@@ -4658,7 +4660,7 @@ test('S6 #12/#13/#19: the client script keeps the date window on chip pushState,
     "cardMatches(d, regions, categories)",
     "(d.valley ? allRegionKeys : [d.region])",
     "emptyInventory.hidden = INVENTORY;",
-    "empty.hidden = !(INVENTORY && shown === 0);",
+    "empty.hidden = !(INVENTORY && any === 0);",
     app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
   ]) assert.ok(script.includes(needle), `script contains ${needle}`);
   const page = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'this-week' }));
@@ -4694,10 +4696,10 @@ test("What's On simplification: results are reachable without scrolling past a f
   assert.equal((above.match(/outdoor-activity-card/g) || []).length, 0, 'no category image tiles above the results');
   assert.equal((above.match(/<img/g) || []).length, 0, 'no images at all above the results');
 
-  // 2. Replaced by one compact chip row: All + the twelve categories.
+  // 2. Replaced by one compact chip row: All + Free (2026-10-29) + the twelve categories.
   assert.match(markup, /<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">/);
   assert.match(markup, /data-category-all="1"/, 'an All reset chip');
-  assert.equal((markup.match(/<button type="button" class="outdoor-filter-chip whatson-cat-chip/g) || []).length, app.WHATSON_CATEGORIES.length + 1, 'All + one chip per category');
+  assert.equal((markup.match(/<button type="button" class="outdoor-filter-chip whatson-cat-chip/g) || []).length, app.WHATSON_CATEGORIES.length + 2, 'All + Free + one chip per category');
 
   // 3. Search exists and is a real input, not a heading-sized block.
   assert.match(markup, /<input type="search" id="whatsOnSearch" class="whatson-search-input" placeholder="Search events\.\.\."/);
@@ -5027,6 +5029,18 @@ test('Guide route: a real guide renders, an unknown badge or thin guide is the s
   assert.match(body, /<body class="golf-page not-found-page">/);
   assert.match(body, /<a href="\/kelowna"><span>Everything in Kelowna<\/span>/);
 }));
+test('Guide route: a real badge guide with too few places sends visitors to the town page, not a dead end (2026-11-14)', () => withDiscoveryServer(async (base) => {
+  // Test data has far fewer than 8 dog-friendly places in Penticton's neighbour; any thin region+badge combination works.
+  const thin = await fetch(`${base}/guide/kaleden/open_early`, { redirect: 'manual' });
+  assert.equal(thin.status, 302);
+  assert.equal(thin.headers.get('location'), '/kaleden');
+  const fr = await fetch(`${base}/fr/guide/kaleden/open_early`, { redirect: 'manual' });
+  assert.equal(fr.status, 302);
+  assert.equal(fr.headers.get('location'), '/fr/kaleden');
+  // An unknown badge or town is still a plain 404.
+  assert.equal((await fetch(`${base}/guide/kaleden/not_a_badge`)).status, 404);
+  assert.equal((await fetch(`${base}/guide/nowhere/open_early`)).status, 404);
+}));
 // Stage 5C (2026-10-01): My Trip identifies a stop by its ref (Trip half of
 // W07). Every server-rendered Add to trip button carries "venue:<id>" or
 // "event:<id>" next to its existing name / query / region.
@@ -5103,10 +5117,10 @@ test('W14: the V2 and V3 "Add whole trip" buttons recalculate after a tray Undo,
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
   // Stage 4.1: winery venue pages use the themed venue shell, never the guide theme.
   const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(venue, /<body class="golf-page winery-page">/);
+  assert.match(venue, /<body class="golf-page winery-page fd-venue-page winery-venue-page fd-no-photo">/); // the winery layout (2026-11-08)
   assert.doesNotMatch(venue, /guide-page/);
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
-  assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js[?"]/);
+  assert.doesNotMatch(region, /<body class="[^"]*(?:guide|golf)-page|<script src="\/scripts\/app\.js[?"]/); // (shared inline CSS names the page classes)
 });
 
 // ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
@@ -5189,8 +5203,10 @@ test('Canonical footer: venue/category/region/guide/event/events-index pages all
     ['venue', venueHtml], ['category', categoryHtml], ['region', regionHtml],
     ['guide', guideHtml], ['event', eventHtml], ['events index', eventsIndexHtml],
   ]) {
-    assert.match(html, /<footer class="home-footer">/, `${label} page must render the approved home-footer`);
     assert.doesNotMatch(html, /class="site-footer"/, `${label} page must NOT render the old siteFooter() one-liner`);
+    // The compact Kelowna city page (kelowna-page.js, Nov 2026) has its own small footer instead of the full home-footer.
+    if (label === 'region') { assert.match(html, /<footer class="bw-footer">/, 'region page renders the compact city-page footer'); continue; }
+    assert.match(html, /<footer class="home-footer">/, `${label} page must render the approved home-footer`);
     assert.match(html, /home-footer-region-subcol/, `${label} page's footer must include the two Regions subcolumns`);
     // The markup alone rendering isn't enough (this was exactly /trip's old
     // bug) -- the page's own CSS must actually include the shared ruleset,
@@ -5217,7 +5233,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   const venuePage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
   assert.equal(venuePage.status, 200);
-  assert.match(await venuePage.text(), /<h1>Test Trattoria<\/h1>/);
+  assert.match(await venuePage.text(), /<h1[^>]*>Test Trattoria<\/h1>/);
 
   const notFound = await fetch(`${base}/this-region-does-not-exist`);
   assert.equal(notFound.status, 404);
@@ -5356,8 +5372,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.equal(restaurantsAllRegionsPage.status, 200, '/restaurants is the dedicated valley-wide Food & Drink page');
   assert.match(await restaurantsAllRegionsPage.text(), /<h1>Restaurants in the Okanagan<\/h1>/);
 
-  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
-  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
+  // SEO (2026-10-20): a town category page with fewer than 3 places is noindex and left out of the sitemap.
+  const kelownaGolfCount = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'kelowna' AND type = 'golf' AND redirect_to IS NULL").get().n;
+  assert.equal(/<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/.test(sitemapBody), kelownaGolfCount >= 3, 'golf category is in the sitemap exactly when it has enough places to be indexable');
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/golf<\/loc>/, 'the valley-wide golf page is in the sitemap');
+  // SEO r13 (2026-10-20): a thin place page (no hours, short description) is noindex and left out of the sitemap.
+  const golfFixture = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  assert.equal(/<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/.test(sitemapBody), !app.venuePageIsThin(golfFixture), 'golf venue is in the sitemap exactly when its page is indexable');
 
   const tokensCss = await fetch(`${base}/styles/tokens.css`);
   assert.equal(tokensCss.status, 200, 'shared tokens.css must be served');
@@ -5400,7 +5421,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Milestone 1 (approved homepage redesign) — the old "Worth the Drive"
   // carousel is intentionally replaced by a scenic hero + a new "What are
   // you in the mood for?" section, both ahead of the wizard.
-  assert.match(homepageBody, /class="hero-scenic(?:\s|\")/, 'New scenic hero (Milestone 1) must render');
+  // (Nov 2026) the homepage is the simplified home-simple.js page: <div id="homeSimple"> with a scenic hero.
+  assert.match(homepageBody, /<div id="homeSimple"><main id="main"[^>]*><section class="hero" id="heroScenic">/, 'scenic hero must render');
   assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
   assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
 
@@ -5411,7 +5433,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // dictionary on load, so both had to change or the new copy would have
   // been clobbered at runtime).
   assert.match(homepageBody, /<h1 class="hero-title" data-i18n="hero\.headline">Explore the Okanagan<\/h1>/, 'hero heading must be unchanged');
-  assert.match(homepageBody, /<p class="hero-lead hero-lead-full" data-i18n="hero\.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place\.<\/p>/, 'hero subtitle must be the new elevator pitch');
+  assert.match(homepageBody, /<span class="home-en">Great food\. Beautiful places\. Something new to discover\.<br>Your local guide to the whole valley\.<\/span>/, 'hero subtitle (home-simple.js)');
   assert.doesNotMatch(homepageBody, /Find the places worth discovering/, 'old hero subtitle copy must be gone');
 
   // Reference redesign: rebuilt header (decisions #4/#5) — new logo,
@@ -5450,12 +5472,12 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Gems -> Explore -> Build Trip -> footer. The old Browse/Search wizard
   // no longer renders on this page at all (verified above and via the
   // dedicated /browse checks below).
-  assert.match(homepageBody, /id="buildTrip"/, 'Build Your Perfect Okanagan Trip section (Milestone 3) must render');
-  const heroPos = homepageBody.indexOf('class="hero-scenic"');
+  assert.match(homepageBody, /<section class="trip-banner"[^>]*>[\s\S]*?<a class="pill" href="\/trip">/, 'Build Your Okanagan adventure banner must render');
+  const heroPos = homepageBody.indexOf('id="heroScenic"');
   const moodPos = homepageBody.indexOf('id="moodCards"');
   const gemsPos = homepageBody.indexOf('id="hiddenGems"');
   const explorePos = homepageBody.indexOf('id="exploreRegions"');
-  const tripPos = homepageBody.indexOf('id="buildTrip"');
+  const tripPos = homepageBody.indexOf('class="trip-banner"');
   assert.ok(
     heroPos < moodPos && moodPos < gemsPos && gemsPos < explorePos && explorePos < tripPos,
     `expected Hero < Mood < Hidden Gems < Explore < Build Trip in page order, got positions ${JSON.stringify({ heroPos, moodPos, gemsPos, explorePos, tripPos })}`
@@ -5464,8 +5486,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // home-footer (2026-09-17 redesign, class="home-footer" -- distinct
   // from /browse's still-original plain <footer>, checked separately
   // below) -- nothing from the old directory stack follows it.
-  const footerPos = homepageBody.indexOf('<footer class="home-footer">');
-  assert.ok(footerPos !== -1, 'expected the new home-footer to render on the homepage');
+  const footerPos = homepageBody.indexOf('<footer class="footer">'); // home-simple.js footer (Nov 2026)
+  assert.ok(footerPos !== -1, 'expected the home footer to render on the homepage');
   assert.ok(tripPos < footerPos, 'the footer must immediately follow Build My Trip, with nothing old in between');
 
   // Build My Trip, Stage 2 (2026-09-18): GET /trip serves the real planner
@@ -5481,7 +5503,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     // The homepage's own CTA copy (frozen, checked above via id="buildTrip")
     // must still say exactly what it always has -- confirms the /trip route
     // addition didn't touch renderBuildTripCTAHTML() in any way.
-    assert.match(homepageBody, /Tell us what you&rsquo;re looking for\. We&rsquo;ll help build your adventure\./);
+    assert.match(homepageBody, /Tell us what you enjoy\. Build My Trip helps bring your food stops, activities and discoveries together\./);
   }
 
   // "Browse Okanagan Roam by guide" SEO crawl-links block (2026-09-17
@@ -5514,11 +5536,11 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // single venue type, straight to that category page -- see the Golf/
   // Wine mood-card tests above). No dangling in-page anchors left behind.
   assert.doesNotMatch(homepageBody, /href="#directory"/, 'no homepage link should still point at the removed #directory anchor');
-  const homepageGemLinks = [...homepageBody.matchAll(/class="hidden-gem-card" href="([^"]+)"/g)].map((m) => m[1]);
+  const homepageGemLinks = [...homepageBody.match(/<section class="section" id="hiddenGems">[\s\S]*?<\/section>/)[0].matchAll(/<a class="photo" href="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(homepageGemLinks.length, 3, 'the three Hidden Gems editorial cards render');
   assert.deepEqual(homepageGemLinks, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'each card links to its dedicated Hidden Gems destination');
-  assert.match(homepageBody, /home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems/, '"See all hidden gems" must link to the dedicated \/hidden-gems page');
-  assert.match(homepageBody, /home-see-all" href="\/categories"><span class="home-en">See all categories/, '"See all categories" must link to the dedicated \/categories page');
+  assert.match(homepageBody, /<a class="view" href="\/hidden-gems"><span class="home-en">Explore more/, 'the Hidden Gems "Explore more" link must go to the dedicated \/hidden-gems page');
+  assert.match(homepageBody, /<a class="view" href="\/categories"><span class="home-en">All categories/, 'the "All categories" link must go to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
   const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
   assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
@@ -5556,7 +5578,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // ---- /events: the standalone events index (2026-09-17), replacing the
   // homepage's own removed Happening Soon strip. The What's On mood card
   // must link here instead of the old #happeningSoon anchor.
-  assert.match(homepageBody, /class="mood-card mood-card-whats-on" href="\/whats-on">/, 'What\'s On mood card must link to its current /whats-on destination');
+  assert.match(homepageBody, /<a class="photo" href="\/whats-on"><img class="mood-card-img"/, 'What\'s On mood card must link to its current /whats-on destination');
   const eventsLegacy = await fetch(`${base}/events`, { redirect: 'manual' });
   assert.equal(eventsLegacy.status, 301, '/events redirects to its current canonical page');
   assert.equal(eventsLegacy.headers.get('location'), '/whats-on');
@@ -6668,8 +6690,7 @@ test('POST/PUT /api/venues normalize price to an integer 1-4 and reject anything
 test('/admin/correct-phone and /admin/correct-amenities return 503 when ENRICHMENT_ADMIN_TOKEN is unset (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-503-isolation-test-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  stageProject(tempDir);
 
   const ISOLATED_PORT = '3098';
   const childEnv = { ...process.env };
@@ -6788,8 +6809,8 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const kelownaGolf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   const html = app.renderVenuePage(kelownaGolf, [], [], []);
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
-  assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
-  assert.match(html, /class="map-link"[^>]*data-track="directions"/);
+  assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps<\/a>/); // without a MAPBOX_TOKEN the built-in "Get Directions" is off (2026-11-04)
+  assert.doesNotMatch(html, /class="map-link"/, 'Get Directions is the one map link; the address does not repeat it (2026-11-01)');
   assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
   assert.match(html, /track\('venue_view', ctx\(\)\)/);
   assert.match(html, /'outbound_click'/);
@@ -6804,7 +6825,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const wk = app.getVenuesByRegionCategory('west-kelowna', 'golf')[0];
   const wkHtml = app.renderVenuePage(wk, [], [], []);
   assert.match(wkHtml, /<a class="cta" href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">Visit Website<\/a>/);
-  assert.match(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/);
+  assert.doesNotMatch(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/, 'the website is only the button, not repeated in Good to Know (2026-11-01)');
 });
 
 test('Golf venue page shows all five actions: Website, Get Directions, Call, Favorite, Add to Trip', () => {
@@ -6816,7 +6837,7 @@ test('Golf venue page shows all five actions: Website, Get Directions, Call, Fav
   assert.match(row[1], /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
   const body = row[2];
   assert.match(body, /class="cta secondary" href="https:\/\/example-golf\.test\/"[^>]*data-track="website">Website ↗</);
-  assert.match(body, /class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
+  assert.match(body, /class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Open in Google Maps</);
   assert.match(body, /class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call</);
   assert.match(body, /class="card-action fav-btn" data-fav-name="Test Golf Course" aria-pressed="false"/);
   assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
@@ -6854,7 +6875,8 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     // My Trip (2026-10-14) reads the menu button to place its count badge, but
     // only app.js listens to it.
     const navScripts = html.split(/<script[^>]*>/).filter((part) => part.includes("getElementById('navHamburger')"));
-    assert.ok(navScripts.every((part) => !/(?:hamburger|burger|getElementById\('navHamburger'\))\.addEventListener/.test(part.split('</script>')[0])), 'no duplicate nav handlers alongside app.js');
+    // (2026-10-18) the header's own fallback handlers only run when the page has no app.js (guarded in the script).
+    assert.ok(navScripts.every((part) => { const js = part.split('</script>')[0]; return !/(?:hamburger|burger|getElementById\('navHamburger'\))\.addEventListener/.test(js) || js.includes(`!document.querySelector('script[src*="/scripts/app.js"]')`); }), 'no duplicate nav handlers alongside app.js');
   }
   // Batch 4A (2026-09-27): Food & Drink VENUE pages now use the themed shell
   // (see the Batch 4A tests); their listings do not. Stage 4.1: nor do winery
@@ -6862,7 +6884,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
   const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   const wineryRegion = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   for (const html of [restaurants, wineryRegion]) {
-    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js(\?v=[0-9a-f]{12})?"><\/script>/);
+    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|<body class="golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js(\?v=[0-9a-f]{12})?"><\/script>/); // (the shared inline CSS names body.golf-page on every page)
     assert.match(html, /<header class="top">/);
     assert.match(html, /<body>/);
   }
@@ -6874,7 +6896,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
 // facts; the polish styles ship only on golf venue pages.
 test('Golf venue page: hero is the title treatment, header does not repeat it, indoor venues read "Indoor Golf"', () => {
   const course = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
-  assert.match(course, /<div class="venue-hero venue-hero-fallback venue-hero-golf venue-hero-has-photo">\s*<img class="venue-hero-img" src="[^"]+"[^>]*>\s*<span class="venue-hero-type">Golf Course<\/span>\s*<h1>Test Golf Course<\/h1>\s*<span class="venue-hero-example">Example photo<\/span>\s*<\/div>/);
+  assert.match(course, /<div class="venue-hero venue-hero-fallback venue-hero-golf">\s*<span class="venue-hero-type">Golf Course<\/span>\s*<h1>Test Golf Course<\/h1>\s*<\/div>/);
   assert.equal((course.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
   assert.match(course, /<div class="venue-header">\s*<p class="venue-at-a-glance">Golf Course &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/, 'header opens with the meta line, not a second title');
   assert.doesNotMatch(course, /<span class="venue-hero-name">/, 'hero name span replaced by the <h1> on golf pages');
@@ -6886,7 +6908,7 @@ test('Golf venue page: hero is the title treatment, header does not repeat it, i
 
   const sim = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-simulator'), [], [], []);
   assert.match(sim, /<span class="venue-hero-type">Indoor Golf<\/span>\s*<h1>Test Golf Simulator<\/h1>/);
-  assert.match(sim, /<p class="venue-at-a-glance">Indoor Golf &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
+  assert.match(sim, /<p class="gb-eyebrow">⛳ Indoor golf · <a href="\/kelowna">Kelowna<\/a><\/p>/); // the shared Indoor & Rainy Day layout (2026-11-08)
   // Good to Know drops the Type row (2026-10-14): the hero and the line under it already say it.
   assert.doesNotMatch(sim, /<span class="label">Type<\/span>/, 'no repeated Type row');
   assert.match(sim, /"@type":"GolfCourse"/, 'JSON-LD type unchanged');
@@ -6945,7 +6967,7 @@ test('Golf "At a glance" card renders only curated facts, escaped, in a dl grid;
 // URL-wrap rule, but never the golf At-a-glance card or "Indoor Golf".
 test('Beach venue page: hero carries the <h1>, header opens with "Beach · Region", no golf card', () => {
   const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
-  assert.match(beach, /<div class="venue-hero venue-hero-fallback venue-hero-beach venue-hero-has-photo">\s*<img class="venue-hero-img" src="[^"]+"[^>]*>\s*<span class="venue-hero-type">Beach<\/span>\s*<h1>Test Beach Park<\/h1>\s*<span class="venue-hero-example">Example photo<\/span>\s*<\/div>/);
+  assert.match(beach, /<div class="venue-hero venue-hero-fallback venue-hero-beach">\s*<span class="venue-hero-type">Beach<\/span>\s*<h1>Test Beach Park<\/h1>\s*<\/div>/);
   assert.equal((beach.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
   assert.match(beach, /<div class="venue-header">\s*<p class="venue-at-a-glance">Beach &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
   assert.doesNotMatch(beach, /<span class="venue-hero-name">/);
@@ -7068,7 +7090,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), `${type}: app.css before the inline SEO CSS`);
     assert.match(html, /body\.golf-page \{/, type);
     assert.match(html, /<style>\s*\/\* Hero: same per-type gradient/, `${type}: venue hero polish`);
-    assert.match(html, new RegExp(`<body class="golf-page ${type}-page">`), type);
+    assert.match(html, new RegExp(`<body class="golf-page ${type}-page fd-venue-page fd-no-photo">`), type);
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, type);
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${type}: tray precedes the header`);
     assert.match(html, /<header id="top">/, type);
@@ -7077,8 +7099,9 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
     assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, type);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
-    assert.match(html, new RegExp(`<div class="venue-hero venue-hero-fallback venue-hero-${type} venue-hero-has-photo">\\s*<img class="venue-hero-img" src="[^"]+"[^>]*>\\s*<span class="venue-hero-type">${label}</span>\\s*<h1>Test Trattoria</h1>\\s*<span class="venue-hero-example">Example photo</span>\\s*</div>`), `${type}: hero carries the title`);
-    assert.match(html, /<div class="venue-header">\s*<p class="venue-at-a-glance">/, `${type}: header does not repeat the name`);
+    // Food & Drink layout (2026-11-07): a venue with no photo has no hero block; its name is the one <h1>, in the header.
+    assert.doesNotMatch(html, /<div class="venue-hero venue-hero-fallback/, `${type}: no empty photo block`);
+    assert.match(html, /<div class="venue-header"><h1 class="venue-desktop-title">Test Trattoria<\/h1>/, `${type}: the header carries the title`);
     assert.doesNotMatch(html.replace(/<style>[\s\S]*?<\/style>/g, ''), /venue-hero-name/, `${type}: duplicate hero name removed`);
   }
 });
@@ -7107,10 +7130,13 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip<\\/button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
+    // Food & Drink layout (2026-11-07): Directions leads the main buttons (Call and the save buttons sit in the "Keep this one handy" card).
+    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page"><a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps</a>(?:<a class="cta secondary" href="#venueHours">[^<]*</a>)?</div>`), `${type}: main buttons`);
+    assert.match(html, new RegExp(`<div class="fd-actions fd-contact-actions" data-venue-id="\\d+"[^>]*><a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a></div>`), `${type}: Call`);
+    assert.match(html, new RegExp(`<div class="fd-actions fd-save-actions" data-venue-id="\\d+"[^>]*>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip</button>\\s*</div>`), `${type}: Favorite / Add to trip`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
-    assert.match(html, /<h2>Good to Know<\/h2>/);
-    // Favorite / Add to Trip (2026-10-14): one of each, in the CTA row.
+    assert.match(html, /<h2>Your visit, made easy<\/h2>/);
+    // Favorite / Add to Trip (2026-10-14): one of each (Food & Drink layout, 2026-11-07: in the "Keep this one handy" card).
     const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '');
     assert.equal((markup.match(/class="card-action fav-btn"/g) || []).length, 1, `${type}: one Favorite`);
     assert.equal((markup.match(/class="card-action trip-btn"/g) || []).length, 1, `${type}: one Add to trip`);
@@ -7130,20 +7156,20 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
 // engagement script takes its hand-off branch; winery REGION pages are unchanged.
 test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> and their Favorite / Add to Trip controls', () => {
   const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(html, /<body class="golf-page winery-page">/);
+  assert.match(html, /<body class="golf-page winery-page fd-venue-page winery-venue-page fd-no-photo">/); // the winery layout (2026-11-08)
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
   assert.match(html, /id="tripTray"/, 'the site-wide Trip tray is on the page');
   assert.match(html, /<header id="top">/, 'the shared site header and navigation');
   assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'the old minimal header is gone');
   assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1>');
-  assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*(?:<img class="venue-hero-img"[^>]*>\s*)?<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
+  assert.match(html, /<div class="venue-header"><h1 class="venue-desktop-title">Test Winery<\/h1>/, 'a winery with no photo: its name is the one heading, in the header (winery layout, 2026-11-08)');
   // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
   assert.match(html, /<button type="button" class="card-action fav-btn" data-fav-name="Test Winery" aria-pressed="false" aria-label="Favorite Test Winery"><svg [^>]*>[\s\S]*?<\/svg> Favorite<\/button>/, 'app.js heart label, as on Golf venue pages');
   assert.ok(/class="card-action trip-btn" data-trip-name="Test Winery"[^>]*>(<svg[\s\S]*?<\/svg> Add to trip)<\/button>/.exec(html)[1] === app.APP_TRIP_LABEL_HTML);
   assert.doesNotMatch(html, /\.venue-card\[data-venue-category="winery"\] \.card-actions/, 'the engagement-only stylesheet is for unthemed pages');
   assert.match(html, /body\.golf-page \.venue-cta-row \.card-action \{/, 'the themed CTA-row button rules apply instead');
-  assert.match(html, /<div class="venue-cta-row" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
+  assert.match(html, /<div class="fd-actions fd-save-actions" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
   // app.js loads first, so the engagement script takes its hand-off branch (as on Golf venue pages).
   const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
   assert.ok(appAt > 0 && appAt < html.indexOf('var pageCtx'), 'app.js loads before the venue engagement script');
@@ -7166,7 +7192,7 @@ test('Stage 4.1: the winery venue page keeps its SEO head; winery region pages k
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   assert.match(region, /<body>/);
   assert.match(region, /<header class="top">/);
-  assert.doesNotMatch(region, /golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js[?"]/);
+  assert.doesNotMatch(region, /<body class="golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js[?"]/); // (shared inline CSS names body.golf-page)
   assert.match(region, /class="card-action fav-btn"/);
   assert.match(region, /\.venue-card\[data-venue-category="winery"\] \.card-action/, 'region cards keep the engagement-only stylesheet');
   assert.match(region, /var HOLDER = '\[data-venue-category="winery"\]'/);
@@ -7427,8 +7453,8 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   assert.ok(cta, 'CTA row must render');
   assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
   // Batch 3: themed venue pages render the canonical app.js labels ("Favorite", "Add to trip").
-  const order = ['Get Directions', 'Website ↗', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
-  assert.ok(order.every((i) => i >= 0), 'Get Directions, Website, Favorite, Add to trip all present');
+  const order = ['Open in Google Maps', 'Website ↗', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
+  assert.ok(order.every((i) => i >= 0), 'Directions, Website, Favorite, Add to trip all present');
   assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order (2026-10-20): Get Directions, Website, Favorite, Add to Trip');
   assert.doesNotMatch(cta[2], />Call</, 'no Call button when phone is null');
   assert.match(cta[2], /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.86,-119\.49"/, 'Get Directions uses the verified coordinates');
@@ -7443,7 +7469,7 @@ test('Beach venue page with no address, coordinates, website or phone: Get Direc
   const html = app.renderVenuePage(b, [], [], []);
   const cta = html.match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/);
   assert.ok(cta);
-  assert.doesNotMatch(cta[1], /Get Directions|Visit Website|>Call<|google\.com\/maps|tel:/);
+  assert.doesNotMatch(cta[1], /Get Directions|Open in Google Maps|Visit Website|>Call<|google\.com\/maps|tel:/);
   assert.match(cta[1], /Favorite/);
   assert.match(cta[1], /Add to trip/); // Batch 3: canonical app.js label on themed venue pages
   assert.doesNotMatch(html, /"geo":/);
@@ -7451,7 +7477,7 @@ test('Beach venue page with no address, coordinates, website or phone: Get Direc
   // Vernon fixture: coordinates but no address -> Get Directions from coordinates only, no address row.
   const v = app.findVenueBySlug('vernon', 'beach', 'test-vernon-beach');
   const vh = app.renderVenuePage(v, [], [], []);
-  assert.match(vh, /Get Directions/);
+  assert.match(vh, /Open in Google Maps/); // the built-in Get Directions needs a MAPBOX_TOKEN (not set in tests)
   assert.match(vh, /query=50\.26,-119\.35/);
   assert.doesNotMatch(vh, /<p class="venue-address">/);
 });
@@ -7465,8 +7491,8 @@ test('Advisories: the collection is bootstrapped, memberships render a "Check be
   const beforeCard = app.venueCardHtml(b);
   const beforeCategory = app.renderCategoryPage('kelowna', 'beach', venues, []);
   const beforePage = app.renderVenuePage(b, [], [], []);
-  assert.doesNotMatch(beforePage, /venue-advisory/);
-  assert.doesNotMatch(beforeCategory, /venue-advisory/);
+  assert.doesNotMatch(beforePage, /<aside class="venue-advisory"/);
+  assert.doesNotMatch(beforeCategory, /<aside class="venue-advisory"/);
 
   const note = 'Swimming advisory in effect. Check the official source for the latest update. https://www.kelowna.ca/parks-recreation/parks-beaches/water-quality-beaches (checked 2026-09-19)';
   const meta = { reason: 'test advisory', batch_id: 'test-advisories' };
@@ -7533,7 +7559,7 @@ test('Golf regression: Golf listing and venue pages are unchanged by the Beaches
   const golfVenues = app.getVenuesByRegionCategory('kelowna', 'golf');
   const category = app.renderCategoryPage('kelowna', 'golf', golfVenues, []);
   assert.match(category, /<body class="golf-page">/, 'Golf body class must remain exactly golf-page');
-  assert.doesNotMatch(category, /beach-page|data-venue-category="beach"|Beach page theme|Test Beach Park/);
+  assert.doesNotMatch(category, /beach-page|(?<!\[)data-venue-category="beach"|Beach page theme|Test Beach Park/);
   assert.match(category, /data-venue-category="golf"/);
   assert.match(category, /var HOLDER = '\[data-venue-category="golf"\]';/);
   assert.match(category, /venue_category: 'golf',/);
@@ -7545,7 +7571,7 @@ test('Golf regression: Golf listing and venue pages are unchanged by the Beaches
   assert.match(page, /"@type":"GolfCourse"/);
   assert.match(page, /"venue_category":"golf","surface":"venue_page"/);
   assert.match(page, /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
-  assert.doesNotMatch(page, /beach-page|data-venue-category="beach"|class="venue-hero venue-hero-fallback venue-hero-beach"|Beach page theme|<aside class="venue-advisory"/);
+  assert.doesNotMatch(page, /beach-page|(?<!\[)data-venue-category="beach"|class="venue-hero venue-hero-fallback venue-hero-beach"|Beach page theme|<aside class="venue-advisory"/);
   const wide = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
   assert.match(wide, /<body class="golf-page">/);
   assert.doesNotMatch(wide, /Test Beach Park|beach-page/);
@@ -7561,7 +7587,7 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
   // theme, app.css, tray, app.js) but still no beach theme, advisory,
   // Favorite / Add to Trip or tracking markup.
   const page = app.renderVenuePage(trattoria, [], [], []);
-  assert.match(page, /<body class="golf-page restaurant-page">/);
+  assert.match(page, /<body class="golf-page restaurant-page fd-venue-page fd-no-photo">/);
   assert.doesNotMatch(page, /Beach page theme|\.venue-advisory \{/);
   assert.doesNotMatch(markupOnly(page), /beach-page|venue-advisory|data-venue-category="(?!restaurant")/);
   assert.match(markupOnly(page), /data-venue-category="restaurant"/, 'its own Favorite / Add to Trip row since 2026-10-14');
@@ -7575,8 +7601,8 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
 test('Region hub page lists a Beaches category card once a region has beaches', () => {
   const counts = app.getRegionCategoryCounts('kelowna');
   const html = app.renderRegionPage('kelowna', counts, []);
-  assert.match(html, /<h3><a href="\/kelowna\/beaches">Beaches<\/a><\/h3>/);
-  assert.match(html, /2 beaches in Kelowna/);
+  // The compact Kelowna city page (Nov 2026) has mood tiles instead of per-category cards with counts.
+  assert.match(html, /<a class="bw-tile" href="\/beaches\?regions=kelowna">[\s\S]*?<b>Beaches &amp; Lake<\/b>|<a class="bw-tile" href="\/beaches\?regions=kelowna">[\s\S]*?<b>Beaches & Lake<\/b>/);
 });
 
 test('Beach theme CSS is derived from the Golf rules: every derived rule is keyed to beach, and the Golf theme text is unchanged', () => {
@@ -7590,7 +7616,9 @@ test('Beach theme CSS is derived from the Golf rules: every derived rule is keye
   assert.match(beachCss, /body\.golf-page \.venue-card\[data-venue-category="beach"\] \.trip-btn\.in-trip,/);
   // Derivation is mechanical: a synthetic Golf rule maps 1:1.
   assert.equal(app.deriveBeachRulesFromGolfCss('.x[data-venue-category="golf"] .y { color: red; }\n.z { c: d }'), '.x[data-venue-category="beach"] .y { color: red; }');
-  if (golfCss) assert.doesNotMatch(golfCss, /beach/);
+  // (2026-11-01, #603) the Golf theme carries one deliberate shared rule that gives outdoor, beach and sport cards
+  // their badge row back; nothing else in it may name beach.
+  if (golfCss) assert.doesNotMatch(golfCss.replace(/^.*(?:\[data-venue-category="beach"\]|park, beach and sports cards).*$/gm, ''), /beach/);
 });
 
 // ---- FROZEN HOMEPAGE: byte-identity before/after beach data (isolated child) ----
@@ -7603,9 +7631,7 @@ test('Beach theme CSS is derived from the Golf rules: every derived rule is keye
 test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an advisory exist; sitemap, /beaches routes and trip API behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-beaches-homepage-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) {
-    fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
-  }
+  stageProject(tempDir);
   const ISOLATED_PORT = '3097';
   const TOKEN = 'beaches-homepage-test-token';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN };
@@ -7626,7 +7652,8 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const seedRes = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Fixture Winery', region: 'kelowna', type: 'winery', description: 'fixture', slug: 'homepage-fixture-winery' }) });
     assert.equal(seedRes.status, 201);
     const homeNoBeaches = await (await fetch(`${base}/`)).text();
-    assert.match(homeNoBeaches, /class="mood-card mood-card-beaches" href="#exploreRegions">/, 'with no beach data the card keeps its previous in-page target');
+    // The Beaches tile keeps its in-page target until beach data exists (the page 404s before that).
+    assert.match(homeNoBeaches, /<a class="photo" href="#exploreRegions"><img class="mood-card-img" data-src="\/images\/mood\/beach/, 'with no beach data the tile keeps its previous in-page target');
     const sitemapBefore = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.equal((await fetch(`${base}/beaches`)).status, 404, 'no beaches yet -> /beaches is a 404, never an empty page');
     assert.equal((await fetch(`${base}/kelowna/beaches`)).status, 404);
@@ -7635,10 +7662,11 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const b1 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach One', region: 'kelowna', type: 'beach', description: 'fixture beach', slug: 'homepage-beach-one', address: '1 Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://www.kelowna.ca/example' }) });
     assert.equal(b1.status, 201);
     const beachOne = await b1.json();
-    // The ONLY homepage byte change beach data may cause is the approved Beaches mood-card href (2026-09-20).
+    // The ONLY homepage byte change beach data may cause is the Beaches tile's href (2026-09-20).
     const homeBefore = await (await fetch(`${base}/`)).text();
-    assert.match(homeBefore, /class="mood-card mood-card-beaches" href="\/beaches">/);
-    assert.equal(homeBefore, homeNoBeaches.replace('class="mood-card mood-card-beaches" href="#exploreRegions">', 'class="mood-card mood-card-beaches" href="/beaches">'), 'beach data changes exactly one attribute on "/": the Beaches mood-card href');
+    const beachTile = '<a class="photo" href="#exploreRegions"><img class="mood-card-img" data-src="/images/mood/beach';
+    assert.ok(homeNoBeaches.includes(beachTile));
+    assert.equal(homeBefore, homeNoBeaches.replace(beachTile, '<a class="photo" href="/beaches"><img class="mood-card-img" data-src="/images/mood/beach'), 'beach data changes exactly one attribute on "/": the Beaches tile href');
     const b2 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach Two', region: 'vernon', type: 'beach', description: 'fixture beach two', slug: 'homepage-beach-two' }) });
     assert.equal(b2.status, 201);
     const adv = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'add', note: 'Partial closure (rdco.com, 2026-09-19).', note_fr: 'Fermeture partielle (rdco.com, 2026-09-19).', reason: 'test', batch_id: 'homepage-test' }) });
@@ -7652,9 +7680,8 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: further beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
     // Explicit no-Beaches-on-homepage assertions (independent of the byte check).
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
-    assert.equal((withoutSiteHeader(homeAfter).match(/href="\/beaches"/g) || []).length, 2, 'exactly two /beaches links outside the header: the mood card and the footer Beaches link');
+    assert.equal((withoutSiteHeader(homeAfter).match(/href="\/beaches"/g) || []).length, 1, 'exactly one /beaches link outside the header: the Beaches tile (the simplified footer has no Beaches link)');
     assert.equal(((homeAfter.match(/<header id="top">[\s\S]*?<\/header>/) || [''])[0].match(/href="\/beaches"/g) || []).length, 1, 'and exactly one in the header: Things to Do');
-    assert.match(homeAfter, /<li><a href="\/beaches" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link points at /beaches (2026-09-25)');
     assert.doesNotMatch(homeAfter, /Homepage Beach One|Homepage Beach Two/);
 
     // Routes now live: wide page, regional page, venue page; sitemap gains exactly the beach URLs.
@@ -7676,23 +7703,23 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const venueBody = await venuePage.text();
     assert.match(venueBody, /"@type":"Beach"/);
     assert.match(venueBody, /<p class="venue-advisory-kicker">Check before you go<\/p>\n  <p class="venue-advisory-text">Partial closure \(rdco\.com, 2026-09-19\)\.<\/p>/);
-    assert.match(venueBody, /Get Directions/);
-    assert.match(venueBody, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u, 'all three badges on the venue page, existing badges unchanged');
+    assert.match(venueBody, /Get Directions|Open in Google Maps/);
+    assert.match(venueBody, /<p class="chips"><span class="chip hidden-gem-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u, 'all three badges on the venue page, existing badges unchanged: ' + JSON.stringify((venueBody.match(/<p class="chips">[\s\S]*?<\/p>/) || [''])[0].replace(/<svg[\s\S]*?<\/svg>/g, '<svg/>')));
     const beachTwoBody = await (await fetch(`${base}/vernon/beaches/homepage-beach-two`)).text();
     assert.match(beachTwoBody, /<div class="venue-header">[\s\S]*?<p class="chips"><\/p>/, 'non-member beach carries no badges in its own header (related cards may still show other venues\' badges)');
     assert.doesNotMatch(beachTwoBody, /Get Directions|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
     assert.equal((await fetch(`${base}/kelowna/beaches/does-not-exist`)).status, 404);
     assert.equal((await fetch(`${base}/osoyoos/beaches`)).status, 404, 'region with zero beaches is a 404');
     const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches<\/loc>/);
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches\/homepage-beach-one<\/loc>/);
+    // (SEO rule: thin pages -- fewer than 3 places -- stay out of the sitemap, so one fixture beach adds no region URL.)
+    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/beaches<\/loc>/, 'the valley-wide beaches hub is listed');
     // No beach *category or venue* URLs before the data exists. (The static
     // valley-wide /beaches hub is always listed, so match region-scoped URLs.)
     assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/beaches/);
 
     // Region hub shows the new category card.
     const hub = await (await fetch(`${base}/kelowna`)).text();
-    assert.match(hub, /<h3><a href="\/kelowna\/beaches">Beaches<\/a><\/h3>/);
+    assert.match(hub, /<h1[^>]*>/, 'the compact town page still renders (it no longer lists category cards)');
 
     // Trip planner: beach is not an interest, not a discovery kind, and never an itinerary stop.
     const badInterest = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, interests: ['beach'] }) });
@@ -7766,9 +7793,9 @@ test('Dog Friendly badge coexists with the existing Hidden Gem / Local Favourite
     assert.equal(app.guardedCollectionMembershipUpdate(kind, b.id, 'add', note, meta).ok, true);
   }
   const page = app.renderVenuePage(b, [], [], []);
-  assert.match(page, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u);
+  assert.match(page, /<p class="chips"><span class="chip hidden-gem-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u);
   const card = app.venueCardHtml(b, { isHiddenGem: true, isLocalFavourite: true, dogFriendlyNote: 'Off-leash dog beach' });
-  assert.match(card, /<span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> /u);
+  assert.match(card, /<span class="chip hidden-gem-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> /u);
   // Golf regression: golf pages unaffected by the new kind.
   const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   assert.doesNotMatch(app.renderVenuePage(golf, [], [], []), /dog-friendly-badge/);
@@ -7779,13 +7806,13 @@ test('Beach venue CTA rules: Get Directions from coordinates OR a verified addre
   const base = { id: 999901, name: 'CTA Rule Beach', region: 'kelowna', type: 'beach', slug: 'cta-rule-beach', description: 'x', redirect_to: null };
   const ctaOf = (v) => { const m = app.renderVenuePage(v, [], [], []).match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1] : ''; };
   const addrOnly = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: null, longitude: null, website: null, phone: null });
-  assert.match(addrOnly, /Get Directions/);
+  assert.match(addrOnly, /Open in Google Maps/); // the built-in "Get Directions" needs a MAPBOX_TOKEN (not set in tests)
   assert.match(addrOnly, /query=12%20Sample%20Beach%20Rd%2C%20Kelowna%2C%20BC/, 'address-only venues get directions via the address query, same pattern as every other venue');
   assert.doesNotMatch(addrOnly, /Visit Website|>Call</);
   const coordsOnly = ctaOf({ ...base, address: null, latitude: 49.9, longitude: -119.5, website: null, phone: null });
   assert.match(coordsOnly, /query=49\.9,-119\.5/);
   const nothing = ctaOf({ ...base, address: null, latitude: null, longitude: null, website: null, phone: null });
-  assert.doesNotMatch(nothing, /Get Directions|Visit Website|>Call</);
+  assert.doesNotMatch(nothing, /Get Directions|Open in Google Maps|Visit Website|>Call</);
   assert.match(nothing, /Favorite/); assert.match(nothing, /Add to trip/); // Batch 3: canonical app.js label
   const full = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://storymaps.arcgis.com/stories/ae662360d11c44c6a8edb3bf2eb315d3', phone: '+1 250-555-0199' });
   assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Website ↗</);
@@ -7915,22 +7942,22 @@ test('Outdoor venue page: hero carries the H1 (exactly one), themed CTA row, can
   const venue = app.findVenueBySlug('kelowna', 'outdoor', 'test-canyon-regional-park');
   const html = app.renderVenuePage(venue, [], [], []);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
-  assert.match(html, /<div class="venue-hero venue-hero-fallback venue-hero-outdoor venue-hero-has-photo">\s*<img class="venue-hero-img" src="[^"]+"[^>]*>\s*<span class="venue-hero-type">Outdoor Destination<\/span>\s*<h1>Test Canyon Regional Park<\/h1>\s*<span class="venue-hero-example">Example photo<\/span>\s*<\/div>/);
+  assert.match(html, /<div class="venue-hero venue-hero-fallback venue-hero-outdoor">\s*<span class="venue-hero-type">Outdoor Destination<\/span>\s*<h1>Test Canyon Regional Park<\/h1>\s*<\/div>/);
   assert.doesNotMatch(html, /<div class="venue-header">\s*<h1>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/outdoors\/test-canyon-regional-park"/);
   assert.match(html, /<title>Test Canyon Regional Park/);
   assert.match(html, /<meta property="og:title" content="Test Canyon Regional Park/);
   assert.match(html, /"@type":"TouristAttraction"/);
-  assert.match(html, /<body class="golf-page outdoor-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page outdoor-venue-page outdoor-no-photo">/); // the shared Outdoors layout (2026-11-08)
   assert.match(html, /Outdoor page theme \(2026-09-20\)/);
   assert.match(html, /body\.golf-page \.venue-hero-fallback\.venue-hero-outdoor \{ box-shadow/);
   assert.match(html, /<a class="category-back-link" href="\/kelowna\/outdoors">← Kelowna Outdoors<\/a>/);
   assert.match(html, /data-venue-category="outdoor" data-venue-name="Test Canyon Regional Park" data-surface="venue_page"/);
-  assert.match(html, /Website ↗/); assert.match(html, /Get Directions/); assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
+  assert.match(html, /Website ↗/); assert.match(html, /Open in Google Maps/); /* no MAPBOX_TOKEN in tests */ assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
   assert.doesNotMatch(html, /<span class="label">Type<\/span>/, 'type is in the hero, not repeated in Good to Know (2026-10-14)');
   assert.doesNotMatch(outdoorMarkupOnly(html), /golf-glance|Indoor Golf|beach-page/);
   const bare = app.renderVenuePage(app.findVenueBySlug('vernon', 'outdoor', 'test-nordic-centre'), [], [], []);
-  assert.doesNotMatch(bare, /Get Directions|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
+  assert.doesNotMatch(bare, /Get Directions|Open in Google Maps|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
   assert.equal((bare.match(/<h1[\s>]/g) || []).length, 1);
 });
 
@@ -7962,9 +7989,7 @@ test('REGRESSION (Outdoors): Golf and Beach pages carry no outdoor theme or mark
 test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and after outdoor venues exist; /beaches and /golf unchanged; routes, sitemap and trip API behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-outdoors-homepage-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) {
-    fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
-  }
+  stageProject(tempDir);
   const ISOLATED_PORT = '3096';
   const TOKEN = 'outdoors-homepage-test-token';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN };
@@ -8012,10 +8037,12 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal(tag.status, 200, await tag.text());
 
     const homeAfter = await (await fetch(`${base}/`)).text();
-    assert.equal(homeAfter, homeBefore.replace('class="mood-card mood-card-outdoors" href="#exploreRegions">', 'class="mood-card mood-card-outdoors" href="/outdoors">').replace('<li><a href="#exploreRegions" data-i18n="mood.outdoors.title">Outdoors</a></li>', '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>'), 'outdoor data changes exactly two hrefs on "/": the Outdoors mood card and the footer Outdoors link (2026-09-20, same pattern as Beaches)');
-    assert.match(homeAfter, /class="mood-card mood-card-outdoors" href="\/outdoors">/, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
-    assert.match(homeAfter, /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'the footer Outdoors link now points at /outdoors like the mood card');
-    assert.match(homeBefore, /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'with no outdoor data the footer link keeps its in-page anchor');
+    // The simplified homepage (home-simple.js, Nov 2026) has no footer Outdoors link: outdoor data changes exactly one href on "/",
+    // the Outdoors mood card (in-page anchor before, the Okanagan-wide /outdoors listing after).
+    const outdoorsCardBefore = '<a class="photo" href="#exploreRegions"><img class="mood-card-img" data-src="/images/mood/explore.';
+    assert.ok(homeBefore.includes(outdoorsCardBefore), 'with no outdoor data the mood card keeps its in-page anchor');
+    assert.equal(homeAfter, homeBefore.replace(outdoorsCardBefore, outdoorsCardBefore.replace('href="#exploreRegions"', 'href="/outdoors"')), 'outdoor data changes exactly one href on "/": the Outdoors mood card');
+    assert.match(homeAfter, /<a class="photo" href="\/outdoors"><img class="mood-card-img" data-src="\/images\/mood\/explore\./, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/outdoors"|Fixture Canyon Park|outdoor-page/);
     // The shared footer is on these pages too, so its Outdoors link (and only that) may change with outdoor data.
     const withFooterOutdoors = (html) => html.replace(/<li><a href="\/?#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>');
@@ -8048,13 +8075,16 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal((await fetch(`${base}/kelowna/outdoors/does-not-exist`)).status, 404);
     assert.equal((await fetch(`${base}/osoyoos/outdoors`)).status, 404, 'region with zero outdoor venues is a 404');
     const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors<\/loc>/);
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/);
+    // SEO (2026-10-20): the fixture town page has one place (under 3) and the fixture venue page has no hours and a
+    // three-word description, so both are noindex and left out of the sitemap.
+    assert.doesNotMatch(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors<\/loc>/, 'a thin town category page is not in the sitemap');
+    assert.doesNotMatch(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/, 'a thin venue page is not in the sitemap');
+    assert.match(await (await fetch(`${base}/kelowna/outdoors/fixture-canyon-park`)).text(), /name="robots" content="noindex/, 'and the page itself is noindex');
     // No outdoor *category or venue* URLs before the data exists. (The static
     // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
     assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
-    assert.match(hub, /<h3><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h3>/, 'region hub gains the category card, exactly as Beaches did');
+    assert.match(hub, /<a class="bw-tile" href="\/outdoors\?regions=kelowna">/, 'the compact Kelowna page has an Outdoor Adventures tile');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
     assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'one member is below the activity threshold -> 404, never a thin page');
     assert.equal((await fetch(`${base}/outdoors/not-an-activity`)).status, 404);
@@ -8269,7 +8299,7 @@ test('REGRESSION (Outdoors Phase 2): Golf/Beach wide pages keep their heading an
 test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a live activity page change nothing on "/", /beaches, /golf, /browse, /trip; activity route, sitemap and 404s behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-outdoors-activity-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3095';
   const TOKEN = 'outdoors-activity-test-token';
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -8301,8 +8331,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     assert.equal(r2.status, 200);
     const after = await snap();
     for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
-    assert.match(after['/'], /class="mood-card mood-card-outdoors" href="\/outdoors">/);
-    assert.match(after['/'], /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
+    // (Nov 2026) home-simple.js: the Outdoors mood card is the only Outdoors link on "/" (no footer link).
+    assert.match(after['/'], /<a class="photo" href="\/outdoors"><img class="mood-card-img" data-src="\/images\/mood\/explore\./);
     assert.doesNotMatch(withoutSiteHeader(after['/']), /\/outdoors\/hiking|outdoor-activity/);
 
     const act = await fetch(`${base}/outdoors/hiking`);
@@ -8536,7 +8566,7 @@ test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bar
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'prefilter-http-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-prefilter-'));
-  for (const f of ['server.js', 'db.js']) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
+  stageProject(dir);
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
   const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderrOutput = '';
@@ -8755,7 +8785,7 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.deepEqual(app.listLiveOutdoorActivities().map((a) => a.slug).sort(), ['camping', 'hiking']);
 
     // 10. Favorite / Add to trip, View details, region line and description survive on every landing card; no phone/website on list cards; compact clamp shipped.
-    assert.match(pm, new RegExp(`<li class="venue-card" data-venue-id="${kelA}" data-venue-region="kelowna" data-venue-category="outdoor" data-venue-name="Explorer Kelowna Trail" data-surface="category_card">\\s*<h2><a class="venue-card-link" href="/kelowna/outdoors/explorer-kelowna-trail"><span class="venue-card-name">Explorer Kelowna Trail</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>\\s*<p class="venue-meta">Kelowna</p>\\s*<div class="card-slot card-slot-fee"></div>\\s*<div class="card-slot card-slot-desc">\\s*<div class="golf-desc" id="golf-desc-${kelA}"><p>Explorer Kelowna Trail is a fixture[^<]*</p></div>\\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-${kelA}" hidden>Read more &rarr;</button>[\\s\\S]*?<button type="button" class="card-action fav-btn" data-fav-name="Explorer Kelowna Trail"[\\s\\S]*?<button type="button" class="card-action trip-btn" data-trip-name="Explorer Kelowna Trail"`));
+    assert.match(pm, new RegExp(`<li class="venue-card" data-venue-id="${kelA}" data-venue-region="kelowna" data-venue-category="outdoor" data-venue-name="Explorer Kelowna Trail" data-surface="category_card">\\s*<h2><a class="venue-card-link" href="/kelowna/outdoors/explorer-kelowna-trail"><span class="venue-card-name">Explorer Kelowna Trail</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>\\s*<p class="venue-meta">Kelowna</p>(?:\\s*<p class="fd-open-status"[^>]*>[^<]*</p>)?\\s*<div class="card-slot card-slot-fee"></div>\\s*<div class="card-slot card-slot-desc">\\s*<div class="golf-desc" id="golf-desc-${kelA}"><p>Explorer Kelowna Trail is a fixture[^<]*</p></div>\\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-${kelA}" hidden>Read more &rarr;</button>[\\s\\S]*?<button type="button" class="card-action fav-btn" data-fav-name="Explorer Kelowna Trail"[\\s\\S]*?<button type="button" class="card-action trip-btn" data-trip-name="Explorer Kelowna Trail"`));
     assert.doesNotMatch(pm.slice(pm.indexOf('id="outdoorResults"')), /card-action-website|card-action-phone|tel:/);
     assert.ok(plain.includes('body.outdoor-page #outdoorResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }'), 'landing cards clamp to about three lines');
     assert.ok(!app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)).includes('id="outdoorResults"'), 'activity pages keep the four-line clamp (no #outdoorResults there)');
@@ -9011,7 +9041,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
   assert.match(html, /"@type":"ItemList"/);
-  assert.match(markup, /<body class="golf-page outdoor-page fd-page">/);
+  assert.match(markup, /<body class="golf-page outdoor-page fd-page fd-refresh">/);
   assert.match(markup, /Home<\/a>[\s\S]{0,80}Food &amp; Drink/, 'breadcrumb');
 
   // The compact surface, in order, with the results directly after it.
@@ -9022,30 +9052,33 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(markup, /<div class="fd-pop-panel" id="fdFeaturesPanel" hidden>/, 'features popover starts closed');
   assert.match(markup, /<div class="fd-pop-panel" id="fdRegionsPanel" hidden>/, 'regions popover starts closed');
   assert.match(markup, /<p class="fd-count" id="fdResultsSummary" aria-live="polite">/, 'compact result bar');
-  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-type-row"', 'class="fd-controls"', 'id="fdFeaturesBtn"', 'id="fdRegionsBtn"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
+  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-controls"', 'id="fdRegionsBtn"', 'id="fdFeaturesBtn"', 'class="fd-type-row"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
 
   // None of the old oversized directory treatment.
   // The one exception (2026-10-12): the category banner, hidden unless a single type is chosen.
-  assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*><\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
+  assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*>(?:<span class="fd-banner-credit"[^>]*>[^<]*<\/span>)?<\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
   assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
   // Sort (2026-10-14): the one dropdown is the native Sort select in the result bar.
   assert.equal((markup.replace(/<dialog[\s\S]*?<\/dialog>/g, '').match(/<select/g) || []).length, 1, 'one dropdown control (the footer Contact dialog has its own topic select)');
-  assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
+  assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="nearest">Nearest to me<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
 
   // Venue types: All + the five, with counts, and NO wineries.
   assert.deepEqual([...markup.matchAll(/data-fd-type="([a-z]+)"/g)].map((m) => m[1]), app.FD_HUB_TYPES.map((t) => t.type));
-  assert.match(markup, /<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="true">All<\/button>/);
+  assert.match(markup, /<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="true">All places<\/button>/);
   assert.doesNotMatch(markup, /data-fd-type="winery"/, 'Wineries are not a Food & Drink type here');
   assert.doesNotMatch(markup, /data-venue-category="winery"/, 'no winery cards on the Food & Drink hub');
   assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
 
   // Features: every chip is a real BOOL_FIELDS column, never an invented one.
-  assert.equal(app.FD_HUB_FEATURES.length, 16, 'the fourteen researched badges plus Open Early / Open Late');
+  // The fourteen researched badges, the two things-to-do badges, and (2026-11-02) four Sports & Recreation-only
+  // attributes that are not columns (sportVenueWithAttrs() sets them from data/sports-attributes.json).
+  const SPORTS_ONLY = ['beginner', 'lit', 'covered', 'rentals'];
+  assert.equal(app.FD_HUB_FEATURES.length, 20, 'the fourteen food badges, two things-to-do badges and four sports-only attributes');
   assert.doesNotMatch(markup, /data-fd-feature="free_entry"|data-fd-feature="arts_culture"/, 'the things-to-do badges are not Food & Drink filters');
-  for (const f of app.FD_HUB_FEATURES) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
-  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key).filter((k) => k !== 'free_entry' && k !== 'arts_culture'));
+  for (const f of app.FD_HUB_FEATURES.filter((x) => !SPORTS_ONLY.includes(x.key))) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
+  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key).filter((k) => k !== 'free_entry' && k !== 'arts_culture' && !SPORTS_ONLY.includes(k)));
 
   // Regions: the canonical list, from the SAME renderer the other directories use.
   for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`data-region="${r}"`), `canonical region chip for ${r}`);
@@ -9150,7 +9183,7 @@ test('Food & Drink hub: types OR, features AND, regions OR, AND between groups; 
 test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine hub, the F&D category/region/venue routes and the other directories are untouched (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-fd-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3599;
   const child = require('node:child_process').spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -9832,11 +9865,10 @@ test('Dog Friendly Finds: card contract, photos, engagement wiring and internal 
   assert.doesNotMatch(markup, /class="chip dog-friendly-badge"/);
   assert.doesNotMatch(markup, /<span class="chip">Dog-Friendly<\/span>/);
 
-  // A photo on every card: the stylesheet's example photos, a dog one for
-  // food and drink, a beach or trail one outdoors.
+  // Real photos only (2026-10-28): each card has the place's own photo or the no-photo panel, never a stock one.
   const keys = [...markup.matchAll(/<li class="venue-card" data-fd-i="\d+" data-venue-id="\d+" data-ph="([a-z]+(?:-[a-z0-9]+)?)"/g)].map((m) => m[1]);
   assert.equal(keys.length, venues.length, 'every card has a photo key');
-  assert.ok(keys.every((k) => /^(dogbeach|dogoutdoor|winery|restaurant|cafe|pub|cocktail|brewery|distillery)-(\d+|dog)$/.test(k)), keys.join(','));
+  assert.ok(keys.every((k) => k === 'own' || k === 'none'), keys.join(','));
   assert.match(app.dogCardPhotoKey({ id: 4, type: 'outdoor' }, false), /^dogoutdoor-\d+$/);
   assert.match(app.dogCardPhotoKey({ id: 4, type: 'beach' }, true), /^dogbeach-\d+$/);
 
@@ -9946,12 +9978,21 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
-test('Cards: themed listing cards cap the badge row at 5 chips (+N more) and the grid uses uniform, bottom-aligned cards', () => {
+test('Cards: themed listing cards cap the badge row at two badges (+N more) and the grid uses uniform, bottom-aligned cards', () => {
   const v = { id: 990003, name: 'Chip Cap Fixture', region: 'kelowna', type: 'brewery', slug: 'chip-cap-fixture', description: 'Fixture.', vegan: true, vegetarian: true, patio: true, live_music: true, happy_hour: true, great_groups: true, gluten_free: true };
   const card = app.venueCardHtml(v, { themed: true });
   const chips = card.match(/<p class="chips">(.*?)<\/p>/)[1];
-  assert.equal((chips.match(/class="chip/g) || []).length, 5);
-  assert.match(chips, /<span class="chip chip-more" title="Live Music, Great for Groups, Happy Hour">\+3 more<\/span>/);
+  assert.equal((chips.match(/class="chip/g) || []).length, 3);
+  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live music, Groups, Happy hour" aria-label="5 more: [^"]*">\+5<\/span>/);
+  // One quiet line (2026-10-28): short labels led by a line icon; the venue page keeps the full names.
+  assert.match(chips, /^<span class="chip chip-feat"><svg class="ui-icon"[^>]*>.*?<\/svg>Vegan<\/span> <span class="chip chip-feat"><svg/);
+  assert.match(app.badgeChipsHtml(v), /<span class="chip">Vegan-Friendly<\/span>/);
+  const three = app.venueCardHtml({ ...v, live_music: false, happy_hour: false, great_groups: false, gluten_free: false }, { themed: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
+  assert.match(three, /Vegetarian<\/span> <span class="chip chip-more"[^>]*>\+1<\/span>$/, 'three badges are two and +1, so none is cut off');
+  // Card redesign (2026-10-28): the Hidden Gem / Local Favourite badge goes on the photo and is not counted.
+  const lf = app.venueCardHtml(v, { themed: true, isLocalFavourite: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
+  assert.match(lf, /^<span class="chip local-favourite-badge">/);
+  assert.equal((lf.match(/class="chip(?! local-favourite-badge)/g) || []).length, 3, 'two badges and +N more besides the photo badge');
   assert.equal(app.capChips('<span class="chip">A</span>', 5), '<span class="chip">A</span>', 'short rows untouched');
   const plain = app.venueCardHtml(v, { themed: false });
   assert.doesNotMatch(plain, /chip-more/, 'unthemed cards keep every chip');
@@ -9974,13 +10015,14 @@ test('Cards: a season-only notice is a one-line tag on list cards; written advis
 });
 
 test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too', () => {
-  const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true };
+  const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true, patio: true };
   const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
   assert.equal((both.match(/Dog Friendly<\/span>/g) || []).length, 1, 'the collection badge');
   assert.doesNotMatch(both, /<span class="chip">Dog-Friendly<\/span>/, 'no duplicate amenity chip');
-  assert.match(both, /<span class="chip">Lake View<\/span>/, 'other badges unchanged');
+  assert.match(both, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?Patio<\/span>/, 'other badges unchanged (a beach card leaves off Lake view since 2026-10-29)');
+  assert.doesNotMatch(both, /Dogs welcome/, 'no duplicate short amenity chip either');
   const plain = app.venueCardHtml(v, {});
-  assert.match(plain, /<span class="chip">Dog-Friendly<\/span>/, 'without the collection badge the amenity chip still shows');
+  assert.match(plain, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Dog-Friendly|Dogs OK)<\/span>/, 'without the collection badge the amenity chip still shows');
   assert.equal(app.badgeChipsHtml(v), app.badgeChipsHtml(v, {}), 'default output unchanged');
 });
 
@@ -10097,12 +10139,18 @@ test('Destination pages: every linked category tab has an active venue, and food
     const activePubs = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'apex' AND type = 'pub' AND redirect_to IS NULL").get().n;
     assert.equal(counts.pub || 0, activePubs, 'redirected venues are not counted');
     const region = s6markup(app.renderRegionPage('apex', counts, []));
-    assert.match(region, /class="golf-page outdoor-page region-page"/, 'themed shell');
+    // Apex is a ski resort: since Nov 2026 it renders the compact ski-resort page (ski-resort-pages.js), whose
+    // category tiles replace the old per-category tabs with counts.
+    assert.match(region, /class="golf-page outdoor-page ski-resort-page"/, 'themed shell');
     assert.match(region, /id="tripTray"/);
-    const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]* <span class="outdoor-activity-count">(\d+)<\/span>/g)];
-    assert.ok(tabs.length > 0);
-    for (const [, slug, n] of tabs) assert.ok(Number(n) >= 1, `${slug} tab has an active venue`);
-    assert.match(region, /href="\/apex\/cafes">/);
+    const tiles = [...region.matchAll(/<a class="bw-tile" href="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(tiles.length > 0);
+    assert.ok(tiles.includes('/food-drink?regions=apex'), 'Eat & Drink tile opens the scoped directory');
+    for (const href of tiles) {
+      const m = /^\/apex\/([a-z-]+)$/.exec(href);
+      if (m && m[1] !== 'events') assert.ok(Object.values(app.CATEGORY_SLUGS).includes(m[1]), `${href} is a real category page`);
+    }
+    assert.doesNotMatch(region, /href="\/apex\/pubs"/, 'a category with only redirected venues is not linked');
 
     // Scoped food & drink page: only this region + primary type.
     const venues = app.getVenuesByRegionCategory('apex', 'cafe');
@@ -10214,7 +10262,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25; font fallback faces in every stack, speed/CLS PR approved 2026-10-18)');
   // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
   // cream background (the logo's "Roam"); every existing token keeps its value.
-  assert.equal(md5('public/styles/tokens.css'), 'c155b965403a835bfdeba76f9fb58e8f', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18)');
+  // Approved accessibility passes (2026-11, aac810fb and 8c4d04da): token colours deepened for contrast.
+  assert.equal(md5('public/styles/tokens.css'), '7f666aa7162ca3921181a0780ab8af3d', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18; contrast passes 2026-11)');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
   // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
   // without the /browse #venueGrid -- including the homepage, which never used
@@ -10235,7 +10284,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
-  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d', 'public/scripts/app.js (Add to trip line icons, polish pass 2026-10-26)');
+  // Approved Build My Trip page copy (2026-10-29, Dayton): tripv3.* strings only (hint, example plan, "What we check for you"; then a shorter lead, four shorter examples and the example card), EN + FR.
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010', 'public/scripts/app.js (Build My Trip page copy 2026-10-29)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -10518,8 +10568,9 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
   assert.equal(events.headers.get('location'), '/whats-on?when=this-weekend');
   // Not routable. Stage 3.4 (D2): several words no page can show go to the
   // /search results page, in the visitor's own words -- never a dead end.
-  // Smarter search (2026-10-18): "date night in Kelowna" now goes to Kelowna's restaurants and cocktail lounges.
-  assert.equal((await fetch(`${base}/browse?q=${encodeURIComponent('date night in Kelowna')}`, { redirect: 'manual' })).headers.get('location'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  // Search ranking (2026-10-18): "date night in Kelowna" is a ranked list on the /search page (restaurants and cocktail
+  // lounges ordered by the planner's romance scoring), no longer /food-drink's generic list.
+  assert.equal((await fetch(`${base}/browse?q=${encodeURIComponent('date night in Kelowna')}`, { redirect: 'manual' })).headers.get('location'), `/search?q=${encodeURIComponent('date night in Kelowna')}`);
   for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park']) {
     const res = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
     assert.equal(res.status, 302, q);
@@ -10594,7 +10645,9 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   const page = await (await fetch(`${base}/trip`)).text();
   // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out
   // (and the shared CSS is linked, 2026-10-18).
-  assert.equal(page, app.withMainSkipTarget(app.withSharedStylesheets(app.tidySeoHead(app.englishTwinHtml(legacy, '/trip')))), 'GET /trip serves the unchanged page');
+  // Since then the server's page pipeline also adds font fallbacks, deferred cards, versioned images and preloads.
+  const piped = app.withFirstCardPhotoPreload(app.withBannerHeroFirst(app.withVersionedImages(app.withMainSkipTarget(app.withRestCardsDeferred(app.withSharedStylesheets(app.withFontFallbacks(app.withFilterBarReady(app.withLazyCardPhotos(app.withChipWidths(app.tidySeoHead(app.englishTwinHtml(legacy, '/trip'))))))))))));
+  assert.equal(page, piped, 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -10893,11 +10946,12 @@ test('hours.js status on the Okanagan clock: Pacific Time, daylight-saving chang
 test('hours.js scope: guarded load; one reading for the venue page, structured data and Build My Trip; status only in venueHoursStatusAt() and the Food & Drink Open Now; never /browse', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const hoursModule = \(\(\) => \{ try \{ return require\('\.\/hours\.js'\); \} catch \(e\) \{ return null; \} \}\)\(\);/, 'guarded require, like golf-data.js');
-  assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 2, 'status is computed only in venueHoursStatusAt and foodDrinkOpenNowInfo');
+  // Since then Roam Now, the near-me map, the happy-hour filter and the place-page closed-today notes read it too (7 call sites, all server-side).
+  assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 7, 'status is computed only at the known server-side call sites');
   assert.equal((src.match(/renderFoodDrinkHubScriptHtml\(\{ openNow: true \}\)/g) || []).length, 1, 'the browser status runs on the /food-drink hub only');
   // Since 2026-10-14 the venue page's open-now line reads it (venueOpenStatus).
   // Season end (2026-10-19): and by seasonLastOpeningPassed (is the venue open right now, on its last season day).
-  assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 4, 'defined, exported, and read by the venue page status line and the season end');
+  assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 8, 'defined, exported, and read by the venue page status line, the season end and the closed-today notes');
   assert.equal((src.match(/hoursModule\.openingPeriods\(/g) || []).length, 1, 'structured data periods come from hours.js');
   assert.equal((src.match(/hoursModule\.dayHoursText\(/g) || []).length, 1, 'the venue page list comes from hours.js');
   const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
@@ -11229,7 +11283,7 @@ test('Open Now on /browse follows stored hours + the Okanagan clock with no prov
     const html = app.renderBrowseHubPage(venues, app.parseBrowseHubQuery({}, app.browseCuisines(venues)), now);
     const card = (id) => (html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
     for (const id of [A, B, C]) assert.match(card(id), /<p class="fd-open-status" data-fd-open="open">/, `card ${id} shows Open now`);
-    assert.ok(!card(D).includes('fd-open-status'), 'no hours: no status line');
+    assert.match(card(D), /<p class="fd-open-status" data-fd-open="(?:unknown|appointment)">/, 'no hours: an honest status line, never a blank (and never Open now)');
     const data = JSON.parse(html.match(/<script type="application\/json" id="[^"]*">([\s\S]*?)<\/script>/)[1]);
     assert.ok(data[String(A)].h && !data[String(D)].h);
     const onHtml = app.renderBrowseHubPage(venues, { ...app.parseBrowseHubQuery({}, app.browseCuisines(venues)), openNow: true }, now);
@@ -11286,7 +11340,7 @@ test('Hidden Gems link: a broader Hidden Gems result never links to /secret-spot
   assert.equal(route('hidden gems in Kelowna').url, null);
   assert.equal(route('hidden gems in Kelowna').reason, 'collection_broader_than_page');
   assert.equal(route('hidden gems').url, null, 'valley-wide Hidden Gems are broader than /secret-spots');
-  const plan = app.runTripPlan({ text: 'hidden gems in Kelowna' });
+  const plan = app.runTripPlan({ text: 'hidden gems in Kelowna' }, SUMMER_NOW);
   assert.equal(plan.seeAll, null, 'no "See everything that matches" link');
   // The results themselves are untouched: every Kelowna Hidden Gem is still returned.
   const gemIds = app.getHiddenGemVenueIds();
@@ -11301,7 +11355,7 @@ test('Hidden Gems link: /secret-spots is still offered where it genuinely holds 
   assert.equal(app.countHiddenGemsOutsideSecretSpots(['osoyoos']), 0);
   assert.equal(route('hidden gems in Osoyoos').url, '/secret-spots?regions=osoyoos');
   assert.equal(route('secret spots in Osoyoos').url, '/secret-spots?regions=osoyoos');
-  const plan = app.runTripPlan({ text: 'hidden gems in Osoyoos' });
+  const plan = app.runTripPlan({ text: 'hidden gems in Osoyoos' }, SUMMER_NOW);
   assert.deepEqual(plan.seeAll, { url: '/secret-spots?regions=osoyoos' });
   assert.deepEqual(plan.recommendations.map((s) => s.venue.name).sort(), ['HG Osoyoos Beach', 'HG Osoyoos Trail']);
 }));
@@ -11438,18 +11492,19 @@ test('Destination pages: every destination shows its live categories in the appr
     const counts = app.getRegionCategoryCounts(r);
     const live = app.destinationCategories(r, counts).filter((c) => c.href);
     const html = app.renderRegionPage(r, counts, []);
-    const tabs = destTabs(html);
-    assert.deepEqual(tabs.map((t) => t.label), live.map((c) => c.label), r);
-    assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS.filter((l) => tabs.some((t) => t.label === l)), `${r} keeps the approved order`);
-    assert.ok(tabs.every((t) => t.tag === 'a'), `${r}: every tab is a link`);
-    const cards = [...html.matchAll(/<li class="category-card">\s*<h3><a href="([^"]+)">/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-    assert.deepEqual(cards, live.map((c) => c.href), `${r}: one photo card per live category`);
+    // Every destination now uses the compact guide layout (Kelowna, towns, ski hills): a mood-tile grid instead of category
+    // tabs and photo cards. The live categories, in the approved order, are published as the page's ItemList structured data.
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1])).find((j) => j['@type'] === 'ItemList');
+    // (Only the indexable category pages are listed: no filtered "?" views, and the events page only while it is indexed.)
+    const listed = live.filter((c) => !c.href.includes('?') && c.href !== `/${r}/events`);
+    const items = (ld ? ld.itemListElement : []).filter((i) => i.url !== `https://okanaganroam.com/${r}/events`);
+    assert.deepEqual(items.map((i) => i.name), listed.map((c) => `${c.label} in ${app.REGION_LABELS[r]}`), r);
+    assert.deepEqual(items.map((i) => i.url), listed.map((c) => `https://okanaganroam.com${c.href}`), `${r}: one ItemList entry per live category page`);
+    const labels = live.map((c) => c.label);
+    assert.deepEqual(labels, DEST_ORDER_LABELS.filter((l) => labels.includes(l)), `${r} keeps the approved order`);
+    const tiles = [...html.matchAll(/<a class="bw-tile" href="([^"]+)">/g)].map((m) => m[1]);
+    assert.ok(tiles.length >= 4 && tiles.every((h) => h.startsWith('/')), `${r}: a grid of on-site mood tiles`);
     assert.doesNotMatch(html, /None listed in/, `${r}: no empty category is shown`);
-    if (live.length > 6) {
-      assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">(Experiences|More ways to explore)<\/h2>/, r);
-    } else {
-      assert.match(html, new RegExp(`<h2 class="category-subsection-heading">Explore ${app.REGION_LABELS[r]}</h2>`), `${r}: a small place gets one grid`);
-    }
   }
 });
 
@@ -11457,7 +11512,8 @@ test('Destination pages: counts and links come from existing data, filtered to t
   for (const r of destRegions()) {
     const counts = app.getRegionCategoryCounts(r);
     const cats = app.destinationCategories(r, counts);
-    const tabs = destTabs(app.renderRegionPage(r, counts, []));
+    // The compact destination pages have no category tabs; a live category is one with a link (and so an ItemList entry).
+    const html = app.renderRegionPage(r, counts, []);
     const inRegion = (list) => list.filter((v) => v.region === r).length;
     const expected = {
       'whats-on': app.listUpcomingEventsForRegion(r, { limit: Number.MAX_SAFE_INTEGER }).length,
@@ -11469,13 +11525,12 @@ test('Destination pages: counts and links come from existing data, filtered to t
     for (const c of cats) {
       const want = c.type ? (counts[c.type] || 0) + (c.type === 'sport' ? sportsAlso : 0) : expected[c.key];
       assert.equal(c.count, want, `${r} ${c.key}`);
-      const tab = tabs.find((t) => t.label === c.label);
       if (want === 0) {
         assert.equal(c.href, null, `${r} ${c.key}: empty -> no link`);
-        assert.equal(tab, undefined, `${r} ${c.key}: empty -> no tab`);
+        assert.equal(html.includes(`"name":"${c.label} in ${app.REGION_LABELS[r]}"`), false, `${r} ${c.key}: empty -> not listed on the page`);
         continue;
       }
-      assert.equal(tab && tab.count, want, `${r} ${c.key} tab`);
+      assert.ok(c.href, `${r} ${c.key}: a live category has a link`);
       const href = c.type ? `/${r}/${app.CATEGORY_SLUGS[c.type]}` : null;
       if (href) assert.equal(c.href, href);
       if (c.key === 'dog-friendly') assert.equal(c.href, `/dog-friendly?regions=${r}`);
@@ -11491,11 +11546,13 @@ test('Region pages (2026-10-14): a banner photo, the resort heading on ski hills
     const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
     const photo = app.regionBannerPhoto(r);
     if (photo) {
-      assert.match(html, /<div class="category-banner[^"]*"><img src="\/images\//, `${r} opens with a photo`);
+      // The compact guide layout opens with a hero section whose background is the destination's photo.
+      assert.match(html, /<section class="bw-hero">/, `${r} opens with a hero`);
+      assert.ok(html.includes(photo.src), `${r} hero uses its photo`);
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', photo.src)), `${r} banner exists`);
     }
     assert.doesNotMatch(html, /See all of [^<]* on Okanagan Roam/);
-    assert.match(html, /<a href="\/destinations">See all Okanagan destinations &rarr;<\/a>/);
+    assert.match(html, /<a href="\/destinations">All destinations<\/a>/);
     assert.doesNotMatch(html, /verified venues across/);
   }
   assert.equal(app.regionHeading('big-white'), 'Big White Ski Resort');
@@ -12027,7 +12084,7 @@ test('List Your Venue: admin routes require the admin token', () => withDiscover
   assert.equal((await lyvAdmin(base, '/admin/venue-submissions?status=bogus')).status, 400);
 }));
 
-test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Facebook link goes on the listing and its card', () => withDiscoveryServer(async (base) => {
+test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Facebook link goes on the listing (not its card since 2026-10-29)', () => withDiscoveryServer(async (base) => {
   const ig = await (await lyvPost(base, lyvValid({ name: 'Social Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'https://www.instagram.com/social.link.test/?igsh=abc' }))).json();
   const fb = await (await lyvPost(base, lyvValid({ name: 'Facebook Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'facebook.com/fblinktest' }))).json();
   const other = await (await lyvPost(base, lyvValid({ name: 'Linktree Test Cafe', type: 'cafe', region: 'penticton', social_url: 'linktr.ee/linktreetest' }))).json();
@@ -12042,9 +12099,8 @@ test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Faceb
   const listing = await fetch(`${base}/penticton/cafes/social-link-test-cafe`).then((r) => r.text());
   assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/social\.link\.test\/" rel="nofollow noopener" target="_blank">Instagram<\/a>/);
   const cards = await fetch(`${base}/penticton/cafes`).then((r) => r.text());
-  assert.match(cards, /aria-label="Social Link Test Cafe on Instagram"/);
-  assert.match(cards, /aria-label="Facebook Link Test Cafe on Facebook"/);
-  assert.doesNotMatch(cards, /aria-label="Linktree Test Cafe on/);
+  // Cards no longer carry the links (2026-10-29): they are on the venue page only.
+  assert.doesNotMatch(cards, /aria-label="(Social Link|Facebook Link) Test Cafe on/);
 }));
 
 test('List Your Venue: approval creates the venue exactly once through createVenue and records provenance', () => withDiscoveryServer(async (base) => {
@@ -12127,10 +12183,10 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 const LYV_FOOTER_ABOUT = `<h2 data-i18n="footer.about">About</h2>
         <ul>
-          <li><a href="/about">About Okanagan Roam</a></li>
+          <li><a href="/about" data-i18n="footer.aboutSite">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
-          <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="/owner/login">Business login</a></li>
+          <li><a href="/list-an-event" data-i18n="footer.listEvent">List an Event</a></li>
+          <li><a href="/owner/login" data-i18n="footer.businessLogin">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
           <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>`;
@@ -12140,6 +12196,15 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     const res = await fetch(base + page);
     assert.equal(res.status, 200, page);
     const html = await res.text();
+    if (page === '/') {
+      // The simplified homepage (home-simple.js) has its own bilingual footer: three folds, one link each.
+      const simple = html.match(/<footer class="footer">[\s\S]*?<\/footer>/);
+      assert.ok(simple, '/ renders the homepage footer');
+      assert.equal((simple[0].match(/href="\/list-your-venue"/g) || []).length, 1, '/ one List your business link');
+      assert.equal((simple[0].match(/href="\/list-an-event"/g) || []).length, 1, '/ exactly one List an event link');
+      assert.doesNotMatch(simple[0], /browse#list-venue/, '/ footer no longer links to the old /browse form');
+      continue;
+    }
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
     assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Business login / Contact / the sister site, Whistler Roam (2026-10-27)`);
@@ -12150,7 +12215,8 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     // Explore and Regions are <details> that fold on phones (2026-10-14).
     const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h2 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
-    assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
+    assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions'], `${page}: same three columns in the same order (Social Media sits under the logo, 2026-10-29)`);
+    assert.match(footer[0], /<div class="home-footer-col home-footer-social">\s*<h2 data-i18n="homeFooter\.socialMedia">/, `${page}: Social Media under the logo`);
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
     assert.ok(header, page);
@@ -12174,7 +12240,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -12544,7 +12610,7 @@ test('List an Event: the staging table is additive and nothing else was touched'
   assert.ok(!eventCols.includes('submission_id'), 'events schema unchanged');
   const header = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
   assert.doesNotMatch(header, /list-an-event/, 'no navigation link yet');
-  assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event">List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
+  assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event"(?: data-i18n="footer\.listEvent")?>List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
 });
 
 // ---- Golf data (2026-09-26): verified green fees, price sort, course-map links ----
@@ -12577,9 +12643,9 @@ test('Golf data: the region golf page shows verified green fees and sorts by pri
   assert.deepEqual(order(page('price-desc')), ['Penticton Golf &amp; Country Club', 'Skaha Meadows Golf Course', 'Pine Hills Golf Club']);
   assert.deepEqual(order(page('recommended')), order(app.renderCategoryPage('penticton', 'golf', venues, [])), 'default order is the existing order');
   const asc = page('price-asc');
-  assert.match(asc, /<span class="golf-fee-price">\$40<\/span> <span class="golf-fee-detail">· 9 holes<\/span>/);
-  assert.match(asc, /<span class="golf-fee-price">\$99<\/span> <span class="golf-fee-detail">· 18 holes · plus tax<\/span>/);
-  assert.match(asc, /Green fees not yet verified/);
+  assert.match(asc, /<span class="golf-fee-price">From \$40<\/span>/);
+  assert.match(asc, /<span class="golf-fee-price">From \$99<\/span>/);
+  assert.match(asc, /<span class="golf-fee-price">From \$24<\/span>/, 'a course without a verified fee set starts from the lowest rate in its box (data/golf-card-prices.json)');
   assert.match(asc, /<nav class="category-region-selector golf-sort" aria-label="Sort golf courses">/);
   assert.match(asc, /<a href="\/penticton\/golf\?sort=price-desc" rel="nofollow">Price: high to low<\/a>/);
   assert.match(asc, /Golf data \(2026-09-26\)/, 'golf data styles loaded on golf pages');
@@ -12649,9 +12715,8 @@ test('Golf data: /golf and /penticton/golf honour ?sort= over HTTP, unknown valu
   golfFixtures();
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-golf-data-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'golf-data.js', 'okanagan.html', 'okanagan.db']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'golf-course-data.json'), path.join(tempDir, 'data', 'golf-course-data.json'));
+  stageProject(tempDir);
+  fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3611;
   const child = require('node:child_process').spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
   const get = async (p) => { const r = await fetch(`http://localhost:${port}${p}`); return { status: r.status, text: await r.text() }; };
@@ -13190,7 +13255,7 @@ test('Measurement Phase A: the analytics block never carries visitor-supplied va
 test('Measurement Phase A (+ Analytics Cleanup C1): the homepage and /browse serve okanagan.html\'s own GA4 snippet with ONLY the loader tag and gtag(config) swapped for the shared internal-traffic IIFE, with no page_type (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4a-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3597;
   const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -13319,7 +13384,7 @@ test('Measurement Phase B: gtag.js is never fetched off the live hostname (local
 test('Measurement Phase B (+ Analytics Cleanup C1): the server ignores ?roam_internal (identical HTML) on every page incl. / and /browse; okanagan.html on disk does not know about it, the served homepage does (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4b-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3596;
   const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -13412,7 +13477,7 @@ test('Measurement Phase C: venue pages -- every type tags its outbound links; Fo
   for (const type of ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery']) {
     const html = app.renderVenuePage({ ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), type }, [], [], []);
     assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call<\/a>/, type);
-    assert.match(html, /data-track="directions">Get Directions<\/a>/, type);
+    assert.match(html, /data-track="directions">Open in Google Maps<\/a>/, type);
     assert.equal((html.match(/track\('venue_view', ctx\(\)\)/g) || []).length, 1, `${type}: one venue_view`);
     assert.equal((html.match(/track\('outbound_click', params\)/g) || []).length, 1, `${type}: one outbound listener`);
     assert.match(html, /okanaganFavorites/, `${type}: Favorite module`);
@@ -13957,7 +14022,7 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
   const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js', 'trip-story.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
-    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    stageProject(tempDir);
     fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
     const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', ...env } });
     try {
@@ -14008,7 +14073,9 @@ test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails cl
   const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-story.js'];
   const run = async (port, files, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
-    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    stageProject(tempDir);
+    // The whole project is staged, so a run that must go without the French planner removes it here.
+    if (!files.includes('trip-planner-fr.js')) fs.rmSync(path.join(tempDir, 'trip-planner-fr.js'));
     fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
     const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', TRIP_PLANNER_V3: 'on' } });
     try {
@@ -14243,7 +14310,7 @@ test('Stage 2: the venue page hours list never shows an unlisted day as "Closed"
     // 12-hour since 2026-10-14, the same reading as every status line.
     assert.deepEqual(rows, [
       ['Monday', 'Hours not listed'], ['Tuesday', '12 PM – 11 PM'], ['Wednesday', 'Closed'], ['Thursday', '12 PM – 2 AM'],
-      ['Friday', '11 AM – 12 AM'], ['Saturday', '12 AM – 11:59 PM'], ['Sunday', 'Closed'],
+      ['Friday', '11 AM – midnight'], ['Saturday', '12 AM – 11:59 PM'], ['Sunday', 'Closed'],
     ]);
     assert.doesNotMatch(list, /26:00|24:00|Open 24 hours/);
     const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.openingHoursSpecification);
@@ -14302,9 +14369,7 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
-  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
-    if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
-  }
+  stageProject(dir);
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
   const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderrOutput = '';
@@ -14583,13 +14648,15 @@ test('Stage 3.4: Hero Search sends each kind of request to the right place, neve
   for (const q of ['not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'restaurants in kelowna nothing fancy',
     'cheap eats', 'things to do', 'xqzvbn plorf']) assert.equal(await go(q), search(q), q);
   // Smarter search (2026-10-18): date night and dated events now have pages of their own.
-  assert.equal(await go('date night'), '/food-drink?types=restaurant,cocktail');
+  // Date night is answered on /search, ranked by the planner's romance scoring (search ranking, 2026-10-18), not /food-drink's generic list.
+  assert.equal(await go('date night'), search('date night'));
   assert.equal(await go('something fun this weekend'), '/whats-on?when=this-weekend');
   assert.equal(await go('live music tonight'), '/whats-on?when=today&categories=live-music');
   // D2 / Stage 3.6 (2026-09-30, approved): one word -> /search, whether or not
   // places match (before Stage 3.6 a word with matches stayed on /browse, '200').
   assert.equal(await go('fixture'), search('fixture'));
-  assert.equal(await go('beachee'), search('beachee'));
+  // A near-miss spelling of a category is now corrected to that category's page instead of a results page.
+  assert.equal(await go('beachee'), '/beaches');
   // D4: "open now" on Food & Drink types -> the hub's verified-hours Open Now filter.
   assert.equal(await go('restaurants open now'), '/food-drink?types=restaurant&open=now');
   assert.equal(await go('cafes open now in kelowna'), '/food-drink?types=cafe&regions=kelowna&open=now');
@@ -14691,7 +14758,7 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   }
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/map<\/loc>/);
   const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
-  assert.match(venue, /<a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
+  assert.match(venue, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
 }));
 
 test('Menus (2026-10-14): Things to Do is the seven sections, Discover adds Guides and Secret Spots, the search icon opens Browse, and phone menus fold', () => {
@@ -14705,9 +14772,13 @@ test('Menus (2026-10-14): Things to Do is the seven sections, Discover adds Guid
 });
 
 test('Stage 3.4: "App coming soon" opens the existing app teaser on every page; no app is implied', () => withDiscoveryServer(async (base) => {
-  for (const p of ['/', '/browse', '/trip', '/kelowna', '/kelowna/restaurants/test-trattoria', '/destinations', '/map']) {
+  // The compact destination guides (/kelowna, towns, ski hills) have their own slim footer with no app link at all.
+  const compact = await (await fetch(`${base}/kelowna`)).text();
+  assert.doesNotMatch(compact, /appTeaserDialog|data-app-teaser-open|App Store|Google Play/, '/kelowna: its footer implies no app');
+  for (const p of ['/', '/browse', '/trip', '/kelowna/restaurants/test-trattoria', '/destinations', '/map']) {
     const html = await (await fetch(base + p)).text();
-    const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
+    // The simplified homepage (home-simple.js) has its own footer element, with the same teaser button.
+    const footer = html.match(/<footer class="(?:home-footer|footer)">[\s\S]*?<\/footer>/);
     assert.ok(footer, p);
     assert.ok(footer[0].includes('data-app-teaser-open'), `${p}: the footer control opens the teaser`);
     assert.equal((html.match(/id="appTeaserDialog"/g) || []).length, 1, `${p}: exactly one teaser dialog`);
@@ -15614,7 +15685,7 @@ test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as pa
   assert.doesNotMatch(html, /rel="canonical"/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<h1>My Favorites<\/h1>/);
-  assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
+  assert.match(html, /<main class="wrap-wide golf-main" id="main"(?: tabindex="-1")?>/);
   assert.match(html, /id="tripTray"/);
   assert.match(html, /page_type: 'favorites'/);
   // The browser runs exactly the tested rules.
@@ -15773,19 +15844,14 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.match(home, /id="navTripBtn"[^>]*><span data-i18n="trip\.buildMyTrip">Build My Trip<\/span> <svg/);
   assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1, 'one analytics listener');
   // Mood strip: the six cards in their existing order, still a native scroll-snap strip, sized for 2.25 visible, bleeding to the screen edge.
-  const order = [...home.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)].map((m) => m[1]);
-  assert.equal(order.length, 6); assert.equal(order[0], 'food-drink');
-  assert.match(home, /@media \(max-width: 640px\) \{\s*\.mood-card-grid \{[^}]*overflow-x: auto; scroll-snap-type: x mandatory;/);
-  assert.match(home, /\.mood-card \{ flex: 0 0 calc\(\(100% \+ var\(--mood-pad\) - 2 \* var\(--mood-gap\)\) \/ 2\.25\); scroll-snap-align: start;/);
-  assert.match(home, /margin-right: calc\(-1 \* var\(--mood-pad\)\); padding-right: var\(--mood-pad\);/);
-  assert.ok(home.includes('.mood-card-grid::-webkit-scrollbar { display: none; }') && !/mood-card-grid[^}]*(animation|scroll-behavior)/.test(home), 'no motion or auto-scroll');
-  // The "Swipe to explore" cue was removed (2026-10-14, Dayton): beside "Explore all categories →" it read as a second
-  // link; the third card peeking in at the edge shows the row scrolls, as on the other swipe rows.
+  // The simplified homepage (home-simple.js) replaced the swipe strip: six photo tiles in a grid, food & drink first.
+  const grid = home.match(/<section class="section" id="moodCards">[\s\S]*?<\/section>/)[0];
+  const order = [...grid.matchAll(/<a class="photo" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(order.length, 6); assert.equal(order[0], '/food-drink');
+  assert.ok(!/animation|scroll-behavior/.test(grid), 'no motion or auto-scroll');
+  // The "Swipe to explore" cue was removed (2026-10-14, Dayton).
   assert.equal(count(home, 'class="mood-swipe-cue"'), 0);
   assert.ok(!home.includes('Swipe to explore'));
-  assert.match(home, /\.mood-card-indoor \.mood-card-title, \.mood-card-sports \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day and Sports & Recreation titles are a step smaller');
-  assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
-  assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
 }))));
 
 // ---- Build My Trip in the header (2026-10-06) ----------------------------------
@@ -15795,7 +15861,8 @@ test('Build My Trip is a permanent header button (no strip under the header), fi
   const STRIP_LEFTOVERS = ['bmtStrip', 'bmt-strip', 'okrBmtStrip', 'promo_strip', 'Tell us what you&rsquo;re into', 'Hide the Build My Trip banner'];
   // The homepage: the header button and the menu link, and the existing deeper section; the hero follows the header directly.
   const home = await page('/');
-  assert.ok(home.includes('id="tripCtaOpenTrip"'), 'the existing homepage section is kept');
+  // (The old deeper homepage section, #tripCtaOpenTrip, went with the 2026 homepage redesign; the header button and menu link remain.)
+  assert.ok(home.includes('id="navTripBtn"'), 'the header button is on the homepage');
   assert.match(home, /<a class="app-btn" id="navTripBtn" href="\/trip">|<button class="app-btn" id="navTripBtn" type="button">/);
   assert.ok(home.includes('<li class="nav-links-trip"><a href="/trip"'));
   assert.equal(count(home, 'id="bmt-header"'), 1, 'one header style');
@@ -15849,7 +15916,8 @@ test('homepage hero uses the 3:1 sunset panorama with its own crop and type, sco
   const page = async (p) => (await fetch(`${base}${p}`)).text();
   const NEW = '/images/okanagan-valley-sunset-hero.webp';
   const home = noImgV(await page('/'));
-  assert.match(home, /<section class="hero-scenic hero-scenic-home" id="heroScenic">/);
+  // (The simplified homepage, home-simple.js, renders the same hero as <section class="hero" id="heroScenic">.)
+  assert.match(home, /<section class="hero" id="heroScenic">/);
   assert.ok(home.includes(`src="${NEW}" width="2000" height="667"`), 'the homepage hero image is the panorama, at its real size');
   assert.ok(!home.includes('src="/images/hero.webp"'), 'the old hero image is gone from the homepage');
   // Phones get their own near-square crop of the same scene; everything wider keeps the panorama.
@@ -16130,9 +16198,12 @@ test('Browse hub: the whole card opens the venue page through one title link (no
   // Navigation is the browser's own: the page script never navigates on card clicks.
   const script = html.slice(html.lastIndexOf('<script>\n(function(){\nfunction bhStart(){\n  var LABELS'), html.lastIndexOf('</script>'));
   assert.doesNotMatch(script, /location\.(href|assign)\s*=|location\.assign\(|window\.open\(/, 'no card-click navigation script');
-  // The overlay is Browse-only: the other hubs keep their cards exactly as they were.
+  // Card redesign (2026-10-28): every list page's photo cards now open the place from anywhere on the card too
+  // (CARD_V2_CSS), with the same one-link markup.
   const fd = await (await fetch(`${base}/food-drink`)).text();
-  assert.doesNotMatch(fd, /a\.venue-card-link::after/);
+  assert.match(fd, /<style id="card-v2">[\s\S]*a\.venue-card-link::after \{ content: ""; position: absolute; inset: 0;/);
+  // Row alignment (2026-10-31): only parts a card shows are levelled, so a card with its description hidden keeps no blank slot.
+  assert.match(fd, /<script id="card-v2-rows">[\s\S]*\.filter\(function \(e\) \{ return e && e\.getBoundingClientRect\(\)\.height > 0; \}\)/);
 })));
 
 test('Venue detail keeps the operational actions, data-dependent: Website / Directions / Call only when on file, never Find menu or online booking', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
@@ -16211,7 +16282,8 @@ test('Browse hub: /browse keeps its previous header -- no Favorites link -- whil
   const themed = app.renderGolfHeaderHtml();
   assert.ok(themed.includes('nav-links-favorites'), 'the shared header still carries it');
   const stripped = app.withoutFavoritesNavLink(themed);
-  assert.ok(html.includes(stripped), '/browse\'s header is the shared header without the link');
+  // (withMainSkipTarget points /browse's skip link at its own #directory instead of #main.)
+  assert.ok(html.replace('<a class="skip-link" href="#directory">', '<a class="skip-link" href="#main">').includes(stripped), '/browse\'s header is the shared header without the link');
   assert.ok(themed.replace(app.FAVORITES_NAV_ITEM + '\n      ', '').replace('\n' + app.FAVORITES_NAV_STYLE, '') === stripped);
   // The shared themed shell is unchanged for everyone else.
   for (const p of ['/food-drink', '/dog-friendly', '/favorites', '/trip']) assert.ok((await (await fetch(base + p)).text()).includes('nav-links-favorites'), `${p}: still has the link`);
@@ -16252,8 +16324,18 @@ test('Contact: the footer Contact is a button that opens one native dialog on ev
     const res = await fetch(base + page);
     if (res.status !== 200) { await res.text(); continue; }
     const html = await res.text();
-    const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/)[0];
-    assert.match(footer, /<li><a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a><\/li>/, page);
+    if (page === '/kelowna') {
+      // The compact destination guides have a slim footer whose Contact is a plain link to the /contact page (no dialog).
+      const slim = html.match(/<footer class="bw-footer">[\s\S]*?<\/footer>/)[0];
+      assert.match(slim, /<a href="\/contact">Contact<\/a>/, page);
+      assert.doesNotMatch(slim, /mailto:/, `${page}: no mailto link in the footer`);
+      continue;
+    }
+    // The simplified homepage (home-simple.js) has its own bilingual footer, with the same dialog button and teaser button.
+    const home = page === '/';
+    const footer = html.match(home ? /<footer class="footer">[\s\S]*?<\/footer>/ : /<footer class="home-footer">[\s\S]*?<\/footer>/)[0];
+    if (home) assert.match(footer, /<a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog"><span class="home-en">Contact us<\/span>/, page);
+    else assert.match(footer, /<li><a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a><\/li>/, page);
     assert.doesNotMatch(footer.replace(/<dialog[\s\S]*?<\/dialog>/g, ''), /mailto:/, `${page}: no mailto link in the footer itself (the dialog shows the address as an alternative)`);
     assert.equal((html.match(/id="contactDialog"/g) || []).length, 1, `${page}: exactly one Contact dialog`);
     const dialog = html.match(/<dialog class="app-teaser-dialog contact-dialog"[\s\S]*?<\/dialog>/)[0];
@@ -16271,7 +16353,8 @@ test('Contact: the footer Contact is a button that opens one native dialog on ev
     assert.doesNotMatch(script.slice(0, script.indexOf('</script>')), /trackEvent|gtag|dataLayer/, 'no analytics event');
     // The App coming soon dialog is still there, exactly once, unchanged in markup.
     assert.equal((html.match(/id="appTeaserDialog"/g) || []).length, 1);
-    assert.match(footer, /<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog"/);
+    if (home) assert.match(footer, /<button class="footer-app-link" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog"/);
+    else assert.match(footer, /<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog"/);
   }
 }));
 
@@ -16428,7 +16511,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86');
-  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
+  assert.equal(md5('public/scripts/app.js'), 'badaee14507d028ea4849c9eafd1b010');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16521,7 +16604,12 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d', 'app.js is unchanged by the classic Open Now page');
+    // Brewery test 1 (2026-11-12): app.js changed on purpose (badgeLabelFor: "Kids until 9 PM" on a card's kids badge).
+    // Cocktail test 2 (2026-11-13): app.js changed on purpose (« Que recherchez-vous ? » with its narrow no-break space).
+    // French public side (2026-11-14): app.js changed on purpose (French « 5 à 7 » badge, stamp, results note and Build My Trip copy).
+    // Tour types (2026-11-16): app.js changed on purpose (a tour card's link says "Tours & prices", not "Find menu").
+    // Tour test 2 (2026-11-16): app.js changed on purpose again (the French tour card link says « Sorties et tarifs »).
+    assert.equal(md5('public/scripts/app.js'), 'eb1d8999c5a459a2d1133383524e79ae', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -16645,20 +16733,15 @@ test('Region intros: every destination carries local copy; towns get a "Things t
     const label = app.REGION_LABELS[region];
     const intro = app.REGION_INTROS[region];
     const html = app.renderRegionPage(region, app.getRegionCategoryCounts(region) || {}, []);
-    const block = html.slice(html.indexOf('<div class="region-intro">'), html.indexOf('</label>', html.indexOf('<div class="region-intro">')) + 8);
-    assert.ok(html.includes('<div class="region-intro">'), `${region} has an intro`);
-    // The intro sits between the count subtitle and the category tiles.
-    assert.ok(html.indexOf('class="region-intro"') > html.indexOf('verified venues across'), `${region} intro placement`);
+    // The compact destination guides no longer print the long intro on the page; the copy lives in REGION_INTROS and still
+    // feeds the page title and description and the guide's "places to start". Its local copy is checked here as data.
+    assert.ok(intro && intro.paragraphs.length > 0, `${region} has an intro`);
+    const block = intro.paragraphs.map((p) => `${p[0] || ''} ${p[1]}`).join(' ');
     const words = text(block).split(' ').length;
     assert.ok(words >= 40 && words <= 320, `${region} intro is ${words} words`);
     const hrefs = [...block.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
     assert.ok(hrefs.length >= 4, `${region} intro links on-site pages`);
     assert.ok(hrefs.every((h) => /^\/[a-z0-9_\/-]+(#[a-z-]+)?$/.test(h)), `${region} intro links are on-site paths`);
-    if (intro.paragraphs.length > 1) {
-      // Phones: first paragraph, then a Read more toggle for the rest.
-      assert.match(block, /<input type="checkbox" id="region-intro-toggle" class="region-intro-toggle">\s*<div class="region-intro-more">/);
-      assert.ok(block.includes(`Read more about ${label.replace('&', '&amp;')}</label>`), `${region} read more label`);
-    }
     const title = html.match(/<title>([^<]*)<\/title>/)[1];
     const desc = html.match(/<meta name="description" content="([^"]*)">/)[1];
     if (app.SKI_RESORT_REGIONS.has(region)) {
@@ -16727,7 +16810,7 @@ test('Ski guide: served at its path, listed in the sitemap, and linked from the 
   const sitemap = await s4request('GET', '/sitemap.xml');
   assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/guides\/ski-season-big-white-silverstar<\/loc>/);
   const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
-  assert.match(bigWhite, /href="\/guides\/ski-season-big-white-silverstar#big-white">Read our ski season guide/);
+  assert.match(bigWhite, /href="\/guides\/ski-season-big-white-silverstar#big-white">Read the full Big White guide/);
   const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
   assert.doesNotMatch(kelowna, /ski-season-big-white-silverstar/);
 });
@@ -16927,9 +17010,12 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.includes(closed[t]) && ids.includes(open[t]), `${path}: both fixtures listed`);
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
-        assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Fermé pour la saison)/.test(card), `${path}: the tag`);
-        assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
-        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\./);
+        // Tour test 1 (Whistler, 2026-11-16): the closed line is said once on a card. The status line below says it (with the
+        // date), so the closed pill on the photo is dropped (it said "Closed · reopens …" a second time).
+        assert.ok(!card.includes('class="season-tag season-tag-closed"') && /(Closed for the season|Fermé pour la saison)/.test(card), `${path}: the closed line once`);
+        if (['golf', 'tour', 'sport', 'indoor', 'outdoor', 'beach'].includes(t) && !path.startsWith('/fr/')) assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
+        else assert.match(card, /fd-open-status" data-fd-open="seasonal">/, `${path}: a status line in French too`);
+        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai|Fermé pour la saison · Réouverture le 15 mai 2027/);
       }
       // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
       const bh = (await (await fetch(base + '/browse')).text()) + (await (await fetch(base + '/browse/cards.json')).json()).html;
@@ -16976,10 +17062,12 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
   }
 });
 
-test('Seasons everywhere: the card tag reads "Open until Oct 31" (fr "Ouvert jusqu’au 31 oct."); seasonClosedLast keeps every other place in order', () => {
+test('Seasons everywhere: the card tag reads "Closes Oct 31" (fr "Ferme le 31 oct."); seasonClosedLast keeps every other place in order', () => {
   const st = app.seasonStateOn({ status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
   assert.equal(st.text, 'Open for the season until October 31.', 'the venue page keeps the sentence');
-  assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Open until Oct 31</p>`));
+  assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Closes Oct 31</p>`));
+  assert.match(app.seasonTagHtml(st, true), /Season ends Oct 31<\/p>$/, 'winery cards distinguish season end from daily closing time');
+  assert.equal(app.frText('Closes Oct 31'), 'Ferme le 31 oct.');
   assert.equal(app.frText('Open until Oct 31'), 'Ouvert jusqu’au 31 oct.');
   assert.equal(app.frText('Open until Nov 1'), 'Ouvert jusqu’au 1er nov.');
   const closedSt = app.seasonStateOn({ status: 'closed', until_date: null, reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
@@ -17267,8 +17355,9 @@ test('Happy hour times: guarded write, the admin route, and Happy hour now on th
   assert.ok(row && typeof row[11] === 'string' && row[11].includes('14:00-17:00'), 'the compact times ship as [11]');
   const html = app.renderPlacesMapPage();
   assert.ok(html.includes(`data-pm-feat="happy" aria-pressed="false"><span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour now</button>`));
-  // Audit fix (2026-10-27): on now, or (while no happy hour is on anywhere) later today.
-  assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && \(p\.hhs\.now \|\| !hhAnyNow\)\)/, 'Happy hour now needs researched times that are on now');
+  // Roam Now redesign (#647): the filter is strict -- only places whose researched happy hour is on now (the earlier
+  // "later today while none is on" fallback was dropped with the redesign).
+  assert.match(html, /k === 'happy' \? !\(p\.hhs && p\.hhs\.now\)/, 'Happy hour now needs researched times that are on now');
 });
 
 test('Seasonal notices read in French on French pages (2026-10-14)', () => {
@@ -17425,7 +17514,8 @@ test('Derived hours badges: PUT/POST /api/venues cannot set them, and PUT re-der
     const json = await (await fetch(`${base}/api/venues/${c.id}`)).json();
     assert.equal(json.open_late, true);
     const page = await (await fetch(`${base}/summerland/restaurants/hb-posted-bistro`)).text();
-    assert.match(page, /<span class="chip"[^>]*>Open Late<\/span>/);
+    // The venue page leaves Open late to the open-now line and the hours (2026-11-01 badge look).
+    assert.doesNotMatch(page, /<span class="chip[^"]*"[^>]*>(?:<svg[^>]*>.*?<\/svg>)?Open Late<\/span>/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
@@ -17549,16 +17639,17 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
       process.env.OKR_TODAY_OVERRIDE = '2026-07-15';
       const summer = await WINTER_GET(base, '/');
       assert.equal(summer.status, 200);
-      assert.match(summer.text, /mood-card mood-card-beaches/);
-      assert.doesNotMatch(summer.text, /mood-card mood-card-sports/);
+      // The simplified homepage (home-simple.js) wraps the same tiles as <a class="photo"> in #moodCards.
+      assert.match(summer.text, /<a class="photo" href="\/beaches">/);
+      assert.doesNotMatch(summer.text, /<a class="photo" href="\/sports">/);
       // Dec 15: winter tiles, and past the Sep-Nov fall hero text, so only the tiles (and season link) differ.
       process.env.OKR_TODAY_OVERRIDE = '2026-12-15';
       const winter = await WINTER_GET(base, '/');
-      assert.match(winter.text, /<a class="mood-card mood-card-sports" href="\/sports">/);
-      assert.match(winter.text, /<a class="mood-card mood-card-indoor" href="\/indoor">/);
-      assert.doesNotMatch(winter.text, /mood-card mood-card-beaches|mood-card mood-card-golf/);
+      assert.match(winter.text, /<a class="photo" href="\/sports">/);
+      assert.match(winter.text, /<a class="photo" href="\/indoor">/);
+      assert.doesNotMatch(winter.text, /<a class="photo" href="\/beaches">|<a class="photo" href="\/golf">/);
       // Only the two swapped cards differ between the seasons.
-      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|sports|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
+      const strip = (h) => h.replace(/<a class="photo" href="\/(?:beaches|golf|sports|indoor)">[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
       assert.equal(strip(winter.text), strip(summer.text));
     });
     process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
@@ -17594,9 +17685,9 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.match(empty.text, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="indoor-coming-soon">More indoor spots are coming soon/);
       // One list since 2026-10-14: the simulators sit in it, under the Indoor Golf chip.
-      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">[1-9]\d*<\/span>/);
+      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">⛳ Indoor Golf <span class="outdoor-activity-count">[1-9]\d*<\/span>/);
       assert.match(empty.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator links to its existing golf page');
-      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page fd-refresh indoor-page indoor-hub-page">/);
       assert.doesNotMatch(empty.text, /noindex/);
       assert.equal((await WINTER_GET(base, '/vernon/indoor')).status, 404, 'an empty region/indoor pair 404s like any other');
 
@@ -17617,12 +17708,19 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.match(venue.text, /"@type":"TouristAttraction"/);
       assert.match(venue.text, /indoor-page/);
       const kelowna = await WINTER_GET(base, '/kelowna');
-      assert.match(kelowna.text, /<a href="\/kelowna\/indoor">Indoor &amp; Rainy Day Spots<\/a>/);
+      // The compact Kelowna guide has no category link list; the live Indoor category is in its ItemList structured data.
+      assert.match(kelowna.text, /"url":"https:\/\/okanaganroam\.com\/kelowna\/indoor"/);
 
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
-      for (const loc of ['/indoor', '/ski-snow', '/kelowna/indoor', '/kelowna/indoor/winter-test-gallery']) {
+      for (const loc of ['/indoor', '/ski-snow']) {
         assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
       }
+      // SEO rule (r13): a town x category page with fewer than MIN_INDEXABLE_CATEGORY_VENUES places and a thin place page
+      // are noindex, so the one-venue fixture's pages stay out of the sitemap.
+      for (const loc of ['/kelowna/indoor', '/kelowna/indoor/winter-test-gallery']) {
+        assert.ok(!sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), `${loc} is thin, so not in the sitemap`);
+      }
+      assert.match(region.text, /<meta name="robots" content="noindex/, 'the thin region/indoor page is noindex');
       const cats = (await WINTER_GET(base, '/categories')).text;
       assert.match(cats, /<a href="\/indoor">Indoor &amp; Rainy Day<\/a>/);
       assert.match(cats, /<a href="\/ski-snow">Ski &amp; Snow<\/a>/);
@@ -17678,8 +17776,9 @@ test('Indoor & Rainy Day: discovery sends museum/escape room/bowling/gallery/the
     }
     assert.equal(route('escape rooms in Penticton').url, '/penticton/indoor');
     assert.equal(route('What can we do around Penticton if it rains?').url, '/penticton/indoor');
-    // A region with no indoor venues keeps the old heuristic answer.
-    assert.equal(route('rainy day in Vernon').reason, 'heuristic_occasion');
+    // A region with no indoor venues gets no page: it is read as a trip request now (it used to be a bare heuristic occasion).
+    assert.equal(route('rainy day in Vernon').url, null);
+    assert.equal(route('rainy day in Vernon').reason, 'trip_request');
     // Other occasions are unchanged.
     assert.equal(route('date night in Kelowna').reason, 'heuristic_occasion');
   } finally {
@@ -17822,12 +17921,15 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       assert.match(venue.text, /"@type":"TouristAttraction"/);
       assert.match(venue.text, /tour-page/);
       const kelowna = await WINTER_GET(base, '/kelowna');
-      assert.match(kelowna.text, /<a href="\/kelowna\/tours">Tours &amp; Experiences<\/a>/);
+      // The compact town page (2026-11) links the hub in the header menu rather than a per-town category list.
+      assert.match(kelowna.text, /<a href="\/tours"[^>]*>Tours &amp; Experiences<\/a>/);
 
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
-      for (const loc of ['/tours', '/kelowna/tours', '/kelowna/tours/tour-test-lake-cruise']) {
-        assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
-      }
+      assert.ok(sitemap.includes('<loc>https://okanaganroam.com/tours</loc>'), '/tours');
+      // SEO r13: a thin place page (short description, no hours) is noindex and left out of the sitemap, together.
+      assert.equal(sitemap.includes('<loc>https://okanaganroam.com/kelowna/tours/tour-test-lake-cruise</loc>'), !/noindex/.test(venue.text), 'sitemap matches the place page noindex');
+      // SEO r13: a town page with fewer than MIN_INDEXABLE_CATEGORY_VENUES places is noindex and left out of the sitemap, together.
+      assert.equal(sitemap.includes('<loc>https://okanaganroam.com/kelowna/tours</loc>'), !/noindex/.test(region.text), 'sitemap matches the town page noindex');
       const cats = (await WINTER_GET(base, '/categories')).text;
       assert.match(cats, /<a href="\/tours">Tours &amp; Experiences<\/a>/);
       const form = (await WINTER_GET(base, '/list-your-venue')).text;
@@ -17835,6 +17937,47 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
     });
   } finally {
     if (cruise) db.prepare('DELETE FROM venues WHERE id = ?').run(cruise.id);
+  }
+});
+
+test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summary, first price and trip length, then badges', () => {
+  const v = app.createVenue({ name: 'Tour Card Fixture Wine Tours', region: 'kelowna', type: 'tour', description: 'A long description that the card does not need when the place has a Known for line.', slug: 'tour-card-fixture-wine-tours', kid_friendly: 1, great_groups: 1 });
+  try {
+    const r = app.guardedVisitInfoUpdate(v.id, null, { rows: [
+      { label: 'Known for', text: 'Small-group wine tours of three Kelowna wineries with pickup.' },
+      { label: 'Prices', text: 'Full day $169, half day $145; tastings included.' },
+      { label: 'Time needed', text: 'The tour runs about 5 to 6 hours including pickup.' },
+    ], booking_url: null, source_url: 'https://tour.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-tour-card' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const html = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
+    assert.match(html, /<li class="venue-card"[^>]*>/);
+    assert.match(html, /<p class="venue-meta">Kelowna &middot; Wine tour<\/p>/);
+    assert.match(html, /<div class="golf-desc"[^>]*><p>Small-group wine tours of three Kelowna wineries with pickup\.<\/p>/);
+    assert.doesNotMatch(html, /A long description/);
+    delete app.CARD_PRICES[String(v.id)]; // a fixture id can coincide with a real venue id in the data file
+    const htmlNoPrice = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
+    assert.doesNotMatch(htmlNoPrice, /From \$/, 'no verified price on file, so no price chip (never a guess from the box text)');
+    app.CARD_PRICES[String(v.id)] = { from: 169 };
+    assert.match(app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true }), /<span class="chip chip-feat chip-price">[^]*?From \$169<\/span>/);
+    delete app.CARD_PRICES[String(v.id)];
+    assert.match(html, /<span class="chip chip-feat">[^]*?5\u20136 hr<\/span>/);
+    assert.doesNotMatch(html, /card-note/);
+    // Facts come only from the box: no box, no price chip.
+    assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: null, time: null });
+    assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
+    // The trip length skips arrival, check-in, drive and briefing times (2026-10-31).
+    const tm = (text) => app.tourCardFacts({ rows: [{ label: 'Time needed', text }] }).time;
+    assert.equal(tm('Tours are 2 or 3 hours; arrive 15 minutes early. Callaghan base is about a 15-25 minute drive south of the village.'), '2\u20133 hr');
+    assert.equal(tm('14 minutes in the air. Check in 15 minutes before departure.'), '14 min');
+    assert.equal(tm('Each race is about 10 minutes. Arrive 30 minutes early for check-in and the driver briefing.'), '10 min');
+    assert.equal(tm('1 hour, daily at 1:00pm, plus a 5-10 minute bike orientation.'), '1 hr');
+    assert.equal(tm('The tour runs about 5 to 6 hours including pickup.'), '5\u20136 hr');
+    app.CARD_PRICES['999999'] = { from: 14.29 }; assert.equal(app.cardPriceFor(999999), 'From $14.29'); app.CARD_PRICES['999998'] = { from: 2095 }; assert.equal(app.cardPriceFor(999998), 'From $2,095');
+    app.CARD_PRICES['999997'] = { from: 660, per: 'helicopter' }; assert.equal(app.cardPriceFor(999997), 'From $660 / helicopter');
+    delete app.CARD_PRICES['999999']; delete app.CARD_PRICES['999998']; delete app.CARD_PRICES['999997'];
+  } finally {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
 
@@ -17856,9 +17999,9 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
       assert.match(hub.text, /href="\/vernon\/outdoors\/tours-also-atv-outfitter"/, 'an outdoor operator links to its outdoors page');
       assert.match(hub.text, /href="\/kelowna\/wineries\/tours-also-sleigh-farm"/, 'a winery links to its winery page');
       assert.doesNotMatch(hub.text, /noindex/);
-      // The membership note is shown on that card only, labelled "Experience:".
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Experience:<\/span> Guided ATV tours, May to October<\/p>/);
-      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      // The membership note is that card's summary (Tours cards, 2026-10-31): no separate "Experience:" line.
+      assert.match(hub.text, /<li class="venue-card"[^>]*>[^]*?<div class="card-slot card-slot-desc">\s*<div class="golf-desc"[^>]*><p>Guided ATV tours, May to October<\/p>/);
+      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 0);
       assert.doesNotMatch(hub.text, /Rainy day:/);
       // The card script wires every type on /tours (Read more clamp, Favorite / Trip), and descriptions clamp to 3 lines.
       // Shared engine (2026-10-14): the tours_also cards sit in the one list.
@@ -17939,7 +18082,7 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(empty.text, /<h1>Sports &amp; Recreation in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="sport-coming-soon">More sports and recreation spots are coming soon/);
       // One list on the directory engine since 2026-10-14.
-      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Skate parks, pump tracks, BMX tracks, bike parks and mountain bike trail networks, disc golf courses, and pickleball, tennis and beach volleyball courts/);
+      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Find your next place to ride, skate or play\./);
       assert.match(empty.text, /<body class="golf-page outdoor-page fd-page sport-page sports-hub-page">/);
       assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
       assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/sports\/sports\.jpg"/);
@@ -17967,11 +18110,13 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(venue.text, /"@type":"SportsActivityLocation"/);
       assert.match(venue.text, /sport-page/);
       const penticton = await WINTER_GET(base, '/penticton');
-      assert.match(penticton.text, /<a href="\/penticton\/sports">Sports &amp; Recreation<\/a>/);
+      assert.match(penticton.text, /<a href="\/sports"[^>]*>Sports &amp; Recreation<\/a>/, 'the compact town page links the hub from the menu (2026-11)');
 
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
-      for (const loc of ['/sports', '/penticton/sports', '/penticton/sports/sport-test-skate-park']) {
-        assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
+      assert.ok(sitemap.includes('<loc>https://okanaganroam.com/sports</loc>'), '/sports');
+      // SEO r13: thin town and place pages are noindex and left out of the sitemap, together.
+      for (const [loc, page] of [['/penticton/sports', region], ['/penticton/sports/sport-test-skate-park', venue]]) {
+        assert.equal(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), !/noindex/.test(page.text), `${loc}: sitemap matches noindex`);
       }
       const cats = (await WINTER_GET(base, '/categories')).text;
       assert.match(cats, /<a href="\/sports">Sports &amp; Recreation<\/a>/);
@@ -18012,8 +18157,7 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       assert.match(hub.text, /href="\/vernon\/golf\/sports-also-disc-golf-club"/, 'a golf course links to its golf page');
       assert.doesNotMatch(hub.text, /noindex/);
       // The membership note is that card's "Play:" line; a card without one names its activities.
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Skate park and four tennis courts<\/p>/);
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Disc Golf<\/p>/);
+      assert.doesNotMatch(hub.text, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
       assert.doesNotMatch(hub.text, /Rainy day:|Experience:<\/span>/);
       // The card script wires every type on /sports, and descriptions clamp to 3 lines.
       assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="golf"\][^)]*\[data-venue-category="outdoor"\]/);
@@ -18030,11 +18174,13 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       assert.match(kel.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
       assert.match(kel.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
       assert.match(kel.text, /<span class="card-note-label">Play:<\/span> Skate park and four tennis courts/);
-      assert.doesNotMatch(kel.text, /noindex|No sports &amp; recreation are listed/);
+      assert.doesNotMatch(kel.text, /No sports &amp; recreation are listed/);
+      // SEO r13: a town page with fewer than 3 places is noindex and out of the sitemap (both tagged venues here are single).
+      assert.match(kel.text, /noindex/);
       assert.doesNotMatch(kel.text, /sports-also-disc-golf-club/, 'only this region\'s tagged venues');
       const sitemap = await WINTER_GET(base, '/sitemap.xml');
-      assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/kelowna\/sports<\/loc>/);
-      assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/vernon\/sports<\/loc>/);
+      assert.doesNotMatch(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/kelowna\/sports<\/loc>/);
+      assert.doesNotMatch(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/vernon\/sports<\/loc>/);
       // A region with nothing to play is still a 404.
       assert.equal((await WINTER_GET(base, '/osoyoos/sports')).status, 404);
       // With one sport venue of its own, the count reads in the singular.
@@ -18171,7 +18317,8 @@ test('Shops & Outfitters: /shops renders with zero shop venues (coming soon, noi
       assert.match(venue.text, /"@type":"Store"/);
       assert.match(venue.text, /shop-page/);
       const armstrong = await WINTER_GET(base, '/armstrong');
-      assert.match(armstrong.text, /<a href="\/armstrong\/shops">Shops &amp; Outfitters<\/a>/);
+      // The compact town page (2026-11) has no per-category list, so the noindex shop pages are not linked from it.
+      assert.doesNotMatch(armstrong.text, /href="\/armstrong\/shops"/);
 
       assert.doesNotMatch(venue.text, /<meta name="robots" content="noindex/, 'a shop page itself is indexable');
 
@@ -18452,7 +18599,8 @@ test('Navigation (2026-10-12): the header\'s Things to Do menu and the footer\'s
       const footer = html.slice(html.lastIndexOf('<footer'), html.lastIndexOf('</footer>'));
       for (const [href, key, label] of [['/sports', 'tripv3.type.sport', 'Sports &amp; Recreation'], ['/tours', 'tripv3.type.tour', 'Tours &amp; Experiences'], ['/indoor', 'mood.indoor.title', 'Indoor &amp; Rainy Day'], ['/ski-snow', 'mood.skiSnow.title', 'Ski &amp; Snow']]) {
         assert.ok(header.includes(`<a href="${href}" data-i18n="${key}">${label}</a>`), `${p}: header links ${href}`);
-        assert.ok(footer.includes(`<li><a href="${href}" data-i18n="${key}">${label}</a></li>`), `${p}: footer links ${href}`);
+        // The simplified homepage (2026-11) has its own slim footer; the Explore column is on every other page.
+        if (p !== '/') assert.ok(footer.includes(`<li><a href="${href}" data-i18n="${key}">${label}</a></li>`), `${p}: footer links ${href}`);
       }
     }
   });
@@ -18672,7 +18820,7 @@ test('Outdoor activity banners (2026-10-13): each live activity page opens with 
   assert.match(page, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/outdoors\/activity-hiking\.jpg"/);
   assert.match(page, /<div class="category-hero-text"><h1>Hiking &amp; Trails in the Okanagan<\/h1><\/div>/);
   const landing = app.renderCategoryAllRegionsPage('outdoor', venues, null, {});
-  assert.match(landing, /"fishing":\{"banner":\{"src":"\/images\/outdoors\/activity-fishing\.jpg"/, 'the landing carries each activity\'s swap content');
+  assert.match(landing, /"fishing":\{"banner":\{"src":"\/images\/outdoors\/activity-fishing-2610\.jpg(?:\?v=\w+)?"/, 'the landing carries each activity\'s swap content');
   assert.match(landing, /querySelectorAll\('\[data-activity\]\[aria-pressed="true"\]'\)/);
 });
 
@@ -18762,6 +18910,8 @@ test('Card excerpts (2026-10-13): Food & Drink list cards show a short blurb, th
 
 test('Event images (SEO, 2026-10-13): event pages share a picture and their Event schema carries one -- the event\'s own image_url, else its What\'s On category photo, else the What\'s On banner', () => {
   assert.equal(app.eventImagePath({ image_url: 'https://cdn.example.com/poster.jpg' }, ['live-music']), 'https://cdn.example.com/poster.jpg');
+  assert.equal(app.eventImagePath({ image_url: '/images/events/kal-tire-place-2611.jpg' }, ['sports']), '/images/events/kal-tire-place-2611.jpg', 'a photo kept on this site counts');
+  assert.notEqual(app.eventImagePath({ image_url: '/images/events/not-a-real-file-2611.jpg' }, ['sports']), '/images/events/not-a-real-file-2611.jpg', 'a missing local file falls back');
   assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'community-events']), '/images/whats-on/nightlife.jpg');
   // Event photos (2026-10-16): a kind of event wins over the category photo; live music with no clearer match shows a band.
   assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'live-music']), '/images/events/rock-2610.jpg');
@@ -19081,7 +19231,8 @@ test('Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/th
     assert.equal(page.status, 200);
     assert.match(page.text, /<title>Things to Do in Lumby This Weekend \| Okanagan Roam<\/title>/);
     assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/lumby\/events\/this-weekend">/);
-    assert.doesNotMatch(page.text, /name="robots" content="noindex/, 'indexable because /lumby/events is live');
+    // SEO (2026-11, 7edfc36c): every weekend page is noindex now, whatever its town page does; they stay out of the sitemap.
+    assert.match(page.text, /name="robots" content="noindex/, 'weekend pages are noindex');
     assert.ok(page.text.includes(app.formatLocalDateShort(wk.from)), 'the intro names the weekend dates');
     assert.match(page.text, /Coming up after the weekend<\/h2>[\s\S]*Harbour Lantern Gala/, 'a quiet weekend shows what comes next');
     const crumbs = s5jsonLd(page.text).find((b) => b['@type'] === 'BreadcrumbList').itemListElement.map((x) => x.name);
@@ -19095,8 +19246,8 @@ test('Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/th
     for (const e of made.slice(3)) assert.ok(list.itemListElement.some((x) => x.url.endsWith(`/lumby/events/${e.slug}`)), `${e.name} is in the weekend list`);
     assert.ok(!list.itemListElement.some((x) => x.url.endsWith(made[0].slug)), 'next month is not in the weekend list');
     const sitemap = (await s5get('/sitemap.xml')).text;
-    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/whats-on/this-weekend</loc>'));
-    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/lumby/events/this-weekend</loc>'));
+    assert.ok(!sitemap.includes('<loc>https://okanaganroam.com/whats-on/this-weekend</loc>'));
+    assert.ok(!sitemap.includes('<loc>https://okanaganroam.com/lumby/events/this-weekend</loc>'));
     assert.match((await s5get('/lumby/events')).text, /<a href="\/lumby\/events\/this-weekend">Lumby<\/a>/, 'town pages link the weekend pages');
     const thinTown = Object.keys(app.REGION_LABELS).find((r) => !app.liveWhatsOnScopes().some((x) => x.path === `/${r}/events`));
     assert.match((await s5get(`/${thinTown}/events/this-weekend`)).text, /name="robots" content="noindex/, 'a thin town\'s weekend page is noindex');
@@ -19109,7 +19260,7 @@ test('Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/th
   }
 });
 
-test('Town pages (2026-10-13): a TouristDestination plus an ItemList of the category pages the page links to, never a filtered view', async () => {
+test('Town pages (2026-10-13): a TouristDestination plus an ItemList of the category pages that exist for the town, never a filtered view', async () => {
   const page = await s5get('/kelowna');
   assert.equal(page.status, 200);
   const ld = s5jsonLd(page.text);
@@ -19124,7 +19275,8 @@ test('Town pages (2026-10-13): a TouristDestination plus an ItemList of the cate
     assert.equal(x.position, i + 1);
     assert.ok(!x.url.includes('?'), `${x.url} is a page of its own`);
     assert.match(x.name, / in Kelowna$/);
-    assert.ok(page.text.includes(`href="${x.url.replace('https://okanaganroam.com', '')}"`), `${x.url} is linked from the page`);
+    // The compact town page (2026-11) links a few places and /browse?regions=, not each category page, so each listed page must at least exist.
+    assert.equal((await s5get(x.url.replace('https://okanaganroam.com', ''))).status, 200, `${x.url} is a live page`);
   }
   assert.equal(app.regionPageSchemas('kelowna', 'Kelowna', 'd', 'https://x', [{ key: 'a', label: 'Dog Friendly', count: 3, href: '/dog-friendly?regions=kelowna' }, { key: 'b', label: 'Golf', count: 0, href: null }]).length, 1, 'no list when nothing qualifies');
 });
@@ -19171,6 +19323,8 @@ function frVisibleText(html) {
   for (const n of names) text = text.split(n).join(' ');
   return text;
 }
+// SEO (2026-10-19, 7edfc36c): while FRENCH_INDEXABLE is false French pages are noindex, with no hreflang pairs and no sitemap URLs.
+const frenchPairsLive = () => /const FRENCH_INDEXABLE = true;/.test(fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8'));
 function withFrenchDescriptions(fn) {
   const rows = db.prepare('SELECT id, description_fr FROM venues').all();
   db.prepare("UPDATE venues SET description_fr = 'Une adresse de l’Okanagan, décrite en français.' WHERE description_fr IS NULL OR description_fr = ''").run();
@@ -19187,8 +19341,13 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   assert.match(page.text, /<html lang="fr" data-page-lang="fr">/);
   assert.match(page.text, /<title>Test Trattoria — Restaurant à Kelowna, C\.-B\. \| Okanagan Roam<\/title>/);
   assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria">/);
-  for (const [lang, href] of [['en-CA', '/kelowna/restaurants/test-trattoria'], ['fr-CA', '/fr/kelowna/restaurants/test-trattoria'], ['x-default', '/kelowna/restaurants/test-trattoria']]) {
-    assert.ok(page.text.includes(`<link rel="alternate" hreflang="${lang}" href="https://okanaganroam.com${href}">`), lang);
+  if (frenchPairsLive()) {
+    for (const [lang, href] of [['en-CA', '/kelowna/restaurants/test-trattoria'], ['fr-CA', '/fr/kelowna/restaurants/test-trattoria'], ['x-default', '/kelowna/restaurants/test-trattoria']]) {
+      assert.ok(page.text.includes(`<link rel="alternate" hreflang="${lang}" href="https://okanaganroam.com${href}">`), lang);
+    }
+  } else {
+    assert.match(page.text, /<meta name="robots" content="noindex/, 'French pages are noindex');
+    assert.doesNotMatch(page.text, /hreflang="(?:en-CA|fr-CA|x-default)"/, 'no hreflang pair');
   }
   assert.match(page.text, /<meta property="og:locale" content="fr_CA">/);
   assert.match(page.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/share\/fr\/kelowna\/restaurants\/test-trattoria\.png\?v=/);
@@ -19203,7 +19362,8 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   // The English page names its twin and offers the switch.
   const en = await s5get('/kelowna/restaurants/test-trattoria');
   assert.match(en.text, /<html lang="en" data-page-lang="en">/);
-  assert.match(en.text, /<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria">/);
+  if (frenchPairsLive()) assert.match(en.text, /<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria">/);
+  else assert.doesNotMatch(en.text, /<link rel="alternate" hreflang="fr-CA"/);
   assert.match(en.text, /<a href="\/fr\/kelowna\/restaurants\/test-trattoria" hreflang="fr" lang="fr">Français<\/a>/);
   assert.doesNotMatch(en.text, /og:locale/, 'the English page head is otherwise unchanged');
   // Unknown places 404; a place without French goes to its English page.
@@ -19223,7 +19383,8 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   // Sitemap: both URLs, each with the pair as alternates.
   const sitemap = (await s5get('/sitemap.xml')).text;
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
-  assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria<\/loc>[\s\S]*?<xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria"\/>/);
+  if (frenchPairsLive()) assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria<\/loc>[\s\S]*?<xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria"\/>/);
+  else assert.doesNotMatch(sitemap, /<loc>https:\/\/okanaganroam\.com\/fr\//);
   // The French share card.
   const card = await s5get('/share/fr/kelowna/restaurants/test-trattoria.png');
   assert.equal(card.status, 200);
@@ -19386,7 +19547,7 @@ test('One photo per destination (2026-10-15): every town has one photo, the same
   const at = (iso) => app.renderExploreRegionsHTML({ now: new Date(`${iso}T19:00:00Z`) });
   assert.equal(at('2026-10-13'), at('2026-07-15'));
   // A credited photo carries its credit on the town page.
-  assert.match(app.renderRegionPage('vernon', app.getRegionCategoryCounts('vernon') || {}, []), /<p class="region-photo-credit">Photo: <a href="https:\/\/www\.flickr\.com\/photos\/52450054@N04\/15340405619"[^>]*>Judy Gallagher<\/a>, CC BY 2\.0<\/p>/);
+  assert.match(app.renderRegionPage('vernon', app.getRegionCategoryCounts('vernon') || {}, []), /<p class="bw-credit">Hero photo: Judy Gallagher, CC BY 2\.0, via Wikimedia Commons<\/p>/, 'the compact town page (2026-11) credits the photo in its footer');
   assert.doesNotMatch(app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []), /region-photo-credit"/, 'no credit line where none is needed');
 });
 
@@ -19515,7 +19676,7 @@ test('Homepage: the counts strip, This Weekend and Top Picks render from real da
     const order = ['id="heroScenic"', 'id="moodCards"', 'id="hiddenGems"', 'id="exploreRegions"'].map((m) => html.indexOf(m));
     assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'existing sections keep their order');
     for (const id of ['thisWeekend', 'topPicks']) if (html.includes(`id="${id}"`)) assert.ok(html.indexOf(`id="${id}"`) > html.indexOf('id="moodCards"') && html.indexOf(`id="${id}"`) < html.indexOf('id="hiddenGems"'), id);
-    assert.ok(html.includes('html[lang="fr"] .home-fr { display: inline; }'), 'the language switch shows the French text');
+    assert.ok(html.includes('html[lang="fr"] #homeSimple .home-fr{display:initial}'), 'the language switch shows the French text (simplified homepage, 2026-11)');
   });
 });
 
@@ -19539,7 +19700,7 @@ test('Food & Drink sort: Recommended weighs rating by review count, ignores edit
   assert.deepEqual(app.sortFoodDrinkVenues(list, 'az').map((v) => v.name), ['14th Ave', 'Few Reviews', 'Proven', 'Unrated']);
   // Local Favourite / Hidden Gem never change the score: no featured placement by the back door.
   assert.equal(app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100)), app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100, { local_favorite: 1, hidden_gem: 1 })));
-  assert.deepEqual(app.FD_SORTS.map((s) => s.key), ['recommended', 'rating', 'az']);
+  assert.deepEqual(app.FD_SORTS.map((s) => s.key), ['recommended', 'nearest', 'rating', 'az']);
 });
 
 test('Food & Drink hub: ?sort= picks the order, the page script can re-sort, and unknown values fall back to Recommended', async () => {
@@ -19579,22 +19740,16 @@ test('Food & Drink payload hours: the compact string expands back to exactly wha
   assert.equal(app.compactFoodDrinkHours(odd), odd, 'anything unusual ships unchanged');
 });
 
-test('Food & Drink cards: an example photo of the place type on every hub card, real files only, and a venue photo wins', () => {
+test('Food & Drink cards: the venue\'s own photo or the no-photo panel, never an example photo (2026-10-28)', () => {
   const all = [...Object.values(app.FD_CARD_PHOTOS).flat(), ...Object.values(app.FD_CARD_DOG_PHOTOS), '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg'];
   for (const src of all) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
   const venues = app.getFoodDrinkHubVenues();
   const html = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
   const cards = html.match(/<li class="venue-card"[^>]*>/g) || [];
   assert.equal(cards.length, venues.length);
-  assert.ok(cards.every((c) => /data-ph="[a-z]+(?:-(?:\d|dog))?"/.test(c)), 'every card names its photo');
-  for (const key of new Set(cards.map((c) => c.match(/data-ph="([^"]+)"/)[1]))) assert.ok(html.includes(`li.venue-card[data-ph="${key}"]{--fd-ph:url(`), key);
+  assert.ok(cards.every((c) => /data-ph="(?:own|none)"/.test(c)), 'own photo or none');
+  if (cards.some((c) => c.includes('data-ph="none"'))) assert.match(app.withLazyCardPhotos(html), /:is\(\[data-ph="none"\], \[data-card-ph="none"\]\)::before \{ background: #EEE8DC url\("data:image\/svg\+xml/);
   assert.equal(app.foodDrinkCardPhotoKey({ id: 7, type: 'restaurant', cuisine: 'Ramen' }), 'noodle');
-  // No twin example photos in a row: a key is never the same as one of the
-  // three cards before it when its kind has another photo to swap in.
-  const keys = cards.map((c) => c.match(/data-ph="([^"]+)"/)[1]).filter((k) => /^[a-z]+-\d+$/.test(k));
-  keys.forEach((k, i) => {
-    if ((app.FD_CARD_PHOTOS[k.split('-')[0]] || []).length > 3) assert.ok(!keys.slice(Math.max(0, i - 3), i).includes(k), `${k} repeats at card ${i}`);
-  });
   const spread = app.photoKeySpreader();
   assert.deepEqual(['winery-1', 'winery-1', 'winery-1', 'own', 'beach-0'].map(spread), ['winery-1', 'winery-2', 'winery-3', 'own', 'beach-0']);
   assert.equal(app.foodDrinkCardPhotoKey({ id: 9, type: 'pub', dog_friendly: 1 }), 'pub-dog');
@@ -19644,7 +19799,7 @@ test('Food & Drink search: every word in any order, plurals, accents, synonyms, 
   const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
   const vm = require('node:vm');
   const texts = ['Kelowna Restaurants Patio The best tacos in town', 'Penticton Cafes Coffee and croissants', 'Kelowna Cafes Sushi bar', 'Vernon Breweries Craft beer and a taco truck', 'Kelowna Restaurants Open early breakfast', "Earls Kitchen + Bar Kelowna Restaurants", 'Kelowna Cafés crème brûlée'];
-  const ctx = {};
+  const ctx = { welcoming: false };
   vm.runInNewContext(`${src}; var cards = ${JSON.stringify(texts)}.map(function(t){ return { __fd: fdFold(t) }; }); function hitsRaw(q){ searchPlan = fdPlan(q); return cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; }); } this.hits = function(q){ return JSON.stringify(hitsRaw(q)); }; this.plan = function(q){ return fdPlan(q); };`, ctx);
   const H = (q) => JSON.parse(ctx.hits(q));
   assert.deepEqual(H('kelowna patio'), [0]);
@@ -19683,17 +19838,13 @@ test('Venue page: Food & Drink pages offer Favorite / Add to trip; every type ha
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
 });
 
-test('Venue page hero: an example photo of the place type, labelled, never in alt text; a venue photo wins and is not labelled', () => {
+test('Venue page hero: only the place\'s own photo; without one, the plain title hero and no "Example photo" (2026-10-28)', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.match(html, /<img class="venue-hero-img" src="\/images\/food-drink\/restaurants\.jpg" srcset="\/images\/food-drink\/restaurants-800\.jpg 800w, \/images\/food-drink\/restaurants-1200\.jpg 1200w, \/images\/food-drink\/restaurants\.jpg 1600w"[^>]* alt=""/);
-  assert.match(html, /<span class="venue-hero-example">Example photo<\/span>/);
-  for (const type of Object.keys(app.CATEGORY_LABELS)) {
-    const p = app.venueHeroPhoto({ ...venue, type });
-    if (p) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', p.src)), `${type}: ${p.src}`);
-  }
+  assert.doesNotMatch(html, /<img class="venue-hero-img"|<span class="venue-hero-example">/);
+  for (const type of Object.keys(app.CATEGORY_LABELS)) assert.equal(app.venueHeroPhoto({ ...venue, type, image_url: null }), null, type);
   assert.deepEqual(app.venueHeroPhoto({ ...venue, image_url: '/images/food-drink/cafes-800.jpg' }), { src: '/images/food-drink/cafes-800.jpg', small: null, alt: venue.name, pos: 50, example: false });
-  assert.equal(app.venueHeroPhoto({ ...venue, image_url: "javascript:alert(1)" }).example, true, 'a bad image_url is ignored');
+  assert.equal(app.venueHeroPhoto({ ...venue, image_url: "javascript:alert(1)" }), null, 'a bad image_url is ignored');
 });
 
 test('Venue page open-now line: hours.js on the Okanagan clock, French wording, none with an advisory or without hours', () => {
@@ -19718,11 +19869,13 @@ test('Venue page open-now line: hours.js on the Okanagan clock, French wording, 
 test('Venue page layout: details in a sidebar without repeating type, town or rating; the address carries the map link', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  const aside = html.slice(html.indexOf('<aside class="venue-aside">'), html.indexOf('</aside>'));
-  assert.ok(html.indexOf('<div class="venue-layout">') < html.indexOf('<div class="venue-main">'));
-  assert.match(aside, /<h2>Good to Know<\/h2>/);
+  // Food & Drink layout (2026-11-07): the facts sit in the "Your visit, made easy" sidebar beside the main column.
+  const aside = html.slice(html.indexOf('<aside class="fd-aside">'), html.indexOf('</aside>'));
+  assert.ok(html.indexOf('<div class="fd-layout">') < html.indexOf('<div class="fd-content">'));
+  assert.match(aside, /<h2>Your visit, made easy<\/h2>/);
   assert.doesNotMatch(aside, /<span class="label">(?:Type|Region|Rating)<\/span>/);
-  assert.match(aside, /<span class="label">Address<\/span><span>[^<]+<br><a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496"[^>]*>View on map ↗<\/a>/);
+  assert.match(aside, /<span class="label">Address<\/span><span>[^<]+<\/span>/);
+  assert.doesNotMatch(aside, /class="map-link"/, 'the address no longer repeats the map link (2026-11-01)');
   assert.doesNotMatch(html, /class="venue-section venue-location"/, 'no separate Location box when there is an address');
   assert.match(html, /<style id="venue-page-layout">/);
 });
@@ -19754,7 +19907,8 @@ test('Venue page picks: related ranks by review-weighted rating with the same cu
   assert.ok(Math.abs(app.venueDistanceKm({ latitude: 49.888, longitude: -119.496 }, { latitude: 49.888, longitude: -119.482 }) - 1.0) < 0.05);
   const brewery = app.findVenueBySlug('kelowna', 'brewery', 'buffalo-rouge-brewing-co');
   const html = app.renderVenuePage(venue, [], [{ ...brewery, distance_km: 0.42 }], []);
-  assert.match(html, /<div class="related-card related-card-brewery has-photo">\s*<img class="related-photo" src="\/images\/[^"]+" alt="" loading="lazy" width="480" height="270">/);
+  // Real photos only (2026-10-28): a related place without its own photo gets the no-photo band, not a stock photo.
+  assert.match(html, /<div class="related-card related-card-brewery">/);
   assert.match(html, /<div class="related-meta">[^<]*400 m /);
 });
 
@@ -19781,7 +19935,7 @@ test('Wineries hub: search, regions, winery features, Open now and Sort; best fi
   const html = app.renderWineriesHubPage(venues, { types: [], features: [], regions: [] });
   assert.match(html, /<title>Wineries in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/wineries">/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page winery-page wine-hub-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh winery-page wine-hub-page">/);
   assert.match(html, /placeholder="Search by name, town or wine\.\.\."/);
   assert.match(html, /id="fdRegionsBtn"/);
   assert.match(html, /id="fdFeaturesBtn"/);
@@ -19835,6 +19989,44 @@ test('Description rewrites: every entry is complete, rating-free and guarded by 
 });
 
 // ---------- Sports & Recreation hub (2026-10-14) ----------
+test('Cards: Free is the first badge, ahead of the Dog Friendly collection badge', () => {
+  assert.equal(app.freeChipFirst('<span class="chip">Dog Friendly</span> <span class="chip chip-feat">Free</span> <span class="chip">Lake view</span>'),
+    '<span class="chip chip-feat">Free</span> <span class="chip">Dog Friendly</span> <span class="chip">Lake view</span>');
+  const noFree = '<span class="chip">Dog Friendly</span> <span class="chip">Lake view</span>';
+  assert.equal(app.freeChipFirst(noFree), noFree);
+});
+
+test('Sports hub: a free park keeps its own badges on the card (top two + N), other pages still leave the expected ones off', () => {
+  const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
+  const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
+  assert.match(hub, /Free[^]*Dogs OK[^]*fd-extra-features[^]*Kids OK/, 'free and dogs remain visible; extra amenities expand');
+  assert.match(hub, /body\.sports-hub-page\.golf-page \.card-grid > li\.venue-card[^{]*> \.chips:not\(:empty\) \{ display: flex !important; \}/, 'badge row shown on trail and park cards too');
+  // Free-or-price is the first badge on every card (2026-11-02); the default card still leaves the third badge off.
+  assert.match(app.cardBadgeChipsHtml(park), /Free[^]*Dogs OK/);
+  assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids OK/);
+  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs OK[^]*Kids OK/, 'Free is the first badge');
+});
+
+test('Sports hub: cross-listed courts show their sport note without unrelated centre admission or hours', () => {
+  const centre = {id:1553, name:'Fixture Recreation Centre', type:'indoor', region:'kelowna', slug:'fixture-recreation-centre', description:'A pool and fitness centre.'};
+  const notes = new Map([[1553,'12 outdoor pickleball and 6 tennis courts outside']]);
+  const html = app.renderSportsHubPage([], [centre], notes, {types:['courts'], features:[], regions:[]});
+  assert.match(html, /sports-play-info[^]*12 outdoor pickleball and 6 tennis courts outside/);
+  assert.match(html, /Activity hours: check venue details/);
+  assert.doesNotMatch(html, /From \$9/);
+  assert.match(html, /card-slot-fee \{display:block!important;/, 'sport details remain visible in the compact card');
+});
+
+test('Sports hub: Covered / Indoor is read from the place and shows as a filter and a card badge', () => {
+  const arenas = [1, 2, 3].map((n) => ({ id: 9200 + n, name: `Fixture Arena ${n}`, region: 'vernon', type: 'sport', slug: `fixture-arena-${n}`, description: 'An ice arena.', kid_friendly: 1 }));
+  const html = app.renderSportsHubPage(arenas, [], new Map(), { types: [], features: [], regions: [] });
+  assert.match(html, /data-fd-feature="covered"/, 'filter offered');
+  assert.doesNotMatch(html, /data-fd-feature="lit"/, 'no filter for an attribute nobody has');
+  assert.match(html, /Covered<\/span>|Kids OK[^]*Covered/, 'badge on the card');
+  assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Skate Park', type: 'sport' }).covered, undefined);
+  assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Arena', type: 'sport' }).covered, 1);
+});
+
 test('Sports hub: one list, activity chips, Biggest first from the stated size, a Play line and activity photo on every card', () => {
   assert.ok(app.sportScaleScore({ name: 'A', description: '' }, 'MTB network: 107 trails, 150+ km singletrack') > app.sportScaleScore({ name: 'B', description: 'A small skate park.' }, 'Skate park'));
   assert.ok(app.sportScaleScore({ name: 'Resort', description: 'A short 30-minute drive, 33 km from town, with 80 runs.' }, '9-hole disc golf course') < app.sportScaleScore({ name: 'X', description: '' }, 'Freeride MTB network: 65 trails, 68+ km'), 'a drive or ski runs are not trail');
@@ -19843,14 +20035,19 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   const notes = new Map([[9002, 'MTB network: 60 trails, 70 km singletrack']]);
   const html = app.renderSportsHubPage([own], [big], notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">2 places to play</);
+  assert.match(html, /Mountain biking network: 60 trails, 70 km of narrow trails/);
+  assert.match(html, /Tennis, Pickleball &amp; More/);
+  assert.match(html, /Numbers show how many places match each filter/);
+  assert.match(html, /Numbers show how many places match each activity/);
+  assert.match(html, /bottom:auto!important;max-height:calc\(100dvh - 92px\)!important/);
   assert.ok(html.indexOf('data-venue-name="Fixture Trail Network"') < html.indexOf('data-venue-name="Fixture Skate Park"'), 'biggest first');
-  assert.match(html, /<span class="card-note-label">Play:<\/span> MTB network: 60 trails, 70 km singletrack/);
-  assert.match(html, /<span class="card-note-label">Play:<\/span> Skate Parks &amp; BMX/);
-  assert.match(html, /data-venue-id="9002"[^>]*data-ph="bike-\d"/);
-  assert.match(html, /data-venue-id="9001"[^>]*data-ph="skate-0"/);
+  assert.doesNotMatch(html, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
+  assert.match(html, /Skate Parks &amp; BMX/);
+  assert.match(html, /data-venue-id="9002"[^>]*data-ph="none"/);
+  assert.match(html, /data-venue-id="9001"[^>]*data-ph="none"/);
   for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
-  assert.match(html, /data-fd-type="skate" aria-pressed="false">Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
-  assert.match(html, /<option value="recommended" selected>Biggest first<\/option><option value="town">By town<\/option>/);
+  assert.match(html, /data-fd-type="skate" aria-pressed="false">🛹 Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /<option value="recommended" selected>Largest places first<\/option><option value="town">By town<\/option>/);
   assert.match(html, /if \(key === 'town'\)/, 'the page can sort by town');
   assert.match(html, /<a href="\/sports\/bike">Mountain Biking <span>1<\/span><\/a>/, 'activity pages stay linked');
   assert.match(html, /"bike":"Mountain Biking"/, 'search knows the activity names');
@@ -19873,16 +20070,20 @@ test('Indoor hub: one list, experience chips incl. Indoor Golf, a real Family Fu
   const notes = new Map([[9106, 'Bowling lanes and arcade']]);
   const html = app.renderIndoorHubPage(indoor, golf, also, notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">6 places</);
-  assert.match(html, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /data-fd-type="golf" aria-pressed="false">⛳ Indoor Golf <span class="outdoor-activity-count">1<\/span>/);
   // Family Fun is the hands-on places, not every kid-friendly listing; never the brewery.
   assert.deepEqual(app.indoorExperiencesOf(indoor[2], null), ['family']);
   assert.ok(!app.indoorExperiencesOf(indoor[1], null).includes('family'), 'a kid-friendly gallery is not Family Fun');
   assert.ok(!app.indoorExperiencesOf(also[0], notes.get(9106)).includes('family'), 'a brewery is never Family Fun');
   assert.ok(app.indoorExperiencesOf(also[0], notes.get(9106)).includes('games'));
   assert.match(html, /id="fdOpenNow"/);
+  assert.match(html, /fd-page fd-refresh indoor-page/);
+  assert.match(html, /Choose a town/);
+  assert.match(html, /id="indoorSortHelp"/);
+  assert.match(html, /data-fd-close>Close ×/);
   assert.match(html, /<span class="card-note-label">Rainy day:<\/span> Bowling lanes and arcade/);
-  assert.match(html, /data-venue-id="9105"[^>]*data-ph="simgolf-0"/);
-  assert.match(html, /data-venue-id="9103"[^>]*data-ph="family-0"/);
+  assert.match(html, /data-venue-id="9105"[^>]*data-ph="none"/);
+  assert.match(html, /data-venue-id="9103"[^>]*data-ph="none"/);
   for (const k of ['arts', 'family', 'games', 'spas', 'theatre', 'indoorall', 'simgolf']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
   assert.match(html, /<option value="recommended" selected>Recommended<\/option><option value="town">By town<\/option>/);
   assert.match(html, /var SEARCH_LABELS = \{"arts":"museum gallery"/, 'chip labels never widen search ("escape room")');
@@ -19896,7 +20097,7 @@ test('Shared directory search: short words match whole words, swapped letters co
   const script = html.match(/<script>\s*\(function\(\)\{\s*var LABELS[\s\S]*?<\/script>/)[0];
   const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
   const vm = require('node:vm');
-  const ctx = {};
+  const ctx = { welcoming: false };
   vm.runInNewContext(`${src}; var cards = ${JSON.stringify(['Kelowna Thermal spa and steam', 'A spacious play space', 'Exit Escape Games'])}.map(function(t){ return { __fd: fdFold(t) }; }); this.hits = function(q){ searchPlan = fdPlan(q); return JSON.stringify(cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; })); }; this.plan = function(q){ return JSON.stringify(fdPlan(q)); };`, ctx);
   assert.deepEqual(JSON.parse(ctx.hits('spa')), [0], '"spa" is not "space"');
   assert.equal(JSON.parse(ctx.plan('escpae')).corrected, 'escape');
@@ -19951,7 +20152,7 @@ test("What's On cards: template write-ups become a short summary + source line; 
 test("What's On page: soonest first under headings, every card a photo, 48 per page with Show more", async () => {
   const html = app.renderWhatsOnPage(null, {});
   assert.match(html, /<style id="whatson-list">/);
-  assert.match(html, /const PAGE = |var page = 1, busy = false, PAGE = 48;/);
+  assert.match(html, /const PAGE = |var page = 1, (?:busy = false, )?PAGE = 48;/);
   assert.match(html, /<button type="button" class="whatson-show-more" id="whatsOnShowMore" hidden>Show more<\/button>/);
   const heads = [...html.matchAll(/<li class="whatson-group-head" data-group="([^"]+)"/g)].map((m) => m[1]);
   const order = ['today', 'tomorrow', 'week', 'ongoing', 'next-week'];
@@ -19985,7 +20186,8 @@ test('Event page: photo, status line, short summary, Tickets / directions / cale
   assert.match(page, /<div class="event-hero"><img src="[^"]+"/);
   assert.match(page, /<div class="event-layout">[\s\S]*<aside class="event-aside">/);
   assert.match(page, /<a class="cta event-cta-primary" href="https:\/\/example\.com\/festival"[^>]*>Tickets &amp; info/);
-  assert.match(page, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&amp;query=[^"]+"[^>]*>Get directions<\/a>/);
+  // Get directions opens the built-in map (data-roam-directions, 2026-11); without it the link is Google Maps.
+  assert.match(page, /href="[^"]+" data-roam-directions[^>]*>Get directions<\/a>|href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&amp;query=[^"]+"[^>]*>Open in Google Maps<\/a>/);
   assert.match(page, /href="\/kelowna\/events\/test-future-festival\/calendar\.ics" download>Add to calendar<\/a>/);
   assert.match(page, /<p class="event-status">/);
   const cal = await fetch(`${base}/kelowna/events/test-future-festival/calendar.ics`);
@@ -20112,8 +20314,8 @@ test('Footer (2026-10-14): About, Privacy and Terms pages exist, are linked from
   for (const w of ['Google Analytics', 'FormSubmit', 'PIPEDA', 'info@okanaganroam.com']) assert.ok(privacy.includes(w), `privacy mentions ${w}`);
   const footer = app.renderHomeFooterHTML();
   assert.match(footer, /<a href="\/privacy">Privacy<\/a>/);
-  assert.match(footer, /<a href="\/terms">Terms<\/a>/);
-  assert.match(footer, /<a href="\/destinations">See all destinations &rarr;<\/a>/);
+  assert.match(footer, /<a href="\/terms"(?: data-i18n="footer\.terms")?>Terms<\/a>/);
+  assert.match(footer, /<a href="\/destinations"(?: data-i18n="footer\.allDestinations")?>See all destinations &rarr;<\/a>/);
   const sitemap = await (await fetch(base + '/sitemap.xml')).text();
   for (const p of ['/about', '/privacy', '/terms']) assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`));
 }));
@@ -20158,7 +20360,7 @@ test('Venue lookup (2026-10-14): name search for the listing forms, at most 8, p
   const any = db.prepare("SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL LIMIT 1").get();
   const hits = app.venueLookup(any.name.slice(0, 6));
   assert.ok(hits.length >= 1 && hits.length <= 8);
-  for (const h of hits) assert.deepEqual(Object.keys(h).sort(), ['name', 'region', 'type', 'url']);
+  for (const h of hits) assert.deepEqual(Object.keys(h).sort(), ['claim', 'claimFr', 'id', 'name', 'region', 'type', 'typeFr', 'url', 'urlFr']); // French page + claim links added since
   const res = await fetch(`${base}/api/venue-lookup?q=${encodeURIComponent(any.name.slice(0, 6))}&region=${any.region}`);
   assert.equal(res.status, 200);
   assert.ok((await res.json()).venues.every((h) => h.region === app.REGION_LABELS[any.region]));
@@ -20207,7 +20409,7 @@ test('My Trip (2026-10-14): /api/trip-stops describes each stop, /my-trip is a p
   assert.equal(out.length, 2, 'malformed refs are skipped');
   assert.equal(out[0].name, v.name);
   assert.equal(out[0].url, `/${v.region}/${app.CATEGORY_SLUGS[v.type]}/${v.slug}`);
-  assert.match(out[0].photo, /^\/images\//);
+  assert.ok(out[0].photo === null || /^\/images\//.test(out[0].photo), 'the place\'s own photo or none');
   assert.match(out[0].query, /Okanagan Valley, BC$/);
   assert.deepEqual(out[1], { ref: 'venue:999999999', missing: true });
   const api = await (await fetch(`${base}/api/trip-stops?refs=venue:${v.id}`)).json();
@@ -20267,7 +20469,7 @@ test('Sections on the shared engine (2026-10-14): Outdoors, Beaches, Tours, Ski 
   if (golf.status === 200) {
     const gh = await golf.text();
     assert.doesNotMatch(gh, /Value index unavailable/);
-    assert.match(gh, /data-card-ph style="--card-ph:url\('/);
+    assert.match(gh, /data-card-ph(?: style="--card-ph:url\('|="none")/);
   }
 }));
 
@@ -20355,13 +20557,14 @@ test('French twins: the word list and its patterns (times, opening status, count
   assert.equal(app.frText('Some sentence nobody has translated'), null, 'unknown text stays as it is');
 });
 
-test('French twins: /fr/food-drink is the Food & Drink page in French, paired with the English page', () => withDiscoveryServer(async (base) => {
+test('French twins: /fr/food-drink is the Food & Drink page in French, paired with the English page', () => withFrenchDescriptions(() => withDiscoveryServer(async (base) => {
   const res = await fetch(`${base}/fr/food-drink`);
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.match(html, /<html lang="fr" data-page-lang="fr">/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/food-drink">/);
-  assert.match(html, /<link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/food-drink">\n<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink">\n<link rel="alternate" hreflang="x-default" href="https:\/\/okanaganroam\.com\/food-drink">/);
+  if (frenchPairsLive()) assert.match(html, /<link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/food-drink">\n<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink">\n<link rel="alternate" hreflang="x-default" href="https:\/\/okanaganroam\.com\/food-drink">/);
+  else assert.doesNotMatch(html, /hreflang="(?:en-CA|fr-CA|x-default)"/, 'no hreflang pair while French pages are noindex (2026-10-19)');
   assert.match(html, /<meta property="og:locale" content="fr_CA">/);
   assert.match(html, /<title>Où manger et boire dans l’Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /<h1 id="fdHeading">Où manger et boire dans l’Okanagan<\/h1>/);
@@ -20376,12 +20579,13 @@ test('French twins: /fr/food-drink is the Food & Drink page in French, paired wi
   const en = await (await fetch(`${base}/food-drink`)).text();
   assert.match(en, /<html lang="en" data-page-lang="en">/);
   assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
-  assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
+  if (frenchPairsLive()) assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
+  else assert.doesNotMatch(en, /hreflang="fr-CA"/);
   assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
   const nf = await fetch(`${base}/fr/kelowna/events/no-such-event`);
   assert.equal(nf.status, 404, 'a missing event has no French page (round 9: every real one does)');
   assert.match(await nf.text(), /<html lang="fr" data-page-lang="fr">/, 'the /fr 404 page is French');
-}));
+})));
 
 test('French twins: a French place page links up to the French town page but keeps its English switch', () => withDiscoveryServer(async (base) => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
@@ -20394,6 +20598,10 @@ test('French twins: a French place page links up to the French town page but kee
 test('French twins: the sitemap lists each main and town page in both languages, each naming the pair', () => {
   const entry = (p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>2026-10-14</lastmod>\n  </url>`;
   const out = app.withFrenchTwinEntries([entry('/kelowna'), entry('/whats-on'), entry('/kelowna/restaurants/test-trattoria')]);
+  if (!frenchPairsLive()) {
+    assert.deepEqual(out, [entry('/kelowna'), entry('/whats-on'), entry('/kelowna/restaurants/test-trattoria')], 'no French URLs in the sitemap while French pages are noindex (2026-10-19)');
+    return;
+  }
   assert.equal(out.length, 5, 'one extra entry each for /fr/kelowna and /fr/whats-on');
   assert.match(out[1], /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna<\/loc>\n    <xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna"\/>/);
   assert.match(out[0], /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna"\/>/);
@@ -20416,12 +20624,12 @@ test('What\'s On town pages: only that town (and valley-wide) events, a change-t
 test('Near-me map: Near me, Places/Events, Open now and Directions; the location is never sent anywhere', () => withDiscoveryServer(async (base) => {
   const html = await (await fetch(`${base}/map`)).text();
   // Full-screen map app: search and quick chips float on the map, a round locate button, the list in a bottom sheet, the rest behind Filters.
-  assert.match(html, /<div class="pm-stage" id="pmStage">\s*<div id="okMap"/);
+  assert.match(html, /<div class="pm-stage[^"]*" id="pmStage">\s*<div id="okMap"/);
   assert.match(html, /<button type="button" class="pm-locate" id="pmNear" aria-pressed="false">/);
   assert.match(html, /<section class="pm-sheet" id="pmSheet" data-state="peek"/);
   assert.match(html, /id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"/);
   assert.match(html, /<div class="pm-panel" id="pmPanel" hidden/);
-  assert.match(html, /<h1 class="visually-hidden">Roam Now: map of what’s open near you in the Okanagan<\/h1>/);
+  assert.match(html, /<h1>Find your kind of nearby\.<\/h1>/, 'Roam Now redesign (2026-11): a visible heading');
   assert.match(html, /id="pmTabPlaces" aria-selected="true"/);
   assert.match(html, /id="pmTabEvents" aria-selected="false"/);
   assert.equal((html.match(/data-pm-open aria-pressed="false"/g) || []).length, 2, 'Open now as a quick chip and in Filters');
@@ -20429,7 +20637,9 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
   assert.match(src, /navigator\.geolocation\.watchPosition\(onPos, onErr/, 'location only after Near me, watched while the page is open');
   assert.match(src, /document\.addEventListener\('visibilitychange'/, 'no location updates in the background');
-  assert.doesNotMatch(src, /fetch\([^)]*me\.|localStorage|sessionStorage|document\.cookie/, 'the position is never sent, stored or put in an address');
+  // sessionStorage only keeps the page address to return to ('roamReturn'), never the position.
+  assert.doesNotMatch(src, /fetch\([^)]*me\.|localStorage|document\.cookie/, 'the position is never sent, stored or put in an address');
+  assert.equal((src.match(/sessionStorage/g) || []).length, (src.match(/sessionStorage\.(?:get|set)Item\('roamReturn'/g) || []).length, 'sessionStorage holds only the return address');
   assert.match(src, /https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/);
   assert.match(src, /https:\/\/maps\.apple\.com\/\?daddr=/);
   const conf = JSON.parse(src.match(/var CONF = (\{[\s\S]*?\});\n/)[1]);
@@ -20442,7 +20652,7 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   }
   assert.ok(Array.isArray(data.e));
   const fr = await (await fetch(`${base}/fr/map`)).text();
-  assert.match(fr, /<h1 class="visually-hidden">Carte de ce qui est ouvert près de vous dans l’Okanagan \(Roam Now\)<\/h1>/);
+  assert.match(fr, /<h1>Trouvez votre prochaine découverte\.<\/h1>/);
   assert.match(fr, /<h2 id="pmPanelTitle">Filtres<\/h2>/);
   // The Okanagan only, and a pin to drop for visitors who are elsewhere (or without location).
   assert.match(html, /<button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false">/);
@@ -20543,7 +20753,7 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
-  assert.match(home, /<a class="hero-near-me" href="\/map#near-me">/);
+  assert.match(home, /<a class="hero-action" href="\/map#near-me">/);
   const manifest = await (await fetch(`${base}/site.webmanifest`)).json();
   assert.equal(manifest.shortcuts[0].url, '/map#near-me');
 }));
@@ -20630,6 +20840,10 @@ test('Owner portal: edit link, owner page, change request, review and approval',
     assert.equal(reqRow.venue_name, 'Owner Portal Fixture');
     assert.equal(reqRow.previous.badges.patio, false);
     assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /waiting for review/);
+    // Saving again with nothing new while earlier changes wait says they are safe (2026-11-07).
+    const nothingNew = await send(token, { changes: { badges: {} }, started_at: started });
+    assert.equal(nothingNew.status, 400);
+    assert.match(nothingNew.body.errors.form, /already waiting for review/);
 
     // A newer request is added to the older pending one (2026-10-15): the earlier
     // fields stay, the field sent again takes the new value, and it is reviewed once.
@@ -20762,7 +20976,8 @@ test('Owner portal: photo uploads are private until approved, then can become th
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${row.file}`);
     const page = await fetch(`${base}/kelowna/cafes/owner-photos-fixture`).then((r) => r.text());
     assert.match(page, new RegExp(`/images/owner/${row.file}`));
-    assert.match(page, /Photo: Owner Photos Fixture/);
+    // 2026-10-29: the owner's credit defaults to the business's own name, which the page no longer repeats under the photo.
+    assert.doesNotMatch(page, /Photo: Owner Photos Fixture/);
     // Rejecting deletes the file.
     const second = await up(good);
     const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(second.body.id);
@@ -21463,23 +21678,23 @@ test('Last updated (2026-10-15): only the owner\'s own changes date the listing,
   const listing = '/kelowna/cafes/last-updated-fixture';
   try {
     // Never touched by an owner: no date anywhere.
-    assert.doesNotMatch(await get(listing), /Verified by the venue/);
+    assert.doesNotMatch(await get(listing), /Verified by the business/);
     // Our own edit (admin) does not count.
     app.updateVenue(v.id, { description: 'Changed by us, not the owner. A cozy cafe in Kelowna.' });
-    assert.doesNotMatch(await get(listing), /Verified by the venue/);
+    assert.doesNotMatch(await get(listing), /Verified by the business/);
     // A rejected owner update does not count either.
     const r1 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0181' }, started_at: Date.now() - 10000 });
     await post(`/admin/owner-changes/${r1.body.id}/reject`, { reviewer: 'dayton', reason: 'x' }, { Authorization: `Bearer ${LYV_TOKEN}` });
-    assert.doesNotMatch(await get(listing), /Verified by the venue/);
+    assert.doesNotMatch(await get(listing), /Verified by the business/);
     // The owner's update that went live dates it, by when the owner sent it.
     const r2 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0182' }, started_at: Date.now() - 10000 });
     db.prepare("UPDATE owner_change_requests SET submitted_at = '2026-09-02 18:30:00' WHERE id = ?").run(r2.body.id);
     const ok = await post(`/admin/owner-changes/${r2.body.id}/approve`, { reviewer: 'dayton' }, { Authorization: `Bearer ${LYV_TOKEN}` });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
-    assert.match(await get(listing), /<span class="venue-verified" title="The business manages this listing on Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;<\/span>Verified by the venue <span class="venue-verified-date">&middot; updated Sept 2, 2026<\/span><\/span>/);
+    assert.match(await get(listing), /<span class="venue-verified" title="The business manages this listing on Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;<\/span>Verified by the business <span class="venue-verified-date">&middot; updated Sept 2, 2026<\/span><\/span>/);
     // Later edits by us leave the owner's date alone.
     app.updateVenue(v.id, { description: 'Changed by us again. A cozy cafe in Kelowna with pastries.' });
-    assert.match(await get(listing), /Verified by the venue <span class="venue-verified-date">&middot; updated Sept 2, 2026/);
+    assert.match(await get(listing), /Verified by the business <span class="venue-verified-date">&middot; updated Sept 2, 2026/);
     // The owner sees it too.
     assert.match(await get(`/owner/${token}`), /<p class="op-last">Last updated Sept 2, 2026<\/p>/);
     const cookie = (await post(`/owner/${token}/account`, { email: 'lastupdated@example.com', password: 'a long enough password' })).cookie;
@@ -21648,7 +21863,7 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
   try {
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
     assert.match(page, /id="opBizName" maxlength="100" value="Links Fixture Cafe"/);
-    assert.match(page, /<details class="op-fold" id="opLinksBox">\s*<summary><span class="lyv-section-label">Name, address &amp; links<\/span>/, 'folded by default');
+    assert.match(page, /<details class="op-fold" id="opLinksBox" data-task="contact">\s*<summary><span class="lyv-section-label">Name, address &amp; links<\/span>/, 'folded by default');
     assert.match(page, /var fold = first\.closest\('details'\); if \(fold\) fold\.open = true;/, 'opens itself to show an error');
     assert.match(page, /id="opInstagram"[^>]*placeholder="@yourbusiness"/);
     // Bad input is refused with a clear message.
@@ -21663,8 +21878,12 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
       booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: '@links.fixture', facebook_url: 'facebook.com/linksfixture' });
     assert.equal(ok.status, 201, JSON.stringify(ok.body));
     const req = app.getOwnerChange(ok.body.id);
+    // Instagram and Facebook go live straight away (Dayton, 2026-11-09); name, address, menu and booking wait for review.
     assert.deepEqual(req.changes, { name: 'Links Fixture Cafe & Bakery', address: '1475 Fairview Road, Kelowna, BC', menu_url: 'https://linksfixture.ca/menu',
-      booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: 'https://www.instagram.com/links.fixture/', facebook_url: 'https://facebook.com/linksfixture' });
+      booking_url: 'https://www.opentable.ca/r/links-fixture' });
+    assert.deepEqual([...ok.body.live].sort(), ['facebook_url', 'instagram_url']);
+    assert.equal(app.venueLinks(v.id).instagram_url, 'https://www.instagram.com/links.fixture/');
+    assert.equal(app.venueLinks(v.id).facebook_url, 'https://www.facebook.com/linksfixture');
     // Nothing shows until approved.
     let listing = await fetch(`${base}/kelowna/cafes/links-fixture-cafe`).then((r) => r.text());
     assert.doesNotMatch(listing, /See the menu/);
@@ -21673,7 +21892,7 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
     assert.match(review, /check the map pin/);
     assert.match(review, /the page address \(URL\) stays the same/);
-    assert.match(review, /name="instagram_url" value="https:\/\/www\.instagram\.com\/links\.fixture\/"/);
+    assert.doesNotMatch(review, /name="instagram_url"/, 'Instagram went live, so it is not in the review');
     const appr = await post(`/admin/review/change/${ok.body.id}/approve`, {}, { Cookie: cookie });
     assert.equal(appr.status, 200, JSON.stringify(appr.body));
     const row = db.prepare('SELECT name, address, slug FROM venues WHERE id = ?').get(v.id);
@@ -21684,10 +21903,10 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     assert.match(listing, /<h1>Links Fixture Cafe &amp; Bakery<\/h1>|Links Fixture Cafe &amp; Bakery/);
     assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
     assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank" data-track="booking">Book<\/a>/);
-    assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
-    // The listing card shows the same links (2026-10-16).
+    assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/www\.facebook\.com\/linksfixture"/);
+    // Listing cards no longer show them (2026-10-29): Instagram and Facebook are on the venue page only.
     const cards = await fetch(`${base}/kelowna/cafes`).then((r) => r.text());
-    assert.match(cards, /<p class="card-social"[^>]*><a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank" aria-label="Links Fixture Cafe &amp; Bakery on Instagram"[^>]*>Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
+    assert.doesNotMatch(cards, /class="card-social"/);
     const logged = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(v.id).map((r) => r.field_name).sort();
     assert.deepEqual(logged, ['address', 'booking_url', 'facebook_url', 'instagram_url', 'menu_url', 'name']);
     // The form now starts from the new values, and a link can be removed.
@@ -21701,8 +21920,9 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
 
 test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar and leave warning, Make more changes', async () => {
   const http = require('node:http');
-  seasonInsert.run({ name: 'Unsent Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'unsent-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'cafe', 'unsent-fixture');
+  // A golf course: cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Unsent Fixture', type: 'golf', hours: SEASON_WEEK, slug: 'unsent-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'golf', 'unsent-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const handler = app.server.listeners('request')[0];
   const srv = http.createServer(handler);
@@ -21792,6 +22012,28 @@ test('Edit link re-sends (2026-10-18): repeated requests never push out the work
   assert.ok(app.venueForOwnerToken(t3));
 });
 
+test('Claim submission answers at once even when the email notice is slow (2026-11-07)', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Slow Notice Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'slow-notice-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'slow-notice-cafe');
+  db.prepare("UPDATE venues SET phone = '250-555-0188' WHERE id = ?").run(v.id);
+  let sent = 0;
+  app.setVenueSubmissionTransport(async () => { await new Promise((r) => setTimeout(r, 1500)); sent += 1; });
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const t0 = Date.now();
+    const r = await fetch(`${base}/api/claims`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.77.0.1' },
+      body: JSON.stringify({ venue_id: v.id, lang: 'en', started_at: Date.now() - 10000, company_website: '', name: 'Sam Slow', role: 'owner', email: 'sam@slownotice.example', phone: '250 555 0188', verify_method: 'call', verify_detail: '', message: '' }) });
+    assert.equal(r.status, 201);
+    assert.ok(Date.now() - t0 < 1200, `answered in ${Date.now() - t0} ms, not after the 1.5 s notice`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    assert.equal(sent, 1, 'the notice still goes out');
+    assert.equal(db.prepare('SELECT notify_status FROM venue_claims WHERE venue_id = ?').get(v.id).notify_status, 'sent');
+  } finally { srv.close(); app.setVenueSubmissionTransport(null); db.prepare('DELETE FROM venue_claims WHERE venue_id = ?').run(v.id); }
+});
+
 test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, storage, email to info@, admin approve makes a working link', async () => {
   const http = require('node:http');
   seasonInsert.run({ name: 'Claim Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'claim-fixture-cafe' });
@@ -21830,7 +22072,23 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(frForm, /<html lang="fr" data-page-lang="fr">/, 'French pass 6: the French twin markup, like the other French pages');
     assert.match(frForm, /<h1>Réclamer cette fiche<\/h1>/);
     assert.match(frForm, /Envoyer ma demande/);
-    assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
+    // A removed listing's claim link (2026-11-14): the town's list of that kind of place, or the town page when it has none; an unknown town still 404s.
+    const gone = await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`, { redirect: 'manual' });
+    assert.equal(gone.status, 302);
+    assert.equal(gone.headers.get('location'), '/kelowna/cafes');
+    assert.equal((await fetch(`${base}/fr/claim/kelowna/cafes/no-such-cafe`, { redirect: 'manual' })).headers.get('location'), '/fr/kelowna/cafes');
+    if (!db.prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL').get('kelowna', 'distillery')) {
+      assert.equal((await fetch(`${base}/claim/kelowna/distilleries/no-such-place`, { redirect: 'manual' })).headers.get('location'), '/kelowna');
+    }
+    assert.equal((await fetch(`${base}/claim/atlantis/cafes/no-such-cafe`, { redirect: 'manual' })).status, 404);
+    // An old claim link (emailed before the listing was renamed) follows the rename (2026-11-07).
+    db.prepare('INSERT OR REPLACE INTO venue_slug_redirects (region, type, old_slug, venue_id, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)').run('kelowna', 'cafe', 'claim-fixture-cafe-old', v.id);
+    const oldLink = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe-old?utm_medium=email`, { redirect: 'manual' });
+    assert.equal(oldLink.status, 301);
+    assert.match(oldLink.headers.get('location'), /^\/claim\/kelowna\/cafes\/claim-fixture-cafe(\?|$)/);
+    const oldFr = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe-old`, { redirect: 'manual' });
+    assert.equal(oldFr.status, 301);
+    assert.match(oldFr.headers.get('location'), /^\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe/);
 
     // Guards and validation; nothing stored.
     const before = db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n;
@@ -22009,7 +22267,7 @@ const OHB_QUESTIONS = [
   ['how do i put my menu on', 'edit', 'menu-add'], ['can i type the menu myself', 'menu', 'menu-add'], ['where is the log out button', 'settings', 'logout'],
   ['I didnt get the password reset email', 'forgot', 'noemail'], ['can 2 people manage the listing', 'account', 'staff'], ['how much does it cost to be featured', 'edit', 'cost'],
   ['someone else claimed my busness', 'claim', 'dispute'], ['we have diffrent hours on stat holidays', 'edit', 'seasonal-hours'], ['how do i make a login', 'edit', 'login-create'],
-  ['is the menu scan blury', 'menu', 'menu-blurry'], ['how do i set the hapy hour', 'edit', 'features'], ['i forgot my pasword', 'login', 'forgot'],
+  ['is the menu scan blury', 'menu', 'menu-blurry'], ['how do i set the hapy hour', 'edit', 'hh-times' /* cocktail test 3 (2026-11-14): happy hour times have their own answer */], ['i forgot my pasword', 'login', 'forgot'],
   ['photo upload keeps failing', 'edit', 'photo-small'], ['can i change hours without waiting for approval', 'edit', 'live-speed'], ['what does $$ mean', 'edit', 'price-range'],
   // French, on French and English pages alike.
   ['ou est le bouton pour me deconnecter', 'account', 'logout', 'fr'], ['nous sommes fermés le 25 décembre', 'edit', 'closures', 'fr'], ['comment ajouter des photos', 'edit', 'photo-add', 'fr'],
@@ -22085,7 +22343,8 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
     assert.match(signedIn[id].a, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
     assert.doesNotMatch(signedIn[id].a, /edit link we emailed you/, id);
     assert.match(signedIn[id].aFr, /href="\/fr\/owner\/account">Mes fiches<\/a> → <strong>Modifier la fiche<\/strong>/, id);
-    if (id !== 'access') assert.match(link[id].a, /the private link we emailed you/, id);
+    // Winery test 3 (2026-11-12): on her edit link already, never "the link we emailed you".
+    if (id !== 'access') { assert.match(link[id].a, /On your edit page/, id); assert.doesNotMatch(link[id].a, /emailed/, id); }
   }
   // People with access (PR #358): remove people added after you; anyone added before you goes to Dayton.
   for (const t of [signedIn.access, link.access, out.access, signedIn.staff]) {
@@ -22293,7 +22552,7 @@ test('Owner accessibility (2026-10-15): errors announce and tie to their box, de
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
     assert.doesNotMatch(page, /<p class="lyv-error" id="/, 'every error message has role=alert');
     assert.match(page, /<p class="lyv-error" role="alert" id="opDescriptionError" hidden><\/p>/);
-    assert.match(page, /<p class="lyv-section-label" id="opDescriptionLabel">Description<\/p>/);
+    assert.match(page, /<p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description<\/p>/);
     assert.match(page, /<textarea id="opDescription"[^>]*aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">/);
     assert.match(page, /input\.setAttribute\('aria-invalid', 'true'\)/);
     assert.match(page, /\.venue-form-submit:disabled::after \{ content: 'Sending…';/);
@@ -22328,9 +22587,15 @@ test('Venue photo gallery (2026-10-16): main photo plus approved owner photos op
   const slides = page.match(/<figure class="vg-slide"><img src="([^"]+)"/g).map((x) => x.match(/src="([^"]+)"/)[1]);
   assert.deepEqual(slides, ['/images/owner/galleryfixture0000000001.jpg', '/images/owner/galleryfixture0000000002.jpg', '/images/owner/galleryfixture0000000003.jpg'], 'main photo first, once; pending photos stay hidden');
   assert.match(page, /<figcaption>Photo: Gallery Cafe<\/figcaption>/);
+  // 2026-10-29: a credit that only repeats the venue's own name is left out of the viewer.
+  db.prepare("UPDATE owner_photos SET credit = 'Gallery Fixture Cafe' WHERE venue_id = ?").run(v.id);
+  const nameOnly = await fetch(`${base}/kelowna/cafes/gallery-fixture-cafe`).then((r) => r.text());
+  assert.doesNotMatch(nameOnly, /<figcaption>Photo: Gallery Fixture Cafe<\/figcaption>/);
+  db.prepare("UPDATE owner_photos SET credit = 'Gallery Cafe' WHERE venue_id = ?").run(v.id);
   // The thumbnails skip the main photo (it is already the big one) and open the viewer at photo 2.
   // Round 11 (2026-10-20): the strip is in the page twice, by the photo and after the buttons for phones (.vg-phone).
-  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 4);
+  // Food & Drink layout (2026-11-07): the thumbnails sit beside the photo on phones too, so the strip is in the page once.
+  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 2);
   assert.match(page, /<div class="vg-mosaic"><div class="venue-hero venue-hero-photo">[\s\S]*?<\/div><div class="vg-strip vg-count-2"><button type="button" class="vg-thumb" data-vg-open="1" aria-label="Open photo 2 of 3">/);
   assert.match(page, /<\/div><\/div><p class="venue-photo-credit"[^>]*>Photo: Gallery Cafe<\/p>/, 'credit sits under the whole gallery');
   assert.match(page, /aria-label="Next photo"/);
@@ -22350,22 +22615,16 @@ test('Venue galleries (2026-10-16): every photo in data/venue-gallery.json exist
   }
 });
 
-test('Related cards (2026-10-16): a venue page does not repeat one stock photo across its "Other ..." cards', () => withDiscoveryServer(async (base) => {
-  // Keep only wineries whose ids land on the same example photo (id % 5), the case that used to repeat.
+test('Related cards (2026-10-28): "Other ..." cards show only the places\' own photos, never a stock photo', () => withDiscoveryServer(async (base) => {
   const ids = [];
-  for (let i = 1; i <= 25; i += 1) ids.push(Number(seasonInsert.run({ name: `Stock Photo Fixture Winery ${i}`, type: 'winery', hours: SEASON_WEEK, slug: `stock-photo-fixture-winery-${i}` }).lastInsertRowid));
-  const keep = ids.filter((id) => id % 5 === ids[0] % 5);
-  for (const id of ids) if (!keep.includes(id)) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
-  assert.ok(keep.length >= 4);
-  const first = db.prepare('SELECT slug FROM venues WHERE id = ?').get(keep[0]).slug;
+  for (let i = 1; i <= 6; i += 1) ids.push(Number(seasonInsert.run({ name: `Stock Photo Fixture Winery ${i}`, type: 'winery', hours: SEASON_WEEK, slug: `stock-photo-fixture-winery-${i}` }).lastInsertRowid));
+  const first = db.prepare('SELECT slug FROM venues WHERE id = ?').get(ids[0]).slug;
   const page = await fetch(`${base}/kelowna/wineries/${first}`).then((r) => r.text());
   const section = page.slice(page.indexOf('Other wineries in'), page.indexOf('</div>\n      </div>', page.indexOf('Other wineries in')));
   const srcs = [...section.matchAll(/<img class="related-photo" src="([^"]+)"/g)].map((m) => m[1]);
-  assert.ok(srcs.length >= 3, `has photo cards (${srcs.length})`);
-  const stock = srcs.filter((s) => !/^\/images\/(?:venues|owner)\//.test(s));
-  const pool = 5; // the winery example photos
-  assert.equal(new Set(stock).size, Math.min(stock.length, pool), `no repeated stock photo: ${stock.join(', ')}`);
+  assert.ok(srcs.every((s) => /^\/images\/(?:venues|owner|hiking\/venues)\//.test(s)), `no stock photo: ${srcs.join(', ')}`);
 }));
+
 
 test('Venue page top and "More in" links (2026-10-16): back link and language switch share one line; guide links are chips', () => withDiscoveryServer(async (base) => {
   seasonInsert.run({ name: 'Top Links Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'top-links-fixture-cafe' });
@@ -22499,7 +22758,7 @@ test('Water Activities photos (2026-10-16): example photos exist in both sizes; 
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
     assert.ok(credits[rel], `${rel} is credited`);
   }
-  assert.equal(app.venueHeroPhoto({ id: 1448, name: 'Splashdown Vernon', type: 'outdoor' }).src, '/images/outdoors/examples/water-waterslide-2610.jpg');
+  assert.equal(app.venueHeroPhoto({ id: 1448, name: 'Splashdown Vernon', type: 'outdoor' }), null, 'real photos only (2026-10-28)');
 });
 
 // ---- Shareable trips (2026-10-16) ----
@@ -22617,11 +22876,12 @@ test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists
       if (process.env.DUMP_EN) require('node:fs').writeFileSync(process.env.DUMP_EN, page.text);
       assert.match(page.text, /At a glance/);
       // Linked from the town page, the town's wineries page and the /guides index.
-      assert.match((await WINTER_GET(base, '/peachland')).text, /Popular searches in Peachland[\s\S]*href="\/guide\/peachland\/dog-friendly-patios"/);
+      // The compact town page (2026-11) no longer carries a "Popular searches" list; the guide is reached from /guides, the category page and the sitemap.
       assert.match((await WINTER_GET(base, '/peachland/wineries')).text, /href="\/guide\/peachland\/wineries-with-lake-views"/);
       assert.match((await WINTER_GET(base, '/guides')).text, /href="\/guide\/peachland\/dog-friendly-patios"/);
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
-      assert.match(sitemap, /https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/);
+      // SEO (2026-10-19): a guide with fewer than MIN_INDEXABLE_GUIDE_VENUES (10) places is noindex and left out of the sitemap, together.
+      assert.equal(/https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/.test(sitemap), !/name="robots" content="noindex/.test(page.text));
     });
   } finally { for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
 });
@@ -22718,7 +22978,7 @@ test('Tours & Experiences photos (2026-10-16): example photos exist in both size
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
     assert.ok(credits[rel], `${rel} is credited`);
   }
-  assert.equal(app.venueHeroPhoto({ id: 1628, name: 'GottaGoat Farm', type: 'tour' }).src, '/images/outdoors/examples/tour-goat-2610.jpg');
+  assert.equal(app.venueHeroPhoto({ id: 1628, name: 'GottaGoat Farm', type: 'tour' }), null, 'real photos only (2026-10-28)');
 });
 
 // ---- Trip share cards over a photo (2026-10-17) ----
@@ -22872,8 +23132,12 @@ test('SEO audit fixes (2026-10-17): sitemap pages, .ics noindex, no hreflang on 
     const sitemap = (await get('/sitemap.xml')).text;
     for (const p of ['/trip', '/browse', '/list-your-venue', '/list-an-event']) {
       assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`), p);
-      assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com/fr${p}</loc>`), `/fr${p}`);
-      assert.match(sitemap, new RegExp(`hreflang="fr-CA" href="https://okanaganroam\\.com/fr${p}"`), `${p} alternates`);
+      if (frenchPairsLive()) {
+        assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com/fr${p}</loc>`), `/fr${p}`);
+        assert.match(sitemap, new RegExp(`hreflang="fr-CA" href="https://okanaganroam\\.com/fr${p}"`), `${p} alternates`);
+      } else {
+        assert.doesNotMatch(sitemap, new RegExp(`<loc>https://okanaganroam\\.com/fr${p}</loc>`), `/fr${p} stays out while French pages are noindex (2026-10-19)`);
+      }
     }
 
     // A calendar download is kept out of search.
@@ -22897,7 +23161,8 @@ test('SEO audit fixes (2026-10-17): sitemap pages, .ics noindex, no hreflang on 
     // A noindex page carries no hreflang; an indexable one does.
     const head = (robots) => `<!DOCTYPE html><html lang="en"><head>\n<link rel="canonical" href="https://okanaganroam.com/naramata/events">\n${robots}</head><body></body></html>`;
     assert.doesNotMatch(app.addTwinHead(head('<meta name="robots" content="noindex">\n'), '/naramata/events'), /hreflang/);
-    assert.match(app.addTwinHead(head(''), '/naramata/events'), /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/naramata\/events"/);
+    if (frenchPairsLive()) assert.match(app.addTwinHead(head(''), '/naramata/events'), /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/naramata\/events"/);
+    else assert.doesNotMatch(app.addTwinHead(head(''), '/naramata/events'), /hreflang/, 'no hreflang pair while French pages are noindex (2026-10-19)');
 
     // Field of Screams: its stored description has French, so it gets a French twin whose written title, description
     // and sections are French too.
@@ -23274,6 +23539,13 @@ test('Menus: the Claude request (model, refusal fallback, structured output) and
   assert.equal(app.menuPriceLabel('18'), '$18');
   assert.equal(app.menuPriceLabel('18.50', 'fr'), '18,50 $');
   assert.equal(app.menuPriceLabel('12 / 16'), '12 / 16');
+  // A decimal pads to cents and a size range gets a sign on both ends (Cue's Game Room, 2026-11-04).
+  assert.equal(app.menuPriceLabel('2.5'), '$2.50');
+  assert.equal(app.menuPriceLabel('9.5'), '$9.50');
+  assert.equal(app.menuPriceLabel('5 - 8'), '$5 - $8');
+  assert.equal(app.menuPriceLabel('11-16'), '$11 - $16');
+  assert.equal(app.menuPriceLabel('7 \u2013 11.5'), '$7 - $11.50');
+  assert.equal(app.menuPriceLabel('5 - 8', 'fr'), '5 - 8\u00a0$');
   assert.equal(app.menuPriceNumber('$18.50'), 18.5);
   assert.equal(app.menuPriceNumber('MP'), null);
   assert.deepEqual(app.normalizeMenuData({ sections: [{ name: 'Empty', items: [] }, { name: 'X', items: [{ name: '  ' }, { name: 'Tea', price: 3 }] }] }),
@@ -24142,7 +24414,7 @@ test('New business (2026-10-17): approval emails the owner their private edit li
     assert.match(approved.text, /tours & prices/);
     const page = await fetch(`${base}${link[1]}`).then((r) => r.text());
     assert.match(page, /Add your tours &amp; prices/);
-    assert.match(page, /<details class="op-fold" id="opLinksBox" open>/, 'booking link up front for a tour');
+    assert.match(page, /<details class="op-fold" id="opLinksBox"[^>]* open>/, 'booking link up front for a tour');
     const v = app.findVenueBySlug('kelowna', 'tour', 'ridge-test-tours');
     assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'ridge@example.com');
 
@@ -24189,15 +24461,22 @@ test('Owner season (2026-10-17): an owner sets "open May to October"; out of sea
     assert.match(page, /id="opSeasonMode"/);
     assert.match(page, /Create a login<\/strong> \(30 seconds\): your photos and prices then go live straight away/);
     assert.equal((await post(`/owner/${token}/changes`, { changes: { open_months: '6-6' }, started_at: Date.now() - 10000 })).status, 400);
-    const ch = await post(`/owner/${token}/changes`, { changes: { open_months: '11-4' }, started_at: Date.now() - 10000 });
+    // A two-month season that starts two months from today, so the venue is out of season whatever day the suite runs.
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const todayIso = app.todayLocal(); const curMonth = Number(todayIso.slice(5, 7));
+    const startM = ((curMonth + 1) % 12) + 1; const endM = (startM % 12) + 1;
+    const reopenYear = Number(todayIso.slice(0, 4)) + (startM > curMonth ? 0 : 1);
+    const seasonLabel = `${MONTHS[startM - 1]} – ${MONTHS[endM - 1]}`;
+    const reopenText = `${MONTHS[startM - 1]} 1${reopenYear === Number(todayIso.slice(0, 4)) ? '' : `, ${reopenYear}`}`;
+    const ch = await post(`/owner/${token}/changes`, { changes: { open_months: `${startM}-${endM}` }, started_at: Date.now() - 10000 });
     assert.equal(ch.status, 201, JSON.stringify(ch.body));
     const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
-    assert.match(await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text()), /November – April/);
+    assert.match(await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text()), new RegExp(seasonLabel));
     assert.equal((await post(`/admin/review/change/${ch.body.id}/approve`, {}, cookie)).status, 200);
-    // The test day is in July: a November-to-April business is out of season.
+    // The season starts two months from today: the business is out of season.
     const html = await fetch(`${base}/kelowna/tours/season-fixture-sleigh`).then((r) => r.text());
-    assert.match(html, /Open November – April each year/);
-    assert.match(html, /Closed for the season\. Reopens November 1/);
+    assert.match(html, new RegExp(`Open ${seasonLabel} each year`));
+    assert.match(html, new RegExp(`Closed for the season\\. Reopens ${reopenText}`));
     assert.doesNotMatch(html, /id="venueOpenStatus"/, "no Open now for her out of season");
   } finally {
     app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
@@ -24550,20 +24829,21 @@ test('Lazy card photos (2026-10-18): the first cards load at once, the rest wait
   try {
     for (const p of ['/restaurants', '/kelowna/restaurants', '/food-drink', '/fr/restaurants', '/browse']) {
       const html = await (await fetch(base + p)).text();
-      const tags = [...html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]).filter((t) => /data-(?:card-)?ph[ =]/.test(t));
-      assert.ok(tags.length > 8, `${p}: photo cards on the page`);
-      assert.deepEqual(tags.slice(0, 4).map((t) => /\sdata-lz\b/.test(t)), [false, false, false, false], `${p}: the first four load at once`);
+      const tags = [...html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]).filter((t) => /data-(?:card-)?ph[ =]/.test(t) && !/-ph="none"/.test(t));
+      // Real photos only (2026-10-28): earlier fixtures without a photo now show the no-photo panel, so fewer photo cards may lead.
+      assert.ok(tags.length > 0, `${p}: photo cards on the page`);
+      assert.ok(tags.slice(0, 4).every((t) => !/\sdata-lz\b/.test(t)), `${p}: the first four load at once`);
       assert.ok(tags.slice(4).every((t) => /\sdata-lz\b/.test(t)), `${p}: every later card waits`);
       assert.equal((html.match(/id="lazy-card-photos"/g) || []).length, 1, `${p}: one lazy script`);
       const rest = html.match(/<template id="fdRest" data-rest="([0-9a-f]{12})"><\/template>/);
       if (rest) {
         const part = await (await fetch(`${base}/cards/rest/${rest[1]}.html?u=${encodeURIComponent(p)}`)).text();
-        const restTags = [...part.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]);
+        const restTags = [...part.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]).filter((t) => !/-ph="none"/.test(t));
         assert.ok(restTags.length && restTags.every((t) => /\sdata-lz\b/.test(t)), `${p}: deferred cards wait too`);
       }
     }
     const json = await (await fetch(base + '/browse/cards.json')).json();
-    const jTags = [...json.html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]);
+    const jTags = [...json.html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]).filter((t) => !/-ph="none"/.test(t));
     assert.ok(jTags.length && jTags.every((t) => /\sdata-lz\b/.test(t)), '/browse/cards.json cards wait for the screen');
     // Phones keep the 480 copy (speed first); iPhones do not zoom on the sort menu.
     const css = app.inlineSharedStylesheets(await (await fetch(base + '/restaurants')).text());
@@ -24704,7 +24984,7 @@ test('Lighter pages: crawlable links: every place and event waiting for "Show mo
       const links = crawlLinks(html);
       const missing = events.filter((e) => !links.has(`/${e.region}/events/${e.slug}`) && !links.has(`/fr/${e.region}/events/${e.slug}`)).map((e) => e.slug);
       assert.deepEqual(missing, [], `${p}: every upcoming fixture event is linked`);
-      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>More upcoming events \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
+      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>View a simple list \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
     }
     // A page whose cards all ship gets no list.
     assert.doesNotMatch(await (await fetch(base + '/kelowna')).text(), /class="rest-links"/);
@@ -24816,7 +25096,7 @@ test('Accessibility: home and /fr home have one main#main, skip link and labelle
       assert.equal((html.match(/<\/main>/g) || []).length, 1, `${p}: one </main>`);
       const main = html.slice(html.indexOf('<main id="main" tabindex="-1">'), html.indexOf('</main>'));
       assert.ok(main.includes('id="heroScenic"'), `${p}: hero inside main`);
-      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${p}: footer after main`);
+      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="footer">'), `${p}: footer after main`);
       assert.match(html, new RegExp(`<a class="skip-link" href="#main"[^>]*>${skip}</a>`), `${p}: skip link`);
       assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${menu}"`), `${p}: menu label`);
       assert.doesNotMatch(html, /<h4 data-i18n="(?:homeFooter|footer)\./, `${p}: footer headings are not h4`);
@@ -25041,7 +25321,7 @@ test('Accessibility pass 3: contrast, target-size and small markup fixes', async
   try {
     for (const p of ['/', '/fr']) {
       const html = await (await fetch(base + p)).text();
-      assert.match(html, /<input type="search" id="heroSearchInput" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"/, `${p}: hero search field`);
+      assert.match(html, /<input type="search" id="heroSearchInput" name="q" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"/, `${p}: hero search field`);
     }
   } finally {
     await new Promise((resolve) => srv.close(resolve));
@@ -25077,7 +25357,7 @@ test('French gaps (2026-10-18): every newly translated event description resolve
 test('French gaps (2026-10-18): trip planner French copy uses French numbers and hours', () => {
   const { t3FrenchText } = require('../trip-french-copy');
   assert.equal(t3FrenchText('Rated 4.7 from 1,234 reviews'), 'Note de 4,7 selon 1\u00a0234 avis');
-  assert.equal(t3FrenchText('Listed hours: 07:00–17:00 Mon–Fri; 10:30–22:00 Sat'), 'Horaires indiqués : 7 h–17 h lun.–ven.; 10 h 30–22 h sam.');
+  assert.equal(t3FrenchText('Listed hours: 07:00–17:00 Mon–Fri; 10:30–22:00 Sat'), 'Horaires indiqués : 7 h–17 h lun.–ven.\u202f; 10 h 30–22 h sam.');
   const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(page, /\? '\/fr\/trip' : '\/trip'/, 'a plan made on /fr/trip keeps its French address');
   assert.match(page, /\^\(Listed hours\|Horaires indiqu/, 'the hours line is not repeated in the French reasons');
@@ -25495,8 +25775,10 @@ test('Search gaps: a /search card for a place closed for the season shows the se
     const list = cardOf(await (await fetch(`${base}/kelowna/wineries`)).text());
     for (const [where, card] of [['/search', search], ['/kelowna/wineries', list]]) {
       assert.ok(card, `${where}: the card is there`);
-      assert.match(card, /season-tag season-tag-closed/, `${where}: the season tag`);
-      assert.doesNotMatch(card, /fd-open-status/, `${where}: no "Closed · Opens" line`);
+      // Winery test 3 (2026-11-12): the status line says it, so the closed-season pill on the photo no longer repeats it.
+      assert.doesNotMatch(card, /season-tag season-tag-closed/, `${where}: said once, by the status line`);
+      assert.doesNotMatch(card, /fd-open-status" data-fd-open="(?:open|closed)"/, `${where}: no live "Closed · Opens" line`);
+      assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season/, `${where}: the card says closed for the season`);
     }
     const data = (html) => JSON.parse((/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/.exec(html) || [])[1] || '{}');
     assert.equal((data(await (await fetch(`${base}/search?q=${encodeURIComponent('sg season winery')}`)).text())[String(v.id)] || {}).h, undefined, 'no hours shipped for the live status');
@@ -25824,8 +26106,11 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   assert.equal(made.status, 201);
   const cookie = made.cookie;
   const page = await get(`/owner/account/venue/${v.id}`, cookie);
-  assert.match(page, /go live on <a href="[^"]+">your page<\/a> straight away/);
-  assert.match(page, /id="opSubmit">Save changes</);
+  // A restaurant's signed-in intro (portal polish 2026-11-08): live on save, quick ones first, no time total.
+  assert.match(page, /Your changes go live on <a href="[^"]+">your page<\/a> as soon as you save them\./);
+  assert.match(page, /Start with the quick ones in the bar above/);
+  assert.doesNotMatch(page, /about 5 minutes/);
+  assert.match(page, /id="opSubmit"[^>]*>Save changes</);
   assert.match(page, /\$\$ &mdash; \$15–30 per person/, 'price range selector with its scale');
   // Portal polish (2026-10-18): the scale shows once, in the choices; the hint no longer repeats it.
   const priceSec = page.slice(page.indexOf('id="price"'), page.indexOf('</details>', page.indexOf('id="price"')));
@@ -25895,7 +26180,7 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   const linkPage = await get(`/owner/${token}`);
   assert.match(linkPage, /id="opPhone" maxlength="40" value="250-555-0199"/, 'the pending phone, not the live (empty) one');
   assert.match(linkPage, /Phone <span class="op-status op-status-wait op-wait-chip">Waiting for review<\/span>/);
-  assert.match(linkPage, /We review every change, usually within a day/);
+  assert.match(linkPage, /<p>Quick answers go live right away\. Other changes go live after a quick check, usually within a day\. <a [^>]+>See your page<\/a>\./, 'a restaurant on the edit link: most changes wait, the checklist answers go live');
   // Inline scripts on the edit pages and the review page parse (regexes in template literals keep their backslashes).
   const vm = require('node:vm');
   for (const html of [page, again, linkPage, app.renderAdminReviewPage()]) {
@@ -25956,7 +26241,7 @@ test('Seasonal hours and special closures (2026-10-18): hours.js applies them by
   const fr = require('../french-text.js');
   assert.ok(fr);
   assert.equal(app.frStatusText('Closed today (holiday) · Opens tomorrow 9 AM'), 'Fermé aujourd’hui (jour férié) · ouvre demain à 9 h');
-  assert.equal(app.frStatusText('Closed today (Thanksgiving) · Opens Mon 10 AM'), 'Fermé aujourd’hui (Thanksgiving) · ouvre lun. à 10 h');
+  assert.equal(app.frStatusText('Closed today (Thanksgiving) · Opens Mon 10 AM'), 'Fermé aujourd’hui (Action de grâce) · ouvre lun. à 10 h');
 });
 
 test('Seasonal hours and closures (2026-10-18): owners set them; the venue page (EN and FR), cards, map and trip facts respect them', () => withOwnerPortalServer(async ({ post, get }) => {
@@ -26002,12 +26287,12 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   assert.match(en, /<summary>Winter hours \(Nov 1 – Apr 30\)<\/summary>/);
   assert.match(en, /Special closures:<\/strong> Oct 12 \(Thanksgiving\)/);
   const frPage = app.renderVenuePage(fresh, [], [], [], { now, lang: 'fr' });
-  assert.match(frPage, /Fermé aujourd’hui \(Thanksgiving\) · ouvre demain à 9 h/);
+  assert.match(frPage, /Fermé aujourd’hui \(Action de grâce\) · ouvre demain à 9 h/);
   // Round 10: the owner's English note stays off the French hours list (no French for it in the list).
   assert.match(frPage, /<span>Fermé<\/span>/);
   assert.doesNotMatch(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);
   assert.match(frPage, /<summary>Heures saisonnières \(1er nov\. – 30 avr\.\)<\/summary>/);
-  assert.match(frPage, /Fermetures spéciales:<\/strong>/);
+  assert.match(frPage, /Fermetures spéciales :<\/strong>/);
   // In winter the seasonal set is the week shown, and the usual hours fold away.
   const nov = app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-11-02T20:00:00Z') });
   assert.match(nov, /<li class="is-today"><span>Monday<\/span><span>10 AM – 4 PM<\/span><\/li>/);
@@ -26064,11 +26349,11 @@ test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px f
     assert.doesNotMatch(html, /\.op-hint \{[^}]*rgba\(42,32,25,0\.62\)/);
     assert.match(html, /\.op-act-date \{ font-size: 0\.8rem; color: rgba\(42,32,25,0\.8\); \}/);
     // Hours and Photos open; Badges, Events folded; one section bar.
-    assert.match(html, /<details class="op-fold op-sec" id="hours" open>/);
-    assert.match(html, /<details class="op-fold op-sec" id="photos" open>/);
-    assert.match(html, /<details class="op-fold op-sec" id="badges">/);
-    assert.match(html, /<details class="op-fold op-sec" id="events">[\s\S]*id="oeHead">Add an event</);
-    assert.match(html, /<nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours<\/a><a href="#photos">Photos<\/a><a href="#opMenuCard">Menu<\/a><a href="#events">Events<\/a><\/nav>/);
+    assert.match(html, /<details class="op-fold op-sec" id="hours"[^>]* open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="photos"[^>]* open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="badges"[^>]*>/);
+    assert.match(html, /<details class="op-fold op-sec" id="events"[^>]*>[\s\S]*id="oeHead">Add an event</);
+    assert.match(html, /<nav class="op-secnav" id="opSecNav"[^>]* aria-label="Parts of this page"><a href="#hours">Hours<\/a><a href="#photos">Photos<\/a><a href="#opMenuCard">Menu<\/a><a href="#events">Events<\/a><\/nav>/);
     assert.match(html, /id="opMenuCard"/);
     assert.match(html, /position: sticky; top: 0; z-index: 30;/);
     // Footer with privacy, terms and info@ on the edit page and the simple pages.
@@ -26083,8 +26368,9 @@ test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px f
 test('Owner portal photos (2026-10-18): the grid refreshes in place and owners move photos earlier or later; the order sticks', async () => {
   const nodeFs = require('node:fs');
   const nodePath = require('node:path');
-  seasonInsert.run({ name: 'Photo Order Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'cafe', 'photo-order-fixture');
+  // A golf course: cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Photo Order Fixture', type: 'golf', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'golf', 'photo-order-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
   const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Order Cafe', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
@@ -26120,7 +26406,7 @@ test('Owner portal photos (2026-10-18): the grid refreshes in place and owners m
     assert.deepEqual(db.prepare('SELECT id, sort_order FROM owner_photos WHERE venue_id = ? ORDER BY sort_order').all(v.id).filter((r) => r.sort_order != null).map((r) => r.id), [b, c, a], 'stored');
     assert.deepEqual(await gridOrder(), [main, b, c, a]);
     // The public gallery uses the same order after the main photo.
-    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'cafe', 'photo-order-fixture'));
+    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'golf', 'photo-order-fixture'));
     const byFile = Object.fromEntries(db.prepare('SELECT id, file FROM owner_photos WHERE venue_id = ?').all(v.id).map((r) => [`/images/owner/${r.file}`, r.id]));
     assert.deepEqual(gallery.map((g) => byFile[g.src.split('?')[0]]).filter(Boolean), [main, b, c, a]);
     // A new upload goes after the ordered ones.
@@ -26313,7 +26599,7 @@ test('Pending link changes (2026-10-18): creating a login or adding the listing 
   await post(`/owner/${tokenW}/changes`, { changes: { phone: '250-555-0175' }, contact_email: 'sam@pendingcarry.example', started_at: Date.now() - 10000 });
   const frPage = await get(`/fr/owner/account/venue/${w.id}`, made.cookie);
   assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(w.id).phone, '250-555-0173', 'opening a listing never publishes');
-  assert.match(frPage, /Touchez <strong>Enregistrer les modifications<\/strong> pour mettre en ligne maintenant : téléphone\./);
+  assert.match(frPage, /Touchez <strong>Enregistrer les modifications<\/strong> pour mettre en ligne maintenant\u00a0: téléphone\./);
   assert.doesNotMatch(frPage, /Tout ce que vous envoyez maintenant s’y ajoute/);
   const frSigned = await get(`/fr/owner/account/venue/${v.id}`, made.cookie);
   assert.match(frSigned, /Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour/);
@@ -26364,7 +26650,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     // French: the button, the confirm text and the emailed link are French.
     const fr = await (await s.get(`/fr/owner/account/venue/${v.id}`, owner.cookie)).text();
     assert.match(fr, /id="opResetLink">Réinitialiser le lien de modification<\/button>/);
-    assert.match(fr, /"resetConfirm":"Réinitialiser le lien de modification privé de cette fiche\?/);
+    assert.match(fr, /"resetConfirm":"Réinitialiser le lien de modification privé de cette fiche\u202f\?/);
     assert.match(fr, /"nLogins":"\{n\} comptes peuvent modifier cette fiche"/);
     mail.length = 0;
     const rf = await s.post(`/fr/owner/account/venue/${v.id}/reset-link`, {}, owner.cookie);
@@ -26467,7 +26753,12 @@ test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event nam
     assert.doesNotMatch(await (await s.get(`/owner/account/venue/${a.id}`, me.cookie)).text(), /id="opWelcome"/);
     const welcomeFr = await (await s.get(`/fr/owner/account/venue/${a.id}?welcome=1`, me.cookie)).text();
     assert.match(welcomeFr, /id="opWelcome" role="status">Vous êtes connecté\. Désormais/);
-    assert.doesNotMatch(await (await s.get(`/owner/${tokenB}`)).text(), /&#128247;|&#128203;|📷|📋/);
+    // (The "What would you like to do today?" start tiles added 2026-11-04 carry their own aria-hidden emoji icons; the menu card does not.)
+    const linkPage = await (await s.get(`/owner/${tokenB}`)).text();
+    const menuCard = /<a class="op-menu-card"[\s\S]*?<\/a>/.exec(linkPage);
+    assert.ok(menuCard, 'the menu card is on the page');
+    assert.doesNotMatch(menuCard[0], /&#128247;|&#128203;|📷|📋/);
+    assert.match(menuCard[0], /<svg class="ui-icon"/);
     // Settings: "Tap" on touch screens, and a message once the last business is gone.
     const settings = await (await s.get('/owner/account/settings', me.cookie)).text();
     assert.match(settings, /"tap":"Tap again to remove ","click":"Click again to remove "/);
@@ -26542,10 +26833,11 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
     db.prepare("UPDATE venues SET website = 'https://www.example-cafe.ca/' WHERE id = ?").run(v.id);
     const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
     assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
-    assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
-    assert.match(en, /<div class="venue-extra">/);
-    // Round 9 (2026-10-19): the extras follow the sidebar in the page itself, so no CSS order is needed.
-    assert.ok(en.indexOf('</aside>') < en.indexOf('<div class="venue-extra">'));
+    assert.doesNotMatch(en, />example-cafe\.ca ↗<\/a>/, 'the website is the button above, not repeated as a sidebar row (2026-11-01)');
+    assert.match(en, /href="https:\/\/www\.example-cafe\.ca\/"[^>]*>(?:Website ↗|Visit Website)<\/a>/, 'the Website button');
+    // Food & Drink layout (2026-11-07): the main column comes first, the facts sidebar after it, visitor extras last.
+    assert.match(en, /<div class="fd-content">/);
+    assert.ok(en.indexOf('<div class="fd-content">') < en.indexOf('<aside class="fd-aside">'));
     assert.doesNotMatch(en, /\.venue-aside \{ order: 1;/);
     const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
     assert.match(fr, /<span>Tous les jours<\/span>/);
@@ -26640,26 +26932,26 @@ test('French portal (2026-10-18): every signed-in page has a French address with
     assert.match(html, /"lang":"fr"/, `${p}: the help bot is French`);
   }
   const edit = await (await get(pages.edit, cookie)).text();
-  assert.match(edit, /id="opSubmit">Enregistrer les modifications</);
+  assert.match(edit, /id="opSubmit"[^>]*>Enregistrer les modifications</);
   assert.match(edit, /<span class="lyv-section-label">Heures d’ouverture/);
   assert.match(edit, /<span class="op-status op-status-wait op-wait-chip">En attente de vérification<\/span>/, 'the waiting chip on the website field');
-  assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche : Site web/i);
+  assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche[ \u00a0]: Site web/i);
   assert.match(edit, /Envoyé le \d{1,2} [a-zéû]+\.?</, 'French short dates ("18 oct.")');
   assert.match(edit, /Personnes ayant accès[\s\S]*Ajouté le \d{1,2} [a-zéû]+\.?/);
-  assert.match(edit, /\$\$ &mdash; 15 à 30 \$ par personne/);
-  assert.match(edit, /Copier le lundi sur :/);
+  assert.match(edit, /\$\$ &mdash; 15 à 30\u00a0\$ par personne/); // no-break space before $ (cocktail test 2)
+  assert.match(edit, /Copier le lundi sur\u00a0:/);
   assert.match(edit, /<option value="11" selected>novembre<\/option>/, 'French month names');
-  assert.match(edit, /"liveNow":"En ligne maintenant : \{fields\}\. Votre page l’affiche tout de suite\. "/);
-  assert.match(edit, /"review":"Nous vérifierons ceci d’ici un jour : \{fields\}\. "/);
+  assert.match(edit, /"liveNow":"En ligne maintenant[ \u00a0]: \{fields\}\. Votre page l’affiche tout de suite\. "/);
+  assert.match(edit, /"review":"Nous vérifierons ceci d’ici un jour[ \u00a0]: \{fields\}\. "/);
   assert.match(edit, /href="\/fr\/owner\/account\/venue\/\d+\/menu" id="opMenuCard"/);
   assert.match(edit, /<footer class="op-footer"><a href="\/fr\/privacy">Confidentialité<\/a>/);
   assert.doesNotMatch(edit, /href="\/owner\/(account|login|forgot)[^"]*"(?! hreflang)/, 'portal links stay French (the EN switch aside)');
   const account = await (await get(pages.account, cookie)).text();
-  assert.match(account, /En attente de vérification : 1 mise à jour, 1 événement/);
+  assert.match(account, /En attente de vérification[ \u00a0]: 1 mise à jour, 1 événement/);
   assert.match(account, /href="\/fr\/owner\/account\/venue\/\d+">Modifier la fiche/);
   const link = await (await get(pages.link)).text();
   assert.match(link, /<strong>Créer un compte<\/strong> \(30 secondes\)/);
-  assert.match(link, /id="opSubmit">Envoyer les modifications</);
+  assert.match(link, /id="opSubmit"[^>]*>Envoyer les modifications</);
   const add = await (await get(pages.addToLogin, cookie)).text();
   assert.match(add, /id="olsAdd">Ajouter à mon compte \(portail@example\.com\)</);
   // An invalid link and an expired reset link are French too.
@@ -26698,10 +26990,11 @@ test('French portal (2026-10-18): forms post from French pages, messages and ema
   assert.deepEqual(ok.body.live.sort(), ['phone', 'price_range']);
   assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, '250-555-0142');
   // Events, photos, settings, access and the help bot.
-  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: '', started_at: old }, cookie);
+  // An end time with no start time (owners may leave both blank since 2026-11-11, so this is the time error they can get).
+  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: '', end_time: '21:00', started_at: old }, cookie);
   assert.equal(ev.body.error, 'Corrigez les champs indiqués.');
   assert.equal(ev.body.errors.name, 'Entrez le nom de l’événement.');
-  assert.equal(ev.body.errors.start_time, 'Entrez l’heure de début ou cochez « Toute la journée ».');
+  assert.equal(ev.body.errors.start_time, 'Ajoutez aussi l’heure de début, ou effacez l’heure de fin.');
   const ph = await post(`/fr/owner/account/venue/${v.id}/photos`, { image: '', credit: 'Portail', rights: false, started_at: old }, cookie);
   assert.equal(ph.body.errors.rights, 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.');
   const pw = await post('/fr/owner/account/password', { current: 'not the password', password: 'another long password' }, cookie);
@@ -26777,21 +27070,25 @@ test('French portal (2026-10-18): the EN / FR switch round-trips, remembers the 
     assert.ok(en.includes(`location.replace(${JSON.stringify(frPath)}+location.search+location.hash)`), enPath);
     assert.ok(!fr.includes('location.replace('), frPath);
     // Clicking the switch stores the language picked, so the English page doesn't bounce back to French.
-    for (const [page, want] of [[en, 'fr'], [fr, 'en']]) {
-      const code = /<script>\n\(function\(\)\{\n  var t = document\.getElementById\('langToggle'\)[\s\S]*?<\/script>/.exec(page)[0].replace(/<\/?script>/g, '');
+    // Café test 6 (2026-11-12): one capture-phase handler for the header link, the ☰ menu's EN / FR and the visible link;
+    // it stores the choice and goes straight to the other address (the menu's buttons used to press the inert header link).
+    for (const [page, want, other] of [[en, 'fr', frPath], [fr, 'en', enPath]]) {
+      const code = /<script>\n\(function\(\)\{\n  var root = document\.documentElement;[\s\S]*?<\/script>/.exec(page)[0].replace(/<\/?script>/g, '');
       const store = {};
-      let click;
-      const toggle = { getAttribute: () => want, addEventListener: (e, f) => { click = f; } };
-      vm.runInNewContext(code, { document: { getElementById: () => toggle }, localStorage: { setItem: (k, x) => { store[k] = x; } } });
-      click();
+      let click, went = '';
+      const link = { getAttribute: (a) => (a === 'href' ? other : null), classList: { contains: () => false } };
+      const doc = { documentElement: { lang: want === 'fr' ? 'en' : 'fr', getAttribute: () => other }, getElementById: () => link, querySelector: () => link, addEventListener: (e, f) => { click = f; } };
+      vm.runInNewContext(code, { document: doc, window: {}, location: { search: '', hash: '', assign: (h) => { went = h; } }, localStorage: { setItem: (k, x) => { store[k] = x; } } });
+      click({ target: { closest: () => link }, preventDefault() {}, stopPropagation() {} });
       assert.equal(store.okanaganLang, want);
+      assert.equal(went, other);
     }
     // The English page is still English.
     assert.match(en, /<html lang="en"/);
     assert.doesNotMatch(pfrVisible(en), /Enregistrer les modifications|Mes fiches|Paramètres du compte|Connecté en tant que/, enPath);
   }
   const en = await (await get(`/owner/account/venue/${v.id}`, cookie)).text();
-  assert.match(en, /id="opSubmit">Save changes</);
+  assert.match(en, /id="opSubmit"[^>]*>Save changes</);
   assert.match(en, /<span class="lyv-section-label">Opening hours/);
   assert.match(en, /"liveNow":"Live now: \{fields\}\. Your page shows it straight away\. "/);
   assert.match(en, /<footer class="op-footer"><a href="\/privacy">Privacy<\/a>/);
@@ -27002,7 +27299,7 @@ test('Portal polish (2026-10-18): Undo takes a reason; the owner sees "Changed b
   assert.equal(enMail.subject, 'We changed back an update to X');
   assert.match(enMail.text, /We put back the earlier phone on the X listing[\s\S]*Reason: Wrong number/);
   const fr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
-  assert.match(fr, /<span class="op-why">Rétabli par nous : Ce numéro sonne chez un autre commerce\.<\/span>/);
+  assert.match(fr, /<span class="op-why">Rétabli par nous\u00a0: Ce numéro sonne chez un autre commerce\.<\/span>/);
   const en = await get(`/owner/account/venue/${v.id}`, cookie);
   assert.match(en, /<span class="op-why">Changed back by us: Ce numéro sonne chez un autre commerce\.<\/span>[\s\S]*?Changed back by us<\/span>/);
   // The admin card: a reason box before Undo, and after it no "p.m.." double period.
@@ -27069,8 +27366,8 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
   assert.match(after, /id="opSeasonalSummary">Winter hours Nov 1–Apr 30</);
   assert.match(after, /id="opClosuresSummary">2 closures \(next: [A-Z][a-z]{2} \d{1,2}\)</);
   const afterFr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
-  assert.match(afterFr, /id="opSeasonalSummary">Winter hours du 1er nov\. au 30 avr\.</);
-  assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine : /);
+  assert.match(afterFr, /id="opSeasonalSummary">Heures d’hiver du 1er nov\. au 30 avr\.</); // the setup name in French (cocktail test 2)
+  assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine\u00a0: /);
   // Venue page structured data, on a fixed clock.
   db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-12-25', to: '2026-12-26', note: '' }, { from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);
   app.clearHoursExtraCache();
@@ -27292,7 +27589,7 @@ test('Search ranking: A-Z lists add the town to a repeated name, show ALL-CAPS n
   assert.ok(fr.includes('>Earls (Penticton)<') && fr.includes('>Earls (Kelowna)<'));
   // A name that appears once keeps no town; events keep their order and label.
   assert.ok(en.includes('>Solo Winery<'));
-  assert.match(app.restLinksHtml('whatsOnRest', card('/kelowna/events/b', 'B Show') + card('/kelowna/events/a', 'A Show'), 'en'), /More upcoming events \(2\)[\s\S]*B Show[\s\S]*A Show/);
+  assert.match(app.restLinksHtml('whatsOnRest', card('/kelowna/events/b', 'B Show') + card('/kelowna/events/a', 'A Show'), 'en'), /View a simple list \(2\)[\s\S]*B Show[\s\S]*A Show/);
 });
 
 test('Search ranking: the desktop /map lists the places in view, open first then by rating; Open now over the clusters lists them', () => {
@@ -27316,7 +27613,9 @@ test('Search ranking: the desktop /map lists the places in view, open first then
   const html = app.renderPlacesMapPage();
   assert.ok(html.includes('function mapPlaceList(onMap, o)'));
   assert.match(html, /items = mapPlaceList\(onMap, \{ me: !!me, town: town, wide: WIDE\.matches/);
-  assert.match(html, /map\.on\('moveend', function\(\)\{ if \(me \|\| tab !== 'places'\) return;/);
+  // (Roam Now redesign, #647: panning offers a "Search this area" button instead of silently redrawing; it redraws after a fit.)
+  assert.match(html, /map\.on\('moveend',function\(\)\{if\(me\|\|tab!=='places'\)return;/);
+  assert.match(html, /if\(fitRefresh\)\{fitRefresh=false;moveTimer=setTimeout\(function\(\)\{render\(false\)\},150\)\}else \$\('rnSearchArea'\)\.hidden=false;/);
   assert.match(html, /var filtering = !!\(anyOn\(kinds\) \|\| anyOn\(feats\) \|\| openOnly/);
 });
 
@@ -27877,7 +28176,7 @@ test('Exact names first on live data: "19 bistro" puts 19 Bistro @ Fitz first ev
       const shown = names(page);
       assert.equal(shown[0], '19 Bistro @ Fitz', `${q}: the named place first`);
       assert.ok(!shown.includes('Chaos Bistro') && shown.length < 10, `${q}: not drowned in every bistro (${shown.length})`);
-      assert.match(page, /Closed for the season/, `${q}: the season notice still shows`);
+      assert.match(page, /Closed for the season|Closed \u00b7 reopens/, `${q}: the season notice still shows`);
       assert.match(page, /search-count">1 place</);
     }
     const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('19 bistro')}`)).text();
@@ -28139,16 +28438,17 @@ test('Speed pass 6 (2026-10-19): every 800px tile has 360px and 480px copies, an
 });
 
 test('Speed pass 6 (2026-10-19): town pages load the banner first; tiles carry 360/480px copies and wait for it', () => withDiscoveryServer(async (base) => {
+  // Compact town pages (#633/#636, Nov 2026) have no tile grid that waits for a banner: their photos are small native
+  // lazy-loaded 480px copies, so nothing competes with the page's first paint. The hero-ready signal (roamAfterHero)
+  // still exists for the homepage and guides, and GA4 falls straight through to loading when a page has none.
   const raw = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || { restaurant: 3, winery: 2 }, []);
-  assert.ok(raw.indexOf('window.roamAfterHero = function') > raw.indexOf('<meta charset="UTF-8">'), 'the hero signal is in <head>');
-  assert.ok(raw.indexOf('window.roamAfterHero = function') < raw.indexOf("googletagmanager.com/gtag/js"), 'before the GA4 snippet (gtag.js waits for it)');
-  assert.doesNotMatch(raw, /<div class="region-card-photo"><img src=/, 'no tile photo loads before the banner');
-  const tiles = raw.match(/<div class="region-card-photo"><img data-src="[^"]+"[^>]* data-home-hero><noscript><img src="[^"]+" alt="" width="\d+" height="\d+"><\/noscript><\/div>/g) || [];
-  assert.ok(tiles.length >= 2, `${tiles.length} tiles wait for the banner, each with a no-JS copy`);
-  assert.ok(tiles.some((t) => /data-srcset="\/images\/[\w-]+\/thumbs\/[\w-]+-w360\.jpg 360w, [^"]+-w480\.jpg 480w, [^"]+ 800w" sizes="\(max-width: 899px\) calc\(50vw - 31px\)/.test(t)), 'category tiles offer the small copies');
-  assert.ok(raw.includes("window.roamAfterHero(start)") && raw.indexOf('id="home-card-lz"') < raw.indexOf('</main>'), 'the loader is on the page');
-  // The banner (fetchpriority="high") is what releases them.
-  const js = raw.match(/<script>\n\(function\(\)\{\n  var q = \[\], done = false;[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
+  assert.doesNotMatch(raw, /<div class="region-card-photo"><img src=/, 'no big tile photo loads before the banner');
+  const lazy = raw.match(/<img loading="lazy" decoding="async" src="\/images\/[^"]+-w480\.jpg[^"]*" alt="">/g) || [];
+  assert.ok(lazy.length >= 2, `${lazy.length} town photos are lazy 480px copies`);
+  // The banner (fetchpriority="high") is what releases the waiting images on pages that have the signal.
+  const head = app.withHomeHeroFirst('<!DOCTYPE html><html><head><meta charset="UTF-8">\n</head><body></body></html>');
+  assert.ok(head.indexOf('window.roamAfterHero = function') > head.indexOf('<meta charset="UTF-8">'), 'the hero signal is in <head>');
+  const js = head.match(/<script>\n\(function\(\)\{\n  var q = \[\], done = false;[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
   const vm = require('node:vm');
   const docL = {}; const ctx = { document: { addEventListener: (t, fn) => { docL[t] = fn; } }, addEventListener() {}, setTimeout() {} };
   ctx.window = ctx; vm.createContext(ctx); vm.runInContext(js, ctx);
@@ -28160,8 +28460,9 @@ test('Speed pass 6 (2026-10-19): town pages load the banner first; tiles carry 3
   // Served, English and French.
   for (const p of ['/kelowna', '/fr/kelowna']) {
     const html = await (await fetch(base + p)).text();
-    if (!/region-card-photo/.test(html)) continue;
-    assert.ok(html.includes('window.roamAfterHero = function') && !/<div class="region-card-photo"><img src=/.test(html), `${p}: hero first`);
+    assert.ok(!/<div class="region-card-photo"><img src=/.test(html), `${p}: no early big tile photos`);
+    assert.ok(/<img loading="lazy" decoding="async" src="\/images\/[^"]+-w480\.jpg/.test(html), `${p}: lazy 480px copies`);
+    assert.ok(html.includes("if (typeof window.roamAfterHero === 'function') window.roamAfterHero(load); else load();"), `${p}: GA4 loads at once when there is no hero signal`);
   }
 }));
 
@@ -28581,7 +28882,7 @@ test('Map search pass 6: a new search drops the last search\'s filters, keeps ha
   assert.match(src, /lastSearchSet = searchDiff\(before, snapshot\(\)\);/);
   assert.match(src, /readSearch\(v, false\); searchEl\.value = String\(v \|\| ''\)\.trim\(\);/);
   // Audit fix (2026-10-27): a search from the address also fits the map to its results (searchFit).
-  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); searchFit = true; \}/);
+  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); searchFit = true;/);
   assert.match(src, /lastSearchSet = null; radiusFixed = false; searchEl\.value = '';/, 'Clear forgets the last search');
   // With the location known and something within 1 km, the map shows the 1 km around the visitor.
   assert.match(src, /if \(within1\) fitTo\(L\.latLng\(me\.lat, me\.lng\)\.toBounds\(2000\), 17\);/);
@@ -28803,12 +29104,12 @@ test("What's On pass 6: Today + one category: the More upcoming list follows it,
   // Every live-music event left today is on the first page, so all the waiting ones are other kinds or finished.
   // Round 9 (2026-10-19): a hidden link keeps its address in data-href, so crawlers don't follow it.
   assert.match(links, /<li hidden><a data-href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
-  assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>More upcoming events \(0\)</);
+  assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>View a simple list \(0\)</);
   assert.doesNotMatch(links, /<li><a /);
   const unit = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-2" data-group="earlier"><h2><a class="venue-card-link" href="/kelowna/events/b"><span class="venue-card-name">B Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-3" data-group="today"><h2><a class="venue-card-link" href="/kelowna/events/c"><span class="venue-card-name">C Show</span></a></h2></li>', 'en');
-  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
+  assert.match(unit, /View a simple list \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
   assert.match(app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>', 'en'), /<details class="rest-links" id="whatsOnRestLinks" hidden>/, 'an empty list is hidden');
   // Markets today: all over, so the block says so and lists the next three markets.
   const mk = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: WO6_NIGHT });
@@ -29088,10 +29389,11 @@ test('A11y pass 5: muted text is one solid token at 4.6:1 or better, never opaci
 
 test('A11y pass 5: region intro checkbox leaves the tab order on desktop; /kelowna columns in em, not ch', () => withPass4Server(async (get) => {
   const region = await withPass5Css(get, '/kelowna');
-  assert.match(region, /@media \(min-width: 641px\) \{\s*body\.region-page \.region-intro-toggle \{ display: none; \}/);
-  assert.match(region, /\.region-lead-split \{ display: grid; grid-template-columns: minmax\(0, 38\.4em\) minmax\(0, 1fr\);/);
-  assert.match(region, /body\.region-page \.region-intro \{ max-width: 40\.8em;/);
+  // The compact /kelowna layout (#633) has no "Read more" intro checkbox at all, so nothing hidden sits in the tab order;
+  // its columns are in em (or fractions), never ch.
+  assert.doesNotMatch(region, /<input type="checkbox"[^>]*region-intro-toggle/);
   assert.doesNotMatch(region, /minmax\(0, 64ch\)/);
+  assert.doesNotMatch(region, /grid-template-columns:[^;}]*\d(?:\.\d+)?ch\b/, 'grid columns are not in ch');
   assert.match(region, /@media \(min-width: 941px\) \{ \.nav \.logo-wordmark \{ display: inline-block; min-width: 9\.95em; \} \}/);
 }));
 
@@ -29218,18 +29520,19 @@ test('Round 7 phone: /map popups pan clear of the search bar and chips, a phone 
 }));
 
 test('Round 7 phone: town event cards are tappable across the whole card with one link each', () => withPass4Server(async (get) => {
+  // The compact town pages (#633/#636) no longer list individual upcoming events; the What's On entry is a tile that is
+  // itself the one link, so the whole card is tappable and nothing nests a second link inside it.
   const counts = app.getRegionCategoryCounts('kelowna');
   const html = app.renderRegionPage('kelowna', counts, []);
-  const block = (html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/) || [''])[0];
-  const cards = [...block.matchAll(/<div class="related-card related-card-event">([\s\S]*?)<\/div>/g)];
-  assert.ok(cards.length > 0, 'the fixture region shows event cards');
-  for (const c of cards) assert.equal((c[1].match(/<a /g) || []).length, 1, 'one link per card');
+  const tiles = [...html.matchAll(/<a class="bw-tile" href="([^"]+)">([\s\S]*?)<\/a>/g)];
+  assert.ok(tiles.length >= 4, 'the town page shows its tiles');
+  const events = tiles.find((t) => t[1] === '/kelowna/events');
+  assert.ok(events, 'a What’s On tile for the town');
+  assert.match(events[2], /What’s On/);
+  for (const t of tiles) assert.doesNotMatch(t[2], /<a /, `${t[1]}: one link per tile`);
   const page = (await get('/kelowna')).text;
-  const hrefs = [...page.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
-  const css = page + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
-  assert.match(css, /\.related-card-event \{ position: relative; \}/);
-  assert.match(css, /\.related-card-event > a::after \{ content: ""; position: absolute; inset: 0;/);
-  assert.match(css, /\.related-card-event > a:focus-visible::after \{ outline: 3px solid/);
+  assert.match(page, /<a class="bw-tile" href="\/kelowna\/events">/, 'served too');
+  assert.match(page, /\.bw-tile ?\{[^}]*display: ?(?:block|grid|flex)/, 'the tile link fills the card');
 }));
 
 test('Round 7 phone: the open phone menu leaves a dimmed strip to tap, and a tap there closes it', () => withPass4Server(async (get) => {
@@ -29431,7 +29734,7 @@ test('Round 7 tech: a ?v= image is immutable only when it is the file\'s own has
   assert.equal(app.imageVersionMatches(file, md5.slice(0, 10)), true);
   assert.equal(app.imageVersionMatches(file, md5.slice(0, 12)), true);
   assert.equal(app.imageVersionMatches(file, sha.slice(0, 12)), true, 'the hashed hero names use sha256');
-  for (const bad of ['20261016', 'sports-photo-1', 'abc123', md5.slice(0, 6), '0000000000', undefined, ['x']]) assert.equal(app.imageVersionMatches(file, bad), false, String(bad));
+  for (const bad of ['20261016', 'sports-photo-2', 'abc123', md5.slice(0, 6), '0000000000', undefined, ['x']]) assert.equal(app.imageVersionMatches(file, bad), false, String(bad));
   assert.equal(app.imageVersionMatches('/images/nope/missing.jpg', md5.slice(0, 10)), false);
   await withDiscoveryServer(async (base) => {
     const cc = async (u) => (await fetch(base + u)).headers.get('cache-control');
@@ -29701,7 +30004,7 @@ test('Banner speed (round 7): food list pages preload a phone-sized banner first
     // Hero-ready signal right after the charset, ahead of the GA4 snippet that waits for it.
     assert.ok(head.indexOf('window.roamAfterHero = ') !== -1 && head.indexOf('window.roamAfterHero = ') < head.indexOf("gtag('js'"), `${p}: hero-ready signal before GA4`);
     assert.match(head, /<style id="hero-first-cards">html\.hf li\.venue-card::before\{background-image:none!important\}/);
-    const m = /<div class="category-banner"[^>]*><picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="([^" ]+) 800w" sizes="100vw"><img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*fetchpriority="high"><\/picture><\/div>/.exec(html);
+    const m = /<div class="category-banner"[^>]*><picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="([^" ]+) 800w" sizes="100vw"><img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*fetchpriority="high"><\/picture>(?:<span class="fd-banner-credit"[^>]*>[^<]*<\/span>)?<\/div>/.exec(html);
     assert.ok(m, `${p}: the banner has a phone <source>`);
     assert.match(m[1], /-800\.jpg\?v=[0-9a-f]{10}$/);
     assert.match(m[3], /-800\.jpg\?v=[0-9a-f]{10} 800w, .*-1200\.jpg\?v=[0-9a-f]{10} 1200w, .*\?v=[0-9a-f]{10} 1600w$/);
@@ -29907,6 +30210,7 @@ test('Round 8 speed: /browse preloads its first card photo; a banner page keeps 
     assert.ok(card, `${p}: the first card is in the HTML`);
     const own = /--fd-ph:url\('([^']+)'\)/.exec(card[1]);
     const key = (/data-ph="([^"]+)"/.exec(card[1]) || [])[1];
+    if (key === 'none') { assert.ok(!/<link rel="preload" as="image"/.test(head), `${p}: no photo, no preload`); continue; }
     const want = own ? own[1] : `${app.cardPhotoKeyUrl(key)}?v=${app.imageVersion(app.cardPhotoKeyUrl(key))}`;
     assert.ok(head.includes(`<link rel="preload" as="image" href="${want}"`), `${p}: preloads ${want}`);
     assert.ok(!/data-lz/.test(card[1]), `${p}: the first card's photo is not held back`);
@@ -30626,8 +30930,8 @@ test('Free to Visit and Arts & Culture badges (2026-10-19): things-to-do badges 
     assert.equal(api.free_entry, true);
     assert.equal(api.arts_culture, true);
     const page = await fetch(`${base}/kelowna/indoor/free-arts-gallery-fixture`).then((r) => r.text());
-    assert.match(page, /<span class="chip">Free to Visit<\/span>/);
-    assert.match(page, /<span class="chip"[^>]*>Arts &amp; Culture<\/span>/);
+    assert.match(page, /<span class="chip chip-vb chip-vb-people"><svg[^>]*>.*?<\/svg>Free to Visit<\/span>/);
+    assert.match(page, /<span class="chip chip-vb chip-vb-place"><svg[^>]*>.*?<\/svg>Arts &amp; Culture<\/span>/);
     // Guide pages read the badge like any other.
     const guide = app.renderGuidePage('kelowna', 'free_entry', [app.findVenueBySlug('kelowna', 'indoor', 'free-arts-gallery-fixture')]);
     assert.match(guide, /Free Things to Do in Kelowna/);
@@ -31088,7 +31392,10 @@ test('Round 9 phone: 44px tap targets on venue, town, category, map, home and pl
   for (const p of ['/map', '/fr/map']) assert.match(await r8PageWithCss(get, p), /body\.map-page \.pm-dir, body\.map-page \.pm-link \{ display: inline-flex; align-items: center; min-height: 44px;/);
   for (const p of ['/', '/fr']) {
     const home = await r8PageWithCss(get, p);
-    assert.match(home, /\.hero-search-box \{ padding: 2px 2px 2px 16px; \}\n\s*\.hero-search-field input \{ min-height: 44px; padding: 0; \}\n\s*\.hero-search-box button \{ height: 44px; \}/);
+    // The simpler homepage (#642) has one flex search row: the field stretches to the button, which is 12px + 12px of
+    // padding around a 14px/1.5 line on a phone (45px) and 48px-ish on desktop.
+    assert.match(home, /#homeSimple \.quick-search\{display:flex;/);
+    assert.match(home, /#homeSimple \.quick-search button\{padding:12px 17px;font-size:14px\}/);
   }
   // The planner's CSS (trip-planner-v3-page.js): "+N more" and the "Before you go" links.
   const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
@@ -31103,12 +31410,15 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
     db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
     for (const lang of ['en', 'fr']) {
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
-      const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
-      assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
-      assert.ok(html.indexOf('class="map-link"') > aside && html.indexOf('class="map-link"') < asideEnd, 'View on map is in the sidebar');
+      // English Food & Drink pages (2026-11-07): the sidebar closes the facts, and the visitor photos and tips come after it.
+      const fdPage = lang === 'en';
+      const aside = html.indexOf(fdPage ? '<aside class="fd-aside">' : '<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = fdPage ? asideEnd : html.indexOf('<div class="venue-extra">');
+      assert.ok(aside > 0 && extra >= asideEnd, 'the extras follow the sidebar');
+      // (#572: one map link, the Directions button; a place with no coordinates for the built-in directions gets the Google Maps button.)
+      assert.match(html, /<a class="cta" href="[^"]+"[^>]*data-track="directions">(?:Get Directions|Itinéraire|Open in Google Maps|Ouvrir dans Google Maps)<\/a>/, 'the map link is the Directions button');
       assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
       if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
-      assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
+      assert.ok(html.indexOf(fdPage ? '<div class="fd-content">' : '<div class="venue-main">') < aside, 'the story still comes first');
       // Desktop keeps two columns: the extras under the story, the sidebar beside both. Phones need no CSS order.
       assert.match(html, /body\.golf-page \.venue-layout \{ display: grid; grid-template-columns: minmax\(0, 1fr\) 340px; grid-template-rows: auto 1fr;/);
       assert.match(html, /body\.golf-page \.venue-aside \{ grid-column: 2; grid-row: 1 \/ span 2; \}/);
@@ -31364,7 +31674,7 @@ test('Round 9 help bot: a week\'s closure in French, uploading a menu, privacy, 
   const privacy = cfg.topics.find((t) => t.id === 'privacy');
   assert.match(privacy.a, /href="\/privacy"/);
   assert.match(privacy.aFr, /href="\/fr\/privacy"/);
-  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics?');
+  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics\u202f?');
 });
 
 test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no space before a question mark', () => r9Fixtures({
@@ -31567,6 +31877,17 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   for (const opts of [{}, { lang: 'fr' }]) {
     const html = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria fictive pour les tests.' }, [], [], [], opts);
+    if (!opts.lang) {
+      // English Food & Drink pages (2026-11-07) follow Copper's approved order: a short introduction, then the main buttons
+      // (Directions, Menu, Hours); Call and the save buttons sit in the "Keep this one handy" card with the facts.
+      const top = html.slice(html.indexOf('<div class="fd-content">'), html.indexOf('<aside class="fd-aside">'));
+      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description">') > top.indexOf('<div class="venue-header">'));
+      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description">'), 'the introduction, then the main buttons');
+      assert.match(html, /<div class="fd-actions fd-contact-actions"[^>]*><a class="cta secondary" href="tel:/, 'the Call button is in the contact card');
+      assert.match(html, /<div class="fd-actions fd-save-actions"[^>]*>\s*<button type="button" class="card-action fav-btn"/);
+      assert.ok(html.indexOf('<aside class="fd-aside">') < html.indexOf('id="vcOpen"') || !html.includes('id="vcOpen"'), 'the facts come before the visitor photos and tips');
+      continue;
+    }
     const main = html.slice(html.indexOf('<div class="venue-main">'), html.indexOf('<aside class="venue-aside">'));
     const at = (s) => main.indexOf(s);
     assert.ok(at('<div class="venue-header">') >= 0 && at('<div class="venue-cta-row"') > 0 && at('<p class="venue-description"') > 0);
@@ -31581,7 +31902,7 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   }
   // Editorial story sections (Elora) follow the description in the page and are marked for the wide-screen order.
   const elora = app.renderVenuePage(eloraPageFixture(), [], [], []);
-  assert.ok(elora.indexOf('<div class="venue-cta-row"') < elora.indexOf('<p class="venue-description"'));
+  assert.ok(elora.indexOf('<p class="venue-description"') < elora.indexOf('<div class="venue-cta-row"'), 'Food & Drink layout (2026-11-07): the introduction, then the buttons');
   assert.ok(elora.indexOf('<p class="venue-description"') < elora.indexOf('<section class="venue-section venue-editorial"'));
 });
 
@@ -31596,7 +31917,7 @@ test('Round 10 phone: map, What\'s On, list, homepage, gallery, footer and town-
   assert.match(map, /body\.map-page \.pm-filters-btn \{[^}]*width: 44px; height: 44px;/);
   assert.match(map, /body\.map-page \.pm-mic \{[^}]*width: 44px; height: 44px;/);
   assert.doesNotMatch(map, /body\.map-page \.pm-(?:chip|tab|more|mode|route-end) \{[^}]*min-height: (?:3\d|4[0-3])px/);
-  // "More upcoming events (N)" (What's On) and "All places on this page, A-Z" (list pages) share one summary rule.
+  // "View a simple list (N)" (What's On) and "All places on this page, A-Z" (list pages) share one summary rule.
   const rest = app.restLinksHtml('fdRest', '<li class="venue-card"><a class="venue-card-link" href="/kelowna/restaurants/a-place"><span class="venue-card-name">A Place</span></a></li>', 'en');
   assert.match(rest, /\.rest-links summary\{[^}]*min-height:44px/);
   assert.match(app.renderWhatsOnStyles(), /\.whatson-browse-list a, body\.whatson-page \.whatson-browse-list span \{[^}]*min-height: 44px;/);
@@ -31917,13 +32238,17 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
   set.run(49.705, -119.40, null, null, app.findVenueBySlug('kelowna', 'cafe', 'close-by-cafe-fixture').id); // ~0.6 km
   set.run(49.73, -119.40, null, null, app.findVenueBySlug('kelowna', 'pub', 'close-by-pub-fixture').id); // ~3.3 km
   set.run(49.99, -119.40, null, null, app.findVenueBySlug('kelowna', 'restaurant', 'close-by-far-fixture').id); // ~32 km
+  db.prepare('INSERT OR REPLACE INTO venue_links (venue_id, menu_url, booking_url) VALUES (?, ?, ?)').run(host.id, 'http://www.host.example', 'https://host.example/');
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, resolve));
   try {
     const html = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries/close-by-host-fixture`).then((r) => r.text());
     const row = html.slice(html.indexOf('<div class="venue-cta-row"'), html.indexOf('</div>', html.indexOf('<div class="venue-cta-row"')));
-    assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions<\/a>/);
+    assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">(?:Get Directions|Open in Google Maps)<\/a>/); // Google Maps when the built-in directions have no route data for the fixture
     assert.match(row, /<a class="cta secondary" href="https:\/\/host\.example\/"[^>]*target="_blank" data-track="website">Website ↗<\/a>/);
+    // 2026-10-29: a menu or booking link that is only the website itself is left out (no Book button, no Menu row).
+    assert.doesNotMatch(html, /data-track="booking"/);
+    assert.doesNotMatch(html, /See the menu/);
     const strip = html.slice(html.indexOf('<section class="nearby-strip"'), html.indexOf('</section>', html.indexOf('<section class="nearby-strip"')));
     assert.ok(strip.length > 0, 'the Close by strip renders');
     assert.ok(html.indexOf('class="venue-description"') < html.indexOf('class="nearby-strip"'), 'after the description');
@@ -31945,6 +32270,10 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
     assert.ok(strip.indexOf('Close By Cafe Fixture') < strip.indexOf('Close By Pub Fixture'), 'closest first');
     assert.match(strip, /class="card-action trip-btn" data-trip-name="Close By Cafe Fixture"[^>]*data-trip-ref="venue:\d+"/);
     assert.match(strip, /window\.trackEvent\('nearby_click'/);
+    // 2026-10-29: "More to explore near" never repeats a place already in Close by.
+    const exploreAt = html.indexOf('<h2>More to explore near');
+    const explore = exploreAt < 0 ? '' : html.slice(exploreAt, html.indexOf('</div>\n      </div>', exploreAt));
+    for (const name of ['Close By Cafe Fixture', 'Close By Pub Fixture']) assert.ok(!explore.includes(name), `${name} shows once`);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
@@ -32019,7 +32348,7 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     assert.equal(seasonSet.ok, true, JSON.stringify(seasonSet));
     const pick = (id) => ({ id, why: `Why ${id} & more`, why_fr: `Pourquoi ${id}` });
     const data = { picks: [pick(ok[0]), pick(noPhoto), pick(closed), pick(999999), pick(ok[1]), pick(ok[2]), pick(ok[3]), pick(ok[0])] };
-    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date() });
+    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date(), rotate: false });
     const hrefs = [...html.matchAll(/class="home-pick-card home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
     assert.equal(hrefs.length, 4, `the four good picks, once each: ${hrefs.join(" ")}`);
     assert.deepEqual(hrefs, ['/kelowna/wineries/pick-winery-one', '/kelowna/cafes/pick-cafe-two', '/kelowna/indoor/pick-gallery-three', '/kelowna/restaurants/pick-bistro-four']);
@@ -32036,27 +32365,35 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     app.clearHoursExtraCache();
     const withShut = app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(shut), pick(ok[1]), pick(ok[2]), pick(ok[3])] }, now: new Date() });
     assert.ok(!withShut.includes('Pick Shut This Week'), 'closed today: skipped');
-    // Full rows only: five, six or seven usable picks show four (never a ragged row).
+    // Four picks a week (2026-11-09): however many are usable, the row shows four.
     const five = [add('Pick Five A', 'cafe', '/images/venues/p5a.jpg'), add('Pick Five B', 'cafe', '/images/venues/p5b.jpg'), add('Pick Five C', 'cafe', '/images/venues/p5c.jpg')];
     const sevenHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [...ok, ...five].map(pick) }, now: new Date() });
     assert.equal((sevenHtml.match(/home-editors-card/g) || []).length, 4, 'seven usable picks show four');
-    // Eight usable with a skipped one in front: the backup steps in, and the row is a full eight.
-    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ...ok, ...five, add('Pick Backup', 'cafe', '/images/venues/pb.jpg')].map(pick) }, now: new Date() });
-    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 8, 'the backup fills the eighth card');
-    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week'));
+    // A skipped pick in the first four: the next one on the list (a backup) steps in, and the row is still four.
+    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ok[0], ok[1], ok[2], add('Pick Backup', 'cafe', '/images/venues/pb.jpg'), ok[3], ...five].map(pick) }, now: new Date() });
+    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 4, 'the backup fills the fourth card');
+    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week') && !eightHtml.includes('Pick Bistro Four'));
     // A pick can use another of its own photos; a photo outside the place's own folders is ignored.
     const own = app.renderHomeEditorsPicksHTML({ data: { picks: [{ ...pick(ok[0]), photo: '/images/owner/abcdefabcdefabcdefabcdef.jpg' }, pick(ok[1]), pick(ok[2]), { ...pick(ok[3]), photo: 'https://example.com/x.jpg' }] }, now: new Date() });
     assert.ok(own.includes('/images/owner/abcdefabcdefabcdefabcdef.jpg'));
     assert.ok(!own.includes('example.com') && own.includes('/images/venues/pick-four.jpg'));
-    // Four cards: no arrows; eight: arrows to page through on a computer.
+    // Four cards, all in view: no arrows.
     assert.ok(!own.includes('home-carousel-btn'));
-    assert.ok(eightHtml.includes('class="home-carousel-btn" data-dir="1"') && eightHtml.includes('<script>'));
+    assert.ok(!eightHtml.includes('home-carousel-btn'));
+    // Daily rotation: the row shifts one place a day, so every pick takes a turn first; the same day is stable.
+    const rotIds = [...ok, ...five, add('Pick Rot', 'cafe', '/images/venues/prot.jpg')].slice(0, 8);
+    const rot = (d) => [...app.renderHomeEditorsPicksHTML({ data: { picks: rotIds.map(pick) }, now: new Date(`${d}T12:00:00-08:00`) }).matchAll(/home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
+    const day1 = rot('2026-11-10'), day2 = rot('2026-11-11'), day9 = rot('2026-11-18');
+    assert.equal(day1.length, 4);
+    assert.deepEqual(day2, [...day1.slice(1), day1[0]], 'one place along the next day');
+    assert.deepEqual(day9, day1, 'eight days is two full cycles of four, back to the start');
+    assert.deepEqual(rot('2026-11-10'), day1, 'stable within a day');
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
-    // The shipped list is well formed: up to eight picks, each with a reason in both languages, no repeats.
+    // The shipped list is well formed: four picks plus backups, each with a reason in both languages, no repeats.
     const shipped = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'editors-picks.json'), 'utf8'));
-    assert.ok(shipped.picks.length >= 8, 'eight picks plus backups');
+    assert.ok(shipped.picks.length >= 5, 'four picks plus at least one backup');
     assert.equal(new Set(shipped.picks.map((p) => p.id)).size, shipped.picks.length);
     for (const p of shipped.picks) { assert.ok(Number.isInteger(p.id) && p.why && p.why_fr && p.why.length <= 60, JSON.stringify(p)); }
     // On the homepage it sits right under This Weekend (when both show), above Hidden Gems.
@@ -32094,4 +32431,635 @@ test('Homepage counts strip: four numbers after the happy hour count, ending wit
   assert.ok(hrefs.length <= 4, hrefs.join(' '));
   assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/hidden-gems'));
   assert.equal(hrefs[hrefs.length - 1], '/food-drink');
+});
+
+test('Cards: a beach card leaves off Kids welcome and Lake view; a free park leaves off Kids welcome; Free stays first (2026-11-03)', () => {
+  const beach = { type: 'beach', kid_friendly: true, lake_view: true, free_entry: true, dog_friendly: true, patio: true };
+  const b = app.cardBadgeChipsHtml(beach);
+  assert.doesNotMatch(b, /Kids OK|Lake view/);
+  assert.match(b, /^<span class="chip chip-feat chip-price">[^]*?Free<\/span>/, 'Free is the first chip');
+  assert.match(b, /Dogs OK/); assert.match(b, /Patio/);
+  const park = { type: 'outdoor', kid_friendly: true, lake_view: true, free_entry: true };
+  const p = app.cardBadgeChipsHtml(park);
+  assert.doesNotMatch(p, /Kids OK/); assert.match(p, />Free</); assert.match(p, /Lake view/);
+  const paid = { type: 'outdoor', kid_friendly: true, lake_view: true };
+  assert.match(app.cardBadgeChipsHtml(paid), /Kids OK/, 'a paid attraction keeps Kids OK');
+  assert.match(app.badgeChipsHtml(beach), /Lake View|Lake view/, 'the full badge list is unchanged');
+});
+
+test('Browse: the What matters to you list offers Free to Visit and Arts & Culture (2026-10-29)', () => {
+  const html = app.browseFeatureChipsHtml({});
+  assert.match(html, /data-bh-feature="free_entry"/);
+  assert.match(html, /data-bh-feature="arts_culture"/);
+  assert.match(html, /data-bh-feature="kid_friendly"/);
+});
+
+test('Venue page polish (2026-10-29): a theatre leads with its next show and Show dates; one top row on computers', () => {
+  const hours = JSON.stringify({ mon: null, tue: null, wed: null, thu: null, fri: [['19:30', '21:30']], sat: [['19:30', '21:29']], sun: [['14:00', '16:00']] });
+  db.prepare(`INSERT INTO venues (name, region, type, description, address, latitude, longitude, hours, slug)
+    VALUES ('Polish Fixture Theatre', 'penticton', 'indoor', 'A fixture theatre.', '1 Stage Rd, Penticton, BC', 49.49, -119.6, ?, 'polish-fixture-theatre')`).run(hours);
+  const v = app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre');
+  const NOW = new Date('2026-10-29T22:00:00Z'); // a Thursday, two weeks before the run
+  const page = () => app.renderVenuePage(app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre'), [], [], [], { now: NOW });
+  // No show coming up: the usual open-now line and Hours.
+  assert.match(page(), /id="venueOpenStatus">Closed today/);
+  assert.match(page(), /<div class="venue-section venue-hours" id="venueHours"><h2>Hours/);
+  const occurrences = [['2026-11-13', '19:30', '21:30'], ['2026-11-14', '19:30', '21:30'], ['2026-11-15', '14:00', '16:00'], ['2026-11-20', '19:30', '21:30']]
+    .map(([start_date, start_time, end_time]) => ({ start_date, start_time, end_time }));
+  const r = app.createEvent({ region: 'penticton', name: 'Footlight Follies – Polish Fixture Theatre', description: 'Fixture run.', source_type: 'official_organizer',
+    source_name: 'polish fixture', source_url: 'https://example.com/polish/footlight', venue_id: v.id, categories: ['arts-culture'], occurrences }, { reason: 'fixture', batch_id: 'test-polish' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  try {
+    const html = page();
+    assert.match(html, /<p class="venue-open-status" data-open="show" id="venueOpenStatus">Next show: Fri Nov 13, 7:30 PM <a href="#venueHours">See all 4 dates<\/a><\/p>/);
+    const box = html.slice(html.indexOf('id="venueHours"'), html.indexOf('</div>', html.indexOf('id="venueHours"')));
+    assert.match(box, /<h2>Show dates<\/h2><p class="venue-show-title"[^>]*>Footlight Follies<\/p>/, 'the repeated venue name is dropped from the title');
+    assert.match(box, /Nov 13 – Nov 20 · 4 shows/);
+    assert.match(box, /<li><span>Fridays<\/span><span>7:30 PM – 9:30 PM<\/span><\/li><li><span>Saturdays<\/span>.*<li><span>Sundays<\/span><span>2 PM – 4 PM<\/span><\/li>/);
+    assert.match(box, new RegExp(`href="/penticton/events/${r.event.slug}"`));
+    assert.doesNotMatch(html, /Closed today/);
+    // One top row on computers: the breadcrumb and the back link share .venue-topbar; the back link hides at 900px+.
+    assert.match(html, /<div class="venue-topbar"><nav class="breadcrumb"/);
+    assert.match(html, /\.venue-topbar \.venue-top-links \.category-back-link \{ display: none; \}/);
+    // A non-theatre with the same event keeps its hours.
+    db.prepare("UPDATE venues SET name = 'Polish Fixture Hall' WHERE id = ?").run(v.id);
+    assert.match(page(), /id="venueOpenStatus">Closed today/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(r.event.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(r.event.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a tasting; compare-and-set; English only', async () => {
+  seasonInsert.run({ name: 'Visit Fixture Winery', type: 'winery', hours: SEASON_WEEK, slug: 'visit-fixture-winery' });
+  seasonInsert.run({ name: 'Visit Fixture Bistro', type: 'restaurant', hours: SEASON_WEEK, slug: 'visit-fixture-bistro' });
+  const w = app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery');
+  const bistro = app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-bistro');
+  const meta = { reason: 'fixture', batch_id: 'test-visit' };
+  const visit = {
+    rows: [
+      { label: 'Tastings', text: '4 wines from $20 (Reserve $35), about 30 min. Book ahead online.' },
+      { label: 'Restaurant', text: 'Visit Fixture Bistro on site, 11 AM – 9:30 PM.', venue_id: bistro.id, url: 'https://visit.example/bistro' },
+    ],
+    booking_url: 'https://visit.example/book', source_url: 'https://www.visit.example/tastings', checked_at: '2026-10-29',
+  };
+  // Validation: a bad row, a missing source, an unknown venue.
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, rows: [{ label: '', text: 'x' }] }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, source_url: null }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, rows: [{ label: 'R', text: 'x', venue_id: 99999999 }] }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, visit, {}).reason, 'invalid_meta');
+  const set = app.guardedVisitInfoUpdate(w.id, null, visit, meta);
+  assert.equal(set.ok, true, JSON.stringify(set));
+  assert.equal(set.changed, true);
+  // Compare-and-set: a stale expected value is refused and the live value comes back.
+  const stale = app.guardedVisitInfoUpdate(w.id, null, null, meta);
+  assert.equal(stale.reason, 'mismatch');
+  assert.equal(stale.live.visit, set.info);
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  assert.match(box, /<h2 id="venueVisitHead">Plan your visit<\/h2>/);
+  // The tasting is listed once, in the Tastings card above the box (2026-11-08), never again in the box.
+  assert.doesNotMatch(box, /visit-label">Tastings</);
+  assert.equal(page.split('4 wines from $20 (Reserve $35), about 30 min. Book ahead online.').length - 1, 1);
+  assert.match(page.slice(page.indexOf('id="fdTastings"')), /4 wines from \$20 \(Reserve \$35\), about 30 min\. Book ahead online\./);
+  assert.match(box, /<a href="\/kelowna\/restaurants\/visit-fixture-bistro">Visit Fixture Bistro<\/a> on site/, 'the on-site restaurant links to its own listing');
+  assert.match(box, /<a href="https:\/\/visit\.example\/bistro" rel="nofollow noopener" target="_blank">More ↗<\/a>/);
+  assert.match(box, /From visit\.example, checked Oct 29, 2026/);
+  assert.ok(page.indexOf('id="venueVisit"') < page.indexOf('id="venueHours"'), 'the box comes before the hours');
+  // The winery layout (2026-11-08): the winery's own booking link leads the main buttons, with an arrow for "opens elsewhere".
+  assert.match(page, /<a aria-label="Book a tasting on [^"]*website \(opens in a new tab\)" class="cta fd-menu-button" href="https:\/\/visit\.example\/book" rel="nofollow noopener" target="_blank"[^>]*>Book a tasting <span class="fd-external-arrow" aria-hidden="true">↗<\/span><\/a>/);
+  // Box polish (2026-10-31): times are tidied ("on site, 11 AM – 9:30 PM").
+  assert.match(box, /on site, 11 AM – 9:30 PM\./);
+  // French pages leave it out.
+  assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], [], { lang: 'fr' }), /venue-visit/);
+  // Box polish (2026-10-31): extras and groups fold under "More", Tastings / Restaurant / Winter stay open; the Menu row
+  // in Good to Know goes when the box links the same page, and stays when it doesn't.
+  db.prepare('INSERT OR REPLACE INTO venue_links (venue_id, menu_url) VALUES (?, ?)').run(w.id, 'https://visit.example/bistro/');
+  const fuller = { ...visit, rows: [visit.rows[0], { label: 'Wine & cheese', text: 'Pairing at 11 AM - 1 PM, $50.' }, { label: 'Groups', text: '8 or more book ahead.' }, visit.rows[1], { label: 'Winter', text: 'Open Daily, Fri - Sun.' }] };
+  const set2 = app.guardedVisitInfoUpdate(w.id, set.info, fuller, meta);
+  assert.equal(set2.ok, true, JSON.stringify(set2));
+  const page2 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  const box2 = page2.slice(page2.indexOf('<section class="venue-section venue-visit"'), page2.indexOf('</section>', page2.indexOf('<section class="venue-section venue-visit"')));
+  const open = box2.slice(0, box2.indexOf('<details'));
+  assert.match(open, /visit-label">Restaurant<.*visit-label">Winter</s, 'the key rows stay open, in their stored order (Tastings is in its own card)');
+  assert.doesNotMatch(open, /visit-label">Tastings</);
+  assert.match(box2, /<details class="visit-more"><summary>More: wine &amp; cheese, groups<\/summary>/);
+  assert.match(box2, /11 AM – 1 PM/);
+  // (Winery layout, 2026-11-08: the Menu card in the main column links the menu; the sidebar's own Menu row still goes.)
+  assert.doesNotMatch(page2.slice(page2.indexOf('<aside class="fd-aside">'), page2.indexOf('</aside>')), /See the menu/, 'the Menu row goes when the box already links that page');
+  // Known for (2026-10-31): always first and open, wherever it is stored; up to 7 rows.
+  const known = { ...fuller, rows: [...fuller.rows, { label: 'Known for', text: 'Pinot Noir and Chardonnay; also the Old Vines Foch.' }] };
+  const set3 = app.guardedVisitInfoUpdate(w.id, set2.info, known, meta);
+  assert.equal(set3.ok, true, JSON.stringify(set3));
+  const page3 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  assert.match(page3, /<ul class="visit-list"><li><span class="visit-label">Known for<\/span><span>Pinot Noir and Chardonnay; also the Old Vines Foch\.<\/span><\/li><li><span class="visit-label">Restaurant</);
+  set2.info = set3.info;
+  db.prepare('UPDATE venue_links SET menu_url = ? WHERE venue_id = ?').run('https://visit.example/wine-list', w.id);
+  assert.match(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []), /See the menu/, 'a different menu link stays');
+  db.prepare('DELETE FROM venue_links WHERE venue_id = ?').run(w.id);
+  set.info = set2.info;
+  // Clearing removes the box and the button.
+  assert.equal(app.guardedVisitInfoUpdate(w.id, set.info, null, meta).ok, true);
+  const cleared = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  assert.doesNotMatch(cleared, /venue-visit|Book a tasting/);
+});
+
+test('Plan your visit (2026-10-29): GET /admin/visit-info/:id and POST /admin/set-visit-info', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Visit Route Winery', type: 'winery', hours: SEASON_WEEK, slug: 'visit-route-winery' });
+  const w = app.findVenueBySlug('kelowna', 'winery', 'visit-route-winery');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const auth = { Authorization: 'Bearer test-fixture-admin-token', 'Content-Type': 'application/json' };
+  try {
+    assert.equal((await fetch(`${base}/admin/visit-info/${w.id}`)).status, 401);
+    const got = await (await fetch(`${base}/admin/visit-info/${w.id}`, { headers: auth })).json();
+    assert.equal(got.expected_current, null);
+    const body = { id: w.id, expected_current: null, reason: 'fixture', batch_id: 'test-visit-route',
+      visit: { rows: [{ label: 'Tastings', text: 'Free, walk-ins welcome.' }], booking_url: null, source_url: 'https://route.example/visit', checked_at: '2026-10-29' } };
+    assert.equal((await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify({ ...body, extra: 1 }) })).status, 400);
+    const ok = await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+    assert.equal(ok.status, 200);
+    const okBody = await ok.json();
+    assert.equal(okBody.changed, true);
+    assert.equal((await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify(body) })).status, 409, 'stale expected_current');
+    const again = await (await fetch(`${base}/admin/visit-info/${w.id}`, { headers: auth })).json();
+    assert.equal(again.expected_current, okBody.expected_current);
+    assert.deepEqual(again.visit.rows, [{ label: 'Tastings', text: 'Free, walk-ins welcome.' }]);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Plan your visit (2026-10-31): a restaurant keeps Reservations, Menu and Dietary open, folds Patio and Groups, and its button says Reserve a table', () => {
+  seasonInsert.run({ name: 'Visit Fixture Kitchen', type: 'restaurant', hours: SEASON_WEEK, slug: 'visit-fixture-kitchen' });
+  const k = app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-kitchen');
+  const r = app.guardedVisitInfoUpdate(k.id, null, { rows: [
+    { label: 'Patio', text: 'Heated patio open May to October.' },
+    { label: 'Known for', text: 'Wood-fired pizza and an Okanagan wine list.' },
+    { label: 'Groups', text: 'Private room seats 24.' },
+    { label: 'Menu', text: 'Pizza and pasta, mains $22 to $38.' },
+    { label: 'Reservations', text: 'Recommended Friday and Saturday.' },
+    { label: 'Dietary', text: 'Vegan and gluten-free options.' },
+  ], booking_url: 'https://kitchen.example/reserve', source_url: 'https://kitchen.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-food' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-kitchen'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  const open = box.slice(0, box.indexOf('<details'));
+  assert.match(open, /visit-label">Known for<.*visit-label">Menu<.*visit-label">Reservations<.*visit-label">Dietary</s, 'the key rows stay open; Known for first');
+  assert.match(box, /<details class="visit-more"><summary>More: patio, groups<\/summary>/);
+  assert.match(page, />Reserve a table<\/a>/);
+});
+
+test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and its button says Book a table', () => {
+  seasonInsert.run({ name: 'Visit Fixture Brewery', type: 'brewery', hours: SEASON_WEEK, slug: 'visit-fixture-brewery' });
+  const b = app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-brewery');
+  const r = app.guardedVisitInfoUpdate(b.id, null, { rows: [
+    { label: 'Games', text: 'Shuffleboard and board games.' },
+    { label: 'Flights', text: 'Four 5 oz tasters for $12.' },
+    { label: 'Food', text: 'Wood-fired pizza from noon.' },
+    { label: 'Known for', text: 'Hazy IPAs and a coffee stout.' },
+  ], booking_url: 'https://brew.example/book', source_url: 'https://brew.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-brew' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-brewery'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  const open = box.slice(0, box.indexOf('<details'));
+  assert.match(open, /visit-label">Known for<.*visit-label">Flights<.*visit-label">Food</s);
+  // One folded row (Games) shows open instead of behind a one-item More (2026-10-31).
+  assert.doesNotMatch(box, /<details class="visit-more">/);
+  assert.match(box, /visit-label">Games</);
+  assert.match(page, />Book a table<\/a>/);
+  // booking_label (2026-10-31): the button's own words win over the brewery default.
+  const cur = app.currentVisitInfoJson(b.id);
+  const relabel = app.guardedVisitInfoUpdate(b.id, cur, { ...JSON.parse(cur), booking_label: 'Book a tour' }, { reason: 'fixture', batch_id: 'test-brew' });
+  assert.equal(relabel.ok, true, JSON.stringify(relabel));
+  assert.match(app.renderVenuePage(app.findVenueBySlug(b.region, 'brewery', 'visit-fixture-brewery'), [], [], []), />Book a tour<\/a>/);
+  assert.equal(app.guardedVisitInfoUpdate(b.id, relabel.info, { ...JSON.parse(relabel.info), booking_label: 'x'.repeat(30) }, { reason: 'fixture', batch_id: 'test-brew' }).reason, 'invalid_visit');
+});
+
+test('Plan your visit (2026-10-31): French pages show the translated rows, French labels, footer and button; untranslated rows are left out', () => {
+  seasonInsert.run({ name: 'Visit Fixture Cidery', type: 'brewery', hours: SEASON_WEEK, slug: 'visit-fixture-cidery' });
+  const c = app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery');
+  const r = app.guardedVisitInfoUpdate(c.id, null, { rows: [
+    { label: 'Known for', text: 'Light-handed winemaking at an urban Kelowna winery: crisp whites, rosés, reds and the Small Lots program.' },
+    { label: 'Prices', text: 'A sentence the French list has never seen.' },
+    { label: 'Tastings', text: 'Another untranslated line, $12.' },
+  ], booking_url: 'https://cider.example/book', booking_label: 'Book a tasting', source_url: 'https://cider.example/', checked_at: '2026-10-29' }, { reason: 'fixture', batch_id: 'test-visit-fr' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], [], { lang: 'fr' });
+  const box = fr.slice(fr.indexOf('<section class="venue-section venue-visit"'), fr.indexOf('</section>', fr.indexOf('<section class="venue-section venue-visit"')));
+  assert.match(box, /<h2 id="venueVisitHead">Planifiez votre visite<\/h2>/);
+  assert.match(box, /<span class="visit-label">Connu pour<\/span><span>Vinification à main légère dans un vignoble urbain de Kelowna/);
+  assert.doesNotMatch(box, /Light-handed|never seen|untranslated/, 'untranslated rows are left out, never shown in English');
+  assert.doesNotMatch(box, /visit-label">(Prices|Tarifs|Tastings|Dégustations)</);
+  assert.match(box, /Source\u00a0: cider\.example, vérifié le 29 oct\. 2026/);
+  assert.match(fr, />Réserver une dégustation<\/a>/, 'the Book button reads in French');
+  // The English page is unchanged.
+  const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], []);
+  assert.match(en, /<h2 id="venueVisitHead">Plan your visit<\/h2>/);
+  assert.match(en, /A sentence the French list has never seen\./);
+  // A box with nothing translated shows no French box and no French Book button.
+  const cur = app.currentVisitInfoJson(c.id);
+  const only = app.guardedVisitInfoUpdate(c.id, cur, { ...JSON.parse(cur), rows: [{ label: 'Prices', text: 'Entirely untranslated.' }] }, { reason: 'fixture', batch_id: 'test-visit-fr' });
+  assert.equal(only.ok, true, JSON.stringify(only));
+  assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], [], { lang: 'fr' }), /venue-visit|Réserver une dégustation/);
+});
+
+test('Ski resort pages (2026-11-01): the Mountain at a glance panel shows status, stats and the hill’s own links, and reads in French', async () => {
+  const REG = ['big-white', 'silverstar', 'apex', 'baldy'];
+  for (const r of REG) {
+    const f = app.SKI_RESORT_SEASON[r];
+    const soon = app.skiSeasonBoxHtml(r, '2026-11-01');
+    assert.match(soon, /<h2 id="skiHubHeading" class="ski-hub-title">Mountain at a glance<\/h2>/, r);
+    assert.match(soon, new RegExp(`ski-hub-status ski-hub-status-${f.opens ? 'soon' : 'tba'}`), r);
+    assert.match(soon, /class="ski-hub-stats"/, r);
+    for (const k of ['snow', 'webcams', 'tickets']) assert.ok(soon.includes(`href="${f.links[k]}"`), `${r} ${k} link`);
+    assert.doesNotMatch(soon, /href="null"|href="undefined"|>undefined</, r);
+    assert.equal((soon.match(/class="ski-hub-tool"/g) || []).length, ['snow', 'webcams', 'tickets', 'map'].filter((k) => f.links[k]).length, r);
+    assert.equal(app.skiSeasonBoxHtml(r, '2028-01-01').includes('ski-hub-status'), false, `${r}: no season line after the season`);
+    assert.match(app.skiSeasonBoxHtml(r, '2028-01-01'), /class="ski-hub-tools"/, `${r}: links stay`);
+  }
+  assert.match(app.skiSeasonBoxHtml('big-white', '2026-12-01'), /ski-hub-status-open[^>]*><span class="ski-hub-dot" aria-hidden="true"><\/span>Open for the season/);
+  assert.match(app.skiSeasonBoxHtml('big-white', '2026-11-01'), /Opens Thursday, November 26/);
+  // The resort pages 404 without a listing, so the test brings its own.
+  const fixture = db.prepare("INSERT INTO venues (name, region, type, description, hours, slug) VALUES ('Ski Glance Fixture Pub', 'big-white', 'pub', 'A fixture.', ?, 'ski-glance-fixture-pub')").run(SEASON_WEEK).lastInsertRowid;
+  // The panel sits above the category tabs, in both languages.
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ en: await (await fetch(`${base}/big-white`)).text(), fr: await (await fetch(`${base}/fr/big-white`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); db.prepare('DELETE FROM venues WHERE id = ?').run(fixture); }
+  }));
+  // On the compact resort page (#634) the same facts sit in the "Mountain essentials" strip right under the tiles:
+  // the date-aware status and the hill's own snow report, webcams and tickets links, in both languages.
+  const essentials = (h) => h.slice(h.indexOf('<aside class="bw-essentials">'), h.indexOf('</aside>', h.indexOf('<aside class="bw-essentials">')));
+  const en = essentials(pages.en), fr = essentials(pages.fr);
+  assert.ok(en.length > 0 && pages.en.indexOf('<aside class="bw-essentials">') < pages.en.indexOf('<section class="bw-section" id="picks">'), 'the strip is above the picks');
+  assert.match(en, /Mountain essentials/);
+  assert.match(en, /Opens Thursday, November 26|Open for the season|Check resort status/);
+  for (const k of ['webcams', 'tickets']) assert.ok(en.includes(`href="${app.SKI_RESORT_SEASON['big-white'].links[k]}"`), `${k} link`);
+  assert.match(en, /href="https:\/\/www\.bigwhite\.com\/(?:mountain-conditions\/)?daily-snow-report"[^>]*>[^<]*Snow report/); // big-white-page.js keeps its own copy of the snow link
+  assert.match(fr, /L’essentiel en montagne/);
+  assert.match(fr, /Conditions de neige/);
+  assert.match(fr, /Infos sur la montagne/);
+  assert.doesNotMatch(fr, /Mountain essentials|Snow report|More mountain info/);
+});
+
+test('Ski resort pages (2026-11-01): one full-width flow with no side column; other towns keep the split layout', async () => {
+  // Since #633-#636 every town and resort uses the compact layout (no region-lead / split intro at all); the resort pages
+  // are one full-width flow (hero, tiles, essentials, picks, plan) and the towns have their own body class.
+  // The resort pages 404 without a listing, so the test brings its own.
+  const fixture = db.prepare("INSERT INTO venues (name, region, type, description, hours, slug) VALUES ('Ski Flow Fixture Pub', 'big-white', 'pub', 'A fixture.', ?, 'ski-flow-fixture-pub')").run(SEASON_WEEK).lastInsertRowid;
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ ski: await (await fetch(`${base}/big-white`)).text(), town: await (await fetch(`${base}/kelowna`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); db.prepare('DELETE FROM venues WHERE id = ?').run(fixture); }
+  }));
+  assert.match(pages.ski, /<body class="golf-page outdoor-page big-white-page">/);
+  assert.match(pages.ski, /<main id="main" class="bw-landing"[^>]*>/);
+  assert.doesNotMatch(pages.ski, /region-lead|<aside class="venue-aside"/, 'no side column or split intro');
+  assert.match(pages.town, /<body class="golf-page outdoor-page kelowna-page">/);
+  assert.doesNotMatch(pages.town, /ski-region">|big-white-page/);
+});
+
+test('Ski resort pages (2026-11-01): Plan your trip cards show stay, getting-here and kids facts with the hill’s own links, only where the hill states them', () => {
+  let shown = 0;
+  for (const r of Object.keys(app.SKI_RESORT_SEASON)) {
+    const html = app.skiPlanHtml(r);
+    const plan = app.SKI_RESORT_SEASON[r].plan;
+    if (!plan) { assert.equal(html, '', `${r}: no plan, no section`); continue; }
+    shown++;
+    assert.match(html, /<h2 id="skiPlanHeading" class="ski-plan-heading">Plan your trip<\/h2>/, r);
+    for (const [key, title] of [['stay', 'Where to stay'], ['getting', 'Getting here'], ['kids', 'With kids']]) {
+      if (plan[key] && (plan[key].facts.length || plan[key].links.length)) assert.ok(html.includes(`</svg>${title}</h3>`), `${r}: ${title}`);
+      for (const [label, url] of (plan[key] ? plan[key].links : [])) {
+        assert.match(url, /^https:\/\//, `${r}: ${label}`);
+        assert.ok(html.includes(`href="${url.replace(/&/g, '&amp;')}"`), `${r}: ${label} link`);
+      }
+      for (const fact of (plan[key] ? plan[key].facts : [])) assert.ok(fact.length <= 115, `${r}: fact too long: ${fact}`);
+    }
+    assert.doesNotMatch(html, /undefined|null/, r);
+  }
+  assert.ok(shown >= 2);
+});
+
+test('Food & Drink (2026-11-01): the Sort menu offers Nearest to me, which is picked in the page, never from the address', async () => {
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ hub: await (await fetch(`${base}/food-drink`)).text(), forced: await (await fetch(`${base}/food-drink?sort=nearest`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); }
+  }));
+  assert.match(pages.hub, /<option value="nearest">Nearest to me<\/option>/);
+  assert.match(pages.hub, /<p class="fd-near-note" id="fdNearNote" aria-live="polite" hidden><\/p>/);
+  assert.match(pages.hub, /data-ll="-?\d+\.\d{4},-?\d+\.\d{4}"/, 'cards carry their pin');
+  assert.doesNotMatch(pages.forced, /<option value="nearest" selected>/, 'the address never selects Nearest');
+  assert.ok(app.FD_SORT_KEYS ? !app.FD_SORT_KEYS.has('nearest') : true);
+});
+
+test('Venue page cleanup (2026-11-01): local phone format, no second map link, and a Known for row that only repeats the description is left out', () => {
+  assert.equal(app.displayPhone('+1 250-491-2695'), '250-491-2695');
+  assert.equal(app.displayPhone('(250) 491 2695'), '250-491-2695');
+  assert.equal(app.displayPhone('1-800-663-2772'), '800-663-2772');
+  assert.equal(app.displayPhone('ext 5'), 'ext 5');
+  const desc = 'A big, all-ages bowling centre with 24 ten-pin and 6 five-pin lanes, plus cosmic bowling and lane-side food and drinks from the attached Freddy’s Brewpub.';
+  const info = { rows: [{ label: 'Known for', text: '30 lanes (24 ten-pin, 6 five-pin) with cosmic bowling, plus Freddy’s Brewpub and its own in-house brewery.' }, { label: 'Booking', text: 'Book lanes online.' }] };
+  assert.deepEqual(app.visitDropRepeatedKnownFor(info, desc).rows.map((r) => r.label), ['Booking']);
+  // New facts stay; a box with only that row keeps it; no description changes nothing.
+  assert.deepEqual(app.visitDropRepeatedKnownFor(info, 'Quiet family-run cafe on the lake road.').rows.map((r) => r.label), ['Known for', 'Booking']);
+  const only = { rows: [info.rows[0]] };
+  assert.equal(app.visitDropRepeatedKnownFor(only, desc), only);
+  assert.equal(app.visitDropRepeatedKnownFor(info, ''), info);
+});
+
+test('Venue page (2026-11-01): the Call button is hidden on laptops in the themed shell too, and stays on phones', () => {
+  const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course') || app.getVenuesByRegionCategory('west-kelowna', 'golf')[0], [], [], []);
+  assert.match(html, /@media \(hover: hover\) and \(min-width: 900px\) \{ body\.golf-page \.venue-cta-row \.cta\[href\^="tel:"\] \{ display: none; \} \}/);
+});
+
+test('Plan your hike (2026-11-01): a trail box leads with The hike, the page shows the one-line summary under the title, and the heading says hike', () => {
+  seasonInsert.run({ name: 'Hike Fixture Trail', type: 'outdoor', hours: SEASON_WEEK, slug: 'hike-fixture-trail' });
+  const v = app.findVenueBySlug('kelowna', 'outdoor', 'hike-fixture-trail');
+  try {
+    const r = app.guardedVisitInfoUpdate(v.id, null, { rows: [
+      { label: 'Dogs', text: 'Dogs are welcome on a leash.' },
+      { label: 'The hike', text: '5.2 km loop, 280 m climb, moderate, about 2 hours' },
+      { label: 'Before you go', text: 'Upper loop closed for restoration; stay on marked trails.' },
+      { label: 'Trail map', text: 'Official trail map', url: 'https://trails.example/map.pdf' },
+    ], booking_url: null, source_url: 'https://trails.example/park', checked_at: '2026-11-01' }, { reason: 'fixture', batch_id: 'test-hike' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'outdoor', 'hike-fixture-trail'), [], [], []);
+    assert.match(html, /<p class="venue-glance">5\.2 km loop, 280 m climb, moderate, about 2 hours<\/p>/);
+    assert.match(html, /<h2 id="venueVisitHead">Plan your hike<\/h2>/);
+    const box = html.slice(html.indexOf('id="venueVisit"'));
+    // The hike leads the box. (Whether the Dogs row shows depends on the venue's dog-friendly state, so check the first row.)
+    assert.equal((box.match(/visit-label">([^<]*)/) || [])[1], 'The hike', 'The hike is the first row');
+    assert.match(box, /visit-label">Trail map<\/span><span>Official trail map <a href="https:\/\/trails\.example\/map\.pdf"/);
+  } finally {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
+  }
+});
+
+test('Venue badges (2026-11-01): icon first, grouped by kind (food, people, setting, time), no Open early/late, Happy hour only when no happy-hour line', () => {
+  const v = { vegan: 1, gluten_free: 1, kid_friendly: 1, patio: 1, happy_hour: 1, open_late: 1, dog_friendly: 1 };
+  const html = app.venueBadgeChipsHtml(v, { skipDogFriendly: true });
+  assert.match(html, /chip-vb-food"><svg[^>]*>.*?<\/svg>Vegan-Friendly/);
+  assert.ok(html.indexOf('chip-vb-food') < html.indexOf('chip-vb-people') && html.indexOf('chip-vb-people') < html.indexOf('chip-vb-place') && html.indexOf('chip-vb-place') < html.indexOf('chip-vb-time'), 'grouped food, people, setting, time');
+  assert.doesNotMatch(html, /Open Late|Dog-Friendly/);
+  assert.match(html, /Happy Hour/);
+  assert.doesNotMatch(app.venueBadgeChipsHtml(v, { skipHappyHour: true }), /Happy Hour/);
+});
+
+test('French guide card (2026-11-01): the Okanagan-to-Whistler road trip description is French on /fr/guides', () => {
+  const fs2 = require('node:fs');
+  const g = JSON.parse(fs2.readFileSync(require('node:path').join(__dirname, '..', 'data', 'guides', 'okanagan-to-whistler-road-trip.json'), 'utf8'));
+  const fr = JSON.parse(fs2.readFileSync(require('node:path').join(__dirname, '..', 'data', 'french', 'guide-desc-okanagan-whistler-2026-11-01.json'), 'utf8'));
+  assert.ok(fr[g.description], 'the guide description has a French line');
+  assert.match(fr[g.description], /^De Kelowna à Whistler/);
+});
+
+test('A card for a place with a notice never shows times: it says by appointment only when the notice says so', () => {
+  assert.equal(app.appointmentLineFor(-1, 'In winter, visits are by appointment only unless the winery posts otherwise.'), 'By appointment \u00b7 call ahead');
+  assert.equal(app.appointmentLineFor(-1, 'Open Thursday to Saturday, 10 am to 4 pm.'), null);
+  assert.equal(app.appointmentLineFor(-1, null), null);
+});
+
+test('Card status line for a place with a notice: closed for the season / temporarily closed (with the reopening date) / by appointment', () => {
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: '2027-05-01' }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season \u00b7 Reopens May 1, 2027' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: '2026-12-26' }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season \u00b7 Reopens Dec 26' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: null }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'temp_closed', current: true, to: '2026-11-09' }, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed \u00b7 Reopens Nov 10' });
+  assert.equal(app.blockedStatusLine(-1, 'x', { kind: 'temp_closed', current: false, to: '2026-11-09' }, '2026-11-01'), null, 'a closure that has not started says nothing');
+  assert.deepEqual(app.blockedStatusLine(-1, 'Visits are by appointment only.', null, '2026-11-01'), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
+  assert.equal(app.blockedStatusLine(-1, 'Tastings at noon.', null, '2026-11-01'), null);
+  assert.deepEqual(app.blockedStatusLine(-1, 'Temporarily closed. No reopening date is posted.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'Open for the season until October 31. Temporarily closed. The tasting room has no reopening date.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' }, 'a season sentence before the notice does not hide it');
+});
+
+test('Every card has a status line: live, notice, by appointment from the place\'s own words, or hours not confirmed', () => {
+  assert.deepEqual(app.cardStatusFor({ eligible: true, state: 'open', text: 'Open \u00b7 Closes 5 PM' }, { id: -1 }), { state: 'open', text: 'Open \u00b7 Closes 5 PM' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: { state: 'seasonal', text: 'Closed for the season' } }, { id: -1 }), { state: 'seasonal', text: 'Closed for the season' });
+  assert.deepEqual(app.cardStatusFor(undefined, { id: -1, description: 'A small, appointment-style winery.' }), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, description: 'Pinot Noir and Chardonnay.' }), { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' });
+});
+
+test('Book-ahead tours and reservation-only notices read as such on the card', () => {
+  const id = [...app.BOOKING_ONLY_IDS][0];
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id, description: 'A tour.' }), { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' });
+  assert.equal(app.appointmentLineFor(-1, 'Tastings are by reservation only (checked October 19, 2026).'), 'By appointment \u00b7 call ahead');
+});
+
+test('Public places with no hours say Open to the public; arenas and tours do not', () => {
+  assert.equal(app.isPublicAccessPlace({ type: 'beach', name: 'Any Beach' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'outdoor', free_entry: 1, name: 'A Trail' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'outdoor', free_entry: 0, name: 'Paid Park' }), false);
+  assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Lumby Skate Park' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Enderby Arena' }), false);
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'B' }), { state: 'public', text: 'Open to the public' });
+});
+
+test('A public place that mentions booking (campsites) still says Open to the public, not By appointment', () => {
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'Bear Creek', description: 'Campsite reservations required in summer.' }), { state: 'public', text: 'Open to the public' });
+});
+
+test('French: card status lines for places with a notice', () => {
+  assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
+  assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
+  assert.equal(app.frText('Temporarily closed \u00b7 Reopens Nov 10'), 'Ferm\u00e9 temporairement \u00b7 R\u00e9ouverture le 10 nov.');
+});
+
+test('Golf, tours, sports and indoor cards carry a status line like Food & Drink cards (no empty space)', () => {
+  golfFixtures();
+  const venues = app.getVenuesByRegionCategory('penticton', 'golf');
+  const html = app.renderCategoryPage('penticton', 'golf', venues, [], { today: '2026-11-02' });
+  const cards = html.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  assert.ok(cards.length >= 3);
+  for (const c of cards) assert.match(c, /<p class="fd-open-status" data-fd-open="[a-z]+">[^<]+<\/p>/, 'every golf card has a status line');
+  const all = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
+  const allCards = all.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  assert.ok(allCards.length >= 3);
+  for (const c of allCards) assert.match(c, /fd-open-status/, 'every card on /golf has a status line');
+});
+
+test('Outdoor pages: the quick facts are their own Good to Know section (no Checked row, no "Free to visit" repeat)', () => {
+  app.OUTDOOR_FACTS['99993'] = { cost: 'Free to visit', parking: 'Small lot', dogs: 'On a leash', alerts: 'Trail closed to Dec 1', source_url: 'https://www.bcparks.ca/x/', checked_at: 'Nov 2, 2026' };
+  try {
+    const html = app.outdoorGoodToKnowHtml({ id: 99993, type: 'outdoor', free_entry: 1 });
+    assert.match(html, /<h2 id="venueGtkHead">Good to Know<\/h2>/);
+    assert.deepEqual([...html.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]), ['Heads up', 'Parking', 'Dogs'], 'Free to visit repeats the badge, Checked is a footer line');
+    assert.match(html, /From bcparks\.ca, checked Nov 2, 2026/);
+    assert.match(app.outdoorGoodToKnowHtml({ id: 99993, type: 'outdoor', free_entry: 0 }), /<dt>Cost<\/dt><dd>Free to visit<\/dd>/, 'with no badge the cost row stays');
+    assert.equal(app.outdoorGoodToKnowHtml({ id: 99994, type: 'outdoor' }), '');
+    assert.equal(app.outdoorGoodToKnowHtml({ id: 99993, type: 'beach' }), '');
+  } finally { delete app.OUTDOOR_FACTS['99993']; }
+});
+
+test('Outdoors Good to Know: quick facts show in a fixed order with a Checked line; other types and empty places show none', () => {
+  app.OUTDOOR_FACTS['99991'] = { cost: 'Free', parking: 'Small lot', dogs: 'On a leash', alerts: 'Trail closed to Dec 1', extras: [{ label: 'Water', text: 'None on trail' }], source_url: 'https://www.bcparks.ca/x/', checked_at: 'Nov 2, 2026' };
+  try {
+    const rows = app.outdoorFactRows({ id: 99991, type: 'outdoor' });
+    assert.deepEqual(rows.map((r) => r[0]), ['Heads up', 'Cost', 'Parking', 'Dogs', 'Water', 'Checked']);
+    assert.match(rows[5][1], /bcparks\.ca<\/a>, Nov 2, 2026/);
+    assert.deepEqual(app.outdoorFactRows({ id: 99991, type: 'beach' }), []);
+    assert.deepEqual(app.outdoorFactRows({ id: 99992, type: 'outdoor' }), []);
+  } finally { delete app.OUTDOOR_FACTS['99991']; }
+});
+
+test('Guides: a file guide names its author and real dates, on the page and in its Article data (2026-11-03)', () => {
+  const dates = app.guideDatesFor('/guides/winter-in-kelowna');
+  assert.match(dates.published, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(dates.modified, /^\d{4}-\d{2}-\d{2}$/);
+  const html = app.guideBylineHtml({ published: '2026-10-18', modified: '2026-11-03' });
+  assert.match(html, /<a href="\/about">By Dayton<\/a>/);
+  assert.match(html, /<time datetime="2026-11-03">Updated Nov 3, 2026<\/time>/);
+  assert.doesNotMatch(app.guideBylineHtml(null), /Updated/);
+});
+
+test("What's On cards: an event at a place with its own photo shows that photo; no place, no photo or a redirected place keep the kind photo (2026-11-04)", () => {
+  const base = { id: 9001, name: 'Host Photo Fixture Market', slug: 'host-photo-fixture-market', region: 'kelowna', categories: ['markets-fairs'], dateLabel: 'Sat Nov 7', description: 'A fixture event.' };
+  const withPhoto = app.createVenue({ name: 'Host Photo Fixture Hall', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-hall', image_url: '/images/venues/host-photo-fixture-hall.jpg' });
+  const noPhoto = app.createVenue({ name: 'Host Photo Fixture Barn', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-barn' });
+  const day = '2026-11-04';
+  const own = app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id }, day);
+  assert.match(own, /<img class="whatson-event-img whatson-event-photo" src="\/images\/venues\/host-photo-fixture-hall\.jpg"[^>]*data-photo="venue"/);
+  for (const ev of [{ ...base }, { ...base, venueId: noPhoto.id }, { ...base, venueId: 99999999 }]) {
+    const card = app.whatsOnEventCardHtml(ev, day);
+    assert.doesNotMatch(card, /data-photo="venue"/, 'no host photo: the kind photo stays');
+    assert.match(card, /<img class="whatson-event-img whatson-event-photo" src="\/images\//);
+  }
+  // The event's own picture (a /path in image_url) still wins, and the page-level image helpers are untouched.
+  assert.match(app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id, image: '/images/events/own-test.jpg' }, day), /src="\/images\/events\/own-test\.jpg"/);
+  assert.doesNotMatch(app.eventImagePath({ id: 9001, name: base.name, description: base.description, image_url: null }, ['markets-fairs']), /host-photo-fixture/);
+});
+
+test("What's On cards: a busy place's photo shows on at most two cards per page; the rest keep the kind photo (2026-11-04)", () => {
+  const v = app.createVenue({ name: 'Host Cap Fixture Theatre', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-cap-fixture-theatre', image_url: '/images/venues/host-cap-fixture-theatre.jpg' });
+  const used = new Map();
+  const claim = (id) => { const n = used.get(id) || 0; if (n >= 2) return false; used.set(id, n + 1); return true; };
+  const cards = [1, 2, 3, 4].map((i) => app.whatsOnEventCardHtml({ id: 9100 + i, name: `Cap Fixture Show ${i}`, slug: `cap-fixture-show-${i}`, region: 'kelowna', categories: ['live-music'], dateLabel: 'Sat Nov 7', description: 'x', venueId: v.id }, '2026-11-04', null, claim));
+  assert.deepEqual(cards.map((c) => /data-photo="venue"/.test(c)), [true, true, false, false]);
+  assert.match(cards[2], /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\//);
+});
+
+test('a combination guide with too few places sends people to the closest real page, keeps campaign tags, and unknown guides stay 404', () => withDiscoveryServer(async (base) => {
+  const r = await fetch(`${base}/guide/peachland/wineries-with-live-music?utm_source=x&utm_medium=email&utm_campaign=y`, { redirect: 'manual' });
+  assert.equal(r.status, 301);
+  const to = r.headers.get('location');
+  assert.match(to, /^\/(?:guide\/)?peachland(?:[/?]|$)/);
+  assert.match(to, /utm_campaign=y/);
+  assert.equal((await fetch(`${base}/guide/peachland/not-a-combo`, { redirect: 'manual' })).status, 404);
+}));
+
+test('Storefront spot: the portal offers it, a link upload waits for review, a signed-in owner near the pin goes live, the photo link works', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Storefront Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'storefront-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'storefront-fixture');
+  db.prepare('UPDATE venues SET latitude = 49.8863, longitude = -119.4966 WHERE id = ?').run(v.id);
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const spot = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, lat: 49.8864, lng: -119.4966, device_lat: 49.8864, device_lng: -119.4966, accuracy: 9, rights: true };
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.9.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const files = [];
+  try {
+    const page = await (await fetch(`${base}/owner/${token}`)).text();
+    assert.match(page, /id="arrival" data-task="arrival"/);
+    assert.match(page, /data-pick="arrival"|Help people find your door/);
+    const viaLink = await post(`/owner/${token}/arrival`, spot);
+    assert.equal(viaLink.status, 201, JSON.stringify(viaLink.body));
+    assert.equal(viaLink.body.live, false);
+    const row = db.prepare('SELECT * FROM venue_arrival_points WHERE id = ?').get(viaLink.body.id);
+    files.push(row.file);
+    assert.equal(row.status, 'pending');
+    const img = await fetch(`${base}/owner-photos/arrival/${row.preview_key}.jpg`);
+    assert.equal(img.status, 200); assert.match(img.headers.get('content-type'), /image\/jpeg/); assert.match(img.headers.get('x-robots-tag'), /noindex/);
+    assert.equal((await fetch(`${base}/owner-photos/arrival/${'x'.repeat(24)}.jpg`)).status, 404);
+    const made = await post(`/owner/${token}/account`, { email: 'storefront@example.com', password: 'a long enough password' });
+    const live = await post(`/owner/account/venue/${v.id}/arrival`, spot, made.cookie);
+    assert.equal(live.status, 201, JSON.stringify(live.body));
+    assert.equal(live.body.live, true);
+    files.push(db.prepare('SELECT file FROM venue_arrival_points WHERE id = ?').get(live.body.id).file);
+    assert.equal((await post(`/owner/account/venue/${v.id}/arrival`, spot)).status, 401);
+    const after = db.prepare('SELECT latitude, longitude FROM venues WHERE id = ?').get(v.id);
+    assert.deepEqual([after.latitude, after.longitude], [49.8863, -119.4966]);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+    for (const f of files) { try { require('node:fs').unlinkSync(require('node:path').join(process.env.OWNER_PHOTO_DIR || require('node:path').join(__dirname, '..', '.owner-photos-local'), f)); } catch (e) { /* already gone */ } }
+  }
+});
+
+test('Roam Now: a live storefront spot ships with its place and its photo becomes public; a waiting one does neither', async () => {
+  const http = require('node:http'); const fsx = require('node:fs'); const pathx = require('node:path');
+  seasonInsert.run({ name: 'Look For This Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'look-for-this-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'look-for-this-fixture');
+  db.prepare('UPDATE venues SET latitude = 49.8863, longitude = -119.4966 WHERE id = ?').run(v.id);
+  const dir = process.env.OWNER_PHOTO_DIR || pathx.join(__dirname, '..', '.owner-photos-local');
+  fsx.mkdirSync(dir, { recursive: true });
+  const live = 'a1'.repeat(12) + '.jpg'; const wait = 'b2'.repeat(12) + '.jpg';
+  for (const f of [live, wait]) fsx.writeFileSync(pathx.join(dir, f), Buffer.from([0xFF, 0xD8, 0xFF, 0xD9]));
+  const add = db.prepare('INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, ?, ?, ?, ?, ?)');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    add.run(v.id, wait, 'w'.repeat(24), 49.8864, -119.4966, 'pending');
+    assert.equal((await fetch(`${base}/images/arrival/${wait}`)).status, 404);
+    const row = (d) => d.p.find((a) => a[2] === 'Look For This Fixture');
+    add.run(v.id, live, 'l'.repeat(24), 49.8865, -119.4966, 'approved');
+    assert.equal((await fetch(`${base}/images/arrival/${live}`)).status, 200);
+    const page = await (await fetch(`${base}/map`)).text();
+    const src = /\/map\/data\.json\?v=[a-z0-9]+/.exec(page)[0];
+    const place = row(await (await fetch(base + src)).json());
+    assert.deepEqual(place[20], [49.8865, -119.4966, `/images/arrival/${live}`]);
+    assert.match(page, /Look for this/); assert.match(page, /function showLook/);
+    assert.equal(place[0], 49.8863, 'the map pin itself stays where it was');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+    db.prepare('DELETE FROM venue_arrival_points WHERE venue_id = ?').run(v.id);
+    for (const f of [live, wait]) { try { fsx.unlinkSync(pathx.join(dir, f)); } catch (e) { /* gone */ } }
+  }
+});
+
+test('Portal: places that serve alcohol get a clear Happy hour choice with a Save button; others do not', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Happy Tile Pub', type: 'pub', hours: SEASON_WEEK, slug: 'happy-tile-pub' });
+  seasonInsert.run({ name: 'Happy Tile Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'happy-tile-cafe' });
+  const link = (type, slug) => app.createOwnerLink(app.findVenueBySlug('kelowna', type, slug).id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const pub = await (await fetch(`${base}/owner/${link('pub', 'happy-tile-pub')}`)).text();
+    assert.match(pub, /data-pick="happy"/); assert.match(pub, /Your times and what’s on special/);
+    assert.match(pub, /id="happy" data-task="happy more"/);
+    assert.match(pub, /id="opSubmit" data-task="hours contact happy more all"/);
+    const cafe = await (await fetch(`${base}/owner/${link('cafe', 'happy-tile-cafe')}`)).text();
+    assert.doesNotMatch(cafe, /data-pick="happy"/);
+    assert.doesNotMatch(cafe, /id="happy"/);
+    assert.doesNotMatch(cafe, /Dog friendly, patio, happy hour/);
+  } finally { await new Promise((resolve) => srv.close(resolve)); }
+});
+
+test('Kalamalka parking: named entrances resolve to distinct sourced parking points, never the generic park pin', () => {
+  const path = '/coldstream/outdoors/kalamalka-lake-provincial-park-trails-rattlesnake-point';
+  const a = app.mapDestination(path, new Date(), 'twin-bays');
+  const b = app.mapDestination(path, new Date(), 'cosens-bay');
+  assert.equal(a.name, 'Twin Bays / Yellow Gate parking');
+  assert.equal(a.lat, 50.20386581);
+  assert.equal(a.lng, -119.2805426);
+  assert.equal(b.lat, 50.20929417);
+  assert.equal(b.lng, -119.23262088);
+  assert.notEqual(a.url, path, 'do not replace the entrance with the matching generic park marker on load');
+  assert.equal(app.mapDestination(path, new Date(), 'invented'), null);
+  assert.equal(app.mapDestination('/kelowna/outdoors/another-place', new Date(), 'twin-bays'), null);
 });

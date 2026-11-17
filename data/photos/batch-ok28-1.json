@@ -1,0 +1,198 @@
+{
+ "reason": "Venue photos ok28-1",
+ "batch_id": "photos-ok28-1-2026-10-28",
+ "venues": [
+  {
+   "id": 1009,
+   "name": "Straight Outta Brooklyn Pizza & Subs",
+   "region": "penticton",
+   "slug": "straight-outta-brooklyn-pizza-subs",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/straight-outta-brooklyn-pizza-subs-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 212,
+   "name": "Firefly Eatery",
+   "region": "vernon",
+   "slug": "firefly-eatery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/firefly-eatery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 79,
+   "name": "Bless'd Sips & Slices",
+   "region": "kelowna",
+   "slug": "bless-d-sips-slices",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bless-d-sips-slices-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 376,
+   "name": "Gino's Family Kitchen",
+   "region": "oliver",
+   "slug": "gino-s-family-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gino-s-family-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 393,
+   "name": "Pizza πr2",
+   "region": "oliver",
+   "slug": "marcos-pizzeria",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/marcos-pizzeria-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1848,
+   "name": "Angel Springs Trail (via KLO Creek)",
+   "region": "kelowna",
+   "slug": "angel-springs-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/angel-springs-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1911,
+   "name": "Blue Grouse Mountain",
+   "region": "west-kelowna",
+   "slug": "blue-grouse-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/blue-grouse-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1871,
+   "name": "Cascade Falls Trail (Mabel Lake)",
+   "region": "lumby",
+   "slug": "cascade-falls-trail-mabel-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cascade-falls-trail-mabel-lake-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1849,
+   "name": "Eagle View and Quail Flume Trails",
+   "region": "kelowna",
+   "slug": "eagle-view-quail-flume-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/eagle-view-quail-flume-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1869,
+   "name": "Gardom Lake Park Trails",
+   "region": "enderby",
+   "slug": "gardom-lake-park-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gardom-lake-park-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1901,
+   "name": "Grindrod Park Riverside Path",
+   "region": "enderby",
+   "slug": "grindrod-park-riverside-path",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/grindrod-park-riverside-path-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1886,
+   "name": "Lakeshore Pathway (Summerland)",
+   "region": "summerland",
+   "slug": "lakeshore-pathway-summerland",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakeshore-pathway-summerland-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1917,
+   "name": "Mission Ridge Park Loop",
+   "region": "kelowna",
+   "slug": "mission-ridge-park-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mission-ridge-park-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1919,
+   "name": "Mount Nkwala Trails",
+   "region": "penticton",
+   "slug": "mount-nkwala-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-nkwala-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1888,
+   "name": "Southern Viewpoint Trail (Okanagan Mountain Park)",
+   "region": "naramata",
+   "slug": "southern-viewpoint-trail-okanagan-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/southern-viewpoint-trail-okanagan-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1903,
+   "name": "Vidler Ridge Trail",
+   "region": "lumby",
+   "slug": "vidler-ridge-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vidler-ridge-trail-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+[
+ {
+  "id": 512,
+  "name": "Pizza Factory (Kelowna)",
+  "reason": "Google Maps has only 4 photos, all food close-ups (wings, pizzas); the website has only food shots; no storefront or room photo anywhere"
+ },
+ {
+  "id": 1464,
+  "name": "Xperience Games Kelowna",
+  "reason": "Google Maps has 3 photos: a 360 sphere of a gym event and two groups posing with signs (people fill the frame); the website shows only AI-style room posters and night-city renders, no real photo of the Hunter Rd rooms"
+ },
+ {
+  "id": 1762,
+  "name": "Teehouse Wine Tours",
+  "reason": "Pickup tour company with no premises of its own: its 6 Google photos are a promo graphic, guests posing, Mission Hill and Quails' Gate wineries (other businesses), a bottle and a tasting menu; the website uses stock tasting/barrel shots and a Mission Hill photo. No photo of the company's own vehicle or tour"
+ }
+]

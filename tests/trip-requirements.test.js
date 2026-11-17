@@ -1,4 +1,5 @@
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test'),assert=require('node:assert/strict');
 const r=require('../trip-requirements');
 const venue=(id,type,kinds=[],features={})=>({id,name:`Venue ${id}`,type,plannerKinds:kinds,features,region:'kelowna',activities:[],collections:[],lat:49.9,lng:-119.5});

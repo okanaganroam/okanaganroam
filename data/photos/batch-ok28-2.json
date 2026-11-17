@@ -1,0 +1,210 @@
+{
+ "reason": "Venue photos ok28-2",
+ "batch_id": "photos-ok28-2-2026-10-28",
+ "venues": [
+  {
+   "id": 311,
+   "name": "Jugo Juice",
+   "region": "kelowna",
+   "slug": "jugo-juice",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jugo-juice-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 748,
+   "name": "Tyga Sushi",
+   "region": "west-kelowna",
+   "slug": "tyga-sushi",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tyga-sushi-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 402,
+   "name": "Memphis Blues Barbeque House & Catering Co.",
+   "region": "kelowna",
+   "slug": "memphis-blues-barbeque-house-catering-co",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/memphis-blues-barbeque-house-catering-co-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1648,
+   "name": "Half Blind Bean Coffee",
+   "region": "kelowna",
+   "slug": "half-blind-bean-coffee",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/half-blind-bean-coffee-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1890,
+   "name": "Apex Mountain Summit Trail",
+   "region": "apex",
+   "slug": "apex-mountain-summit-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apex-mountain-summit-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1872,
+   "name": "Boulder Trail (Okanagan Mountain Park)",
+   "region": "kelowna",
+   "slug": "boulder-trail-okanagan-mountain-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/boulder-trail-okanagan-mountain-park-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1912,
+   "name": "Christie Falls",
+   "region": "west-kelowna",
+   "slug": "christie-falls",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/christie-falls-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1853,
+   "name": "Gellatly Bay Waterfront Walkway",
+   "region": "west-kelowna",
+   "slug": "gellatly-bay-waterfront-walkway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gellatly-bay-waterfront-walkway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1916,
+   "name": "Hidden Lake Parkway (Glenmore)",
+   "region": "kelowna",
+   "slug": "hidden-lake-parkway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hidden-lake-parkway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1855,
+   "name": "Lakestone Trails (Benchlands Park)",
+   "region": "lake-country",
+   "slug": "lakestone-trails-benchlands-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakestone-trails-benchlands-park-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1905,
+   "name": "Monashee Lake Trail",
+   "region": "lumby",
+   "slug": "monashee-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/monashee-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1887,
+   "name": "Mountain Goat Trail (Okanagan Mountain Park)",
+   "region": "naramata",
+   "slug": "mountain-goat-trail-okanagan-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mountain-goat-trail-okanagan-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1863,
+   "name": "Peach Cliff Trail",
+   "region": "okanagan-falls",
+   "slug": "peach-cliff-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/peach-cliff-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1851,
+   "name": "Stockley Open Space Lookout Loop",
+   "region": "kelowna",
+   "slug": "stockley-open-space-lookout-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/stockley-open-space-lookout-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1867,
+   "name": "The Ponds Interpretive Trail",
+   "region": "coldstream",
+   "slug": "ponds-interpretive-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ponds-interpretive-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1907,
+   "name": "Vista Pass Trail",
+   "region": "lumby",
+   "slug": "vista-pass-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vista-pass-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1608,
+   "name": "Wake the Lake Penticton",
+   "region": "penticton",
+   "slug": "wake-the-lake-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wake-the-lake-penticton-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

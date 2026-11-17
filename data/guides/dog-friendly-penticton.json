@@ -137,12 +137,6 @@
    "heading": "Cafés and restaurants with dog-friendly patios",
    "items": [
     {
-     "ref": "penticton/bench-market",
-     "name": "Bench Market",
-     "text": "a popular breakfast, brunch and market spot, and a handy pitstop on a Naramata Bench wine tour. Dogs are welcome on the outdoor terrace.",
-     "where": "Penticton"
-    },
-    {
      "ref": "penticton/wayne-freda",
      "name": "Wayne & Freda",
      "text": "a bustling café attached to a mercantile shop, with a patio where dogs are welcome. It's right by the farmers market.",
@@ -213,7 +207,6 @@
    [
     "Breakfast on a dog-friendly patio",
     [
-     "penticton/bench-market|Bench Market",
      "penticton/wayne-freda|Wayne & Freda"
     ]
    ]

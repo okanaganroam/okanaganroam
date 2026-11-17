@@ -1,0 +1,100 @@
+{
+ "town": "okanagan-falls",
+ "name": "Okanagan Falls",
+ "hero": "/images/regions/photos/okanagan-falls-2610-1200.jpg",
+ "category": "wine",
+ "sub": "Vineyards, quiet lakes and the wine-country back roads.",
+ "placeholder": "Search Okanagan Falls… wineries, lakes, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=okanagan-falls",
+   "img": "/images/venues/the-restaurant-at-liquidity-wines-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=okanagan-falls",
+   "img": "/images/venues/noble-ridge-vineyard-winery-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=okanagan-falls",
+   "img": "/images/beaches/venues/okanagan-falls-vaseux-lake-provincial-park-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=okanagan-falls",
+   "img": "/images/venues/peach-cliff-trail-2610-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/okanagan-falls/events",
+   "img": "/images/venues/blasted-church-vineyards-20261020-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=okanagan-falls",
+   "img": "/images/venues/white-lake-trail-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "the-barn-bistro-at-see-ya-later-ranch",
+   "name": "The Barn Bistro",
+   "tag": "Casual food in the vineyard",
+   "copy": "A casual kitchen on a hilltop winery estate.",
+   "href": "/okanagan-falls/restaurants/the-barn-bistro-at-see-ya-later-ranch",
+   "img": "/images/venues/the-barn-bistro-at-see-ya-later-ranch-2610-w480.jpg"
+  },
+  {
+   "slug": "vaseux-lake-wildlife-centre-migratory-bird-sanctuary",
+   "name": "Vaseux Lake Sanctuary",
+   "tag": "Birdwatching by the marsh",
+   "copy": "A boardwalk to a wildlife viewing tower.",
+   "href": "/okanagan-falls/outdoors/vaseux-lake-wildlife-centre-migratory-bird-sanctuary",
+   "img": "/images/hiking/venues/vaseux-lake-wildlife-centre-migratory-bird-sanctuary-20261016-nature-w480.jpg"
+  },
+  {
+   "slug": "tickleberrys",
+   "name": "Tickleberry’s",
+   "tag": "A classic sweet stop",
+   "copy": "Ice cream, handmade fudge and chocolates since 1990.",
+   "href": "/okanagan-falls/cafes/tickleberrys",
+   "img": "/images/venues/tickleberrys-2610-w480.jpg"
+  },
+  {
+   "slug": "wild-goose-winery",
+   "name": "Wild Goose Winery",
+   "tag": "Award-winning wines",
+   "copy": "Premium wines from carefully tended vines.",
+   "href": "/okanagan-falls/wineries/wild-goose-winery",
+   "img": "/images/venues/wild-goose-winery-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Okanagan Falls is small, with wineries, beaches and trails spread around it. Plan your route and check hours before you go.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Wine tasting tips",
+   "copy": "Check hours, seasonal opening and whether reservations are needed, and arrange a designated driver or tour.",
+   "href": "/wineries?regions=okanagan-falls",
+   "label": "Find wineries"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Many places suit the whole crew. Check each listing for family- and dog-friendly details and confirm current policies with the venue.",
+   "href": "/guide/okanagan-falls/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

@@ -31,6 +31,7 @@ function table(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v :
 module.exports = {
   shared, local, mergeAliases,
   sharedTable: (key) => table(shared[key]),
+  sharedList: (key) => list(shared[key]),
   localTable: (key) => table(local[key]),
   localList: (key) => list(local[key]),
 };

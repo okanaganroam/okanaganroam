@@ -7,6 +7,7 @@
 // On presets/categories -- plus a handful of cuisines and venues, so every
 // expectation here is about the interpreter, not about live data.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');
@@ -197,11 +198,12 @@ test('trip length: digits, words, adjectives, weekends, weeks and out-of-range',
   const cases = [['3 days in Kelowna', 3], ['three days in Kelowna', 3], ['a 3-day Kelowna trip', 3], ['3 relaxed days in Kelowna', 3],
     ['a weekend in Kelowna', 2], ['a long weekend in Penticton', 3], ['a week in Vernon', 7], ['one day in Kelowna', 1], ['2 nights in Osoyoos', 3]];
   for (const [q, days] of cases) { const i = I(q); assert.equal(i.days, days, q); assert.equal(i.mode, 'plan', q); }
+  // 2026-11-05: more than a week plans the first week and says so (it used to fall back to a one-day plan).
   const tooLong = I('10 days in Kelowna');
-  assert.equal(tooLong.days, null);
+  assert.equal(tooLong.days, 7);
   assert.equal(tooLong.mode, 'plan');
-  assert.deepEqual(tooLong.needs, ['days']);
-  assert.ok(tooLong.unsupported.some((u) => /10 days/.test(u)));
+  assert.ok(tooLong.unsupported.some((u) => /10 days/.test(u) && /first 7/.test(u)));
+  assert.equal(I('400 days in Kelowna').days, null, 'an absurd length is still not planned');
   assert.equal(I('I ate 3 apples that day').days, null, 'a number near "day" is not a trip length');
 });
 
@@ -607,7 +609,8 @@ test('Stage 3.1 plural-tolerant aliases: dinner/dinners, lunch/lunches, pizza/pi
   assert.deepEqual(I('italians').cuisines, [], 'a nationality plural is not a cuisine request');
   assert.deepEqual(I('spirit').types, [], '"spirits" is not singularised');
   assert.deepEqual(I('bars in Kelowna').types, ['pub']);
-  assert.deepEqual(I('drinks in Kelowna').types, ['pub', 'cocktail']);
+  // Distillery test 2 (Whistler, 2026-11-16): a distillery pours cocktails in its own lounge, so "drinks" includes it.
+  assert.deepEqual(I('drinks in Kelowna').types, ['pub', 'cocktail', 'distillery']);
   assert.deepEqual(I('golf courses').types, ['golf']);
   assert.deepEqual(I('wines').types, ['winery']);
   assert.deepEqual(I('parks').types, ['outdoor']);
@@ -726,7 +729,7 @@ test('Stage 3.2: real words near the vocabulary are never corrected (reviewed li
     'america', 'americana', 'americas', 'badly', 'bleach', 'blinking', 'bloating', 'boasting', 'boosting', 'breach', 'breeches', 'brewer', 'bridging',
     'campaign', 'celeriac', 'celia', 'circling', 'composite', 'defining', 'divining', 'drinking', 'easting', 'eater', 'exacting', 'finishing', 'flashing', 'flushing',
     'germane', 'germanic', 'indiana', 'javanese', 'koran', 'longe', 'lounger', 'lunge', 'olive', 'olivier', 'outsider', 'outsized', 'padding', 'piazza', 'polis', 'polished',
-    'skidding', 'skinning', 'skipping', 'skirting', 'streak', 'toddle', 'trailers', 'trial', 'tumbling', 'westland', 'whisk',
+    'shopping', 'skidding', 'skinning', 'skipping', 'skirting', 'streak', 'toddle', 'trailers', 'trial', 'tumbling', 'westland', 'whisk',
   ]);
   for (const w of d.DISCOVERY_NEVER_CORRECT) assert.deepEqual(I(w).corrections, [], w);
   // Final safety review: each is a real food, cuisine or name one edit from a target.

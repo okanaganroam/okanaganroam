@@ -4,6 +4,7 @@
 // server, no database. Advisory rules use copies of real facts with a
 // synthetic advisory note (no advisory was public when the snapshot was taken).
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

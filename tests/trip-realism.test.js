@@ -3,6 +3,7 @@
 // requests the planner mishandled. The requests are the real ones from drafts/site-review-2026-10-18-pass3.md. PURE
 // tests on a fixture valley shaped like the live data (opening hours, What's On occurrences); no server, no database.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

@@ -4,6 +4,7 @@
 // PURE tests: the real functions are sliced out of app.js and run in a vm
 // context next to a verbatim copy of the previous implementation.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

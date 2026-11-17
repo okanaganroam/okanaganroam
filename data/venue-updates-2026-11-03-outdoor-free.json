@@ -1,0 +1,29 @@
+{
+  "note": "Free entry: Baldy snowshoe trails (Visit Oliver: free to use) and Vernon BMX track (club: practice is free). Nov 3 2026.",
+  "venues": [
+    {
+      "id": 1399,
+      "name": "Baldy Snowshoe Trails",
+      "region": "baldy",
+      "slug": "baldy-snowshoe-trails",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    },
+    {
+      "id": 1843,
+      "name": "Vernon BMX Track (Ranger Park)",
+      "region": "vernon",
+      "slug": "vernon-bmx-track-ranger-park",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,1056 @@
+{
+ "note": "2026-11-03: Indoor & Rainy Day descriptions cut to one or two sentences (English and French). Logistics the Plan your visit box shows (prices, hours, ages, booking) are left out; nothing new is added.",
+ "count": 105,
+ "venues": [
+  {
+   "id": 1459,
+   "region": "kelowna",
+   "slug": "airhouse-kelowna",
+   "name": "Airhouse Kelowna",
+   "description": "Airhouse Kelowna is a freestyle training centre with trampolines, a spring floor, skateboard ramps and parkour areas. It offers drop-in sessions for all ages, plus lessons, camps, ski and snowboard dryland training and birthday parties.",
+   "description_fr": "Airhouse Kelowna est un centre d'entraînement freestyle avec trampolines, plancher à ressorts, rampes de planche à roulettes et zones de parkour. On y offre des séances libres pour tous les âges, ainsi que des cours, des camps, de l'entraînement hors neige pour le ski et la planche à neige et des fêtes d'anniversaire.",
+   "before_sha1": "4cfbf576257c8b0ead161ac5f3340ffb3ba1d725",
+   "before_fr_sha1": "21b3cb0a3bfb44ea2bcc8776187ef6c9dd8ca36c"
+  },
+  {
+   "id": 1845,
+   "region": "peachland",
+   "slug": "beeps-peachland-bat-colony-batcam",
+   "name": "BEEPS – Peachland Bat Colony & BatCam",
+   "description": "Up to a thousand female bats raise their pups each summer in the attic of Peachland's historic schoolhouse, and the volunteer-run BEEPS society streams them live on infrared BatCams. It also holds dusk bat counts, talks and family events.",
+   "description_fr": "Jusqu'à mille chauves-souris femelles élèvent leurs petits chaque été dans le grenier de l'ancienne école historique de Peachland, et la société BEEPS, gérée par des bénévoles, les diffuse en direct par caméras infrarouges. Elle organise aussi des décomptes au crépuscule, des causeries et des activités familiales.",
+   "before_sha1": "f91ad4b285de337c4049d8b9fed87634f6d8f67f",
+   "before_fr_sha1": "708840895d056b1c08e566a48890a2f266adae7d"
+  },
+  {
+   "id": 1573,
+   "region": "vernon",
+   "slug": "canadian-wildlife-museum",
+   "name": "Canadian Wildlife Museum",
+   "description": "Canadian Wildlife Museum is a private natural-history museum north of Vernon with 350+ mounted specimens, from mice to bison, shown in life-like dioramas over two floors. Browse 45 viewing stations and a large butterfly and moth collection, and stop by the gift shop.",
+   "description_fr": "Le Canadian Wildlife Museum est un musée privé d'histoire naturelle au nord de Vernon, avec plus de 350 spécimens montés, de la souris au bison, présentés dans des dioramas réalistes sur deux étages. On y parcourt 45 postes d'observation et une grande collection de papillons de jour et de nuit, sans oublier la boutique de cadeaux.",
+   "before_sha1": "4400bd5c59c9c9ac4920841520023d5f28b6312d",
+   "before_fr_sha1": "e3dbfada00c452ec1fff591677942a36c075fd79"
+  },
+  {
+   "id": 1548,
+   "region": "kelowna",
+   "slug": "chances-casino-kelowna",
+   "name": "Chances Casino Kelowna",
+   "description": "Chances Casino Kelowna is the city's locally owned casino, with nearly 400 slots, a six-table poker room and electronic and live table games such as blackjack, roulette, baccarat and Ultimate Texas Hold'em. A sportsbook lounge has a 25-foot screen.",
+   "description_fr": "Le Chances Casino Kelowna est le casino de la ville, appartenant à des intérêts locaux, avec près de 400 machines à sous, une salle de poker de six tables et des jeux de table électroniques et en direct comme le blackjack, la roulette, le baccara et l'Ultimate Texas Hold'em. Un salon de paris sportifs est doté d'un écran de 25 pieds.",
+   "before_sha1": "a432ce9654af09b97ca8e2e19c0a85440cf0642b",
+   "before_fr_sha1": "39f636f8d11d65a2f7c97c1e777d5fc1d9e83e24"
+  },
+  {
+   "id": 1547,
+   "region": "enderby",
+   "slug": "courtyard-gallery",
+   "name": "Courtyard Gallery",
+   "description": "A non-profit, artist-run co-op gallery in downtown Enderby showing and selling fine art and crafts by local artists. Exhibitions change regularly.",
+   "description_fr": "Une galerie coopérative à but non lucratif, gérée par des artistes, au centre-ville d'Enderby, qui expose et vend des œuvres d'art et de l'artisanat d'artistes locaux. Les expositions changent régulièrement.",
+   "before_sha1": "d2805a5a6d8cfdb51d1f649f19797c1395e39667",
+   "before_fr_sha1": "461529504bf79447ea74cda3c2f1bf50a0ed8f8b"
+  },
+  {
+   "id": 1551,
+   "region": "west-kelowna",
+   "slug": "funspace-kids",
+   "name": "FunSpace Kids",
+   "description": "FunSpace Kids in West Kelowna is an indoor playground for kids 1 to 12, with slides, a trampoline, a Lego wall and separate zones for toddlers and bigger kids. Parents can relax at the café while the kids burn off energy.",
+   "description_fr": "FunSpace Kids, à West Kelowna, est une aire de jeux intérieure pour les enfants de 1 à 12 ans, avec glissades, trampoline, mur de Lego et zones distinctes pour les tout-petits et les plus grands. Les parents peuvent se détendre au café pendant que les enfants se dépensent.",
+   "before_sha1": "92a654086d4bca29d9877cddb6a0e05a40e97ac3",
+   "before_fr_sha1": "6eb08e964654ed435d5eca11c86a004fb7618dc6"
+  },
+  {
+   "id": 1697,
+   "region": "penticton",
+   "slug": "gallery-one-twenty-seven",
+   "name": "Gallery One Twenty-Seven",
+   "description": "Gallery One Twenty-Seven is the Penticton gallery of painter Peggie Collins, showing her Okanagan-inspired originals alongside prints, posters, postcards and other small keepsakes. It also carries handcrafted jewellery and metalwork from local artists.",
+   "description_fr": "La Gallery One Twenty-Seven est la galerie de la peintre Peggie Collins, à Penticton, où l'on trouve ses originaux inspirés de l'Okanagan, ainsi que des estampes, des affiches, des cartes postales et d'autres petits souvenirs. Elle propose aussi des bijoux et des objets en métal faits à la main par des artistes locaux.",
+   "before_sha1": "b40b4547c30ecafc2aa29b8983f13d6ddcf0e589",
+   "before_fr_sha1": "2dc95b1903dc336a1d55607a341fcecbbee6790c"
+  },
+  {
+   "id": 1490,
+   "region": "kelowna",
+   "slug": "gneiss-climbing-og-banks",
+   "name": "Gneiss Climbing - OG Banks",
+   "description": "A bouldering-focused climbing gym with regularly reset problems and training areas.",
+   "description_fr": "Un gymnase d'escalade axé sur le bloc, avec des voies renouvelées régulièrement et des zones d'entraînement.",
+   "before_sha1": "531e908a2d9b3fe93ba4d727a90cc6ca878c5a80",
+   "before_fr_sha1": "5a6f54387664c1df8dde7b9b2c1762a60ef3d913"
+  },
+  {
+   "id": 1545,
+   "region": "vernon",
+   "slug": "historic-o-keefe-ranch",
+   "name": "Historic O'Keefe Ranch",
+   "description": "Historic O'Keefe Ranch is a heritage site just north of Vernon on Highway 97 where you can tour the 1860s-era O'Keefe Mansion, the general store and post office and St. Ann's Church. In October there are historian-led mansion tours, a model railway display and a corn maze.",
+   "description_fr": "Le Historic O'Keefe Ranch est un site patrimonial juste au nord de Vernon, sur la route 97, où l'on peut visiter le manoir O'Keefe des années 1860, le magasin général et bureau de poste ainsi que l'église St. Ann's. En octobre, on y propose des visites du manoir avec un historien, une exposition de trains miniatures et un labyrinthe de maïs.",
+   "before_sha1": "959f0bf0849f7abdc136c15435c9e6d3afe74330",
+   "before_fr_sha1": "271a88b144d86c2736ace9faaa43b00448a6c844"
+  },
+  {
+   "id": 1466,
+   "region": "kelowna",
+   "slug": "kelowna-art-gallery",
+   "name": "Kelowna Art Gallery",
+   "description": "The Kelowna Art Gallery is the city's public art gallery in the downtown Cultural District, with rotating contemporary and historical exhibitions across several galleries plus a courtyard installation space. Family programs and a gallery shop round out a visit.",
+   "description_fr": "La Kelowna Art Gallery est la galerie d'art publique de la ville, dans le quartier culturel du centre-ville, avec des expositions contemporaines et historiques en rotation dans plusieurs salles, ainsi qu'un espace d'installation dans la cour. Des programmes familiaux et une boutique complètent la visite.",
+   "before_sha1": "40b0f89728dd0a199105012706c0608bab759c19",
+   "before_fr_sha1": "4f14a55e19ac2be87b4a470f4a7dffa5c4f672f8"
+  },
+  {
+   "id": 1635,
+   "region": "kelowna",
+   "slug": "kelowna-downtown-ymca",
+   "name": "Kelowna Downtown YMCA",
+   "description": "The Kelowna Downtown YMCA is a fitness centre in the heart of downtown with free weights, strength machines and cardio equipment, plus around 22 group classes a week such as yoga, cycle, barre and TRX. Lockers and showers are available.",
+   "description_fr": "Le YMCA du centre-ville de Kelowna est un centre de conditionnement physique au cœur du centre-ville, avec poids libres, appareils de musculation et équipement cardio, ainsi qu'environ 22 cours collectifs par semaine, comme le yoga, le vélo, le barre et le TRX. Casiers et douches sont offerts.",
+   "before_sha1": "b927a2502cb2d6467aee791b6dfa05034d9fa701",
+   "before_fr_sha1": "f61b11f36399fc65bdfa11deb5291c9cb10cc4d0"
+  },
+  {
+   "id": 1522,
+   "region": "osoyoos",
+   "slug": "kobau-lanes",
+   "name": "Kobau Lanes",
+   "description": "Eight-lane 5-pin bowling centre in Osoyoos with cosmic lighting and a licensed lounge. Casual games run alongside local leagues, and you can order pizza in.",
+   "description_fr": "Salle de quilles à cinq quilles de huit allées à Osoyoos, avec éclairage cosmique et salon avec permis d'alcool. Les parties décontractées côtoient les ligues locales, et on peut commander une pizza sur place.",
+   "before_sha1": "aacff28d6e7b073c6df6442b0f157a0a247397f5",
+   "before_fr_sha1": "e7145d1f974b7b918ee394c26d020554c051e8b1"
+  },
+  {
+   "id": 1570,
+   "region": "penticton",
+   "slug": "lakeline-gallery",
+   "name": "Lakeline Gallery",
+   "description": "Lakeline Gallery is a two-floor downtown gallery on Martin Street, mixing street art and graffiti downstairs with a curated collector's gallery of original works upstairs. It also runs painting nights, graffiti sessions and other creative workshops.",
+   "description_fr": "La Lakeline Gallery est une galerie à deux étages du centre-ville, rue Martin, qui réunit au rez-de-chaussée l'art urbain et le graffiti et, à l'étage, une galerie de collectionneur avec des œuvres originales choisies avec soin. Elle propose aussi des soirées de peinture, des séances de graffiti et d'autres ateliers créatifs.",
+   "before_sha1": "d5c04a15a47c3ed18349fd7b1e8d5dec95000f8a",
+   "before_fr_sha1": "a9b9ba311edb2d09e7787e0b5267dcc92eb13754"
+  },
+  {
+   "id": 1510,
+   "region": "penticton",
+   "slug": "leir-house-cultural-centre-penticton-arts-council-gallery",
+   "name": "Leir House Cultural Centre (Penticton & District Community Arts Council)",
+   "description": "Leir House Cultural Centre is a historic 1920s house on Manor Park Avenue run by the Penticton & District Community Arts Council, with a community gallery and resident artists' studios. Creative drop-in groups run from knitting and beading to board games.",
+   "description_fr": "Le Leir House Cultural Centre est une maison historique des années 1920 sur l'avenue Manor Park, gérée par le Penticton & District Community Arts Council, avec une galerie communautaire et des ateliers d'artistes en résidence. Des groupes créatifs libres vont du tricot et des perles aux jeux de société.",
+   "before_sha1": "889733f04c9a28893fb78f40ab1ea55af66e29d5",
+   "before_fr_sha1": "b83fc7256060eb4dd5faef0ced46d654a2ab22b3"
+  },
+  {
+   "id": 1711,
+   "region": "coldstream",
+   "slug": "mackie-lake-house",
+   "name": "Mackie Lake House",
+   "description": "Mackie Lake House is a historic 1910 home on the shore of Kalamalka Lake, right beside Sovereign Park in Coldstream. Guided tours walk you through the house and its stories, and the foundation also hosts tea services and concerts. Pair a visit with a stroll down to the lake.",
+   "description_fr": "La Mackie Lake House est une maison historique de 1910 au bord du lac Kalamalka, juste à côté du parc Sovereign, à Coldstream. Des visites guidées font découvrir la maison et ses histoires, et la fondation organise aussi des services de thé et des concerts. On peut combiner la visite avec une promenade jusqu'au lac.",
+   "before_sha1": "8c4dd1b7310bcc47b72a5007df6ce9ab8c3974c3",
+   "before_fr_sha1": "ff01a19550988d6cd8756a65dae4ec68181febc6"
+  },
+  {
+   "id": 1514,
+   "region": "summerland",
+   "slug": "nixdorf-classic-cars",
+   "name": "Nixdorf Classic Cars",
+   "description": "Nixdorf Classic Cars is a private classic-car museum in Summerland with a 14,000 sq ft showroom of more than 50 restored two-door hardtops and convertibles from 1936 to 1970, including Chevrolets, Fords, Oldsmobiles, Chryslers and muscle cars, each with its restoration story.",
+   "description_fr": "Nixdorf Classic Cars est un musée privé de voitures anciennes à Summerland, avec une salle d'exposition de 14 000 pi² regroupant plus de 50 coupés à toit rigide et décapotables restaurés de 1936 à 1970 (Chevrolet, Ford, Oldsmobile, Chrysler et voitures musclées), chacun accompagné de l'histoire de sa restauration.",
+   "before_sha1": "d3ebd6a28b69f64bc8f7acadb06e694fc1afec9f",
+   "before_fr_sha1": "5032842b2b3c9e46358e34fb5d04bdeca18f69a6"
+  },
+  {
+   "id": 1724,
+   "region": "peachland",
+   "slug": "okanagan-folk-school",
+   "name": "Okanagan Folk School",
+   "description": "The Okanagan Folk School sits in Peachland's restored historic schoolhouse on Beach Avenue, looking out over the lake. Its gift shop sells local artists' work, and small hands-on classes, from stained glass and beading to fibre arts and storytelling, change monthly.",
+   "description_fr": "L'Okanagan Folk School occupe l'ancienne école historique restaurée de Peachland, avenue Beach, avec vue sur le lac. Sa boutique vend des œuvres d'artistes locaux, et de petits ateliers pratiques, du vitrail et des perles aux arts textiles et à la narration, changent chaque mois.",
+   "before_sha1": "563ad2b860dfa665897a348f2221cd8b2286e4e7",
+   "before_fr_sha1": "778ce728219b8c743855f644aa022a54d90b7629"
+  },
+  {
+   "id": 1526,
+   "region": "vernon",
+   "slug": "okanagan-science-centre",
+   "name": "Okanagan Science Centre",
+   "description": "The Okanagan Science Centre is a hands-on science centre in Polson Park with rotating interactive exhibits, planetarium shows and live animals. It also runs workshops and science camps.",
+   "description_fr": "L'Okanagan Science Centre est un centre scientifique interactif du parc Polson, avec des expositions interactives en rotation, des spectacles de planétarium et des animaux vivants. Il organise aussi des ateliers et des camps scientifiques.",
+   "before_sha1": "07f212883558f4f7e8c2eb602b14bb4353edf141",
+   "before_fr_sha1": "47695d783a2aefb294e8a3e9206e11c36c0ccf4a"
+  },
+  {
+   "id": 1523,
+   "region": "oliver",
+   "slug": "oliver-theatre",
+   "name": "Oliver Theatre",
+   "description": "Oliver Theatre is a single-screen downtown movie house that has been showing films since 1947, now with digital projection, a big screen and surround sound. It's a nostalgic, budget-friendly way to spend a rainy evening, with family matinees on weekends.",
+   "description_fr": "L'Oliver Theatre est un cinéma à une seule salle du centre-ville qui projette des films depuis 1947, avec maintenant la projection numérique, un grand écran et le son ambiophonique. C'est une façon nostalgique et économique de passer une soirée pluvieuse, avec des matinées familiales les week-ends.",
+   "before_sha1": "0f987a96930b450a891ca7df4a6842a1d8ffd5ac",
+   "before_fr_sha1": "db551c08ed233f15b5295d66a158b5cfbba3805f"
+  },
+  {
+   "id": 1487,
+   "region": "peachland",
+   "slug": "peachland-art-gallery",
+   "name": "Peachland Art Gallery",
+   "description": "Community arts council gallery on the Peachland waterfront with rotating shows of Okanagan artists, workshops and events.",
+   "description_fr": "Galerie du conseil des arts communautaire sur le front de mer de Peachland, avec des expositions en rotation d'artistes de l'Okanagan, des ateliers et des événements.",
+   "before_sha1": "b37f7b668542dc5fbf13cee21d407793c852ba1e",
+   "before_fr_sha1": "ccaab763f9251e66ad07d3540c5548a1e786c56a"
+  },
+  {
+   "id": 1502,
+   "region": "penticton",
+   "slug": "penticton-art-gallery",
+   "name": "Penticton Art Gallery",
+   "description": "Penticton Art Gallery is a public gallery on the Okanagan Lake waterfront by Okanagan Beach, with rotating exhibitions across several gallery rooms. Browse regional, provincial and national contemporary art plus seasonal shows and sales.",
+   "description_fr": "La Penticton Art Gallery est une galerie publique sur le bord du lac Okanagan, près de la plage Okanagan, avec des expositions en rotation dans plusieurs salles. On y découvre de l'art contemporain régional, provincial et national, ainsi que des expositions et des ventes saisonnières.",
+   "before_sha1": "8bea0fb9058c6ccf0ab3f5db10197dfd03392107",
+   "before_fr_sha1": "969e0cf394610d6be2434da3a3bf93e399078886"
+  },
+  {
+   "id": 1561,
+   "region": "penticton",
+   "slug": "penticton-virtual-reality-studio",
+   "name": "Penticton Virtual Reality Studio",
+   "description": "Penticton Virtual Reality Studio is a small VR studio inside the Cannery Trade Centre where you try VR headsets and VR escape experiences, or play free arcade games, an infinity game table and foosball. Private party packages make it a handy rainy-day birthday spot.",
+   "description_fr": "Le Penticton Virtual Reality Studio est un petit studio de réalité virtuelle au Cannery Trade Centre où l'on essaie des casques de RV et des expériences d'évasion en RV, ou encore des jeux d'arcade gratuits, une table de jeu infinie et un baby-foot. Les forfaits de fête privée en font un choix pratique pour un anniversaire les jours de pluie.",
+   "before_sha1": "2e4a04cc7f3e39343845f2ee1cfcf6d99b7f88b1",
+   "before_fr_sha1": "eed6ff46b80992cf3dcfc07fb42ad0a7956f7cdd"
+  },
+  {
+   "id": 1472,
+   "region": "kelowna",
+   "slug": "rotary-centre-for-the-arts",
+   "name": "Rotary Centre for the Arts",
+   "description": "The Rotary Centre for the Arts is a community arts hub with the 326-seat Mary Irwin Theatre hosting comedy, concerts and film, plus art galleries and artist studios. It also runs art programs and camps, and Roma Nord Bistro on site makes it easy to linger over a coffee or lunch.",
+   "description_fr": "Le Rotary Centre for the Arts est un carrefour des arts communautaire avec le Mary Irwin Theatre de 326 places, qui accueille humour, concerts et cinéma, ainsi que des galeries d'art et des ateliers d'artistes. Il offre aussi des programmes et des camps d'art, et le Roma Nord Bistro sur place permet de s'attarder autour d'un café ou d'un déjeuner.",
+   "before_sha1": "e663df84b66f2541927c9b7fe39d18a7e1a2bd94",
+   "before_fr_sha1": "78bd15391110181f54809b504fba0e0a8e486a8f"
+  },
+  {
+   "id": 1563,
+   "region": "penticton",
+   "slug": "shelter-floating-sauna",
+   "name": "Shelter Floating Sauna",
+   "description": "Shelter Floating Sauna is a cedar sauna that floats on Okanagan Lake at the Lakeside Resort marina, where you cycle between heat, a cold plunge in the lake and rest. Join a shared social session or book the whole sauna privately.",
+   "description_fr": "Shelter Floating Sauna est un sauna en cèdre qui flotte sur le lac Okanagan, à la marina du Lakeside Resort, où l'on alterne entre la chaleur, un plongeon froid dans le lac et le repos. On peut se joindre à une séance sociale partagée ou réserver tout le sauna en privé.",
+   "before_sha1": "4ac3c52a6e362b7e8fd5f1a123992b7026df379f",
+   "before_fr_sha1": "fec3b256f7d6d55154defdede8bf6005db129910"
+  },
+  {
+   "id": 1568,
+   "region": "penticton",
+   "slug": "springers-gymnastics-drop-in-gym",
+   "name": "Springers Gymnastics (Drop-in Gym)",
+   "description": "Springers Gymnastics is a club in the Cannery Trade Centre that opens its gym for drop-in sessions alongside its registered classes. Kids tumble, bounce and climb on proper equipment, with weekday drop-ins and Sunday family sessions.",
+   "description_fr": "Springers Gymnastics est un club du Cannery Trade Centre qui ouvre son gymnase pour des séances libres en plus de ses cours avec inscription. Les enfants font des culbutes, rebondissent et grimpent sur du vrai équipement, avec des séances libres en semaine et des séances familiales le dimanche.",
+   "before_sha1": "4f94283a5d8ccb7fbcbad781415a891141df6ef6",
+   "before_fr_sha1": "0f338b944962fc22fc24a133a5d18b9c4af8ead3"
+  },
+  {
+   "id": 1488,
+   "region": "kelowna",
+   "slug": "tality-wellness-kelowna",
+   "name": "Tality Wellness Kelowna",
+   "description": "Tality Wellness Kelowna is a downtown social bathhouse with a 20-person cedar sauna (85-90°C), four cold plunges (3-11°C) and a lounge around a vapour firepit, with robes, towels, kombucha and hot tea included. Join a shared community session or book a private group slot.",
+   "description_fr": "Tality Wellness Kelowna est un bain social du centre-ville avec un sauna en cèdre de 20 personnes (85-90 °C), quatre bains froids (3-11 °C) et un salon autour d'un foyer à vapeur, avec peignoirs, serviettes, kombucha et thé chaud inclus. On peut se joindre à une séance communautaire partagée ou réserver un créneau privé pour un groupe.",
+   "before_sha1": "5a91654e4b60627f82f4e33d69e7c0234ad1cf72",
+   "before_fr_sha1": "19d456c5780df4d88f25864bab02ca570d6b0f78"
+  },
+  {
+   "id": 1467,
+   "region": "kelowna",
+   "slug": "alternator-centre-for-contemporary-art",
+   "name": "Alternator Centre for Contemporary Art",
+   "description": "The Alternator is an artist-run contemporary art centre inside the Rotary Centre for the Arts, showing emerging, established and experimental artists since 1989. Exhibitions are joined by workshops and live performances.",
+   "description_fr": "L'Alternator est un centre d'art contemporain géré par des artistes, à l'intérieur du Rotary Centre for the Arts, qui présente depuis 1989 des artistes émergents, établis et expérimentaux. Des ateliers et des spectacles s'ajoutent aux expositions.",
+   "before_sha1": "29b5f3abd9d5487aba6be6422513673aa4c2a9a6",
+   "before_fr_sha1": "b2c608d7a052d4e3c19be95771ef47068a115543"
+  },
+  {
+   "id": 1528,
+   "region": "vernon",
+   "slug": "beyond-belief-escape-rooms",
+   "name": "Beyond Belief Escape Rooms",
+   "description": "Beyond Belief Escape Rooms on 25th Street in Vernon has six themed rooms, from Lost Island to Wizards Academy, where teams work together to solve the mission before time runs out.",
+   "description_fr": "Beyond Belief Escape Rooms, sur la 25th Street à Vernon, propose six salles thématiques, de Lost Island à Wizards Academy, où les équipes travaillent ensemble pour accomplir leur mission avant la fin du temps imparti.",
+   "before_sha1": "ab6f839a3ef0109a5e627326823f82ba3de3b876",
+   "before_fr_sha1": "359c2161cfc62299e5997fe61553c490aab88836"
+  },
+  {
+   "id": 1540,
+   "region": "enderby",
+   "slug": "cardiff-miller-art-warehouse",
+   "name": "Cardiff Miller Art Warehouse",
+   "description": "The Cardiff Miller Art Warehouse in Enderby is devoted to the immersive sound and installation art of Janet Cardiff and George Bures Miller, with about ten large installations to wander through.",
+   "description_fr": "Le Cardiff Miller Art Warehouse, à Enderby, est consacré à l'art sonore et aux installations immersives de Janet Cardiff et George Bures Miller, avec une dizaine de grandes installations à parcourir.",
+   "before_sha1": "23ad9610c38207c084755869a295bc6cba9a0220",
+   "before_fr_sha1": "9958dc17130093738651c9603d176a57f84f7347"
+  },
+  {
+   "id": 1475,
+   "region": "kelowna",
+   "slug": "cineplex-cinemas-orchard-plaza",
+   "name": "Cineplex Cinemas Orchard Plaza",
+   "description": "Cineplex Cinemas Orchard Plaza is the multiplex in Orchard Plaza Shopping Centre, screening new releases in full recliner seats with RealD 3D. It also shows National Theatre Live and Metropolitan Opera broadcasts.",
+   "description_fr": "Le Cineplex Cinemas Orchard Plaza est le complexe de l'Orchard Plaza Shopping Centre, qui présente les nouveautés dans des fauteuils inclinables avec projection RealD 3D. On y voit aussi des diffusions du National Theatre Live et du Metropolitan Opera.",
+   "before_sha1": "027ca342f10ae011c4d66b1f7ff1e1f00c6a05e6",
+   "before_fr_sha1": "33d26a9a2c3a69f440b38707af6911d4181f85a2"
+  },
+  {
+   "id": 1485,
+   "region": "lake-country",
+   "slug": "creekside-theatre",
+   "name": "Creekside Theatre",
+   "description": "Creekside Theatre is Lake Country's community theatre, an intimate room hosting touring musicians, tribute acts, comedy, dance, ballet, family theatre and magic shows, with a strong roster of Canadian roots and folk artists.",
+   "description_fr": "Le Creekside Theatre est le théâtre communautaire de Lake Country, une salle intime qui accueille musiciens en tournée, spectacles hommage, humour, danse, ballet, théâtre familial et magie, avec une belle programmation d'artistes folk et racines canadiens.",
+   "before_sha1": "5fb5b11bffa51542e76c62c51cbbaa3b9a3280b8",
+   "before_fr_sha1": "e1d1ca745b636482284f188de081b7d2acff9c3a"
+  },
+  {
+   "id": 1535,
+   "region": "vernon",
+   "slug": "galaxy-cinemas-vernon",
+   "name": "Galaxy Cinemas Vernon",
+   "description": "Galaxy Cinemas Vernon is the city's Cineplex multiplex on Highway 6, an easy rainy-day fallback for first-run movies with RealD 3D screenings. Concessions include Starbucks and MiniMelts, so there's more than popcorn.",
+   "description_fr": "Le Galaxy Cinemas Vernon est le complexe Cineplex de la ville, sur la route 6, un bon plan les jours de pluie pour voir les nouveautés, avec des projections RealD 3D. Les concessions incluent Starbucks et MiniMelts, donc pas seulement du maïs soufflé.",
+   "before_sha1": "98df8880979fde2a5c33422b306600fc3d09967d",
+   "before_fr_sha1": "9619519f2ee69a9b098ab06dc7034772a3537aca"
+  },
+  {
+   "id": 1457,
+   "region": "kelowna",
+   "slug": "h2o-adventure-fitness-centre",
+   "name": "H2O Adventure + Fitness Centre",
+   "description": "H2O Adventure + Fitness Centre is a YMCA-run indoor waterpark with waterslides, a FlowRider, wave pool, lazy river and splash park. A go-to for families on a cold or rainy day, with a hot tub and steam room for grown-ups.",
+   "description_fr": "Le H2O Adventure + Fitness Centre est un parc aquatique intérieur géré par le YMCA, avec glissades, FlowRider, piscine à vagues, rivière paresseuse et jeux d'eau. Une valeur sûre pour les familles par temps froid ou pluvieux, avec bain à remous et bain de vapeur pour les adultes.",
+   "before_sha1": "e038d379b58148a6cf3fb5a57574cbf618ce9be7",
+   "before_fr_sha1": "b104af626ebed72e0a77d4734d45fc185340ee40"
+  },
+  {
+   "id": 1481,
+   "region": "west-kelowna",
+   "slug": "johnson-bentley-memorial-aquatic-centre",
+   "name": "Johnson Bentley Memorial Aquatic Centre",
+   "description": "Johnson Bentley Memorial Aquatic Centre is West Kelowna's indoor pool, with a 25 m tank, slides, a rope swing, beach-entry access, a warm soaking pool, hot tub and steam room. Aquatic wheelchairs and family change rooms help everyone get in the water.",
+   "description_fr": "Le Johnson Bentley Memorial Aquatic Centre est la piscine intérieure de West Kelowna, avec un bassin de 25 m, des glissades, une corde pour se balancer, une entrée en pente douce, un bassin d'eau chaude, un bain à remous et un bain de vapeur. Fauteuils aquatiques et vestiaires familiaux facilitent l'accès à l'eau.",
+   "before_sha1": "4bad11260ab7a9a30d7b0174064df05293853cb9",
+   "before_fr_sha1": "5941423d3e83b5f01ac48fe91c999dcb5cdbddd0"
+  },
+  {
+   "id": 1550,
+   "region": "kelowna",
+   "slug": "kelowna-comedy-club-at-dakoda-s-comedy-lounge",
+   "name": "Kelowna Comedy Club at Dakoda's Comedy Lounge",
+   "description": "Kelowna Comedy Club at Dakoda's Comedy Lounge is the city's dedicated stand-up room, inside Dakoda's Sports Bar & Grill, with touring and local comics on weekend nights, an open mic night and themed charity shows through the year.",
+   "description_fr": "Le Kelowna Comedy Club au Dakoda's Comedy Lounge est la salle d'humour de la ville, à l'intérieur du Dakoda's Sports Bar & Grill, avec des humoristes d'ici et en tournée les soirs de fin de semaine, une soirée micro ouvert et des spectacles-bénéfice thématiques durant l'année.",
+   "before_sha1": "87ed463c91a21a2aa3042c2d2d91eb4eff819ad6",
+   "before_fr_sha1": "59bcaf26d50e6c885716174c3680c9f667f27ddb"
+  },
+  {
+   "id": 1556,
+   "region": "kelowna",
+   "slug": "kelowna-escape-room-by-omni",
+   "name": "Kelowna Escape Room by Omni",
+   "description": "A downtown escape game that sprawls across several themed rooms – living room, office, kitchen – with live actors and electronic puzzles woven into the story.",
+   "description_fr": "Un jeu d'évasion du centre-ville qui s'étend sur plusieurs pièces thématiques – salon, bureau, cuisine – avec des acteurs en direct et des énigmes électroniques intégrées à l'histoire.",
+   "before_sha1": "df5443539b7696638da877bf41e2afc92d9510e5",
+   "before_fr_sha1": "6a20802190759ab703d2c0d5d74cfc99ac7f7017"
+  },
+  {
+   "id": 1506,
+   "region": "penticton",
+   "slug": "landmark-cinemas-7-penticton",
+   "name": "Landmark Cinemas 7 Penticton",
+   "description": "Landmark Cinemas 7 Penticton is a seven-screen downtown movie theatre showing first-run films with rocker seating. It also hosts the Penticton Art Gallery's TIFF Film Circuit series, a good pick for film fans on a wet evening.",
+   "description_fr": "Le Landmark Cinemas 7 Penticton est un cinéma de sept salles au centre-ville qui présente les nouveautés dans des fauteuils berçants. Il accueille aussi la série TIFF Film Circuit de la Penticton Art Gallery, un bon choix pour les cinéphiles par temps pluvieux.",
+   "before_sha1": "522e9103ff0d47ab345483794563084a1c59f674",
+   "before_fr_sha1": "4565ac39df9edd5b79135ce2e6a0b779f2856b9b"
+  },
+  {
+   "id": 1537,
+   "region": "vernon",
+   "slug": "lincoln-lanes",
+   "name": "Lincoln Lanes",
+   "description": "Lincoln Lanes is a family 5-pin bowling centre in Vernon with automatic scoring and a snack bar. Bowlers of all abilities are welcome, with adaptive ramps, bumpers and special-needs leagues, plus regular leagues and birthday parties.",
+   "description_fr": "Lincoln Lanes est un salon de quilles à cinq quilles familial à Vernon, avec pointage automatique et casse-croûte. Les joueurs de tous niveaux sont les bienvenus, avec rampes adaptées, bumpers et ligues pour besoins particuliers, en plus des ligues régulières et des fêtes d'anniversaire.",
+   "before_sha1": "f3f3712df78e65b2659b87195bd71a46e2a97ed7",
+   "before_fr_sha1": "9dd753bf400db52a6c7bc608a56bba2a34062c7b"
+  },
+  {
+   "id": 1512,
+   "region": "penticton",
+   "slug": "many-hats-theatre-company-cannery-stage",
+   "name": "Many Hats Theatre Company (Cannery Stage)",
+   "description": "Many Hats Theatre Company is a community live-theatre company founded in 2007, staging five plays a year at the Cannery Stage in Penticton's Cannery Trade Centre. Check their website to see what play is up next.",
+   "description_fr": "La Many Hats Theatre Company est une troupe de théâtre communautaire fondée en 2007, qui monte cinq pièces par année à la Cannery Stage, au Cannery Trade Centre de Penticton. Consultez son site Web pour voir quelle pièce est à l'affiche.",
+   "before_sha1": "2721e7f24e879e7b8fb3f252126d4f6f6d196da9",
+   "before_fr_sha1": "8577d3767f8b12e72381a3a95a9112a113cf4567"
+  },
+  {
+   "id": 1517,
+   "region": "osoyoos",
+   "slug": "okanagan-art-gallery",
+   "name": "Okanagan Art Gallery",
+   "description": "Okanagan Art Gallery is an artist-run co-op on Main Street with a bright 2,100 sq ft space across six rooms. It shows paintings, sculpture, photography and work in glass, wood and metal, and a member artist is on hand to chat.",
+   "description_fr": "L'Okanagan Art Gallery est une coopérative d'artistes de la rue Main, dans un espace lumineux de 2 100 pi² réparti en six salles. On y voit peintures, sculptures, photographies et œuvres en verre, en bois et en métal, et un artiste membre est sur place pour discuter.",
+   "before_sha1": "0448e8ba3d9e297733e1b0905b55176bd484ba4a",
+   "before_fr_sha1": "92caf039e3b780fe0d84b9eff84c938339073368"
+  },
+  {
+   "id": 1468,
+   "region": "kelowna",
+   "slug": "okanagan-heritage-museum",
+   "name": "Okanagan Heritage Museum",
+   "description": "The Okanagan Heritage Museum is a downtown museum covering the natural and human history of the Okanagan, from syilx culture to settler life, with exhibits such as Dinosaurs of BC. It also houses the Kelowna Public Archives.",
+   "description_fr": "L'Okanagan Heritage Museum est un musée du centre-ville consacré à l'histoire naturelle et humaine de l'Okanagan, de la culture syilx à la vie des colons, avec des expositions comme Dinosaurs of BC. Il abrite aussi les archives publiques de Kelowna.",
+   "before_sha1": "f86f27db8c948eeb5a827d5c649ba8e2a92f89bd",
+   "before_fr_sha1": "17dab1246dbd1c11870943a3bfb3ff8e81ce0c93"
+  },
+  {
+   "id": 1469,
+   "region": "kelowna",
+   "slug": "okanagan-wine-orchard-museum-laurel-packinghouse",
+   "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+   "description": "The Okanagan Wine & Orchard Museum tells the valley's fruit-growing and wine-making story from the historic 1918 Laurel Packinghouse. A good primer before, or instead of, a rainy winery day.",
+   "description_fr": "L'Okanagan Wine & Orchard Museum raconte l'histoire de l'arboriculture et de la viticulture de la vallée depuis le Laurel Packinghouse, bâtiment historique de 1918. Une bonne introduction avant une journée de vignobles pluvieuse, ou à sa place.",
+   "before_sha1": "b0647e94c6e05d5e4510f72818bd5ef775d4daa0",
+   "before_fr_sha1": "ae4acff1c69c676e9845af721b6b729601562a69"
+  },
+  {
+   "id": 1516,
+   "region": "osoyoos",
+   "slug": "osoyoos-district-museum-and-archives",
+   "name": "Osoyoos & District Museum and Archives",
+   "description": "Downtown Osoyoos museum, in its Main Street home since 2023, with 4,000+ artifacts and photo exhibits on the town's early days, ranching, orchards and Syilx history. It also hosts community events like First Fridays and game nights.",
+   "description_fr": "Musée du centre-ville d'Osoyoos, installé sur la rue Main depuis 2023, avec plus de 4 000 artefacts et des expositions de photos sur les débuts de la ville, l'élevage, les vergers et l'histoire syilx. Il accueille aussi des activités communautaires comme les First Fridays et des soirées de jeux.",
+   "before_sha1": "aff19446578eb886f61170d1fac68d055474277a",
+   "before_fr_sha1": "91a0204f782e540340d61c12dc0ec8db08e4b985"
+  },
+  {
+   "id": 1557,
+   "region": "peachland",
+   "slug": "peachland-community-centre-drop-in-pickleball",
+   "name": "Peachland Community Centre – Drop-in Pickleball",
+   "description": "The District of Peachland's community centre gym on Beach Avenue runs drop-in indoor pickleball for all levels, with skill-graded and all-play times and paddles to rent on site.",
+   "description_fr": "Le gymnase du centre communautaire de Peachland, sur Beach Avenue, offre du pickleball intérieur libre pour tous les niveaux, avec des plages selon le niveau et des plages ouvertes à tous, et des raquettes à louer sur place.",
+   "before_sha1": "cf3a5eda8131572ecd3d9335ba9cbb71925b5559",
+   "before_fr_sha1": "cc91d52634e5031eb38bfa0dfa23e8e1d380d81a"
+  },
+  {
+   "id": 1505,
+   "region": "penticton",
+   "slug": "penticton-community-centre-pool-lazy-river",
+   "name": "Penticton Community Centre (Pool & Lazy River)",
+   "description": "Penticton Community Centre has a 10-lane, 25 m lap pool plus a leisure pool with a lazy river, spray features and a waterslide. A big whirlpool, sauna and steam room are there for warming up on a cold day.",
+   "description_fr": "Le Penticton Community Centre compte une piscine de 25 m à dix couloirs et une piscine de loisirs avec rivière paresseuse, jeux d'eau et glissade. Un grand bain à remous, un sauna et un bain de vapeur permettent de se réchauffer par temps froid.",
+   "before_sha1": "7cb3261b5958e6c7b66d4288cefa27b240560c14",
+   "before_fr_sha1": "d3c0782ca0fac512201d3503680c086c0b7e69cc"
+  },
+  {
+   "id": 1572,
+   "region": "vernon",
+   "slug": "planet-bee-honey-farm-honeymoon-meadery",
+   "name": "Planet Bee Honey Farm & Honeymoon Meadery",
+   "description": "Planet Bee Honey Farm & Honeymoon Meadery is a working honey farm in Vernon where you can watch live bees build comb in viewing hives and learn how honey is made. Tasting is free: honey flavours and, for adults, honey wine.",
+   "description_fr": "Planet Bee Honey Farm & Honeymoon Meadery est une ferme apicole en activité à Vernon, où l'on observe des abeilles construire leurs rayons dans des ruches d'observation et où l'on découvre comment le miel est fait. La dégustation est gratuite : miels et, pour les adultes, vin de miel.",
+   "before_sha1": "f367d678a42cff6170df0e823a658500e014742d",
+   "before_fr_sha1": "dccf90438b909bb9851a0ab64a94b0562df2830a"
+  },
+  {
+   "id": 1493,
+   "region": "kelowna",
+   "slug": "sopa-fine-arts",
+   "name": "SOPA Fine Arts",
+   "description": "A contemporary gallery in Pandosy Village featuring rotating solo and group shows by Canadian and international artists. A relaxed stop while exploring the South Pandosy shops and cafes.",
+   "description_fr": "Une galerie d'art contemporain du village Pandosy qui présente en rotation des expositions solos et collectives d'artistes canadiens et internationaux. Un arrêt tranquille en explorant les boutiques et les cafés de South Pandosy.",
+   "before_sha1": "3092c41397c482c50db025cab11e40fda31d02c7",
+   "before_fr_sha1": "d6b5448aeaf053a0f0aec38c7153d527c152288a"
+  },
+  {
+   "id": 1479,
+   "region": "west-kelowna",
+   "slug": "sncewips-heritage-museum",
+   "name": "Sncewips Heritage Museum",
+   "description": "Sncewips Heritage Museum is Westbank First Nation's living museum, sharing syilx history, language, tools, dwellings and present-day cultural practice through community-curated exhibits. There's a gift shop to browse before you go.",
+   "description_fr": "Le Sncewips Heritage Museum est le musée vivant de la Première Nation de Westbank, qui partage l'histoire, la langue, les outils, les habitations et les pratiques culturelles actuelles des Syilx par des expositions conçues par la communauté. Une boutique de cadeaux est à découvrir avant de partir.",
+   "before_sha1": "36421e6de2fde22da389259e78ee025e7b7f8b8f",
+   "before_fr_sha1": "b4c98bb5644f45e4d521312df84547ab3342c073"
+  },
+  {
+   "id": 1564,
+   "region": "summerland",
+   "slug": "summerland-aquatic-fitness-centre",
+   "name": "Summerland Aquatic & Fitness Centre",
+   "description": "Summerland's indoor pool and hot tub, celebrating 50 years in 2026, with public swims, lane swims and AquaFit.",
+   "description_fr": "La piscine intérieure et le bain à remous de Summerland, qui célèbrent leurs 50 ans en 2026, avec des baignades libres, des baignades en couloir et de l'AquaFit.",
+   "before_sha1": "219c65876cb9c369b735cca4965e693c6e23f12c",
+   "before_fr_sha1": "6fc2ceb0666d83c764e6d050bb103eb9f57b7f8f"
+  },
+  {
+   "id": 1511,
+   "region": "penticton",
+   "slug": "tempest-theatre-film",
+   "name": "Tempest Theatre & Film",
+   "description": "Tempest Theatre & Film is an 80-seat black-box theatre near downtown Penticton, home to local plays, film events and acting classes. In a room this size, every seat puts you close to the performers.",
+   "description_fr": "Le Tempest Theatre & Film est une salle expérimentale de 80 places près du centre-ville de Penticton, qui accueille pièces locales, événements cinéma et cours de théâtre. Dans une salle de cette taille, chaque siège vous place près des interprètes.",
+   "before_sha1": "f3121a6418c80fd5625fa8b6cc0e32f3781786d3",
+   "before_fr_sha1": "e977a2ca1173460e2df22d508a737b6cbe449a57"
+  },
+  {
+   "id": 1527,
+   "region": "vernon",
+   "slug": "the-rock-garden-climbing-centre",
+   "name": "The Rock Garden Climbing Centre",
+   "description": "The Rock Garden Climbing Centre is Vernon's indoor climbing gym, with a bouldering area and roped routes for beginners through experienced climbers. Intro lessons, kids' programs and birthday parties are also on offer.",
+   "description_fr": "Le Rock Garden Climbing Centre est le gymnase d'escalade intérieur de Vernon, avec une zone de bloc et des voies à corde pour les débutants comme les grimpeurs expérimentés. Des cours d'initiation, des programmes pour enfants et des fêtes d'anniversaire sont aussi offerts.",
+   "before_sha1": "08da817ea17562630496d3af5ef94a4f6748f7ae",
+   "before_fr_sha1": "08208f6d431fd32056a0b4fc5b20d8edfaf930cc"
+  },
+  {
+   "id": 1574,
+   "region": "vernon",
+   "slug": "vernon-curling-club",
+   "name": "Vernon Curling Club",
+   "description": "The Vernon Curling Club is a busy downtown club with leagues, bonspiels and the Stone's Throw Cafe overlooking the sheets. Newcomers can try the game in short instructional sessions with a half-hour lesson and a six-end game.",
+   "description_fr": "Le Vernon Curling Club est un club animé du centre-ville, avec ligues, bonspiels et le Stone's Throw Cafe qui donne sur les pistes. Les nouveaux venus peuvent essayer le jeu lors de courtes séances d'initiation comprenant une leçon d'une demi-heure et une partie de six bouts.",
+   "before_sha1": "8267fd627f9849ebcf9eabd8ed4a5cf7036b9827",
+   "before_fr_sha1": "17f7cd69b5945de94840f63d922c4d7c85082da8"
+  },
+  {
+   "id": 1489,
+   "region": "kelowna",
+   "slug": "virtual-rcades",
+   "name": "Virtual Rcades",
+   "description": "Virtual Rcades is a VR motion-simulator arcade with 30+ simulators and gaming pods across racing, flight, theme-park and adventure themes. Seated, standing and non-motion options suit most ages and abilities.",
+   "description_fr": "Virtual Rcades est une salle d'arcade de réalité virtuelle avec plus de 30 simulateurs et cabines de jeu sur les thèmes de la course, du vol, des parcs d'attractions et de l'aventure. Des options assises, debout et sans mouvement conviennent à la plupart des âges et des capacités.",
+   "before_sha1": "8748a992ad099fd405afb4e57732cffe5a7edbfb",
+   "before_fr_sha1": "8965f2e1c75b707b7982d27fbd862c999866e3e2"
+  },
+  {
+   "id": 1464,
+   "region": "kelowna",
+   "slug": "xperience-games-kelowna",
+   "name": "Xperience Games Kelowna",
+   "description": "Xperience Games Kelowna runs tech-based escape rooms with no locks or keys, such as Haunted Apartment and Cosmic Color Heist, alongside more than a dozen VR escape games. Every game is private to your group.",
+   "description_fr": "Xperience Games Kelowna propose des salles d'évasion technologiques sans cadenas ni clés, comme Haunted Apartment et Cosmic Color Heist, ainsi que plus d'une douzaine de jeux d'évasion en réalité virtuelle. Chaque partie est privée pour votre groupe.",
+   "before_sha1": "18f9251968b7af98b70de2274d6ade9debfb7870",
+   "before_fr_sha1": "6ddf78fac965bc86740ea28f8f83218fc4918a25"
+  },
+  {
+   "id": 1529,
+   "region": "vernon",
+   "slug": "another-world-vr-vernon",
+   "name": "Another World VR Vernon",
+   "description": "A 4,100 sq ft free-roam virtual reality arena in downtown Vernon where groups play multiplayer VR adventures, shooters and escape games. Foam-blaster battles and party packages with a private party room are also offered.",
+   "description_fr": "Une arène de réalité virtuelle en libre déplacement de 4 100 pi² au centre-ville de Vernon, où les groupes vivent des aventures, des jeux de tir et des jeux d'évasion multijoueurs en RV. On propose aussi des combats de pistolets en mousse et des forfaits de fête avec salle privée.",
+   "before_sha1": "d08a668361a692d3a0cf0accf4dedaa20a756a9d",
+   "before_fr_sha1": "0c55fce996fcbb725636d95b8ea23378e871dc23"
+  },
+  {
+   "id": 1461,
+   "region": "kelowna",
+   "slug": "beyond-the-crux-climbing-gym",
+   "name": "Beyond the Crux Climbing Gym",
+   "description": "Full-service indoor climbing gym with over 5,000 sq ft of bouldering, plus top rope and lead walls and a training area. Rentals make it easy for beginners to try, and an adult belay course teaches you to climb the roped walls.",
+   "description_fr": "Centre d'escalade intérieur complet, avec plus de 5 000 pieds carrés de bloc, des murs de moulinette et de premier de cordée, et une zone d'entraînement. La location d'équipement permet aux débutants de s'initier facilement, et un cours d'assurage pour adultes vous prépare aux murs avec corde.",
+   "before_sha1": "91f2ab03c4f78be30a706fedbc947ec1c91d3034",
+   "before_fr_sha1": "fb76ca7cc4e09a24f1f854c0cf452a3d17d1be02"
+  },
+  {
+   "id": 1558,
+   "region": "penticton",
+   "slug": "cascades-casino-penticton",
+   "name": "Cascades Casino Penticton",
+   "description": "Casino beside the South Okanagan Events Centre with more than 400 slot machines from 1¢ to $1, table games and a poker room. MATCH Eatery & Public House and the Summit Bar make it an easy evening out for adults.",
+   "description_fr": "Casino voisin du South Okanagan Events Centre, avec plus de 400 machines à sous de 1 ¢ à 1 $, des jeux de table et une salle de poker. Le MATCH Eatery & Public House et le Summit Bar en font une sortie de soirée facile pour les adultes.",
+   "before_sha1": "91e844543886e3d214cea2561ddbb4911b7a8374",
+   "before_fr_sha1": "571a13322624bb5c4d1109ea03274be5f0a6d7f5"
+  },
+  {
+   "id": 1507,
+   "region": "penticton",
+   "slug": "cleland-community-theatre",
+   "name": "Cleland Community Theatre",
+   "description": "City-run, 443-seat performing arts theatre inside the Penticton Community Centre, hosting symphonies, touring concerts, comedy, dance, speakers and local productions. Check the event calendar for a show on a rainy evening.",
+   "description_fr": "Théâtre municipal de 443 places au sein du centre communautaire de Penticton, qui accueille symphonies, concerts en tournée, humour, danse, conférenciers et productions locales. Consultez le calendrier des événements pour trouver un spectacle lors d'une soirée pluvieuse.",
+   "before_sha1": "c978eafc904173535a9e3f0af3be146e24c58355",
+   "before_fr_sha1": "5afcef976886ca38d51915dcf831270a0ac2600c"
+  },
+  {
+   "id": 1566,
+   "region": "kaleden",
+   "slug": "dominion-radio-astrophysical-observatory-drao",
+   "name": "Dominion Radio Astrophysical Observatory (DRAO)",
+   "description": "The National Research Council's radio telescope site in the White Lake valley, where guided tours explain how its giant dishes and the CHIME telescope listen to the universe. A fascinating outing for curious kids and science fans.",
+   "description_fr": "Site de radiotélescopes du Conseil national de recherches, dans la vallée de White Lake, où des visites guidées expliquent comment ses immenses antennes et le télescope CHIME écoutent l'univers. Une sortie fascinante pour les enfants curieux et les passionnés de science.",
+   "before_sha1": "d32f771dc7b433ac6e91b36f74b509c866fd826f",
+   "before_fr_sha1": "39cd5c13c7afb3b27c12b7833b89dc0b13dee206"
+  },
+  {
+   "id": 1569,
+   "region": "penticton",
+   "slug": "ethos-parkour-movement",
+   "name": "Ethos Parkour & Movement",
+   "description": "Indoor parkour gym with vaults, bars and walls, where kids, teens and adults can join supervised open-gym sessions. It also hosts birthday parties, camps and Parents' Night Out events.",
+   "description_fr": "Gym de parkour intérieur avec obstacles, barres et murs, où enfants, ados et adultes peuvent participer à des séances de gym libre supervisées. Il propose aussi des fêtes d'anniversaire, des camps et des soirées Parents' Night Out.",
+   "before_sha1": "e627d62634b3b83caeaea767706e25435f17b78d",
+   "before_fr_sha1": "3b39d3c0748ae6e80b0277b944782a9f638f01d5"
+  },
+  {
+   "id": 1492,
+   "region": "kelowna",
+   "slug": "gallery-421",
+   "name": "Gallery 421",
+   "description": "A commercial fine-art gallery near Pandosy Village with more than 500 original works by over 30 professional artists. Expect paintings and sculpture by local, national and international artists, plus blown glass, an easy stop on a grey afternoon.",
+   "description_fr": "Galerie d'art commerciale près de Pandosy Village, avec plus de 500 œuvres originales de plus de 30 artistes professionnels. On y trouve des peintures et des sculptures d'artistes locaux, nationaux et internationaux, ainsi que du verre soufflé, un arrêt facile par un après-midi gris.",
+   "before_sha1": "77b3dab495d23b9fa4b644d2fc0b3048158b6bec",
+   "before_fr_sha1": "d69d23b443fb71d74ba7351ded88772bf588d3ab"
+  },
+  {
+   "id": 1501,
+   "region": "kelowna",
+   "slug": "geert-maas-sculpture-gardens-gallery",
+   "name": "Geert Maas Sculpture Gardens & Gallery",
+   "description": "Private garden and gallery in Kelowna's north end holding hundreds of works by artist Geert Maas, including one of Canada's largest collections of bronze sculpture. Wander the grounds and gallery at your own pace; exhibitions change often.",
+   "description_fr": "Jardin et galerie privés dans le nord de Kelowna, qui abritent des centaines d'œuvres de l'artiste Geert Maas, dont l'une des plus importantes collections de sculptures en bronze au Canada. Parcourez les jardins et la galerie à votre rythme; les expositions changent souvent.",
+   "before_sha1": "3e690181be59fbc545556f52fbe0a7771c6b9f53",
+   "before_fr_sha1": "527e65f889280a707007b7b46672db626d4bdf32"
+  },
+  {
+   "id": 1496,
+   "region": "kelowna",
+   "slug": "kf-aerospace-centre-for-excellence",
+   "name": "KF Centre for Excellence",
+   "description": "Aviation discovery centre next to Kelowna International Airport, with 12 historic aircraft behind glass hangar doors, interactive exhibits and the stories of the people who shaped the industry. Watch planes come and go from the upper-level viewing gallery.",
+   "description_fr": "Centre de découverte de l'aviation voisin de l'aéroport international de Kelowna, avec 12 aéronefs historiques derrière de grandes portes vitrées de hangar, des expositions interactives et les histoires de ceux qui ont façonné l'industrie. Regardez les avions arriver et partir depuis la galerie d'observation à l'étage.",
+   "before_sha1": "ddce550524360e20a26cca6d6a9c86815ad983b7",
+   "before_fr_sha1": "450f1f054b30d1527cacffd089508e90c6d1d04f"
+  },
+  {
+   "id": 1471,
+   "region": "kelowna",
+   "slug": "kelowna-community-theatre",
+   "name": "Kelowna Community Theatre",
+   "description": "City-run, roughly 850-seat theatre in the Cultural District and the home stage of the Okanagan Symphony Orchestra, plus touring comedy, music and film festivals. A smaller Black Box space hosts cabaret and intimate shows.",
+   "description_fr": "Théâtre municipal d'environ 850 places dans le quartier culturel, scène de l'Orchestre symphonique de l'Okanagan, qui accueille aussi des spectacles d'humour et de musique en tournée et des festivals de films. Une salle plus petite, la Black Box, présente cabarets et spectacles intimes.",
+   "before_sha1": "ad79a11e0a8aa98e44b8e4651e65588256a949cd",
+   "before_fr_sha1": "af465e0597e9469e7a66d00b54676017bd6f5721"
+  },
+  {
+   "id": 1634,
+   "region": "kelowna",
+   "slug": "kelowna-family-ymca",
+   "name": "Kelowna Family YMCA",
+   "description": "Community health and fitness centre in Rutland with pools, a hot tub, sauna, gym, climbing wall and youth zone. A handy spot for a workout or a family activity when the weather turns.",
+   "description_fr": "Centre communautaire de santé et de conditionnement physique à Rutland, avec piscines, bain à remous, sauna, gym, mur d'escalade et espace jeunesse. Un endroit pratique pour s'entraîner ou faire une activité en famille quand le temps se gâte.",
+   "before_sha1": "fbd1864533086892475569c71be3b353282ae040",
+   "before_fr_sha1": "bf3ae121af27bdd29964e260c55a99c070c407b6"
+  },
+  {
+   "id": 1484,
+   "region": "lake-country",
+   "slug": "lake-country-art-gallery",
+   "name": "Lake Country Art Gallery",
+   "description": "Public gallery showing rotating exhibitions of regional contemporary art, with a small gift shop and a coffee house sharing the space. Its annual Under 200 show features affordable local work.",
+   "description_fr": "Galerie publique qui présente des expositions tournantes d'art contemporain régional, avec une petite boutique-cadeaux et un café dans les mêmes lieux. Son exposition annuelle Under 200 met en vedette des œuvres locales abordables.",
+   "before_sha1": "afb55b199b49b896c767594a90f63dbd8c61cafe",
+   "before_fr_sha1": "936ce49b06f65607dbd19a79caf37c6fb9820394"
+  },
+  {
+   "id": 1542,
+   "region": "lumby",
+   "slug": "lumby-district-museum",
+   "name": "Lumby & District Museum",
+   "description": "Small volunteer-run museum on Glencaird Street telling the story of Lumby and the Monashee area's logging and pioneer history. Open June to September, afternoons only.",
+   "description_fr": "Petit musée géré par des bénévoles sur la rue Glencaird, qui raconte l'histoire de Lumby et de la région de Monashee, marquée par l'exploitation forestière et les pionniers. Ouvert de juin à septembre, l’après-midi seulement.",
+   "before_sha1": "fa5f8e2d8644954a1356f3e70506fc3208ce7374",
+   "before_fr_sha1": "5dd4584408b35ded72922d198ff74f47d90c9895"
+  },
+  {
+   "id": 1462,
+   "region": "kelowna",
+   "slug": "mccurdy-bowling-centre",
+   "name": "McCurdy Bowling Centre",
+   "description": "Big, all-ages bowling centre with 24 ten-pin and 6 five-pin lanes, plus cosmic bowling and lane-side food and drinks from the attached Freddy's Brewpub. It hosts leagues, birthday parties and group events, a good plan for a wet weekend.",
+   "description_fr": "Grand salon de quilles pour tous les âges, avec 24 allées de quilles à dix et 6 allées de cinq quilles, du bowling cosmique, et de la nourriture et des boissons servies aux allées par le Freddy's Brewpub attenant. On y organise ligues, fêtes d'anniversaire et événements de groupe, un bon plan pour une fin de semaine pluvieuse.",
+   "before_sha1": "a5002228c4792525e5e03b38d1bf9a5cdf56994a",
+   "before_fr_sha1": "cd3799fd3d92cfb0ad570d76a6f521b72e242744"
+  },
+  {
+   "id": 1498,
+   "region": "kelowna",
+   "slug": "okanagan-bowling-club-obc",
+   "name": "Okanagan Bowling Club (OBC)",
+   "description": "Five-pin bowling centre in Capri Centre, in the former Capri Lanes space, billed as the largest 5-pin alley in the Okanagan. Weekends add glow-in-the-dark laser bowling, and food and drinks make it an easy group outing.",
+   "description_fr": "Salon de cinq quilles au Capri Centre, dans l'ancien local de Capri Lanes, présenté comme le plus grand de l'Okanagan. Les fins de semaine ajoutent le bowling laser sous lumière noire, et la nourriture et les boissons en font une sortie de groupe facile.",
+   "before_sha1": "41d0eb080de48dd9e17052bca9d4a6be9b1ad872",
+   "before_fr_sha1": "81a3b207b870bc3552ac3421074ec722d53f3f83"
+  },
+  {
+   "id": 1470,
+   "region": "kelowna",
+   "slug": "okanagan-military-museum",
+   "name": "Okanagan Military Museum",
+   "description": "Museum in the Kelowna Memorial Arena building telling the stories of Okanagan people in military service, with uniforms, artifacts and archives.",
+   "description_fr": "Musée situé dans l'édifice du Kelowna Memorial Arena, qui raconte les histoires des gens de l'Okanagan ayant servi dans l'armée, avec uniformes, objets et archives.",
+   "before_sha1": "21f1f4a61dba54b3afd44d822ca0215b71348b83",
+   "before_fr_sha1": "5181ef3b3d375aca03d89436288b6c0bda39c6c3"
+  },
+  {
+   "id": 1520,
+   "region": "oliver",
+   "slug": "oliver-district-museum",
+   "name": "Oliver & District Museum & Archives",
+   "description": "Heritage museum in Oliver's 1920's provincial police building, with exhibits on mining, irrigation, agriculture, natural history and the syilx Okanagan people. The original jailhouse from the former gold mining community of Fairview stands in its heritage garden.",
+   "description_fr": "Musée du patrimoine dans l'ancien bureau de la police provinciale d'Oliver, datant des années 1920, avec des expositions sur l'exploitation minière, l'irrigation, l'agriculture, l'histoire naturelle et le peuple syilx de l'Okanagan. L'ancienne prison de Fairview, ancienne communauté minière, se trouve dans son jardin patrimonial.",
+   "before_sha1": "9941971cef6651c1ba0eb0e2baa50398b12000e5",
+   "before_fr_sha1": "2884f9de9ed1a1642b6e0de73a9c507b7b41f6a4"
+  },
+  {
+   "id": 1560,
+   "region": "osoyoos",
+   "slug": "osoyoos-curling-club",
+   "name": "Osoyoos Curling Club",
+   "description": "Friendly community curling club in Osoyoos with leagues, social draws and Learn to Curl clinics for first-timers. A good winter rainy-day option for groups wanting to try the sport.",
+   "description_fr": "Club de curling communautaire et chaleureux à Osoyoos, avec ligues, parties sociales et cliniques Apprendre à jouer au curling pour les débutants. Une bonne option hivernale par temps de pluie pour les groupes qui veulent essayer ce sport.",
+   "before_sha1": "f441dde094a6ce085e0376b205d2958d9a5d1c23",
+   "before_fr_sha1": "f34af0c23e1d57783b3cae959fb476c274abca6a"
+  },
+  {
+   "id": 1486,
+   "region": "peachland",
+   "slug": "peachland-museum",
+   "name": "Peachland Museum",
+   "description": "Volunteer-run history museum in Peachland's distinctive 8-sided former Baptist church on the waterfront, built mainly by volunteers in 1910. See historical photographs and artefacts, and upstairs a model railway recreating the Kettle Valley Railway.",
+   "description_fr": "Musée d'histoire géré par des bénévoles, installé dans l'ancienne église baptiste octogonale de Peachland, au bord de l'eau, construite surtout par des bénévoles en 1910. On y voit des photographies historiques et des objets d'époque, et à l'étage, un chemin de fer miniature qui recrée le Kettle Valley Railway.",
+   "before_sha1": "a307be207cd7bfa0cadc459cfcebf885f31b625f",
+   "before_fr_sha1": "2f43338a7702c062e2af610e7221a57887a47b9f"
+  },
+  {
+   "id": 1559,
+   "region": "penticton",
+   "slug": "penticton-curling-club",
+   "name": "Penticton Curling Club",
+   "description": "Curling club on Vees Drive across from the South Okanagan Events Centre, with Learn to Curl sessions for newcomers each fall. It also hosts bonspiels like the Penticton Curling Classic, where spectators can watch top-level curling.",
+   "description_fr": "Club de curling sur la promenade Vees, en face du South Okanagan Events Centre, qui offre chaque automne des séances Apprendre à jouer au curling pour les nouveaux venus. Il accueille aussi des bonspiels comme le Penticton Curling Classic, où les spectateurs peuvent voir du curling de haut niveau.",
+   "before_sha1": "b9a1c753cd7d5accda89b89bddcfdd54e4bffff4",
+   "before_fr_sha1": "fcb3ed7075952b2fc1a7f889ada6460293348224"
+  },
+  {
+   "id": 1463,
+   "region": "kelowna",
+   "slug": "planet-lazer-kelowna",
+   "name": "Planet Lazer Kelowna",
+   "description": "Long-running entertainment centre with multi-level laser tag, duckpin bowling, free-roam VR and a card-based arcade. There's a kitchen and private party rooms for birthdays and groups.",
+   "description_fr": "Centre de divertissement bien établi, avec laser tag sur plusieurs niveaux, quilles miniatures, RV en libre déplacement et salle d'arcade à cartes. Une cuisine et des salles de fête privées servent aux anniversaires et aux groupes.",
+   "before_sha1": "71692034b8dad70967c140b55ac60bf8d9c43262",
+   "before_fr_sha1": "a288339b3564b233fc18c4b388a3cf73cc9b7698"
+  },
+  {
+   "id": 1552,
+   "region": "kelowna",
+   "slug": "revelry-food-music-hub",
+   "name": "Revelry Food + Music Hub",
+   "description": "Two-level downtown music venue in the Cultural District that hosts touring bands, hip-hop, metal and indie acts plus other ticketed live shows. Expect a standing-room club vibe with food and drinks, though some shows offer limited reserved seats.",
+   "description_fr": "Salle de spectacle sur deux niveaux dans le quartier culturel du centre-ville, qui accueille groupes en tournée, hip-hop, métal et indie ainsi que d'autres spectacles payants. Attendez-vous à une ambiance de club debout avec nourriture et boissons, bien que certains spectacles offrent des places réservées limitées.",
+   "before_sha1": "57958ffb4cdc4e56ba05383a81041c59a9bf2382",
+   "before_fr_sha1": "f7863261ce478d0add47851621c1e90a4457376a"
+  },
+  {
+   "id": 1503,
+   "region": "penticton",
+   "slug": "ss-sicamous-museum-heritage-park",
+   "name": "SS Sicamous Museum & Heritage Park",
+   "description": "Restored 1914 sternwheeler beached at the west end of Okanagan Beach, now a museum you can explore deck by deck. Wander the cabins, dining saloon and wheelhouse to learn about steamship travel on Okanagan Lake.",
+   "description_fr": "Bateau à aubes de 1914 restauré, échoué à l'extrémité ouest d'Okanagan Beach et transformé en musée que l'on explore pont par pont. Parcourez les cabines, la salle à manger et la timonerie pour en apprendre davantage sur les voyages en bateau à vapeur sur le lac Okanagan.",
+   "before_sha1": "b729098448242dfc4e6ae5f17dd0e12789ecbd29",
+   "before_fr_sha1": "c1ce945d9c73cc6dc3f2cf9d3fe5d068b74c0fcb"
+  },
+  {
+   "id": 1565,
+   "region": "osoyoos",
+   "slug": "sonora-community-centre",
+   "name": "Sonora Community Centre",
+   "description": "Osoyoos's indoor recreation centre, with squash courts, a gymnasium hosting drop-in pickleball and other sports, and a weight room. A handy rainy-day way to stay active without a membership.",
+   "description_fr": "Centre de loisirs intérieur d'Osoyoos, avec courts de squash, un gymnase où se jouent le pickleball et d'autres sports sans réservation, et une salle de musculation. Une façon pratique de rester actif par temps de pluie, sans abonnement.",
+   "before_sha1": "68f96686910104c79a55c0b8f8ab3f40205e0c79",
+   "before_fr_sha1": "cc93d6fd8e99bcb6779dbb7029b5fc64bbb7c731"
+  },
+  {
+   "id": 1518,
+   "region": "osoyoos",
+   "slug": "the-art-gallery-osoyoos",
+   "name": "The Art Gallery Osoyoos",
+   "description": "Volunteer-run community gallery of the Osoyoos & District Arts Council, just west of Town Hall. New shows by local and regional artists open year-round, most running about three weeks. Look for its popular Summer and Christmas Artisan Markets with smaller, more affordable works.",
+   "description_fr": "Galerie communautaire gérée par des bénévoles du Osoyoos & District Arts Council, juste à l'ouest de l'hôtel de ville. De nouvelles expositions d'artistes locaux et régionaux ouvrent toute l'année, la plupart durant environ trois semaines. Ne manquez pas ses populaires marchés d'artisans d'été et de Noël, avec des œuvres plus petites et plus abordables.",
+   "before_sha1": "976a1bbbd56d9aa4986ace9a86eee39fd4989f6f",
+   "before_fr_sha1": "abd7542dfdf70c73b9da4f5690548f8ec2612e7e"
+  },
+  {
+   "id": 1519,
+   "region": "oliver",
+   "slug": "venables-theatre",
+   "name": "Venables Theatre",
+   "description": "Oliver's 400-seat performing arts theatre, hosting a busy season of touring concerts, comedy, ballet and dance, family programming and local theatre productions. An on-site lounge and full accessibility make it an easy night out when the weather turns.",
+   "description_fr": "Théâtre de 400 places d'Oliver, qui accueille une saison bien remplie de concerts en tournée, d'humour, de ballet et de danse, de programmation familiale et de productions théâtrales locales. Un salon sur place et une accessibilité complète en font une sortie de soirée facile quand le temps tourne.",
+   "before_sha1": "634eaaa65211acd40540cdb914da24439440473c",
+   "before_fr_sha1": "f77d00651b98792b4e1962cd4194d57a6cf77b01"
+  },
+  {
+   "id": 1480,
+   "region": "west-kelowna",
+   "slug": "westbank-museum",
+   "name": "Westbank Museum",
+   "description": "Small community museum sharing the West Kelowna Visitor Centre building. It covers the Fur Brigade Trail, pioneer families, orchards, forestry and even Ogopogo, with a working miniature sawmill to find, so there's something for history buffs and curious kids.",
+   "description_fr": "Petit musée communautaire qui partage l'édifice du centre d'information touristique de West Kelowna. Il couvre la piste des brigades de fourrure, les familles pionnières, les vergers, la foresterie et même Ogopogo, avec une scierie miniature fonctionnelle à repérer, pour les amateurs d'histoire comme pour les enfants curieux.",
+   "before_sha1": "68b05cb33ead7900a831fdc463e5d00123fe9637",
+   "before_fr_sha1": "419e2789f4fd49ec3dc5372b7b2aa9a060c52bcb"
+  },
+  {
+   "id": 1539,
+   "region": "armstrong",
+   "slug": "armstrong-spallumcheen-museum-art-gallery",
+   "name": "Armstrong Spallumcheen Museum & Art Gallery",
+   "description": "Armstrong Spallumcheen Museum & Art Gallery in downtown Armstrong shares local history through its museum and two galleries of rotating exhibitions by regional artists. There's also a local-artisan gift shop and an archive for research.",
+   "description_fr": "L’Armstrong Spallumcheen Museum & Art Gallery, au centre-ville d’Armstrong, fait découvrir l’histoire locale grâce à son musée et à ses deux galeries d’expositions temporaires d’artistes de la région. On y trouve aussi une boutique d’artisans locaux et des archives pour la recherche.",
+   "before_sha1": "c627779b9173290e82fdc51dec7e7838643ec0c6",
+   "before_fr_sha1": "38e6cb9f9689a429d9414161cb68f8174db4cec6"
+  },
+  {
+   "id": 1531,
+   "region": "vernon",
+   "slug": "caetani-cultural-centre",
+   "name": "Caetani Cultural Centre",
+   "description": "Caetani Cultural Centre is the historic Pleasant Valley Road home of artist Sveva Caetani, with a gallery of her Recapitulation series and tours of the house and grounds. It also hosts art workshops, markets and seasonal ghost tours.",
+   "description_fr": "Le Caetani Cultural Centre est l’ancienne maison de l’artiste Sveva Caetani, sur Pleasant Valley Road, avec une galerie consacrée à sa série Recapitulation et des visites guidées ou libres de la maison et du terrain. Les visites guidées retracent les années de la famille à Vernon. On y trouve aussi des ateliers d’art, des marchés et des visites de fantômes de saison.",
+   "before_sha1": "d449b8f75b94d930fa859c40f2f63ade38daf374",
+   "before_fr_sha1": "326c6346f2bbc70edfa8767ef15de1ae95120b42"
+  },
+  {
+   "id": 1499,
+   "region": "kelowna",
+   "slug": "catelowna-cat-cafe",
+   "name": "Catelowna Cat Cafe",
+   "description": "Catelowna Cat Cafe is a downtown spot where you spend an hour with resident and adoptable cats in a lounge, over coffee or tea. It also runs events like cat yoga, Paint-A-Pet nights and afternoon Kit-Tea.",
+   "description_fr": "Le Catelowna Cat Cafe, au centre-ville, permet de passer une heure avec des chats résidents et à adopter dans un salon, autour d’un café ou d’un thé. Il organise aussi des activités comme le yoga avec chats, des soirées Paint-A-Pet et le Kit-Tea de l’après-midi.",
+   "before_sha1": "135ffe3022864642e8338e4506dc64ad4df833da",
+   "before_fr_sha1": "48066a8aaf2ed12665b2e7d3ff43d041acc4a93f"
+  },
+  {
+   "id": 1497,
+   "region": "kelowna",
+   "slug": "cleopatra-s-rituals-thermal-spa-and-steam",
+   "name": "Cleopatra's Rituals Thermal Spa and Steam",
+   "description": "Cleopatra's Rituals is a Kelowna thermal spa inspired by ancient bathing traditions, with a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. Rituals include a traditional Hammam and a scalp spa.",
+   "description_fr": "Cleopatra’s Rituals est un spa thermal de Kelowna inspiré des traditions de bain anciennes, avec un circuit chaud-froid de sauna, de vapeur, de douches thermales et une salle de neige qui tombe. Les rituels comprennent un hammam traditionnel et un soin du cuir chevelu.",
+   "before_sha1": "ad0fc927fa0fce147adfa0932b2ddabdbee0d6cb",
+   "before_fr_sha1": "2d9edeea75a9143629c0538580c6aca897e104d8"
+  },
+  {
+   "id": 1521,
+   "region": "penticton",
+   "slug": "donut-house-studios",
+   "name": "Donut House Studios",
+   "description": "Donut House Studios is a pottery and craft studio in the Cannery Trade Centre offering workshops like mug making, casserole dishes, lino printing and jewellery making, plus wheel-throwing courses. Classes suit all skill levels, a good hands-on rainy afternoon with friends.",
+   "description_fr": "Donut House Studios est un atelier de poterie et d’artisanat du Cannery Trade Centre qui propose des ateliers (tasses, plats à gratin, linogravure, bijoux) ainsi que des cours de tournage. Les cours conviennent à tous les niveaux : une belle idée pour un après-midi pluvieux créatif entre amis.",
+   "before_sha1": "4cf868a22338ae8b13371b8ab68d893968cbcefc",
+   "before_fr_sha1": "90d44530ff96b376f6a11d3e80c399973fe53e6b"
+  },
+  {
+   "id": 1460,
+   "region": "kelowna",
+   "slug": "exit-kelowna-escape-games",
+   "name": "Exit Kelowna Escape Games",
+   "description": "Exit Kelowna Escape Games has five themed rooms: Abandoned, Haunted, Pirate Cove, Potions and Runaway Train. Teams work together against the clock, making it a solid pick for groups and families.",
+   "description_fr": "Exit Kelowna Escape Games propose cinq salles à thème : Abandoned, Haunted, Pirate Cove, Potions et Runaway Train. Les équipes collaborent contre la montre, un bon choix pour les groupes et les familles.",
+   "before_sha1": "8aec12c1edee67db430705d076f76f2530cf0408",
+   "before_fr_sha1": "7dbd0c9989cc35d8158f845d29c5015d7c751900"
+  },
+  {
+   "id": 1543,
+   "region": "silverstar",
+   "slug": "gallery-artiva",
+   "name": "Gallery Artiva",
+   "description": "Gallery Artiva is a village gallery in the Lord Aberdeen Building at SilverStar, showing and selling fine art, crafts and gifts by Okanagan and Canadian artists, from stained-glass coasters to local books. It also hosts occasional paint-and-sip classes.",
+   "description_fr": "La Gallery Artiva, galerie du village de SilverStar dans le Lord Aberdeen Building, expose et vend des œuvres d’art, des articles d’artisanat et des cadeaux d’artistes de l’Okanagan et du Canada, des sous-verres en vitrail aux livres locaux. Elle accueille aussi à l’occasion des cours de peinture et dégustation.",
+   "before_sha1": "f3255bf469ea22a630d4b5dcd1ad67b14890c967",
+   "before_fr_sha1": "ba74282516da6cd6226c2af62b36d07ff4551531"
+  },
+  {
+   "id": 1473,
+   "region": "kelowna",
+   "slug": "kelowna-actors-studio",
+   "name": "Kelowna Actors Studio",
+   "description": "Kelowna Actors Studio is a Broadway-style musical theatre company with its own downtown stage, offering dinner-theatre or show-only seating. The 2026 season includes Little Shop of Horrors and Disney's Frozen.",
+   "description_fr": "Le Kelowna Actors Studio est une troupe de théâtre musical de style Broadway dotée de sa propre salle au centre-ville, avec une formule souper-théâtre ou spectacle seulement. La saison 2026 comprend Little Shop of Horrors et La Reine des neiges de Disney.",
+   "before_sha1": "fe1e211778c1b7ef043f14a0c7bf0e05335240b7",
+   "before_fr_sha1": "abb87efaed2c6d40013a4c5f469018cacb3721d9"
+  },
+  {
+   "id": 1549,
+   "region": "kelowna",
+   "slug": "kelowna-curling-club",
+   "name": "Kelowna Curling Club",
+   "description": "The Kelowna Curling Club is a 12-sheet club near downtown that offers Try Curling sessions with an instructor and all equipment supplied. Small parties may be paired with other newcomers, and bigger groups can arrange a curling party.",
+   "description_fr": "Le Kelowna Curling Club, un club de 12 pistes près du centre-ville, propose des séances d’initiation au curling avec instructeur et tout l’équipement fourni. Les petits groupes peuvent être jumelés à d’autres débutants, et les groupes plus nombreux peuvent organiser une fête de curling.",
+   "before_sha1": "81c7542cdfebd6a2dce7cd22b64ca565760c56c6",
+   "before_fr_sha1": "73f3c3e414996855b561d756188ab14edad3cbf4"
+  },
+  {
+   "id": 1495,
+   "region": "kelowna",
+   "slug": "kelowna-karting-entertainment-centre",
+   "name": "Kelowna Karting Entertainment Centre",
+   "description": "Kelowna Karting Entertainment Centre packs an electric go-kart track, Zero Latency free-roam VR, a gel-blaster and laser tag arena, axe throwing and an arcade under one roof, plenty for groups and older kids.",
+   "description_fr": "Le Kelowna Karting Entertainment Centre réunit sous un même toit une piste de karting électrique, la réalité virtuelle en liberté Zero Latency, une arène de gel blaster et de laser tag, du lancer de hache et une salle d’arcade : de quoi occuper les groupes et les enfants plus âgés.",
+   "before_sha1": "95b7edb258c258648560089a9342cd54dded1b68",
+   "before_fr_sha1": "ea9a3067f07ac5bfb04f91d9a4e82693628f947c"
+  },
+  {
+   "id": 1483,
+   "region": "lake-country",
+   "slug": "lake-country-museum-archives",
+   "name": "Lake Country Museum & Archives",
+   "description": "Lake Country Museum & Archives is a heritage museum in Okanagan Centre Park telling Lake Country's story, from the syilx people and early orchards to the Applebox Belles and South Asian settlers. Volunteers offer guided looks at the collection.",
+   "description_fr": "Le Lake Country Museum & Archives est un musée patrimonial du parc Okanagan Centre qui raconte l’histoire de Lake Country, des syilx et des premiers vergers aux Applebox Belles et aux colons sud-asiatiques. Des bénévoles proposent des visites guidées de la collection.",
+   "before_sha1": "dfa20c29842ef6bba67c936425930b16e1f28dfb",
+   "before_fr_sha1": "948df988c19529cb90067bdbddb160de0e2626bd"
+  },
+  {
+   "id": 1554,
+   "region": "kelowna",
+   "slug": "loyly-floating-sauna",
+   "name": "Löyly Floating Sauna",
+   "description": "Löyly Floating Sauna is a Finnish-style cedar sauna floating at Kelowna's Downtown Marina, with a lake cold plunge and a warm solarium lounge overlooking Okanagan Lake. Share a community session or take over the whole sauna with friends.",
+   "description_fr": "Le Löyly Floating Sauna est un sauna finlandais en cèdre flottant à la marina du centre-ville de Kelowna, avec bain froid dans le lac et salon-solarium chauffé donnant sur le lac Okanagan. On peut se joindre à une séance communautaire ou réserver tout le sauna entre amis.",
+   "before_sha1": "6896591ac64df4e306fb3a7e71c15f7539b402a2",
+   "before_fr_sha1": "a6c21de5ef1c945c91a3a61861229fabb77ef0fe"
+  },
+  {
+   "id": 1524,
+   "region": "vernon",
+   "slug": "museum-archives-of-vernon",
+   "name": "Museum & Archives of Vernon",
+   "description": "The Museum & Archives of Vernon is the North Okanagan's community history museum, with permanent and changing exhibits, streetscapes and dioramas. It also holds the Greater Vernon Archives, a good spot for local history research.",
+   "description_fr": "Le Museum & Archives of Vernon est le musée d’histoire communautaire du nord de l’Okanagan, avec des expositions permanentes et temporaires, des rues reconstituées et des dioramas. Il abrite aussi les Greater Vernon Archives, un bon endroit pour la recherche en histoire locale.",
+   "before_sha1": "097e5e6fbde591f6ec57bd30e0a4167949a20f12",
+   "before_fr_sha1": "c3fdcd2ba42780b6be80c1553475616d5a7839b8"
+  },
+  {
+   "id": 1810,
+   "region": "okanagan-falls",
+   "slug": "okanagan-falls-museum-bassett-house",
+   "name": "Okanagan Falls Museum (Bassett House)",
+   "description": "The Okanagan Falls Museum is built around the Bassett House, a 1909 mail-order home shipped in pieces and hauled to the village by wagon. The grounds also hold pioneer artifacts, early-1900s machinery and a log building honouring rodeo champion Kenny McLean.",
+   "description_fr": "L’Okanagan Falls Museum est bâti autour de la Bassett House, une maison de 1909 commandée par catalogue, expédiée en pièces et transportée au village en charrette. Le terrain abrite aussi des objets de pionniers, de la machinerie du début des années 1900 et un bâtiment en rondins en l’honneur du champion de rodéo Kenny McLean.",
+   "before_sha1": "a218d81eb6a5f36057291127725d1c17d6a9f8c4",
+   "before_fr_sha1": "ddb10ba71c9681ad4623c410f115e89699fccd22"
+  },
+  {
+   "id": 1633,
+   "region": "kelowna",
+   "slug": "okanagan-regional-library-kelowna-downtown-branch",
+   "name": "Okanagan Regional Library – Kelowna Downtown Branch",
+   "description": "The downtown Kelowna branch of the Okanagan Regional Library is a free rainy-day stop in the Cultural District. Beyond books, there are computers, Wi-Fi, study rooms and a makerspace with a 3D printer and recording studio, plus story times and drop-in game nights.",
+   "description_fr": "La succursale du centre-ville de Kelowna de l’Okanagan Regional Library est une halte gratuite et accueillante les jours de pluie, dans le quartier culturel. Outre les livres, on y trouve des ordinateurs, le Wi-Fi, des salles d’étude et un espace de création avec imprimante 3D et studio d’enregistrement, ainsi que des heures du conte et des soirées de jeux libres.",
+   "before_sha1": "5de3da700939ed742e3d378c803c438ac68f92c2",
+   "before_fr_sha1": "ab8797ea57d9169c15ac83207eff3054ca324ebf"
+  },
+  {
+   "id": 1571,
+   "region": "oliver",
+   "slug": "oliver-curling-club-eastlink-curling-centre",
+   "name": "Oliver Curling Club Society",
+   "description": "The Oliver Curling Club offers Learn to Curl sessions in both regular and stick curling for new curlers or anyone who has curled at the club for less than two years. Its ice also hosts provincial championships and local bonspiels.",
+   "description_fr": "L’Oliver Curling Club offre des séances d’initiation au curling, classique ou avec bâton, pour les nouveaux curleurs ou toute personne qui curle au club depuis moins de deux ans. Sa glace accueille aussi des championnats provinciaux et des bonspiels locaux.",
+   "before_sha1": "2d4457daea3774bf6844557de017fcdf632a390d",
+   "before_fr_sha1": "b3b53eaedc6d9becc14e18b02b4665b16954d8c3"
+  },
+  {
+   "id": 1553,
+   "region": "kelowna",
+   "slug": "parkinson-recreation-centre",
+   "name": "Parkinson Recreation Centre",
+   "description": "Parkinson Recreation Centre, the City of Kelowna's main rec centre close to downtown, has a 25-metre pool and a children's play pool, plus a hot tub, steam room, gymnasiums and a fitness centre, a handy rainy-day swim. Outside are 12 pickleball courts and 6 tennis courts.",
+   "description_fr": "Le Parkinson Recreation Centre, principal centre récréatif de la Ville de Kelowna, près du centre-ville, compte une piscine de 25 mètres et une pataugeoire, ainsi qu’un bain à remous, un bain de vapeur, des gymnases et un centre de conditionnement physique : une baignade pratique les jours de pluie. À l’extérieur, on trouve 12 terrains de pickleball et 6 courts de tennis.",
+   "before_sha1": "21a1216613556cfd94ad406a20e565592bccefcb",
+   "before_fr_sha1": "ac989859fa6a4c3834a0ed67deb1bf4965a28aa2"
+  },
+  {
+   "id": 1482,
+   "region": "west-kelowna",
+   "slug": "pearl-fern-pottery-studio",
+   "name": "Pearl & Fern Pottery Studio",
+   "description": "Pearl & Fern Pottery Studio is a West Kelowna pottery studio and supply shop stocking thousands of clay supplies, with classes, workshops and small-group clay experiences. Beginners can try wheel throwing or hand building, and there are raku firings and pottery paint nights too.",
+   "description_fr": "Le Pearl & Fern Pottery Studio est un atelier de poterie et une boutique de fournitures de West Kelowna, avec des milliers d’articles pour l’argile, des cours, des ateliers et des expériences d’argile en petit groupe. Les débutants peuvent s’initier au tournage ou au modelage à la main, et il y a aussi des cuissons raku et des soirées de peinture sur poterie.",
+   "before_sha1": "923eef9adffa14c27fca7ff244684a27b6587ffe",
+   "before_fr_sha1": "3014b7d5c0a868460bdb8ac703097dae22eaab1b"
+  },
+  {
+   "id": 1477,
+   "region": "kelowna",
+   "slug": "play-area-kelowna",
+   "name": "Play Area Kelowna",
+   "description": "Play Area Kelowna is an indoor playground for young kids with a ball pit, sand pit, play structures and toys, open for drop-in play. Birthday parties, STEM-based play experiences, slime making and group field trips are also available.",
+   "description_fr": "Le Play Area Kelowna est un terrain de jeu intérieur pour jeunes enfants, avec piscine à balles, bac à sable, structures de jeu et jouets, ouvert pour le jeu libre. On y propose aussi des fêtes d’anniversaire, des activités de jeu axées sur les STIM, de la fabrication de slime et des sorties de groupe.",
+   "before_sha1": "c8bbb8d40973999577054fffa2300bea4fd79d79",
+   "before_fr_sha1": "e98130a53ce49163da9d9d8752021c43a4e719ed"
+  },
+  {
+   "id": 1508,
+   "region": "penticton",
+   "slug": "roll-n-stones-fun-centre",
+   "name": "Roll N Stones Fun Centre",
+   "description": "Roll N Stones Fun Centre is a family fun centre with bowling lanes, glow-in-the-dark laser bowling on weekend nights, billiards, darts and an arcade. The licensed Victory Lane Bar & Grill serves pizza and wings lane-side.",
+   "description_fr": "Le Roll N Stones Fun Centre est un centre de divertissement familial avec pistes de quilles, quilles laser phosphorescentes les soirs de fin de semaine, billard, fléchettes et salle d’arcade. Le Victory Lane Bar & Grill, avec permis d’alcool, sert pizza et ailes directement aux pistes.",
+   "before_sha1": "5435a53802ab3eeb826ff7524f174ca4ff3ba382",
+   "before_fr_sha1": "b631506b781f9db198bf923739778a3192c6a98d"
+  },
+  {
+   "id": 1513,
+   "region": "summerland",
+   "slug": "summerland-museum-archives",
+   "name": "Summerland Museum & Archives",
+   "description": "Summerland Museum & Archives covers Syilx history, early orchard farming and the Kettle Valley Railway. Upstairs, the Giant's Head Model Railway shows Summerland in the 1920s and 1950s, and kids' workshops and an insect collection add hands-on fun.",
+   "description_fr": "Le Summerland Museum & Archives couvre l’histoire syilx, les débuts de l’arboriculture et le Kettle Valley Railway. À l’étage, le Giant’s Head Model Railway présente Summerland dans les années 1920 et 1950. Des ateliers libres pour enfants et une collection d’insectes ajoutent une touche interactive.",
+   "before_sha1": "cbdda61740ceffd261cb1317314b61bab8df31ed",
+   "before_fr_sha1": "b1ec8eb03af2466a7186a41e69a42d736e525426"
+  },
+  {
+   "id": 1562,
+   "region": "penticton",
+   "slug": "the-dream-live-music-venue",
+   "name": "The Dream",
+   "description": "The Dream is a 135-seat listening room at 67 Front Street, run by volunteers and carrying on the Dream Cafe's legacy of folk, blues, rock and jazz shows. The room is under renovation with no opening date yet, so check where each show is held.",
+   "description_fr": "The Dream est une salle d’écoute de 135 places au 67 Front Street, gérée par des bénévoles, qui perpétue l’héritage du Dream Cafe avec des spectacles folk, blues, rock et jazz. La salle est en rénovation et aucune date d’ouverture n’est annoncée; vérifiez où se tient chaque spectacle.",
+   "before_sha1": "9f4fac66597ffac2ff32f942a396ac14920d60c2",
+   "before_fr_sha1": "aa54c781773e12b5049aefbef7ab71a44089aaca"
+  },
+  {
+   "id": 1532,
+   "region": "vernon",
+   "slug": "vernon-district-performing-arts-centre",
+   "name": "Vernon & District Performing Arts Centre",
+   "description": "The Vernon & District Performing Arts Centre is Vernon's main performing arts venue, hosting touring concerts, comedy, dance, theatre and family shows in a 750-seat auditorium, plus the smaller Marie Fleming Studio. Its Spotlight Series includes programming for young audiences.",
+   "description_fr": "Le Vernon & District Performing Arts Centre est la principale salle de spectacle de Vernon, qui accueille concerts, humour, danse, théâtre et spectacles familiaux en tournée dans un auditorium de 750 places, en plus du plus petit Marie Fleming Studio. Sa série Spotlight comprend une programmation pour les jeunes publics.",
+   "before_sha1": "0d09f5b26365cf9cfe654dad0c0234ee37797b92",
+   "before_fr_sha1": "75022ad527804437e1ec3a6231c4acdb7e187ff1"
+  },
+  {
+   "id": 1525,
+   "region": "vernon",
+   "slug": "vernon-public-art-gallery",
+   "name": "Vernon Public Art Gallery",
+   "description": "The Vernon Public Art Gallery is the largest public art gallery in the North Okanagan, presenting changing contemporary exhibitions. It also hosts artist talks, workshops and hands-on art activities for all ages, an easy stop on a grey afternoon.",
+   "description_fr": "La Vernon Public Art Gallery est la plus grande galerie d’art publique du nord de l’Okanagan et présente des expositions contemporaines changeantes. Elle accueille aussi des causeries d’artistes, des ateliers et des activités artistiques pour tous les âges : une halte facile par une journée grise.",
+   "before_sha1": "8544d716e335683dde656f6bf1ce010c412c8bca",
+   "before_fr_sha1": "f7be5d3a5657dbaa485d2c45d4d580d323921886"
+  }
+ ]
+}

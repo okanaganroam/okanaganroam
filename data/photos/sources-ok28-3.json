@@ -1,0 +1,162 @@
+[
+ {
+  "id": 814,
+  "name": "Back Door Winery",
+  "file": "/images/venues/back-door-winery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482651117fd6ea5:0xdc36ceb743518d44",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcBGW-USshz5geCXVBHxePpVHG1pH2Yi-mMyRk4zF2RL4b3c490eyQtgwehDk_79DtKKqOwqNNEq9gjWVjNEu1wK1ju0pTo-9fvNtaT4ZyfndJgzcFJ-EcKQZfsJ_A6rrfkEibT=w2400",
+  "source_kind": "google_maps",
+  "note": "White clapboard tasting-room building with the \"Welcome to Back Door Winery\" sign and pergola patio edge"
+ },
+ {
+  "id": 588,
+  "name": "Sister Bodega",
+  "file": "/images/venues/sister-bodega-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54826317f4e70b67:0x9e7ebaa9d0a86373",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcy3R7hHqGgAeQNIPWGZ1Tzv6aWbsKAYtGRnj36gpAb_gS-MQtt7WJuMkOHQ__ZHEdKL2-Q-yf1PlHLMn0VFgJ1BuAgeaBiukBw3zXVh4OiTnD0Nfb3CQhLjOcCAYoXImsKPEEyuIhL_TqI=w2400",
+  "source_kind": "google_maps",
+  "note": "Main St storefront at dusk: window with \"Sister Bodega\" lettering, lit counter and room inside"
+ },
+ {
+  "id": 31,
+  "name": "Armstrong Bakery",
+  "file": "/images/venues/armstrong-bakery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e7c7b5396f6d3:0x29f25d122a0e0c49",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeQTay9w1miy3OXF0TEEb3dplCdERmB7n-K0hSKofvNbljsjFv4ubtHo2jMMdKNJYd1GOH7XHYQBFbeEFMy57Q-TG6ZB8R8wnQ9Bn8BPeNgiCwyiOH7Gw5sSKcxnu68IhXOdkBVxEV4DBw=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront under the awning with the hanging \"Armstrong Bakery & Delicatessen\" sign, door and window (strip is sign-heavy)"
+ },
+ {
+  "id": 1925,
+  "name": "Kelowna Farmers' and Crafters' Market",
+  "file": "/images/venues/kelowna-farmers-and-crafters-market-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8cc6fef50a57:0xbccbc6d5dc8cd827",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeo4RJNQgfhtnA52ao8nj_6b7cfDsqRGedYkBHNTZ5p9_-81rdXVx9bUUPknKOWGLji9Ljtzkjk_XDvdEl-NjVEM2ort9PJpSANvYgxoUQ0qVK3EgEi4jwo2lNTHm6uZOccLRJAOn4qU4_j=w2400",
+  "source_kind": "google_maps",
+  "note": "Market day in the Landmark District: produce stall (Sadi's Farm Produce) under tents, shoppers along the row"
+ },
+ {
+  "id": 1865,
+  "name": "Becker Park – Community Hill Trail",
+  "file": "/images/venues/becker-park-community-hill-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ddf34130201e5:0x3eef452a374cfe7b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfyX73GiaMdiaOKGg8s7AW2IIBwtgPp6eFR4BMs_WcAt4RtQLiFu2iSxjHc90Z1u9SPHWQfVWMyLjeoE7uGDHWwhN9h289dDJvrktxKbMd6GnAd44XJt0IFuXG-47EjVVn0CZXz=w2400",
+  "source_kind": "google_maps",
+  "note": "Becker Park hilltop trail winding down the grassy knoll with Vernon rooftops and fall colours below"
+ },
+ {
+  "id": 1898,
+  "name": "Comin' Round the Mountain Trail (Kalamalka Lake Park)",
+  "file": "/images/venues/kal-park-comin-round-the-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8e9bf375199:0x39f5e274cde84b9b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfMG_SeSwBDjQP9duViCbDU7AuawYOkVA3h9t-k-RHCk4ViSXtQGoVu-dPxKBQVTFZ7OkBKmGz31mGgL-CGVMxwN7hU4NIfcT3yC6jg0p4ciJ2A7rmALtY5_1N7zN5q_hhwpxvB=w2400",
+  "source_kind": "google_maps",
+  "note": "Kalamalka Lake Park upland: pines and grassland with Kalamalka Lake and hills beyond"
+ },
+ {
+  "id": 1896,
+  "name": "Ellison Nature Trail",
+  "file": "/images/venues/ellison-nature-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de0d808b4b11b:0x2350eacea52042d0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfGyaEV_Rb5_CC14X6iwBmKWjj23_uAxoHKGf3bJHsbGhNmfN_pQ83N0qHPT154x4TFP5hAfJ7QWPWZaNQZux41QOwW_wv_AxsSC-pWcBEA-mUJOdhDYYD1A1iA3oB0Yn7-9tuTPw=w2400",
+  "source_kind": "google_maps",
+  "note": "Ellison Park trail through ponderosa pines opening onto the Okanagan Lake shore"
+ },
+ {
+  "id": 1879,
+  "name": "High Rim Trail: Beaver Lake Road to Oyama Lake Road",
+  "file": "/images/venues/high-rim-trail-wrinkly-face-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de914dca65a79:0xf0c8b1634194fa0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeEGg0B18vmpguMm-U1KZgGYgkw-zMSENNC3gsnEfP-z35VtpCa79iOn_BQeCCKg5l9FxiCBQKuvedUxXK5Jbsy8n-OvU_iMNkmzQwx-Ep1yKrnCnF_rCDUVXKQRmegnFhivt6J=w2400",
+  "source_kind": "google_maps",
+  "note": "Wrinkly Face Provincial Park (High Rim Trail) meadow of blue camas/lupine flowers edged by conifers"
+ },
+ {
+  "id": 1870,
+  "name": "Larch Hills Trails (summer hiking)",
+  "file": "/images/venues/larch-hills-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://shuswaptrails.com/trails/system/14/Larch-Hills-Nordic/",
+  "image_url": "https://shuswaptrails.com/image/w2000/files/IMG_1940.jpeg",
+  "source_kind": "website",
+  "note": "Summer singletrack through cedar/fir forest in the Larch Hills trail system (Shuswap Trails Alliance page)"
+ },
+ {
+  "id": 1908,
+  "name": "Mount Beaven Trail",
+  "file": "/images/venues/mount-beaven-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c3ecf5d2d3ea1:0xe2bc81c690362e95",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcM3Cu8xZ9bzBwItkNSfidLC_Rq4UtgFipHEmLeyumfbr_jqu0VC2-BRdXvpLjQxCIKlPtLZlBcB3grLtoJuEiWqeI13rCtXWhlQ8WuUgxcHlHaDOmM_TF9XG04n8Dfq4aslIW7=w2400",
+  "source_kind": "google_maps",
+  "note": "Mount Beaven approach: spring clearing with snow patches, spruce forest and the snowy Monashee peaks"
+ },
+ {
+  "id": 1862,
+  "name": "Penticton Channel Walk",
+  "file": "/images/venues/penticton-channel-walk-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482620eb37f7987:0x84b369499b472e4e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdYYfFp1qWSEnpxErMQWRdLbLzySsM5eWAd27N7EkJSymCqZW6gklsEnCklrDHhYOuC-jw23h2h0sOUdXIMQA-szFJ6Lda1drb63r7IvVE4t-AztJn8Bx7wRU71_EpX_4X6pPt5=w2400",
+  "source_kind": "google_maps",
+  "note": "Okanagan River Channel with the gravel walking path along the bank, bare cottonwoods (late fall/early spring)"
+ },
+ {
+  "id": 1921,
+  "name": "Rim Rocks Trail",
+  "file": "/images/venues/rim-rocks-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dda54d23e0789:0xd9e4ca39e9d19753",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf0VOkqIP0uqfzFFW6t11s9vdmkOxCa7epdgOOxsd5utACDTJGQXe4SM3x3IJh9t86I_3EjJSkIwKGfnRCWQQzzFrIiJ0K-hwABsBgqVuvpp6EutcMP-s6EDegfFfgd2rIPPcMg=w2400",
+  "source_kind": "google_maps",
+  "note": "Rim Rocks basalt spire rising out of the forest, Coldstream valley hills behind"
+ },
+ {
+  "id": 1922,
+  "name": "Sugarloaf Mountain (Westside Road)",
+  "file": "/images/venues/sugarloaf-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de1c738f97575:0x8c287295fb11e38e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdNba6Dic2dnHj-69Wo0MU8JKumF7EFx0-AbA1QcE_kdRU1Tyyn0y0EXhq6IqNh-XNX-7Is5UOvkydoXuLz1If2FGcSA43Ykqot_yHZIHNQqYms1RvURklouElELsy7b7c5q5aN=w2400",
+  "source_kind": "google_maps",
+  "note": "View from Sugarloaf Mountain south down Okanagan Lake, pine in foreground"
+ },
+ {
+  "id": 1885,
+  "name": "Trans Canada Trail: Prairie Valley (Summerland)",
+  "file": "/images/venues/tct-prairie-valley-summerland-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548265d2c16913cb:0xbc65bf0e855f295d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdmyDSV0K3gbFNt18CRi4qT-tsL7q09-StuDD8CMUn9EJqte3OGDiVMZNINOJ6TSzxksUbzhFTXsz3Fnqi0gssSIw8rKe4UoaaQ8VgXdLYREXsaZBu0G97bv7rEGaLHsnoieKD_HuRzN0ik=w2400",
+  "source_kind": "google_maps",
+  "note": "Trout Creek trestle (KVR / Trans Canada Trail bridge with pedestrian railing) among pines above vineyards, Summerland"
+ },
+ {
+  "id": 1891,
+  "name": "White Lake Trail (White Lake Grasslands)",
+  "file": "/images/venues/white-lake-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482f29b09941d73:0x8547cd4faeacd389",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcK6QPISzXppSKtsKV3n3Q4t7-k_8BFDtocRoLr7G4qwgHsCD7zE4kUN5UlfE806P24FFe9N88fvB9xW961I9fRwPmDepZLQyqNfLblP2m08NzYC7whx8Oyl4iFy-fgAm3l7bA=w2400",
+  "source_kind": "google_maps",
+  "note": "White Lake in its sagebrush grassland basin with forested hills and yellow wildflowers"
+ },
+ {
+  "id": 1051,
+  "name": "Moose Lounge",
+  "file": "/images/venues/moose-lounge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d9e54e096afd5:0xe878ccf7b0294d0d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfyzVyAjAqcdG1nwI4iI__3qDVRErWUcARg2TBJrFbbHRy3rPFnRt_yAOLlHdhuPNEz0zKVZu37X7xYflSuBjcB7r-Cx1zQmte_dmpclV6hBAJq6Wge1mI-DmAy0dsmZVB8fRKICKA2JK8=w2400",
+  "source_kind": "google_maps",
+  "note": "Happy Valley Day Lodge exterior with its name sign; Moose Lounge is the upstairs floor (windows shown)"
+ }
+]

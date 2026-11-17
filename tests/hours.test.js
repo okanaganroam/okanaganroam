@@ -2,6 +2,7 @@
 // ({ weekday, minutes } -- the shape okanaganClock() returns), no database,
 // no server. Pacific Time / daylight-saving tests that go through the real
 // okanaganClock() live in server.test.js.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('../hours.js');
@@ -238,7 +239,7 @@ const label = (hours, weekday, hhmm) => {
 };
 
 test('wording: 12-hour clock times', () => {
-  assert.equal(h.formatClockMinutes(0), '12 AM');
+  assert.equal(h.formatClockMinutes(0), 'midnight'); // pub fresh-eyes (2026-11-10): never 12 AM
   assert.equal(h.formatClockMinutes(210), '3:30 AM');
   assert.equal(h.formatClockMinutes(720), '12 PM');
   assert.equal(h.formatClockMinutes(1260), '9 PM');

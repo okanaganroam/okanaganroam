@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05f",
+  "update": [
+    {
+      "id": 1023,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/mission-hill-culinary-2611.jpg"
+      },
+      "why": "Venue's own photo of its culinary class"
+    }
+  ]
+}

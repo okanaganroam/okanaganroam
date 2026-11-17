@@ -1,0 +1,174 @@
+{
+ "reason": "Venue photos ok28-4",
+ "batch_id": "photos-ok28-4-2026-10-28",
+ "venues": [
+  {
+   "id": 385,
+   "name": "Made in India Restaurant",
+   "region": "west-kelowna",
+   "slug": "made-in-india-restaurant",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/made-in-india-restaurant-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 754,
+   "name": "Valoroso Foods West Kelowna",
+   "region": "west-kelowna",
+   "slug": "valoroso-foods-west-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/valoroso-foods-west-kelowna-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 162,
+   "name": "Crumbs and Roses Bakery",
+   "region": "kelowna",
+   "slug": "crumbs-and-roses-bakery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/crumbs-and-roses-bakery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1909,
+   "name": "Bedford Lookout Loop (Peachland Trails)",
+   "region": "peachland",
+   "slug": "bedford-lookout-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bedford-lookout-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1878,
+   "name": "Burdekin Lane Beach Trail",
+   "region": "peachland",
+   "slug": "burdekin-lane-beach-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/burdekin-lane-beach-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1847,
+   "name": "Fieldnotes Market",
+   "region": "armstrong",
+   "slug": "fieldnotes-market",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fieldnotes-market-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1889,
+   "name": "Gillies Creek Trails (Skaha Bluffs Provincial Park)",
+   "region": "penticton",
+   "slug": "gillies-creek-trails-skaha-bluffs",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gillies-creek-trails-skaha-bluffs-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1868,
+   "name": "Jim Watt Heritage River Walk",
+   "region": "enderby",
+   "slug": "jim-watt-heritage-river-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jim-watt-heritage-river-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1875,
+   "name": "Little White Mountain (Upper Crawford Trail)",
+   "region": "kelowna",
+   "slug": "little-white-mountain-upper-crawford",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/little-white-mountain-upper-crawford-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1920,
+   "name": "Mount Drought Trails",
+   "region": "west-kelowna",
+   "slug": "mount-drought-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-drought-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1861,
+   "name": "Penticton Creek Walk",
+   "region": "penticton",
+   "slug": "penticton-creek-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/penticton-creek-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1835,
+   "name": "Robinson Park Pickleball Courts",
+   "region": "penticton",
+   "slug": "robinson-park-pickleball-courts",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/robinson-park-pickleball-courts-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1873,
+   "name": "Wild Horse Canyon Trail to Commando Bay",
+   "region": "kelowna",
+   "slug": "wild-horse-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wild-horse-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 934,
+   "name": "14th Ave Bar & Grill",
+   "region": "vernon",
+   "slug": "14th-ave-bar-grill",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/14th-ave-bar-grill-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

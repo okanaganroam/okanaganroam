@@ -1,0 +1,90 @@
+{
+ "reason": "Venue photos resort29",
+ "batch_id": "photos-resort29-2026-10-29",
+ "venues": [
+  {
+   "id": 1926,
+   "name": "Alpine Express",
+   "region": "big-white",
+   "slug": "alpine-express",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/alpine-express-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1927,
+   "name": "Night Skiing at Big White",
+   "region": "big-white",
+   "slug": "night-skiing-big-white",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/night-skiing-big-white-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1928,
+   "name": "Big White Ski & Board School",
+   "region": "big-white",
+   "slug": "big-white-ski-board-school",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/big-white-ski-board-school-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1931,
+   "name": "After Dark: Kids' Night Out at Big White",
+   "region": "big-white",
+   "slug": "after-dark-kids-night-out-big-white",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/after-dark-kids-night-out-big-white-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1932,
+   "name": "Kelowna Rockets Hockey Trips from Big White",
+   "region": "big-white",
+   "slug": "kelowna-rockets-hockey-trips",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kelowna-rockets-hockey-trips-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1929,
+   "name": "Vernon Vipers Hockey Trips from SilverStar",
+   "region": "silverstar",
+   "slug": "vernon-vipers-hockey-trips",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vernon-vipers-hockey-trips-2610.jpg?v=20261029"
+   }
+  },
+  {
+   "id": 1930,
+   "name": "Baldy Cat Skiing",
+   "region": "baldy",
+   "slug": "baldy-cat-skiing",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/baldy-cat-skiing-2610.jpg?v=20261029"
+   }
+  }
+ ]
+}

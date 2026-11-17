@@ -20,12 +20,6 @@
    "lead": "Fuel up at the foot of the Bench, then start tasting when the wineries open.",
    "items": [
     {
-     "ref": "penticton/bench-market",
-     "name": "Bench Market",
-     "text": "a popular cafeteria-style breakfast and market spot, and a handy pitstop before a Naramata Bench wine day. The gluten-free options are excellent, and dogs are welcome on the terrace.",
-     "where": "Penticton"
-    },
-    {
      "ref": "naramata/laughing-stock-vineyards",
      "name": "Laughing Stock Vineyards",
      "text": "an award-winning winery high on a hill, with a terrace overlooking the lake. Try the playful blind-tasting format, and don't miss the chardonnay and syrah.",
@@ -92,7 +86,7 @@
     {
      "ref": "naramata/bistro-lapin-perdu",
      "name": "Bistro Lapin Perdu",
-     "text": "a quiet, romantic French bistro inside the historic Naramata Inn, with a garden view. It's built for slow conversation, course by course, so book ahead.",
+     "text": "a quiet, romantic French bistro inside the historic Naramata Inn, with a garden view. It's built for slow conversation, course by course, so book ahead. Closed for the season right now, with no reopening date announced, so check before you plan around it.",
      "where": "Naramata"
     }
    ]
@@ -234,12 +228,6 @@
    "Go to"
   ],
   "rows": [
-   [
-    "Breakfast before the wineries",
-    [
-     "penticton/bench-market|Bench Market"
-    ]
-   ],
    [
     "A view with your tasting",
     [

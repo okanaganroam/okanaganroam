@@ -16,6 +16,8 @@ const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'r19-specials-admin-token';
 const app = require('../server.js');
+// Owner changes send a notice to the site inbox; never a real one from tests.
+app.setVenueSubmissionTransport(async () => {});
 const db = require('../db.js');
 
 const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -332,7 +334,8 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   assert.ok(html.indexOf('data-pm-feat="specials"') < html.indexOf('data-pm-feat="patio"'), 'beside Happy hour now, at the front of the row');
   assert.ok(html.includes('"specials":32768'));
   assert.ok(html.includes("if (a[17] && a[17][1]) { p.spDay = a[17][0]; p.sp = FR && a[17][2] ? a[17][2] : a[17][1]; p.spEn = !!(FR && !a[17][2]);"));
-  assert.ok(html.includes("p.spOn = !!(p.sp && p.spDay === wd);"));
+  // Café test 1 (Whistler, #879): a special is not "Today" once its end time has passed (spOver).
+  assert.ok(html.includes("p.spOn = !!(p.sp && p.spDay === wd && !spOver(p, ck));"));
   assert.ok(html.includes(`if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';`));
   assert.ok(html.includes("k === 'specials' ? !p.spOn :"));
   assert.ok(html.includes("spToday: 'Today:'") && html.includes("spToday: 'Aujourd’hui :'"));
@@ -348,7 +351,7 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   }
   // The search: the page's own deal matcher over the deal + special words, run with the page's mapNameKey.
   const keySrc = html.match(/function mapNameKey\(name\)\{[^\n]*\}/)[0];
-  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p){'));
+  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p'));
   const ctx = {};
   vm.runInNewContext(`${keySrc}\nvar dealQuery = '', dealWordsFor = null, dealWords = [];\n${dealSrc}\nthis.hit = function(q, a){ var p = {}; if (a[17] && a[17][1]) p.dk = (p.dk || ' ') + mapNameKey(a[17].slice(1).join(' ')).slice(1); dealQuery = q; return dealHit(p); };`, ctx);
   const ribRow = tue.find((p) => p[2] === 'Specials Map Pub FR');
@@ -493,7 +496,7 @@ test('Owner help bot: "How do I add my weekly specials?" in English and French',
   const t = cfg.topics.find((x) => x.id === 'specials');
   assert.ok(t, 'the topic is there');
   assert.equal(t.q, 'How do I add my weekly specials?');
-  assert.equal(t.qFr, 'Comment ajouter mes spéciaux de la semaine?');
+  assert.equal(t.qFr, 'Comment ajouter mes spéciaux de la semaine\u202f?');
   assert.match(JSON.stringify(t), /Weekly specials/);
   assert.match(JSON.stringify(t), /Spéciaux de la semaine/);
   for (const lang of ['en', 'fr']) {

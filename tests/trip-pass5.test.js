@@ -3,6 +3,7 @@
 // times, drive legs between towns, French copy, "no driving after 18 h" and Swap on a plan with a borrowed dinner.
 // The requests are the real ones from drafts/site-review-2026-10-19-pass4.md. PURE tests on the realism fixture valley.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

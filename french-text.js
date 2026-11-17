@@ -19,10 +19,11 @@ function frTime(h, mm, ap) {
 const TIME = '(\\d{1,2})(?::(\\d\\d))? ?(AM|PM|am|pm)';
 
 const FR_CUISINE = {
-  'Italian': 'Italien', 'Pub Fare': 'Cuisine de pub', 'Japanese': 'Japonais', 'Indian': 'Indien', 'Mexican': 'Mexicain', 'Coffee': 'Café',
+  'Italian': 'Italien', 'Comfort food': 'Cuisine réconfortante', 'Pub Fare': 'Cuisine de pub', 'Japanese': 'Japonais', 'Indian': 'Indien', 'Mexican': 'Mexicain', 'Coffee': 'Café',
   'Breakfast & Brunch': 'Déjeuner et brunch', 'Dessert': 'Desserts', 'Chinese': 'Chinois', 'Bakery': 'Boulangerie', 'Café': 'Café',
   'Seafood': 'Poissons et fruits de mer', 'Pizza': 'Pizza', 'West Coast': 'Cuisine de la côte Ouest', 'Vietnamese': 'Vietnamien', 'BBQ': 'BBQ',
   'French': 'Français', 'Farm-to-Table': 'De la ferme à la table', 'Burgers': 'Burgers', 'Thai': 'Thaïlandais', 'Steakhouse': 'Grilladerie',
+  'European': 'Européen', 'Swiss & Alpine': 'Suisse et alpin',
   'Sandwiches': 'Sandwichs', 'Lebanese': 'Libanais', 'Greek': 'Grec', 'Canadian': 'Canadien', 'Bubble Tea': 'Thé aux perles', 'Ukrainian': 'Ukrainien',
   'Mediterranean': 'Méditerranéen', 'Korean': 'Coréen', 'German': 'Allemand', 'Asian Fusion': 'Fusion asiatique', 'Vegan': 'Végane',
   'American': 'Américain', 'Poutine': 'Poutine', 'Juice & Smoothies': 'Jus et smoothies', 'Asian': 'Asiatique', 'Tapas': 'Tapas',
@@ -40,11 +41,25 @@ const FR_CUISINE = {
   'Casual winery bistro': 'Bistro de vignoble décontracté', 'Casual eatery': 'Restaurant décontracté', 'Café & bubble tea': 'Café et thé aux perles',
   'Brunch': 'Brunch', 'Bistro & bakery': 'Bistro et boulangerie', 'Bakery & breakfast/lunch bistro': 'Boulangerie et bistro déjeuner-dîner',
   'Austrian café and pastry': 'Café et pâtisserie autrichiens',
+  // The restaurant cuisine list of 2026-11-09.
+  'Chicken & Wings': 'Poulet et ailes', 'Fish & Chips': 'Fish and chips', 'Noodles & Ramen': 'Nouilles et ramen', 'Spanish & Tapas': 'Espagnol et tapas',
+  'Poke & Hawaiian': 'Poké et hawaïen', 'Contemporary & Global': 'Contemporain et international', 'Small plates & bar snacks': 'Petites assiettes et bouchées',
 };
 
 const FR_TEXT = {
+  // The weekend email box on What's On and the homepage (2026-11-16, weekend-email.js).
+  'Get this weekend’s events every Thursday': 'Recevez les événements de la fin de semaine chaque jeudi',
+  'A free email with what’s on Friday to Sunday across the Okanagan.': 'Un courriel gratuit avec tout ce qui se passe du vendredi au dimanche dans l’Okanagan.',
+  'Your email': 'Votre courriel',
+  'Sign me up': 'Je m’inscris',
+  'We’ll email you once a week. Unsubscribe anytime.': 'Un courriel par semaine. Désabonnez-vous en tout temps.',
+  'Leave this empty': 'Laissez ce champ vide',
   // What's On (2026-10-19): the On now heading outside the daytime (the /map wording).
   'Exhibitions & multi-day events': 'Expositions et événements de plusieurs jours',
+  // Winery test 3 (2026-11-12): the owner's free tasting on French cards, and the line under an experience saved without
+  // details.
+  'Free tasting': 'Dégustation gratuite',
+  'Ask when you visit': 'Renseignez-vous sur place',
   ...FR_CUISINE,
   // ---- Cards, chips and filters ----
   'View details →': 'Voir les détails →',
@@ -62,12 +77,25 @@ const FR_TEXT = {
   'Open Early': 'Ouvert tôt',
   'Open Late': 'Ouvert tard',
   'Live Music': 'Musique en direct',
-  'Happy Hour': 'Happy hour',
+  'Happy Hour': '5 à 7',
   'Free to Visit': 'Gratuit',
   'Non-Alcoholic Options': 'Options sans alcool',
   'Sports TV': 'Sports à la télé',
   'Sports on TV': 'Sports à la télé',
   'Patio': 'Terrasse',
+  'Heated patio': 'Terrasse chauffée',
+  // Short badge labels on the listing cards (2026-10-28).
+  'Dogs welcome': 'Chiens bienvenus',
+  // Brewery French check (2026-11-12): the Kids badge's short card label was left in English on French cards.
+  'Kids OK': 'Enfants OK',
+  // Brewery test 4 (2026-11-13): the dog chip when the owner says dogs are on the patio only.
+  'Dogs on patio': 'Chiens sur la terrasse', 'Dogs outside only': 'Chiens à l’extérieur seulement',
+  'Non-alcoholic': 'Sans alcool',
+  'Live music': 'Musique en direct',
+  'Groups': 'Groupes',
+  'Happy hour': '5 à 7',
+  'Free': 'Gratuit',
+  'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',
   'Dog Friendly': 'Accepte les chiens',
@@ -97,6 +125,7 @@ const FR_TEXT = {
   'Clear search': 'Effacer la recherche',
   'Mixed': 'Varié',
   'By town': 'Par ville',
+  'Nearest to me': 'Les plus proches',
   'Top rated': 'Les mieux notés',
   // Smarter search (2026-10-18): the /fr/search sort and card notes.
   'Best match': 'Meilleure correspondance',
@@ -174,7 +203,7 @@ const FR_TEXT = {
   'Choose venue types': 'Choisir des types de lieux',
   'Choose what you are looking for': 'Choisir ce que vous recherchez',
   'Choose what matters to you': 'Choisir ce qui compte pour vous',
-  'What are you looking for?': 'Que recherchez-vous?',
+  'What are you looking for?': 'Que recherchez-vous\u202f?',
   'What matters to you?': 'Qu’est-ce qui compte pour vous?',
   'Choose an activity': 'Choisir une activité',
   'Choose an indoor experience': 'Choisir une activité intérieure',
@@ -409,7 +438,7 @@ const FR_TEXT = {
   'Browse & Search the Okanagan | Okanagan Roam': 'Parcourir et rechercher l’Okanagan | Okanagan Roam',
   'All Categories: Food, Wine, Outdoors & Events in the Okanagan | Okanagan Roam': 'Toutes les catégories : restos, vin, plein air et événements | Okanagan Roam',
   'Okanagan Roam: Restaurants, Wineries & What’s Open Near You': 'Okanagan Roam : restos, vignobles et ce qui est ouvert',
-  'Find what’s open near you in BC’s Okanagan: 1,700+ restaurants, wineries, beaches and trails, live happy hours, this week’s events and a free trip planner.': 'Trouvez ce qui est ouvert près de vous dans l’Okanagan (C.-B.) : plus de 1 700 restaurants, vignobles, plages et sentiers, les happy hours en cours, les événements de la semaine et un planificateur de voyage gratuit.',
+  'Find what’s open near you in BC’s Okanagan: 1,700+ restaurants, wineries, beaches and trails, live happy hours, this week’s events and a free trip planner.': 'Trouvez ce qui est ouvert près de vous dans l’Okanagan (C.-B.) : plus de 1 700 restaurants, vignobles, plages et sentiers, les 5 à 7 en cours, les événements de la semaine et un planificateur de voyage gratuit.',
   'Okanagan Roam, Find Wineries, Lounges & Restaurants Worth the Drive': 'Okanagan Roam : vignobles, bars et restaurants qui valent le détour',
   'A review-backed guide to {0}+ wineries, restaurants, breweries and cafes across BC\'s Okanagan Valley, plus local events and a day-by-day trip planner.': 'Un guide appuyé par les avis de plus de {0} vignobles, restaurants, brasseries et cafés dans la vallée de l’Okanagan, en Colombie-Britannique, avec les événements locaux et un planificateur de voyage jour par jour.',
   'Lakeside patios, farm-to-table dining rooms and easygoing local favourites — every restaurant across the Okanagan that Okanagan Roam has verified.': 'Terrasses au bord du lac, tables de la ferme à l’assiette et adresses locales sans prétention : tous les restaurants de l’Okanagan vérifiés par Okanagan Roam.',
@@ -437,6 +466,8 @@ const FR_TEXT = {
   'Big White and SilverStar: lifts, passes, where to stay and how to get there.': 'Big White et SilverStar : remontées, laissez-passer, hébergement et comment s’y rendre.',
   'Winter outdoors →': 'Plein air en hiver →',
   'Snowshoe trails, Nordic centres and winter walks across the valley.': 'Sentiers de raquette, centres nordiques et promenades d’hiver partout dans la vallée.',
+  'Official visitor information:': 'Information touristique officielle :',
+  'events calendar': 'calendrier des événements',
   'Read our ski season guide: where to eat, drink and play this winter →': 'Lisez notre guide de la saison de ski : où manger, boire et s’amuser cet hiver →',
   'Big White, SilverStar, Apex and Baldy — four ski hills, each with its own feel, from the valley’s biggest village to a small, uncrowded local favourite.': 'Big White, SilverStar, Apex et Baldy : quatre stations de ski, chacune avec son caractère, du plus grand village de la vallée à une petite station locale peu achalandée.',
   'Museums, galleries, theatres, escape rooms, bowling, climbing gyms and more — the Okanagan’s best ideas for grey, wet or cold days.': 'Musées, galeries, théâtres, jeux d’évasion, quilles, centres d’escalade et plus encore : les meilleures idées de l’Okanagan pour les jours gris, pluvieux ou froids.',
@@ -867,7 +898,7 @@ const FR_TEXT = {
   'What you search on the map': 'Ce que vous cherchez sur la carte',
   'When you search on the map, the words you search and how many results they found may be counted anonymously with Google Analytics, so we can see what people look for and don’t find, and add it. Your location, a dropped pin and the distance you pick are never sent with them.': 'Quand vous faites une recherche sur la carte, les mots cherchés et le nombre de résultats trouvés peuvent être comptés de façon anonyme avec Google Analytics, pour que nous voyions ce que les gens cherchent sans le trouver, et que nous l’ajoutions. Votre position, un repère déposé et la distance choisie ne sont jamais envoyés avec eux.',
   'Search by voice': 'Rechercher en parlant', 'If you search by voice, your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple). Okanagan Roam never receives the recording, only the words, the same as typing.': 'Si vous cherchez en parlant, le service vocal de votre navigateur transforme vos paroles en texte (Google dans Chrome, Apple sur iPhone). Okanagan Roam ne reçoit jamais l’enregistrement, seulement les mots, comme si vous les tapiez.',
-  'Happy hour now': 'Happy hour en cours', 'Specials today': 'Spéciaux du jour', 'Weekly nights tonight': 'Soirées ce soir', 'Dietary': 'Alimentation', 'Gluten-free': 'Sans gluten', 'Open late': 'Ouvert tard', 'Open early': 'Ouvert tôt', 'Good for groups': 'Bien pour les groupes', 'Alcohol-free drinks': 'Boissons sans alcool',
+  'Happy hour now': '5 à 7 en cours', 'Specials today': 'Spéciaux du jour', 'Weekly nights tonight': 'Soirées ce soir', 'Dietary': 'Alimentation', 'Gluten-free': 'Sans gluten', 'Open late': 'Ouvert tard', 'Open early': 'Ouvert tôt', 'Good for groups': 'Bien pour les groupes', 'Alcohol-free drinks': 'Boissons sans alcool', 'Heated or covered patio': 'Terrasse chauffée ou couverte', 'Local wine & craft beer': 'Vins locaux et bières artisanales', 'Wheelchair accessible': 'Accessible en fauteuil roulant', 'Takes reservations': 'Accepte les réservations', 'Takeout': 'Pour emporter', 'Locally owned': 'Propriété locale',
     '✕ Clear': '✕ Effacer', 'Quick filters': 'Filtres rapides', 'Show more of the list': 'Afficher plus de la liste',
   'Tours, sports & indoor': 'Visites, sports et intérieur',
   'Browse & Search every place': 'Parcourir et rechercher tous les lieux',
@@ -895,6 +926,7 @@ const FR_TEXT = {
   'Back to the home page': 'Retour à l’accueil',
   'Everything in {T}': 'Tout à {T}',
   'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley’s best dining rooms — every restaurant, café, pub, cocktail lounge and brewery Okanagan Roam has verified.': 'Dîners en terrasse au bord du lac, cafés de spécialité, salles de dégustation de brasseries et les meilleures tables de la vallée : tous les restaurants, cafés, pubs, bars à cocktails et brasseries vérifiés par Okanagan Roam.',
+  'Every restaurant, café, pub, cocktail lounge and brewery in the Okanagan that Okanagan Roam has verified.': 'Tous les restaurants, cafés, pubs, bars à cocktails et brasseries de l’Okanagan vérifiés par Okanagan Roam.',
   'How we pick our Hidden Gems': 'Comment nous choisissons nos trésors cachés',
   'Every Hidden Gem is chosen by hand, one place at a time. We look for spots that are easy to miss: small independents, places off the main strip, or somewhere a local tourism, parks or community source points to as a lesser-known find. Each one has to be worth the trip on its own merits. Star ratings and review counts don’t decide it, and the list isn’t ranked: “Mixed” order changes every day. Every card tells you why it made the cut.': 'Chaque trésor caché est choisi à la main, un endroit à la fois. Nous cherchons des lieux faciles à manquer : de petits commerces indépendants, des adresses à l’écart des grandes artères, ou un endroit qu’une source locale (tourisme, parcs ou organisme communautaire) signale comme méconnu. Chacun doit valoir le détour en soi. Les étoiles et le nombre d’avis ne décident pas, et la liste n’est pas un classement : l’ordre « Varié » change chaque jour. Chaque fiche explique pourquoi il a été retenu.',
   'How we pick our Secret Spots': 'Comment nous choisissons nos coins secrets',
@@ -1079,8 +1111,23 @@ const FR_PATTERNS = [
     return m[3] ? `Fermé du ${day(m[2])} ${MONTHS[m[1]]} au ${day(m[4])} ${MONTHS[m[3]]}, réouverture le ${back}.`
       : `Fermé du ${day(m[2])} au ${day(m[4])} ${MONTHS[m[1]]}, réouverture le ${back}.`;
   }],
+  // Card status lines for places with a notice (2026-11-02).
+  [/^By appointment \u00b7 call ahead$/, () => 'Sur rendez-vous \u00b7 appelez avant'],
+  [/^Book ahead \u00b7 tours by reservation$/, () => 'R\u00e9servez \u00e0 l\u2019avance \u00b7 sorties sur r\u00e9servation'],
+  [/^Open to the public \u00b7 no set hours$/, () => 'Ouvert au public \u00b7 sans horaire fixe'],
+  [/^Open to the public$/, () => 'Ouvert au public'],
+  [/^Open year-round$/, () => 'Ouvert toute l\u2019ann\u00e9e'],
+  [/^By Dayton$/, () => 'Par Dayton'],
+  [/^Updated (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}), (\d{4})$/, (m) => `Mis \u00e0 jour le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]} ${m[3]}`],
+  [/^Ticket prices vary$/, () => 'Prix des billets variables'],
+  [/^Hours not confirmed \u00b7 call ahead$/, () => 'Heures non confirm\u00e9es \u00b7 appelez avant'],
+  [/^Closed for the season$/, () => 'Ferm\u00e9 pour la saison'],
+  [/^(Closed for the season|Temporarily closed) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `${m[1] === 'Temporarily closed' ? 'Ferm\u00e9 temporairement' : 'Ferm\u00e9 pour la saison'} \u00b7 R\u00e9ouverture le ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
+  [/^Temporarily closed$/, () => 'Ferm\u00e9 temporairement'],
+  // Winery test 3 (2026-11-12): the photo pill on themed cards, "Closed · reopens April 25" (the month in full).
+  [/^Closed \u00b7 reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (\d{1,2})$/, (m) => `Ferm\u00e9 \u00b7 r\u00e9ouverture le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
-  [/^Open until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
+  [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
   // The "Check before you go" box on list cards (2026-10-18): its source link ("Official source: example.com ↗").
   [/^Official source(?:: (.+?))? ↗$/, (m) => `Source officielle${m[1] ? ` : ${m[1]}` : ''} ↗`],
@@ -1194,7 +1241,7 @@ const FR_SCRIPT = [
   // same French wording as the place pages ("Ouvert · ferme à 17 h").
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
-    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
+    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\\d{1,2}), /, function(m, d, mo, n){ var M = { Jan: 'janv.', Feb: 'f\\u00e9vr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'ao\\u00fbt', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'd\\u00e9c.' }; return D[d] + ' ' + (n === '1' ? '1er' : n) + ' ' + M[mo] + ' \\u00e0 '; }).replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
     "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
@@ -1292,13 +1339,14 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Add to Google Calendar': 'Ajouter à Google Agenda',
   'Tickets & info ↗': 'Billets et infos ↗',
   'Tickets & info': 'Billets et infos',
-  'Website': 'Site web',
+  'Website': 'Site Web',
   'Featured in our guides:': 'Dans nos guides :',
   'Upcoming dates': 'Dates à venir',
   '(past)': '(passée)',
   'Recurs': 'Récurrence',
   'With': 'Avec',
   'All day': 'Toute la journée',
+  'Time to be confirmed': 'Heure à confirmer',
   'Matinee': 'Matinée',
   'Mondays & Thursdays until the end of October': 'Les lundis et jeudis jusqu’à la fin d’octobre',
   'Nightly Oct 24 to Oct 30, 7 pm': 'Tous les soirs du 24 au 30 oct., 19 h',
@@ -1375,6 +1423,9 @@ FR_PATTERNS.unshift(
 // Round 8 (2026-10-19): a place listed as "The Dream (live music venue)" keeps its name, with the note in French,
 // also where its name runs on ("The Dream (live music venue) · 67 Front St").
 FR_PATTERNS.unshift([/^(.+?) \(live music venue\)(.*)$/, (m) => `${m[1]} (salle de concerts)${m[2]}`]);
+// Tour test 1 (Whistler, 2026-11-16): a town's tours intro stayed in English (« Tours and experiences in and from
+// Pemberton, booked with local operators. »).
+FR_PATTERNS.unshift([/^Tours and experiences in and from (.+), booked with local operators\.$/, (m) => `Visites et expériences à ${m[1]} et au départ de ${m[1]}, à réserver auprès d’entreprises locales.`]);
 
 // Round 10 (2026-10-19): the Free to Visit guide (#405) showed "Free Things to Do" as a chip and in the breadcrumb, and
 // its search label ("Search free things to do in kelowna") and the Arts & Culture one stayed in English.

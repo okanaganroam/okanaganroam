@@ -1,0 +1,100 @@
+{
+ "town": "lumby",
+ "name": "Lumby",
+ "hero": "/images/venues/freedom-flight-park-and-school-2610.jpg",
+ "category": "country",
+ "sub": "Mountain lakes, valley views and small-town charm.",
+ "placeholder": "Search Lumby… cafés, lakes, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=lumby",
+   "img": "/images/venues/ida-s-bakery-deli-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=lumby",
+   "img": "/images/venues/monashee-lake-trail-2610-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/lumby/events",
+   "img": "/images/venues/echo-lake-resort-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/lumby/kid_friendly",
+   "img": "/images/sports/venues/lumby-lumby-skate-park-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=lumby",
+   "img": "/images/venues/cottonwood-beach-recreation-site-mabel-lake-2610-w480.jpg"
+  },
+  {
+   "title": "Golf",
+   "sub": "Tee up in Lumby",
+   "href": "/golf?regions=lumby",
+   "img": "/images/venues/lumby-golf-club-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "jitter-beans-coffee-house",
+   "name": "Jitter Beans",
+   "tag": "Coffee, patio & burgers",
+   "copy": "Loaded sandwiches and a patio out back.",
+   "href": "/lumby/cafes/jitter-beans-coffee-house",
+   "img": "/images/venues/jitter-beans-coffee-house-2610-w480.jpg"
+  },
+  {
+   "slug": "cascade-falls-trail-mabel-lake",
+   "name": "Cascade Falls Trail",
+   "tag": "A short waterfall walk",
+   "copy": "A short mossy gully walk to a waterfall.",
+   "href": "/lumby/outdoors/cascade-falls-trail-mabel-lake",
+   "img": "/images/venues/cascade-falls-trail-mabel-lake-2610-w480.jpg"
+  },
+  {
+   "slug": "shuswap-falls-recreation-area",
+   "name": "Shuswap Falls",
+   "tag": "River views & picnics",
+   "copy": "Picnic tables beside the historic Wilsey Dam.",
+   "href": "/lumby/outdoors/shuswap-falls-recreation-area",
+   "img": "/images/venues/shuswap-falls-recreation-area-2610-w480.jpg"
+  },
+  {
+   "slug": "blue-ox-pub",
+   "name": "Blue Ox Pub",
+   "tag": "Classic small-town pub",
+   "copy": "Classic BC drafts and a borscht with a following.",
+   "href": "/lumby/pubs/blue-ox-pub",
+   "img": "/images/venues/blue-ox-pub-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Lumby is a small village and the lakes and trails are a drive away, so plan your stops and check road and trail access before you go.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Mountain lakes, waterfalls and trails sit around the village. Check seasonal access, conditions and posted rules before you head out.",
+   "href": "/outdoors?regions=lumby",
+   "label": "Find outdoor adventures"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Many places suit the whole crew. Check each listing for family- and dog-friendly details and confirm current policies with the venue.",
+   "href": "/guide/lumby/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

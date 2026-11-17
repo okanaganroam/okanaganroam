@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05d",
+  "update": [
+    {
+      "id": 1029,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/copper-brewing-2611.jpg"
+      },
+      "why": "Real photo of the host place (Copper Brewing Co., photo uploaded by the owner to their listing)"
+    }
+  ]
+}

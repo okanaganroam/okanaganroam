@@ -1,0 +1,37 @@
+[
+ {
+  "id": 761,
+  "name": "Villages Pizza - Lower Mission",
+  "reason": "Google listing has only a pizza-box logo shot, a food photo and a night storefront signed 'Mr Mozzarella' (different name); chain website has no photo of this location"
+ },
+ {
+  "id": 119,
+  "name": "Canadian 2 For 1 Pizza Winfield",
+  "reason": "Google listing (8 photos) is all pizza/bread close-ups plus a kids' dance party; chain website has no Winfield storefront photo"
+ },
+ {
+  "id": 1724,
+  "name": "Okanagan Folk School",
+  "reason": "Google place (and 5684 Beach Ave) has 0 photos; okfolkschool.ca only shows close-ups of finished crafts and people, nothing of the venue"
+ },
+ {
+  "id": 1894,
+  "name": "Commonage Trail (Mission Hill)",
+  "reason": "No Google place for the trail (tried Commonage Trail, trailhead, Mission Hill Trail, Mission Rd); only nearby Mission Hill Park (a mown city lawn/dog park, not the DND gravel trail); Tourism Vernon trail data has no image for it; Hike the Okanagan has no page"
+ },
+ {
+  "id": 1902,
+  "name": "Nelson Mountain Trail",
+  "reason": "Google 'Mount Nelson' (North Okanagan) has 0 photos and no trail place exists; Recreation Sites and Trails BC (REC169460) has only 3 old photos at 1024 px wide or less (below the 1200 px minimum); no Hike the Okanagan page"
+ },
+ {
+  "id": 637,
+  "name": "Sweet Emotion Ice Cream",
+  "reason": "Counter is inside Prime Time Donair & Poutine; the only photo of the Sweet Emotion counter and sign has a person in a swimsuit with a pool float filling a third of the frame; the rest are ice-cream close-ups and the Prime Time storefront (sign cut off in the 3:1 strip, different business name); no website"
+ },
+ {
+  "id": 1859,
+  "name": "Trout Creek Dike Trail",
+  "reason": "No Google place for the dike trail (tried dike trail, Trout Creek Beach, Hwy 97 bridge); the 'Trout Creek' place photos are all of the KVR trestle canyon upstream, a different spot; Summerland trail page is a 2017 PDF map; no Hike the Okanagan page"
+ }
+]

@@ -17,6 +17,8 @@ const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'r22-nights-admin-token';
 const app = require('../server.js');
+// Owner changes send a notice to the site inbox; never a real one from tests.
+app.setVenueSubmissionTransport(async () => {});
 const db = require('../db.js');
 
 const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -54,7 +56,7 @@ test('validateWeeklyNights: canonical list, kinds, frequencies, lengths, times, 
   assert.equal(v(Array.from({ length: 8 }, () => TRIVIA)).ok, false, 'at most 7');
   assert.equal(v(Array.from({ length: 7 }, () => TRIVIA)).ok, true);
   for (const k of app.NIGHT_KINDS) assert.equal(v([{ ...TRIVIA, kind: k }]).ok, true, k);
-  assert.deepEqual(app.NIGHT_KINDS, ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'other']);
+  assert.deepEqual(app.NIGHT_KINDS, ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'tour', 'class', 'tasting', 'other']); // restaurant test 2: 'tasting'
   assert.equal(v([{ ...TRIVIA, kind: 'quiz' }]).ok, false);
   assert.equal(v([{ ...TRIVIA, kind: undefined }]).ok, false, 'kind is required');
   for (const f of ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th']) assert.equal(v([{ ...TRIVIA, frequency: f }]).nights[0].frequency, f);
@@ -240,8 +242,8 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   assert.equal((en.match(/venue-wn-today/g) || []).length, 2, 'only tonight');
   assert.doesNotMatch(en, /[\u{1F300}-\u{1FAFF}]/u, 'no emoji');
   assert.match(en, /<span class="venue-hours-checked venue-wn-checked">Checked [A-Z][a-z]{2} \d+, \d{4}<\/span><\/section>$/);
-  // Placement: inside .venue-extra, before the hours.
-  const extra = html.indexOf('<div class="venue-extra">'), at1 = html.indexOf('id="venueNights"'), hours = html.indexOf('id="venueHours"');
+  // Placement: inside .venue-extra (the Food & Drink layout's main column, 2026-11-07), before the hours.
+  const extra = Math.max(html.indexOf('<div class="venue-extra">'), html.indexOf('<div class="fd-content">')), at1 = html.indexOf('id="venueNights"'), hours = html.indexOf('id="venueHours"');
   assert.ok(extra > 0 && at1 > extra && (hours === -1 || at1 < hours));
   // French: kinds in French, English title marked lang="en", the French title where given, « Ce soir ».
   const fr = card(page(v, at(TUE, '12:00'), 'fr'));
@@ -257,7 +259,7 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   // Titles that don't name the kind (card polish 2026-10-27: a title that does drops the label).
   set(kinds, app.NIGHT_KINDS.slice(0, 7).map((k, i) => ({ days: ['mon'], kind: k, title: `Monday ${['one', 'two', 'three', 'four', 'five', 'six', 'seven'][i]}` })));
   const frKinds = card(page(kinds, at(TUE, '12:00'), 'fr'));
-  for (const w of ['Quiz', 'Karaoké', 'Scène ouverte', 'Bingo', 'Humour', 'Soirée DJ', 'Musique live']) assert.ok(frKinds.includes(` ${w}</span>`), w);
+  for (const w of ['Quiz', 'Karaoké', 'Scène ouverte', 'Bingo', 'Humour', 'Soirée DJ', 'Musique en direct']) assert.ok(frKinds.includes(` ${w}</span>`), w);
   // Owner-entered nights: "Confirmed by <venue>" (the #501 line), not the grey date.
   const own = mk({ name: 'Nights Owner Pub' });
   set(own, [TRIVIA], { source_url: 'venue_owner' });
@@ -439,7 +441,7 @@ test('Build My Trip: an evening stop on a night says "Tonight: Trivia at 7 PM" (
   assert.equal(t('2026-11-10'), undefined);
   // The planner page prints it; the trip API adds it after planning; the planner never reads it.
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(v3.includes(`(stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')`));
+  assert.ok(v3.includes(`(stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')`));
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.ok(src.includes('withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))))'));
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /venue_weekly_nights|withTripWeeklyNights/, 'ranking unchanged');
@@ -524,7 +526,7 @@ test('Owner help bot: "How do I add my trivia or karaoke night?" in English and 
   const t = cfg.topics.find((x) => x.id === 'weekly-nights');
   assert.ok(t, 'the topic is there');
   assert.equal(t.q, 'How do I add my trivia or karaoke night?');
-  assert.equal(t.qFr, 'Comment ajouter ma soirée quiz ou karaoké?');
+  assert.equal(t.qFr, 'Comment ajouter ma soirée quiz ou karaoké\u202f?');
   assert.match(JSON.stringify(t), /Weekly nights/);
   assert.match(JSON.stringify(t), /Soirées de la semaine/);
   for (const lang of ['en', 'fr']) {
@@ -539,4 +541,15 @@ test('Owner help bot: "How do I add my trivia or karaoke night?" in English and 
     assert.equal(ctx.best('How do I add my weekly specials?').id, 'specials');
     assert.equal(ctx.best('How do I add my happy hour deals?').id, 'hh-deals');
   }
+});
+
+// Cocktail test 2 (2026-11-13): a night's season is part of what an owner sends (OWNER_NIGHT_KEYS) and survives a
+// validate + store round trip with every other field.
+test('weekly nights: every field of a night, its season included, survives validation and storage', () => {
+  const night = { days: ['sat'], kind: 'live_music', title: 'Saturday music', start: '20:00', end: '23:00', detail: 'Local bands', host: 'Marc', cost: 'Free', frequency: 'monthly-last',
+    title_fr: 'Musique du samedi', detail_fr: 'Groupes locaux', season_from: '06-01', season_to: '09-30' };
+  const r = app.validateWeeklyNights([night], { source: 'venue_owner', checked_at: app.todayLocal() });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const { source, checked_at, ...rest } = r.nights[0];
+  assert.deepEqual(rest, night);
 });

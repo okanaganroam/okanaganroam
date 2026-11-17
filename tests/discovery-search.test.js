@@ -3,6 +3,7 @@
 // PURE tests: venue records are built here, requests are interpreted by the
 // real interpreter over a small taxonomy; no server.js, no database.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const s = require('../discovery-search.js');

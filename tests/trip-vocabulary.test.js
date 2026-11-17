@@ -2,6 +2,7 @@
 // understand) and in data/vocabulary/local.json "tests" (this site's own towns and areas) is read as expected. Add a
 // request here whenever a visitor's wording is taught to the planner, so it never breaks again.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

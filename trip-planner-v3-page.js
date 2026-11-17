@@ -1,5 +1,6 @@
 'use strict';
-const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
+const SITE_PAGE=require('./trip-site.js').page;
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -41,13 +42,13 @@ function t3TimelineRows(p,removed={}){
 // "19 h 30". The planner API keeps 24-hour clock strings; this changes only the page's text.
 function t3LocalTimes(value,language){
  const fr=language==='fr';
- const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h===0&&!m?'minuit':h+' h'+(m?' '+String(m).padStart(2,'0'):'');return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
+ const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h===0&&!m?'minuit':h+' h'+(m?' '+String(m).padStart(2,'0'):'');if(h===0&&!m)return 'midnight';return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
  // English ISO dates read as dates (2026-10-19): "Trip starts on 2026-10-24" -> "Trip starts on Sat, Oct 24, 2026".
  const iso=s=>fr?s:s.replace(/\b(20\d\d)-(\d\d)-(\d\d)\b/g,(raw,y,m,d)=>{const t=new Date(Date.UTC(+y,+m-1,+d,12));if(t.getUTCMonth()!==+m-1)return raw;return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][t.getUTCDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+(+d)+', '+y;});
  const text=s=>iso(String(s)).replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,ap)=>{const n=Number(h);if(n<1||n>12)return raw;return fmt(n%12+(ap.toLowerCase()==='pm'?12:0),m);})
   .replace(/\b(0\d|1\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|h\b))/g,(_,h,m)=>fmt(h,m))
   .replace(/\b0(\d) h\b/g,'$1 h')
-  .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d)/g,fr?'$1–$2':'$1 – $2');
+  .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d|midnight\b)/g,fr?'$1–$2':'$1 – $2');
  const skip={url:1,photo:1,name:1,address:1,slug:1,query:1,id:1,date:1,startDate:1,endDate:1,startTime:1,endTime:1,region:1,regionLabel:1,venueName:1};
  const walk=(x,key)=>{if(typeof x==='string')return skip[key]?x:text(x);if(Array.isArray(x))return x.map(y=>walk(y,key));if(x&&typeof x==='object'){const o={};for(const k of Object.keys(x))o[k]=walk(x[k],k);return o;}return x;};
  return typeof value==='string'?text(value):walk(value,'');
@@ -90,7 +91,7 @@ function t3FrenchHref(u, urlFr) {
   if (typeof urlFr === 'string' && /^\/fr(?:\/|$)/.test(urlFr)) return urlFr;
   if (typeof u !== 'string' || !/^\/(?!\/)/.test(u) || /^\/fr(?:[\/?#]|$)/.test(u)) return u;
   var path = u.split(/[?#]/)[0], first = path.split('/')[1] || '';
-  var towns = ['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+  var towns = SITE_PAGE.regionSlugs;
   var pages = ['whats-on','browse','guides','guide','food-drink','restaurants','cafes','breweries','pubs','cocktail-lounges','distilleries','wineries','golf','beaches','outdoors','tours','ski-snow','indoor','sports','dog-friendly','local-favorites','secret-spots','hidden-gems','destinations','categories','map','my-trip','trip','search','favorites'];
   return towns.indexOf(first) !== -1 || pages.indexOf(first) !== -1 ? '/fr' + u : u;
 }
@@ -98,7 +99,7 @@ function t3PlanNextSteps(p) {
   var steps=[],seen={};
   function browseUrl(item){
     var types={restaurant:'restaurants',cafe:'cafes',winery:'wineries',brewery:'breweries',pub:'pubs-bars',cocktail:'cocktail-lounges',distillery:'distilleries',beach:'beaches',golf:'golf',indoor:'indoor',outdoor:'outdoors',sport:'sports-recreation',tour:'tours'};
-    var validRegions=['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+    var validRegions=SITE_PAGE.regionSlugs;
     var regions=p.intent&&Array.isArray(p.intent.regions)?p.intent.regions:[];
     if(item.kind==='event'){
       var categories={festival:'events-festivals',market:'markets-fairs','live-music':'live-music',hockey:'sports-recreation'};
@@ -117,9 +118,9 @@ function t3PlanNextSteps(p) {
     var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market',comedy:'comedy show',show:'show',concert:'concert'};
     var requestLabels={pottery:'pottery class'};
     // The category word in French too (2026-10-19: "event — Non inclus").
-    var labelsFr={'hockey game':'match de hockey','live music':'musique en direct',festival:'festival',market:'marché','comedy show':'spectacle d’humour',show:'spectacle',concert:'concert',event:'événement','sports event':'événement sportif','pottery class':'atelier de poterie',restaurant:'restaurant',cafe:'café',winery:'vignoble',brewery:'microbrasserie',pub:'pub',cocktail:'bar à cocktails',distillery:'distillerie',beach:'plage',golf:'golf',indoor:'lieu intérieur',outdoor:'lieu de plein air',tour:'visite guidée',sport:'sport','dog friendly':'lieu qui accepte les chiens','kid friendly':'lieu adapté aux enfants',hiking:'randonnée',rainy:'activité par temps de pluie'};
-    var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
-    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode};}):[]});
+    var labelsFr={'hockey game':'match de hockey','live music':'musique en direct',festival:'festival',market:'marché','comedy show':'spectacle d’humour',show:'spectacle',concert:'concert',event:'événement','sports event':'événement sportif','pottery class':'atelier de poterie',restaurant:'restaurant',cafe:'café',winery:'vignoble',brewery:'microbrasserie',pub:'pub',cocktail:'bar à cocktails',distillery:'distillerie',beach:'plage',golf:'golf',indoor:'lieu intérieur',outdoor:'lieu de plein air',tour:'visite guidée',sport:'sport','dog friendly':'lieu qui accepte les chiens','kid friendly':'lieu adapté aux enfants',hiking:'randonnée',rainy:'activité par temps de pluie',breakfast:'déjeuner',brunch:'brunch',lunch:'dîner',dinner:'souper','happy hour':'5 à 7',patio:'terrasse','great groups':'bien pour les groupes'}; // Distillery test 2 (Whistler, 2026-11-16): « déjeuner — non inclus », not « breakfast — Non inclus ».
+    var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.venueName||i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',venue:i.kind==='venue',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode,appointment:a.appointment===true,closedDay:a.closedDay&&typeof a.closedDay.day==='string'&&Array.isArray(a.closedDay.open)?{day:a.closedDay.day,from:typeof a.closedDay.from==='string'?a.closedDay.from:null,to:typeof a.closedDay.to==='string'?a.closedDay.to:null,open:a.closedDay.open.filter(function(d){return typeof d==='string';})}:null};}):[]});
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
@@ -152,13 +153,42 @@ function t3PlanNextSteps(p) {
   return steps;
 }
 
+// Brewery test 4 (2026-11-13): why a matching place is left out on that day, from its own week: "Closed Mondays (Oct–Apr)
+// · try Tue–Sun" / « Fermé le lundi (oct.–avr.) · essayez du mardi au dimanche ». Null without the closed-day facts.
+function t3ClosedDayText(c,fr){
+  var K=['mon','tue','wed','thu','fri','sat','sun'];
+  if(!c||K.indexOf(c.day)<0||!Array.isArray(c.open)||!c.open.length)return null;
+  var EN={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'},ENL={mon:'Mondays',tue:'Tuesdays',wed:'Wednesdays',thu:'Thursdays',fri:'Fridays',sat:'Saturdays',sun:'Sundays'};
+  var FRL={mon:'lundi',tue:'mardi',wed:'mercredi',thu:'jeudi',fri:'vendredi',sat:'samedi',sun:'dimanche'},FRS={mon:'lun',tue:'mar',wed:'mer',thu:'jeu',fri:'ven',sat:'sam',sun:'dim'};
+  var MEN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],MFR=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  var open=K.filter(function(d){return c.open.indexOf(d)>=0;});
+  // One run of days, counted around the week from the day after the closed one ("Tue–Sun"), or a list.
+  var start=(K.indexOf(c.day)+1)%7,ring=[];for(var i=0;i<7;i++)ring.push(K[(start+i)%7]);
+  var inOrder=ring.filter(function(d){return open.indexOf(d)>=0;}),first=ring.indexOf(inOrder[0]),run=inOrder.every(function(d,j){return ring[first+j]===d;});
+  var mo=function(md,L){var n=Number(String(md||'').slice(0,2));return n>=1&&n<=12?L[n-1]:null;};
+  var a=mo(c.from,fr?MFR:MEN),b=mo(c.to,fr?MFR:MEN),sea=a&&b?' ('+a+'–'+b+')':'';
+  var days=fr?(run&&inOrder.length>2?'du '+FRL[inOrder[0]]+' au '+FRL[inOrder[inOrder.length-1]]:open.map(function(d){return FRS[d];}).join(', ')):(run&&inOrder.length>2?EN[inOrder[0]]+'–'+EN[inOrder[inOrder.length-1]]:open.map(function(d){return EN[d];}).join(', '));
+  return fr?'Fermé le '+FRL[c.day]+sea+' · essayez '+(run&&inOrder.length>2?'':'le ')+days:'Closed '+ENL[c.day]+sea+' · try '+days;
+}
+
+// Brewery test 4 follow-up: when the only matching places nearby were left out because they're closed all that day,
+// the missing line says so ("Lakeside Lager House is closed Mondays (Oct–Apr) · try Tue–Sun.") instead of "Try another
+// date or destination". Null otherwise. Distillery test 2 (2026-11-13): French has no « est fermé » after the name (it
+// read « Distillerie du Ruisseau (test) est fermé »); the subject-free « Fermé le mardi… » follows a dash.
+function t3MissingClosedText(step,fr){
+  var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
+  var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
+  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
+  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
+}
+
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
- const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing'};
- const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing};
- return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(reason[a.reasonCode]?' — '+esc(reason[a.reasonCode]):'')+'</li>';}).join('')+'</ul></div>';
+ const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',appt:'By appointment · call ahead'};
+ const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults};
+ return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(t3ClosedDayText(a.closedDay,fr)||reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
 }
 
 function t3TimingChecklist(step,fr){
@@ -179,14 +209,14 @@ function t3EditLosesMatch(previous,next) {
 
 // What the visitor asked for that the plan could not use (2026-10-19): the "not used" words and anything the planner
 // reported as unsupported, once each.
-// "Drive from Kelowna to Penticton: about 42–50 min (estimate)" (2026-10-19).
+// "Drive from Squamish to Whistler: about 47–55 min (estimate)" (2026-10-19).
 function t3DriveText(leg, lang) {
   if (!leg || !leg.fromLabel || !leg.toLabel) return '';
   var fr = lang === 'fr', a = leg.minMinutes, b = leg.maxMinutes;
   var mins = a && b && a !== b ? (fr ? a + ' à ' + b : a + '–' + b) : String(b || a);
-  // Round 7: a drive to the other shore of Okanagan Lake goes around it, and says so.
+  // Round 7: a drive that has to go around a lake (leg.aroundLake, set by the planner) says so.
   var lake = leg.aroundLake ? (fr ? ' en contournant le lac' : ' around the lake') : '';
-  // Round 11 (2026-10-20): « Trajet d’Osoyoos », not « de Osoyoos ».
+  // Round 11 (2026-10-20): « d’ » before a vowel (« Trajet d’Alta Lake »), « de » otherwise.
   return fr ? 'Trajet ' + (/^[AEIOUYÉÈÊaeiouyéèê]/.test(leg.fromLabel) ? 'd’' : 'de ') + leg.fromLabel + ' à ' + leg.toLabel + lake + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + lake + ': about ' + mins + ' min (estimate)';
 }
 function t3DroppedRequests(p) {
@@ -323,7 +353,7 @@ function t3MapsUrl(queries) {
 }
 // The whole-trip map's points (Stage 5G, 2026-10-02): per day, in plan order,
 // each shown stop numbered by its place among that day's shown stops. Only a
-// stored location inside a generous Okanagan box counts (lat 48.5-51.5, lng
+// stored location inside a generous Sea to Sky box counts (lat 48.5-51.5, lng
 // -121.5 to -117.5); a stop without one (an event with no known place) is
 // counted as "not on the map". Removed stops and empty slots have no card, so
 // they are neither numbered nor counted.
@@ -339,10 +369,10 @@ function t3MapPoints(days, removed) {
       const key = d.day + '-' + s.daypart;
       if (removed && Object.prototype.hasOwnProperty.call(removed, key)) return;
       n += 1;
-      // Round 14 (2026-10-20): an event with a known place (its listing's pin, or a curated host such as the Penticton
-      // Trade & Convention Centre) is on the map too; Christkindl and the Penticton holiday markets were "not on the map".
+      // Round 14 (2026-10-20): an event with a known place (its listing's pin, or a curated host with no listing of
+      // its own) is on the map too; holiday markets at such hosts were "not on the map".
       const v = s.venue || (s.event && s.event.location ? { name: s.event.name, latitude: s.event.location.lat, longitude: s.event.location.lng } : null);
-      if (!v || !inRange(v.latitude, 48.5, 51.5) || !inRange(v.longitude, -121.5, -117.5)) { out.skipped += 1; return; }
+      if (!v || !inRange(v.latitude, SITE_PAGE.mapBounds.lat[0], SITE_PAGE.mapBounds.lat[1]) || !inRange(v.longitude, SITE_PAGE.mapBounds.lng[0], SITE_PAGE.mapBounds.lng[1])) { out.skipped += 1; return; }
       points.push({ n, key, label: String(s.label || ''), name: String(v.name || ''), lat: v.latitude, lng: v.longitude });
     });
     if (points.length) { out.days.push({ day: d.day, points }); out.count += points.length; }
@@ -374,15 +404,10 @@ function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
   return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
-  'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
-  '2 days in Penticton with the kids — museums, parks and easy food',
-  'A romantic autumn weekend in Naramata with wineries and a great dinner',
-  'A dog-friendly autumn weekend in Vernon',
-  'Coffee, an autumn hike, a winery and dinner in Kelowna',
-  'What can we do around Penticton if it rains?',
+  ...SITE_PAGE.examples,
 ];
 
 function renderStyles() {
@@ -420,14 +445,34 @@ function renderStyles() {
   .t3-btn-ghost:hover { background: rgba(27,43,58,0.06); }
   .t3-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; max-width: 900px; }
   .t3-examples-label { width: 100%; font-size: 0.8rem; color: rgba(255,255,255,0.72); margin-bottom: 2px; }
-  .t3-example { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.28); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: left; }
-  .t3-example:hover { background: rgba(255,255,255,0.22); }
+  .t3-example { background: rgba(27,43,58,0.58); color: #fff; border: 1px solid rgba(255,255,255,0.34); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: left; }
+  .t3-example:hover { background: rgba(27,43,58,0.78); }
+  /* Example plan (2026-10-29): what a result looks like, under the example requests. */
+  .t3-sample { margin: 14px 0 0; max-width: 900px; font-size: 0.86rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
+  .t3-sample-label { font-weight: 800; }
+  .t3-try { display: block; margin: 16px 0 0; max-width: 560px; background: rgba(255,255,255,0.96); color: var(--ref-navy); border-radius: 14px; padding: 14px 16px 12px; box-shadow: 0 14px 30px -20px rgba(0,0,0,0.6); }
+  .t3-try-title { margin: 0 0 8px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; font-size: 1rem; }
+  .t3-try-when { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: 999px; background: var(--ref-navy); color: #fff; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; vertical-align: 2px; }
+  .t3-try-stops { list-style: none; margin: 0; padding: 0; }
+  .t3-try-stops li { display: grid; grid-template-columns: 5.2em 1fr; gap: 8px; padding: 7px 0; border-top: 1px solid rgba(27,43,58,0.1); font-size: 0.86rem; line-height: 1.35; }
+  .t3-try-stops li:first-child { border-top: 0; }
+  .t3-try-time { font-weight: 800; white-space: nowrap; }
+  .t3-try-stop a { font-weight: 800; color: var(--ref-navy); text-decoration: none; }
+  .t3-try-stop a:hover { text-decoration: underline; }
+  .t3-try-hh, .t3-try-deal { display: block; font-size: 0.8rem; color: rgba(27,43,58,0.78); }
+  .t3-try-hh { color: #1F5450; font-weight: 700; }
+  .t3-try-btn { display: inline-flex; align-items: center; gap: 6px; width: auto; margin-top: 8px; background: var(--ref-navy); color: #fff; border: 0; border-radius: 999px; padding: 9px 16px; min-height: 40px; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
+  .t3-try-btn:hover { background: #24384c; }
+  .t3 .t3-fr { display: none; }
+  html[lang="fr"] .t3 .t3-fr { display: inline; }
+  html[lang="fr"] .t3 .t3-en { display: none; }
+
   /* 2026-10-19: the example chips' height is reserved (measured with the final fonts), so the hero does not grow when the
      web font replaces the fallback and a chip wraps onto another line. */
-  .t3-examples { min-height: 216px; }
-  html[lang="fr"] .t3-examples { min-height: 264px; }
-  @media (max-width: 1023px) { .t3-examples { min-height: 264px; } html[lang="fr"] .t3-examples { min-height: 312px; } }
-  @media (max-width: 640px) { .t3-examples { min-height: 396px; } html[lang="fr"] .t3-examples { min-height: 446px; } }
+  /* Four shorter examples (2026-10-29): measured 120px at 900 and 1280 wide (EN and FR), 230px on a 375 phone, 258px
+     in French on a 320 phone. */
+  .t3-examples { min-height: 120px; align-content: flex-start; }
+  @media (max-width: 640px) { .t3-examples { min-height: 232px; } html[lang="fr"] .t3-examples { min-height: 260px; } }
   .t3-status { min-height: 1.4em; margin: 14px 0 0; font-weight: 700; font-size: 0.92rem; color: #fff; }
   .t3-status.is-error { color: #FFD7A8; }
   /* Phones opening a plan link (2026-10-18): the request shrinks to one "Edit request" bar so the plan is on screen
@@ -438,12 +483,12 @@ function renderStyles() {
   .t3-editbar-label { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #E0A94E; }
   .t3-editbar-btn { flex: none; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 0; background: #fff; color: var(--ref-navy-deep, #101B24); font-weight: 800; font-size: 0.86rem; cursor: pointer; }
   .t3.is-compact .t3-hero-inner { padding-top: 12px; padding-bottom: 12px; }
-  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples { display: none; }
+  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples, .t3.is-compact .t3-sample, .t3.is-compact .t3-try { display: none; }
   .t3.is-compact .t3-crumb { margin-bottom: 10px; }
   .t3.is-compact .t3-status:empty { display: none; }
   /* What we understood (the editable chips) belongs to the request, so it folds away with it until "Edit request"
      (2026-10-18): the plan then starts right under the bar instead of about 400px further down. */
-  .t3.is-compact .t3-understood { display: none; }
+  .t3.is-compact > .t3-understood { display: none; }
   .t3.is-compact .t3-result { padding-top: 14px; }
 
   /* How it works (before the first plan). */
@@ -452,7 +497,6 @@ function renderStyles() {
   .t3-how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 0; padding: 0; list-style: none; }
   .t3-how-grid li { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); font-size: 0.92rem; line-height: 1.5; }
   .t3-how-grid strong { display: block; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.02rem; margin-bottom: 4px; }
-  .t3-how-num { display: inline-flex; width: 26px; height: 26px; border-radius: 999px; background: var(--ref-navy); color: #fff; font-weight: 800; font-size: 0.8rem; align-items: center; justify-content: center; margin-bottom: 8px; }
 
   /* Result */
   .t3-result { padding: 26px 0 64px; }
@@ -468,7 +512,7 @@ function renderStyles() {
   .t3-length-ask { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-length-ask select { font: inherit; font-size: 16px; min-height: 44px; margin-left: 6px; }
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
-  /* Phone (2026-10-19, round 8): at 320px the "Where" chip's select ("Anywhere in the Okanagan") pushed the page 12px
+  /* Phone (2026-10-19, round 8): at 320px the "Where" chip's select ("Anywhere in the Sea to Sky") pushed the page 12px
      sideways. A chip now never grows past its row: long text wraps, and on narrow screens a chip's select shrinks to
      the space left beside its label. The plan's date and time inputs get 16px text and a 44px height, so tapping
      them doesn't make iPhone Safari zoom the page. */
@@ -493,7 +537,7 @@ function renderStyles() {
   .t3-plan-head .t3-btn-ghost:hover { background: rgba(255,255,255,0.12); }
   .t3-plan-status { margin: 10px 0 0; font-size: 0.88rem; color: rgba(255,255,255,0.9); min-height: 1.2em; }
   .t3-edit-error { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #FFF6E6; border: 1px solid rgba(181,69,43,0.45); color: #7A2E1B; font-size: 0.88rem; font-weight: 700; }
-  .t3-rain a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
+  .t3-rain a, .t3-ski-suggest a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
   .t3-details { margin-top: 12px; font-size: 0.84rem; color: rgba(255,255,255,0.8); }
   .t3-details summary { cursor: pointer; font-weight: 700; padding: 11px 0; } /* round 11 (2026-10-20): 44px tap target */
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
@@ -641,6 +685,31 @@ function renderStyles() {
   .t3-caveats li + li { margin-top: 4px; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
+  .t3-estimate { padding: 14px 16px; border-radius: 12px; background: #e9f1ec; font-weight: 800; }
+  .t3-stop-price { margin: 6px 0; font-size: .88rem; font-weight: 800; color: #28594d; }
+  .t3-how .t3-sample { color: inherit; }
+  .t3-fit summary, .t3-how summary { cursor: pointer; font-weight: 700; }
+  @media (min-width: 900px) {
+    .t3-stops .t3-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(132px, max-content);
+      grid-template-rows: auto auto 1fr;
+      column-gap: 16px;
+    }
+    .t3-stops .t3-card .t3-more-menu { position: static; min-width: 0; box-sizing: border-box; }
+    .t3-stops .t3-card > :not(.t3-actions) { grid-column: 1; }
+    .t3-stops .t3-card .t3-actions {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      flex-direction: column;
+      align-items: stretch;
+      align-self: start;
+      margin: 0;
+      padding: 0 0 0 14px;
+      border-top: 0;
+      border-left: 1px solid rgba(27,43,58,.1);
+    }
+  }
   .t3-card.is-swapped { box-shadow: 0 0 0 3px var(--ref-gold, #C9A227); transition: box-shadow 0.4s; }
   .t3-swap-note { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 800; color: #6B5410; }
   .t3-more { position: relative; display: inline-block; }
@@ -757,6 +826,28 @@ function renderStyles() {
 </style>`;
 }
 
+// Example card (2026-10-29): a real plan run on the server for today (d.sample, see tripSamplePlan in server.js), so
+// visitors see what they get before they type. English and French both render; html[lang] shows one. Without a plan
+// (late at night) the one-line example stays.
+function t3SampleCardHtml(d) {
+  const esc = d.esc;
+  const x = d.sample;
+  const line = `<p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">${SITE_PAGE.sampleText}</span></p>`;
+  if (!x || !x.stops || x.stops.length < 2) return line;
+  const DAYS = [['Sunday', 'dimanche'], ['Monday', 'lundi'], ['Tuesday', 'mardi'], ['Wednesday', 'mercredi'], ['Thursday', 'jeudi'], ['Friday', 'vendredi'], ['Saturday', 'samedi']];
+  const day = x.date && x.date !== d.today ? DAYS[new Date(`${x.date}T12:00:00Z`).getUTCDay()] : null;
+  const two = (en, fr) => (en === fr ? esc(en) : `<span class="t3-en">${esc(en)}</span><span class="t3-fr" lang="fr">${esc(fr)}</span>`);
+  const when = day ? two(day[0], day[1]) : two('Today', 'Aujourd\u2019hui');
+  const rows = x.stops.map((st) => `
+          <li><span class="t3-try-time">${two(st.time, st.timeFr)}</span><span class="t3-try-stop"><a href="${esc(st.url)}">${esc(st.name)}</a>${st.hh ? `<span class="t3-try-hh">${two(`${SITE_PAGE.sampleStopLabel.en} ${st.hh}`, `${SITE_PAGE.sampleStopLabel.fr} ${st.hhFr}`)}</span>` : ''}${st.deal ? `<span class="t3-try-deal">${two(st.deal, st.dealFr || st.deal)}</span>` : ''}</span></li>`).join('');
+  return `<div class="t3-try" aria-labelledby="t3TryTitle">
+        <p class="t3-try-title" id="t3TryTitle"><span class="t3-try-when">${when}</span> <span data-i18n="tripv3.cardTitle">${SITE_PAGE.sampleTitle}</span></p>
+        <ol class="t3-try-stops">${rows}
+        </ol>
+        <button type="button" class="t3-try-btn" data-t3-request="${esc(x.request)}"><span data-i18n="tripv3.cardButton">Plan this trip</span> <span aria-hidden="true">&rarr;</span></button>
+      </div>`;
+}
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -771,18 +862,18 @@ function renderBody(d) {
     <div class="t3-wrap t3-hero-inner">
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
       <p class="t3-eyebrow" data-i18n="tripv3.name">Build My Trip</p>
-      <h1 class="t3-title" id="t3Title" data-i18n="tripv3.title">Tell us the trip. We&rsquo;ll map it out.</h1>
-      <p class="t3-lead" data-i18n="tripv3.lead">Describe your Okanagan trip in your own words &mdash; how long, who&rsquo;s coming, what you love. We&rsquo;ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.</p>
+      <h1 class="t3-title" id="t3Title"><span class="t3-en">${SITE_PAGE.title}</span><span class="t3-fr" lang="fr">${SITE_PAGE.titleFr}</span></h1>
+      <p class="t3-lead"><span class="t3-en">Tell us where you’re going, for how long, and what you’d like to do.</span><span class="t3-fr" lang="fr">Indiquez votre destination, la durée du voyage et ce que vous aimeriez faire.</span></p>
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
-        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food." data-i18n-placeholder="tripv3.placeholder"></textarea>
+        <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
-          <span class="t3-hint" data-i18n="tripv3.hint">Real Okanagan Roam places only &mdash; no invented details.</span>
+          <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
       </form>
       <div class="t3-examples">
-        <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
+        <span class="t3-examples-label" id="t3ExamplesLabel"><span class="t3-en">Try an example</span><span class="t3-fr" lang="fr">Essayez un exemple</span></span>
           ${chips}
       </div>
       <div class="t3-editbar" id="t3EditBar" hidden>
@@ -792,14 +883,11 @@ function renderBody(d) {
       <p class="t3-status" id="t3Status" role="status" aria-live="polite"></p>
     </div>
   </section>
-  <section class="t3-wrap t3-how" id="t3How" aria-labelledby="t3HowTitle">
-    <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">How it works</h2>
-    <ol class="t3-how-grid">
-      <li><span class="t3-how-num">1</span><strong data-i18n="tripv3.how1Title">Say it your way</strong><span data-i18n="tripv3.how1Text">&ldquo;Three days, wineries and a cozy dinner, plus an autumn walk.&rdquo; Days, dates, kids, dogs and occasions all count.</span></li>
-      <li><span class="t3-how-num">2</span><strong data-i18n="tripv3.how2Title">Real places, real reasons</strong><span data-i18n="tripv3.how2Text">Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it &mdash; and we tell you why.</span></li>
-      <li><span class="t3-how-num">3</span><strong data-i18n="tripv3.how3Title">Make it yours</strong><span data-i18n="tripv3.how3Text">Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.</span></li>
-    </ol>
-  </section>
+  <details class="t3-wrap t3-how" id="t3How">
+    <summary><span class="t3-en">How it works</span><span class="t3-fr" lang="fr">Comment ça marche</span></summary>
+    <p><span class="t3-en">Describe your trip or choose an example. Then swap or remove stops, save your trip, and share the plan with your group.</span><span class="t3-fr" lang="fr">Décrivez votre voyage ou choisissez un exemple. Remplacez ou retirez des arrêts, enregistrez le voyage et partagez le plan avec votre groupe.</span></p>
+    ${t3SampleCardHtml(d)}
+  </details>
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
 </main>`;
 }
@@ -821,6 +909,7 @@ function renderScript(d) {
   // Day headers that show a pre-rendered map instead of a photograph: { slug: { group: { key, label }, assets: { desktop, narrow } } } (see tripV3MapHeaders in server.js).
   var MAP_HEADERS = ${JSON.stringify(d.mapHeaders || {})};
   var TRIP_MAX_STOPS = 30; // My Trip's own limit (MAX_STOPS in /scripts/app.js; 30 since 2026-10-18)
+  var SITE_PAGE = ${JSON.stringify(SITE_PAGE)};
   ${CLIENT_HELPERS_SRC}
   ${t3EditLosesMatch.toString()}
   ${t3FrenchHref.toString()}
@@ -839,6 +928,17 @@ function renderScript(d) {
   ${frHeadingWhen.toString()}
   ${frHeadingWhere.toString()}
   ${t3FrenchHeading.toString()}
+  // Distillery test 2 (2026-11-13): the plan's summary sentence in French (t3FrenchHeading falls back to it).
+  ${t3FrenchHeadingCore.toString()}
+  ${t3FrenchSummary.toString()}
+  ${frSummaryItems.toString()}
+  ${frSummaryList.toString()}
+  ${frSummaryAround.toString()}
+  ${frOccasionNoun.toString()}
+  var FR_SITE = ${JSON.stringify(FR_SITE)};
+  ${frSiteIn.toString()}
+  ${frSiteOut.toString()}
+  ${t3FrenchTextCore.toString()}
   ${t3FrenchText.toString()}
   ${t3FrenchEvent.toString()}
   // Round 8: the written French summary and its lookup ship with t3FrenchPlan, which calls them.
@@ -881,7 +981,7 @@ function renderScript(d) {
   function frLabel(key, english){ if (lang() !== 'fr') return english; var s = tx(key); return s === key ? english : s; }
   function num(n){ return lang() === 'fr' ? String(n).replace('.', ',') : String(n); }
   // Strings for the map day header (new; kept here so the shared dictionary in app.js stays untouched).
-  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: 'Powered by Geoapify' }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: 'Fourni par Geoapify' } };
+  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: ${JSON.stringify(SITE_PAGE.mapCredit.en)} }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: ${JSON.stringify(SITE_PAGE.mapCredit.fr)} } };
   function dh(key, vars){
     var s = (DH_TEXT[lang()] || DH_TEXT.en)[key] || DH_TEXT.en[key] || key;
     if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
@@ -912,7 +1012,8 @@ function renderScript(d) {
   function errorText(msg){
     if (lang() !== 'fr') return msg;
     var m = /^A locked stop cannot be kept: (.+) on day ([0-9]+) no longer fits this plan[.] Unlock it, or change the request[.]$/.exec(msg || '');
-    return m ? 'Un arrêt conservé ne peut pas être gardé : ' + m[1] + ' (jour ' + m[2] + ') ne convient plus à ce plan. Libérez-le ou modifiez la demande.' : msg;
+    // Cocktail test 2 (2026-11-13): the date conflicts ("The calendar date conflicts with the named weekday…") too.
+    return m ? 'Un arrêt conservé ne peut pas être gardé : ' + m[1] + ' (jour ' + m[2] + ') ne convient plus à ce plan. Libérez-le ou modifiez la demande.' : t3FrenchText(msg);
   }
   function request(extra, opts){
     opts = opts || {};
@@ -1042,7 +1143,7 @@ function renderScript(d) {
   }
   // Round 10 (2026-10-19): a short plan's stops (itinerary or outing), what a Swap sends of them, and their shown starts.
   // Round 10 (2026-10-19): a suggested start as people read it, "11:30 AM" (« 11 h 30 » in French), not "11:30".
-  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h === 12 && !mm ? 'midi' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
+  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h === 12 && !mm ? 'midi' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); if (h === 0 && !mm) return 'midnight'; return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
   function shortStops(){ var p = state.last || {}; return (p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []; }
   function shortShown(list){
     return list.slice(0, 12).map(function(s){
@@ -1076,7 +1177,7 @@ function renderScript(d) {
       return;
     }
     if (!ns || !ns.venue || ns.venue.name === oldName) return;
-    // Round 11: one full stop after a name that already ends with one ("Kelowna Brewing Co." read "Co..").
+    // Round 11: one full stop after a name that already ends with one ("Whistler Brewing Co." read "Co..").
     var stopped = function(t){ return /[.!?…]$/.test(t) ? t : t + '.'; };
     announce(oldName ? (fr ? stopped(oldName + ' a été remplacé par ' + ns.venue.name) : stopped('Swapped ' + oldName + ' for ' + ns.venue.name)) : (fr ? stopped('Nouvelle suggestion : ' + ns.venue.name) : stopped('New suggestion: ' + ns.venue.name)));
     var nb = findBtn();
@@ -1100,7 +1201,7 @@ function renderScript(d) {
     (p.recommendations || []).forEach(function(s){ if (s.venue) ids.push(s.venue.id); });
     return ids.slice(0, 200);
   }
-  function tripQuery(v){ return v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', Okanagan Valley, BC'); }
+  function tripQuery(v){ return v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', ${SITE_PAGE.addressSuffix}'); }
   function nameCounts(){
     var c = {}, p = state.last || {};
     var all = [];
@@ -1118,7 +1219,7 @@ function renderScript(d) {
   // detaches it before rewriting the result and puts it back into the new
   // plan's map slot, so an open map, its chosen day and its Leaflet instance
   // survive every edit -- only the markers and day lines are redrawn. A view
-  // only: no analytics, no URL state, no request to Okanagan Roam.
+  // only: no analytics, no URL state, no request to Whistler Roam.
   var LEAFLET_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
   var LEAFLET_JS_SRI = 'sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==';
   var LEAFLET_CSS_SRI = 'sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==';
@@ -1187,7 +1288,7 @@ function renderScript(d) {
       if (!tripMap.open || tripMap.leaflet || !tripMap.box.parentNode) return;
       if (!ok) { mapStatus(tx('tripv3.map.failed')); return; }
       try {
-        tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView([49.75, -119.55], 9);
+        tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView(${JSON.stringify(SITE_PAGE.mapCentre)}, ${SITE_PAGE.mapZoom});
         L.tileLayer(MAP_TILES, { maxZoom: 15, attribution: MAP_ATTRIBUTION }).addTo(tripMap.leaflet);
         tripMap.layer = L.layerGroup().addTo(tripMap.leaflet);
       } catch (e) { tripMap.leaflet = null; mapStatus(tx('tripv3.map.failed')); return; }
@@ -1277,7 +1378,7 @@ function renderScript(d) {
   // ---- rendering ----
   function factsLine(v){
     var parts = [];
-    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(num(v.rating)) + (v.reviews ? ' <span class="t3-sr">' + esc(tx('tripv3.from')) + '</span>' + esc(tx('tripv3.reviews', { n: Number(v.reviews).toLocaleString(lang() === 'fr' ? 'fr-CA' : 'en-CA') })) : ''));
+    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(num(v.rating)) + (v.reviews ? ' <span class="t3-sr">' + esc(tx('tripv3.from')) + ' </span>' + esc(tx('tripv3.reviews', { n: Number(v.reviews).toLocaleString(lang() === 'fr' ? 'fr-CA' : 'en-CA') })) : ''));
     if (v.price) parts.push('<span aria-label="' + esc(tx('tripv3.priceLevel', { n: v.price })) + '">' + new Array(v.price + 1).join('$') + '</span>');
     return parts.length ? '<p class="t3-facts">' + parts.join(' · ') + '</p>' : '';
   }
@@ -1288,7 +1389,9 @@ function renderScript(d) {
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
   var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening', night: 'Night' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
-  function whenLabel(s, key){ var w = DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; var t = stopTime(s, key); return t ? w + ' · ' + t : w; }
+  // Cocktail test 2 (2026-11-13): a stop named for its kind ("Cocktail lounges · 18 h–19 h") reads in French too
+  // (« Bars à cocktails · 18 h–19 h »).
+  function whenLabel(s, key){ var w = DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : lang() === 'fr' ? t3FrenchText(s.label) : s.label; var t = stopTime(s, key); return t ? w + ' · ' + t : w; }
   // Round 15 (2026-10-20): each stop shows its start and end ("9 AM–10:30 AM", « 9 h–10 h 30 »), from the plan's schedule.
   function stopTime(s, key){
     var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
@@ -1317,12 +1420,16 @@ function renderScript(d) {
     return '/images/trip-v3/stops/stop-' + pick + '-480.jpg';
   }
   function badgesHtml(v){
-    // The badges that answer the request come first: the party's (dog, kids), then Okanagan Roam's own lists.
+    // The badges that answer the request come first: the party's (dog, kids), then Whistler Roam's own lists.
     var party = ((state.last && state.last.understood && state.last.understood.party) || []).join(' ');
     var wanted = function(b){ return (/dog/.test(party) && b.key === 'dog_friendly') || (/kid/.test(party) && b.key === 'kid_friendly') ? 0 : 1; };
     var badges = (v.badges || []).slice().sort(function(a, b){ return wanted(a) - wanted(b); });
     var lead = badges.filter(function(b){ return wanted(b) === 0; }), rest = badges.filter(function(b){ return wanted(b) === 1; });
-    var badgeLi = function(b){ return '<li>' + esc(BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    // Brewery test 1 (2026-11-12): "Kids until 9 PM" (« Enfants jusqu’à 21 h ») where the owner set a time for minors.
+    // The label comes from the planner ("Kids until 9 PM"); the page has already written its time in the page's style
+    // ("9 PM" / "21 h"), so French only swaps the words around it.
+    var kidsUntil = function(b){ var t = String(b.label || '').replace(/^Kids until /, ''); return lang() === 'fr' ? 'Enfants jusqu’à ' + t : 'Kids until ' + t; };
+    var badgeLi = function(b){ return '<li>' + esc(b.key === 'dog_friendly' && v.dogsPatioOnly ? (lang() === 'fr' ? 'Chiens sur la terrasse' : 'Dogs on patio') : b.key === 'dog_friendly' && v.dogsOutsideOnly ? (lang() === 'fr' ? 'Chiens à l’extérieur seulement' : 'Dogs outside only') : b.key === 'kid_friendly' && v.kidsUntil && /^Kids until /.test(b.label || '') ? kidsUntil(b) : BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));
@@ -1334,6 +1441,44 @@ function renderScript(d) {
         .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false" aria-label="' + esc(lang() === 'fr' ? 'Afficher ' + extra + ' autres caract\u00e9ristiques' : 'Show ' + extra + ' more features') + '">' + esc(lang() === 'fr' ? '+' + extra : '+' + extra + ' more') + '</button></li>');
     }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
+  }
+  function cad(cents){
+    return new Intl.NumberFormat(lang() === 'fr' ? 'fr-CA' : 'en-CA', {
+      style: 'currency', currency: 'CAD', minimumFractionDigits: cents % 100 ? 2 : 0
+    }).format(cents / 100);
+  }
+  function stopPriceHtml(v){
+    var french = lang() === 'fr', cost = v.cost;
+    if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
+      // Brewery test 1 (2026-11-12): an owner's flight or tasting price reads "Flights from $14" / "Tastings from $10".
+      // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
+      // wording, the card's « À partir de », not « dès »).
+      var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : cost.label === 'Tour' ? (french ? 'À partir de ' : 'From ') : '';
+      if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
+      return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
+        + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
+    }
+    // Winery test 5 (2026-11-12): a winery whose owner says tastings are free.
+    if (v.freeTasting) return '<p class="t3-stop-price" data-cost-cents="0">' + esc(french ? 'Dégustation gratuite' : 'Free tasting') + '</p>';
+    return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
+      + esc(v.freeEntry ? (french ? 'Entrée gratuite' : 'Free entry') : (french ? 'Prix par personne à vérifier' : 'Check price per person')) + '</p>';
+  }
+  function updateTripEstimate(){
+    var el = resultEl.querySelector('[data-t3-estimate]');
+    if (!el) return;
+    var cards = Array.from(resultEl.querySelectorAll('.t3-stops .t3-card'));
+    var known = 0, cents = 0, french = lang() === 'fr';
+    cards.forEach(function(card){
+      var price = card.querySelector('[data-cost-cents]');
+      if (price) { known++; cents += Number(price.dataset.costCents); }
+    });
+    if (!cards.length) return;
+    var missing = cards.length - known;
+    el.hidden = false;
+    el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
+      + (known ? cad(cents) + ' CAD' : (french ? 'à vérifier' : 'check prices'))
+      + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
+      + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
   }
   function cardHtml(stop, key, opts){
     opts = opts || {};
@@ -1356,21 +1501,22 @@ function renderScript(d) {
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
       + '<div class="t3-card-head">' + photoHtml
-      + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
+      + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : (lang() === 'fr' && v.typeLabelFr ? v.typeLabelFr : frLabel('tripv3.type.' + v.type, v.typeLabel))) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
+      + stopPriceHtml(v)
       + factsLine(v)
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
-      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
-      + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour ' + (stop.happyHourWhenFr ? esc(stop.happyHourWhenFr) + ' ' : '') + ': <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
+      + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? '5 à 7' + (stop.happyHourWhenFr ? ' (' + esc(stop.happyHourWhenFr) + ')' : '') + '\u00a0: <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
-      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
-      + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
+      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
+      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
@@ -1436,14 +1582,16 @@ function renderScript(d) {
     if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
     (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
     // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
-    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
+    // Brewery test 2 (Whistler, 2026-11-16): on the French page a kind the planner names ("venues with happy hour") reads
+    // in French (« Lieux avec un 5 à 7 »); a word the visitor typed stays as typed.
+    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«] *| *[”"»]$/g, ''); /* Distillery test 1 (Whistler, 2026-11-16): this script is a template string, so "\\s" reached the page as "s" and a quoted word lost its last letters (“cocktail class” read "Cocktail cla") */ if (lang() === 'fr' && Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES, w.toLowerCase())) w = FR_HEADING_NAMES[w.toLowerCase()]; chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
     (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
     // No length given (2026-10-19): ask for one, with the same Length control.
     var lengthAsk = '';
     if (u.lengthAsked === false && ['recommendations', 'discover', 'day_plan', 'multi_day'].indexOf(p.kind) !== -1) {
       var lfr = lang() === 'fr', lOpts = '<option value="">' + esc(lfr ? 'Choisir une durée' : 'Choose a length') + '</option>';
       for (var ln = 1; ln <= 7; ln++) lOpts += '<option value="' + ln + '">' + esc(tx(ln === 1 ? 'tripv3.dayOne' : 'tripv3.dayMany', { n: ln })) + '</option>';
-      lengthAsk = '<p class="t3-length-ask">' + esc(planKinds ? (lfr ? 'Vous n’avez pas indiqué de durée : voici un plan de ' + (p.days || []).length + ' jour' + ((p.days || []).length > 1 ? 's' : '') + '. Changez la durée ci-dessus.' : 'You didn’t say how long, so this is a ' + (p.days || []).length + '-day plan. Change the length above.') : (lfr ? 'Combien de temps dure votre voyage? Choisissez une durée pour un plan jour par jour.' : 'How long is your trip? Choose a length for a day-by-day plan.'))
+      lengthAsk = '<p class="t3-length-ask">' + esc(planKinds ? (lfr ? 'Vous n’avez pas indiqué de durée : voici un plan de ' + (p.days || []).length + ' jour' + ((p.days || []).length > 1 ? 's' : '') + '. Changez la durée ci-dessus.' : 'You didn’t say how long, so this is a ' + (p.days || []).length + '-day plan. Change the length above.') : (lfr ? 'Combien de temps dure votre voyage\u202f? Choisissez une durée pour un plan jour par jour.' : 'How long is your trip? Choose a length for a day-by-day plan.'))
         + (planKinds ? '' : ' <select data-t3-override="days" aria-label="' + esc(tx('tripv3.lengthLabel')) + '">' + lOpts + '</select>') + '</p>';
     }
     var notUsed = (u.notUsed || []).length ? '<p class="t3-notused">' + esc(tx('tripv3.notUsed', { list: '\u0001' })).split('\u0001').join(u.notUsed.map(function(w){ return (lang() === 'fr' ? '«\u00a0' : '“') + esc(w) + (lang() === 'fr' ? '\u00a0»' : '”'); }).join(', ')) + '</p>' : '';
@@ -1470,7 +1618,7 @@ function renderScript(d) {
             + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + e.name + ' au voyage' : 'Add ' + e.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || ${JSON.stringify(SITE_PAGE.fallbackRegionLabel)}) + ', ${SITE_PAGE.addressSuffix}') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + e.name + ' au voyage' : 'Add ' + e.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
@@ -1524,7 +1672,7 @@ function renderScript(d) {
       + '<source media="(max-width: ' + (nw.below - 1) + 'px)" srcset="' + esc(nw.src) + '">'
       + '<img src="' + esc(dk.src) + '" alt="" width="' + dk.w + '" height="' + dk.h + '" decoding="async" loading="' + (first ? 'eager' : 'lazy') + '"></picture>'
       + (layout.fits ? pinsHtml : '<span class="t3-dh-ring"></span>') + '</div>'
-      + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="https://www.geoapify.com/" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
+      + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="${SITE_PAGE.mapCredit.url}" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
   }
   // "N stops · About N km" for a day (2026-10-18: every day shows it, not only the first day in a town).
   function dayMeta(d){
@@ -1540,10 +1688,10 @@ function renderScript(d) {
   function mapHeadHtml(d, mh, maps){
     var meta = dayMeta(d);
     var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
-    // Round 11 (2026-10-20): a day in towns of two parts of the valley (Penticton and Vernon) is not tagged with one of them.
+    // Round 11 (2026-10-20): a day in towns of two parts of the corridor (Squamish and Pemberton) is not tagged with one of them.
     if (d.regions && d.regions.length > 1 && d.regions.some(function(r){ var h = MAP_HEADERS[r]; return !h || !h.group || !mh.group || h.group.key !== mh.group.key; })) group = '';
     return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
-      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}')) + '</h3>'
       + (group ? '<p class="t3-dh-sub">' + esc(group) + '</p>' : '')
       + '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
@@ -1612,14 +1760,14 @@ function renderScript(d) {
     // town used to show the town photo with neither. A region without a map keeps the photo header, with the same line.
     var meta = dayMeta(d);
     var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
-      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}')) + '</h3>'
       + (meta.length ? '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>' : '')
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
       + (maps ? '<a class="t3-btn" ' + hrefAttr(maps) + ' target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
-    // A label of its own for each day (2026-10-19): "Day 1 · Kelowna", not "Kelowna" twice.
-    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'
+    // A label of its own for each day (2026-10-19): "Day 1 · Whistler", not "Whistler" twice.
+    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('${SITE_PAGE.i18nAreaKey}'))) + '">'
       + head
       + (d.driveIn ? '<p class="t3-leg t3-leg-drive t3-drive-in">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
@@ -1676,7 +1824,9 @@ function renderScript(d) {
         var value = i.kind === 'duration' || i.kind === 'price_limit' || i.kind === 'rainy' ? i.kind : i.value;
         var label = names[value] || String(value).replace(/_/g, ' ');
         if (i.kind === 'days') label = i.value + (fr ? ' jour(s)' : ' day(s)');
-        if (i.kind === 'venue') label = i.sourceText || label;
+        // Distillery test 3: the place's name, not the visitor's request in lower case ("monday in kelowna bench road …").
+        if (i.kind === 'venue') label = i.venueName || i.sourceText || label;
+        if (i.reason && i.sourceText && (i.kind === 'venue' || i.sourceText.length > 25) && String(i.reason).indexOf(i.sourceText) >= 0) return '<li>' + esc(label) + ' — ' + esc(String(i.reason).split(i.sourceText).join(label)) + '</li>';
         if (i.kind.indexOf('excluded_') === 0) label = (fr ? 'Sans ' : 'No ') + label;
         return '<li>' + esc(label) + (i.reason ? ' — ' + esc(i.reason) : '') + '</li>';
       }).join('') + '</ul></details>';
@@ -1694,22 +1844,26 @@ function renderScript(d) {
     var rainNote = /^(?:If it rains:|S’il pleut :)/;
     var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1 && !((p.rainBackup || []).length && rainNote.test(n)); });
     var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = placeUrl(v); return u ? '<a ' + hrefAttr(u) + '>' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
-    var html = understoodHtml(p)
-      + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
-      + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
+    var html = '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
-      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
-      + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
-      + rainHtml
       + '<div class="t3-plan-actions">'
       + (hasStops ? '<button type="button" class="t3-btn" data-t3-add-all aria-describedby="t3PlanStatus">' + esc(tx('tripv3.addAll')) + '</button>' : '')
       + (regen ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-regen>' + esc(regen) + '</button>' : '')
       + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-share>' + esc(tx('tripv3.share')) + '</button>'
       + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-view-trip hidden>' + esc(tx('tripv3.viewTrip')) + '</button>'
       + '</div><p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p>'
+      + '<details class="t3-details"><summary>' + esc(lang() === 'fr' ? 'Notes sur le plan' : 'Planning notes') + '</summary>'
+      + understoodHtml(p)
+      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
+      + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
+      + rainHtml
+      // Winter: skiing is suggested, not forced (2026-10-25).
+      + (p.skiSuggestion && state.text ? '<p class="t3-expect t3-ski-suggest">' + esc(lang() === 'fr' ? p.skiSuggestion.textFr : p.skiSuggestion.text) + ' <a ' + hrefAttr(((location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip') + '?q=' + encodeURIComponent(state.text + ' ' + (lang() === 'fr' ? p.skiSuggestion.addFr : p.skiSuggestion.add))) + '>' + esc(lang() === 'fr' ? p.skiSuggestion.labelFr : p.skiSuggestion.label) + ' \u2192</a></p>' : '')
+      + '</details>'
       + (notes.length ? '<details class="t3-details"><summary>' + esc(tx('tripv3.howMade')) + '</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
       + '</header>';
+    var aboveStopsLength = html.length;
     if(p.timeBudget){
       var budget=p.timeBudget, fr=document.documentElement.lang==='fr';
       html+='<section class="t3-warnings" aria-label="'+(fr?'Options de durée':'Time budget options')+'"><h3>'+(fr?'Adaptez la sortie à votre temps':'Make this outing fit your time')+'</h3>';
@@ -1728,7 +1882,7 @@ function renderScript(d) {
       // 2026-10-21: folded by default. Each stop card already shows its time, and the full list pushed the day cards
       // three or four screens down on a phone.
       var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
-      html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+' arrêts, heures et trajets':stopCount+' stops, times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
+      html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+(stopCount===1?' arrêt':' arrêts')+', heures et trajets':stopCount+(stopCount===1?' stop':' stops')+', times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
         var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
@@ -1763,7 +1917,7 @@ function renderScript(d) {
       var timeValue=selectedMinutes!==undefined?String(Math.floor(selectedMinutes/60)).padStart(2,'0')+':'+String(selectedMinutes%60).padStart(2,'0'):'';
       // Closed until a date or time is set, so the plan's stops come first on a phone (2026-10-14).
       var schedOpen=!!(state.overrides.startDate||selectedMinutes!==undefined);
-      schedHtml='<details class="t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Dates et heure de départ':'Dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></details>';
+      schedHtml='<details class="t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Dates et heure de départ':'Dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale ${SITE_PAGE.timeLabelFr}. Les événements conservent leurs heures indiquées.':'${SITE_PAGE.timeLabel} local time. Events keep their listed times.')+'</p></details>';
     }
     if(p.shortWalkRepairs && !Object.keys(state.removed).length){
       var swFr=lang()==='fr';
@@ -1798,7 +1952,10 @@ function renderScript(d) {
         if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(nextFr?t3FrenchHref(step.url,step.urlFr):step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
-        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
+        // Distillery test 3 (2026-11-13): a named place that's closed that day says only why ("Bench Road Spirits (test) is
+        // closed Mondays · try Tue–Sun."), not the visitor's whole request in lower case before it.
+        if(step.venue&&t3MissingClosedText(step,nextFr))return '<li>'+esc(t3MissingClosedText(step,nextFr))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+'</li>';
+        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(t3MissingClosedText(step,nextFr)?esc((nextFr?'Non inclus : ':'Not included: ')+t3MissingClosedText(step,nextFr)):(nextFr?'non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.'))+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
     html += requirementSummaryBlock(p);
@@ -1811,10 +1968,12 @@ function renderScript(d) {
     }
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
     html += warningSummaryHtml(p);
+    var tripDetails = html.slice(aboveStopsLength);
+    html = html.slice(0, aboveStopsLength);
     // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
-      // Round 12 (2026-10-20): French day tabs say « Penticton et Osoyoos » (the plan's own days are not translated).
+      // Round 12 (2026-10-20): French day tabs say « Squamish et Whistler » (the plan's own days are not translated).
       if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a ' + hrefAttr('#t3-day-' + d.day) + '>' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(lang() === 'fr' ? String(d.regionLabel).replace(/ and /g, ' et ') : d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
@@ -1838,10 +1997,13 @@ function renderScript(d) {
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
+    if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
+    html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
+    updateTripEstimate();
     // Round 11: French plans link to French pages (see t3FrenchHref).
     if (lang() === 'fr') Array.prototype.forEach.call(resultEl.querySelectorAll('a[href^="/"]'), function(a){ var u = a.getAttribute('href'), fr = t3FrenchHref(u, a.getAttribute('data-url-fr')); if (fr !== u) a.setAttribute('href', fr); });
     resultEl.hidden = false;
@@ -1874,7 +2036,7 @@ function renderScript(d) {
     var c = document.getElementById('tripTrayCount');
     var n = c ? parseInt(c.textContent, 10) : NaN;
     if (!isNaN(n)) return n;
-    try { var t = JSON.parse(window.localStorage.getItem('okanaganTrip') || '[]'); return Array.isArray(t) ? t.length : 0; } catch (e) { return 0; }
+    try { var t = JSON.parse(window.localStorage.getItem('${SITE_PAGE.storagePrefix}Trip') || '[]'); return Array.isArray(t) ? t.length : 0; } catch (e) { return 0; }
   }
   function planStopButtons(day){
     var seen = {}, out = [];
@@ -1913,10 +2075,10 @@ function renderScript(d) {
     s.textContent = '';
     setTimeout(function(){ s.textContent = text; }, 40);
   }
-  // My Trip keeps the plan's days (2026-10-18): each stop's day goes in okanaganTripDays (ref -> day), the same store
+  // My Trip keeps the plan's days (2026-10-18): each stop's day goes in ${SITE_PAGE.storagePrefix}TripDays (ref -> day), the same store
   // the older planner used, so /my-trip groups the stops by day with a directions link per day. Saved trips without
   // days still show as one list.
-  // A dated one-day outing (an itinerary: "brewery crawl Penticton afternoon" on Sat, Oct 24) has no day list, so its
+  // A dated one-day outing (an itinerary: "brewery crawl Squamish afternoon" on Sat, Oct 24) has no day list, so its
   // stops are Day 1 of My Trip and keep that date (round 7: they were saved with no date at all).
   // Round 8 (2026-10-19): the date test needs a doubled backslash inside this template; a single one became "d" and
   // never matched, so a dated one-day outing still lost its date and times in My Trip.
@@ -1936,7 +2098,7 @@ function renderScript(d) {
     return y + '-' + (n < 9 ? '0' : '') + (n + 1);
   }
   function readDays(){
-    try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
+    try { var m = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
   }
   // offset: "Add to it" puts this plan's days after the days already in My Trip (Day 1 of a second trip is Day 3).
   function rememberDays(buttons, offset){
@@ -1946,11 +2108,11 @@ function renderScript(d) {
         var ref = tripKey(b), d = parseInt(b.getAttribute('data-plan-day'), 10);
         if (ref && d > 0 && b.classList.contains('in-trip') && !(offset && dayMap[ref] > 0)) dayMap[ref] = d + (offset || 0);
       });
-      localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripDays', JSON.stringify(dayMap));
       // The plan's dates and times go with them (2026-10-19): ref -> { d: date, s: start, e: end } (minutes), so
       // /my-trip shows "Day 1 · Sat, Oct 24" and each stop's planned time.
       var timeMap = {};
-      try { timeMap = JSON.parse(localStorage.getItem('okanaganTripTimes') || '{}') || {}; } catch (e2) { timeMap = {}; }
+      try { timeMap = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripTimes') || '{}') || {}; } catch (e2) { timeMap = {}; }
       if (typeof timeMap !== 'object' || Array.isArray(timeMap)) timeMap = {};
       var rows = (state.last && state.last.schedule) || [];
       buttons.forEach(function(b){
@@ -1967,11 +2129,11 @@ function renderScript(d) {
         if (row && Number.isFinite(row.startMinutes) && row.status !== 'unmet') { t.s = row.startMinutes; if (Number.isFinite(row.endMinutes)) t.e = row.endMinutes; }
         if (t.d || t.m || t.s != null) timeMap[ref] = t;
       });
-      localStorage.setItem('okanaganTripTimes', JSON.stringify(timeMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripTimes', JSON.stringify(timeMap));
       // Drive legs between towns (2026-10-19) go with their day: day -> { f, t, a, b } (from, to, min and max minutes),
       // shown on /my-trip as a row of their own, never as a stop or a map pin.
       var driveMap = {};
-      try { driveMap = JSON.parse(localStorage.getItem('okanaganTripDrives') || '{}') || {}; } catch (e3) { driveMap = {}; }
+      try { driveMap = JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}TripDrives') || '{}') || {}; } catch (e3) { driveMap = {}; }
       if (typeof driveMap !== 'object' || Array.isArray(driveMap)) driveMap = {};
       var planDays = {};
       buttons.forEach(function(b){ var d = parseInt(b.getAttribute('data-plan-day'), 10); if (d > 0 && b.classList.contains('in-trip')) planDays[d] = true; });
@@ -1979,7 +2141,7 @@ function renderScript(d) {
         var leg = x.driveIn, at = x.day + (offset || 0);
         if (planDays[x.day] && leg && leg.fromLabel && leg.toLabel && !(offset && driveMap[at])) driveMap[at] = { f: String(leg.fromLabel), t: String(leg.toLabel), a: leg.minMinutes || null, b: leg.maxMinutes || null };
       });
-      localStorage.setItem('okanaganTripDrives', JSON.stringify(driveMap));
+      localStorage.setItem('${SITE_PAGE.storagePrefix}TripDrives', JSON.stringify(driveMap));
     } catch (e) {}
     if (window.__roamTripRender) window.__roamTripRender();
   }
@@ -1988,11 +2150,11 @@ function renderScript(d) {
     var days = readDays(), plan = {}, max = 0;
     planStopButtons().forEach(function(b){ var r = tripKey(b); if (r) plan[r] = true; });
     try {
-      (JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []).forEach(function(x){ var k = x && (x.key || x.ref); if (k && !plan[k] && days[k] > max) max = Number(days[k]); });
+      (JSON.parse(localStorage.getItem('${SITE_PAGE.storagePrefix}Trip') || '[]') || []).forEach(function(x){ var k = x && (x.key || x.ref); if (k && !plan[k] && days[k] > max) max = Number(days[k]); });
     } catch (e) {}
     return max;
   }
-  // "Add whole trip" when My Trip already holds other stops (2026-10-18: an old Vernon stop and a new 12-stop plan were
+  // "Add whole trip" when My Trip already holds other stops (2026-10-18: an old stop from another town and a new 12-stop plan were
   // mixed into one list): ask first whether to replace the current trip or add to it.
   function askReplaceOrAdd(){
     var st = addState();
@@ -2058,7 +2220,7 @@ function renderScript(d) {
     var one = e.target.closest && e.target.closest('.trip-btn[data-plan-day]');
     if (one && resultEl.contains(one)) setTimeout(function(){ rememberDays([one]); }, 0);
   });
-  window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
+  window.addEventListener('storage', function(ev){ if (ev.key === '${SITE_PAGE.storagePrefix}Trip') refreshAddAll(); });
 
   // ---- interactions ----
   // An open "More" menu closes when you click elsewhere or press Escape.
@@ -2288,9 +2450,36 @@ function renderScript(d) {
   input.addEventListener('keydown', function(e){
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); }
   });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-t3-request]'), function(btn){
+    btn.addEventListener('click', function(){ input.value = btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
+  });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
+  // /trip?region=<town> (the town pages' "Build my <town> trip" buttons): the placeholder and the four example requests
+  // name that town instead of the usual ones. Nothing is submitted; an unknown town changes nothing.
+  (function(){
+    try {
+      var slug = new URLSearchParams(location.search).get('region');
+      var town = slug && REGIONS.filter(function(r){ return r.slug === slug; })[0];
+      if (!town || !town.label) return;
+      // The example card and its one-liner are about one town (SITE_PAGE.sampleTown); from another town's page they would show
+      // the wrong town, so they are hidden there.
+      if (town.slug !== '${SITE_PAGE.sampleTown}') {
+        Array.prototype.forEach.call(document.querySelectorAll('.t3-try, .t3-sample'), function(el){ el.hidden = true; if (el.style) el.style.display = 'none'; });
+      }
+      var n = town.label, fr = lang() === 'fr';
+      var ex = ${JSON.stringify(SITE_PAGE.townExamples)};
+      var fill = function(s){ return s.split('{n}').join(n); };
+      var texts = (fr ? ex.fr : ex.en).map(fill);
+      Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip, i){
+        if (!texts[i]) return;
+        chip.removeAttribute('data-i18n'); chip.textContent = texts[i];
+      });
+      input.removeAttribute('data-i18n-placeholder');
+      input.setAttribute('placeholder', fill(fr ? ex.placeholderFr : ex.placeholderEn));
+    } catch (e) { /* cosmetic only */ }
+  })();
   // A shared link (/trip?q=...) restores the same plan: it replays the
   // sender's plan request (pin / avoid; an older link without them pins its
   // kept stops, as before), then removes the stops the sender removed. A link
@@ -2371,12 +2560,12 @@ function renderTripPlannerV3Page(d) {
 <meta name="description" content="${d.esc(d.description)}">
 <link rel="canonical" href="${d.canonical}">
 ${d.preview ? '<meta name="robots" content="noindex">\n' : ''}${d.faviconLink || ''}
-<meta property="og:site_name" content="Okanagan Roam">
+<meta property="og:site_name" content="${FR_SITE.brand}">
 <meta property="og:title" content="${d.esc(d.title)}">
 <meta property="og:description" content="${d.esc(d.description)}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="${d.canonical}">
-<meta property="og:image" content="https://okanaganroam.com/og-image.png">
+<meta property="og:image" content="${SITE_PAGE.siteUrl}/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 ${d.breadcrumbJson}
@@ -2404,4 +2593,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3WhyLines, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

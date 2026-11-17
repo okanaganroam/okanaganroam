@@ -1,0 +1,211 @@
+{
+  "date": "2026-11-05",
+  "note": "Real photos of the host place for recurring events. Permission to confirm where no licence is stated.",
+  "photos": [
+    {
+      "file": "public/images/events/prospera-place-2611.jpg",
+      "credit": "Prospera Place",
+      "source_page": "https://www.prosperaplace.com/",
+      "licence": "Venue's own website photo; no licence stated",
+      "event_ids": [
+        1
+      ]
+    },
+    {
+      "file": "public/images/events/soec-penticton-2611.jpg",
+      "credit": "Darren Kirby / Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/",
+      "licence": "CC BY-SA 2.0 (credit required); verify author on Commons page",
+      "event_ids": [
+        11
+      ]
+    },
+    {
+      "file": "public/images/events/kal-tire-place-2611.jpg",
+      "credit": "Vernon Vipers",
+      "source_page": "https://www.vernonvipers.com/",
+      "licence": "Team's own website photo; no licence stated",
+      "event_ids": [
+        12
+      ]
+    },
+    {
+      "file": "public/images/events/sun-bowl-arena-2611.jpg",
+      "credit": "Town of Osoyoos",
+      "source_page": "https://www.osoyoos.ca/",
+      "licence": "Town's own website photo; no licence stated",
+      "event_ids": [
+        627
+      ]
+    },
+    {
+      "file": "public/images/events/caravan-farm-winter-2611.jpg",
+      "credit": "Caravan Farm Theatre",
+      "source_page": "https://www.caravanfarmtheatre.com/",
+      "licence": "Theatre's own website photo; no licence stated",
+      "event_ids": [
+        546
+      ]
+    },
+    {
+      "file": "public/images/events/ubco-gymnasium-2611.jpg",
+      "credit": "UBC Okanagan Campus Recreation",
+      "source_page": "https://recreation.ok.ubc.ca/facilities/gymnasium/",
+      "licence": "Own website photo; no licence stated",
+      "event_ids": [
+        13,
+        17,
+        18,
+        21
+      ]
+    },
+    {
+      "file": "public/images/events/rca-mary-irwin-theatre-2611.jpg",
+      "credit": "Rotary Centre for the Arts",
+      "source_page": "https://www.rotarycentreforthearts.com/facility-rentals/",
+      "licence": "Own website photo; no licence stated",
+      "event_ids": [
+        541,
+        765
+      ]
+    },
+    {
+      "file": "public/images/events/powerhouse-theatre-2611.jpg",
+      "credit": "Powerhouse Theatre",
+      "source_page": "https://powerhousetheatre.net/about-us",
+      "licence": "Theatre's own website photo; no licence stated",
+      "event_ids": [
+        678,
+        955,
+        958
+      ]
+    },
+    {
+      "file": "public/images/events/ottercrest-sleigh-2611.jpg",
+      "credit": "Horse Drawn Okanagan",
+      "source_page": "https://www.horsedrawnokanagan.com",
+      "licence": "none stated; operator own-site photo, cropped to 16:9",
+      "event_ids": [
+        676
+      ]
+    },
+    {
+      "file": "public/images/events/miradoro-2611.jpg",
+      "credit": "Miradoro at Tinhorn Creek (photographer not stated)",
+      "source_page": "https://miradoro.ca",
+      "licence": "none stated; venue own-site photo, cropped to 16:9",
+      "event_ids": [
+        830
+      ]
+    },
+    {
+      "file": "public/images/events/bigwhite-fireworks-2611.jpg",
+      "credit": "Big White Ski Resort",
+      "source_page": "https://www.bigwhite.com/resort-photos?page=13",
+      "licence": "Resort photo library; credit Big White Ski Resort required",
+      "event_ids": [
+        1037
+      ]
+    },
+    {
+      "file": "public/images/events/kvsr-christmas-express-2611.jpg",
+      "credit": "Kettle Valley Steam Railway (photographer not stated)",
+      "source_page": "https://www.kettlevalleyrail.org/experiences/christmas-express/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        670
+      ]
+    },
+    {
+      "file": "public/images/events/rotary-centre-2611.jpg",
+      "credit": "Rotary Centre for the Arts",
+      "source_page": "https://rotarycentreforthearts.com/facility-rentals/south-atrium/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        3
+      ]
+    },
+    {
+      "file": "public/images/events/see-ya-later-ranch-2611.jpg",
+      "credit": "See Ya Later Ranch",
+      "source_page": "https://sylranch.com/the-ranch/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        822,
+        827
+      ]
+    },
+    {
+      "file": "public/images/events/copper-brewing-2611.jpg",
+      "credit": "Copper Brewing Co. (owner-uploaded listing photo)",
+      "source_page": "https://okanaganroam.com/kelowna/breweries/copper-brewing-co",
+      "licence": "Uploaded by the venue owner through the owner portal",
+      "event_ids": [
+        1029
+      ]
+    },
+    {
+      "file": "public/images/events/west-kelowna-warriors-2611.jpg",
+      "credit": "West Kelowna Warriors",
+      "source_page": "https://www.westkelownawarriors.ca/warriors-unveil-new-video-scoreclock",
+      "licence": "Team own-site photo; no licence stated",
+      "event_ids": [
+        2
+      ]
+    },
+    {
+      "file": "public/images/events/mission-hill-culinary-2611.jpg",
+      "credit": "Mission Hill Family Estate",
+      "source_page": "https://www.missionhillwinery.com/culinary-classes-calendar/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        1023
+      ]
+    },
+    {
+      "file": "public/images/events/summerland-jets-2611.jpg",
+      "credit": "Vernon Morning Star (Black Press)",
+      "source_page": "https://vernonmorningstar.com/2025/06/27/summer-ice-installed-at-summerland-arena/",
+      "licence": "News photo found via Google Images; credit outlet; no licence stated",
+      "event_ids": [
+        639
+      ]
+    },
+    {
+      "file": "public/images/events/enderby-icemen-2611.jpg",
+      "credit": "Kelowna Capital News / Vernon Morning Star (Black Press)",
+      "source_page": "https://kelownacapnews.com/2026/09/12/enderby-icemens-first-ever-game-an-8-0-preseason-drubbing-of-sicamous-rivals/",
+      "licence": "News photo found via Google Images; credit outlet; no licence stated",
+      "event_ids": [
+        695
+      ]
+    },
+    {
+      "file": "public/images/events/kelowna-actors-studio-2611.jpg",
+      "credit": "Kelowna Actors Studio",
+      "source_page": "https://kelownaactorsstudio.com/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        539
+      ]
+    },
+    {
+      "file": "public/images/events/riding-4-life-2611.jpg",
+      "credit": "Riding 4 Life Equine Enterprises",
+      "source_page": "https://www.riding4lifeequineenterprises.com/copy-of-services-programs",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        849
+      ]
+    },
+    {
+      "file": "public/images/events/penticton-farmers-market-2611.jpg",
+      "credit": "Penticton Farmers' Market",
+      "source_page": "https://pentictonfarmersmarket.org/",
+      "licence": "Market own-site photo; no licence stated",
+      "event_ids": [
+        238
+      ]
+    }
+  ]
+}

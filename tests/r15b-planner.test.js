@@ -5,6 +5,7 @@
 // before this stop: about 3 hr 15 min", not "Provisional free interval: 195 min". PURE tests on a small fixture valley,
 // like r14-planner.test.js.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');

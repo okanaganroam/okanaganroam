@@ -1,6 +1,7 @@
 'use strict';
 // Build My Trip review fixes (2026-10-21): "no hiking", a walk by the lake, one estate once, beaches off season,
 // dog-only beaches, and summer-only places in October.
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const req = require('../trip-requirements');

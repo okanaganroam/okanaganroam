@@ -221,7 +221,7 @@ test('/map: "free", "free things" and « gratuit » turn on Free to visit; "glut
   for (const q of ['free', 'free things', 'free things to do', 'free stuff']) assert.deepEqual(en.read(q).feats, ['free'], q);
   for (const q of ['gratuit', 'activités gratuites', 'choses gratuites']) assert.deepEqual(fr.read(q).feats, ['free'], q);
   assert.deepEqual(en.read('gluten free').feats, ['gf']);
-  assert.deepEqual(en.read('free parking').feats, []);
+  assert.deepEqual(en.read('free parking').feats, ['parking']); // pub test 8: the Free parking filter, never Free to visit
   assert.equal(en.CONF.f.free, 16384);
   assert.match(en.html, /data-pm-feat="free"/);
   // The data carries the bit for a free place.

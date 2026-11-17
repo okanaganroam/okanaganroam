@@ -1,4 +1,5 @@
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test=require('node:test'),assert=require('node:assert/strict');
 const {t3TimelineRows,t3EventPlaceHtml}=require('../trip-planner-v3-page');
 test('Event card: exposes the listing venue in English and French without trusting markup',()=>{

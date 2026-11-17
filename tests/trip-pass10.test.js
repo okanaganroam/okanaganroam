@@ -5,6 +5,7 @@
 // 12-hour times. The requests are the real ones from drafts/site-review-2026-10-19-pass9.md. PURE tests on a small
 // fixture valley (no server.js, no database), plus the page's serialized helpers run in a vm.
 'use strict';
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');

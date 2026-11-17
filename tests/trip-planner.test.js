@@ -6,6 +6,7 @@
 // about planning behaviour: classification, grounding, heuristics, coherence,
 // exclusions, pins and regeneration.
 
+require('../test-network-guard').install(); // no real network or email from tests
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const d = require('../discovery-intent.js');
@@ -1273,13 +1274,28 @@ test('no alcohol (more phrasings): positive alcohol requests and venue badges st
   assert.ok(allStops(withGastro).some((x) => x.venue.id === gastro.id), 'a restaurant that also serves alcohol is still recommended');
 });
 
-test('stop cards use the venue\'s own photo when it has one, the example photo otherwise (2026-10-17)', () => {
+test('stop cards use the venue\'s own photo when it has one, and no photo otherwise (real photos only, 2026-10-28)', () => {
   const own = tp.publicVenue({ id: 1, name: 'Own Photo Bistro', region: 'kelowna', type: 'restaurant', url: '/x', imageUrl: '/images/venues/own-photo-bistro-2610.jpg?v=1', features: {}, collections: [], activities: [], textName: 'own photo bistro', textDesc: '' }, null);
   assert.equal(own.photo, '/images/venues/own-photo-bistro-2610.jpg?v=1');
   assert.equal(own.ownPhoto, true);
   const none = tp.publicVenue({ id: 2, name: 'No Photo Diner', region: 'kelowna', type: 'restaurant', url: '/y', imageUrl: null, features: {}, collections: [], activities: [], textName: 'no photo diner', textDesc: '' }, null);
-  assert.match(none.photo, /^\/images\/trip-v3\/stops\/stop-restaurant-480\.jpg$/);
+  assert.equal(none.photo, null);
   assert.equal(none.ownPhoto, false);
   const bad = tp.publicVenue({ id: 3, name: 'Bad Url', region: 'kelowna', type: 'cafe', url: '/z', imageUrl: 'javascript:alert(1)', features: {}, collections: [], activities: [], textName: 'bad url', textDesc: '' }, null);
   assert.equal(bad.ownPhoto, false);
+});
+
+// Distillery test 1 (2026-11-13): "tasting" is what a distillery or winery stop is (never "couldn't apply"); a request
+// whose only places are closed that day says only that; tours and classes are the kinds shown at any time of day.
+test('distillery test 1: tasting word used by distillery and winery parts only; closed-only requests; daytime kinds', () => {
+  const trip = (types) => ({ components: [{ kind: 'venue', types }] });
+  assert.equal(tp.tastingWordUsed('tasting', trip(['distillery', 'winery'])), true);
+  assert.equal(tp.tastingWordUsed('tastings', trip(['winery'])), true);
+  assert.equal(tp.tastingWordUsed('tasting', trip(['brewery'])), false, 'other kinds unchanged');
+  assert.equal(tp.tastingWordUsed('lake', trip(['distillery'])), false);
+  const closed = { kind: 'type', value: 'distillery', status: 'unmet', optionalAlternatives: [{ name: 'A', reasonCode: 'different_time', closedDay: { day: 'mon', open: ['tue'] } }] };
+  assert.equal(tp.requirementClosedOnly(closed), true);
+  assert.equal(tp.requirementClosedOnly({ ...closed, optionalAlternatives: [...closed.optionalAlternatives, { name: 'B', reasonCode: 'another_listing' }] }), false);
+  assert.equal(tp.requirementClosedOnly({ kind: 'type', value: 'distillery', status: 'unmet' }), false);
+  assert.deepEqual(tp.DAYTIME_NIGHT_KINDS, ['tour', 'class']);
 });

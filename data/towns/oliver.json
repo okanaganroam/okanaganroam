@@ -1,0 +1,100 @@
+{
+ "town": "oliver",
+ "name": "Oliver",
+ "hero": "/images/regions/photos/oliver-2610-1200.jpg",
+ "category": "wine",
+ "sub": "Wine capital country: vineyards, desert light and easy trails.",
+ "placeholder": "Search Oliver… wineries, patios, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=oliver",
+   "img": "/images/venues/ward-s-wine-country-kitchen-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=oliver",
+   "img": "/images/venues/gehringer-brothers-estate-winery-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=oliver",
+   "img": "/images/venues/n-aylintn-mcintyre-bluff-hike-2610-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/oliver/events",
+   "img": "/images/venues/oliver-theatre-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/oliver/kid_friendly",
+   "img": "/images/venues/kinsmen-spray-park-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=oliver",
+   "img": "/images/venues/lions-park-oliver-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "burrowing-owl-estate-winery",
+   "name": "Burrowing Owl",
+   "tag": "Winery, restaurant & inn",
+   "copy": "A patio table, a glass of red and views.",
+   "href": "/oliver/wineries/burrowing-owl-estate-winery",
+   "img": "/images/venues/burrowing-owl-estate-winery-2610-w480.jpg"
+  },
+  {
+   "slug": "gala-street-walkway-and-ditch-trail",
+   "name": "Gala Street Walkway",
+   "tag": "An easy canal-side stroll",
+   "copy": "An accessible path that joins the Ditch Trail.",
+   "href": "/oliver/outdoors/gala-street-walkway-and-ditch-trail",
+   "img": "/images/venues/gala-street-walkway-and-ditch-trail-2610-w480.jpg"
+  },
+  {
+   "slug": "firehall-brewery",
+   "name": "Firehall Brewery",
+   "tag": "Craft beer & a kids’ area",
+   "copy": "Try the smoked stout and pub food.",
+   "href": "/oliver/breweries/firehall-brewery",
+   "img": "/images/venues/firehall-brewery-2610-w480.jpg"
+  },
+  {
+   "slug": "manzil-indian-restaurant-at-kismet-estate-winery",
+   "name": "Manzil at Kismet",
+   "tag": "Indian dining at a winery",
+   "copy": "Indian cuisine inside a working winery.",
+   "href": "/oliver/restaurants/manzil-indian-restaurant-at-kismet-estate-winery",
+   "img": "/images/venues/manzil-indian-restaurant-at-kismet-estate-winery-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Oliver’s wineries and trails are spread out along the valley, so plan your route, check hours and arrange a designated driver or tour.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Wine tasting tips",
+   "copy": "Check hours, seasonal opening and whether reservations are needed, and pair your tastings with a meal.",
+   "href": "/wineries?regions=oliver",
+   "label": "Find wineries"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Many places suit the whole crew. Check each listing for family- and dog-friendly details and confirm current policies with the venue.",
+   "href": "/guide/oliver/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

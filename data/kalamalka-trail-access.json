@@ -1,0 +1,45 @@
+{
+  "venuePath": "/coldstream/outdoors/kalamalka-lake-provincial-park-trails-rattlesnake-point",
+  "checkedAt": "2026-11-08",
+  "sources": {
+    "park": "https://bcparks.ca/kalamalka-lake-park/",
+    "officialMap": "https://nrs.objectstore.gov.bc.ca/kuwyyf/kalamalka_lake_park_map_ef2fa85195.pdf",
+    "brochure": "https://nrs.objectstore.gov.bc.ca/kuwyyf/kalamalka_brochure_fa2564d226.pdf",
+    "tourismMap": "https://trails.tourismvernon.com/?trail=Rattlesnake+Point",
+    "parkingData": "https://www.tourismvernon.com/trail-parking-data/data",
+    "trailData": "https://www.tourismvernon.com/trail-data/geojson"
+  },
+  "route": {
+    "name": "Rattlesnake Point",
+    "sourceId": "Vernon_0102",
+    "start": "twin-bays",
+    "oneWayKm": 1.24,
+    "returnKm": 2.48,
+    "returnLabel": "About 2.5 km return",
+    "timeLabel": "50–75 min walking",
+    "timeBasis": "Planning estimate for the 2.48 km out-and-back at roughly 2–3 km/h, rounded to 50–75 minutes. Excludes stops; allow longer for terrain, children, heat or winter conditions.",
+    "distanceBasis": "Tourism Vernon describes an out-and-back but supplies a 1.24 km one-direction LineString from Yellow Gate parking to the viewpoint. Geometry measures about 1.233 km; returning on the same route doubles the listed 1.24 km. This is not the separate Juniper Trail or a Juniper/Crest loop."
+  },
+  "entrances": {
+    "twin-bays": {
+      "name": "Twin Bays / Yellow Gate parking",
+      "lat": 50.20386581,
+      "lng": -119.2805426,
+      "sourceId": "Park_0081",
+      "sourceName": "Yellow Gate Parking",
+      "road": "Main park access from Kidston Road",
+      "button": "Directions to Twin Bays parking",
+      "description": "Start here for the mapped Rattlesnake Point route, or choose the separate Jade and Juniper Bay trails."
+    },
+    "cosens-bay": {
+      "name": "Cosens Bay Gate parking",
+      "lat": 50.20929417,
+      "lng": -119.23262088,
+      "sourceId": "Park_0063",
+      "sourceName": "Cosens Bay Parking",
+      "road": "Cosens Bay Road",
+      "button": "Directions to Cosens Bay parking",
+      "description": "Choose this entrance for the Cosens Bay Trail and beach. It is a different outing; the 2.5 km return estimate above does not apply."
+    }
+  }
+}
