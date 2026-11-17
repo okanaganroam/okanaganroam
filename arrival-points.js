@@ -130,10 +130,15 @@ function createArrivalPoints(deps) {
       const en = (x) => String(x).replace('Help people find your door', 'Help people find your meeting spot')
         .replace('Stand on the sidewalk or street, facing your storefront, the way someone arriving would see it.', 'Stand where people meet you (your office, the dock, the trailhead), facing it the way someone arriving would see it.')
         .replace('Stand back far enough to fit the whole front of your business and your sign in the photo.', 'Stand back far enough to fit the spot and your sign or vehicle in the photo.')
-        .replace(/storefront spot/g, 'meeting spot').replace(/storefront/g, 'meeting spot');
+        .replace(/storefront spot/g, 'meeting spot').replace(/storefront/g, 'meeting spot')
+        // Tour test 2 (Whistler, 2026-11-16): the drawing's sign and the permission line say meeting spot too.
+        .replace('>YOUR BUSINESS</text>', '>MEETING SPOT</text>').replace('help visitors find this business', 'help visitors find your meeting spot');
       const fr = (x) => String(x).replace('Aidez les gens à trouver votre porte', 'Aidez les gens à trouver votre point de rencontre')
         .replace(/Placez-vous sur le trottoir ou dans la rue, face à votre devanture, comme quelqu’un qui arrive\./, 'Placez-vous là où l’on vous rejoint (votre bureau, le quai, le départ du sentier), face à l’endroit, comme quelqu’un qui arrive.')
         .replace(/Reculez assez pour que toute la façade de votre commerce et votre enseigne soient sur la photo\./, 'Reculez assez pour que l’endroit et votre enseigne ou votre véhicule soient sur la photo.')
+        .replace('>VOTRE COMMERCE</text>', '>POINT DE RENCONTRE</text>').replace('aider les visiteurs à trouver ce commerce', 'aider les visiteurs à trouver votre point de rencontre')
+        // « de le point » -> « du point » (tour test 2).
+        .replace(/de la devanture/g, 'du point de rencontre').replace(/à la devanture/g, 'au point de rencontre')
         .replace(/l’emplacement de votre devanture/g, 'votre point de rencontre').replace(/ma devanture/g, 'mon point de rencontre').replace(/votre devanture/g, 'votre point de rencontre').replace(/la devanture/g, 'le point de rencontre');
       L = (e, f) => L0(en(e), fr(f));
     }

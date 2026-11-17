@@ -806,7 +806,7 @@ var TRANSLATIONS = {
 
     'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
     'card.findMenu': '\ud83d\udccb Voir le menu',
-    'card.findTours': '\ud83c\udf9f\ufe0f Visites et tarifs',
+    'card.findTours': '\ud83c\udf9f\ufe0f Sorties et tarifs',
     'card.checkBooking': '\ud83d\udcc5 V\u00e9rifier la r\u00e9servation en ligne',
     'card.favorite': 'Favori',
     'card.favorited': 'Ajout\u00e9 aux favoris',

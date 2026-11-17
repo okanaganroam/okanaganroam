@@ -138,7 +138,8 @@ function requestKidAges(text) {
   const re2 = /\b(?:aged?|ages|kids?|children|boys?|girls?|sons?|daughters?) (\d{1,2})(?: (?:and|or|to|through) (\d{1,2}))?\b(?! ?(?:am|pm|h|people|guests|adults|of us))/g; while ((m = re2.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
   return [...new Set(out)].sort((a, b) => a - b);
 }
-function kidsYoungest(ctx) { if (!ctx) return null; const a = requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
+// Tour test 2 (2026-11-16): the ages as typed (ctx.kidAges, read by the server before "10-year-old" becomes "kids").
+function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 function kidsAllowed(v) {
   if (!v) return false;
   const ctx = arguments[1]; // the trip's context when given (the ages it names), tour test 1
@@ -157,7 +158,8 @@ function kidsAllowed(v) {
     if (v.tourMinAge === 'all') return true;
     const young = kidsYoungest(ctx);
     if (young != null && /^\d+$/.test(v.tourMinAge)) return young >= Number(v.tourMinAge);
-    return v.tourMinAge === '6';
+    // Tour test 2 (2026-11-16): 5+ is fine for a family too, like 6+.
+    return v.tourMinAge === '6' || v.tourMinAge === '5';
   }
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
@@ -468,6 +470,7 @@ function buildContext(intent, labels, options) {
     plannerKinds: opts.requirements ? opts.requirements.items.filter(i => i.kind === 'venue_kind' && i.strength === 'must').map(i => i.value) : intent.plannerKinds || [],
     requirements: opts.requirements || null,
     queryText: normWords(opts.text || ''),
+    kidAges: Array.isArray(opts.kidAges) ? opts.kidAges.filter((x) => Number.isInteger(x) && x >= 0 && x < 19) : [],
     ownTourAsked: ownTourAsked(opts),
     niceDinnerOnce: !!opts.niceDinnerOnce,
     // Round 12 (2026-10-20): what the request means, not its wording, seeds the rotation of top picks, so a French request
@@ -1064,7 +1067,7 @@ function eligible(v, ctx, strict) {
   if (v.type === 'indoor' && /\blibrary\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:library|libraries|rain|rainy|raining|books?)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
-  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6') && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
+  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6' || v.tourMinAge === '5') && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
   if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
@@ -1684,10 +1687,14 @@ const TOUR_BOOKING_NOTE = 'Tours run at set times: book ahead with the operator 
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
+  '48h': 'Book at least 48 hours ahead (the operator’s own answer).',
   week: 'Book at least a week ahead (the operator’s own answer).',
   no: 'No need to book (the operator’s own answer).',
 };
 const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
+// Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
+// includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
+const tourAgeNote = (age) => (age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
 // Charters) is booked too, not a walk-in stop: it gets the booking note and is not a first pick for an open slot.
 const OUTFITTER_NAME_RE = /\b(?:adventures?|adventure company|charters?|outfitters?|rentals?|guided|guides?|tours?|expeditions?)\b/;
@@ -1889,7 +1896,7 @@ function stopFrom(v, scored, extra, ctx) {
   let caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
   // Winery test 4 (2026-11-12): a winery that said it is by appointment has no hours to go by: no "Listed hours" reason
   // and no hours caveat next to "By appointment only".
-  if (v && v.ownerAppointment === true) {
+  if (v && (v.ownerAppointment === true || v.tourByBooking === true)) {
     reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
     caveats = caveats.filter((c) => c !== UNKNOWN_HOURS_CAVEAT && !/listed hours/i.test(c));
   }
@@ -1902,7 +1909,7 @@ function stopFrom(v, scored, extra, ctx) {
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
-  if (ctx && ctx.kids && v && v.type === 'tour' && v.tourMinAge === '6' && !caveats.includes(TOUR_AGE6_NOTE)) caveats.push(TOUR_AGE6_NOTE);
+  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && /^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
@@ -6487,7 +6494,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6521,7 +6528,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
