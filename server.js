@@ -1,7 +1,7 @@
 // Under `node --test` (or NODE_ENV=test) every outbound request is refused, so tests never send real email or reach
 // the internet. Never on for the live site: see test-network-guard.js.
 require('./test-network-guard').installIfTesting();
-const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault, roamRouteLocationMessage } = require('./roam-now-layout.js');
+const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault, roamRouteLocationMessage, roamHappyOfferHtml } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
@@ -23882,6 +23882,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
+  ${roamHappyOfferHtml.toString()}
   ${roamOpenByDefault.toString()}
   ${roamRouteLocationMessage.toString()}
   var happyEntry = new URLSearchParams(location.search).get('show') === 'happy-hour';
@@ -24075,7 +24076,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var h = happyHourState(expandFoodDrinkHours(p.hh), clock, !!(p.st && p.st.state === 'closed'), p.h && typeof p.h === 'object' && p.h._closures ? p.h._closures : null, p.h ? { placeHours: expandFoodDrinkHours(p.h) } : null);
       // 2026-10-26: while it is on, the countdown ("Happy hour on now · ends in 1 hr 20 min"), updated every minute.
       var left = h && h.state === 'now' ? happyHourMinutesLeft(h.until, clock) : null;
-      if (h && h.state === 'now' && left != null) return { now: true, text: T.hhOnNow(happyHourLeftText(left, FR)) };
+      if (h && h.state === 'now' && left != null) return { now: true, left: happyHourLeftText(left, FR), text: T.hhOnNow(happyHourLeftText(left, FR)) };
       if (h && h.state === 'now') return { now: true, text: T.hhNow(h.until ? clockText(h.until.minutes) : '') };
       if (h && h.state === 'later') return { now: false, text: T.hhLater(clockText(h.from.minutes)), at: h.from.minutes };
       // 2026-11-14: nothing more today; remember tomorrow's start (p.hht) for the homepage link's "tomorrow" case only.
@@ -24141,18 +24142,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc', 'access', 'heated', 'localdrinks', 'booking', 'takeout', 'ownlocal', 'games', 'localbeer', 'fireplace', 'beachaccess', 'parking', 'rv', 'offsales', 'wifi', 'laptop', 'drivethru'];
   // Cafés (2026-11-10): Laptop friendly and Drive-thru sit above bit 31, so they are read with arithmetic, not '&'.
   function fHas(f, b){ return b > 1073741824 ? Math.floor(f / b) % 2 === 1 : !!(f & b); }
-  function featHtml(p){
-    var on = FEAT_ORDER.filter(function(k){ return fHas(p.f, CONF.f[k]); });
+  function featHtml(p, omitHappy){
+    var on = FEAT_ORDER.filter(function(k){ return !(omitHappy && k === 'happy') && fHas(p.f, CONF.f[k]); });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog) out += '<span class="pm-visit-note"><strong>' + esc(T.dogRule) + '</strong> ' + esc(p.dog) + '</span>';
     if (p.gluten) out += '<span class="pm-visit-note"><strong>' + esc(FR ? 'Sans gluten :' : 'Gluten-free:') + '</strong> ' + esc(p.gluten) + '</span>';
     // Happy hour deals (2026-10-26): the first two, after the happy hour line, while it is on now or later today.
-    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">${uiIcon('cocktail')} ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
+    if (p.hhs && !omitHappy) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">${uiIcon('cocktail')} ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
     // Weekly specials (2026-10-27): "Today: Wing Wednesday · 60¢ wings" (« Aujourd’hui : … »).
-    if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';
+    if (p.spOn && (!omitHappy || feats.specials)) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';
     // Weekly nights (2026-10-27): "Tonight: Trivia 7 PM" (« Ce soir : Quiz 19 h »).
-    if (p.wnOn) out += '<span class="pm-wn' + (feats.nights ? ' is-on' : '') + '">${uiIcon('calendar')} ' + esc(T.wnTonight) + ' ' + wnHtml(p) + '</span>';
+    if (p.wnOn && (!omitHappy || feats.nights)) out += '<span class="pm-wn' + (feats.nights ? ' is-on' : '') + '">${uiIcon('calendar')} ' + esc(T.wnTonight) + ' ' + wnHtml(p) + '</span>';
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
@@ -24317,7 +24318,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
     $('rnLocationAction').textContent=town||me?(FR?'Changer de lieu':'Change location'):(FR?'Choisir un lieu':'Choose a location');
-    stage.classList.toggle('rn-happy-entry', happyEntry && !!feats.happy);
+    var happyMode = happyEntry && !!feats.happy && tab === 'places';
+    stage.classList.toggle('rn-happy-entry', happyMode);
+    if (tab === 'places') {
+      searchEl.placeholder = happyMode ? (FR ? 'Pubs, terrasses, cocktails…' : 'Pubs, patios, cocktails…') : (FR ? 'Chercher un lieu' : 'Search places');
+      $('rnSearchLabel').textContent = searchEl.placeholder;
+    }
+    if (happyMode) {
+      var entryMode = hhEntryWide();
+      $('rnHappyTitle').textContent = (entryMode === 'later' ? (FR ? '5 à 7 plus tard aujourd’hui' : 'Happy Hour Later Today') : entryMode === 'tomorrow' ? (FR ? '5 à 7 demain' : 'Happy Hour Tomorrow') : (FR ? '5 à 7 en cours' : 'Happy Hour Now')) + ' 🍹';
+      $('rnHappyIntro').textContent = entryMode === 'now' ? (FR ? 'Trouvez une offre en cours.' : 'Find a great deal happening now.') : entryMode === 'later' ? (FR ? 'Aucun 5 à 7 en cours. Voici ceux à venir aujourd’hui.' : 'None on right now. Here’s what’s coming up today.') : (FR ? 'Plus de 5 à 7 aujourd’hui. Voici ceux de demain.' : 'Finished for today. Here’s what’s coming up tomorrow.');
+    }
     if (watching && !me && !town && !pendingRoute) {
       countEl.textContent = FR ? 'Recherche de votre position…' : 'Finding your location…';
       listItems = [];
@@ -24344,7 +24355,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       items = mapPlaceList(onMap, { me: !!me, town: town || (happyEntry && feats.happy && !me), wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
       if (hhLater && !hhNoteShown) { hhNoteShown = true; setStatus(hhMode === 'tomorrow' ? T.hhTomorrowNote : T.hhLaterNote, 9000); }
       if (!feats.happy) hhNoteShown = false;
-      countEl.textContent = happyEntry && feats.happy ? (hhMode === 'later' ? (FR ? '5 à 7 plus tard aujourd’hui' : 'Happy Hour Later Today') : hhMode === 'tomorrow' ? (FR ? '5 à 7 demain' : 'Happy Hour Tomorrow') : (FR ? '5 à 7 en cours' : 'Happy Hour Now')) + ' · ' + items.length : town ? T.placesHere(items.length) + (FR ? ' à ' : ' in ') + CONF.r[town] : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
+      countEl.textContent = happyEntry && feats.happy ? items.length + (hhMode === 'later' ? (FR ? ' happy hour plus tard aujourd’hui' : ' happy hours later today') : hhMode === 'tomorrow' ? (FR ? ' happy hour demain' : ' happy hours tomorrow') : (FR ? ' happy hour en cours' : (items.length === 1 ? ' happy hour happening now' : ' happy hours happening now'))) + (town ? ' · ' + CONF.r[town] : '') : town ? T.placesHere(items.length) + (FR ? ' à ' : ' in ') + CONF.r[town] : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = evGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
@@ -24439,7 +24450,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="rn-card-info"><span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + (x.st ? statusHtml(x.st) : includeUnlistedHours && openOnly ? '<span class="pm-st">' + esc(FR ? 'Horaires non indiqués' : 'Hours not listed') + '</span>' : '') + featHtml(x) + '</span></a>'
+        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="rn-card-info"><span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + (happyEntry && feats.happy ? roamHappyOfferHtml(x, FR, hhEntryWide(), x.hht != null ? clockText(x.hht) : '') : '') + (x.st ? statusHtml(x.st) : includeUnlistedHours && openOnly ? '<span class="pm-st">' + esc(FR ? 'Horaires non indiqués' : 'Hours not listed') + '</span>' : '') + featHtml(x, happyEntry && feats.happy) + '</span></a>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -25006,7 +25017,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var out = [].concat(pick('town'), pick('at'), pick('price'));
     if (topOnly) out.push({ id: 'top', label: T.top });
     if (openOnly) out.push({ id: 'open', label: openBtns[0].textContent.replace(/^\\s+|\\s+$/g, '') });
-    on(feats).forEach(function(k){ out.push({ id: 'feat:' + k, label: featLabel(k) }); });
+    on(feats).forEach(function(k){ out.push({ id: 'feat:' + k, label: k === 'happy' && happyEntry ? (hhEntryWide() === 'later' ? (FR ? '🍹 5 à 7 plus tard' : '🍹 Happy hour later today') : hhEntryWide() === 'tomorrow' ? (FR ? '🍹 5 à 7 demain' : '🍹 Happy hour tomorrow') : (FR ? '🍹 5 à 7 en cours' : '🍹 Happy hour now')) : featLabel(k) }); });
     out = out.concat(pick('not'), pick('tag'));
     on(kinds).forEach(function(k){ out.push({ id: 'kind:' + k, label: kindLabel(k) }); });
     if (term) out.push({ id: 'term', label: termShown(term) });
@@ -26207,7 +26218,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','5 à 7 en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les 5 à 7 en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Roam Now','Roam Now')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Find places and events near you.','Trouvez des lieux et événements près de vous.')}</p></div><div class="rn-location-row"><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span><span aria-hidden="true">⌄</span></button><button type="button" id="rnLocateQuick" class="rn-locate-quick">${uiIcon('pin', 16, true)} ${R('Use my location','Utiliser ma position')}</button></div></div>
+      <div class="rn-intro"><div><h1 class="rn-happy-copy" id="rnHappyTitle">${R('Happy Hour Now 🍹','5 à 7 en cours')}</h1><p class="rn-happy-copy" id="rnHappyIntro">${R('Find happy hours happening right now.','Trouvez les 5 à 7 en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Roam Now','Roam Now')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Find places and events near you.','Trouvez des lieux et événements près de vous.')}</p></div><div class="rn-location-row"><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small id="rnLocationAction">${R('Choose a location','Choisir un lieu')}</small><b id="rnLocationText">${R('Across the Okanagan','Dans l’Okanagan')}</b></span><span aria-hidden="true">⌄</span></button><button type="button" id="rnLocateQuick" class="rn-locate-quick">${uiIcon('pin', 16, true)} ${R('Use my location','Utiliser ma position')}</button></div></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>

@@ -10,6 +10,18 @@ function roamRouteLocationMessage(reason,destination,lang='en'){
   const causes=fr?{blocked:'La position est bloquée dans votre navigateur.',failed:'Votre position est introuvable.',outside:'Votre position est hors de l’Okanagan.',unsupported:'Ce navigateur ne peut pas partager votre position.'}:{blocked:'Location is blocked in your browser.',failed:'Couldn’t find your location.',outside:'Your location is outside the Okanagan.',unsupported:'This browser cannot share your location.'};
   return (fr?'Vers ':'To ')+destination+'. '+(causes[reason]?causes[reason]+' ':'')+(fr?'Utilisez votre position pour le guidage en direct, ou choisissez le départ sur la carte pour un aperçu.':'Use your location for live guidance, or choose a start on the map for a route preview.');
 }
+// Deal text is supplied only by the server's verified, non-stale deal payload.
+// Self-contained so this same presentation runs in the map without new data requests.
+function roamHappyOfferHtml(p, fr, mode = 'now', startText = '') {
+  const live = !!(p.hhs && p.hhs.now);
+  const upcoming = !live && (mode === 'later' && p.hhs || mode === 'tomorrow' && p.hht != null);
+  if (!live && !upcoming) return '';
+  const label = live ? (fr ? '5 à 7 en cours' : 'Happy hour on now') : mode === 'tomorrow' ? (fr ? 'Demain à partir de ' : 'Tomorrow from ') + startText : p.hhs.text;
+  const safe = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return '<span class="rn-hh-offer"><span class="rn-hh-status"><span class="rn-hh-live' + (upcoming ? ' rn-hh-upcoming' : '') + '">● ' + safe(label) + '</span>' +
+    (live && p.hhs.left ? '<span class="rn-hh-ending">◷ ' + (fr ? 'Se termine dans ' : 'Ends in ') + safe(p.hhs.left) + '</span>' : '') + '</span>' +
+    (mode !== 'tomorrow' && p.dl ? '<strong class="rn-hh-price"' + (p.dlEn ? ' lang="en"' : '') + '>' + safe(p.dl) + '</strong>' : '<span class="rn-hh-unlisted">' + (fr ? 'Voir les spéciaux auprès du lieu' : 'See venue for current specials') + '</span>') + '</span>';
+}
 function renderRoamFilterGroups({must,diet,lang='en'}) {
   const translations={'Dietary':'Régimes alimentaires','Patios, music, views & sports':'Terrasses, musique, vues et sports','Dogs, kids & groups':'Chiens, enfants et groupes','Open now, deals & events':'Ouvert, offres et événements','Hours, access & amenities':'Horaires, accès et équipements'};
   const titleLabel=t=>lang==='fr'?(translations[t]||t):t;
@@ -535,6 +547,27 @@ body.pm-app-page.rn-design .is-map-picker .rn-selected-filters { display: none; 
   body.pm-app-page.rn-design .rn-location b { display: block; line-height: 1.25; }
   body.pm-app-page.rn-design .rn-locate-quick { max-width: 125px; }
 }
+/* Happy Hour Now: current offers first, with the same real cards and route controls. */
+body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .pm-tabs,
+body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) #pmPlaceFilters { display: none !important; }
+body.pm-app-page.rn-design .rn-happy-entry .rn-selected-filters .pm-chip[data-rn-remove="feat:happy"] { background: #ffdec2; border-color: #f0c49e; }
+body.pm-app-page.rn-design .rn-hh-offer { display: block; margin: 8px 0; }
+body.pm-app-page.rn-design .rn-hh-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+body.pm-app-page.rn-design .rn-hh-live, body.pm-app-page.rn-design .rn-hh-ending { display: inline-block; padding: 5px 9px; border-radius: 20px; font: 800 12px/1.35 Nunito,sans-serif; }
+body.pm-app-page.rn-design .rn-hh-live { background: #dcf0db; color: #19633b; }
+body.pm-app-page.rn-design .rn-hh-ending { background: #ffedbb; color: #705117; }
+body.pm-app-page.rn-design .rn-hh-price { display: block; font: 900 16px/1.45 Nunito,sans-serif; color: var(--rn-ink); }
+body.pm-app-page.rn-design .rn-hh-unlisted { display: block; font-size: 13px; color: #52665e; }
+body.pm-app-page.rn-design .rn-hh-offer ~ .pm-st { font-size: 12px; }
+@media(max-width:899px) {
+  body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .rn-search-row { flex-wrap: wrap; gap: 8px; }
+  body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .rn-search-row .pm-searchbar,
+  body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .rn-search-row .pm-filters-btn { flex: 1 0 100%; box-sizing: border-box; }
+  body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .rn-search-row .pm-filters-btn { min-height: 44px; }
+  body.pm-app-page.rn-design .rn-happy-entry:not(.rn-events-mode) .rn-intro h1 { font-size: 25px; }
+}
+
+body.pm-app-page.rn-design .rn-hh-live.rn-hh-upcoming { background: #ffedbb; color: #705117; }
 
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
@@ -555,3 +588,5 @@ const ROAM_RETURN_SCRIPT=`<script>(function(){try{
 }catch(e){}})();</script>`;
 module.exports.roamDirectionsHref=roamDirectionsHref;
 module.exports.ROAM_RETURN_SCRIPT=ROAM_RETURN_SCRIPT;
+
+module.exports.roamHappyOfferHtml=roamHappyOfferHtml;

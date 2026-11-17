@@ -241,7 +241,7 @@ test('Roam Now: the first two deals ride as a new trailing [16] (only on places 
   assert.ok(html.includes(`(p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '')`));
   // The search: the page's own deal matcher, run with the page's mapNameKey.
   const keySrc = html.match(/function mapNameKey\(name\)\{[^\n]*\}/)[0];
-  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p){'));
+  const dealSrc = html.slice(html.indexOf('  var DEAL_SKIP'), html.indexOf('  function matchesPlace(p, allowUnlisted){'));
   const ctx = {};
   vm.runInNewContext(`${keySrc}\nvar dealQuery = '', dealWordsFor = null, dealWords = [];\n${dealSrc}\nthis.hit = function(q, deals){ dealQuery = q; return dealHit({ dk: deals ? mapNameKey(deals) : null }); };`, ctx);
   const pub = r[16];
@@ -282,7 +282,7 @@ test('Countdown: "Happy hour on now · ends in 1 hr 20 min" on the venue page an
   assert.ok(en.includes('function happyHourLeftText(left, fr)') && en.includes('function happyHourMinutesLeft(until, clock)'));
   assert.ok(en.includes("hhOnNow: function(t){ return 'Happy hour on now · ends in ' + t; }"));
   assert.ok(app.renderPlacesMapPage({ lang: 'fr' }).includes("hhOnNow: function(t){ return '5 à 7 en cours · se termine dans ' + t; }") || en.includes("hhOnNow: function(t){ return '5 à 7 en cours · se termine dans ' + t; }"));
-  assert.match(en, /if \(h && h\.state === 'now' && left != null\) return \{ now: true, text: T\.hhOnNow\(happyHourLeftText\(left, FR\)\) \};/);
+  assert.match(en, /if \(h && h\.state === 'now' && left != null\) return \{ now: true, left: happyHourLeftText\(left, FR\), text: T\.hhOnNow\(happyHourLeftText\(left, FR\)\) \};/);
 });
 
 test('Happy hour guides: the first two deals under each venue that has them', () => {
