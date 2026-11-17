@@ -616,7 +616,27 @@
   // "189 pp", « 189 $ par personne », "129 each"); the box used to cut them at 10 characters and refuse the rest. The
   // tasting, flight and cocktail boxes (readWine, readBrew, readCocktail) drop them with the same pattern, written in place.
   function moneyHead(x){ var t = String(x == null ? '' : x).trim(); var m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(t); return m ? m[1].replace(/[.,\s\u00a0\u202f]+$/, '') : t; }
-  function tourPriceRead(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  // Tour test 5 (Whistler, 2026-11-17): words after the number are never dropped silently. "650 per boat" was saved as
+  // $650 a person and "2 hrs $95pp" as $2. tourPriceWhy says what the words say: 'group' (per boat, per group, charter,
+  // "for 4 people", "/4"), 'hours' (it starts with a trip length), 'many' (a second price or other words), or '' (fine:
+  // per person, pp, each, a person, taxes). The private box takes per-boat words (that is what it is for).
+  function feeHours(x){ return /^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(String(x == null ? '' : x)); }
+  function tourPriceWhy(x, priv){
+    var raw = String(x == null ? '' : x).trim(); if (!raw || !/\d/.test(raw)) return '';
+    if (feeHours(raw)) return 'hours';
+    var head = moneyHead(raw); if (head === raw) return '';
+    var rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    var group = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|vehicles?|cars?|jeeps?|sleds?|canoes?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|v[ée]hicules?|priv[ée]e?s?)\b/.test(rest)
+      || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
+    if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
+    if (/\d/.test(rest)) return 'many';
+    var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
+      .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+    return left ? 'many' : '';
+  }
+  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  // The number a refused per-boat price starts with ("650 per boat" -> 650), to offer it for the Private tours box.
+  function tourPriceNumber(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
   // Tour test 4: the per-person box read as free: "free", "0", "$0", « gratuit » -> 'free'; "by donation", "pay what you
   // want", « contribution volontaire », « don » -> 'donation'; anything else -> ''. (server.js tourFreeRead, the same rule.)
   function tourFreeRead(x){
@@ -632,7 +652,7 @@
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
-    if ((x = v('suTpriv')) !== null) S.tour.priv = tourPriceRead(x);
+    if ((x = v('suTpriv')) !== null) S.tour.priv = tourPriceRead(x, true);
     if ((x = v('suBookUrl')) !== null && TOUR) S.bookUrl = x;
     if ((x = v('suBring')) !== null) S.tour.bring = x;
   }
@@ -647,7 +667,8 @@
   // Tour test 4: is what a price box holds readable now? (The red nudge goes as soon as it is.)
   function priceBoxOk(id, x){
     if (id === 'suTprice') { var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
-    if (id === 'suTpriv') { var b = tourPriceRead(x); return b == null || !isNaN(b); }
+    if (id === 'suTpriv') { var b = tourPriceRead(x, true); return b == null || !isNaN(b); }
+    if (feeHours(x)) return false;
     var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-zÀ-ɏ].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.');
     return /^\d{1,3}(\.\d{1,2})?$/.test(f) && +f <= 500 && (id === 'suCfee' ? +f > 0 : true);
   }
@@ -659,7 +680,7 @@
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
   function readBrew(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN;
+    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : feeHours(x) ? NaN : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN;
       // Distillery test 1 (Whistler, 2026-11-16): a price typed over research's is the owner's own ("Your page says $15
       // now, from your website, so we picked it" stayed after he typed $15 over $12).
       if (S.brew.feeGuessed && S.brew.fee !== C.researchFee) S.brew.feeGuessed = false; }
@@ -671,7 +692,7 @@
     if ((x = v('suGroupsLine')) !== null) S.brew.groups = x;
     if ((x = v('suBookLine')) !== null && CK) S.brew.book = x;
     if ((x = v('suBookUrl')) !== null && FOLD) S.bookUrl = x;
-    if ((x = v('suCfee')) !== null && CK) { var cf = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.cp.fee = cf === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(cf) ? +cf : NaN; }
+    if ((x = v('suCfee')) !== null && CK) { var cf = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.cp.fee = cf === '' ? null : feeHours(x) ? NaN : /^\d{1,3}(\.\d{1,2})?$/.test(cf) ? +cf : NaN; }
   }
   // A brewery's one-of-a-few answers (data-bpick="food:trucks") and on/off chips (data-btogo).
   // `after`: html shown right under one choice (the food-truck chips under "Food trucks").
@@ -707,7 +728,7 @@
   function readWine(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suRname')) !== null) S.wine.rname = x.trim(); if ((x = v('suRwhen')) !== null) S.wine.rwhen = x.trim();
-    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; if (S.wine.feeGuessed && S.wine.fee !== C.researchFee) S.wine.feeGuessed = false; }
+    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : feeHours(x) ? NaN : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; if (S.wine.feeGuessed && S.wine.fee !== C.researchFee) S.wine.feeGuessed = false; }
     if ((x = v('suKnown')) !== null) S.wine.known = x.trim();
     // Winery test 2 (2026-11-12): a booking link typed before tapping a group size or bus chip survives the redraw.
     if ((x = v('suBookUrl')) !== null) S.bookUrl = x;
@@ -2032,6 +2053,7 @@
         // Tour test 4: research's "by donation" / "free" pre-picks no price; it only says what to type (her answer, her tap).
         + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
+        + (S.nudge && S.nudge === T.tpriceGroup && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
@@ -3187,6 +3209,13 @@
     if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; return go('hours:yeardrop'); }
     // Distillery test 1 (Whistler, 2026-11-16): "Skip these dates and keep going" under the all-closed message. A new
     // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
+    // Tour test 5: "Put $650 in Private tours" under the per-boat nudge moves the number to the private box and empties the
+    // per-person box (nothing is saved until Save).
+    if (k === 'tpriceToPriv') {
+      var gm = S.groupMove; if (gm == null) return;
+      var b1 = el('suTprice'), b2 = el('suTpriv'); if (b1) b1.value = ''; if (b2) b2.value = String(gm);
+      S.tour.price = null; S.tour.free = ''; S.tour.priv = gm; S.groupMove = null; S.nudge = T.tpriceGroupMoved || ''; S.badField = 'suTprice'; mark(); return render();
+    }
     if (k === 'seaSkipClosed') {
       var zi = S.seaI, zo = S.seaList[zi]; S.nudge = ''; S.seaClosedNudge = '';
       if (zo && zo.src) S.seaList[zi] = seaLoad(seaBlank(), zo.src);
@@ -3646,8 +3675,13 @@
     }
     if (k === 'priceSave') {
       readTour(); var pp = S.tour.price, pv = S.tour.priv, pfree = S.tour.free;
-      if (!pfree && (pp == null || isNaN(pp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
-      if (pv != null && isNaN(pv)) { S.nudge = T.tprivNeed; S.badField = 'suTpriv'; return render(); }
+      if (!pfree && (pp == null || isNaN(pp))) {
+        // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
+        var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
+        S.groupMove = pwhy === 'group' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
+      }
+      if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }
       var pl = [];
       // Tour test 4: a free or by-donation tour is saved as the word; it is live at once ("Free" on the card and the page).
       if (pfree) {

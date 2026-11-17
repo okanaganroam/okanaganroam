@@ -2064,6 +2064,24 @@ Object.assign(fr.tour, {
   dogChipLabels: ['À toutes les sorties', 'À certaines sorties (dites lesquelles)', 'En laisse'],
   quickDogsFull: ['Chiens bienvenus à toutes les sorties', 'Chiens bienvenus à certaines sorties'],
 });
+// Tour test 5 (Whistler fresh eyes, Rob, 2026-11-17): a per-boat price is never saved as a price per person ("650 per
+// boat" read as $650 a person, "2 hrs $95pp" as $2). The box says why and offers the Private tours box; the lead says "a person".
+Object.assign(en.tour, {
+  tpriceLeadPick: 'Your card will say “From {x} a person”.',
+  tpriceGroup: 'Priced per boat or per group? Put it in Private tours below.',
+  tpriceGroupMove: 'Put {x} in Private tours', tpriceGroupMoved: 'Moved to Private tours. Now type a price for one person, like 95.',
+  tpriceHours: 'That starts with a trip length. Type just the price, like 95.',
+  tpriceOne: 'One price here: your lowest for one person, like 95. Other prices and extras go in “Your tours and prices”.',
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below.',
+});
+Object.assign(fr.tour, {
+  tpriceLeadPick: 'Votre fiche indiquera « À partir de {x} par personne ».',
+  tpriceGroup: 'Un prix par bateau ou par groupe? Mettez-le dans Sorties privées, plus bas.',
+  tpriceGroupMove: 'Mettre {x} dans Sorties privées', tpriceGroupMoved: 'Déplacé dans Sorties privées. Écrivez maintenant un prix pour une personne, par exemple 95.',
+  tpriceHours: 'Ça commence par une durée. Écrivez seulement le prix, par exemple 95.',
+  tpriceOne: 'Un seul prix ici : votre plus bas pour une personne, par exemple 95. Les autres prix et les extras vont dans « Vos sorties et tarifs ».',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas.',
+});
 // All types: a line of the owner's that the page folds under "More" says so after the save.
 Object.assign(en, { hoursBack: 'We put back the hours you had before. Check them, then tap Next.', foldedMore: 'Look for it under “More” in your Plan your visit box.' });
 Object.assign(fr, { hoursBack: 'Nous avons remis les heures que vous aviez. Vérifiez-les, puis touchez Suivant.', foldedMore: 'Elle se trouve sous « Plus » dans l’encadré Planifiez votre visite.' });

@@ -22342,8 +22342,31 @@ function tourFreeRead(x) {
 }
 // -> { value } (a number from 1 to TOUR_PRICE_MAX, at most two decimals; null clears) or { error }. "$129", "129 $",
 // "1,500" and "1 500" all read.
-function cleanTourPrice(x, allowFree = false) {
+// Tour test 5 (Whistler, 2026-11-17): what the words after a typed price say (owner-setup-client.js tourPriceWhy, the
+// same rule): 'group' (per boat / per group / charter / "for 4 people"), 'hours' (it starts with a trip length: "2 hrs
+// $95pp" was saved as $2), 'many' (a second price or other words), or '' (per person, pp, each, taxes). The private box
+// (priv) takes per-boat words.
+function tourPriceWhy(x, priv = false) {
+  const raw = String(x == null ? '' : x).trim();
+  if (!raw || !/\d/.test(raw)) return '';
+  if (/^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(raw)) return 'hours';
+  const m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(raw);
+  if (!m) return '';
+  const head = m[1].replace(/[.,\s\u00a0\u202f]+$/, '');
+  const rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const countRe = /(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g;
+  const group = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|vehicles?|cars?|jeeps?|sleds?|canoes?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|v[ée]hicules?|priv[ée]e?s?)\b/.test(rest)
+    || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
+  if (group) return priv ? (/\d/.test(rest.replace(countRe, '')) ? 'many' : '') : 'group';
+  if (/\d/.test(rest)) return 'many';
+  const left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
+    .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+  return left ? 'many' : '';
+}
+const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.' };
+function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
+  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why], why }; }
   // Tour test 4: "free", "0", "by donation"… in the per-person box (never the private price).
   if (allowFree) { const f = tourFreeRead(x); if (f) return { value: f }; }
   // Tour test 3 (Whistler, 2026-11-17): words after the number are dropped ("$189.00 per person", "189 pp", « 189 $ par personne »).
