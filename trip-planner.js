@@ -127,8 +127,21 @@ function kidsKitchenMeal(v, ctx) {
   const at = ((Number(m[1]) % 12) + (/^p/i.test(m[3]) ? 12 : 0)) * 60 + Number(m[2] || 0);
   return at < until;
 }
+// Tour test 1 (Whistler, 2026-11-16): the ages a request names ("our 14-year-old", "kids aged 8 and 11", "ages 10 and
+// 12"), youngest first; [] when it names none. A tour's own minimum age is read against the youngest.
+function requestKidAges(text) {
+  const t = String(text || '');
+  const out = [];
+  const add = (x) => { const n = Number(x); if (Number.isInteger(n) && n >= 0 && n < 19) out.push(n); };
+  let m;
+  const re1 = /\b(\d{1,2}) ?(?:years? old|year olds?|yrs? old|yo)\b/g; while ((m = re1.exec(t))) add(m[1]);
+  const re2 = /\b(?:aged?|ages|kids?|children|boys?|girls?|sons?|daughters?) (\d{1,2})(?: (?:and|or|to|through) (\d{1,2}))?\b(?! ?(?:am|pm|h|people|guests|adults|of us))/g; while ((m = re2.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+function kidsYoungest(ctx) { if (!ctx) return null; const a = requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 function kidsAllowed(v) {
   if (!v) return false;
+  const ctx = arguments[1]; // the trip's context when given (the ages it names), tour test 1
   if (v.type === 'pub' || v.type === 'brewery') return !!(v.features && v.features.kid_friendly);
   // Distilleries (Decided 4, 2026-11-13): only when the owner said All ages or "until a set time" (v.ownerKidsWelcome);
   // a researched kids badge alone never counts, so an unanswered distillery stays out, as before.
@@ -138,7 +151,14 @@ function kidsAllowed(v) {
   if (v.type === 'cocktail') return v.ownerKidsWelcome === true;
   // Tours (2026-11-16): the operator's own minimum age. All ages or 6+ is fine for a family; 12+, 16+ or 19+ never is
   // (a kids trip doesn't say how old the kids are, so the safe read). Unanswered: as before.
-  if (v.type === 'tour' && v.tourMinAge) return v.tourMinAge === 'all' || v.tourMinAge === '6';
+  // Tour test 1: with the kids' ages named, a tour whose minimum is at or below the youngest is fine ("our 14-year-old" and
+  // a 12+ tour); one above it is not.
+  if (v.type === 'tour' && v.tourMinAge) {
+    if (v.tourMinAge === 'all') return true;
+    const young = kidsYoungest(ctx);
+    if (young != null && /^\d+$/.test(v.tourMinAge)) return young >= Number(v.tourMinAge);
+    return v.tourMinAge === '6';
+  }
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
 // Brewery test 1 (2026-11-12): a brewery or pub whose owner said "minors with an adult until 9 PM" (v.kidsUntil, 'HH:MM').
@@ -837,7 +857,9 @@ const SPECIALIST_OUTDOOR = [
   { sub: /\b(?:crags?|bouldering|climbing area|climbing park|alpine rock)\b/, asked: /\b(?:climb|climbs|climbing|climber|climbers|boulder|bouldering|crag|crags|belay)\b/ },
   { sub: /\b(?:backcountry|ski touring|alpine basin)\b/, asked: /\b(?:backcountry|hut|huts|ski touring|ski tour|splitboard|splitboarding|mountaineering|traverse|overnight hike|backpacking|cross country|nordic)\b/, alsoAsked: SITE.backcountryAskedRe },
   { sub: /\b(?:campground|recreation site|marine campsite)\b/, asked: /\b(?:camp|camping|campground|campgrounds|campsite|campsites|tent|rv|overnight)\b/ },
-  { sub: /\bsnowmobile (?:area|trail)\b/, asked: /\b(?:snowmobile|snowmobiles|snowmobiling|sled|sledding|sledders?)\b/ },
+  // Tour test 1 (Whistler, 2026-11-16): a snowmobile *tour* asked for is the outfitter, not the club's trail (it planned
+  // "Walk the trails at Rutherford Snowmobile Trail"); the trail only when riding your own sled or the trails are asked for.
+  { sub: /\bsnowmobile (?:area|trail)\b/, asked: /\b(?:snowmobile|snowmobiles|snowmobiling|sled|sledding|sledders?)\b/, notIf: /\b(?:snowmobile|snowmobiling|sled) (?:tours?|trips?|rides?|outing|adventures?)\b|\bguided snowmobil\w*/, unlessAsked: /\b(?:trail|trails|own sleds?|our sleds?|sledders?|staging)\b/ },
   { sub: /\b(?:mountain bike trails?(?: network)?|lift access bike park)\b/, asked: /\b(?:bike|bikes|biking|mtb|mountain biking|cycling|ride|riding)\b/ },
   { sub: /\b(?:pump track|dirt jumps|bike skills park|bmx track|skate park)\b/, asked: /\b(?:pump tracks?|dirt jumps|skatepark|bike|bikes|biking|bmx|mtb|skate|skateboard\w*|scooter|kids|children|family|families|teens?|teenagers?)\b/ },
   { sub: /\b(?:kiteboarding|windsurfing)\b/, asked: /\b(?:kite|kiting|kiteboarding|kitesurfing|windsurf|windsurfing)\b/ },
@@ -1005,6 +1027,7 @@ function specialistOutdoorBlocked(v, ctx) {
   if (!rule) return false;
   const text = ctx.queryText || '';
   if (!rule.asked.test(text) && !(rule.alsoAsked && rule.alsoAsked.test(text))) return true;
+  if (rule.notIf && rule.notIf.test(text) && !(rule.unlessAsked && rule.unlessAsked.test(text))) return true;
   // "Easy walks" or a trip with kids keeps big summit and alpine hikes out even though "hike" was said.
   return !!rule.notEasy && (/\b(?:easy|gentle|short|stroll|strolls|flat|accessible|stroller)\b/.test(text) || !!ctx.kids);
 }
@@ -1028,7 +1051,7 @@ function eligible(v, ctx, strict) {
   if (v.type === 'indoor' && /\blibrary\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:library|libraries|rain|rainy|raining|books?)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
-  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6') && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
+  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6') && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
   if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
@@ -1069,7 +1092,7 @@ function eligible(v, ctx, strict) {
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
   if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || '')))) return false;
   if (ctx.kids) {
-    if (!kidsAllowed(v)) return false;
+    if (!kidsAllowed(v, ctx)) return false;
   }
   // Teenagers can't go to bars (2026-10-14).
   if (['pub', 'cocktail', 'distillery'].includes(v.type) && /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '') && !ctx.types.has(v.type)) return false;
@@ -1530,7 +1553,10 @@ function publicVenue(v, ctx) {
   const flight = (v.type === 'brewery' || v.type === 'distillery') && typeof v.flightFee === 'number' && Number.isFinite(v.flightFee) && v.flightFee > 0 ? v.flightFee : null;
   // Cocktail lounges (Decided 2, 2026-11-13): the owner's cocktail price ("Cocktails from $16").
   const cocktail = v.type === 'cocktail' && typeof v.cocktailPrice === 'number' && Number.isFinite(v.cocktailPrice) && v.cocktailPrice > 0 ? v.cocktailPrice : null;
-  const cost = cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
+  // Tour test 1 (Whistler, 2026-11-16): a tour operator's own price per person ("From $149").
+  const tourFrom = v.type === 'tour' && typeof v.tourPrice === 'number' && Number.isFinite(v.tourPrice) && v.tourPrice > 0 ? v.tourPrice : null;
+  const cost = tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+    : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
   return {
@@ -6629,7 +6655,7 @@ function rainBackups(result, input, intent) {
   const text = (v) => `${v.textName || ''} ${v.textDesc || ''}`;
   const scored = (input.facts || []).filter((v) => regions.has(v.region) && !used.has(v.id) && tripRequirements.matches(v, { kind: 'rainy' }) && !['restaurant', 'cafe'].includes(v.type)
     && !(v.advisory && advisoryUnavailable(v.advisory.note))
-    && !(party.kids && (!kidsAllowed(v) || /\bcasino\b/.test(text(v))))
+    && !(party.kids && (!kidsAllowed(v, { queryText: normWords(input.text || '') }) || /\bcasino\b/.test(text(v))))
     && !(noDrink && RAIN_BACKUP_DRINK_TYPES.includes(v.type))
     && !(party.dog && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))))
     .map((v) => {
@@ -8351,6 +8377,9 @@ function planItinerary(input) {
       // Audit fix (2026-10-27): "pub dinner and drinks in Osoyoos" started at The Sage Pub and still warned "No pubs or
       // cocktail lounges matched in Osoyoos": a part whose kinds an earlier stop already covers is not missing.
       else if (stops.some((s) => s.kind === 'venue' && s.venue && (c.types || []).includes(s.venue.type))) continue;
+      // Tour test 1 (Whistler, 2026-11-16): nor a kind an earlier stop already is ("No ATV tour matched in Vernon" under the
+      // ATV tour planned for it).
+      else if ((c.plannerKinds || []).length && stops.some((s) => { if (s.kind !== 'venue' || !s.venue) return false; const f = facts.find((x) => x.id === s.venue.id); return !!f && c.plannerKinds.some((k) => (f.plannerKinds || tripRequirements.inferPlannerKinds(f)).includes(k)); })) continue;
       // Brewery test 4: dinner at the brewery already in the plan, when its own kitchen is open for it.
       else if (kitchenPart && (() => {
         const st = stops.find((s) => s.kind === 'venue' && s.venue && !s.kitchenMeal && kitchenMealFit(facts.find((f) => f.id === s.venue.id), kitchenWin, kitchenDay)?.ok);
@@ -8622,7 +8651,7 @@ module.exports = {
   wineTourMeansWineries,
   applyWineTourMeaning,
   fastFood,
-  publicVenue, breweryIsCidery, ciderAsked, kidsAllowed,
+  publicVenue, breweryIsCidery, ciderAsked, kidsAllowed, requestKidAges,
   stopFrom,
   parseVenueHours,
   hoursFit, dayClosedAllDay, closedDayInfo, tastingWordUsed, requirementClosedOnly, DAYTIME_NIGHT_KINDS,

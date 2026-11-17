@@ -30,7 +30,8 @@ const KINDS = {
   bungee: /\b(?:bungee|bungy)(?: jumps?| jumping)?\b/,
   rafting: /\b(?:rafting|white ?water rafting|river rafts?|raft trips?|raft tours?)\b/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic flights?|helicopter tours?|heli tours?|flightseeing|glacier landing)\b/,
-  atv: /\b(?:atvs?|rzr|off road tours?|side by sides?)\b/,
+  // Tour test 1 (Whistler, 2026-11-16): quads, jeeps and off-road tours too (French « quad » and « VTT » read as ATV).
+  atv: /\b(?:atvs?|rzr|off ?road(?:ing)? (?:tours?|trips?|adventures?)|side by sides?|quad (?:tours?|rides?|trips?)|quads|jeep tours?|jeeps?)\b/,
   snowmobile_tour: /\b(?:snowmobil\w*)\b/,
   via_ferrata: /\bvia ferrata\b/,
   shopping: /\b(?:shopping|boutiques?|souvenirs?|gift shops?)\b/,
@@ -137,7 +138,9 @@ function hikingPlace(v){
   return true;
 }
 function inferPlannerKinds(v) {
-  const text = norm([v.name,v.description,v.textName,v.textDesc].filter(Boolean).join(' '));
+  // Tour test 1 (Whistler, 2026-11-16): a tour's own kind words too ("Snowmobile & ATV tours", kept when the operator's kinds
+  // are saved), so an ATV request finds it.
+  const text = norm([v.name,v.description,v.textName,v.textDesc,v.type==='tour'?v.cuisine:''].filter(Boolean).join(' '));
   const name = norm(v.name);
   return Object.entries(v.type==='sport'?{...KINDS,...SPORT_KINDS}:KINDS).filter(([kind,re]) => {
     if (kind==='challenging_hike') {

@@ -1416,6 +1416,9 @@ FR_PATTERNS.unshift(
 // Round 8 (2026-10-19): a place listed as "The Dream (live music venue)" keeps its name, with the note in French,
 // also where its name runs on ("The Dream (live music venue) · 67 Front St").
 FR_PATTERNS.unshift([/^(.+?) \(live music venue\)(.*)$/, (m) => `${m[1]} (salle de concerts)${m[2]}`]);
+// Tour test 1 (Whistler, 2026-11-16): a town's tours intro stayed in English (« Tours and experiences in and from
+// Pemberton, booked with local operators. »).
+FR_PATTERNS.unshift([/^Tours and experiences in and from (.+), booked with local operators\.$/, (m) => `Visites et expériences à ${m[1]} et au départ de ${m[1]}, à réserver auprès d’entreprises locales.`]);
 
 // Round 10 (2026-10-19): the Free to Visit guide (#405) showed "Free Things to Do" as a chip and in the breadcrumb, and
 // its search label ("Search free things to do in kelowna") and the Arts & Culture one stayed in English.

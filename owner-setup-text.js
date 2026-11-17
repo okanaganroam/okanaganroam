@@ -948,6 +948,8 @@ Object.assign(fr, {
 // Café test 6 (2026-11-12): the other season's hours, said on the "Are these still your hours?" screen.
 Object.assign(en, { seasonHoursLine: '{kind} ({range}): {hours} ✓', everyDayHours: '{t} every day' });
 Object.assign(en, { recapAppt: '({a} – {b}) · by appointment the rest of the year', recapOpen: '({a} – {b})', recapHours: 'Your hours', recapRest: 'Rest of the year', stSocialIgLive: 'Instagram on your page now, Facebook within a day', stSocialFbLive: 'Facebook on your page now, Instagram within a day' });
+Object.assign(en, { recapSeason: 'Open {a} – {b}', recapUsual: 'Usual hours' });
+Object.assign(fr, { recapSeason: 'Ouvert du {a} au {b}', recapUsual: 'Heures habituelles' });
 Object.assign(fr, { seasonHoursLine: '{kind} ({range})\u00a0: {hours} ✓', everyDayHours: '{t} tous les jours' });
 Object.assign(fr, { recapAppt: '({a} – {b}) · sur rendez-vous le reste de l’année', recapOpen: '({a} – {b})', recapHours: 'Vos heures', recapRest: 'Le reste de l’année', stSocialIgLive: 'Instagram sur votre page maintenant, Facebook d’ici un jour', stSocialFbLive: 'Facebook sur votre page maintenant, Instagram d’ici un jour' });
 
@@ -1843,7 +1845,7 @@ en.tour = {
 fr.tour = {
   hiLead: 'Préparons la page de vos activités, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
   timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
-  labels: { basics: 'Adresse, téléphone et site Web', hours: 'Quand vous partez', tour: 'Ce que vous offrez', price: 'Prix', booking: 'Réservations', offer: 'Qui peut venir', photos: 'Photos',
+  labels: { basics: 'Adresse, téléphone et site Web', hours: 'Vos heures et votre saison', tour: 'Ce que vous offrez', price: 'Prix', booking: 'Réservations', offer: 'Qui peut venir', photos: 'Photos',
     story: 'Votre histoire et ce pour quoi vous êtes connus', bring: 'Bon à savoir', groups: 'Groupes et réservations privées', social: 'Instagram et Facebook', door: 'Où vous rejoint-on?' },
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', booking: 'pas de réservations en ligne' },
   stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
@@ -1901,6 +1903,64 @@ fr.tour.quick = Object.assign({}, fr.quick, {
   good_to_know: ['Habillez-vous selon la météo', 'Apportez de l’eau et de la crème solaire', 'Portez des chaussures fermées', 'Nous fournissons l’équipement', 'Nous partons beau temps, mauvais temps', 'Nous vous appelons si la météo annule une sortie', 'Cueillette à l’hôtel offerte'],
   groups: ['Visites privées offertes', 'Sorties d’équipe sur demande', 'Appelez à l’avance pour 10 personnes ou plus'],
 });
+// Tour test 1 (Whistler, 2026-11-16). "Your tours and prices" (Dayton approved): the menu feature (a photo, a file or a
+// link, typed up for them) is a tour's first optional screen, and every word of it says "tours and prices" / « visites et
+// tarifs », never menu (the brewery tap list's way: the words are laid over the menu step's own). The rest are the test's
+// wording fixes: the hours editor without lunch, dinner and after-midnight words, the dogs line without a patio, the
+// research note on Good to know, the price box hint, and the French table.
+Object.assign(en.tour, {
+  labels: Object.assign({}, en.tour.labels, { menu: 'Your tours and prices' }),
+  menuQ: 'How should we add your tours and prices?', menuLead: 'Your trips and what each one costs. A photo of your rates sheet or a link to your prices page is perfect. It’s optional.',
+  snap: 'Take a photo of your rates sheet', snapSub: 'Or your brochure, one page at a time', upload: 'Upload your price list', uploadSub: 'A file or photos from your phone or computer',
+  web: 'My tours and prices are on my website', menuSocial: 'My tours and prices are on Facebook or Instagram',
+  emailQ: 'Email your tours and prices to us', emailLead: 'Send a photo or a file of your price list. Put “{name}” in the subject.', mailSubject: 'Tours and prices for {name}',
+  menuSentEmail: '✓ You said you’ll email your tours and prices.', menuNote: 'Sent from the easy setup. Please add our tours and prices to our page.',
+  menuSentQ: 'Your tours and prices are sent ✓', menuNewer: 'Want to send a newer list?', menuSent: '✓ Your tours and prices are sent.',
+  webQ: 'Is this where your tours and prices are?', webLead: 'We filled in your website’s address. If your prices have their own page, type its name after the last /, like /rates.',
+  webQEmpty: 'Where are your tours and prices online?', webLeadEmpty: 'Type the address of the page your prices are on.', webLabel: 'Prices page web address',
+  webEmpty: 'Please type the address of your prices page, like www.yourtours.com/rates.',
+  upQ: 'Upload your price list', upQSome: 'Your price list', upLead: 'Pick the file your tours and prices are in. A file or photos both work.', upPick: 'Choose my price list file', sendMenu: 'Send my tours and prices',
+  camQ: 'Snap your rates sheet', camLead: 'Hold your phone over the rates sheet so the whole page fits.', page: 'Price list page {n}',
+  menuSocialQ: 'Where are your tours and prices?', menuSocialLead: 'Paste the link to your Facebook or Instagram page or post with your prices. Or type the page name and we’ll find it.',
+  menuSocialNote: 'Our tours and prices are on our Facebook or Instagram page: “{name}”. Please find them and add them as our prices link.',
+  savedMenuSocialName: 'We’ll find your tours and prices on that page and add them within a day.',
+  helpTail: 'Photos, your tours and prices and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.',
+  // The price box: several trips or two seasons' prices go in "Your tours and prices".
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details.',
+  // The hours editor: departures, not lunch and dinner; nothing after midnight.
+  addSecond: '+ Add a second time (only if you close in between)', twoTimesMax: 'Up to two times a day.',
+  departHint: 'Departures at set times? Set one time from your first departure to when the last trip gets back (like 9 AM – 5 PM), and list the departure times in your story.',
+  noDogsSub: 'Not on any trip', noDogsSubInside: 'Not on any trip',
+  bringGuess: 'We found this online. Check it: change any words, or tap the answers above to use them instead.',
+});
+Object.assign(fr.tour, {
+  labels: Object.assign({}, fr.tour.labels, { menu: 'Vos visites et tarifs', hours: 'Vos heures et votre saison' }),
+  menuQ: 'Comment ajouter vos visites et tarifs?', menuLead: 'Vos sorties et le prix de chacune. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
+  web: 'Mes visites et tarifs sont sur mon site Web', menuSocial: 'Mes visites et tarifs sont sur Facebook ou Instagram',
+  emailQ: 'Envoyez-nous vos visites et tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Visites et tarifs de {name}',
+  menuSentEmail: '✓ Vous avez dit que vous enverrez vos visites et tarifs par courriel.', menuNote: 'Envoyé depuis la configuration simple. Merci d’ajouter nos visites et tarifs à notre page.',
+  menuSentQ: 'Vos visites et tarifs sont envoyés ✓', menuNewer: 'Voulez-vous envoyer une liste plus récente?', menuSent: '✓ Vos visites et tarifs sont envoyés.',
+  webQ: 'Vos visites et tarifs sont-ils à cette adresse?', webLead: 'Nous avons inscrit l’adresse de votre site Web. Si vos prix ont leur propre page, tapez son nom après le dernier /, comme /tarifs.',
+  webQEmpty: 'Où sont vos visites et tarifs en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouvent vos prix.', webLabel: 'Adresse Web de la page des prix',
+  webEmpty: 'Écrivez l’adresse de votre page de prix, comme www.vosactivites.com/tarifs.',
+  upQ: 'Téléversez votre liste de prix', upQSome: 'Votre liste de prix', upLead: 'Choisissez le fichier de vos visites et tarifs. Un fichier ou des photos, les deux fonctionnent.', upPick: 'Choisir le fichier de ma liste de prix', sendMenu: 'Envoyer mes visites et tarifs',
+  camQ: 'Photographiez votre grille tarifaire', camLead: 'Tenez votre téléphone au-dessus de la grille tarifaire pour que toute la page soit visible.', page: 'Page {n} de la liste de prix',
+  menuSocialQ: 'Où sont vos visites et tarifs?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec vos prix. Ou tapez le nom de la page et nous la trouverons.',
+  menuSocialNote: 'Nos visites et tarifs sont sur notre page Facebook ou Instagram : « {name} ». Merci de les trouver et de les ajouter comme lien de nos prix.',
+  savedMenuSocialName: 'Nous trouverons vos visites et tarifs sur cette page et les ajouterons d’ici un jour.',
+  helpTail: 'Les photos, vos visites et tarifs et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos visites et tarifs », le premier des détails facultatifs.',
+  addSecond: '+ Ajouter une deuxième plage (seulement si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.',
+  departHint: 'Des départs à heures fixes? Indiquez une seule plage, de votre premier départ jusqu’au retour de la dernière sortie (comme 9 h – 17 h), et nommez les heures de départ dans votre histoire.',
+  noDogsSub: 'Sur aucune sortie', noDogsSubInside: 'Sur aucune sortie',
+  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le : changez les mots, ou touchez les réponses plus haut pour les utiliser à la place.',
+  // The French wording table (tour test 1).
+  allYearClosed: 'Nous offrons des sorties une partie de l’année seulement',
+  tpriceQ: 'Combien coûte une sortie par personne?',
+  knownQ: 'Pour quoi êtes-vous connus?',
+});
+
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

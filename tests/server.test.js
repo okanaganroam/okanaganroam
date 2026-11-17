@@ -17008,10 +17008,12 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.includes(closed[t]) && ids.includes(open[t]), `${path}: both fixtures listed`);
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
-        assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
+        // Tour test 1 (Whistler, 2026-11-16): the closed line is said once on a card. The status line below says it (with the
+        // date), so the closed pill on the photo is dropped (it said "Closed · reopens …" a second time).
+        assert.ok(!card.includes('class="season-tag season-tag-closed"') && /(Closed for the season|Fermé pour la saison)/.test(card), `${path}: the closed line once`);
         if (['golf', 'tour', 'sport', 'indoor', 'outdoor', 'beach'].includes(t) && !path.startsWith('/fr/')) assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
         else assert.match(card, /fd-open-status" data-fd-open="seasonal">/, `${path}: a status line in French too`);
-        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai/);
+        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai|Fermé pour la saison · Réouverture le 15 mai 2027/);
       }
       // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
       const bh = (await (await fetch(base + '/browse')).text()) + (await (await fetch(base + '/browse/cards.json')).json()).html;
