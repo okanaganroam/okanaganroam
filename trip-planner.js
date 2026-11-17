@@ -687,6 +687,8 @@ const BUDGET_SKIPPED_TYPES = ['winery', 'distillery'];
 const BUDGET_PAID_RE = /\b(?:spa|spas|wellness|massage|massages|facials?|float(?:ing)? (?:spa|tank|centre|center)|sauna|esthetics?|day spa|adventure company|adventures? (?:co|inc|ltd)|rentals?|zip ?lines?|ziplining|charters?|guided|resort|yurts?|campground|rv park)\b/;
 const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|beach|beaches|lookout|viewpoint|market|markets|promenade|waterfront|nature reserve|free)\b/;
 function budgetPaid(v) {
+  // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) is not a paid stop.
+  if (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')) return false;
   if (v.type === 'tour' || v.type === 'golf') return true;
   if ((v.plannerKinds || []).includes('spa')) return true;
   return ['indoor', 'outdoor', 'sport'].includes(v.type) && BUDGET_PAID_RE.test(`${v.textName || ''} ${v.type === 'indoor' ? v.textDesc || '' : ''}`);
@@ -1299,7 +1301,7 @@ function scoreVenue(v, ctx) {
     const kmTown = kmBetween(v, TOWN_CENTRES[v.region]);
     if (kmTown > 25 && kmTown < 150 && !namedInRequest(v, ctx)) add('far', -Math.min(25, (kmTown - 25) * 0.5 + 8), null);
   }
-  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) { if (v.features.free_entry) add('free', 25, null); else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null); else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null); }
+  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) { if (v.features.free_entry || (v.type === 'tour' && v.tourFree)) add('free', 25, null); else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null); else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null); }
   // A nightclub only for nightlife or a group night out (2026-10-25: a couple in their 60s asking for wine bars got Moe Joe's).
   if (/\bnightclub\b/.test(normWords(v.cuisine || '')) && ctx.occasion !== 'group_getaway' && !NIGHT_OUT_RE.test(ctx.queryText || '')) add('nightclub', -35, null);
   // Winter months (2026-10-25): outdoor places listed for winter come first when nothing more specific was asked.
@@ -1455,7 +1457,7 @@ function scoreVenue(v, ctx) {
   if (vegAsked && DINING_TYPES.includes(v.type) && /\b(?:vegetarian|vegan|plant based)\b/.test(`${v.textName || ''} ${v.textCuisine || ''}`)) add('veg_kitchen', 8, 'An all-vegetarian or vegan kitchen');
   // A "food tour" day is a food-tour operator and good food, not a fruit farm and a pub (2026-10-14).
   if (/\bfood(?:ie)? tours?\b|\bculinary tours?\b/.test(ctx.queryText || '')) {
-    if (v.type === 'tour') { const ft = textHas(v.textName, 'food') || textHas(v.textName, 'culinary') || textHas(v.textDesc, 'food tour'); add('food_tour', ft ? 25 : -15, ft ? 'A guided food tour' : null); }
+    if (v.type === 'tour') { const ft = textHas(v.textName, 'food') || textHas(v.textName, 'culinary') || textHas(v.textDesc, 'food tour') || (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes('food_tour'); add('food_tour', ft ? 25 : -15, ft ? 'A guided food tour' : null); }
     if (['pub', 'brewery', 'cocktail', 'distillery'].includes(v.type)) add('food_tour_bar', -12, null);
   }
   // A dog trip is walks, trails and beaches first, then patios (2026-10-14: a dog weekend was a distillery, a bike park
@@ -1596,7 +1598,10 @@ function publicVenue(v, ctx) {
   const cocktail = v.type === 'cocktail' && typeof v.cocktailPrice === 'number' && Number.isFinite(v.cocktailPrice) && v.cocktailPrice > 0 ? v.cocktailPrice : null;
   // Tour test 1 (Whistler, 2026-11-16): a tour operator's own price per person ("From $149").
   const tourFrom = v.type === 'tour' && typeof v.tourPrice === 'number' && Number.isFinite(v.tourPrice) && v.tourPrice > 0 ? v.tourPrice : null;
-  const cost = tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) says "Free", counts $0 in the
+  // estimate, and never shows a researched price beside it.
+  const tourIsFree = v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation');
+  const cost = tourIsFree ? null : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
@@ -1604,6 +1609,7 @@ function publicVenue(v, ctx) {
     // Distillery test 2 (2026-11-13): a distillery's or brewery's own "Free tastings" (a price of 0) says "Free tasting"
     // too; it read « Prix par personne à vérifier ».
     ...(fee === 0 || ((v.type === 'brewery' || v.type === 'distillery') && v.flightFee === 0) ? { freeTasting: true } : {}),
+    ...(tourIsFree ? { freeTour: v.tourFree } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
@@ -1611,7 +1617,8 @@ function publicVenue(v, ctx) {
     ...(v.type === 'brewery' && BREWERY_KIND_LABEL[v.breweryKind] ? { typeLabelFr: BREWERY_KIND_LABEL[v.breweryKind][1] } : {}),
     ...(v.type === 'cocktail' ? { typeLabelFr: 'Bar à cocktails' } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
-    rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
+    // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
+    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom ? null : v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -1709,6 +1716,7 @@ function coldMonthIceCream(v, date) {
 }
 const TOUR_BOOKING_NOTE = 'Tours run at set times: book ahead with the operator and plan the day around the time you get.';
 // Tours (2026-11-16): the operator's own "book ahead" answer replaces the general note.
+const TOUR_VARIES_NOTE = 'Length, ages and booking can differ by tour: see this operator’s Tours & prices.';
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
@@ -1935,6 +1943,9 @@ function stopFrom(v, scored, extra, ctx) {
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
+  // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
+  // (its own Tours & prices list names different lengths or ages): say so, once.
+  if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
@@ -3288,8 +3299,35 @@ function foodTourMeansFood(text) {
   const t = normWords(text || '');
   return FOOD_TOUR_RE.test(t) && !/\btours? (?:company|companies|operators?|guides?)\b|\bguided (?:food |culinary )?tours?\b|\bbook (?:a|the) (?:food )?tour\b/.test(t);
 }
-function applyFoodTourMeaning(text, intent, requirements) {
+// Tour test 4 (Whistler, 2026-11-17): "food tour in Whistler" planned dinner at a brasserie with two food-tour companies
+// in town. When a region of the request has a food-tour operator (the operator's Food tours kind, or its own words:
+// "Food tour"), a food tour is that operator; restaurants and cafés are the fallback. A diet, dessert, brunch or crawl
+// request still means eating round town ("vegan food tour", "a food crawl"). `venues`: the planner's listings (or the
+// tours); without them the meaning is as before.
+const FOOD_TOUR_OPERATOR_RE = /\b(?:food(?:ie)?|culinary|tasting|food tasting) tours?\b/;
+const FOOD_TOUR_EATING_RE = /\b(?:vegan|vegetarian|gluten|halal|kosher|dessert|bakery|brunch|eating|crawls?|hops?|trails?)\b/;
+function regionHasTourKind(venues, regions, kind) {
+  return (venues || []).some((v) => v && v.type === 'tour' && (!regions || !regions.length || regions.includes(v.region)) && (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(kind));
+}
+function foodTourMeansOperator(text, intent, requirements, venues) {
+  const t = normWords(text || '');
+  if (!venues || !FOOD_TOUR_OPERATOR_RE.test(t) || FOOD_TOUR_EATING_RE.test(t)) return false;
+  if (!(requirements && Array.isArray(requirements.items) && requirements.items.some((i) => i.kind === 'venue_kind' && i.value === 'food_tour' && i.strength === 'must'))) return false;
+  return regionHasTourKind(venues, intent && intent.regions, 'food_tour');
+}
+// A "walking tour", "ghost walk", "history walk" or "lights walk" is a walking-tour operator when a region of the request
+// has one. With none, a "… walk" is a walk again (trails and paths, as before) and a "walking tour" a tour request.
+function applyWalkingTourMeaning(intent, requirements, venues) {
+  if (!venues || !requirements || !Array.isArray(requirements.items) || !requirements.items.some((i) => i.kind === 'venue_kind' && i.value === 'walking_tour')) return false;
+  if (regionHasTourKind(venues, intent && intent.regions, 'walking_tour')) return false;
+  requirements.items = requirements.items.flatMap((i) => (i.kind === 'venue_kind' && i.value === 'walking_tour' ? (i.walkPhrase && !requirements.items.some((x) => x.kind === 'venue_kind' && x.value === 'walk' && x.dayIndex === i.dayIndex) ? [{ ...i, value: 'walk' }] : []) : [i]));
+  return true;
+}
+function applyFoodTourMeaning(text, intent, requirements, venues) {
   if (!foodTourMeansFood(text)) return false;
+  if (foodTourMeansOperator(text, intent, requirements, venues)) return false;
+  // Eating round town: the food-tour kind read from the words is not asked of the listings.
+  if (requirements && Array.isArray(requirements.items)) requirements.items = requirements.items.filter((i) => !(i.kind === 'venue_kind' && i.value === 'food_tour'));
   if (intent) intent.types = [...new Set((intent.types || []).filter((t) => t !== 'tour').concat('restaurant', 'cafe'))];
   if (requirements && Array.isArray(requirements.items)) {
     const wasTour = (i) => i.kind === 'type' && i.value === 'tour';
@@ -6476,7 +6514,13 @@ function planTripUnchecked(input) {
   }
   if (foodTourMeansFood(requirements.text || input.text || '')) {
     requirements = { ...requirements, items: requirements.items.slice() };
-    applyFoodTourMeaning(requirements.text || input.text || '', intent, requirements);
+    applyFoodTourMeaning(requirements.text || input.text || '', intent, requirements, input.facts);
+    input = { ...input, requirements };
+  }
+  // Tour test 4: a walking tour with no walking-tour company in the region falls back (a walk, or a tour request).
+  if (requirements.items.some((i) => i.kind === 'venue_kind' && i.value === 'walking_tour')) {
+    requirements = { ...requirements, items: requirements.items.slice() };
+    applyWalkingTourMeaning(intent, requirements, input.facts);
     input = { ...input, requirements };
   }
   if (requirements.startDate && /next weekend/i.test(requirements.dateSource || '')) intent.unsupported = (intent.unsupported || []).filter((u) => String(u).toLowerCase() !== 'next weekend');
@@ -6497,7 +6541,18 @@ function planTripUnchecked(input) {
   // viewing tour near Squamish on July 20" found only listings with exactly those words and left the rafting company
   // that runs bear tours as "Another listing". The wildlife tour kind covers those words.
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'wildlife_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && WILDLIFE_TOUR_WORDS_RE.test(normWords(f.term))));
+  // Tour test 4: the same for a food tour or a walking tour (real listings have the category "Food tour").
+  if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'food_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:food|foodie|culinary|tasting|food tasting)(?: and drink)? tours?$/.test(normWords(f.term))));
+  if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'walking_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:walking|history|ghost|heritage)(?: (?:and|or) (?:history|food))? (?:tours?|walks?)$/.test(normWords(f.term))));
   intent.textTerms = (intent.textTerms || []).filter(t=>!consumed.has(t));
+  // Tour test 4 (Whistler, 2026-11-17): "free walking tour" / "free tour": when a tour in the request's regions is marked
+  // free by its operator, "free" is applied (free tours are put first), not a word to search for or "not applied".
+  if (/\bfree\b/.test(normWords(requirements.text || input.text || '')) && (requirements.items.some(i => i.kind === 'type' && i.value === 'tour') || requirements.items.some(i => i.kind === 'venue_kind' && ['food_tour', 'walking_tour'].includes(i.value)))
+    && (input.facts || []).some(v => v && v.type === 'tour' && v.tourFree && (!(intent.regions || []).length || intent.regions.includes(v.region)))) {
+    intent.unsupported = (intent.unsupported || []).filter(u => String(u).toLowerCase() !== 'free');
+    intent.textTerms = (intent.textTerms || []).filter(t => String(t).toLowerCase() !== 'free');
+    intent.foodTerms = (intent.foodTerms || []).filter(f => !(f && !f.cuisine && String(f.term).toLowerCase() === 'free'));
+  }
   const length = requirements.items.find(i => i.kind === 'days');
   if (length) { intent.days = length.value; if (intent.mode !== 'events') intent.mode = 'plan'; }
 
@@ -6528,7 +6583,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6562,7 +6617,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
@@ -8686,7 +8741,7 @@ module.exports = {
   // Build My Trip round 8 (2026-10-19)
   dayPartRegions, swapSoftPins, gapFillMinutes,
   // Build My Trip round 7 (2026-10-19)
-  applyFoodTourMeaning, foodTourMeansFood, fillDinnerGaps, eventAllowanceMinutes, skiOffSeasonMonth, nordicOpenOn, asksWineryLunch, wineryLunchSpot, holidayTheme,
+  applyFoodTourMeaning, foodTourMeansFood, foodTourMeansOperator, applyWalkingTourMeaning, regionHasTourKind, fillDinnerGaps, eventAllowanceMinutes, skiOffSeasonMonth, nordicOpenOn, asksWineryLunch, wineryLunchSpot, holidayTheme,
   // Build My Trip pass 6 (2026-10-19)
   isDinnerStop,
   wineryNameWords,

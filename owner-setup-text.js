@@ -2035,6 +2035,38 @@ Object.assign(fr, {
   yearNoSetQ: 'Recevez-vous sur rendez-vous toute l’année?', yearNoSetLead: 'Si vous fermez une partie de l’année, touchez ce choix et indiquez vos dates.',
   yearNoSetYes: 'Oui, toute l’année', yearNoSetKeep: 'Oui, ce sont mes dates', yearNoSetChange: 'Modifier mes dates',
 });
+// Tour test 4 (Whistler fresh eyes, Dev, 2026-11-17): a free or by-donation tour is typed in the same price box (Dayton
+// approved: "free", "0", "by donation", « gratuit », « contribution volontaire »); the dogs follow-up in trip words (no
+// patio, inside or water bowls); "Check them, then tap Next."; "Address or meeting point".
+Object.assign(en.tour, {
+  tpriceLead: 'Your lowest paid price for one adult. It shows on your card as “From $X”.',
+  tpriceLeadFree: 'Your card will say “Free”.', tpriceFreeTip: 'Free or by donation? Type free.',
+  tpriceFreeHint: 'Your page says by donation. Type free if that’s right.',
+  tpriceNeed: 'Just the number, like 189. Free or by donation? Type free.',
+  tpriceSavedFree: 'Your page and your card say “Free” now.', tfreeCard: 'Free', tfreeWords: { free: 'Free', donation: 'By donation' },
+  dogQ: 'Which trips can dogs join?', dogEx: 'Dogs on a leash welcome on our walks, not on the food tour.',
+  streetLabel: 'Address or meeting point',
+  // The chip's words as she taps them ("On some trips (say which)"); the box gets the quick answer itself ("On some trips").
+  dogChipLabels: ['On every trip', 'On some trips (say which)', 'On a leash'],
+  // The page's sentences for the first two chips (server.js dogsChipSentences).
+  quickDogsFull: ['Dogs welcome on every trip', 'Dogs welcome on some trips'],
+});
+en.tour.quick = Object.assign({}, en.tour.quick, { dogs: ['On every trip', 'On some trips', 'On a leash'] });
+fr.tour.quick = Object.assign({}, fr.tour.quick, { dogs: ['À toutes les sorties', 'À certaines sorties', 'En laisse'] });
+Object.assign(fr.tour, {
+  tpriceLead: 'Votre prix payant le plus bas pour un adulte. Il paraît sur votre fiche : « À partir de X $ ».',
+  tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».', tpriceFreeTip: 'Gratuit ou contribution volontaire? Écrivez gratuit.',
+  tpriceFreeHint: 'Votre page parle d’une contribution volontaire. Écrivez gratuit si c’est exact.',
+  tpriceNeed: 'Seulement le chiffre, par exemple 189. Gratuit ou contribution volontaire? Écrivez gratuit.',
+  tpriceSavedFree: 'Votre page et votre fiche indiquent « Gratuit » maintenant.', tfreeCard: 'Gratuit', tfreeWords: { free: 'Gratuit', donation: 'Contribution volontaire' },
+  dogQ: 'À quelles sorties les chiens peuvent-ils venir?', dogEx: 'Chiens en laisse bienvenus à nos marches, pas à la visite gourmande.',
+  streetLabel: 'Adresse ou point de rencontre',
+  dogChipLabels: ['À toutes les sorties', 'À certaines sorties (dites lesquelles)', 'En laisse'],
+  quickDogsFull: ['Chiens bienvenus à toutes les sorties', 'Chiens bienvenus à certaines sorties'],
+});
+// All types: a line of the owner's that the page folds under "More" says so after the save.
+Object.assign(en, { hoursBack: 'We put back the hours you had before. Check them, then tap Next.', foldedMore: 'Look for it under “More” in your Plan your visit box.' });
+Object.assign(fr, { hoursBack: 'Nous avons remis les heures que vous aviez. Vérifiez-les, puis touchez Suivant.', foldedMore: 'Elle se trouve sous « Plus » dans l’encadré Planifiez votre visite.' });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

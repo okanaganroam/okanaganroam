@@ -151,9 +151,10 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
       const id = String(o.venue_id);
       if (o.hidden) { delete prices[id]; continue; }
       // An owner's own price (wineries' tasting fee, 2026-11-12): it is the card price as they gave it, with no research
-      // page behind it (so the weekly check never reads it). A free tasting reads "Free tasting".
+      // page behind it (so the weekly check never reads it). A free tasting reads "Free tasting"; a free tour (basis
+      // 'Free', tour test 4, 2026-11-17) reads "Free".
       if (o.reviewer === OWNER_REVIEWER) {
-        prices[id] = Number(o.from_price) === 0 ? { label: 'Free tasting', conf: 'owner', owner: true } : { from: Number(o.from_price), conf: 'owner', owner: true, ...(o.per ? { per: o.per } : {}), ...(o.basis ? { basis: o.basis } : {}) };
+        prices[id] = Number(o.from_price) === 0 ? { label: o.basis === 'Free' ? 'Free' : 'Free tasting', conf: 'owner', owner: true } : { from: Number(o.from_price), conf: 'owner', owner: true, ...(o.per ? { per: o.per } : {}), ...(o.basis ? { basis: o.basis } : {}) };
         continue;
       }
       const base = prices[id] || original[id] || {};

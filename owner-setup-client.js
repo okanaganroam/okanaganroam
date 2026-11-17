@@ -112,7 +112,7 @@
   function spanOf(from, to){
     if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '')) return '';
     var a = +from.slice(0, 2), b = +to.slice(0, 2), whole = from.slice(3) === '01' && (+to.slice(3) === MLAST[b - 1] || (b === 2 && to.slice(3) === '28'));
-    if (!whole) return fill(T.seaSpanDays, { a: mdLabel(from), b: mdLabel(to) });
+    if (!whole) return fill(T.seaSpanDays, { a: mdLabel(from), b: mdLabel(to) }).replace('au fin février', 'à la fin de février');
     var L = C.monthLong || C.monthNames, ma = String(L[a - 1]), mb = String(L[b - 1]);
     if (a === b) return fill(T.seaSpanMonth, { a: ma });
     return fill(T.seaSpanMonths, { a: ma, b: mb, de: /^[aeiouyéèêh]/i.test(ma) ? 'd’' : 'de ' });
@@ -152,7 +152,9 @@
   }
   function mdRead(id){ var m = el(id + 'M'), d = el(id + 'D'); if (!m || !d || !m.value || !d.value) return ''; var mm = +m.value; return pad2(mm) + '-' + pad2(Math.min(+d.value, MLAST[mm - 1])); }
   // "Apr 25" / « 25 avr ».
-  function mdLabel(md){ if (!/^\d{2}-\d{2}$/.test(md || '')) return md || ''; var n = monthName(+md.slice(0, 2) - 1), d = +md.slice(3); return C.lang === 'fr' ? (d === 1 ? '1er' : d) + ' ' + n : n + ' ' + d; }
+  // Tour test 4 (Whistler, 2026-11-17; all types): a stretch that runs to the end of February is stored as Feb 29:
+  // "Dec 1 – end of February", never "Feb 29" in a year with none.
+  function mdLabel(md){ if (md === '02-29') return C.lang === 'fr' ? 'fin février' : 'end of February'; if (!/^\d{2}-\d{2}$/.test(md || '')) return md || ''; var n = monthName(+md.slice(0, 2) - 1), d = +md.slice(3); return C.lang === 'fr' ? (d === 1 ? '1er' : d) + ' ' + n : n + ' ' + d; }
   function seaExactHtml(id, o){
     // Brewery test 1 (Whistler, 2026-11-15): on the other-hours screen the lead already says "Pick the first and last day".
     return (id === 'hours' && T.seasonEditLeadDates ? '' : '<p class="su-hint" style="margin:10px 0 6px">' + h(T.seasonExactLead) + '</p>') + '<div class="su-seadates"><p class="su-q">' + h(T.seasonFrom) + '</p><span data-sexact="' + id + ':from" data-mdid="sxf' + id + '">' + mdPick('sxf' + id, o.exact.from, T.seasonFrom) + '</span>'
@@ -599,6 +601,10 @@
   // offered as a starting point only ("We picked this from your page — check it"); nothing is saved until she taps Save.
   S.tour = { kinds: (TI.kinds || []).slice(), length: TI.length || '', book: TI.book || '', bookYes: TI.book ? (TI.book === 'no' ? 'no' : 'yes') : '', age: TI.age || '', adult: TI.adult === true,
     price: CUR.tour_price == null ? null : CUR.tour_price, priv: typeof TI.private === 'number' ? TI.private : null, noBook: (CUR.not_offered || []).indexOf('booking_link') >= 0 };
+  // Tour test 4 (Whistler, 2026-11-17): a free or by-donation tour. The stored answer is the word ('free' / 'donation');
+  // here the price is 0 and S.tour.free holds the word. S.savedTourPrice is the stored answer as it is (number or word).
+  S.tour.free = '';
+  if (CUR.tour_price === 'free' || CUR.tour_price === 'donation') { S.tour.free = CUR.tour_price; S.tour.price = 0; }
   S.savedTourPrice = CUR.tour_price == null ? null : CUR.tour_price;
   if (TOUR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (TOUR && !S.tour.length && C.researchLength) { S.tour.length = C.researchLength; S.tour.lengthGuessed = true; }
@@ -611,9 +617,21 @@
   // tasting, flight and cocktail boxes (readWine, readBrew, readCocktail) drop them with the same pattern, written in place.
   function moneyHead(x){ var t = String(x == null ? '' : x).trim(); var m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(t); return m ? m[1].replace(/[.,\s\u00a0\u202f]+$/, '') : t; }
   function tourPriceRead(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  // Tour test 4: the per-person box read as free: "free", "0", "$0", « gratuit » -> 'free'; "by donation", "pay what you
+  // want", « contribution volontaire », « don » -> 'donation'; anything else -> ''. (server.js tourFreeRead, the same rule.)
+  function tourFreeRead(x){
+    var t = String(x == null ? '' : x).toLowerCase().replace(/[’']/g, ' ').replace(/[^a-zà-ÿ0-9$.,]+/g, ' ').trim();
+    if (!t || /[1-9]/.test(t)) return '';
+    if (/\bdonations?\b|\bpay what (?:you|u) (?:want|can|like|wish|think)\b|\bpay as you (?:like|wish|feel)\b|\bpwyw\b|\bcontributions? volontaires?\b|\bdons?\b|\bprix libre\b|\bpayez ce que vous (?:voulez|pouvez)\b/.test(t)) return 'donation';
+    if (/^(?:it s |c est |its |is )?(?:free|gratuit|gratuite|gratuits|gratis|no charge|no cost|sans frais)\b/.test(t) || /^\$? ?0(?:[.,]0{1,2})? ?\$?$/.test(t)) return 'free';
+    return '';
+  }
+  // The stored answer the box now holds: a number, 'free' / 'donation', null (empty) or NaN (can't be read).
+  function tourPriceVal(){ return S.tour.free || S.tour.price; }
+  function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var np = tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; }
+    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
     if ((x = v('suTpriv')) !== null) S.tour.priv = tourPriceRead(x);
     if ((x = v('suBookUrl')) !== null && TOUR) S.bookUrl = x;
     if ((x = v('suBring')) !== null) S.tour.bring = x;
@@ -624,10 +642,18 @@
   var PRICE_BOXES = ['suTprice', 'suTpriv', 'suCfee', 'suFee'];
   S.rawBox = {};
   // A price box's text: the number, or (when it couldn't be read) exactly what was typed.
-  function boxVal(id, n){ return n == null ? '' : isNaN(n) ? (S.rawBox[id] || '') : String(n); }
+  // Tour test 4: a free tour's box keeps her own words ("by donation"), or says "Free" / "By donation" when reopened.
+  function boxVal(id, n){ if (id === 'suTprice' && S.tour && S.tour.free) return tourFreeRead(S.rawBox[id]) === S.tour.free ? S.rawBox[id] : tourFreeWord(S.tour.free); return n == null ? '' : isNaN(n) ? (S.rawBox[id] || '') : String(n); }
+  // Tour test 4: is what a price box holds readable now? (The red nudge goes as soon as it is.)
+  function priceBoxOk(id, x){
+    if (id === 'suTprice') { var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
+    if (id === 'suTpriv') { var b = tourPriceRead(x); return b == null || !isNaN(b); }
+    var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-zÀ-ɏ].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.');
+    return /^\d{1,3}(\.\d{1,2})?$/.test(f) && +f <= 500 && (id === 'suCfee' ? +f > 0 : true);
+  }
   function tourKindName(k){ var o = (C.tourKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
   // The card's price line as she types it ("Your card will say “From $129”").
-  function tourPriceLead(){ var n = S.tour.price; return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
+  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -954,7 +980,10 @@
     if (parts.length && parts.every(function(x){ return sentMemo[x[0]] && sentMemo[x[0]].v === x[1]; })) return Promise.resolve(parts.some(function(x){ return sentMemo[x[0]].st === 'day'; }) ? 'day' : 'live');
     var remember = function(st){ if (changes.not_offered || changes.pub_info) sentMemo = {}; else parts.forEach(function(x){ sentMemo[x[0]] = { v: x[1], st: st }; }); return st; };
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
-      if (j && j.ok) { if (j.tour_words) S.tourWords = j.tour_words[C.lang === 'fr' ? 'fr' : 'en'] || S.tourWords; if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
+      if (j && j.ok) { if (j.tour_words) S.tourWords = j.tour_words[C.lang === 'fr' ? 'fr' : 'en'] || S.tourWords;
+        // Tour test 4 (Whistler, 2026-11-17; all types): a line just saved that the page folds under "More" (a full box, or
+        // a line that always sits there) is said so, never just "It's on your page now".
+        if (changes.visit_rows && typeof changes.visit_rows === 'object') S.foldedNow = (j.visit_folded || []).some(function(k){ return typeof changes.visit_rows[k] === 'string' && changes.visit_rows[k]; }); if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
         if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); if (changes.cafe_info && 'year' in changes.cafe_info) S.savedYear = changes.cafe_info.year || ''; if (changes.brewery_info && 'year' in changes.brewery_info) S.savedYear = changes.brewery_info.year || '';
         return remember(j.review && j.review.length ? 'day' : 'live'); }
       if (nothingChanged(j)) return remember('live');
@@ -1088,7 +1117,8 @@
     // The first "Sent" says what it means (pub fresh-eyes 2), once.
     if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
     // Café test 2 (Whistler, 2026-11-15): a French-only special or event says where it shows (once; frOnlyTell).
-    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line + (S.frOnlyNote === step && T.frPageOnly ? ' ' + T.frPageOnly : '');
+    var foldedNote = S.foldedNow && how === 'live' && T.foldedMore ? ' ' + T.foldedMore : ''; S.foldedNow = false;
+    return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line + foldedNote + (S.frOnlyNote === step && T.frPageOnly ? ' ' + T.frPageOnly : '');
   }
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
   screen.parentNode.insertBefore(toastEl, screen);
@@ -1115,7 +1145,7 @@
   function mark(){ var b = base(S.step); if (isStep(b)) S.dirty = b; }
   function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); }
     // A café's hours always go on to its holidays and closures (the same step); where to after that is decided there.
-    if (COMBO && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
+    if (COMBO && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; S.listBack = true; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
@@ -1246,7 +1276,10 @@
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
     // Breweries (2026-11-12): no "Patio only" for a taproom with no patio ticked.
     if (key === 'dogs' && C.brewery && !S.badges.patio && !S.badges.heated_patio && T.quickDogsNoPatio) l = T.quickDogsNoPatio;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t, l) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(t) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    // Tour test 4 (Whistler, 2026-11-17): a tour's dog chips may show more words than they write ("On some trips (say
+    // which)" puts "On some trips" in the box, and she types which).
+    var shown = key === 'dogs' && TOUR && T.dogChipLabels && T.dogChipLabels.length === l.length ? T.dogChipLabels : l;
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t, qi){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t, l) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(shown[qi]) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   // Tour test 2 (Whistler, 2026-11-16): Good to know stopped mid-sentence at the limit with no word. A visible counter
   // ("212 / 240") that says so at the limit; a tour's Good to know holds 240 (C.bringMax, the server's own limit).
@@ -1395,7 +1428,7 @@
   function preview(){
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -1670,6 +1703,9 @@
     // Tour test 1 (Whistler, 2026-11-16): a price box that was turned down ("$189pp") keeps what she typed under the nudge
     // (all types: the tour price, the private tour price, the cocktail, flight and tasting prices).
     if (S.rawBox) (PRICE_BOXES || []).forEach(function(id){ var n = el(id); if (n) S.rawBox[id] = n.value; });
+    // Tour test 4 (Whistler, 2026-11-17): the green "✓ Saved. It's on your page now." from the screen before stayed above
+    // a red nudge ("Just the number"), so the price looked saved and refused at once. A nudge or an error clears it (all types).
+    if ((S.nudge || S.error) && typeof toastEl !== 'undefined' && toastEl && toastEl.textContent) toastEl.textContent = '';
     kindWords();
     // Café test 3 (2026-11-11): the price step is named in the kind's words ("Price of one drink").
     if (C.cafe && T.spendLabel) T.labels.spend = fill(T.spendLabel, { words: cafeWords() });
@@ -1682,6 +1718,7 @@
     if (seaIsStep(s)) S.sea.dirty = true; else S.seaStaleDone = S.seaStaleDone && ['hours', 'closures', 'saved'].indexOf(base(s)) >= 0 ? S.seaStaleDone : '';
     if (base(s) !== 'closures') S.hoursJust = false;
     if (['hours', 'closures', 'saved'].indexOf(base(s)) < 0) S.seaStale = null;
+    if (s !== 'start') S.listBack = false;
     if (s === 'start' || s === 'more' || s === 'ess') { S.toList = false; S.toFinish = false; S.toEss = false; } else if (s === 'finish') { S.toList = false; S.toEss = false; }
     if (s === 'start') {
       var any = STEPS.some(function(k){ return S.done[k]; });
@@ -1992,8 +2029,11 @@
       var tp = S.tour;
       x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
+        // Tour test 4: research's "by donation" / "free" pre-picks no price; it only says what to type (her answer, her tap).
+        + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
-        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { mode: 'decimal', max: 40 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
+        // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
+        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking') {
@@ -2423,7 +2463,10 @@
     if (e2) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }
     // A rejected answer (pub test 6: the website): the box is outlined in red and the cursor goes into it.
     if (S.badField) { var bf = el(S.badField); S.badField = ''; if (bf) { bf.setAttribute('aria-invalid', 'true'); var em = screen.querySelector('.su-error'); if (em) { em.id = 'suFieldError'; bf.setAttribute('aria-describedby', 'suFieldError'); }
-      bf.addEventListener('input', function(){ bf.removeAttribute('aria-invalid'); }); try { bf.focus({ preventScroll: true }); var nn = bf.value.length; bf.setSelectionRange(nn, nn); } catch (x2) {} bf.scrollIntoView({ block: 'center' }); } }
+      // Tour test 4 (Whistler, 2026-11-17): the red nudge stayed after a valid price was typed. In a price box it goes as
+      // soon as the box can be read (all types: the tour, private tour, cocktail, flight and tasting prices).
+      var bfId = bf.id;
+      bf.addEventListener('input', function(){ bf.removeAttribute('aria-invalid'); if (PRICE_BOXES.indexOf(bfId) >= 0 && S.nudge && priceBoxOk(bfId, bf.value)) { S.nudge = ''; var em2 = screen.querySelector('.su-error'); if (em2 && em2.parentNode) em2.parentNode.removeChild(em2); bf.removeAttribute('aria-describedby'); } }); try { bf.focus({ preventScroll: true }); var nn = bf.value.length; bf.setSelectionRange(nn, nn); } catch (x2) {} bf.scrollIntoView({ block: 'center' }); } }
     if (S.step === 'door:pin') doorMap();
     // A closure just added: show its row (it used to sit hidden under the Save button).
     if (S.step === 'closures' && S.added && !e2) { var ad = el('suAdded'); if (ad) ad.scrollIntoView({ block: 'start' }); window.scrollBy(0, -90); }
@@ -3384,7 +3427,9 @@
       if (C.distillery && (S.savedBadges.sports_tv || (CUR.badges || {}).sports_tv) && C.offerGroups.every(function(g){ return g.keys.indexOf('sports_tv') < 0; })) sendB.sports_tv = false;
       // Tour test 1 (Whistler, 2026-11-16): Patio, Live music and Sports on TV are food and drink badges a tour's page never
       // offers (research ticked them on a snowmobile outfitter): saving "Who can come" takes them off, on this save only.
-      if (TOUR) ['patio', 'live_music', 'sports_tv'].forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
+      // Tour test 4 (Whistler, 2026-11-17): and the food-only ones (Vegan, Vegetarian, Gluten-free, Non-alcoholic, Happy
+      // hour) a wrong scrape left on a walking tour's page. The list comes from the page's config (C.tourFoodBadges).
+      if (TOUR) (C.tourFoodBadges || ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour']).forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
       if (Object.keys(sendB).length) list.push({ badges: sendB });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
@@ -3600,10 +3645,17 @@
       return saveAll('tour', Object.keys(ti0).length ? [{ tour_info: ti0 }] : [], null, null, function(){ Object.keys(ti0).forEach(function(kk){ TI[kk] = ti0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false; });
     }
     if (k === 'priceSave') {
-      readTour(); var pp = S.tour.price, pv = S.tour.priv;
-      if (pp == null || isNaN(pp)) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
+      readTour(); var pp = S.tour.price, pv = S.tour.priv, pfree = S.tour.free;
+      if (!pfree && (pp == null || isNaN(pp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
       if (pv != null && isNaN(pv)) { S.nudge = T.tprivNeed; S.badField = 'suTpriv'; return render(); }
       var pl = [];
+      // Tour test 4: a free or by-donation tour is saved as the word; it is live at once ("Free" on the card and the page).
+      if (pfree) {
+        if (pfree !== S.savedTourPrice) pl.push({ tour_price: pfree });
+        if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
+        S.savedLine.price = T.tpriceSavedFree || T.tpriceSavedLive;
+        return saveAll('price', pl, null, null, function(){ S.savedTourPrice = pfree; CUR.tour_price = pfree; CUR.tour_price_waiting = null; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
+      }
       if (pp !== S.savedTourPrice) pl.push({ tour_price: pp });
       if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
       S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : T.tpriceSavedLive;
@@ -3933,7 +3985,7 @@
       redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
-    var tpi = el('suTprice'); if (tpi && TOUR) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; });
+    var tpi = el('suTprice'); if (tpi && TOUR) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
       S.wine[key8] = String(S.wine[key8]) === String(val8) ? (key8 === 'groups' ? 0 : '') : val8; redraw(); }; });
@@ -4187,6 +4239,9 @@
     // Arriving on our own entry again (Forward, or Back from a link in a help answer): nothing to do.
     if (S.leaving || !S.trap || (e.state && e.state.suTrap)) return;
     S.trap = false;
+    // Tour test 4 (Whistler, 2026-11-17): the phone's Back right after a changed answer was saved left the setup for the
+    // edit page. That first Back now stays on the answers list (where the save put her); the next one leaves as before.
+    if (S.step === 'start' && S.listBack) { S.listBack = false; navSync(); return; }
     if (S.busy) return backArm();
     if (canBack()) { el('suBack').onclick(); return backArm(); }
     try { history.back(); } catch (x) {}

@@ -51,6 +51,15 @@ const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'c
 const PHRASES = [
   ['salle d evasion', 'escape room'], ['salles d evasion', 'escape rooms'],
   ['jeu d evasion', 'escape room'], ['jeux d evasion', 'escape rooms'],
+  // Tour test 4 (Whistler, 2026-11-17): « visite gourmande » was searched for as the word « gourmande ». A food tour, and
+  // the walking tours (« visite à pied », « marche des lumières », « marche historique », « visite fantôme »).
+  ['visite gourmande', 'food tour'], ['visites gourmandes', 'food tours'], ['tournee gourmande', 'food tour'], ['tournees gourmandes', 'food tours'],
+  ['visite culinaire', 'food tour'], ['visites culinaires', 'food tours'], ['tournee culinaire', 'food tour'], ['circuit gourmand', 'food tour'], ['circuits gourmands', 'food tours'],
+  ['tour gourmand', 'food tour'], ['tours gourmands', 'food tours'], ['visite gastronomique', 'food tour'], ['visites gastronomiques', 'food tours'],
+  ['visite guidee a pied', 'walking tour'], ['visites guidees a pied', 'walking tours'], ['visite a pied', 'walking tour'], ['visites a pied', 'walking tours'],
+  ['tour a pied', 'walking tour'], ['tours a pied', 'walking tours'], ['marche des lumieres', 'lights walk'], ['marche aux lumieres', 'lights walk'], ['marche de nuit', 'night walk'], ['marche nocturne', 'night walk'],
+  ['marche historique', 'history walk'], ['marches historiques', 'history walks'], ['visite historique', 'history tour'], ['visites historiques', 'history tours'],
+  ['visite fantome', 'ghost tour'], ['visite des fantomes', 'ghost tour'], ['marche des fantomes', 'ghost walk'], ['marche fantome', 'ghost walk'],
   ['visite guidee', 'guided tour'], ['visites guidees', 'guided tours'],
   ['cours de cuisine', 'cooking class'], ['cours de cuisines', 'cooking classes'],
   ['atelier de poterie', 'pottery class'], ['cours de poterie', 'pottery class'],

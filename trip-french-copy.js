@@ -408,6 +408,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Book at least 48 hours ahead \(the operator’s own answer\)\.$/,'Réservez au moins 48 heures à l’avance (réponse de l’entreprise).');
  text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
+ // Tour test 4 (2026-11-17): several unlike trips behind one answer.
+ text=text.replace(/^Length, ages and booking can differ by tour: see this operator’s Tours & prices\.$/,'La durée, l’âge et la réservation peuvent varier selon la sortie : voyez Sorties et tarifs de cette entreprise.');
  text=text.replace(/^All ages welcome \(the operator’s own answer\)\.$/,'Tous les âges sont bienvenus (réponse de l’entreprise).');
  text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.

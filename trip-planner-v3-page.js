@@ -1460,6 +1460,8 @@ function renderScript(d) {
     }
     // Winery test 5 (2026-11-12): a winery whose owner says tastings are free.
     if (v.freeTasting) return '<p class="t3-stop-price" data-cost-cents="0">' + esc(french ? 'Dégustation gratuite' : 'Free tasting') + '</p>';
+    // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free, or by donation.
+    if (v.freeTour) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Gratuit' : 'Free') + '</strong>' + esc(v.freeTour === 'donation' ? (french ? ' (contribution volontaire)' : ' (pay what you want)') : '') + '</p>';
     return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
       + esc(v.freeEntry ? (french ? 'Entrée gratuite' : 'Free entry') : (french ? 'Prix par personne à vérifier' : 'Check price per person')) + '</p>';
   }
