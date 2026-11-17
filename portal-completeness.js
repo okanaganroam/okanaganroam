@@ -290,9 +290,52 @@ const BREWERY_ITEMS = [
   R('owner_confirmed', { w: 2 }),
 ];
 if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: brewery weights must sum to 100');
+// Tours and guided experiences (Dayton, 2026-11-16: "build the tours setup"): the same engine with their own 100 points.
+// New items: the kind of tour, how long it runs, the price per person, book ahead, and who can come (minimum age). The
+// season is the Hours step's "closed part of the year" (or "By booking only" with no set hours, which answers the hours,
+// their check and the season, as for a winery by appointment). Happy hour, menu, specials and events are never asked of
+// tours. Every answer is the operator's own (venue_tour_info, never researched).
+// The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
+const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'snowshoe', 'paddle', 'raft', 'adventure', 'flight', 'food', 'farm', 'rentals', 'other'];
+const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
+const TOUR_BOOK = ['same_day', 'day', 'week', 'no'];
+const TOUR_AGES = ['all', '6', '12', '16', '19'];
+const TOUR_ITEMS = [
+  R('address_pin', { w: 4, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
+  R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),
+  R('website', { w: 3 }),
+  { key: 'tour_kind', group: 'tour', w: 4, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
+    en: 'What kind of tour', fr: 'Quel genre d’activité', whyEn: 'Snowmobile, jet boat, horseback, fishing, wine tour and so on. Pick up to 3.', whyFr: 'Motoneige, bateau rapide, équitation, pêche, tournée des vignobles, etc. Choisissez-en jusqu’à 3.', btnEn: 'Pick them', btnFr: 'Choisir', icon: '🧭' },
+  R('hours', { w: 8, en: 'When you run', fr: 'Quand vous partez', whyEn: 'Your hours or departure times, or “By booking only”.', whyFr: 'Vos heures ou vos départs, ou « Sur réservation seulement ».' }),
+  R('hours_fresh', { w: 4 }),
+  { key: 'season', group: 'hours', w: 7, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'tour_info'],
+    en: 'Your season', fr: 'Votre saison', whyEn: 'All year, or only part of the year (winter, summer)? Say so, so nobody books a closed season.', whyFr: 'Toute l’année, ou une partie de l’année seulement (hiver, été)? Dites-le, pour que personne ne réserve hors saison.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
+  R('photo_main', { w: 9, whyEn: 'Real photos only, taken by you or your guides. Your trips, your gear, your guests.', whyFr: 'De vraies photos seulement, prises par vous ou vos guides. Vos sorties, votre équipement, vos clients.' }),
+  R('photo_extra', { w: 7, whyEn: 'Your trips, your gear, the views on the way.', whyFr: 'Vos sorties, votre équipement, les paysages en chemin.' }),
+  { key: 'tour_length', group: 'tour', w: 4, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
+    en: 'How long it takes', fr: 'La durée', whyEn: 'An hour, half a day, a full day or several days.', whyFr: 'Une heure, une demi-journée, une journée ou plusieurs jours.', btnEn: 'Answer', btnFr: 'Répondre', icon: '⏱️' },
+  { key: 'tour_price', group: 'tour', w: 8, fix: true, target: { setup: 'price' }, fields: ['tour_price'],
+    en: 'Price per person', fr: 'Prix par personne', whyEn: 'Your lowest price for one person. It shows on your card as “From $X”.', whyFr: 'Votre prix le plus bas pour une personne. Il paraît sur votre fiche : « À partir de X $ ».', btnEn: 'Answer', btnFr: 'Répondre', icon: '💵' },
+  { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'tour', w: 5, fix: true, target: { setup: 'booking' }, fields: ['booking_url'],
+    en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book a trip.', whyFr: 'La page où l’on réserve une sortie.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
+  { key: 'book_ahead', group: 'tour', w: 4, fix: true, target: { setup: 'booking' }, fields: ['tour_info'],
+    en: 'How far ahead to book', fr: 'Combien de temps à l’avance réserver', whyEn: 'Same day is fine, a day ahead, or a week ahead.', whyFr: 'Le jour même, la veille, ou une semaine à l’avance.', btnEn: 'Answer', btnFr: 'Répondre', icon: '🗓️' },
+  { key: 'tour_ages', group: 'yourvisit', w: 5, fix: true, target: { setup: 'offer' }, fields: ['tour_info'],
+    en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (6+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (6+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
+  { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
+    en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible or Free parking on “Who can come”.', whyFr: 'Cochez Accessible en fauteuil roulant ou Stationnement gratuit dans « Qui peut venir ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
+  R('description', { w: 5 }),
+  R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line on your trips, e.g. Small groups, local guides, hot chocolate at the top.', whyFr: 'Une ligne sur vos sorties, p. ex. petits groupes, guides d’ici, chocolat chaud au sommet.' }),
+  R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups and private trips', fr: 'Groupes et sorties privées', whyEn: 'Private tours? From what size should groups call ahead?', whyFr: 'Sorties privées? À partir de quelle taille les groupes doivent-ils appeler?', target: { setup: 'groups' } }),
+  R('instagram', { w: 3 }),
+  R('facebook', { w: 3 }),
+  R('arrival', { w: 2, en: 'Meeting spot photo and exact spot', fr: 'Photo du point de rencontre et emplacement exact', whyEn: 'Stand where people meet you (your door, the dock, the trailhead) and take one photo.', whyFr: 'Placez-vous là où l’on vous rejoint (votre porte, le quai, le départ du sentier) et prenez une photo.' }),
+  R('owner_confirmed', { w: 2 }),
+];
+if (TOUR_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: tour weights must sum to 100');
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
 // (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS };
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -309,7 +352,7 @@ const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', '
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -357,8 +400,9 @@ const SECONDS = {
   winery_kind: 10, tasting_price: 15, visit_how: 15, booking_link: 30, winery_groups: 15, food_here: 15, access: 10,
   brewery_kind: 10, flight_price: 15, to_go: 10,
   cocktail_price: 10,
+  tour_kind: 10, tour_length: 5, tour_price: 15, book_ahead: 10, tour_ages: 10,
 };
-if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -378,6 +422,7 @@ const QUICK_FIELD = { phone: 'phone', website: 'website', cuisine: 'cuisine', ho
 const QUICK_FIELD_BY_TYPE = { brewery: { brewery_kind: 'place_type', flight_price: 'flight_fee', to_go: 'brewery_info', food_here: 'brewery_info', season: 'brewery_info', dogs_kids: 'brewery_info' } };
 QUICK_FIELD_BY_TYPE.distillery = { ...QUICK_FIELD_BY_TYPE.brewery };
 QUICK_FIELD_BY_TYPE.cocktail = { cocktail_price: 'cocktail_price' };
+QUICK_FIELD_BY_TYPE.tour = { tour_kind: 'tour_info', tour_length: 'tour_info', tour_price: 'tour_price', book_ahead: 'tour_info', tour_ages: 'tour_info', season: 'tour_info' };
 const quickFieldFor = (type, key) => ((QUICK_FIELD_BY_TYPE[type] || {})[key]) || QUICK_FIELD[key];
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -408,6 +453,8 @@ const GROUPS = [
   { key: 'tastings', en: 'Tastings and booking', fr: 'Dégustations et réservations' },
   // Breweries (2026-11-12).
   { key: 'taproom', en: 'Taproom', fr: 'Salle de dégustation' },
+  // Tours (2026-11-16).
+  { key: 'tour', en: 'Your tours', fr: 'Vos activités' },
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
@@ -522,6 +569,23 @@ function doneMap(input, today) {
         dogs_kids: BREWERY_MINORS.includes(b.minors && b.minors.policy) && (!!i.dogFriendly || (i.declaredNone || []).includes('dogs') || !!i.offerAnswered),
         entertainment: !!i.liveMusic || Number(i.nightsCount) > 0,
         access: ['wheelchair_accessible', 'free_parking', 'rv_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
+      };
+    })() : {}),
+    // Tours (2026-11-16): venue_tour_info (owner-only, never researched) and the owner's price per person. "By booking
+    // only" (no set hours) answers the hours, their check and the season, as a winery by appointment does.
+    ...(i.type === 'tour' ? (() => {
+      const t = i.tourInfo && typeof i.tourInfo === 'object' ? i.tourInfo : {};
+      const apptOnly = t.visit === 'appointment';
+      return {
+        ...(apptOnly ? { hours: true, hours_fresh: true } : {}),
+        tour_kind: Array.isArray(t.kinds) && t.kinds.some((k) => TOUR_KINDS.includes(k)),
+        tour_length: TOUR_LENGTHS.includes(t.length),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || t.year === 'all' || apptOnly,
+        tour_price: typeof i.tourPrice === 'number' && Number.isFinite(i.tourPrice) && i.tourPrice > 0,
+        booking_link: nonBlank(i.bookingUrl),
+        book_ahead: TOUR_BOOK.includes(t.book),
+        tour_ages: TOUR_AGES.includes(String(t.age || '')),
+        access: ['wheelchair_accessible', 'free_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),
     ...(i.type === 'pub' || i.type === 'cocktail' ? {
@@ -1247,4 +1311,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { TOUR_ITEMS, TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES, COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

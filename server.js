@@ -1748,7 +1748,7 @@ function venueOwnerContentIds() {
     const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
       UNION SELECT venue_id FROM venue_menus WHERE status = 'published' AND (source IS NULL OR source <> 'research' OR owner_confirmed_at IS NOT NULL)
       UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'
-        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price'))`).all().map((r) => r.venue_id));
+        AND EXISTS (SELECT 1 FROM json_each(owner_change_requests.changes) WHERE key NOT IN ('avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price', 'tour_info', 'tour_price'))`).all().map((r) => r.venue_id));
     venueOwnerContentCache = { version, ids };
     return ids;
   } catch (e) { return new Set(); }
@@ -6857,7 +6857,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       // Decided 4 (2026-11-12): a winery's own "how people visit" / off-season answer, on the trip's date (true: by
       // appointment, false: walk-ins), so Build My Trip reads it instead of guessing from words. Left out when unanswered.
-      ...(apptType(v.type) && wineryAppointmentOn(v.id, hoursDate, v.type) !== null ? { ownerAppointment: wineryAppointmentOn(v.id, hoursDate, v.type) } : {}),
+      ...(apptType(v.type) && v.type !== 'tour' && wineryAppointmentOn(v.id, hoursDate, v.type) !== null ? { ownerAppointment: wineryAppointmentOn(v.id, hoursDate, v.type) } : {}),
+      // Tours (2026-11-16): the operator's own minimum age, how far ahead to book and how long a trip takes.
+      ...(v.type === 'tour' ? tourPlannerFacts(v.id) : {}),
       // Winery test 5 (2026-11-12): the owner's tasting fee (live), so a stop says "$10 per person · Tasting" or "Free tasting".
       ...(v.type === 'winery' && wineryTastingFee(v.id) != null ? { tastingFee: wineryTastingFee(v.id) } : {}),
       // Breweries (2026-11-12): the owner's flight price (live), and the kind they picked ("Cidery"), so a stop shows the
@@ -20318,12 +20320,15 @@ function ownerExtraBadgesFor(type) {
   if (brewSetupType(type)) return BREWERY_OWNER_BADGES.slice();
   // Cocktail lounges (Decided 3, 2026-11-13): the pub tiles minus local beer on tap, off-sales, RV room, takeout and games.
   if (type === 'cocktail') return COCKTAIL_OWNER_BADGES.slice();
+  // Tours (2026-11-16): the shared tiles that fit a tour operator (no patio, food, games or reservations tiles).
+  if (type === 'tour') return TOUR_OWNER_BADGES.slice();
   return OWNER_FEATURE_TYPES.has(type) ? OWNER_EXTRA_BADGES : [];
 }
 // The types with owner-only features: the completeness types (restaurants, and pubs since 2026-11-10).
 // Distilleries (Dayton, 2026-11-13): the brewery setup with spirits words (SPEC-distilleries.md, "Decided").
 // Cocktail lounges (Dayton, 2026-11-13): the pub setup with lounge words (SPEC-cocktail-lounges.md, "Decided").
-const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail']);
+const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'tour']);
+const TOUR_OWNER_BADGES = ['free_parking', 'wheelchair_accessible', 'locally_owned', 'service_dogs'];
 const COCKTAIL_OWNER_BADGES = ['local_drinks', 'heated_patio', 'fireplace', 'beach_access', 'free_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'service_dogs'];
 const BREWERY_OWNER_BADGES = ['heated_patio', 'picnic_area', 'free_parking', 'rv_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', 'service_dogs', 'pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
 // Wineries (Dayton, 2026-11-12): heated or covered patio, free parking, room for RVs, wheelchair accessible, locally owned,
@@ -21434,11 +21439,15 @@ function writeWineryVisitRows(venueId, now = new Date()) {
 // Build My Trip keep reading its words, as before).
 // Distilleries (Decided 5, 2026-11-13): the same answer, stored with their brewery answers (pass type 'distillery').
 function apptAnswers(venueId, type) {
+  // Tours (2026-11-16): "By booking only" (no set hours) is the same answer, stored with their tour answers.
+  if (type === 'tour') { const t = venueTourInfo(venueId); return { ...(t.visit ? { visit: t.visit } : {}), ...(t.year ? { year: t.year } : {}) }; }
   if (type !== 'distillery') return venueWineryInfo(venueId);
   const b = venueBreweryInfo(venueId);
   return { ...(b.visit ? { visit: b.visit } : {}), ...(b.year ? { year: b.year } : {}), ...(b.season ? { season: b.season } : {}) };
 }
-function apptType(t) { return t === 'winery' || t === 'distillery'; }
+function apptType(t) { return t === 'winery' || t === 'distillery' || t === 'tour'; }
+// The status line for "by appointment today": a tour's own words ("Book ahead · tours by reservation", 2026-11-16).
+function apptLineFor(type) { return type === 'tour' ? TOUR_APPOINTMENT_LINE : WINERY_APPOINTMENT_LINE; }
 function wineryAppointmentOn(venueId, date, type = 'winery') {
   const w = apptAnswers(venueId, type);
   if (!WINERY_VISIT.includes(w.visit) && !WINERY_YEAR.includes(w.year)) return null;
@@ -21879,6 +21888,232 @@ function breweryCardPrice(venueId) {
     else priceCheck.setOwnerPrice(venueId, null);
   } catch (e) { console.error(`[owner-portal] card price for brewery #${venueId} failed: ${e.message}`); }
 }
+
+// ---------- Tour answers (Dayton, 2026-11-16: "build the tours setup") ----------
+// Owner-only, never researched. Stored in venue_tour_info as one JSON object; each part optional:
+//   kinds    ['snowmobile', 'dogsled', ...]   up to 3 kinds of tour (TOUR_KINDS); the first sets venues.cuisine's words
+//   length   '1h' | '2-3h' | 'half' | 'full' | 'multi'   how long a trip takes
+//   book     'same_day' | 'day' | 'week' | 'no'           how far ahead to book ('no': no booking needed)
+//   age      'all' | '6' | '12' | '16' | '19'             who can come (the minimum age)
+//   adult    true                                         under 18s come with an adult
+//   private  a number                                     private tours from $X (optional)
+//   year     'all' | 'seasonal'                           the season answer from the Hours step
+//   visit    'appointment'                                "By booking only": no set hours (the winery's path)
+//   cuisine_was  the researched kind words (venues.cuisine) the owner's kinds replaced, put back when kinds are cleared
+//   price    the price per person in dollars, only through the 'tour_price' field: live up to TOUR_PRICE_LIVE_MAX, higher
+//            waits for our check. It is also the card's "From $X" (price_overrides, an owner price).
+// The visible lines (Season, Time needed, Prices, Ages, Booking) are written from these answers into the Plan your visit
+// box as the owner's own rows, so research never overwrites them (writeTourVisitRows).
+const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-completeness');
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'private', 'year', 'visit'];
+const TOUR_KINDS_MAX = 3;
+const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
+// Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
+// checked first (a typo of an extra 0), like the tasting and flight prices.
+const TOUR_PRICE_LIVE_MAX = 1000;
+const TOUR_PRICE_MAX = 20000;
+const TOUR_PRICE_ERROR = 'Please enter the price per person in dollars, like 129.';
+// The kinds as chips (English, French) and the words venues.cuisine gets (the Build My Trip and search words read them).
+const TOUR_KIND_LABELS_OWNER = {
+  heli: ['Heli-skiing', 'Héliski'], snowmobile: ['Snowmobile tours', 'Motoneige'], dogsled: ['Dog sledding', 'Traîneau à chiens'],
+  snowshoe: ['Snowshoe or ski touring', 'Raquette ou ski de randonnée'], jetboat: ['Jet boat tours', 'Bateau rapide (jet boat)'],
+  boat: ['Boat tours and charters', 'Croisières et bateaux nolisés'], paddle: ['Kayak, canoe or SUP', 'Kayak, canot ou planche à pagaie'], raft: ['Rafting', 'Rafting'],
+  fishing: ['Fishing', 'Pêche'], wildlife: ['Wildlife and bear viewing', 'Observation de la faune et des ours'], horseback: ['Horseback riding', 'Équitation'],
+  bike: ['Bike and e-bike tours', 'Vélo et vélo électrique'], zipline: ['Ziplines', 'Tyrolienne'], adventure: ['Bungee, climbing or canyoning', 'Saut à l’élastique, escalade ou canyonisme'],
+  flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
+  wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm visits and u-pick', 'Visites de ferme et autocueillette'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
+};
+const TOUR_LENGTH_LINES = { '1h': ['About 1 hour.', 'Environ 1 heure.'], '2-3h': ['2 to 3 hours.', '2 à 3 heures.'], half: ['Half a day (about 4 hours).', 'Une demi-journée (environ 4 heures).'],
+  full: ['A full day (about 8 hours).', 'Une journée complète (environ 8 heures).'], multi: ['Several days.', 'Plusieurs jours.'] };
+const TOUR_BOOK_LINES = { same_day: ['Same-day bookings are often fine.', 'Réserver le jour même convient souvent.'], day: ['Book at least a day ahead.', 'Réservez au moins la veille.'],
+  week: ['Book at least a week ahead.', 'Réservez au moins une semaine à l’avance.'], no: ['No need to book: just come by.', 'Pas besoin de réserver : passez nous voir.'] };
+const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
+let venueTourInfoCache = null;
+function clearVenueTourInfoCache() { venueTourInfoCache = null; }
+function venueTourInfo(venueId) {
+  if (!venueTourInfoCache) {
+    venueTourInfoCache = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, info FROM venue_tour_info').all()) {
+        let o = {}; try { o = JSON.parse(r.info) || {}; } catch (e) { o = {}; }
+        venueTourInfoCache.set(r.venue_id, o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+      }
+    } catch (e) { /* no table yet */ }
+  }
+  return venueTourInfoCache.get(Number(venueId)) || {};
+}
+// "Heli-skiing", "Snowmobile tours & Dog sledding", "Fishing, Rafting & Jet boat tours".
+function tourKindsText(kinds, fr = false) {
+  const l = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).map((k) => TOUR_KIND_LABELS_OWNER[k][fr ? 1 : 0]);
+  if (!l.length) return '';
+  const and = fr ? ' et ' : ' & ';
+  return l.length === 1 ? l[0] : `${l.slice(0, -1).join(', ')}${and}${l[l.length - 1]}`;
+}
+// Writes the answers. The kinds also write venues.cuisine (the words Build My Trip, search and the cards read); the
+// researched words they replace are kept (cuisine_was) and come back when the kinds are taken back (an Undo).
+function writeVenueTourInfo(venueId, info) {
+  const cur = venueTourInfo(venueId);
+  const clean = Object.fromEntries([...TOUR_INFO_PARTS, 'price'].filter((k) => info && info[k] != null && info[k] !== '').map((k) => [k, info[k]]));
+  let v = null; try { v = db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
+  const words = tourKindsText(clean.kinds);
+  if (v && words) {
+    clean.cuisine_was = 'cuisine_was' in cur ? cur.cuisine_was : (v.cuisine == null ? '' : String(v.cuisine));
+    if ((v.cuisine || '') !== words) db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(words, venueId);
+  } else if (v && 'cuisine_was' in cur && (v.cuisine || '') !== (cur.cuisine_was || '')) {
+    db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(cur.cuisine_was || null, venueId);
+  }
+  if (!Object.keys(clean).length) db.prepare('DELETE FROM venue_tour_info WHERE venue_id = ?').run(venueId);
+  else db.prepare('INSERT INTO venue_tour_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, JSON.stringify(clean));
+  clearVenueTourInfoCache();
+  try { clearVenueCuisinesCache(); } catch (e) { /* not loaded yet */ }
+}
+// The answers without the price and the kept research words (what the instant 'tour_info' field holds).
+function tourInfoAnswers(venueId) { const o = { ...venueTourInfo(venueId) }; delete o.price; delete o.cuisine_was; return o; }
+// The owner's price per person or null.
+function tourPrice(venueId) { const f = venueTourInfo(venueId).price; return typeof f === 'number' && Number.isFinite(f) && f > 0 ? f : null; }
+// -> { value } (a number from 1 to TOUR_PRICE_MAX, at most two decimals; null clears) or { error }. "$129", "129 $",
+// "1,500" and "1 500" all read.
+function cleanTourPrice(x) {
+  if (x === null) return { value: null };
+  const t = typeof x === 'number' ? x : typeof x === 'string' && /^\s*\$?\s*\d{1,3}(?:[ ,  ]?\d{3})?(?:[.,]\d{1,2})?\s*\$?\s*$/.test(x)
+    ? Number(x.replace(/[$\s  ]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.')) : NaN;
+  if (!Number.isFinite(t) || t <= 0 || t > TOUR_PRICE_MAX) return { error: TOUR_PRICE_ERROR };
+  return { value: Math.round(t * 100) / 100 };
+}
+// One validated part, or { error }. `x === null` clears that part.
+function cleanTourInfoPart(key, x) {
+  if (x === null) return { value: null };
+  if (key === 'kinds') {
+    if (!Array.isArray(x) || x.length > TOUR_KINDS_MAX || x.some((k) => !TOUR_KINDS.includes(k)) || new Set(x).size !== x.length) return { error: 'Please pick up to 3 kinds of tour from the list.' };
+    return { value: x.slice() };
+  }
+  if (key === 'length') return TOUR_LENGTHS.includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
+  if (key === 'book') return TOUR_BOOK.includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
+  if (key === 'age') return TOUR_AGES.includes(String(x)) ? { value: String(x) } : { error: TOUR_INFO_ERROR };
+  if (key === 'adult') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'private') { const p = cleanTourPrice(x); return p.error ? { error: 'Please enter the private tour price in dollars, like 900, or leave it empty.' } : { value: p.value }; }
+  if (key === 'year') return ['all', 'seasonal'].includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
+  if (key === 'visit') return x === 'appointment' ? { value: x } : { error: TOUR_INFO_ERROR };
+  return { error: TOUR_INFO_ERROR };
+}
+// "$129" / "129 $", "$1,500" / "1 500 $".
+function tourMoney(n, fr) {
+  const whole = Number.isInteger(n);
+  const t = whole ? Math.round(n).toLocaleString(fr ? 'fr-CA' : 'en-CA') : n.toFixed(2);
+  return fr ? `${String(t).replace('.', ',').replace(/\s/g, ' ')} $` : `$${t}`;
+}
+// The season the Hours step stored (open_months), as { from, to } 'MM-DD', or null.
+function tourOpenSeason(venueId) {
+  const om = String((venueLinks(venueId) || {}).open_months || '');
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(om), x = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(om);
+  const LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return m ? { from: `${String(m[1]).padStart(2, '0')}-01`, to: `${String(m[2]).padStart(2, '0')}-${LAST[Number(m[2]) - 1]}` } : x ? { from: x[1], to: x[2] } : null;
+}
+// The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
+// answered, and its row is left as research has it.
+function tourVisitLines(venue, info) {
+  const t = info || venueTourInfo(venue.id);
+  const out = {};
+  const open = tourOpenSeason(venue.id);
+  if (open) out.Season = { en: `${wineryMd(open.from, false)} – ${wineryMd(open.to, false)}.`, fr: `Du ${wineryMd(open.from, true)} au ${wineryMd(open.to, true)}.`.replace(/\.\.$/, '.') };
+  else if (t.year === 'all') out.Season = { en: 'All year.', fr: 'Toute l’année.' };
+  if (TOUR_LENGTHS.includes(t.length)) out['Time needed'] = { en: TOUR_LENGTH_LINES[t.length][0], fr: TOUR_LENGTH_LINES[t.length][1] };
+  const price = typeof t.price === 'number' && t.price > 0 ? t.price : null, priv = typeof t.private === 'number' && t.private > 0 ? t.private : null;
+  if (price != null || priv != null) {
+    out.Prices = {
+      en: [price != null ? `From ${tourMoney(price, false)} a person.` : '', priv != null ? `Private tours from ${tourMoney(priv, false)}.` : ''].filter(Boolean).join(' '),
+      fr: [price != null ? `À partir de ${tourMoney(price, true)} par personne.` : '', priv != null ? `Visites privées à partir de ${tourMoney(priv, true)}.` : ''].filter(Boolean).join(' '),
+    };
+  }
+  if (TOUR_AGES.includes(String(t.age || ''))) {
+    const a = TOUR_AGE_LINES[String(t.age)];
+    const adult = t.adult === true && String(t.age) !== '19' ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
+    out.Ages = { en: a[0] + adult[0], fr: a[1] + adult[1] };
+  }
+  if (TOUR_BOOK.includes(t.book)) out.Booking = { en: TOUR_BOOK_LINES[t.book][0], fr: TOUR_BOOK_LINES[t.book][1] };
+  return out;
+}
+// The labels the tour answers manage (the rest of the box is research's, or the owner's own lines: Known for, Groups,
+// Good to know, Dogs).
+const TOUR_MANAGED_LABELS = ['Season', 'Time needed', 'Prices', 'Ages', 'Booking'];
+// Research labels that say the same thing as an answer's row: set aside first when the box is full.
+const TOUR_REPEAT_LABELS = { Season: /^(?:seasons?|best season|winter|summer|open)$/i, 'Time needed': /^(?:duration|length|how long|trip length)$/i, Prices: /^(?:price|prices|rates?|cost)$/i, Ages: /^(?:ages?|kids|min(?:imum)? age)$/i, Booking: /^(?:book(?:ing)?|reservations?)$/i };
+// Writes the answers' lines into the stored Plan your visit box as the owner's rows (owner_labels), keeping what each
+// replaced (owner_was), so an answer taken back (an Undo) puts research's line back. French text rides along in owner_fr.
+// The winery writer's way (writeWineryVisitRows), with the tour labels. -> { before, after } (JSON or null).
+function writeTourVisitRows(venueId, now = new Date()) {
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  if (!venue || venue.type !== 'tour') return { before: null, after: null };
+  const before = currentVisitInfoJson(venueId);
+  const cur = venueVisitInfo(venueId);
+  const lines = tourVisitLines(rowToVenue(venue), venueTourInfo(venueId));
+  const rows = cur && Array.isArray(cur.rows) ? cur.rows.map((r) => ({ ...r })) : [];
+  const owned = new Set(cur && Array.isArray(cur.owner_labels) ? cur.owner_labels : []);
+  const was = { ...((cur && cur.owner_was) || {}) };
+  const frMap = { ...((cur && cur.owner_fr) || {}) };
+  const managed = new Set(((cur && cur.winery_labels) || []));
+  for (const label of TOUR_MANAGED_LABELS) {
+    const want = label in lines ? lines[label] : undefined;
+    const i = rows.findIndex((r) => r.label === label);
+    if (want === undefined) {
+      if (!managed.has(label)) continue;
+      const old = was[label];
+      if (old && old.text) { const row = { label, text: old.text, ...(old.url ? { url: old.url } : {}) }; if (i >= 0) rows[i] = row; else rows.push(row); } else if (i >= 0) rows.splice(i, 1);
+      delete was[label]; delete frMap[label]; managed.delete(label);
+      if (!old || !old.owned) owned.delete(label);
+      continue;
+    }
+    if (!managed.has(label)) { const r0 = i >= 0 ? rows[i] : null; was[label] = r0 ? { text: r0.text, ...(r0.url ? { url: r0.url } : {}), ...(owned.has(label) ? { owned: true } : {}) } : { text: '', ...(owned.has(label) ? { owned: true } : {}) }; managed.add(label); }
+    owned.add(label);
+    if (want === '') { if (i >= 0) rows.splice(i, 1); delete frMap[label]; continue; }
+    const row = { label, text: want.en };
+    if (i >= 0) rows[i] = row; else rows.push(row);
+    if (want.fr) frMap[label] = { en: want.en, fr: want.fr }; else delete frMap[label];
+  }
+  // A research line that repeats an answer ("Price: $129" beside the owner's "Prices") goes first when the box is full.
+  const stash = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && !managed.has(r.label));
+  for (const r of stash) if (r && r.label && !rows.some((x) => x.label === r.label)) rows.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) });
+  const dropped = [];
+  const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(owned.has(r.label) ? { owned: true } : {}) }); rows.splice(j, 1); };
+  const repeats = (r) => !owned.has(r.label) && Object.keys(TOUR_REPEAT_LABELS).some((l) => managed.has(l) && rows.some((x) => x.label === l) && TOUR_REPEAT_LABELS[l].test(r.label));
+  while (rows.length > VISIT_ROWS_MAX) {
+    let j = -1;
+    for (let k = rows.length - 1; k >= 0; k--) if (repeats(rows[k])) { j = k; break; }
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!owned.has(rows[k].label)) { j = k; break; }
+    setAside(j >= 0 ? j : rows.length - 1);
+  }
+  const next = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
+  if (dropped.length) next.owner_dropped = dropped; else delete next.owner_dropped;
+  if (Object.keys(was).length) next.owner_was = was; else delete next.owner_was;
+  if (Object.keys(frMap).length) next.owner_fr = frMap; else delete next.owner_fr;
+  if (managed.size) next.winery_labels = [...managed].sort(); else delete next.winery_labels;
+  const same = (a, b) => JSON.stringify({ ...a, checked_at: null }) === JSON.stringify({ ...b, checked_at: null });
+  if (cur && same(cur, next)) return { before, after: before };
+  if (!cur && !rows.length && !next.owner_labels.length) return { before, after: before };
+  if (!rows.length && !next.booking_url && !next.owner_labels.length) {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(venueId);
+    return { before, after: null };
+  }
+  const json = JSON.stringify(next);
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, json);
+  return { before, after: json };
+}
+// The owner's price as the card price ("From $129", price_overrides, reviewer 'owner'), or taken off (null).
+function tourCardPrice(venueId) {
+  const p = tourPrice(venueId);
+  try { priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Per person'); } catch (e) { console.error(`[owner-portal] card price for tour #${venueId} failed: ${e.message}`); }
+}
+// The card's duration chip (tourCardFacts reads "Time needed"); and Build My Trip's facts: the minimum age, how far ahead
+// to book and how long a trip takes, from the operator's own answers (null when not answered).
+function tourPlannerFacts(venueId) {
+  const t = venueTourInfo(venueId);
+  return {
+    ...(TOUR_AGES.includes(String(t.age || '')) ? { tourMinAge: String(t.age) } : {}),
+    ...(TOUR_BOOK.includes(t.book) ? { tourBookAhead: t.book } : {}),
+    ...(TOUR_LENGTHS.includes(t.length) ? { tourLength: t.length } : {}),
+  };
+}
+const TOUR_APPOINTMENT_LINE = 'Book ahead · tours by reservation';
 
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
 // town and kind of experience, the summary is the place's own "Known for" line from its Plan your visit box (the card's
@@ -25490,6 +25725,8 @@ function mapDataVersion(now = new Date()) {
   // Brewery answers (2026-11-12): who's welcome sets a brewery's Kids bit, and its kind (venue_cuisines.place_type) the
   // Cider and Brewery searches.
   try { const bi = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_brewery_info').get(); const vc = db.prepare("SELECT MAX(c.updated_at) AS u, COUNT(*) AS n FROM venue_cuisines c JOIN venues v ON v.id = c.venue_id WHERE v.type = 'brewery'").get(); of = { u: `${of.u}|${bi.u}|${vc.u}`, n: `${of.n}|${bi.n}|${vc.n}` }; } catch (err) { /* an older database */ }
+  // Tour answers (2026-11-16): "By booking only" leaves a tour's hours off the map.
+  try { const ti = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_tour_info').get(); of = { u: `${of.u}|${ti.u}`, n: `${of.n}|${ti.n}` }; } catch (err) { /* an older database */ }
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
   return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${advisoryNotesKey(now)}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}|${arrivalPoints.version()}|of:${of.u}|${of.n}`).digest('hex').slice(0, 12);
 }
@@ -29090,7 +29327,7 @@ const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours
 function appointmentLineFor(venueId, noticeText) {
   // A winery's own answer (2026-11-12) instead of its words, when it gave one.
   const own = wineryAppointmentForId(venueId);
-  if (own !== null) return own ? WINERY_APPOINTMENT_LINE : null;
+  if (own !== null) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return own ? apptLineFor(t) : null; }
   const rows = (venueVisitInfo(venueId) || {}).rows || [];
   const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
   return /appointment|by reservation|reservations? (?:only|(?:are |is )?required)/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
@@ -29136,7 +29373,7 @@ function cardStatusFor(st, v) {
   }
   // A winery's own answer (2026-11-12): "by appointment" only when it says so today; never guessed from its words.
   const ownAppt = v && apptType(v.type) ? wineryAppointmentOn(v.id, todayLocal(), v.type) : null;
-  if (ownAppt === true) return { state: 'appointment', text: WINERY_APPOINTMENT_LINE };
+  if (ownAppt === true) return { state: 'appointment', text: apptLineFor(v.type) };
   const rows = ((v && venueVisitInfo(v.id)) || {}).rows || [];
   const own = `${(v && v.description) || ''} ${rows.map((r) => r.text).join(' ')}`;
   if (ownAppt === null && /by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {
@@ -29167,7 +29404,7 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
     // Decided 4 (2026-11-12): a winery that said it is by appointment today (all year, or in its off-season) gets that line
     // and no open/closed claim (never counted as open, no hours on the map). A dated closure still wins.
     if (apptType(v.type) && !shut(v.id) && wineryAppointmentOn(v.id, todayIso, v.type) === true) {
-      byId.set(v.id, { eligible: false, reason: 'appointment', state: null, text: null, hours: null, note: { state: 'appointment', text: WINERY_APPOINTMENT_LINE } });
+      byId.set(v.id, { eligible: false, reason: 'appointment', state: null, text: null, hours: null, note: { state: 'appointment', text: apptLineFor(v.type) } });
       continue;
     }
     const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id) && !(claimed.has(v.id) && !shut(v.id));
@@ -37825,7 +38062,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // with the off-season line, as before.
   const wineryApptBox = venueWineryAppointmentToday(venue, opts.now || new Date());
   const wineryApptAllYear = wineryApptBox && apptAnswers(venue.id, venue.type).visit === 'appointment';
-  const wineryApptLine = `<p class="venue-hours-season venue-hours-appt">${L('By appointment · call ahead', 'Sur rendez-vous · appelez avant')}</p>`;
+  const wineryApptLine = `<p class="venue-hours-season venue-hours-appt">${venue.type === 'tour' ? L('Book ahead · tours by reservation', 'Réservez à l’avance · visites sur réservation') : L('By appointment · call ahead', 'Sur rendez-vous · appelez avant')}</p>`;
   if (wineryApptAllYear) hoursHtml = `<h2>${L('Hours', 'Heures')}</h2>${wineryApptLine}`;
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
@@ -38295,7 +38532,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Winery test 1 (2026-11-12): a winery that is by appointment today (its own answer, all year or in its off-season)
   // says so here exactly as its cards do (cardStatusFor / foodDrinkOpenNowInfo), never "Open now"; a closure still wins.
   const wineryApptToday = venueWineryAppointmentToday(venue, opts.now || new Date());
-  const openStatus = wineryApptToday ? { state: 'appointment', text: WINERY_APPOINTMENT_LINE }
+  const openStatus = wineryApptToday ? { state: 'appointment', text: apptLineFor(venue.type) }
     : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
   const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
@@ -47315,7 +47552,9 @@ const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'descri
   // Wineries (2026-11-12): their answers (venue_winery_info) and the tasting fee (live from $0 to $75, higher checked first).
   'winery_info', 'tasting_fee',
   // Breweries (2026-11-12): their answers (venue_brewery_info) and the flight price (live from $0 to $40, higher checked first).
-  'brewery_info', 'flight_fee', 'cocktail_price'];
+  'brewery_info', 'flight_fee', 'cocktail_price',
+  // Tours (2026-11-16): their answers (venue_tour_info) and the price per person (live up to $1,000, higher checked first).
+  'tour_info', 'tour_price'];
 // Cuisine picker (2026-11-08, reworked 2026-11-09): restaurants only (the types with a completeness list). Dayton
 // (Nov 9 2026): up to 3 food labels from this list of 45, plus one "kind of place". The food list is only food (place
 // styles such as "Casual dining" moved to RESTAURANT_PLACE_TYPES; dietary words are badges), every label has a French
@@ -47533,7 +47772,8 @@ function visitSlotRowIndex(slot, rows, owned) {
 }
 // The label a new line of this slot gets: "Groups" for an answer about groups, else the slot's own.
 function visitSlotNewLabel(slot, text) { return visitGroupsSlot(slot) && VISIT_GROUPS_RE.test(String(text || '')) ? 'Groups' : slot.def; }
-function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return t === 'cocktail' ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
+// Tours (2026-11-16): Groups is its own line and "Good to know" (what to bring, weather calls) its own box, as for lounges.
+function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return t === 'cocktail' || t === 'tour' ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
 // The classic edit page keeps its five boxes (the dogs line is only asked in the setup).
 const OWNER_VISIT_EDIT_KEYS = ['known_for', 'reservations', 'takeout', 'dietary', 'groups'];
 const OWNER_VISIT_ERRORS = {
@@ -48426,6 +48666,8 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     ...(venue.type === 'winery' ? { winery_info: wineryInfoAnswers(venue.id), tasting_fee: wineryTastingFee(venue.id) } : {}),
     // Breweries (2026-11-12): their answers as stored ({} when none) and the owner's flight price (null when none).
     ...(brewSetupType(venue.type) ? { brewery_info: breweryInfoAnswers(venue.id), flight_fee: breweryFlightFee(venue.id) } : {}),
+    // Tours (2026-11-16): their answers as stored ({} when none) and the owner's price per person (null when none).
+    ...(venue.type === 'tour' ? { tour_info: tourInfoAnswers(venue.id), tour_price: tourPrice(venue.id) } : {}),
   };
 }
 // The stored hours_checked_at ('YYYY-MM-DD') or ''.
@@ -48824,7 +49066,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     // Winery test 4 (2026-11-12): "We don't have set hours. Visits are by appointment": a winery that is (or, in this same
     // save, says it is) by appointment only may save a week with no open day. Its old hours are kept for Undo as usual.
     // Distilleries (Decided 5, 2026-11-13): the same, with the answer in brewery_info.
-    const apField = venue.type === 'distillery' ? 'brewery_info' : 'winery_info';
+    const apField = venue.type === 'distillery' ? 'brewery_info' : venue.type === 'tour' ? 'tour_info' : 'winery_info';
     const apptNow = apptType(venue.type) && (((input[apField] && typeof input[apField] === 'object') ? input[apField].visit : undefined) === 'appointment'
       || (!(input[apField] && typeof input[apField] === 'object' && 'visit' in input[apField]) && apptAnswers(venue.id, venue.type).visit === 'appointment'));
     const w = ownerWeekJson(input.hours, 'Hours', { allowEmptyWeek: apptNow });
@@ -49291,6 +49533,34 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (!errors.brewery_info && JSON.stringify(ordered) !== JSON.stringify(Object.fromEntries(BREWERY_INFO_PARTS.filter((k) => k in cur).map((k) => [k, cur[k]])))) changes.brewery_info = ordered;
     }
   }
+  // Tour answers (2026-11-16): an object with any of TOUR_INFO_PARTS; each part replaces that part (null clears it).
+  if ('tour_info' in input) {
+    const x = input.tour_info;
+    if (venue.type !== 'tour') errors.form = TOUR_INFO_ERROR;
+    else if (!x || typeof x !== 'object' || Array.isArray(x) || !Object.keys(x).length || Object.keys(x).some((k) => !TOUR_INFO_PARTS.includes(k))) errors.tour_info = TOUR_INFO_ERROR;
+    else {
+      const cur = current.tour_info || {};
+      const next = { ...cur };
+      for (const k of Object.keys(x)) {
+        const c = cleanTourInfoPart(k, x[k]);
+        if (c.error) { errors.tour_info = c.error; break; }
+        if (c.value != null && !(Array.isArray(c.value) && !c.value.length)) next[k] = c.value; else delete next[k];
+      }
+      // "Under 18s with an adult" goes with an age under 19 only.
+      if (next.adult && (!next.age || next.age === '19')) delete next.adult;
+      const ordered = Object.fromEntries(TOUR_INFO_PARTS.filter((k) => k in next).map((k) => [k, next[k]]));
+      if (!errors.tour_info && JSON.stringify(ordered) !== JSON.stringify(Object.fromEntries(TOUR_INFO_PARTS.filter((k) => k in cur).map((k) => [k, cur[k]])))) changes.tour_info = ordered;
+    }
+  }
+  // The price per person (2026-11-16): dollars, null takes it back. Up to $1,000 it goes live at once.
+  if ('tour_price' in input) {
+    if (venue.type !== 'tour') errors.form = TOUR_INFO_ERROR;
+    else {
+      const c = cleanTourPrice(input.tour_price);
+      if (c.error) errors.tour_price = c.error;
+      else if (c.value !== (current.tour_price == null ? null : current.tour_price)) changes.tour_price = c.value;
+    }
+  }
   // A cocktail lounge's price (Decided 2, 2026-11-13): dollars, 'none' ("We don't serve cocktails") or null (takes it back).
   // Up to $40 it goes live at once.
   if ('cocktail_price' in input) {
@@ -49377,15 +49647,15 @@ const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
-  pub_info: 'Kitchen, who’s welcome and sports', cafe_info: 'Your café answers', cafe_links: 'Ordering links', winery_info: 'Your winery answers', tasting_fee: 'Tasting price', brewery_info: 'Your taproom answers', flight_fee: 'Flight price', cocktail_price: 'Cocktail price' };
+  pub_info: 'Kitchen, who’s welcome and sports', cafe_info: 'Your café answers', cafe_links: 'Ordering links', winery_info: 'Your winery answers', tasting_fee: 'Tasting price', brewery_info: 'Your taproom answers', flight_fee: 'Flight price', cocktail_price: 'Cocktail price', tour_info: 'Your tour answers', tour_price: 'Price per person' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', description_fr: 'description en français', badges: 'caractéristiques', happy_hour: '5 à 7',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du 5 à 7', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix de la palette de dégustation', cocktail_price: 'prix d’un cocktail' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du 5 à 7', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix de la palette de dégustation', cocktail_price: 'prix d’un cocktail', tour_info: 'réponses sur vos activités', tour_price: 'prix par personne' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', description_fr: 'French description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links', winery_info: 'your winery answers', tasting_fee: 'tasting price', brewery_info: 'your taproom answers', flight_fee: 'flight price', cocktail_price: 'cocktail price' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links', winery_info: 'your winery answers', tasting_fee: 'tasting price', brewery_info: 'your taproom answers', flight_fee: 'flight price', cocktail_price: 'cocktail price', tour_info: 'your tour answers', tour_price: 'price per person' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -49430,6 +49700,19 @@ function ownerValueText(field, value) {
     return parts.length ? parts.join(' · ') : '(none)';
   }
   if (field === 'tasting_fee') return value == null ? '(none)' : Number(value) === 0 ? 'Free tastings' : `${wineryMoney(Number(value), false)} a person`;
+  if (field === 'tour_price') return value == null ? '(none)' : `From ${tourMoney(Number(value), false)} a person`;
+  if (field === 'tour_info') {
+    const o = value && typeof value === 'object' ? value : {};
+    const parts = [];
+    if (Array.isArray(o.kinds)) parts.push(`Kind: ${o.kinds.map((k) => (TOUR_KIND_LABELS_OWNER[k] || [k])[0]).join(', ')}`);
+    if (o.length) parts.push(`How long: ${TOUR_LENGTH_LINES[o.length] ? TOUR_LENGTH_LINES[o.length][0].replace(/\.$/, '') : o.length}`);
+    if (o.book) parts.push(TOUR_BOOK_LINES[o.book] ? TOUR_BOOK_LINES[o.book][0].replace(/\.$/, '') : o.book);
+    if (o.age) parts.push(`${TOUR_AGE_LINES[o.age] ? TOUR_AGE_LINES[o.age][0].replace(/\.$/, '') : o.age}${o.adult ? ', under 18s with an adult' : ''}`);
+    if (o.private) parts.push(`Private tours from ${tourMoney(Number(o.private), false)}`);
+    if (o.visit === 'appointment') parts.push('By booking only (no set hours)');
+    if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
+    return parts.length ? parts.join(' · ') : '(none)';
+  }
   if (field === 'cocktail_price') return value == null ? '(none)' : value === 'none' ? 'We don’t serve cocktails' : `Cocktails about ${wineryMoney(Number(value), false)}`;
   if (field === 'flight_fee') return value == null ? '(none)' : Number(value) === 0 ? 'Free flights' : `${wineryMoney(Number(value), false)} a flight`;
   if (field === 'brewery_info') {
@@ -54193,17 +54476,28 @@ const BREWERY_ONLY_STEPS = ['taproom', 'flights'];
 // Specials are not asked (they stay on the edit page); nor are the kind of pub, sports, games, takeout or the old spend.
 const COCKTAIL_SETUP_PART1 = ['basics', 'hours', 'happy', 'cuisine', 'menu', 'spend', 'photos', 'offer'];
 const COCKTAIL_SETUP_PART2 = ['music', 'story', 'groups', 'social', 'door'];
+// Tours (Dayton, 2026-11-16: "build the tours setup"): 7 essentials and 5 optional screens, folded like the winery and
+// brewery setups. Part 1: Basics (where people meet you), When you run (the Hours step, with seasons, closures and the
+// winery's "By booking only" no-set-hours path), What you offer ('tour': the kind of tour and how long), Price ('price': from
+// $X per person, and private tours), Booking ('booking': the booking link and how far ahead), Who can come ('offer': the
+// minimum age above the tiles, dogs and access) and Photos. Part 2: Story and Known for, Good to know ('bring': what to
+// bring or wear, weather calls), Groups and private bookings, Instagram and Facebook, and the meeting spot ('door').
+// Never asked of tours: happy hour, menu, specials, weekly events, food, cuisine and the average spend.
+const TOUR_SETUP_PART1 = ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos'];
+const TOUR_SETUP_PART2 = ['story', 'bring', 'groups', 'social', 'door'];
+const TOUR_ONLY_STEPS = ['tour', 'price', 'booking', 'bring'];
 // The types whose Hours step ends with its holidays and closures, with Instagram and Facebook on one screen.
-const SETUP_COMBO_TYPES = new Set(['cafe', 'winery', 'brewery', 'distillery', 'cocktail']);
+const SETUP_COMBO_TYPES = new Set(['cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'tour']);
 // Every step any type has (what a stored progress may hold).
-const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS, WINERY_ONLY_STEPS, BREWERY_ONLY_STEPS);
+const ALL_SETUP_STEPS = SETUP_STEPS.concat(CAFE_ONLY_STEPS, WINERY_ONLY_STEPS, BREWERY_ONLY_STEPS, TOUR_ONLY_STEPS);
 // All six of a café's Part 2 tiles show (no folded "A few more").
 SETUP_TOP2.cafe = CAFE_SETUP_PART2.slice();
 SETUP_TOP2.winery = WINERY_SETUP_PART2.slice();
 SETUP_TOP2.brewery = BREWERY_SETUP_PART2.slice();
 SETUP_TOP2.distillery = BREWERY_SETUP_PART2.slice();
 SETUP_TOP2.cocktail = COCKTAIL_SETUP_PART2.slice();
-function setupParts(type) { return type === 'cocktail' ? { part1: COCKTAIL_SETUP_PART1, part2: COCKTAIL_SETUP_PART2 } : type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : type === 'winery' ? { part1: WINERY_SETUP_PART1, part2: WINERY_SETUP_PART2 } : brewSetupType(type) ? { part1: BREWERY_SETUP_PART1, part2: BREWERY_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
+SETUP_TOP2.tour = TOUR_SETUP_PART2.slice();
+function setupParts(type) { return type === 'tour' ? { part1: TOUR_SETUP_PART1, part2: TOUR_SETUP_PART2 } : type === 'cocktail' ? { part1: COCKTAIL_SETUP_PART1, part2: COCKTAIL_SETUP_PART2 } : type === 'pub' ? { part1: PUB_SETUP_PART1, part2: PUB_SETUP_PART2 } : type === 'cafe' ? { part1: CAFE_SETUP_PART1, part2: CAFE_SETUP_PART2 } : type === 'winery' ? { part1: WINERY_SETUP_PART1, part2: WINERY_SETUP_PART2 } : brewSetupType(type) ? { part1: BREWERY_SETUP_PART1, part2: BREWERY_SETUP_PART2 } : { part1: SETUP_PART1, part2: SETUP_PART2 }; }
 // Breweries: "Your menu" is a step only for one with its own kitchen (Decided 5). Without a venue id (what a stored
 // progress may record), every step.
 function breweryMenuStepApplies(venueId) { return venueBreweryInfo(venueId).food === 'kitchen'; }
@@ -54221,6 +54515,7 @@ function cafeCoffeeStepApplies(venueId) {
 }
 function setupStepsFor(type, venueId) {
   if (type === 'winery') return WINERY_SETUP_PART1.concat(WINERY_SETUP_PART2);
+  if (type === 'tour') return TOUR_SETUP_PART1.concat(TOUR_SETUP_PART2);
   if (type === 'cocktail') return COCKTAIL_SETUP_PART1.concat(COCKTAIL_SETUP_PART2);
   if (brewSetupType(type)) { const all = BREWERY_SETUP_PART1.concat(BREWERY_SETUP_PART2); return venueId != null && !breweryMenuStepApplies(venueId) ? all.filter((k) => k !== 'menu') : all; }
   if (type !== 'cafe') return SETUP_STEPS;
@@ -54362,10 +54657,10 @@ function setupScore(found) {
 // "within a day" that isn't in this list shows as "on your page". A waiting field we can't place holds every step back.
 const SETUP_WAITING_FIELD_STEPS = {
   name: ['basics'], address: ['basics'], phone: ['basics'], website: ['basics'], description: ['story'], description_fr: ['story'], menu_url: ['menu'],
-  booking_url: ['groups', 'visit', 'book'], instagram_url: ['instagram', 'social'], facebook_url: ['facebook', 'social'], tiktok_url: ['social'],
+  booking_url: ['groups', 'visit', 'book', 'booking'], instagram_url: ['instagram', 'social'], facebook_url: ['facebook', 'social'], tiktok_url: ['social'],
   hours: ['hours'], hours_seasons: ['hours'], open_months: ['hours'], hours_checked: ['hours'], closures: ['closures', 'hours'],
   happy_hour: ['happy'], happy_hour_deals: ['happy'], specials: ['specials'], weekly_nights: ['music'], badges: ['offer'], not_offered: ['offer'],
-  price_range: ['spend'], avg_spend: ['spend'], tasting_fee: ['tastings'], flight_fee: ['flights'], cocktail_price: ['spend'], cafe_links: ['order', 'sellout'],
+  price_range: ['spend'], avg_spend: ['spend'], tasting_fee: ['tastings'], flight_fee: ['flights'], cocktail_price: ['spend'], cafe_links: ['order', 'sellout'], tour_price: ['price'],
 };
 function setupWaitingSteps(venue) {
   const out = new Set();
@@ -54525,7 +54820,9 @@ function renderOwnerSetupPage(found, opts) {
   // Distilleries (2026-11-13): the brewery setup, with the spirits words laid over it in the page (T.kindDistillery).
   const brewery = brewSetupType(venue.type);
   const distillery = venue.type === 'distillery';
-  const over = pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : '';
+  // Tours (2026-11-16): the same engine with tour words and the tour-only screens (owner-setup-text.js .tour).
+  const tour = venue.type === 'tour';
+  const over = pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : tour ? 'tour' : '';
   const S0 = OWNER_SETUP_STRINGS[lang];
   const t0 = over ? { ...S0, ...S0[over], labels: { ...S0.labels, ...(S0[over].labels || {}) }, offers: { ...S0.offers, ...(S0[over].offers || {}) }, noLabels: { ...S0.noLabels, ...(S0[over].noLabels || {}) }, kinds: { ...S0.kinds, ...(S0[over].kinds || {}) } } : S0;
   const CK = cocktail ? S0.pub.cocktail : null;
@@ -54569,12 +54866,19 @@ function renderOwnerSetupPage(found, opts) {
     ...(winery ? { winery_info: snap.winery_info || {}, tasting_fee: snap.tasting_fee == null ? null : snap.tasting_fee, tasting_fee_waiting: ownerTastingFeeWaiting(venue.id) } : {}),
     // Breweries: their answers, the flight price on the page, and one sent over $40 still waiting for our check.
     ...(brewery ? { brewery_info: snap.brewery_info || {}, flight_fee: snap.flight_fee == null ? null : snap.flight_fee, flight_fee_waiting: ownerFlightFeeWaiting(venue.id) } : {}),
+    // Tours: their answers, the price per person on the page, and one sent over $1,000 still waiting for our check.
+    ...(tour ? { tour_info: snap.tour_info || {}, tour_price: snap.tour_price == null ? null : snap.tour_price, tour_price_waiting: ownerTourPriceWaiting(venue.id) } : {}),
   };
   const cuisineIcons = { American: '🇺🇸', BBQ: '🍖', 'Breakfast & Brunch': '🍳', Burgers: '🍔', Canadian: '🍁', 'Chicken & Wings': '🍗', Chinese: '🥡', 'Comfort food': '🍲', Dessert: '🍰', 'Fish & Chips': '🐟',
     Greek: '🥙', Indian: '🍛', Italian: '🍝', Japanese: '🍱', Korean: '🍜', Mexican: '🌮', 'Noodles & Ramen': '🍜', Pizza: '🍕', 'Poke & Hawaiian': '🍣', Poutine: '🍟', 'Pub Fare': '🍺', Sandwiches: '🥪',
     Seafood: '🦐', Steakhouse: '🥩', Thai: '🍜', Vietnamese: '🍜', 'West Coast': '🌲', European: '🍷', 'Swiss & Alpine': '🧀', 'Farm-to-Table': '🧺', Mediterranean: '🫒', 'Spanish & Tapas': '🫒', 'Contemporary & Global': '🌍', 'Small plates & bar snacks': '🍢' };
   // "What you offer": 18 tiles in three groups (Dayton, 2026-11-09). The six owner-only features are new.
-  const offerGroups = brewery ? [
+  const offerGroups = tour ? [
+    // Tours (2026-11-16): "Who can come" asks the minimum age above these tiles; dogs, getting there and the rest. No
+    // patio, food, games or reservations tiles (a tour is booked; the Booking screen asks it).
+    { title: fr ? 'Les chiens' : 'Dogs', keys: ['dog_friendly'] },
+    { title: fr ? 'Accès et stationnement' : 'Access and parking', keys: ['wheelchair_accessible', 'free_parking', 'locally_owned'] },
+  ] : brewery ? [
     // Breweries (2026-11-12, SPEC-breweries.md "What you offer"): the reused tiles, the pub games and Picnic area. No Kids
     // tile ("Who's welcome?" asks it next). Vegan, vegetarian and takeout only with their own kitchen (the page script
     // hides them otherwise). Hidden: local beer on tap, off-sales, fireplace, beach access and the café tiles.
@@ -54623,6 +54927,7 @@ function renderOwnerSetupPage(found, opts) {
   if (cocktail) { offerLabels.nonalcoholic = fr ? 'Cocktails sans alcool' : 'Zero-proof cocktails'; offerLabels.local_drinks = fr ? 'Vins et spiritueux locaux' : 'Local wine and spirits'; }
   if (brewery) offerLabels.nonalcoholic = fr ? 'Boissons sans alcool (pour les conducteurs)' : 'Non-alcoholic drinks (for drivers)';
   if (winery) { offerLabels.kid_friendly = fr ? 'Enfants bienvenus' : 'Kids welcome'; offerLabels.nonalcoholic = fr ? 'Boissons sans alcool (pour les conducteurs et les enfants)' : 'Non-alcoholic drinks (for drivers and kids)'; }
+  if (tour) { offerLabels.dog_friendly = fr ? 'Les chiens peuvent venir' : 'Dogs can come along'; offerLabels.wheelchair_accessible = fr ? 'Accessible en fauteuil roulant' : 'Wheelchair accessible'; }
   if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (p. ex. un puppuccino ou une coupe pour chien)' : 'Dog treats (e.g. a puppuccino or pup cup)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -54660,6 +54965,14 @@ function renderOwnerSetupPage(found, opts) {
     // Breweries (2026-11-12): the kinds, a kind and a food the name or research suggests (pre-selected only, saved when
     // she taps Save), research's flight price as a starting point, and the quick flight prices' live limit.
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
+    // Tours (2026-11-16): the kinds (chips), how long, the quick prices and their live limit, and research's price and
+    // length as suggestions (pre-picked with "We picked this from your page", saved only when she taps Save).
+    ...(tour ? {
+      allSteps: TOUR_SETUP_PART1.concat(TOUR_SETUP_PART2), feeLiveMax: TOUR_PRICE_LIVE_MAX,
+      tourKinds: TOUR_KINDS.map((k) => ({ k, t: TOUR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), tourKindsTop: 12,
+      researchFee: tourResearchPrice(venue), researchLength: tourResearchLength(venue), suggestKinds: (snap.tour_info || {}).kinds ? [] : tourKindSuggestion(venue),
+      bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
+    } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
     // too (a suggestion, saved only with the screen), as it does for breweries.
     // Pub test 3 (Whistler, 2026-11-14): and research's "Family friendly" (or "All ages") pre-picks All ages on a pub's
@@ -54672,11 +54985,11 @@ function renderOwnerSetupPage(found, opts) {
     // Café test 1 (Whistler, 2026-11-15): research's "Free Wi-Fi" and "Free parking" pre-tick a café's tiles the same way
     // (suggestions while the screen is unsaved; saved only when she saves it).
     ...(cafe ? { visitTicks: cafeVisitTicks(venue, snap.badges) } : {}),
-    cafe, pub, winery, brewery, distillery, cocktail, restaurant: venue.type === 'restaurant', combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
+    cafe, pub, winery, brewery, distillery, cocktail, tour, restaurant: venue.type === 'restaurant', combo: SETUP_COMBO_TYPES.has(venue.type), top2: SETUP_TOP2[cocktail ? 'cocktail' : pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : tour ? 'tour' : 'restaurant'], sports: PUB_SPORTS.map((k) => ({ k, t: PUB_SPORT_LABELS[k][lang] })), tvs: PUB_TVS.map((k) => ({ k, t: PUB_TV_LABELS[k][lang] })),
     base: opts.base, back: opts.back, lang, mode: opts.mode, steps, part1: setupParts(venue.type).part1, part2: setupParts(venue.type).part2.filter((k) => steps.includes(k)), progress: { done: progress.done, score }, waiting: setupWaitingSteps(venue), holidayAlt: OWNER_SETUP_STRINGS[fr ? 'en' : 'fr'].holidays, doneForNow: !!progress.done_for_now,
-    name: venue.name, typeLabel: fr && cocktail ? 'Bar à cocktails' : fr && venue.type === 'restaurant' ? 'Restaurant' : fr && winery ? 'Vignoble' : fr && distillery ? 'Distillerie' : fr && brewery ? 'Microbrasserie' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
+    name: venue.name, typeLabel: tour ? (fr ? 'Activité' : 'Tour') : fr && cocktail ? 'Bar à cocktails' : fr && venue.type === 'restaurant' ? 'Restaurant' : fr && winery ? 'Vignoble' : fr && distillery ? 'Distillerie' : fr && brewery ? 'Microbrasserie' : typeLabel, regionLabel: REGION_LABELS[venue.region] || '',
     // The kind of place in a sentence ("Are you at your pub right now?"), 2026-11-10.
-    typeWord: ({ restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub', cocktail: fr ? 'bar' : 'bar', cafe: fr ? 'café' : 'café', winery: fr ? 'vignoble' : 'winery', brewery: fr ? 'salle de dégustation' : 'taproom', distillery: fr ? 'salle de dégustation' : 'tasting room' })[venue.type] || (fr ? 'établissement' : 'place'),
+    typeWord: ({ tour: fr ? 'point de rencontre' : 'meeting spot', restaurant: fr ? 'restaurant' : 'restaurant', pub: fr ? 'pub' : 'pub', cocktail: fr ? 'bar' : 'bar', cafe: fr ? 'café' : 'café', winery: fr ? 'vignoble' : 'winery', brewery: fr ? 'salle de dégustation' : 'taproom', distillery: fr ? 'salle de dégustation' : 'tasting room' })[venue.type] || (fr ? 'établissement' : 'place'),
     // Never a website the owner just asked to remove (still waiting for review) or said they don't have (pub test 5).
     image: pendingMain || ownImage, imageSource: setupImageSource(venue, pendingMain), website: ownerWebsiteRemovalWaiting(venue.id) || (snap.not_offered || []).includes('website') ? '' : ownerWebsitePending(venue.id) || normalizeWebsiteUrl(venue.website) || '', email: INFO_CONTACT_EMAIL, handle,
     // The "What you offer" tiles ticked from our research, not by the owner (pub test 5): a line above the tiles says so.
@@ -54754,7 +55067,7 @@ function renderOwnerSetupPage(found, opts) {
     keys: ['did it go through', 'did my photos go through', 'did you get', 'did you get it', 'did it send', 'did it save', 'was it saved', 'did my menu go through', 'what have i sent', 'what did i send', 'is it saved'],
     keysFr: ['est ce que c est passe', 'avez vous recu', 'c est enregistre', 'qu est ce que j ai envoye', 'mes photos sont passees'],
     a: `<p>Yes. When you see <strong>Saved ✓</strong> or <strong>Sent ✓</strong>, we have it. Here’s what we have from you so far:</p>${sent ? `<ul>${sent}</ul>` : '<p>Nothing yet. Start with the first question.</p>'}<p>Photos, your menu and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.${progress.done.spend === 'live' && !avgSpendPublic() && !cocktail ? ` ${escapeHtml(t.helpSpend)}` : ''}</p>`,
-    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${steps.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml((cocktail ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.pub.cocktail.labels } : cafe ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.cafe.labels } : winery ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.winery.labels } : brewery ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.brewery.labels } : OWNER_SETUP_STRINGS.fr.labels)[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() && !cocktail ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
+    aFr: `<p>Oui. Quand vous voyez <strong>Enregistré ✓</strong> ou <strong>Envoyé ✓</strong>, nous l’avons. Voici ce que nous avons reçu de vous :</p>${sent ? `<ul>${steps.filter((k) => progress.done[k] && progress.done[k] !== 'skip').map((k) => `<li>${escapeHtml((cocktail ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.pub.cocktail.labels } : cafe ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.cafe.labels } : winery ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.winery.labels } : tour ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.tour.labels } : brewery ? { ...OWNER_SETUP_STRINGS.fr.labels, ...OWNER_SETUP_STRINGS.fr.brewery.labels } : OWNER_SETUP_STRINGS.fr.labels)[k])} : ${escapeHtml(stWord(OWNER_SETUP_STRINGS.fr, k))}</li>`).join('')}</ul>` : '<p>Rien encore. Commencez par la première question.</p>'}<p>Les photos, votre menu et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.${progress.done.spend === 'live' && !avgSpendPublic() && !cocktail ? ` ${escapeHtml(OWNER_SETUP_STRINGS.fr.helpSpend)}` : ''}</p>`,
   };
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -54780,7 +55093,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS, SETUP_SEASON_HELP_TOPIC] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -54937,6 +55250,71 @@ const SETUP_NO_WEBSITE_HELP_TOPIC = { id: 'no-website-social', pages: ['setup', 
   a: '<p>That\u2019s fine: you don\u2019t need a website. In <strong>Set up your page</strong>, tap <strong>Instagram and Facebook</strong> (under the extra details) and fill in the ones you have. Your page links to them.</p><p>On the website question, tap that you don\u2019t have one. It still counts as answered.</p>',
   aFr: '<p>Aucun problème : vous n\u2019avez pas besoin d\u2019un site Web. Dans <strong>Configurez votre page</strong>, touchez <strong>Instagram et Facebook</strong> (dans les détails facultatifs) et remplissez ceux que vous avez. Votre page y mène.</p><p>À la question du site Web, touchez que vous n\u2019en avez pas. Elle compte quand même comme répondue.</p>' };
 // Wineries (2026-11-12): what winery owners ask about the winery questions.
+// Tours (Dayton, 2026-11-16: "build the tours setup"): what tour operators ask about the tour screens. Every answer names
+// the screen as the setup shows it ("When you run", "Price", "Booking", "Who can come", "Good to know").
+const TOUR_SETUP_HELP_TOPICS = [
+  SETUP_NO_WEBSITE_HELP_TOPIC,
+  { id: 'tour-season', pages: ['setup', 'edit'], over: ['setup-season', 'seasonal-hours', 'closures', 'hours'],
+    q: 'We only run in winter (or summer)', qFr: 'Nous ne partons que l’hiver (ou l’été)',
+    keys: ['seasonal', 'season', 'winter only', 'summer only', 'only in winter', 'only in summer', 'winter season', 'summer season', 'closed in summer', 'closed in winter', 'closed part of the year', 'season dates', 'our season', 'season is', 'december to april', 'november to april', 'may to october', 'june to september', 'start of the season', 'end of the season', 'snow season', 'when the snow', 'reopen', 'we run from', 'operating season', 'two seasons', 'winter and summer'],
+    keysFr: ['saison', 'saisonnier', 'hiver seulement', 'ete seulement', 'seulement l hiver', 'seulement l ete', 'nous partons seulement l hiver', 'nous partons seulement l ete', 'partons seulement l hiver', 'partons l hiver', 'partons l ete', 'on part l hiver', 'sorties l hiver seulement', 'notre saison', 'de decembre a avril', 'ferme l ete', 'ferme l hiver', 'dates de la saison', 'debut de la saison', 'fin de la saison', 'reouverture', 'hiver et ete'],
+    a: '<p>In <strong>When you run</strong>, after your hours, tap <strong>We’re closed part of the year</strong> and pick your first and last day (for example December 10 to April 5). The dates repeat every year. Outside them your page says “Closed for the season · back Dec 10”, and Build My Trip doesn’t plan you then.</p><p>A winter season and a summer season, with a break in between? Pick the dates of the longer one, then add the other one as <strong>different hours for part of the year</strong>, or add the break under Holidays &amp; closures with <strong>Every year</strong> ticked.</p>',
+    aFr: '<p>Dans <strong>Quand vous partez</strong>, après vos heures, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour (par exemple du 10 décembre au 5 avril). Les dates reviennent chaque année. En dehors de ces dates, votre page indique « Fermé pour la saison · de retour le 10 déc. », et Planifier mon voyage ne vous propose pas.</p><p>Une saison d’hiver et une saison d’été, avec une pause entre les deux? Choisissez les dates de la plus longue, puis ajoutez l’autre comme <strong>des heures différentes une partie de l’année</strong>, ou ajoutez la pause sous Jours fériés et fermetures en cochant <strong>Chaque année</strong>.</p>' },
+  { id: 'tour-booking-only', pages: ['setup', 'edit'], over: ['hours', 'setup-season'],
+    q: 'We don’t have set hours: trips are by booking only', qFr: 'Nous n’avons pas d’heures fixes : sorties sur réservation seulement',
+    keys: ['by booking only', 'booking only', 'by reservation', 'by reservation only', 'no set hours', 'no hours', 'departure times', 'departures', 'set departures', 'times vary', 'private only', 'by appointment', 'on request', 'when booked', 'we go when', 'charter'],
+    keysFr: ['sur reservation', 'sur reservation seulement', 'pas d heures fixes', 'pas d heures', 'heures de depart', 'departs', 'sur rendez vous', 'sur demande', 'horaire variable'],
+    a: '<p>In <strong>When you run</strong>, tap <strong>We don’t have set hours. Trips are by booking only</strong>. Your page then says “Book ahead · tours by reservation” instead of open and closed times.</p><p>Set departure times (9 AM and 1 PM)? Put them in as your hours: tap <strong>+ Add a second time</strong> on a day for a second departure.</p>',
+    aFr: '<p>Dans <strong>Quand vous partez</strong>, touchez <strong>Nous n’avons pas d’heures fixes. Sorties sur réservation seulement</strong>. Votre page indique alors « Réservez à l’avance · visites sur réservation » au lieu des heures d’ouverture.</p><p>Des départs à heures fixes (9 h et 13 h)? Inscrivez-les comme vos heures : touchez <strong>+ Ajouter une deuxième plage</strong> sur un jour pour un deuxième départ.</p>' },
+  { id: 'tour-weather', pages: ['setup', 'edit'], q: 'What about weather cancellations?', qFr: 'Et les annulations à cause de la météo?',
+    keys: ['weather', 'cancel', 'cancellation', 'cancellations', 'cancelled', 'rain', 'rain or shine', 'wind', 'storm', 'refund', 'refunds', 'if the weather', 'avalanche', 'snow conditions', 'conditions'],
+    keysFr: ['meteo', 'annulation', 'annulations', 'annule', 'pluie', 'beau temps mauvais temps', 'vent', 'tempete', 'remboursement', 'conditions'],
+    a: '<p>Say it in one line under <strong>Good to know</strong> (in “More about your place”), like <em>We run rain or shine. If the weather cancels a trip, we call you and you get a full refund.</em> It shows in “Plan your visit” on your page.</p><p>There’s no weather switch: for a day you can’t run, add it under Holidays &amp; closures in <strong>When you run</strong>.</p>',
+    aFr: '<p>Dites-le en une ligne sous <strong>Bon à savoir</strong> (dans « Plus sur votre entreprise »), comme <em>Nous partons beau temps, mauvais temps. Si la météo annule une sortie, nous vous appelons et vous êtes remboursé en entier.</em> Elle paraît dans « Planifiez votre visite » sur votre page.</p><p>Il n’y a pas d’interrupteur météo : pour un jour où vous ne pouvez pas partir, ajoutez-le sous Jours fériés et fermetures dans <strong>Quand vous partez</strong>.</p>' },
+  { id: 'tour-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend'], noRelated: ['price-range', 'avg-spend', 'cafe-price', 'winery-price'],
+    q: 'Price per person or private tour price?', qFr: 'Prix par personne ou prix d’une visite privée?',
+    keys: ['price', 'prices', 'price per person', 'per person', 'how much', 'cost', 'rates', 'private tour', 'private price', 'private tours', 'private charter', 'group price', 'family price', 'kids price', 'child price', 'change my price', 'wrong price', 'from price', 'taxes', 'gst'],
+    keysFr: ['prix', 'prix par personne', 'par personne', 'combien', 'tarif', 'tarifs', 'visite privee', 'prix prive', 'prix de groupe', 'prix enfant', 'changer mon prix', 'mauvais prix', 'taxes'],
+    a: '<p>In <strong>Price</strong>, put your lowest price for one adult on your regular trip. Your card shows it as “From $129”. A price over $1,000 is checked first and shows within a day.</p><p>Private tours have their own box under it (“Private tours from $900”), for the whole group. Kids’ prices, family rates or several trips at different prices? Say them in your story; the card keeps the one lowest price.</p>',
+    aFr: '<p>Dans <strong>Prix</strong>, indiquez votre prix le plus bas pour un adulte, pour votre sortie habituelle. Votre fiche l’affiche : « À partir de 129 $ ». Un prix de plus de 1 000 $ est vérifié d’abord et s’affiche d’ici un jour.</p><p>Les visites privées ont leur propre case en dessous (« Visites privées à partir de 900 $ »), pour tout le groupe. Prix pour enfants, tarif familial ou plusieurs sorties à des prix différents? Dites-le dans votre histoire; la fiche garde le prix le plus bas.</p>' },
+  { id: 'tour-age', pages: ['setup', 'edit'], q: 'Minimum age, and kids', qFr: 'Âge minimum, et les enfants',
+    keys: ['age', 'ages', 'minimum age', 'min age', 'how old', 'kids', 'children', 'child', 'family', 'families', 'teens', 'adults only', '19+', '18+', 'under 18', 'with an adult', 'height', 'weight limit'],
+    keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', 'taille', 'poids'],
+    a: '<p>In <strong>Who can come</strong>, tap your minimum age: All ages, 6+, 12+, 16+ or 19+. Tap <strong>Under 18s come with an adult</strong> if they do. It shows as “Ages” in “Plan your visit”, and Build My Trip leaves you out of family plans when your minimum is 12 or more.</p><p>A height or weight limit? Add it under <strong>Good to know</strong>.</p>',
+    aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez votre âge minimum : Tous les âges, 6+, 12+, 16+ ou 19+. Touchez <strong>Les moins de 18 ans viennent avec un adulte</strong> si c’est le cas. Il paraît comme « Âges » dans « Planifiez votre visite », et Planifier mon voyage ne vous propose pas aux familles si votre minimum est de 12 ans ou plus.</p><p>Une limite de taille ou de poids? Ajoutez-la sous <strong>Bon à savoir</strong>.</p>' },
+  { id: 'tour-multiday', pages: ['setup', 'edit'], q: 'We run multi-day trips', qFr: 'Nous offrons des sorties de plusieurs jours',
+    keys: ['multi day', 'multi-day', 'multiday', 'several days', 'overnight', 'two days', 'three days', 'week long', 'lodge', 'camping trip', 'packages', 'package'],
+    keysFr: ['plusieurs jours', 'deux jours', 'trois jours', 'nuit', 'forfait', 'forfaits', 'chalet', 'sejour'],
+    a: '<p>In <strong>What you offer</strong>, under “How long does a trip take?”, tap <strong>Several days</strong>. Shorter trips too? Pick the one most people book, and name the others in your story. Your price is the lowest per person, for whichever trip it is.</p>',
+    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, sous « Combien de temps dure une sortie? », touchez <strong>Plusieurs jours</strong>. Des sorties plus courtes aussi? Choisissez celle que la plupart des gens réservent, et nommez les autres dans votre histoire. Votre prix est le plus bas par personne, peu importe la sortie.</p>' },
+  { id: 'tour-meeting', pages: ['setup', 'edit'], over: ['address', 'arrival'],
+    q: 'Our office isn’t where people meet us', qFr: 'Notre bureau n’est pas là où l’on nous rejoint',
+    keys: ['meeting point', 'meeting spot', 'meet', 'where to meet', 'pick up', 'pickup', 'hotel pickup', 'shuttle', 'office', 'office address', 'check in', 'check-in', 'dock', 'marina', 'trailhead', 'staging area', 'base', 'different address', 'two locations'],
+    keysFr: ['point de rencontre', 'rencontre', 'ou se rencontrer', 'cueillette', 'navette', 'bureau', 'adresse du bureau', 'enregistrement', 'quai', 'marina', 'depart du sentier', 'deux endroits'],
+    a: '<p>Your address is where people go first. If they meet you somewhere else (the dock, a trailhead, the gondola base), put that address in <strong>Basics</strong>, and next time you’re there, use <strong>Where do people meet you?</strong> in “More about your place” to take one photo on the spot. The map then walks people right to it.</p><p>Hotel pickups? Say so under <strong>Good to know</strong>.</p>',
+    aFr: '<p>Votre adresse est l’endroit où l’on se rend d’abord. Si l’on vous rejoint ailleurs (le quai, le départ d’un sentier, la base de la télécabine), indiquez cette adresse dans <strong>L’essentiel</strong>, et la prochaine fois que vous y êtes, utilisez <strong>Où vous rejoint-on?</strong> dans « Plus sur votre entreprise » pour prendre une photo sur place. La carte y mène alors les gens.</p><p>Cueillette à l’hôtel? Dites-le sous <strong>Bon à savoir</strong>.</p>' },
+  { id: 'tour-gift', pages: ['setup', 'edit'], q: 'We sell gift cards', qFr: 'Nous vendons des cartes-cadeaux',
+    keys: ['gift card', 'gift cards', 'gift certificate', 'gift certificates', 'vouchers', 'voucher', 'gift'], keysFr: ['carte cadeau', 'cartes cadeaux', 'certificat cadeau', 'bon cadeau', 'cadeau'],
+    a: '<p>Say it in your story, in <strong>Your story and Known for</strong>, like <em>Gift cards make a great present: buy them on our website.</em> There’s no separate box for gift cards, to keep it short.</p>',
+    aFr: '<p>Dites-le dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Nos cartes-cadeaux font un beau présent : achetez-les sur notre site Web.</em> Il n’y a pas de case à part pour les cartes-cadeaux, pour rester court.</p>' },
+  { id: 'tour-groups', pages: ['setup', 'edit'], over: ['booking-link'], q: 'Groups and private bookings', qFr: 'Groupes et réservations privées',
+    keys: ['groups', 'group', 'big groups', 'group booking', 'private booking', 'private bookings', 'corporate', 'team building', 'school groups', 'weddings', 'bachelor', 'bachelorette', 'stag', 'buyout', 'whole boat', 'charter the boat'],
+    keysFr: ['groupes', 'groupe', 'grands groupes', 'reservation de groupe', 'reservation privee', 'entreprise', 'consolidation d equipe', 'groupes scolaires', 'mariages', 'enterrement de vie'],
+    a: '<p>Open <strong>Groups and private bookings</strong> in “More about your place”. Tap a size (“Groups of 10 or more: please book ahead”) and add a line in your own words, like <em>Private charters for up to 12. Team building on request.</em> Your booking link box is on the same screen.</p><p>A private tour price goes in <strong>Price</strong>.</p>',
+    aFr: '<p>Ouvrez <strong>Groupes et réservations privées</strong> dans « Plus sur votre entreprise ». Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Sorties privées jusqu’à 12 personnes. Activités d’équipe sur demande.</em> La case de votre lien de réservation est sur le même écran.</p><p>Le prix d’une visite privée va dans <strong>Prix</strong>.</p>' },
+  // The tour version of the setup's "how long until it shows" (it replaces the general one, which names happy hour).
+  { id: 'setup-live-when', pages: ['setup'], over: ['easy-setup', 'live-speed', 'photos-when', 'photo-pending', 'cost'], noRelated: ['cost'],
+    q: 'How long until it shows on my page?', qFr: 'Combien de temps avant que ce soit sur ma page?',
+    keys: ['how long until it shows', 'how long until', 'how long till', 'until it shows', 'how long does it take', 'when will it show', 'when does it show', 'when will this show', 'when is it live', 'when does it go live', 'go live', 'goes live', 'show on my page', 'show up on my page', 'not showing', 'still not showing', 'how soon', 'how fast', 'right away', 'is it live'],
+    keysFr: ['combien de temps', 'quand est ce que ca paraitra', 'en ligne quand', 'pas encore en ligne', 'ca ne parait pas', 'tout de suite'],
+    a: '<p>Most answers are on your page as soon as you see <strong>Saved ✓</strong>: your hours and season, the kind of tour, how long, booking ahead, who can come and your price (up to $1,000). Photos, your story, a new address, website or booking link, and a price over $1,000 are checked first and show <strong>within a day</strong>.</p>',
+    aFr: '<p>La plupart des réponses sont sur votre page dès que vous voyez <strong>Enregistré ✓</strong> : vos heures et votre saison, le genre d’activité, la durée, la réservation à l’avance, qui peut venir et votre prix (jusqu’à 1 000 $). Les photos, votre histoire, une nouvelle adresse, un nouveau site Web ou lien de réservation, et un prix de plus de 1 000 $ sont vérifiés d’abord et s’affichent <strong>d’ici un jour</strong>.</p>' },
+  { id: 'tour-free', pages: ['setup', 'edit'], over: ['cost'], q: 'Is this free? Do you take a booking fee?', qFr: 'Est-ce gratuit? Prenez-vous des frais de réservation?',
+    keys: ['free', 'is this free', 'cost me', 'fee', 'fees', 'booking fee', 'commission', 'commissions', 'pay', 'charge', 'subscription', 'how much does this cost', 'catch'],
+    keysFr: ['gratuit', 'est ce gratuit', 'frais', 'frais de reservation', 'commission', 'payer', 'abonnement', 'combien ca coute'],
+    a: '<p>Yes, it’s free. No cost, ever, and no commission: people book with you directly, through your own booking link or by phone. We never take a cut.</p>',
+    aFr: '<p>Oui, c’est gratuit. Aucuns frais, jamais, et aucune commission : les gens réservent directement chez vous, par votre propre lien de réservation ou par téléphone. Nous ne prenons jamais de pourcentage.</p>' },
+];
 const WINERY_SETUP_HELP_TOPICS = [
   HH_TIMES_EDIT_ONLY_HELP_TOPIC,
   SETUP_NO_WEBSITE_HELP_TOPIC,
@@ -55518,7 +55896,7 @@ function helpHereInSetup(t) {
 // base ones, as the setup page lays them), so a help answer names the step as the owner sees it.
 function setupLabelsFor(venue, lang) {
   const S0 = OWNER_SETUP_STRINGS[lang === 'fr' ? 'fr' : 'en'];
-  const type = venue.type, over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : '';
+  const type = venue.type, over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : type === 'tour' ? 'tour' : '';
   const o = over ? S0[over] || {} : {}, ck = type === 'cocktail' ? (S0.pub.cocktail || {}) : {};
   let kind = {};
   try { const bk = brewSetupType(type) ? brewSetupKind(venue) : ''; kind = (bk === 'Distillery' ? o.kindDistillery : bk === 'Cidery' ? o.kindCidery : null) || {}; } catch (e) { kind = {}; }
@@ -55621,6 +55999,51 @@ function betweenSecondTimeWords(t) {
   return { ...t, a: fix(t.a), aFr: fix(t.aFr) };
 }
 // A tasting fee over $75 the owner sent that is still waiting for our check (a number), or null.
+// Tours (2026-11-16): a price per person over $1,000 sent and waiting for our check, or null.
+function ownerTourPriceWaiting(venueId) {
+  try {
+    for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
+      const c = JSON.parse(w.changes);
+      if (c && 'tour_price' in c) return typeof c.tour_price === 'number' ? c.tour_price : null;
+    }
+  } catch (e) { /* none */ }
+  return null;
+}
+// Tours (2026-11-16): research's starting price ("From $129" on the card, or a "$129" in the Prices line), offered as a
+// suggestion the operator checks ("We picked this from your page"), never saved by itself. null when there is none.
+function tourResearchPrice(venue) {
+  const e = CARD_PRICES[String(venue.id)]; if (e && !e.owner && Number(e.from) > 0) return Number(e.from);
+  const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+  const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?)$/i.test(x.label) && !mine.has(x.label));
+  const m = r && /\$\s?(\d{1,2},?\d{3}|\d{1,4})(?:\.00)?(?!\d|[.,]\d)/.exec(String(r.text || ''));
+  return m && Number(m[1].replace(',', '')) > 0 ? Number(m[1].replace(',', '')) : null;
+}
+// Tours: research's "Time needed" line as a length chip ("2 to 3 hours" -> '2-3h'), a suggestion only. '' when none fits.
+function tourResearchLength(venue) {
+  const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+  const r = (info.rows || []).find((x) => x && x.label === 'Time needed' && !mine.has(x.label));
+  const t = r ? String(r.text || '').toLowerCase() : '';
+  if (!t) return '';
+  if (/\b(?:multi|several|\d+)[- ]days?\b|overnight|nights?\b/.test(t)) return 'multi';
+  if (/full[- ]day|all day|\b(?:6|7|8|9|10)\s*(?:to|-|–)?\s*\d*\s*hours?/.test(t)) return 'full';
+  if (/half[- ]day|\b(?:4|5)\s*(?:to|-|–)?\s*\d*\s*hours?|\b3\s*(?:to|-|–)\s*4\s*hours?/.test(t)) return 'half';
+  if (/\b(?:2|3)\s*(?:to|-|–|or)?\s*\d*\s*hours?|\b(?:90|120)\s*min/.test(t)) return '2-3h';
+  if (/\b(?:1|one)\s*hours?\b|\b(?:45|60)\s*min/.test(t)) return '1h';
+  return '';
+}
+// Tours: the kinds of tour research's words name ("Snowmobile & dog sled tours" -> snowmobile, dogsled), up to 3, as the
+// What you offer screen's starting picks ("We picked these from your page"). Saved only when the owner taps Save.
+const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|sled tours?\b|\bsleds?\b/], ['dogsled', /dog ?sled/], ['jetboat', /jet ?boat/],
+  ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
+  ['bike', /\bbike|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
+  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['adventure', /bungee|climb|via ferrata|canyon|atv|rzr|paraglid|skydiv/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
+  ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard/], ['rentals', /rentals?/]];
+function tourKindSuggestion(venue) {
+  const t = `${venue.cuisine || ''} ${venue.name || ''}`.toLowerCase();
+  const out = [];
+  for (const [k, re] of TOUR_KIND_HINTS) if (re.test(t) && !out.includes(k)) out.push(k);
+  return out.slice(0, TOUR_KINDS_MAX);
+}
 function ownerTastingFeeWaiting(venueId) {
   try {
     for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
@@ -57748,6 +58171,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Café test 2 (Whistler, 2026-11-15): a place that can't have a happy hour (a café that serves no alcohol…) is never
   // offered a happy hour topic as a next thing to read, and no other answer brings happy hour up. Asking about happy hour
   // itself still gets its answer.
+  // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
+  if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   if (opts.noHappyHour) {
     const isHh = (t) => HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`);
     cfg.noChip = cfg.topics.filter(isHh).map((t) => t.id);
@@ -59366,6 +59791,28 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         applied.push(field);
         continue;
       }
+      // Tour answers (2026-11-16): the stored answers become exactly these (an Undo writes the old ones back), the price is
+      // kept. The price per person: stored with them and laid over the card price ("From $129"). Either way the Plan your
+      // visit lines they write follow (writeTourVisitRows). The kinds also write venues.cuisine (writeVenueTourInfo).
+      if (field === 'tour_info' || field === 'tour_price') {
+        const all = venueTourInfo(venue.id);
+        const before = field === 'tour_info' ? tourInfoAnswers(venue.id) : tourPrice(venue.id);
+        if (field === 'tour_info') {
+          const v = value && typeof value === 'object' ? value : {};
+          writeVenueTourInfo(venue.id, { ...Object.fromEntries(TOUR_INFO_PARTS.filter((k) => v[k] != null).map((k) => [k, v[k]])), ...(typeof all.price === 'number' ? { price: all.price } : {}) });
+        } else {
+          const p = typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+          writeVenueTourInfo(venue.id, { ...tourInfoAnswers(venue.id), ...(p != null ? { price: p } : {}) });
+          tourCardPrice(venue.id);
+        }
+        const after = field === 'tour_info' ? tourInfoAnswers(venue.id) : tourPrice(venue.id);
+        if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, field, before == null ? null : JSON.stringify(before), after == null ? null : JSON.stringify(after), meta.reason, meta.batch_id, reviewer);
+        try { const vc = db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(venue.id); if (vc) venue.cuisine = vc.cuisine; } catch (e) { /* keep */ }
+        const w = writeTourVisitRows(venue.id, now);
+        if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       // Brewery answers (2026-11-12): the stored answers become exactly these (an Undo writes the old ones back), the price
       // is kept. The flight price: stored with them and laid over the card price. "We don't do flights" takes the card
       // price off. Either way the Plan your visit lines they write follow (writeBreweryVisitRows).
@@ -59619,6 +60066,15 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         VALUES (?, 'visit_info', ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`).run(venue.id, w.before, w.after, meta.reason, meta.batch_id, reviewer);
     } catch (e) { console.error(`[owner-portal] brewery lines for #${venue.id} failed: ${e.message}`); }
   }
+  // Tours (2026-11-16): the Season line follows the season saved on the Hours step (open_months), so a save of it (or an
+  // Undo) rewrites the answers' lines (nothing changes when they already say it).
+  if (venue.type === 'tour' && ['open_months', 'hours', 'hours_seasons'].some((f) => chosen.includes(f))) {
+    try {
+      const w = writeTourVisitRows(venue.id, now);
+      if (w.before !== w.after) db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, 'visit_info', ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`).run(venue.id, w.before, w.after, meta.reason, meta.batch_id, reviewer);
+    } catch (e) { console.error(`[owner-portal] tour lines for #${venue.id} failed: ${e.message}`); }
+  }
   return { ok: true, applied, listing };
 }
 
@@ -59626,7 +60082,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price', 'tour_info', 'tour_price']);
 // Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
 // address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
 // "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
@@ -59643,10 +60099,10 @@ const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'descript
 // Their two links ('cafe_links') still wait for our check.
 // Wineries (2026-11-12): their answers, and the tasting fee from $0 to $75 (Decided 1: it is already public on most cards,
 // like the phone). A higher fee waits for our check (ownerFieldInstantValue).
-const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price']);
+const OWNER_LINK_INSTANT_FIELDS = new Set(['avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows', 'instagram_url', 'facebook_url', 'tiktok_url', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price', 'tour_info', 'tour_price']);
 // A field whose value decides whether it may go live: a tasting fee over TASTING_FEE_LIVE_MAX always waits for our check,
 // and a brewery's flight price over FLIGHT_FEE_LIVE_MAX (Decided 1, 2026-11-12).
-function ownerFieldInstantValue(field, value) { return !(field === 'cocktail_price' && typeof value === 'number' && value > COCKTAIL_PRICE_LIVE_MAX) && !(field === 'tasting_fee' && typeof value === 'number' && value > TASTING_FEE_LIVE_MAX) && !(field === 'flight_fee' && typeof value === 'number' && value > FLIGHT_FEE_LIVE_MAX); }
+function ownerFieldInstantValue(field, value) { return !(field === 'tour_price' && typeof value === 'number' && value > TOUR_PRICE_LIVE_MAX) && !(field === 'cocktail_price' && typeof value === 'number' && value > COCKTAIL_PRICE_LIVE_MAX) && !(field === 'tasting_fee' && typeof value === 'number' && value > TASTING_FEE_LIVE_MAX) && !(field === 'flight_fee' && typeof value === 'number' && value > FLIGHT_FEE_LIVE_MAX); }
 // Full easy setup (Dayton, 2026-11-09): sent from the setup flow (from_setup: true) by a restaurant, these also go live
 // from the edit link: the business's hours, season, seasonal hours, closures, the badge tiles, happy hour (times and
 // deals), weekly specials and weekly events. They carry no link, name or address; each is logged, in "Your updates",
@@ -59655,7 +60111,7 @@ function ownerFieldInstantValue(field, value) { return !(field === 'cocktail_pri
 // Phone (pub test 3, 2026-11-10) too: the old number stayed on the public "Call" button until someone reviewed the change.
 // Only a real North American number passes from the setup (ownerNanpPhone), and like every instant save it is logged with
 // the number it replaced, in "Your updates", with Undo.
-const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'brewery_info', 'phone']);
+const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'brewery_info', 'tour_info', 'phone']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -59675,7 +60131,7 @@ function ownerFieldEquals(field, a, b) {
   // Winery test 1 (2026-11-12): the winery answers are stored in WINERY_INFO_PARTS order, the request in the order the
   // owner's saves merged them ("year" before "food"): compared with sorted keys, so an Undo of a winery answer works.
   if (field === 'winery_info') { const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v)); return canon(a || {}) === canon(b || {}); }
-  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links' || field === 'brewery_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  if (field === 'pub_info' || field === 'cafe_info' || field === 'cafe_links' || field === 'brewery_info' || field === 'tour_info') return JSON.stringify(a || {}) === JSON.stringify(b || {});
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -60713,7 +61169,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', description_fr: 'Description en français', badges: 'Caractéristiques', happy_hour: '5 à 7',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du 5 à 7', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
-  pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix de la palette de dégustation', cocktail_price: 'Prix d’un cocktail' };
+  pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix de la palette de dégustation', cocktail_price: 'Prix d’un cocktail', tour_info: 'Réponses sur vos activités', tour_price: 'Prix par personne' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de 5 à 7'],
   specials: ['weekly specials', 'de spéciaux de la semaine'], entertainment: ['music or events', 'de musique ni d’événements'], pyv_reservations: ['reservations', 'de réservations'],
@@ -61368,9 +61824,10 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 // "Your page is X% complete" (2026-11-08): restaurants only for now; other types add their own item tables later.
 // Owner portal only, never public, never read by ranking, sorting or indexing.
 // Pubs since 2026-11-10 (their own item list, portal-completeness.js PUB_ITEMS).
-const COMPLETENESS_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail']);
+// Tours (Dayton, 2026-11-16: "build the tours setup"): tour operators get the easy setup and the % checklist too.
+const COMPLETENESS_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'tour']);
 // The menu page's "Just add a link to your menu" (final fresh-eyes 2026-11-09): the same types as the completeness bar.
-const MENU_LINK_TYPES = COMPLETENESS_TYPES;
+const MENU_LINK_TYPES = new Set([...COMPLETENESS_TYPES].filter((t) => t !== 'tour'));
 // Cuisine picker and "These hours are right" (2026-11-08): their styles and page script (restaurants only).
 const OWNER_CUISINE_HOURS_CSS = `
     body.owner-page #ofProgress.op-ok { color: #1E6B3A; font-weight: 800; }
@@ -61641,6 +62098,11 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     ...(brewSetupType(venue.type) ? { placeType: venue.type === 'distillery' ? 'Distillery' : venuePlaceType(venue), wordsKind: breweryWordsKind(venue), openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
       breweryInfo: live.brewery_info || breweryInfoAnswers(venue.id), flightFee: 'flight_fee' in live ? live.flight_fee : breweryFlightFee(venue.id),
       dogFriendly: !!venue.dog_friendly,
+      offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
+    // Tours (2026-11-16): the season answer, the tour's own answers and price per person, and whether "Who can come" was
+    // saved in the setup (wheelchair / parking then counts as answered).
+    ...(venue.type === 'tour' ? { openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
+      tourInfo: live.tour_info || tourInfoAnswers(venue.id), tourPrice: 'tour_price' in live ? live.tour_price : tourPrice(venue.id),
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };
@@ -62008,7 +62470,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // Save (live at once, like before). An old off-list label already on the page stays picked until the owner removes it.
   const cuisineHtml = () => {
     // Wineries (2026-11-12): no food picker; the kind of winery is asked in the setup ("Your winery").
-    if (!completeOn || venue.type === 'winery') return '';
+    // Tours (2026-11-16): no food picker; the kind of tour is asked in the setup ("What you offer").
+    if (!completeOn || venue.type === 'winery' || venue.type === 'tour') return '';
     // Distillery test 3 (2026-11-13): no "What you serve" food picker for a distillery (its Food line comes from the setup),
     // nor for a brewery without its own kitchen (its kind is asked in the setup).
     if (venue.type === 'distillery' || (venue.type === 'brewery' && ((snap.brewery_info || {}).food || '') !== 'kitchen')) return '';
@@ -62068,8 +62531,15 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     // answers (writeBreweryVisitRows), so they show as they read on the page, with a link to change the answer.
     const brew = brewSetupType(venue.type);
     // Cocktail lounges (2026-11-13): the restaurant boxes without Takeout (not asked of lounges); Groups is its own line.
-    const editKeys = venue.type === 'cocktail' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'takeout') : venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : venue.type === 'winery' ? ['known_for'] : brew ? ['known_for', 'groups', 'dogs'] : OWNER_VISIT_EDIT_KEYS;
-    const answerLines = brew ? (() => {
+    const editKeys = venue.type === 'cocktail' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'takeout') : venue.type === 'cafe' ? OWNER_VISIT_EDIT_KEYS.filter((k) => k !== 'reservations' && k !== 'takeout') : venue.type === 'winery' ? ['known_for'] : brew ? ['known_for', 'groups', 'dogs'] : venue.type === 'tour' ? ['known_for', 'groups', 'good_to_know'] : OWNER_VISIT_EDIT_KEYS;
+    // Tours (2026-11-16): the Season, Time needed, Prices, Ages and Booking lines come from the setup answers
+    // (writeTourVisitRows), shown as they read on the page.
+    const answerLines = venue.type === 'tour' ? (() => {
+      const box = venueVisitInfo(venue.id) || {};
+      const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
+      const mine = new Set(box.winery_labels || []);
+      return TOUR_MANAGED_LABELS.filter((l) => mine.has(l)).map((l) => { const r = rows.find((x) => x && x.label === l && x.text); return { label: fr ? visitLabelFr(l) : l, text: r ? ((fr && ownerFrLineText(box, r)) || r.text) : '' }; });
+    })() : brew ? (() => {
       const box = venueVisitInfo(venue.id) || {};
       const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
       const pick = (labels) => labels.map((l) => rows.find((r) => r && r.label === l && r.text)).find(Boolean);
@@ -62084,7 +62554,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     })() : [];
     // Cocktail test 1 (2026-11-13): research's Menu line (and a lounge's Good to know) can be changed here; shown when there
     // is one (always for a lounge), never counted.
-    const extraKeys = brew || venue.type === 'winery' ? [] : venue.type === 'cocktail' ? ['menu', 'good_to_know'] : cur.menu ? ['menu'] : [];
+    const extraKeys = brew || venue.type === 'winery' || venue.type === 'tour' ? [] : venue.type === 'cocktail' ? ['menu', 'good_to_know'] : cur.menu ? ['menu'] : [];
     const countKeys = cur.dogs ? editKeys.filter((k) => k !== 'dogs').concat(['dogs']) : editKeys.filter((k) => k !== 'dogs');
     const filled = countKeys.filter((k) => cur[k]).length + answerLines.filter((x) => x.text).length;
     const countAll = countKeys.length + answerLines.length;
@@ -63851,7 +64321,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour', ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }
@@ -69123,6 +69593,7 @@ module.exports = {
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
+  TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,
   PUB_SETUP_PART1, PUB_SETUP_PART2, PUB_SETUP_HELP_TOPICS, HH_TIMES_HELP_TOPIC, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,

@@ -400,6 +400,12 @@ function t3FrenchTextCore(value){
  text=text.replace(/^By appointment, from the listing: “(.+)” Book ahead\.$/,(_,q)=>'Sur rendez-vous, selon la fiche (texte original) : « '+q+' » Réservez à l’avance.');
  text=text.replace(/^By appointment only \(the winery’s own answer\)\. Book ahead\.$/,'Sur rendez-vous seulement (réponse du vignoble). Réservez à l’avance.');
  text=text.replace(/^By appointment only \(the distillery’s own answer\)\. Book ahead\.$/,'Sur rendez-vous seulement (réponse de la distillerie). Réservez à l’avance.');
+ // Tours (2026-11-16): the operator's own book-ahead and age answers.
+ text=text.replace(/^Same-day bookings are often fine \(the operator’s own answer\)\. Call ahead for the times\.$/,'Réserver le jour même convient souvent (réponse de l’entreprise). Appelez pour connaître les heures.');
+ text=text.replace(/^Book at least a day ahead \(the operator’s own answer\)\.$/,'Réservez au moins la veille (réponse de l’entreprise).');
+ text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');
+ text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
+ text=text.replace(/^Ages 6 and up \(the operator’s own answer\)\.$/,'À partir de 6 ans (réponse de l’entreprise).');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.
  text=text.replace(/^Kids are welcome until (\d{1,2}(?::\d{2})? [AP]M|midnight) only$/,(_,t)=>'Enfants bienvenus jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+' seulement');
  text=text.replace(/^Kids welcome with an adult until (\d{1,2}(?::\d{2})? [AP]M|midnight)(, so plan to leave by then)?$/,(_,t,late)=>'Enfants bienvenus avec un adulte jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+(late?'; prévoyez de partir avant':''));

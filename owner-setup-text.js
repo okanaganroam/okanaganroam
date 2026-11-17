@@ -1775,6 +1775,132 @@ function frSpacing(t) {
     // Cocktail test 2 (2026-11-13): « 15 $ » never wraps before the sign either.
     .replace(/(\d|\})[ \u202f]\$/g, '$1\u00a0$');
 }
+// Tours and guided experiences (Dayton, 2026-11-16: "build the tours setup"): tour words and the tour-only screens (What you
+// offer, Price, Booking, Good to know, and the minimum age on Who can come), laid over the words above for a tour's setup
+// (server.js renderOwnerSetupPage). Holidays end the Hours step and Instagram and Facebook are one screen, as for wineries.
+// The story and Groups screens are the brewery's (Known for on the story screen; the booking link on Groups).
+en.tour = {
+  hiLead: 'Let’s get your tour page ready, one question at a time. About 10 to 20 minutes. You can stop any time and carry on later.',
+  timeLine: 'About 10 to 20 minutes. You can stop any time and carry on later.',
+  labels: { basics: 'Address, phone and website', hours: 'When you run', tour: 'What you offer', price: 'Price', booking: 'Booking', offer: 'Who can come', photos: 'Photos',
+    story: 'Your story and Known for', bring: 'Good to know', groups: 'Groups and private bookings', social: 'Instagram and Facebook', door: 'Where do people meet you?' },
+  noLabels: { social: 'not on Instagram or Facebook', groups: 'no big groups', booking: 'no online bookings' },
+  stStoryKnown: 'Known for on your page, story within a day', stGroupsLink: 'on your page, new booking link within a day',
+  basicsQ: 'Is this where people meet you, and your phone and website?',
+  photosLead: 'Your trips, your guides, your guests having fun. Three photos is perfect.', photosNoMore: 'No, I’m done with photos',
+  // When you run (the Hours step)
+  allYearClosed: 'We only run part of the year', allYearClosedSub: 'Like a winter season, December to April. You pick the dates.',
+  hoursQ: 'Are these still your hours?', needOpenDayAppt: 'Please set at least one day you run. No set hours? Tap “We don’t have set hours” below.',
+  noSetHours: 'We don’t have set hours. Trips are by booking only', noSetHoursNow: 'No set hours. Trips are by booking only ✓',
+  noSetHoursSaved: 'Your old weekly hours are off your page. It says “Book ahead · tours by reservation”.',
+  // What you offer
+  tkindQ: 'What do you offer?', tkindLead: 'Pick up to 3. They show on your card and help Build My Trip find you.',
+  tkindNeed: 'Please tap the kind of tour you run (up to 3).', tkindMax: 'Up to 3. Tap one you picked to take it off first.',
+  tlengthQ: 'How long does a trip take?', tlengths: { '1h': 'About 1 hour', '2-3h': '2 to 3 hours', half: 'Half a day', full: 'A full day', multi: 'Several days' },
+  tlengthNeed: 'Please tap how long a trip takes. More than one? Pick the one most people book.',
+  guessCheck: 'We picked this from your page. Check it, and tap another if it’s changed.',
+  kindsGuess: 'We picked these from your page. Check them: tap to change.', tpriceGuess: 'We picked this from your page. Check it, and type the new price if it’s changed.',
+  // Price
+  tpriceQ: 'What does it cost per person?', tpriceLead: 'Your lowest price for one adult. It shows on your card as “From $X”.', tpriceLeadPick: 'Your card will say “From {x}”.',
+  tpriceLabel: 'Price per person, in dollars', tpriceOver: 'A price over ${n} is checked first and shows within a day.', tpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.',
+  tprivQ: 'Private tours? (optional)', tprivLead: 'The price for a private trip, for the whole group. Leave it empty if you don’t run them.', tprivLabel: 'Private tours from, in dollars',
+  tpriceNeed: 'Please type your price per person in dollars, like 129.', tprivNeed: 'Please type the private tour price in dollars, like 900, or leave it empty.',
+  tpriceSavedLive: 'Your price is on your page and your card now.', tpriceSavedDay: 'We check prices over $1,000 first. It’ll show within a day.', tpriceCard: 'From {x}',
+  // Booking
+  tbookQ: 'How do people book?', tbookLead: 'Your booking link puts a Book button on your page.',
+  bookLinkLabel: 'Booking link', bookLinkEx: 'your website’s booking page, or your FareHarbor or Rezdy page', noBookLink: 'We don’t take bookings online',
+  bookLinkBad: 'Please check the booking link, for example yourtours.com/book.',
+  taheadQ: 'Do people need to book ahead?', taheadYesNo: { yes: 'Yes', no: 'No, people can just come by' }, taheadHow: 'How far ahead?',
+  taheads: { same_day: 'Same day is fine', day: 'A day ahead', week: 'A week ahead' },
+  taheadNeed: 'Please tap how far ahead people should book.', tbookNeed: 'Please add your booking link, or answer “Do people need to book ahead?”.',
+  tbookSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
+  // Who can come
+  offerQ: 'Who can come?', offerLead: 'Families and dog owners check this before they book.',
+  tageQ: 'From what age?', tages: { all: 'All ages', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  tageNeed: 'Please tap the youngest age you take (or All ages).',
+  // Good to know
+  bringQ: 'Good to know', bringLead: 'What should people bring or wear? Anything about the weather? One or two lines.',
+  bringEx: 'Dress warm: we supply helmets and gloves. We call you if the weather cancels a trip.',
+  bringNeed: 'Please type a line, or tap one of the answers above.', bringNoLink: 'Please leave links out of this line. Your booking link has its own box on Booking.',
+  // Your story and Known for
+  storyQ: 'Tell visitors about your tours', storyEx: 'A family-run outfitter since 1998. Small groups, local guides, and hot chocolate at the top.',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit” and on your card.', knownEx: 'Small groups and the best views of the valley',
+  storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
+  // Groups and private bookings
+  groupsQ: 'Groups: from what size should they book ahead?', groupsLead: 'Tap a size, then add private tours or team outings in your own words.',
+  groupsEx: 'Groups of 10 or more: please book ahead. Private charters for up to 12', groupsLine: 'Groups of {n} or more: please book ahead',
+  quickGroups: ['Groups of 8 or more: please book ahead', 'Groups of 10 or more: please book ahead', 'Groups of 12 or more: please book ahead', 'Groups of 15 or more: please book ahead', 'Groups of 20 or more: please book ahead'],
+  groupsLineLabel: 'Your Groups line', groupsNone: 'We can’t take big groups', groupsNeed: 'Please tap a size or type a line, or tap “We can’t take big groups”.',
+  groupsNoLink: 'Please leave links out of the Groups line. Your booking link has its own box below.', groupsSavedLink: 'Your Groups line is on your page now. We check a new booking link first, usually within a day.',
+  // Instagram and Facebook on one screen, and the hours line on the holidays screen
+  socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.', socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
+  hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.', igLead: 'Type your Instagram name, like @yourtours.',
+  // Where do people meet you?
+  doorQ: 'Where do people meet you?', doorLead: 'The office, the dock, the trailhead: wherever people check in. One photo, taken right there, walks visitors to the spot.',
+  doorHere: 'Are you at your meeting spot right now?', mapFailQ: 'Send a photo of your meeting spot',
+  doorPhotoQ: 'Take a photo of your meeting spot', doorPhotoLead: 'Stand where people meet you, with your sign or vehicle in the picture if you can. Your device will ask to share your location, so visitors get directions to this spot.',
+};
+fr.tour = {
+  hiLead: 'Préparons la page de vos activités, une question à la fois. Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  timeLine: 'Environ 10 à 20 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  labels: { basics: 'Adresse, téléphone et site Web', hours: 'Quand vous partez', tour: 'Ce que vous offrez', price: 'Prix', booking: 'Réservations', offer: 'Qui peut venir', photos: 'Photos',
+    story: 'Votre histoire et ce pour quoi vous êtes connus', bring: 'Bon à savoir', groups: 'Groupes et réservations privées', social: 'Instagram et Facebook', door: 'Où vous rejoint-on?' },
+  noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', booking: 'pas de réservations en ligne' },
+  stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
+  basicsQ: 'Est-ce là qu’on vous rejoint, et sont-ce vos téléphone et site Web?',
+  photosLead: 'Vos sorties, vos guides, vos clients qui s’amusent. Trois photos, c’est parfait.', photosNoMore: 'Non, j’ai fini les photos',
+  allYearClosed: 'Nous ne partons qu’une partie de l’année', allYearClosedSub: 'Par exemple une saison d’hiver, de décembre à avril. Vous choisissez les dates.',
+  hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour où vous partez. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
+  noSetHours: 'Nous n’avons pas d’heures fixes. Sorties sur réservation seulement', noSetHoursNow: 'Pas d’heures fixes. Sorties sur réservation seulement ✓',
+  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Réservez à l’avance · visites sur réservation ».',
+  tkindQ: 'Qu’offrez-vous?', tkindLead: 'Choisissez-en jusqu’à 3. Ils paraissent sur votre fiche et aident Planifier mon voyage à vous trouver.',
+  tkindNeed: 'Touchez le genre d’activité que vous offrez (jusqu’à 3).', tkindMax: 'Jusqu’à 3. Touchez d’abord un choix pour le retirer.',
+  tlengthQ: 'Combien de temps dure une sortie?', tlengths: { '1h': 'Environ 1 heure', '2-3h': '2 à 3 heures', half: 'Une demi-journée', full: 'Une journée complète', multi: 'Plusieurs jours' },
+  tlengthNeed: 'Touchez la durée d’une sortie. Plusieurs? Choisissez celle que la plupart des gens réservent.',
+  guessCheck: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et touchez-en un autre s’il a changé.',
+  kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et écrivez le nouveau prix s’il a changé.',
+  tpriceQ: 'Combien coûte-t-elle par personne?', tpriceLead: 'Votre prix le plus bas pour un adulte. Il paraît sur votre fiche : « À partir de X $ ».', tpriceLeadPick: 'Votre fiche indiquera « À partir de {x} ».',
+  tpriceLabel: 'Prix par personne, en dollars', tpriceOver: 'Un prix de plus de {n} $ est vérifié d’abord et s’affiche d’ici un jour.', tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.',
+  tprivQ: 'Visites privées? (facultatif)', tprivLead: 'Le prix d’une sortie privée, pour tout le groupe. Laissez vide si vous n’en offrez pas.', tprivLabel: 'Visites privées à partir de, en dollars',
+  tpriceNeed: 'Écrivez votre prix par personne en dollars, par exemple 129.', tprivNeed: 'Écrivez le prix d’une visite privée en dollars, par exemple 900, ou laissez vide.',
+  tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions d’abord les prix de plus de 1 000 $. Il s’affichera d’ici un jour.', tpriceCard: 'À partir de {x}',
+  tbookQ: 'Comment réserve-t-on?', tbookLead: 'Votre lien de réservation ajoute un bouton Réserver à votre page.',
+  bookLinkLabel: 'Lien de réservation', bookLinkEx: 'la page de réservation de votre site, ou votre page FareHarbor ou Rezdy', noBookLink: 'Nous ne prenons pas de réservations en ligne',
+  bookLinkBad: 'Vérifiez le lien de réservation, par exemple vosactivites.com/reserver.',
+  taheadQ: 'Faut-il réserver à l’avance?', taheadYesNo: { yes: 'Oui', no: 'Non, on peut simplement passer' }, taheadHow: 'Combien de temps à l’avance?',
+  taheads: { same_day: 'Le jour même, c’est correct', day: 'La veille', week: 'Une semaine à l’avance' },
+  taheadNeed: 'Touchez combien de temps à l’avance réserver.', tbookNeed: 'Ajoutez votre lien de réservation, ou répondez à « Faut-il réserver à l’avance? ».',
+  tbookSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
+  offerQ: 'Qui peut venir?', offerLead: 'Les familles et les propriétaires de chiens le vérifient avant de réserver.',
+  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
+  bringQ: 'Bon à savoir', bringLead: 'Quoi apporter ou porter? Quelque chose à savoir sur la météo? Une ou deux lignes.',
+  bringEx: 'Habillez-vous chaudement : nous fournissons casques et gants. Nous vous appelons si la météo annule une sortie.',
+  bringNeed: 'Écrivez une ligne, ou touchez une des réponses plus haut.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre lien de réservation a sa propre case dans Réservations.',
+  storyQ: 'Parlez de vos activités aux visiteurs', storyEx: 'Une entreprise familiale depuis 1998. Petits groupes, guides d’ici, et chocolat chaud au sommet.',
+  knownQ: 'Pour quoi êtes-vous reconnus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite » et sur votre fiche.', knownEx: 'Petits groupes et les plus belles vues de la vallée',
+  storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  groupsQ: 'Groupes : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les sorties privées ou d’équipe dans vos mots.',
+  groupsEx: 'Groupes de 10 personnes ou plus : réservez à l’avance. Sorties privées jusqu’à 12 personnes', groupsLine: 'Groupes de {n} personnes ou plus : réservez à l’avance',
+  quickGroups: ['Groupes de 8 personnes ou plus : réservez à l’avance', 'Groupes de 10 personnes ou plus : réservez à l’avance', 'Groupes de 12 personnes ou plus : réservez à l’avance', 'Groupes de 15 personnes ou plus : réservez à l’avance', 'Groupes de 20 personnes ou plus : réservez à l’avance'],
+  groupsLineLabel: 'Votre ligne Groupes', groupsNone: 'Nous ne pouvons pas accueillir de grands groupes', groupsNeed: 'Touchez une taille ou écrivez une ligne, ou touchez « Nous ne pouvons pas accueillir de grands groupes ».',
+  groupsNoLink: 'Gardez les liens hors de la ligne Groupes. Votre lien de réservation a sa propre case plus bas.', groupsSavedLink: 'Votre ligne Groupes est sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
+  socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.', socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
+  hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.', igLead: 'Écrivez votre nom Instagram, comme @vosactivites.',
+  doorQ: 'Où vous rejoint-on?', doorLead: 'Le bureau, le quai, le départ du sentier : là où les gens se présentent. Une photo, prise sur place, y mène les visiteurs directement.',
+  doorHere: 'Êtes-vous à votre point de rencontre en ce moment?', mapFailQ: 'Envoyez une photo de votre point de rencontre',
+  doorPhotoQ: 'Prenez une photo de votre point de rencontre', doorPhotoLead: 'Placez-vous là où l’on vous rejoint, avec votre enseigne ou votre véhicule dans la photo si possible. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’ici.',
+};
+// Good to know quick answers (what to bring, the weather), and the Groups line's quick answers. Presets: the page shows
+// each in its own language (server.js presetAnswerMap pairs them by place).
+en.tour.quick = Object.assign({}, en.quick, {
+  good_to_know: ['Dress for the weather', 'Bring water and sunscreen', 'Wear closed-toe shoes', 'We supply the gear', 'Trips run rain or shine', 'We call you if the weather cancels a trip', 'Hotel pickup available'],
+  groups: ['Private tours available', 'Team outings on request', 'Call ahead for 10 or more'],
+});
+fr.tour.quick = Object.assign({}, fr.quick, {
+  good_to_know: ['Habillez-vous selon la météo', 'Apportez de l’eau et de la crème solaire', 'Portez des chaussures fermées', 'Nous fournissons l’équipement', 'Nous partons beau temps, mauvais temps', 'Nous vous appelons si la météo annule une sortie', 'Cueillette à l’hôtel offerte'],
+  groups: ['Visites privées offertes', 'Sorties d’équipe sur demande', 'Appelez à l’avance pour 10 personnes ou plus'],
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

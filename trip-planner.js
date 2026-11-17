@@ -136,6 +136,9 @@ function kidsAllowed(v) {
   // Cocktail lounges (Decided 4, 2026-11-13): the same rule; a lounge whose owner said Adults only (19+), or hasn't
   // answered, is never planned for a family (a researched kids badge alone never counts).
   if (v.type === 'cocktail') return v.ownerKidsWelcome === true;
+  // Tours (2026-11-16): the operator's own minimum age. All ages or 6+ is fine for a family; 12+, 16+ or 19+ never is
+  // (a kids trip doesn't say how old the kids are, so the safe read). Unanswered: as before.
+  if (v.type === 'tour' && v.tourMinAge) return v.tourMinAge === 'all' || v.tourMinAge === '6';
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
 // Brewery test 1 (2026-11-12): a brewery or pub whose owner said "minors with an adult until 9 PM" (v.kidsUntil, 'HH:MM').
@@ -1025,7 +1028,7 @@ function eligible(v, ctx, strict) {
   if (v.type === 'indoor' && /\blibrary\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:library|libraries|rain|rainy|raining|books?)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
-  if (ctx.kids && v.type === 'tour' && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
+  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6') && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
   if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
@@ -1638,6 +1641,14 @@ function coldMonthIceCream(v, date) {
   return (month >= 11 || month <= 3) && ICE_CREAM_RE.test(`${v.textName || normWords(v.name)} ${v.textCuisine || ''}`);
 }
 const TOUR_BOOKING_NOTE = 'Tours run at set times: book ahead with the operator and plan the day around the time you get.';
+// Tours (2026-11-16): the operator's own "book ahead" answer replaces the general note.
+const TOUR_BOOK_AHEAD_NOTES = {
+  same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
+  day: 'Book at least a day ahead (the operator’s own answer).',
+  week: 'Book at least a week ahead (the operator’s own answer).',
+  no: 'No need to book (the operator’s own answer).',
+};
+const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
 // Charters) is booked too, not a walk-in stop: it gets the booking note and is not a first pick for an open slot.
 const OUTFITTER_NAME_RE = /\b(?:adventures?|adventure company|charters?|outfitters?|rentals?|guided|guides?|tours?|expeditions?)\b/;
@@ -1850,7 +1861,9 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
-  if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
+  if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
+  else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
+  if (ctx && ctx.kids && v && v.type === 'tour' && v.tourMinAge === '6' && !caveats.includes(TOUR_AGE6_NOTE)) caveats.push(TOUR_AGE6_NOTE);
   if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
