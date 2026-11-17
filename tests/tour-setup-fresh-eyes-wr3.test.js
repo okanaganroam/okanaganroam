@@ -87,8 +87,25 @@ function karen() {
 
 test('1. Build My Trip: an owner’s "all year" (with a kind that isn’t a snow one) lifts the winter-words rule; research alone and snow-only companies keep it', async () => {
   const { v, t } = karen();
-  // Research only (no owner answer): the heli-skiing words still drop it from a July flight request.
-  assert.ok(!names(await plan('Scenic flight in Penticton on July 14 2027')).includes(K));
+  // Research only (no owner answer): the heli-skiing words still drop it from a general July tours request...
+  assert.ok(!names(await plan('tours in Penticton on July 14 2027')).includes(K));
+  // ...but (port of whistlerroam #184) its own category words name helicopter tours and heli-hiking, so a July request
+  // for exactly that keeps it.
+  assert.ok(names(await plan('Scenic flight in Penticton on July 14 2027')).includes(K));
+  assert.ok(names(await plan('Heli-hiking in Penticton on July 22 2027')).includes(K));
+  const vern = { region: 'vernon', address: '6300 Tronson Rd, Vernon', latitude: 50.25, longitude: -119.33 };
+  const drops = mk('tour', { name: 'Monashee Helicopter Wr3', cuisine: 'Heli-sightseeing, heli-hiking & heli-ski drops (ski touring November to July)', ...vern, description: 'Helicopter operator.' });
+  const touring = mk('tour', { name: 'Silver Star Helicopters Wr3', cuisine: 'Heli-assisted ski touring & heli-sightseeing', ...vern, latitude: 50.251, description: 'Helicopter charter.' });
+  const skiOnly = mk('tour', { name: 'Kalamalka Helicopters Wr3', cuisine: 'Heli-skiing', ...vern, latitude: 50.252, description: 'Heli-skiing days, and scenic flights on request.' });
+  const vf = names(await plan('Scenic flight in Vernon on July 14 2027'));
+  assert.ok(vf.includes(drops.name) && vf.includes(touring.name), JSON.stringify(vf));
+  // A company whose category words are only snow ones stays out, whatever its description says; and a general tours
+  // request, or a request for another kind, keeps the rule for all three.
+  assert.ok(!vf.includes(skiOnly.name), JSON.stringify(vf));
+  assert.ok(names(await plan('Heli-hiking in Vernon on July 22 2027')).includes(drops.name));
+  assert.ok(!names(await plan('Heli-hiking in Vernon on July 22 2027')).includes(touring.name));
+  for (const q of ['tours in Vernon on July 14 2027', 'rafting in Vernon on July 14 2027']) { const got = names(await plan(q)); assert.ok(![drops.name, touring.name, skiOnly.name].some((x) => got.includes(x)), `${q}: ${JSON.stringify(got)}`); }
+  assert.ok(tr.inferPlannerKinds({ type: 'tour', name: '', description: '', cuisine: 'Heli-sightseeing' }).includes('scenic_flight'));
   // She picks her kinds and answers "Yes, all year".
   ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
   assert.equal(app.tourPlannerFacts(v.id).tourYearAll, true);
@@ -124,6 +141,8 @@ test('2. planner words: helicopter, heli tour, flightseeing, French, heli-hiking
     assert.deepEqual(names(p), [K], `${q}: ${JSON.stringify(names(p))} ${JSON.stringify(p.warnings)}`);
     assert.match(String(p.summary), /^Tours & experiences in Penticton/, q);
     assert.doesNotMatch(JSON.stringify(p.warnings || []), /No (?:hike|outdoor|scenic flight)/, q);
+    // Port of whistlerroam #184: the helicopter words are used, so they are never listed as "not something we can plan around".
+    assert.doesNotMatch(JSON.stringify([p.unsupported || [], (p.understood || {}).notUsed || []]), /h[eé]licopt/i, q);
   }
   // Kids with an age: the tour's own age answer is said.
   const kid = await plan('heli hike in Penticton on July 22 2027 with our 10-year-old');
@@ -348,6 +367,11 @@ test('6. public category words: short page words per kind, never a side of a chi
 
 test('7. length: "Up to 1 hour" first, on the page too; research’s range starts on the shortest, with the usual note', async () => {
   assert.equal(text.en.tour.tlengths['1h'], 'Up to 1 hour');
+  // Port of whistlerroam #184: the finish screen's line under the % says tours, not "your place"; other types and French (no "place" word) as they were.
+  assert.equal(text.en.tour.pctRaise, 'Add more about your tours to raise it.');
+  assert.equal(text.en.pctRaise, 'Add more about your place to raise it.');
+  assert.equal(text.fr.tour.pctRaise, undefined);
+  assert.equal(text.fr.pctRaise, 'Ajoutez plus de détails pour l’augmenter.');
   assert.match(text.fr.tour.tlengths['1h'], /^Jusqu’à 1\sheure$/);
   assert.deepEqual(Object.keys(text.en.tour.tlengths), ['1h', '2-3h', 'half', 'full', 'multi']);
   const { v, t } = karen();

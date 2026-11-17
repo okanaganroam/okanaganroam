@@ -954,6 +954,19 @@ function ownerSeasonOpenOn(v, ctx) {
   const date = !iso(ctx.requirements && ctx.requirements.startDate) && ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, base) : base;
   return !seasonClosedOnTrip(v, { date });
 }
+// Port of whistlerroam #184 (tour test 3, 2026-11-17): a listing with no owner answer (research only) whose own category
+// words also name a kind that isn't a snow one, when the request asks for that kind: "Heli-sightseeing, heli-hiking &
+// heli-ski drops (ski touring November to July)" and "Heli-assisted ski touring & heli-sightseeing" were dropped from
+// every July scenic flight and heli-hiking request by their ski words. Its category words only (never its name or
+// description), and only for a request that asks for that kind: a general "tours in July" request and a snow-only
+// company keep the rule.
+const SNOW_PLANNER_KINDS = new Set(['snow_tour', 'snowmobile_tour']);
+function namesAskedOffSnowKind(v, ctx) {
+  const asked = ((ctx && ctx.plannerKinds) || []).filter((k) => !SNOW_PLANNER_KINDS.has(k));
+  if (!asked.length || !v || v.type !== 'tour' || !v.cuisine) return false;
+  const own = tripRequirements.inferPlannerKinds({ type: 'tour', name: '', description: '', cuisine: v.cuisine });
+  return asked.some((k) => own.includes(k));
+}
 function offSeasonBlocked(v, ctx) {
   if (namedInRequest(v, ctx) || (ctx.pinnedIds && ctx.pinnedIds.has(v.id))) return false;
   const m = tripMonthOf(ctx);
@@ -968,7 +981,7 @@ function offSeasonBlocked(v, ctx) {
     if (!inRange && !/\byear round\b/.test(sub)) return true;
   }
   // Winter-only tours: heli-skiing, cat-skiing, snowmobile, dog-sled and sleigh tours, ice fishing, ski touring courses.
-  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx)) return true;
+  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx) && !namesAskedOffSnowKind(v, ctx)) return true;
   // Summer-only tours: bike, rafting, sailing, paddling, kite and horseback tours, unless they say winter or year-round.
   if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m)) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;

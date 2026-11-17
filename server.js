@@ -8403,6 +8403,15 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
     const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { text: requirementsText, kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
+    // Port of whistlerroam #184 (tour test 3, 2026-11-17): "helicopter" and "helicopter tour" are on the old list of things
+    // the planner can't do, so a helicopter request planned its scenic flights and still said "Not something we can plan
+    // around yet: helicopter tour" (« tour d'hélicoptère » in French). Once the request is read as a scenic flight, those
+    // words are used.
+    if (((requirements && requirements.items) || []).some((i) => i.kind === 'venue_kind' && i.value === 'scenic_flight' && i.strength === 'must')) {
+      const heliWord = (u) => /h[eé]licopt[eè]res?\b|\bhelicopters?\b/i.test(String(u));
+      plan.unsupported = (plan.unsupported || []).filter((u) => !heliWord(u));
+      result.notUsed = (result.notUsed || []).filter((u) => !heliWord(u));
+    }
     // Restaurant test 3 (2026-11-15): a word a planned place's special used ("free" in "Kids eat free") is not "not used".
     if ((plan.specialWordsUsed || []).length) result.notUsed = (result.notUsed || []).filter((u) => !plan.specialWordsUsed.includes(String(u).toLowerCase()));
     // "No driving after 7pm" is applied by the planner (2026-10-19), so it is never listed as not used.

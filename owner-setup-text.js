@@ -1992,6 +1992,8 @@ Object.assign(en.tour, {
   photosQ: 'Add photos of your trips',
   knownGuess: 'We found this online. Check it, and change any words that aren’t right.', storyLabel: 'About your tours',
   moreOpt: 'Add more about your tours', moreQ: 'More about your tours', moreProg: 'More about your tours · {n} of {total} done',
+  // Port of whistlerroam #184: the line under the % on the finish screen said "your place" beside "Add more about your tours".
+  pctRaise: 'Add more about your tours to raise it.',
   pinQ: 'Is the pin on your meeting spot?', pinLead: 'If not, drag it to your meeting spot.', noGps: 'We couldn’t get your location. Drag the pin to your meeting spot.',
   needPin: 'Please wait for the map, or drag the pin to your meeting spot.',
   tlengths: { '1h': 'Up to 1 hour', '2-3h': '2 to 3 hours', half: 'Half a day', full: 'A full day', multi: 'Several days' },
