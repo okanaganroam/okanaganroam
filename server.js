@@ -35457,6 +35457,7 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 && !(nextUp && nextUp.on) ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
+  ${scope || !hasInventory ? '' : weekendEmail.signupBoxHtml('whats-on')}
   ${scope ? '' : whatsOnWeeklyNightsHtml(renderNow, welcoming)}
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
     <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
@@ -46450,6 +46451,7 @@ function renderPrivacyPage() {
       <li><strong>List your venue and List an event.</strong> These forms ask for business or event details and a contact name and email (and a phone number if you choose to give one). We keep them so we can review the listing and follow up with you.</li>
       <li><strong>Spam protection.</strong> To limit abuse, we briefly use your IP address to cap how many messages can be sent, and we store only a scrambled (hashed) version of it with listing submissions.</li>
       <li><strong>Emails to businesses.</strong> We may contact businesses at their publicly listed email address about their free listing. Reply &ldquo;unsubscribe&rdquo; and we won&rsquo;t email you again.</li>
+      <li><strong>Weekend email.</strong> If you sign up for our free weekend events email, we keep your email address, when and where on the site you signed up, and when you confirmed, only to send it (through our email provider, Brevo). Every email has a one-click unsubscribe link, or reply &ldquo;unsubscribe&rdquo;.</li>
     </ul>
     <h2>Analytics</h2>
     <p>We use Google Analytics to understand how the site is used in general &mdash; which pages are popular, roughly where visitors come from and what devices they use. Google Analytics uses cookies to do this. We use the reports to improve the site, not to identify you. You can learn more in <a href="https://policies.google.com/technologies/partner-sites" rel="noopener" target="_blank">how Google uses information from sites that use its services</a>, or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google Analytics opt-out add-on</a>.</p>
@@ -59205,11 +59207,12 @@ function brevoApiKey() {
   return String(process.env.BREVO_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }
 
-async function sendOwnerEmailViaBrevo({ to, subject, text, html, replyTo }) {
+// headers (optional): extra email headers, e.g. the weekend email's List-Unsubscribe (Brevo passes them through).
+async function sendOwnerEmailViaBrevo({ to, subject, text, html, replyTo, headers }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': brevoApiKey(), 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text, ...(html ? { htmlContent: html } : {}), ...(replyTo ? { replyTo: { email: replyTo } } : {}) }),
+    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text, ...(html ? { htmlContent: html } : {}), ...(replyTo ? { replyTo: { email: replyTo } } : {}), ...(headers ? { headers } : {}) }),
   });
   if (!res.ok) {
     // Brevo's own reason (e.g. "Key not found"), never the key itself.
@@ -59227,6 +59230,44 @@ function ownerDirectEmail() {
   if (ownerEmailTransport) return ownerEmailTransport;
   return brevoApiKey() ? sendOwnerEmailViaBrevo : null;
 }
+
+// ---------- "This weekend" email list (2026-11-16) ----------
+// The list, the emails and the small pages live in weekend-email.js; here are the weekend's events (What's On's own
+// query and filters) and the sender (the owner emails' Brevo sender, From info@okanaganroam.com).
+// Friday to Sunday from What's On: the "this-weekend" window (the coming weekend Mon-Thu, the rest of it Fri-Sun),
+// scheduled events and dates only, a series moved past today's finished dates, ended events out, and months-long
+// exhibitions left out (as on the homepage's This Weekend row). One entry per event, on its first day this weekend.
+function weekendEmailEvents(now = new Date()) {
+  const win = resolveWhatsOnWindow({ when: 'this-weekend' }, now);
+  const list = withoutEndedEvents(whatsOnStillOn(getWhatsOnEvents(win), now), now, win.to);
+  const clock = okanaganClock(now);
+  const out = [];
+  for (const e of list) {
+    const span = (Date.parse(`${e.endDate}T12:00:00Z`) - Date.parse(`${e.startDate}T12:00:00Z`)) / 86400000;
+    if (!e.name || span > 14) continue;
+    const occs = (e.windowOccurrences || (e.firstOccurrence ? [e.firstOccurrence] : [])).filter((o) => o.end_date >= win.from && o.start_date <= win.to && !tripOccurrenceEnded(o, clock));
+    if (!occs.length) continue;
+    const o = occs[0];
+    const day = o.start_date < win.from ? win.from : o.start_date;
+    const untimed = Number(o.all_day) === 1 || o.start_time === '00:00' || !o.start_time;
+    const time = untimed ? (o.start_date < o.end_date ? `Until ${formatLocalDateShort(o.end_date)}` : (Number(o.all_day) === 1 || o.start_time === '00:00' ? 'All day' : ''))
+      : `${formatLocalTime(o.start_time)}${o.end_time && o.end_time !== o.start_time ? `–${formatLocalTime(o.end_time)}` : ''}`;
+    const otherDays = [...new Set(occs.slice(1).map((x) => (x.start_date < win.from ? win.from : x.start_date)).filter((d) => d !== day))];
+    const path = discoveryEventUrl(e);
+    if (!path) continue;
+    out.push({
+      id: e.id, name: e.name, path, day, time, sortTime: untimed ? '' : o.start_time,
+      place: [e.venueName, e.valleyWide ? 'Across the Okanagan' : REGION_LABELS[e.region]].filter((x, i, a) => x && a.indexOf(x) === i).join(', '),
+      also: otherDays.length ? `Also ${otherDays.map((d) => WEEKDAY_SHORT[localWeekday(d)]).join(', ')}` : '',
+      categories: e.categories || [], free: e.priceKind === 'free',
+    });
+  }
+  return { from: win.from, to: win.to, events: out };
+}
+const weekendEmail = require('./weekend-email').create({
+  db, weekendEvents: weekendEmailEvents, getSender: () => ownerDirectEmail(),
+  isSameOrigin: (req) => isSameOriginSubmission(req), clientIp: (req) => requestClientIp(req), emailPattern: SUBMISSION_EMAIL_PATTERN,
+});
 
 function ownerResetRecentCount(accountId) {
   return db.prepare("SELECT COUNT(*) AS n FROM owner_password_resets WHERE account_id = ? AND created_at > datetime('now', '-1 hour')").get(accountId).n;
@@ -65160,7 +65201,8 @@ const server = http.createServer(async (req, res) => {
         html = wrapHomeMain(html);
         // Owner-approved simpler photo-led homepage, preserving the existing live content providers.
         html = homeSimple.apply(html, { mood: moodCards, editors: editorsPicks, events: thisWeekend,
-          gems: hiddenGemsSection, destinations: exploreRegions, stats: statsHtml, trip: buildTripSection, guides: homeGuideIndex });
+          gems: hiddenGemsSection, destinations: exploreRegions, stats: statsHtml, trip: buildTripSection, guides: homeGuideIndex,
+          weekendSignup: weekendEmail.signupBoxHtml('home') });
         // Homepage weight (2026-10-18): smaller card photos, and the sideways rows' off-screen cards wait (see withHomeCardPhotos).
         html = withHomeCardPhotos(html);
         // Hero first (2026-10-19): no Leaflet on the homepage, and the hero-ready signal first in <head> (see withHomeHeroFirst).
@@ -68506,6 +68548,9 @@ const server = http.createServer(async (req, res) => {
           const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
           const inboxes = Object.fromEntries(sites.map((x) => [x.key, x.data && x.data.inbox]));
           home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes });
+          // Weekend email list (2026-11-16): the subscriber count, linking to its page.
+          const wk = weekendEmail.counts().total;
+          home.body += `<div class="card"><h3>Weekend email</h3><p><a href="/admin/weekend-email"><b>${wk.confirmed}</b> confirmed subscriber${wk.confirmed === 1 ? '' : 's'}</a> · ${wk.pending} waiting to confirm · ${wk.unsubscribed} unsubscribed</p></div>`;
         } catch (e) { home = null; }
       }
       return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '', view, home }));
@@ -68932,6 +68977,39 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/contact' && method === 'POST') {
       return await handleContactMessage(req, res);
+    }
+    // "This weekend" email list (2026-11-16, weekend-email.js). The sign-up box posts here; the confirm and unsubscribe
+    // links come from the emails. Every page is noindex (header and meta) and in no sitemap.
+    if (pathname === '/api/weekend-email' && method === 'POST') {
+      return await weekendEmail.handleSignup(req, res);
+    }
+    if (pathname.startsWith('/weekend-email/') && await weekendEmail.handlePublic(req, res, pathname, method)) return;
+    // The admin page: counts, this weekend's preview, a test send and the real send (Dayton presses it; no timer).
+    if ((pathname === '/admin/weekend-email' || pathname === '/admin/weekend-email/') && method === 'GET') {
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, weekendEmail.NOINDEX_HEADERS);
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Weekend email', '<h1>Weekend email</h1><p>The admin key is not set up on this server.</p>'));
+      if (!adminSessionValid(req)) return res.end(renderAdminReviewLoginPage());
+      return res.end(weekendEmail.adminPage({ notice: String(query.notice || ''), confirmStep: query.step === 'confirm' }));
+    }
+    if ((pathname === '/admin/weekend-email/test' || pathname === '/admin/weekend-email/send') && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      const back = (q) => { res.writeHead(303, { Location: `/admin/weekend-email?${q}`, 'Cache-Control': 'no-store' }); return res.end(); };
+      if (pathname.endsWith('/test')) {
+        req.resume();
+        const r = await weekendEmail.sendTest();
+        return back(r.ok ? 'notice=test_sent' : (ownerDirectEmail() ? 'notice=test_failed' : 'notice=email_off'));
+      }
+      let form;
+      try { form = await weekendEmail.readForm(req); } catch (e) { form = null; }
+      if (!form || form.confirm !== 'yes') return back('notice=not_confirmed');
+      const dg = weekendEmail.buildDigest();
+      if (form.weekend !== dg.weekend) return back('notice=stale');
+      const blocker = weekendEmail.sendBlocker(dg);
+      if (blocker) return back('notice=blocked');
+      // Runs in the background (a few emails a second); the page shows the count as it goes.
+      weekendEmail.sendDigest().catch((e) => console.error('[weekend-email] send failed:', e.message));
+      return back('notice=started');
     }
     if (pathname === '/admin/event-submissions' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
@@ -69829,6 +69907,8 @@ module.exports = {
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
   setOwnerEmailTransport,
+  weekendEmail,
+  weekendEmailEvents,
   digestTick, sendWeeklyDigest, pacificNow, healthAlertTick, goalsData,
   createOwnerPasswordReset,
   setContactTransport,
