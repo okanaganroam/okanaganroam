@@ -101,7 +101,7 @@ test('1: the setup asks "Are these your hours all year?" and gives the other sea
     // Yes on the hours, or Next after changing them, goes to the question.
     assert.match(s, /if \(k === 'hoursOk'\) return go\('hours:year'\);/);
     assert.match(s, /if \(k === 'hoursNext'\)/);
-    assert.match(s, /big\(stS\.length && T\.yearKeep \? '✕' : '✓', T\.allYearYes, '', !!\(stS\.length && T\.yearKeep\), 'yearAll'\)/);
+    assert.match(s, /big\(stS\.length && T\.yearKeep \? '✕' : '✓', stS\.length && T\.yearKeep && T\.allYearSame \? T\.allYearSame : T\.allYearYes, '', !!\(stS\.length && T\.yearKeep\), 'yearAll'\)/);
     assert.match(s, /'yearSeason:summer'/); assert.match(s, /'yearSeason:winter'/);
     // The season's own week starts from the usual week, every day (closed ones too), and any day can be opened.
     assert.match(s, /S\.sea\.week = clone\(S\.week\)/);

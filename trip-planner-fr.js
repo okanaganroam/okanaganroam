@@ -22,7 +22,7 @@ const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+const STRONG = new Set(('helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
   + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
@@ -245,6 +245,12 @@ const PHRASES = [
   ['sortie familiale', 'family friendly tour'], ['sorties familiales', 'family friendly tours'], ['excursion familiale', 'family friendly tour'],
   ['descente de riviere', 'rafting'], ['descentes de riviere', 'rafting'], ['descente de rivieres', 'rafting'], ['descente de la riviere', 'rafting'], ['descente en rafting', 'rafting'], ['descente en eau vive', 'whitewater rafting'],
   ['descentes en eau vive', 'whitewater rafting'], ['rafting en eau vive', 'whitewater rafting'], ['eau vive', 'whitewater'], ['ski de descente', 'downhill skiing'], ['velo de descente', 'downhill mountain biking'],
+  // Tour test 3 (Whistler, 2026-11-17): « tour d'hélicoptère » read as the word « helicoptere »; « héli-randonnée » as a hike.
+  ['tour d helicoptere', 'helicopter tour'], ['tours d helicoptere', 'helicopter tours'], ['tour en helicoptere', 'helicopter tour'], ['tours en helicoptere', 'helicopter tours'],
+  ['vol en helicoptere', 'helicopter flight'], ['vols en helicoptere', 'helicopter flights'], ['vol d helicoptere', 'helicopter flight'], ['balade en helicoptere', 'helicopter tour'],
+  ['survol en helicoptere', 'helicopter flight'], ['excursion en helicoptere', 'helicopter tour'], ['sortie en helicoptere', 'helicopter tour'], ['helicoptere', 'helicopter'], ['helicopteres', 'helicopters'],
+  ['vol panoramique', 'scenic flight'], ['vols panoramiques', 'scenic flights'], ['atterrissage sur un glacier', 'glacier landing'], ['atterrissage sur glacier', 'glacier landing'],
+  ['heli randonnee', 'heli hiking'], ['heli randonnees', 'heli hiking'], ['helirandonnee', 'heli hiking'], ['randonnee en helicoptere', 'heli hiking'], ['randonnee heliportee', 'heli hiking'],
   ['sortie guidee', 'guided tour'], ['sorties guidees', 'guided tours'], ['excursion guidee', 'guided tour'], ['excursions guidees', 'guided tours'],
   ['sortie', 'tour'], ['sorties', 'tours'], ['excursion', 'tour'], ['excursions', 'tours'],
   ['camper', 'camping'], ['observation des oiseaux', 'birdwatching'], ['ornithologie', 'birdwatching'], ['faune', 'wildlife'],

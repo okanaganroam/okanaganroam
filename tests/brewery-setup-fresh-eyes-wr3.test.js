@@ -118,7 +118,7 @@ test('year question with other hours stored: the first button keeps them, and "Y
   assert.match(text.fr.yearKeep, /^Aucun changement, garder mes autres heures$/);
   const s = CLIENT();
   // The keep button comes first and only with stored stretches; it saves as "No, keep them" does, with no question.
-  assert.match(s, /\(stS\.length && T\.yearKeep \? big\('✓', T\.yearKeep, '', false, 'yearKeep'\) : ''\) \+ big\(stS\.length && T\.yearKeep \? '✕' : '✓', T\.allYearYes, '', !!\(stS\.length && T\.yearKeep\), 'yearAll'\)/);
+  assert.match(s, /\(stS\.length && T\.yearKeep \? big\('✓', T\.yearKeep, '', false, 'yearKeep'\) : ''\) \+ big\(stS\.length && T\.yearKeep \? '✕' : '✓', stS\.length && T\.yearKeep && T\.allYearSame \? T\.allYearSame : T\.allYearYes, '', !!\(stS\.length && T\.yearKeep\), 'yearAll'\)/);
   assert.match(s, /if \(k === 'yearKeep' \|\| k === 'yearDropKeep'\) \{ S\.seaList\.forEach/);
   assert.match(s, /if \(k === 'yearAll' && storedSeas\(\)\.length\) \{ S\.dropI = null; return go\('hours:yeardrop'\); \}/, '"Yes, all year" still asks first');
   // Every setup type gets the words (the hours step is shared).

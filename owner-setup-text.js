@@ -1985,6 +1985,45 @@ Object.assign(fr.tour, {
   photosQ: 'Ajoutez des photos de vos sorties', moreQ: 'Plus de détails sur votre entreprise',
   doorRights: 'J’ai pris cette photo ou j’ai la permission de la partager, et Okanagan Roam peut l’afficher pour aider les visiteurs à trouver votre point de rencontre.',
 });
+// Tour test 3 (Whistler, 2026-11-17; Karen, an office manager, a year-round helicopter company with set hours): the wording
+// table (photos, Part 2 and the meeting pin say trips, tours and meeting spot), "Up to 1 hour", the per-person price note
+// (the limit comes from the page's config: {n}), the held price said right after saving ({x}), and the price nudge.
+Object.assign(en.tour, {
+  photosQ: 'Add photos of your trips',
+  knownGuess: 'We found this online. Check it, and change any words that aren’t right.', storyLabel: 'About your tours',
+  moreOpt: 'Add more about your tours', moreQ: 'More about your tours', moreProg: 'More about your tours · {n} of {total} done',
+  pinQ: 'Is the pin on your meeting spot?', pinLead: 'If not, drag it to your meeting spot.', noGps: 'We couldn’t get your location. Drag the pin to your meeting spot.',
+  needPin: 'Please wait for the map, or drag the pin to your meeting spot.',
+  tlengths: { '1h': 'Up to 1 hour', '2-3h': '2 to 3 hours', half: 'Half a day', full: 'A full day', multi: 'Several days' },
+  tlengthNeed: 'Please tap how long a trip takes. More than one? Pick your shortest.',
+  tpriceOver: 'A price per person over {n} is checked first and shows within a day.',
+  tpriceSavedDay: 'We’re checking {x}. A price per person over {n} is checked first; it shows within a day.',
+  tpriceNeed: 'Just the number, like 189.', tprivNeed: 'Just the number, like 900, or leave it empty.',
+  tprivLead: 'The price for a private trip, for the whole group. It shows on your page right away. Leave it empty if you don’t run them.',
+});
+Object.assign(fr.tour, {
+  knownGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le et changez les mots qui ne conviennent pas.', storyLabel: 'À propos de vos sorties',
+  pinQ: 'L’épingle est-elle sur votre point de rencontre?', pinLead: 'Sinon, glissez-la jusqu’à votre point de rencontre.', noGps: 'Impossible d’obtenir votre position. Glissez l’épingle jusqu’à votre point de rencontre.',
+  needPin: 'Attendez la carte, ou glissez l’épingle jusqu’à votre point de rencontre.',
+  tlengths: { '1h': 'Jusqu’à 1 heure', '2-3h': '2 à 3 heures', half: 'Une demi-journée', full: 'Une journée complète', multi: 'Plusieurs jours' },
+  tlengthNeed: 'Touchez la durée d’une sortie. Plus d’une? Choisissez la plus courte.',
+  tpriceOver: 'Un prix par personne de plus de {n} est vérifié d’abord et s’affiche d’ici un jour.',
+  tpriceSavedDay: 'Nous vérifions {x}. Un prix par personne de plus de {n} est vérifié d’abord; il s’affiche d’ici un jour.',
+  tpriceNeed: 'Seulement le chiffre, par exemple 189.', tprivNeed: 'Seulement le chiffre, par exemple 900, ou laissez vide.',
+  tprivLead: 'Le prix d’une sortie privée, pour tout le groupe. Il s’affiche sur votre page tout de suite. Laissez vide si vous n’en offrez pas.',
+});
+// Every type with "by appointment / by booking only": the weekly hours are kept when that is tapped and come back with
+// "Add my hours". And the year screen, once other hours are stored, says what its last button does.
+Object.assign(en, {
+  hoursBack: 'We put back the hours you had before. Check them, then save.',
+  allYearSame: 'Same hours all year (removes your other hours)',
+  yearAllDropLead: 'Your page also has other hours {span}. “Same hours all year” removes them.',
+});
+Object.assign(fr, {
+  hoursBack: 'Nous avons remis les heures que vous aviez. Vérifiez-les, puis enregistrez.',
+  allYearSame: 'Mêmes heures toute l’année (retire vos autres heures)',
+  yearAllDropLead: 'Votre page a aussi d’autres heures {span}. Avec «\u202fMêmes heures toute l’année\u202f», elles sont retirées.',
+});
 // The same season question for a winery or a distillery that is by appointment only (it had the same hole).
 Object.assign(en, {
   yearNoSetQ: 'Do you take appointments all year?', yearNoSetLead: 'If you close for part of the year, tap it and pick your dates.',
