@@ -295,7 +295,7 @@ test('5. "by booking only" keeps the weekly hours for "Add my hours" (every type
   const s3 = { week: Object.fromEntries(DAYS.map((d) => [d, null])), weekKept: null };
   assert.equal(run(s3, JSON.stringify(kept)), true, 'kept across a reload of the tab');
   assert.equal(run({ week: Object.fromEntries(DAYS.map((d) => [d, null])), weekKept: null }), false);
-  assert.equal(text.en.hoursBack, 'We put back the hours you had before. Check them, then save.');
+  assert.equal(text.en.hoursBack, 'We put back the hours you had before. Check them, then tap Next.');
   assert.match(text.fr.hoursBack, /^Nous avons remis les heures que vous aviez/);
   // The year question on the by-booking path: the earlier "Yes, all year" shows as picked.
   assert.match(CLIENT, /\(S\.savedWYear === 'all' && T\.youSaid \? '<p class="su-sent" id="suYearSaid">' \+ h\(fill\(T\.youSaid, \{ a: T\.yearNoSetYes \}\)\) \+ '<\/p>' : ''\) \+ big\('✓', T\.yearNoSetYes, '', false, 'noSetAll', S\.savedWYear === 'all' \? ' aria-pressed="true"' : ''\)/);
@@ -313,8 +313,8 @@ test('5. "by booking only" keeps the weekly hours for "Add my hours" (every type
 test('6. public category words: short page words per kind, never a side of a chip her words don’t say; the same set on the preview, the cards and both pages', async () => {
   const kt = app.tourKindsText;
   // Karen: research "Helicopter tours, heli-skiing & heli-hiking", Scenic or helicopter flights + Heli-skiing + Something else.
-  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Helicopter flights, Heli-skiing & Heli-hiking');
-  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Vols en hélicoptère, Héliski et Heli-hiking');
+  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Helicopter flights, heli-skiing & heli-hiking');
+  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Vols en hélicoptère, héliski et heli-hiking');
   // A chip that covers several things: only the side her words name; all of it when they name none or every side.
   assert.equal(kt(['flight'], false, ''), 'Helicopter & scenic flights');
   assert.equal(kt(['flight'], true, ''), 'Vols en hélicoptère et panoramiques');
@@ -325,9 +325,9 @@ test('6. public category words: short page words per kind, never a side of a chi
   assert.equal(kt(['snowshoe'], false, 'Snowshoe tours'), 'Snowshoeing');
   assert.equal(kt(['snowshoe'], false, ''), 'Snowshoe & ski touring');
   assert.equal(kt(['paddle'], false, ''), 'Kayak, canoe & SUP');
-  assert.equal(kt(['walking', 'food'], false, 'Ghost walks & food tours'), 'Walking tours & Food tours');
+  assert.equal(kt(['walking', 'food'], false, 'Ghost walks & food tours'), 'Walking tours & food tours');
   assert.equal(kt(['walking'], false, ''), 'Walking & history tours');
-  assert.equal(kt(['snowmobile', 'adventure'], true, 'Snowmobile & ATV tours'), 'Motoneige et Sorties en quad (VTT)');
+  assert.equal(kt(['snowmobile', 'adventure'], true, 'Snowmobile & ATV tours'), 'Motoneige et sorties en quad (VTT)');
   // Unchanged: her own fuller words, the "and" chips, nothing picked.
   assert.equal(kt(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
   assert.equal(kt(['adventure'], false, ''), 'ATV, bungee, climbing or canyoning');
@@ -340,7 +340,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   // The whole way through: saved kinds -> the listing's words, the save's answer, the setup's preview, the cards, the pages.
   const { v, t } = karen();
   const saved = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
-  const EN = 'Helicopter flights, Heli-skiing & Heli-hiking', FR = 'Vols en hélicoptère, Héliski et Heli-hiking';
+  const EN = 'Helicopter flights, heli-skiing & heli-hiking', FR = 'Vols en hélicoptère, héliski et heli-hiking'; // tour test 4: one capital in the list
   assert.equal(app.getVenue(v.id).cuisine, EN);
   if (saved.body.tour_words) assert.deepEqual(saved.body.tour_words, { en: EN, fr: FR });
   const again = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all', book: '48h' } }));
@@ -360,7 +360,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   const pEn = plain(page(v, 'en')), pFr = plain(page(v, 'fr'));
   assert.ok(pEn.includes(EN), 'the English page');
   assert.ok(pFr.includes(FR), 'the French page');
-  assert.doesNotMatch(pFr, /Helicopter flights, Heli-skiing/);
+  assert.doesNotMatch(pFr, /Helicopter flights, heli-skiing/i);
   // Build My Trip still reads the new words.
   assert.deepEqual(names(await plan('Scenic flight in Penticton on July 14 2027')), [K]);
 });
@@ -419,10 +419,12 @@ test('8. every price box takes words after the number', async () => {
   assert.ok(CLIENT.includes(`if ((x = v('suCfee')) !== null && CK) { var cf = ${tail}`), 'cocktail price box');
   const feeRead = (x) => { const f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); return f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; };
   for (const [typed, want] of [['$15', 15], ['15 $', 15], ['$15 per flight', 15], ['12 dollars', 12], ['12,50 $ par personne', 12.5], ['10 each', 10], ['', null]]) assert.equal(feeRead(typed), want, typed);
-  assert.equal((CLIENT.match(/mode: 'decimal', max: 40 \}/g) || []).length, 5);
+  // Tour test 4 (2026-11-17): the tour's per-person box takes words ("free", "by donation"), so it has no number pad now.
+  assert.equal((CLIENT.match(/mode: 'decimal', max: 40 \}/g) || []).length, 4);
   assert.doesNotMatch(CLIENT, /mode: 'decimal', max: (?:8|10) \}/);
-  assert.equal(text.en.tour.tpriceNeed, 'Just the number, like 189.');
-  assert.match(text.fr.tour.tpriceNeed, /^Seulement le chiffre, par exemple 189\.$/);
+  // Tour test 4 (2026-11-17): the nudge also says what to type for a free tour.
+  assert.equal(text.en.tour.tpriceNeed, 'Just the number, like 189. Free or by donation? Type free.');
+  assert.match(text.fr.tour.tpriceNeed, /^Seulement le chiffre, par exemple 189\. /);
 });
 
 test('9. the price note says "per person" with the limit from the config; a held price says "We’re checking $3,900" right after saving; a private price stays live', async () => {
@@ -565,9 +567,10 @@ test('12. wording: trips, tours and the meeting spot; the year screen’s last b
   assert.doesNotMatch(tourBox, /<details class="visit-more">/);
   const wineBox = app.visitInfoHtml(info, false, { type: 'winery' });
   assert.match(wineBox, /<details class="visit-more"><summary>More: groups<\/summary>/);
-  // Two set aside still fold (one "More" for both).
+  // Tour test 4 (2026-11-17): on a tour's page every line of the operator's own shows open, two set aside too.
   const two = app.visitInfoHtml({ ...info, owner_labels: info.owner_labels.concat(['Parking']), owner_dropped: info.owner_dropped.concat([{ label: 'Getting there', text: 'Ten minutes north of town.', owned: true }]) }, false, { type: 'tour' });
-  assert.match(two, /<details class="visit-more">/);
+  assert.doesNotMatch(two, /<details class="visit-more">/);
+  assert.ok(two.includes('Ten minutes north of town.'));
 });
 
 test('the other setups still load, and their words are as they were', async () => {

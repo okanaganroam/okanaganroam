@@ -364,7 +364,7 @@ test('small ones in the setup: French-only special or event said once; spend gue
   assert.match(s, /frOnlyTell\('specials', out\);\n\s+list\.push\(\{ specials: out \}\); saveAll\('specials', list\);/);
   assert.match(s, /frOnlyTell\('music', out\);\n\s+list\.push\(\{ weekly_nights: out \}\);/);
   assert.match(s, /\(S\.frOnlyNote === p\[1\] && T\.frPageOnly \? '<p class="su-hint" id="suFrOnly">' \+ h\(T\.frPageOnly\) \+ '<\/p>' : ''\)/);
-  assert.match(s, /\+ line \+ \(S\.frOnlyNote === step && T\.frPageOnly \? ' ' \+ T\.frPageOnly : ''\);/, 'and in the "Saved" toast, when the step has no saved screen');
+  assert.match(s, /\+ line \+ foldedNote \+ \(S\.frOnlyNote === step && T\.frPageOnly \? ' ' \+ T\.frPageOnly : ''\);/, 'and in the "Saved" toast, when the step has no saved screen');
   const ctx = clientSlice('  function frOnlyTell(step, out){', '  function apptKind(k){', { S: {} }, 'this.tell = frOnlyTell;');
   ctx.tell('specials', [{ title: 'Wing Wednesday', title_fr: null }]); assert.equal(ctx.S.frOnlyNote, undefined, 'nothing French-only');
   ctx.tell('specials', [{ title: '', title_fr: 'Mercredi croissants' }]); assert.equal(ctx.S.frOnlyNote, 'specials');

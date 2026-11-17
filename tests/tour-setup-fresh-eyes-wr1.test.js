@@ -166,8 +166,8 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   ok(await change(t, { tour_info: { kinds: ['other'] } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile & ATV tours');
   ok(await change(t, { tour_info: { kinds: ['snowmobile', 'other'] } }));
-  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, Ziplines, RZR, Rafting & Snowshoe tours');
-  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, Ziplines, RZR, Rafting & Snowshoe tours'.replace('Ziplines, RZR', 'Ziplines, RZR'));
+  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours');
+  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours'.replace('Ziplines, RZR', 'Ziplines, RZR'));
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
   assert.equal(app.tourKindsText(['adventure'], false, ''), 'ATV, bungee, climbing or canyoning');
   // The card's season word: "Winter" only while she runs in winter alone.
@@ -196,7 +196,7 @@ test('B2 + B3 + Minor: departure-time help, no lunch/dinner or after-midnight wo
   assert.match(CLIENT, /if \(C\.tour\) return '';/);
   assert.match(CLIENT, /if \(TOUR && !late\) \{/);
   assert.match(CLIENT, /if \(TOUR && S\.noDogs && S\.sdogAuto\) \{ S\.badges\.service_dogs = false;/);
-  assert.match(CLIENT, /if \(TOUR\) \['patio', 'live_music', 'sports_tv'\]\.forEach/);
+  assert.match(CLIENT, /if \(TOUR\) \(C\.tourFoodBadges \|\| \['patio', 'live_music', 'sports_tv', /);
   // Help: one time from the first departure to the last return.
   const hb = helpBot((await get(`/owner/${t}/setup`)).text);
   assert.match(hb.topic('tour-booking-only').a, /Set one time from your first departure to when the last trip gets back/);

@@ -119,7 +119,7 @@ test('saving the tour answers: kinds and length, price per person, booking, who 
   assert.deepEqual(info.kinds, ['snowmobile', 'dogsled']);
   assert.equal(info.length, 'half');
   // The kinds write the cuisine words the cards, search and Build My Trip read; research's words are kept for an Undo.
-  assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile tours & Dog sledding');
+  assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile tours & dog sledding');
   assert.equal(info.cuisine_was, 'Snowmobile tours (winter)');
   assert.equal((await change(t, { tour_info: { kinds: ['snowmobile', 'dogsled', 'heli', 'wine'] } })).status, 400);
   assert.equal((await change(t, { tour_info: { kinds: ['bobsled'] } })).status, 400);
@@ -134,7 +134,8 @@ test('saving the tour answers: kinds and length, price per person, booking, who 
   ok(await change(t, { tour_price: '129 $' }));
   assert.equal(app.tourPrice(v.id), 129);
   assert.equal((await change(t, { tour_price: 'about a hundred' })).status, 400);
-  assert.equal((await change(t, { tour_price: 0 })).status, 400);
+  // Tour test 4 (2026-11-17): 0 now means a free tour (tests/tour-setup-fresh-eyes-wr4.test.js); a negative price is still refused.
+  assert.equal((await change(t, { tour_price: -5 })).status, 400);
   const big = await change(t, { tour_price: '1,500' });
   assert.equal(big.status, 200);
   assert.equal(app.tourPrice(v.id), 129, 'a price over $1,000 waits for our check');
@@ -278,7 +279,7 @@ test('Build My Trip: the season, the minimum age with kids, and the operator’s
   assert.match(famNotes, /Ages 6 and up \(the operator’s own answer\)\./);
   assert.match(famNotes, /Same-day bookings are often fine/);
   // The planner's facts for a tour, and the kids rule itself.
-  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189 });
+  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189, tourKinds: ['snowmobile'] });
   const tp = require('../trip-planner.js');
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '16' }), false);
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '12' }), false);
@@ -324,7 +325,7 @@ test('help topics for tours, in English and French, on the setup and the edit pa
   const bot = helpBot(html);
   const asks = {
     'we only run in winter': 'tour-season', 'our season is december to april': 'tour-season',
-    'we have no set hours, trips are by booking only': 'tour-booking-only', 'departure times': 'tour-booking-only',
+    'we have no set hours, trips are by booking only': 'tour-booking-only', 'departure times': 'tour-times',
     'what if the weather cancels a trip': 'tour-weather', 'rain or shine': 'tour-weather',
     'private tour price': 'tour-price', 'price per person': 'tour-price',
     'minimum age': 'tour-age', 'can kids come': 'tour-age',
