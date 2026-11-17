@@ -606,7 +606,11 @@
   // "$129" / "129 $", "$1,500" / "1 500 $".
   function tourMoney(n){ var t = Math.round(n) === n ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, C.lang === 'fr' ? '\u00a0' : ',') : n.toFixed(2); return C.lang === 'fr' ? t.replace('.', ',') + '\u00a0$' : '$' + t; }
   // A typed price: "129", "$129", "129 $", "1,500", "1 500", "12.50" / "12,50". -> number, null (empty) or NaN.
-  function tourPriceRead(x){ var t = String(x == null ? '' : x).trim().replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  // Tour test 3 (Whistler, 2026-11-17): words after the number are dropped in every price box ("$189.00 per person",
+  // "189 pp", « 189 $ par personne », "129 each"); the box used to cut them at 10 characters and refuse the rest. The
+  // tasting, flight and cocktail boxes (readWine, readBrew, readCocktail) drop them with the same pattern, written in place.
+  function moneyHead(x){ var t = String(x == null ? '' : x).trim(); var m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(t); return m ? m[1].replace(/[.,\s\u00a0\u202f]+$/, '') : t; }
+  function tourPriceRead(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suTprice')) !== null) { var np = tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; }
@@ -629,7 +633,7 @@
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
   function readBrew(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN;
+    if ((x = v('suFee')) !== null && C.brewery) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.brew.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN;
       // Distillery test 1 (Whistler, 2026-11-16): a price typed over research's is the owner's own ("Your page says $15
       // now, from your website, so we picked it" stayed after he typed $15 over $12).
       if (S.brew.feeGuessed && S.brew.fee !== C.researchFee) S.brew.feeGuessed = false; }
@@ -641,7 +645,7 @@
     if ((x = v('suGroupsLine')) !== null) S.brew.groups = x;
     if ((x = v('suBookLine')) !== null && CK) S.brew.book = x;
     if ((x = v('suBookUrl')) !== null && FOLD) S.bookUrl = x;
-    if ((x = v('suCfee')) !== null && CK) { var cf = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.cp.fee = cf === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(cf) ? +cf : NaN; }
+    if ((x = v('suCfee')) !== null && CK) { var cf = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.cp.fee = cf === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(cf) ? +cf : NaN; }
   }
   // A brewery's one-of-a-few answers (data-bpick="food:trucks") and on/off chips (data-btogo).
   // `after`: html shown right under one choice (the food-truck chips under "Food trucks").
@@ -677,7 +681,7 @@
   function readWine(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suRname')) !== null) S.wine.rname = x.trim(); if ((x = v('suRwhen')) !== null) S.wine.rwhen = x.trim();
-    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; if (S.wine.feeGuessed && S.wine.fee !== C.researchFee) S.wine.feeGuessed = false; }
+    if ((x = v('suFee')) !== null) { var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-z\u00c0-\u024f].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.'); S.wine.fee = f === '' ? null : /^\d{1,3}(\.\d{1,2})?$/.test(f) ? +f : NaN; if (S.wine.feeGuessed && S.wine.fee !== C.researchFee) S.wine.feeGuessed = false; }
     if ((x = v('suKnown')) !== null) S.wine.known = x.trim();
     // Winery test 2 (2026-11-12): a booking link typed before tapping a group size or bus chip survives the redraw.
     if ((x = v('suBookUrl')) !== null) S.bookUrl = x;
@@ -950,7 +954,7 @@
     if (parts.length && parts.every(function(x){ return sentMemo[x[0]] && sentMemo[x[0]].v === x[1]; })) return Promise.resolve(parts.some(function(x){ return sentMemo[x[0]].st === 'day'; }) ? 'day' : 'live');
     var remember = function(st){ if (changes.not_offered || changes.pub_info) sentMemo = {}; else parts.forEach(function(x){ sentMemo[x[0]] = { v: x[1], st: st }; }); return st; };
     return post(C.base + '/changes?from=setup', { changes: changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: started }).then(function(j){
-      if (j && j.ok) { if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
+      if (j && j.ok) { if (j.tour_words) S.tourWords = j.tour_words[C.lang === 'fr' ? 'fr' : 'en'] || S.tourWords; if (changes.not_offered) S.notOffered = changes.not_offered.slice(); if (changes.badges) Object.keys(changes.badges).forEach(function(b){ S.savedBadges[b] = !!changes.badges[b]; });
         if (changes.cafe_info && 'order' in changes.cafe_info) S.savedOrder = JSON.stringify(changes.cafe_info.order || null); if (changes.cafe_info && 'year' in changes.cafe_info) S.savedYear = changes.cafe_info.year || ''; if (changes.brewery_info && 'year' in changes.brewery_info) S.savedYear = changes.brewery_info.year || '';
         return remember(j.review && j.review.length ? 'day' : 'live'); }
       if (nothingChanged(j)) return remember('live');
@@ -1391,7 +1395,7 @@
   function preview(){
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -1754,13 +1758,13 @@
       // Tour test 2 (Whistler, 2026-11-16): by booking only (no weekly hours): "Do you run trips all year?" Two choices.
       if (noSetYear()) x = q(T.yearNoSetQ, T.yearNoSetLead) + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + msgs()
         + '<div class="su-stack" id="suYearNoSet">' + (S.openSea ? big('✓', T.yearNoSetKeep, '', false, 'noSetKeep') + big('✎', T.yearNoSetChange, '', true, 'yearClosed') + big('✕', T.yearNoSetYes, '', true, 'noSetAll')
-          : big('✓', T.yearNoSetYes, '', false, 'noSetAll') + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')) + '</div>';
+          : (S.savedWYear === 'all' && T.youSaid ? '<p class="su-sent" id="suYearSaid">' + h(fill(T.youSaid, { a: T.yearNoSetYes })) + '</p>' : '') + big('✓', T.yearNoSetYes, '', false, 'noSetAll', S.savedWYear === 'all' ? ' aria-pressed="true"' : '') + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')) + '</div>';
       else x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + (sea2 && seaSpan(sea2) ? '<p class="su-sent su-seasonnow" id="suSeasonNow2">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea2) })) + '</p>' : '') + msgs()
         // Pub test 3 (Whistler, 2026-11-14): with a season stored, "Change my Apr 20 – Jun 30 hours" opens it with its own
         // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
         // Brewery test 3 (Whistler, 2026-11-16): back to change one day with stretches stored, the first button keeps them
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
-        + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TOUR && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
+        + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TOUR && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), the same screen again.
           + (stS.length < 2 && S.seaList.length < 2 && T.seaAdd ? big('🍂', T.seaAdd, T.seaAddSub, true, 'yearSeasonAdd') : '') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
@@ -1792,6 +1796,7 @@
     } else if (s === 'hours:edit' || seaIsStep(s)) {
       var seas = seaIsStep(s), seaOther = seas ? S.seaList[1 - S.seaI] : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
       if (!S.week) { S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); }
+      if (!seas && APPT) weekRestore();
       if (seas && !S.sea.week) S.sea.week = clone(S.week);
       // A clear Open ✓ / Closed switch, "Same as Monday" on every later day (pub fresh-eyes, 2026-11-10: Sunday could only
       // copy Saturday, and "Open" read like a label). "Copy Monday to every day" sits right under Monday's card (pub
@@ -1814,7 +1819,7 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + msgs() + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
@@ -1921,7 +1926,7 @@
         + (CUR.cocktail_price_waiting != null ? '<p class="su-sent" id="suCpWaiting">' + h(fill(T.cpriceWaiting, { x: cpText(CUR.cocktail_price_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.cpriceQ) + '" id="suCpChips">' + CQ.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (cpOn(n) ? 'true' : 'false') + '" data-cfee="' + n + '">' + h(cpText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (cp.other && !cp.none ? 'true' : 'false') + '" data-cfee="other">' + h(T.feeOther) + '</button></div>'
-        + (cp.other && !cp.none ? field('suCfee', T.feeLabel, boxVal('suCfee', cp.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
+        + (cp.other && !cp.none ? field('suCfee', T.feeLabel, boxVal('suCfee', cp.fee), { mode: 'decimal', max: 40 }) + '<p class="su-hint" id="suCfeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax || 40 })) + '</p>' : '')
         // Cocktail test 1 (2026-11-13): no "We don't serve cocktails" for a lounge (only while it is the stored answer).
         + (cp.none ? '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big" aria-pressed="true" data-cfee="none" id="suCpNone"><span class="su-ico" aria-hidden="true">✓</span><span>' + h(T.cpriceNone) + '<small>' + h(T.cpriceNoneSub) + '</small></span></button></div>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'cpriceSave') + '</div>' + skip('spend');
@@ -1963,7 +1968,7 @@
         + '<button type="button" class="su-chip" aria-pressed="' + (bf.feeOther && !bf.noFlights ? 'true' : 'false') + '" data-bfee="other">' + h(T.feeOther) + '</button>'
         // Distilleries (Decided 2): "Free tastings" is its own button (the card says "Free tasting").
         + (C.distillery && T.feeFree ? '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (feeOn(0) ? 'true' : 'false') + '" data-bfee="0">' + h(T.feeFree) + '</button>' : '') + '</div>'
-        + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, boxVal('suFee', bf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
+        + (bf.feeOther && !bf.noFlights ? field('suFee', T.feeLabel, boxVal('suFee', bf.fee), { mode: 'decimal', max: 40 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + '<div class="su-stack" style="margin-top:10px"><button type="button" class="su-big' + (bf.noFlights ? '' : ' su-alt') + '" aria-pressed="' + (bf.noFlights ? 'true' : 'false') + '" data-bfee="none"><span class="su-ico" aria-hidden="true">' + (bf.noFlights ? '✓' : '○') + '</span><span>' + h(T.noFlights) + '<small>' + h(T.noFlightsSub) + '</small></span></button></div>'
         // Distillery test 1 (2026-11-13): the winery's "free with a bottle" question (not for free tastings or none).
         + (C.distillery && T.waivedQ && !bf.noFlights && !(bf.fee === 0 && !bf.feeOther) ? '<h2 class="su-h2" id="suWaivedQ">' + h(T.waivedQ) + '</h2>' + bpicks('waived', ['yes', 'two', 'no'], T.waivedOpts) : '')
@@ -1988,8 +1993,8 @@
       x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
-        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { mode: 'decimal', max: 10 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: C.lang === 'fr' ? '1\u00a0000' : '1,000' })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
-        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 10 })
+        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { mode: 'decimal', max: 40 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
+        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking') {
       // Tours (2026-11-16): the booking link (the edit page's same field), and "Do people need to book ahead?" with how far.
@@ -2027,7 +2032,7 @@
         + (CUR.tasting_fee_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.feeWaiting, { x: feeText(CUR.tasting_fee_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-label="' + h(T.feeQ) + '" id="suFeeChips">' + QUICK_FEES.map(function(n){ return '<button type="button" class="su-chip" aria-pressed="' + (feeOn(n) ? 'true' : 'false') + '" data-fee="' + n + '">' + h(feeText(n)) + '</button>'; }).join('')
         + '<button type="button" class="su-chip" aria-pressed="' + (wf.feeOther ? 'true' : 'false') + '" data-fee="other">' + h(T.feeOther) + '</button></div>'
-        + (wf.feeOther ? field('suFee', T.feeLabel, boxVal('suFee', wf.fee), { mode: 'decimal', max: 8 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
+        + (wf.feeOther ? field('suFee', T.feeLabel, boxVal('suFee', wf.fee), { mode: 'decimal', max: 40 }) + '<p class="su-hint" id="suFeeOver">' + h(fill(T.feeOver, { n: C.feeLiveMax })) + '</p>' : '')
         + (wf.fee === 0 && !wf.feeOther ? '' : '<h2 class="su-h2">' + h(T.waivedQ) + '</h2>' + wpicks('waived', ['yes', 'two', 'no'], T.waivedOpts))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tastingsSave') + '</div>' + skip('tastings');
     } else if (s === 'visit') {
@@ -2319,7 +2324,9 @@
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
-        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
+        + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>'
+          // Tour test 3 (Whistler, 2026-11-17): research's Known for line, untouched, says it came from online (tours).
+          + (T.knownGuess && !!S.brew.known && S.brew.known === ((CUR.visit_rows || {}).known_for || '') && (C.visitResearch || []).indexOf('known_for') >= 0 ? '<p class="su-sent su-research" id="suKnownGuess">' + h(T.knownGuess) + '</p>' : '') + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
         + '<div class="su-stack">' + big('✓', C.winery || FOLD ? T.saveThese : T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
@@ -2539,16 +2546,29 @@
   }
   function windowsOk(w){ return DAYS.some(function(d){ return w[d] && w[d].length; }); }
   // Winery test 4 (2026-11-12): the one "no set hours" choice, wineries only.
+  // The weekly hours as they are before "no set hours" clears them (null when no day is open), kept for "Add my hours".
+  function weekKeep(){ return S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }) ? clone(S.week) : null; }
+  function weekKept(w){ if (!w) return; S.weekKept = w; try { window.sessionStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} }
+  function weekRestore(){
+    var w = S.weekKept; if (!w) { try { w = JSON.parse(window.sessionStorage.getItem('suWeekKept:' + C.base) || 'null'); } catch (e) { w = null; } }
+    if (!w || typeof w !== 'object' || (S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }))) return false;
+    S.week = {}; DAYS.forEach(function(d){ S.week[d] = Array.isArray(w[d]) && w[d].length ? clone(w[d]) : null; });
+    S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
+    S.weekBack = true; return true;
+  }
   function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }
   function noSetHoursSave(){
     var none = {}; DAYS.forEach(function(d){ none[d] = []; });
+    // Tour test 3 (Whistler, 2026-11-17): one wrong tap wiped all seven days ("Add my hours" started with every day
+    // closed). The week she had is kept (this browser tab) and put back when she adds her hours again.
+    var keptWeek = weekKeep();
     var ch = { hours: none, hours_checked: true }; if (AI.visit !== 'appointment') { if (C.distillery) ch.brewery_info = { visit: 'appointment' }; else if (TOUR) ch.tour_info = { visit: 'appointment' }; else ch.winery_info = { visit: 'appointment' }; }
     // Tour test 2 (Whistler, 2026-11-16): "by booking only" went straight to the closures and the season was never asked
     // (the page then said "All year"). The same "all year / part of the year" question comes next, without hours words;
     // wineries and distilleries by appointment only had the same hole.
     saveAll('hours', [ch], null, T.yearNoSetQ ? 'hours:year' : COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
-      AI.visit = 'appointment'; S.wine.visit = 'appointment'; var nw = {}; DAYS.forEach(function(d){ nw[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw : JSON.stringify(nw);
+      weekKept(keptWeek); AI.visit = 'appointment'; S.wine.visit = 'appointment'; var nw = {}; DAYS.forEach(function(d){ nw[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw : JSON.stringify(nw);
       S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); S.hoursOpenSet = false; S.seaList.forEach(function(o){ o.on = false; }); S.seaTouched = false; S.openTouched = false; S.wYearPick = '';
     });
   }
@@ -3586,7 +3606,7 @@
       var pl = [];
       if (pp !== S.savedTourPrice) pl.push({ tour_price: pp });
       if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
-      S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? T.tpriceSavedDay : T.tpriceSavedLive;
+      S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : T.tpriceSavedLive;
       return saveAll('price', pl, null, null, function(){ if (pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
     }
     if (k === 'bookingSave') {
@@ -3662,8 +3682,9 @@
       if (wantNone && S.notOffered.indexOf('booking_link') < 0) vl.push({ not_offered: { add: ['booking_link'] } });
       if (!wantNone && S.notOffered.indexOf('booking_link') >= 0) vl.push({ not_offered: { remove: ['booking_link'] } });
       S.savedLine.visit = [apptClear ? T.apptHoursGone : '', linkCh ? T.visitSavedLink : ''].filter(Boolean).join(' ');
+      var keptWeek2 = apptClear ? weekKeep() : null;
       return saveAll('visit', vl, null, null, function(){ Object.keys(wi2).forEach(function(kk){ WI[kk] = wi2[kk]; }); if (linkCh) CUR.booking_url = bu;
-        if (apptClear) { var nw2 = {}; DAYS.forEach(function(d){ nw2[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw2 : JSON.stringify(nw2); S.week = clone(nw2); S.hoursOpenSet = false; } });
+        if (apptClear) { weekKept(keptWeek2); var nw2 = {}; DAYS.forEach(function(d){ nw2[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw2 : JSON.stringify(nw2); S.week = clone(nw2); S.hoursOpenSet = false; } });
     }
     if (k === 'expSave') {
       readWine();

@@ -408,6 +408,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Book at least 48 hours ahead \(the operator’s own answer\)\.$/,'Réservez au moins 48 heures à l’avance (réponse de l’entreprise).');
  text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
+ text=text.replace(/^All ages welcome \(the operator’s own answer\)\.$/,'Tous les âges sont bienvenus (réponse de l’entreprise).');
  text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.
  text=text.replace(/^Kids are welcome until (\d{1,2}(?::\d{2})? [AP]M|midnight) only$/,(_,t)=>'Enfants bienvenus jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+' seulement');

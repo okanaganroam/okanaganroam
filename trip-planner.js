@@ -934,7 +934,19 @@ function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && /\b(?:s
 // on a date inside that season, and not in one of their closures, the winter-only rules below do not drop it. Outside
 // the season (or with no owner season) nothing changes.
 const OWNER_SEASON_RE = /^(?:\d{2}-\d{2}:\d{2}-\d{2}|\d{1,2}-\d{1,2})$/;
+// Tour test 3 (Whistler, 2026-11-17): the operator's "Yes, all year" answer (tour_info.year 'all', v.tourYearAll) counts
+// too, when its own words name something besides the snow kinds ("Scenic or helicopter flights · Heli-skiing"): a
+// year-round helicopter company was dropped from every July flight request once it ticked heli-skiing. A company whose
+// only words are snow ones ("Heli-skiing", "Snowmobile tours") keeps the rule, and so does a listing with no owner
+// answer (research only).
+const SNOW_KIND_WORDS_RE = /\b(?:heli ?ski\w*|heliski\w*|heli ?board\w*|cat ?ski\w*|snowcats?|snowmobil\w*|dog ?sled\w*|sleighs?|ice fishing|ski touring|avalanche|snowshoe\w*|ski school|ski lessons?|snowboard lessons?|nordic ski\w*|adaptive ski\w*|ski clinics?|biathlon|ski|skiing|snowboard\w*|snow|winter)\b/g;
+const KIND_FILLER_WORDS_RE = /\b(?:and|or|the|guided|guides?|local|private|tours?|trips?|experiences?|adventures?|activities|excursions?|outfitters?|operators?|company|co|in|of|from|with|year round|summer|spring|fall|day|days|all|seasons?)\b/g;
+function ownerAllYearOtherKinds(v) {
+  if (!v || v.type !== 'tour' || v.tourYearAll !== true) return false;
+  return normWords(v.cuisine || '').replace(SNOW_KIND_WORDS_RE, ' ').replace(KIND_FILLER_WORDS_RE, ' ').replace(/\s+/g, ' ').trim().length > 2;
+}
 function ownerSeasonOpenOn(v, ctx) {
+  if (ownerAllYearOtherKinds(v)) return true;
   if (!v || !OWNER_SEASON_RE.test(String(v.openMonths || ''))) return false;
   const iso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
   const base = iso(ctx.requirements && ctx.requirements.startDate) || iso(ctx.tripDate);
@@ -1694,7 +1706,8 @@ const TOUR_BOOK_AHEAD_NOTES = {
 const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
-const tourAgeNote = (age) => (age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
+// Tour test 3 (Whistler, 2026-11-17): "All ages" is said too when the request names an age ("with our 10-year-old").
+const tourAgeNote = (age) => (age === 'all' ? 'All ages welcome (the operator’s own answer).' : age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
 // Charters) is booked too, not a walk-in stop: it gets the booking note and is not a first pick for an open slot.
 const OUTFITTER_NAME_RE = /\b(?:adventures?|adventure company|charters?|outfitters?|rentals?|guided|guides?|tours?|expeditions?)\b/;
@@ -1909,7 +1922,7 @@ function stopFrom(v, scored, extra, ctx) {
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
-  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && /^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
@@ -6409,6 +6422,9 @@ function planTrip(input) {
   if (stops.length && !stops.some((s) => s.venue || s.event) && !(result.warnings || []).length) result.warnings = [`No ${SITE.brand} listings match every part of that request.`];
   return result;
 }
+// Tour test 3 (2026-11-17, from whistlerroam #183): the words of a bear or wildlife tour request are the wildlife tour
+// kind, not also a category to match.
+const WILDLIFE_TOUR_WORDS_RE = /^(?:bears?|grizzly|grizzlies|wildlife)(?: and bears?)? (?:viewing|watching|spotting|tours?|safaris?)(?: tours?| safaris?)?$/;
 function planTripUnchecked(input) {
   // A dated plan with nothing else to check is still timed and dated (2026-10-18: a family weekend matched to What's On).
   // 2026-10-19: any start date or start time (the Dates & start time control) is timed too: "romantic weekend in
@@ -6463,6 +6479,11 @@ function planTripUnchecked(input) {
     if (intent.mode === 'recommend' || intent.mode === 'find') { intent.mode = 'plan'; intent.days = intent.days || 1; }
   }
   intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
+  // Tour test 3 (2026-11-17, from whistlerroam #183): real listings can have the category "Bear viewing tour" (and a park
+  // "Wildlife viewing"), so the words of a bear or wildlife tour request also came back as a category to match: "Bear
+  // viewing tour near Squamish on July 20" found only listings with exactly those words and left the rafting company
+  // that runs bear tours as "Another listing". The wildlife tour kind covers those words.
+  if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'wildlife_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && WILDLIFE_TOUR_WORDS_RE.test(normWords(f.term))));
   intent.textTerms = (intent.textTerms || []).filter(t=>!consumed.has(t));
   const length = requirements.items.find(i => i.kind === 'days');
   if (length) { intent.days = length.value; if (intent.mode !== 'events') intent.mode = 'plan'; }
@@ -6494,7 +6515,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6528,7 +6549,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
