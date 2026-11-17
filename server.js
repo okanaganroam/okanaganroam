@@ -26693,6 +26693,8 @@ function renderSocialLinksPage(now = new Date()) {
   const main = [
     { title: 'Build My Trip', path: '/trip', note: 'Type one sentence, get a plan' },
     { title: "What's On", path: '/whats-on', note: 'Events this week' },
+    // The weekend email sign-up box on What's On (PR #903), 2026-11-17.
+    { title: 'Weekend email', path: '/whats-on#wkSignupTitle-whats-on', note: 'This weekend’s events, every Thursday' },
     { title: 'Guides', path: '/guides', note: 'Local guides by season' },
     { title: 'Map', path: '/map', note: 'What is near you' },
   ];
