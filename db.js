@@ -1640,4 +1640,34 @@ if (!db.prepare('PRAGMA table_info(event_occurrences)').all().some((c) => c.name
   db.exec('ALTER TABLE event_occurrences ADD COLUMN time_tbc INTEGER NOT NULL DEFAULT 0');
 }
 
+// "This weekend" email list (2026-11-16, weekend-email.js): one row per address (stored lower-case). Double opt-in: an
+// address gets the digest only after confirmed_at is set from the emailed link; unsubscribed_at stops it for good (a new
+// sign-up must confirm again). weekend_email_sends has one row per weekend (its Friday) and subscriber, written before
+// the email goes out, so nobody gets the same weekend twice.
+db.exec(`
+CREATE TABLE IF NOT EXISTS weekend_email_subscribers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  lang TEXT NOT NULL DEFAULT 'en',
+  source TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  confirm_token TEXT UNIQUE,
+  confirm_sent_at TEXT,
+  confirmed_at TEXT,
+  unsubscribe_token TEXT NOT NULL UNIQUE,
+  unsubscribed_at TEXT,
+  last_sent_at TEXT,
+  last_sent_weekend TEXT
+);
+CREATE TABLE IF NOT EXISTS weekend_email_sends (
+  weekend TEXT NOT NULL,
+  subscriber_id INTEGER NOT NULL REFERENCES weekend_email_subscribers(id),
+  status TEXT NOT NULL,
+  error TEXT,
+  attempted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  sent_at TEXT,
+  PRIMARY KEY (weekend, subscriber_id)
+);
+`);
+
 module.exports = db;

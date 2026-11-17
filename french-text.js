@@ -47,6 +47,13 @@ const FR_CUISINE = {
 };
 
 const FR_TEXT = {
+  // The weekend email box on What's On and the homepage (2026-11-16, weekend-email.js).
+  'Get this weekend’s events every Thursday': 'Recevez les événements de la fin de semaine chaque jeudi',
+  'A free email with what’s on Friday to Sunday across the Okanagan.': 'Un courriel gratuit avec tout ce qui se passe du vendredi au dimanche dans l’Okanagan.',
+  'Your email': 'Votre courriel',
+  'Sign me up': 'Je m’inscris',
+  'We’ll email you once a week. Unsubscribe anytime.': 'Un courriel par semaine. Désabonnez-vous en tout temps.',
+  'Leave this empty': 'Laissez ce champ vide',
   // What's On (2026-10-19): the On now heading outside the daytime (the /map wording).
   'Exhibitions & multi-day events': 'Expositions et événements de plusieurs jours',
   // Winery test 3 (2026-11-12): the owner's free tasting on French cards, and the line under an experience saved without
