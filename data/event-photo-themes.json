@@ -731,6 +731,9 @@
   "1061": "rock",
   "1078": "lightup",
   "1079": "rockgem",
+  "1099": "lightup",
+  "1100": "craftfair",
+  "1101": "lightup",
   "1049": "wo-holiday-seasonal",
   "1042": "wo-holiday-seasonal",
   "1077": "wo-wineries-wine-events"
@@ -1466,6 +1469,9 @@
   "1061": "Dropkick Murphys: St. Patrick's Day Tour",
   "1078": "Osoyoos Christmas Lite-Up",
   "1079": "Vernon ROCKS Rock and Gem Show",
+  "1099": "Coldstream Community Christmas Light-Up",
+  "1100": "Oliver Arts & Crafts Fair",
+  "1101": "Peachland Christmas Light Up",
   "1049": "Candy Cane Lane",
   "1042": "Armstrong Downtown Light Up: A Little Christmas Magic",
   "1077": "Light Up the Vines on Summerland's Bottleneck Drive"
