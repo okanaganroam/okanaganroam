@@ -6,7 +6,7 @@
 // listing; anything else waits in the review inbox.
 const crypto = require('node:crypto');
 
-const LIMITS = { near_pin_m: 150, accuracy_m: 40, nudge_m: 50, too_far_m: 3000, min_edge: 800, max_edge: 2400, max_bytes: 3 * 1024 * 1024, max_body: 5 * 1024 * 1024 };
+const LIMITS = { near_pin_m: 150, accuracy_m: 40, nudge_m: 50, choose_m: 500, too_far_m: 3000, min_edge: 800, max_edge: 2400, max_bytes: 3 * 1024 * 1024, max_body: 5 * 1024 * 1024 };
 const KEYS = new Set(['image', 'lat', 'lng', 'device_lat', 'device_lng', 'accuracy', 'rights', 'company_website']);
 
 // Metres between two points.
@@ -169,13 +169,22 @@ function createArrivalPoints(deps) {
 
   const pending = () => db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all();
 
+  // Tour test 5 (Whistler, 2026-11-17): "Send with my address" (no map) after an address change sent the old pin (his
+  // house) while the phone stood at the dock, 2.7 km away; a quick "Looks right" kept the house. When the phone's reading
+  // is more than 500 m from the spot sent, both are offered and one must be picked before "Looks right" works.
+  const farChoice = (a) => a.device_lat != null && a.device_lng != null && validPoint(Number(a.device_lat), Number(a.device_lng))
+    && distanceMeters({ lat: Number(a.lat), lng: Number(a.lng) }, { lat: Number(a.device_lat), lng: Number(a.device_lng) }) > LIMITS.choose_m;
   function cardHtml(a, esc, actions) {
+    const far = farChoice(a), apart = far ? Math.round(distanceMeters({ lat: Number(a.lat), lng: Number(a.lng) }, { lat: Number(a.device_lat), lng: Number(a.device_lng) })) : 0;
+    const choose = far ? `<fieldset class="rv-choose"><legend><strong>Which spot is right?</strong> The phone was ${apart} m from the spot sent. Pick one, then tap Looks right.</legend>
+      <label class="rv-opt"><input type="radio" name="use" value="phone"> Where the phone was (<a href="https://www.google.com/maps?q=${a.device_lat},${a.device_lng}" target="_blank" rel="noopener">map</a>)</label>
+      <label class="rv-opt"><input type="radio" name="use" value="sent"> The spot sent, the listing’s old pin (<a href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">map</a>)</label></fieldset>` : '';
     return `<article class="rv-card" data-kind="arrival" data-id="${a.id}">
       <h3>${esc(a.venue_name)}</h3>
       <p class="rv-meta">Storefront spot #${a.id}${a.distance_m != null ? ` · ${a.distance_m} m from the map pin` : ''}${a.accuracy_m != null ? ` · phone accurate to about ${Math.round(a.accuracy_m)} m` : ''}</p>
       ${a.review_reasons ? `<p class="rv-meta">Why it’s here: ${esc(a.review_reasons)}</p>` : ''}
       <p><img src="/owner-photos/arrival/${esc(a.preview_key)}.jpg" alt="" loading="lazy" style="max-width:320px;width:100%;border-radius:10px"></p>
-      <p><a class="rv-btn" href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">See this spot on a map</a></p>
+      ${far ? choose : `<p><a class="rv-btn" href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">See this spot on a map</a></p>`}
       ${actions}
     </article>`;
   }
@@ -185,6 +194,12 @@ function createArrivalPoints(deps) {
     if (!row) return { status: 404, body: { error: 'That storefront spot was not found.' } };
     if (row.status !== 'pending') return { status: 409, body: { error: 'This was already dealt with.' } };
     if (act === 'approve') {
+      // The phone far from the spot sent: one of the two must be picked (the phone's reading becomes the spot).
+      if (farChoice(row)) {
+        const use = body && typeof body.use === 'string' ? body.use : '';
+        if (use !== 'phone' && use !== 'sent') return { status: 400, body: { error: 'Pick which spot is right first: where the phone was, or the spot sent.' } };
+        if (use === 'phone') db.prepare('UPDATE venue_arrival_points SET lat = device_lat, lng = device_lng WHERE id = ?').run(id);
+      }
       db.prepare("UPDATE venue_arrival_points SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
       retire(row.venue_id, id);
       return { status: 200, body: { ok: true, emailed: 'not_told' } };

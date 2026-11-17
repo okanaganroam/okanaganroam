@@ -616,7 +616,7 @@ test('small ones: the second time removed, chip-filled boxes, the story tile, a 
   assert.match(s, /if \(sz0 && \+q5\[1\] === 1 && w\.length === 1 && w\[0\]\[1\] === '14:30'\) w\[0\]\[1\] = sz0;/);
   // Her own chip tap this visit is not selected on the first tap; research's text still is.
   assert.match(s, /var chipOwn = !!\(S\.chipFilled && inp\.id && S\.chipFilled\[inp\.id\] != null && S\.chipFilled\[inp\.id\] === inp\.value\);/);
-  assert.match(s, /\|\| researchStory \|\| researchLine\) && !chipOwn, first = true;/);
+  assert.match(s, /\|\| researchLine\) && !chipOwn, first = true;/); // tour test 5: the story box is never selected now, the one-line research boxes still are
   assert.match(s, /\(S\.chipFilled = S\.chipFilled \|\| \{\}\)\['nt' \+ q2\[0\]\] = e\.what;/);
   assert.match(s, /\(S\.chipFilled = S\.chipFilled \|\| \{\}\)\.suGroupsLine = S\.brew\.groups;/);
   // The story tile says "on your page" once nothing of it is waiting (it kept "within a day" after approval).
@@ -656,7 +656,7 @@ test('Build My Trip: “Dogs outside only” for a place whose owner said so (ne
   assert.ok(!out.reasons.includes('Has the Dog-Friendly badge'));
   assert.notEqual(ins.venue.badges.find((b) => b.key === 'dog_friendly').label, 'Dogs outside only');
   // Where the planner gives the badge as a reason, it is the same words.
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /if \(v\.features\.dog_friendly\) add\('feature', 8, v\.dogsPatioOnly \? 'Dogs on patio' : v\.dogsOutsideOnly \? 'Dogs outside only' : 'Has the Dog-Friendly badge'\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /if \(v\.features\.dog_friendly\) add\('feature', 8, v\.dogsPatioOnly \? 'Dogs on patio' : v\.dogsOutsideOnly \? 'Dogs outside only' : v\.dogsSomeTrips \? 'Dogs on some trips' : 'Has the Dog-Friendly badge'\);/); // + tour test 5
   assert.equal(frCopy.t3FrenchText('Dogs outside only'), 'Chiens à l’extérieur seulement');
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.match(v3, /b\.key === 'dog_friendly' && v\.dogsOutsideOnly \? \(lang\(\) === 'fr' \? 'Chiens à l’extérieur seulement' : 'Dogs outside only'\)/);

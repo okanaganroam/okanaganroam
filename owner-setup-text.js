@@ -1734,8 +1734,11 @@ en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kin
 en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
 // A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
 en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
-en.storyResearchHint = 'This is what your page says now. Type to replace this text, or tap again to add to it. The ✕ clears it.';
-fr.storyResearchHint = 'Voici ce que dit votre page maintenant. Tapez pour remplacer ce texte, ou touchez une deuxième fois pour y ajouter des mots. Le ✕ l’efface.';
+// Tour test 5 (Whistler, 2026-11-17): the box is no longer selected on its first tap (one tap and typing wiped Rob's
+// description): typing adds to the end, and replacing it is the link under the hint (or the ✕).
+en.storyResearchHint = 'This is what your page says now. Typing adds to the end of it.';
+fr.storyResearchHint = 'Voici ce que dit votre page maintenant. Ce que vous tapez s’ajoute à la fin.';
+en.storyReplaceLink = 'Clear it and write my own'; fr.storyReplaceLink = 'L’effacer et écrire le mien';
 Object.assign(en, {
   seasonAllClosed: 'Closed the whole time? That goes on the next screen under “Closed for a week or two”.',
   seasonAllClosedSoon: 'Closed the whole time? That goes a little further on, under “Closed for a week or two”.',
@@ -2063,6 +2066,35 @@ Object.assign(fr.tour, {
   streetLabel: 'Adresse ou point de rencontre',
   dogChipLabels: ['À toutes les sorties', 'À certaines sorties (dites lesquelles)', 'En laisse'],
   quickDogsFull: ['Chiens bienvenus à toutes les sorties', 'Chiens bienvenus à certaines sorties'],
+});
+// Tour test 5 (Whistler fresh eyes, Rob, 2026-11-17): a per-boat price is never saved as a price per person ("650 per
+// boat" read as $650 a person, "2 hrs $95pp" as $2). The box says why and offers the Private tours box; the lead says "a person".
+Object.assign(en.tour, {
+  tpriceLeadPick: 'Your card will say “From {x} a person”.',
+  tpriceGroup: 'Priced per boat or per group? Put it in Private tours below.',
+  tpriceGroupMove: 'Put {x} in Private tours', tpriceGroupMoved: 'Moved to Private tours. Now type a price for one person, like 95.',
+  tpriceHours: 'That starts with a trip length. Type just the price, like 95.',
+  tpriceOne: 'One price here: your lowest for one person, like 95. Other prices and extras go in “Your tours and prices”.',
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below.',
+});
+Object.assign(fr.tour, {
+  tpriceLeadPick: 'Votre fiche indiquera « À partir de {x} par personne ».',
+  tpriceGroup: 'Un prix par bateau ou par groupe? Mettez-le dans Sorties privées, plus bas.',
+  tpriceGroupMove: 'Mettre {x} dans Sorties privées', tpriceGroupMoved: 'Déplacé dans Sorties privées. Écrivez maintenant un prix pour une personne, par exemple 95.',
+  tpriceHours: 'Ça commence par une durée. Écrivez seulement le prix, par exemple 95.',
+  tpriceOne: 'Un seul prix ici : votre plus bas pour une personne, par exemple 95. Les autres prix et les extras vont dans « Vos sorties et tarifs ».',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas.',
+});
+// Tour test 5: by-booking tours' Groups question (everyone books), the meeting-spot examples with a dock or marina.
+Object.assign(en.tour, {
+  groupsQBooked: 'Groups and private bookings: how big can a group be?', groupsLeadBooked: 'Tap the most people you take, then add private trips or team outings in your own words.',
+  groupsLineBooked: 'Groups of up to {n}', groupsChipBooked: 'Up to {n}',
+  doorPhotoLead: 'Stand where people meet you (the dock or marina, the trailhead, the office), with your sign, boat or vehicle in the picture if you can. Your device will ask to share your location, so visitors get directions to this spot.',
+});
+Object.assign(fr.tour, {
+  groupsQBooked: 'Groupes et réservations privées : quelle taille peut avoir un groupe?', groupsLeadBooked: 'Touchez le plus grand nombre de personnes que vous prenez, puis ajoutez les sorties privées ou d’équipe dans vos mots.',
+  groupsLineBooked: 'Groupes jusqu’à {n} personnes', groupsChipBooked: 'Jusqu’à {n}',
+  doorPhotoLead: 'Placez-vous là où l’on vous rejoint (le quai ou la marina, le départ du sentier, le bureau), avec votre enseigne, votre bateau ou votre véhicule dans la photo si possible. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’à ce point.',
 });
 // All types: a line of the owner's that the page folds under "More" says so after the save.
 Object.assign(en, { hoursBack: 'We put back the hours you had before. Check them, then tap Next.', foldedMore: 'Look for it under “More” in your Plan your visit box.' });

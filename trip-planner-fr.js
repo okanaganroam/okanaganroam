@@ -268,7 +268,21 @@ const PHRASES = [
   ['points de vue', 'viewpoints'], ['point de vue', 'viewpoint'], ['belvedere', 'lookout'], ['belvederes', 'lookouts'],
   ['vue panoramique', 'scenic view'], ['vues panoramiques', 'scenic views'], ['tyrolienne', 'zipline'], ['tyroliennes', 'zipline'],
   ['aventure', 'adventure'], ['aventures', 'adventures'], ['aventureux', 'adventurous'], ['sensations fortes', 'thrills'],
-  ['aller a la peche', 'fishing'], ['peche', 'fishing'], ['pecher', 'fishing'],
+  // Tour test 5 (Whistler, 2026-11-17): « pêche », « excursion de pêche » and « bateau nolisé » ask for a fishing or boat
+  // operator (« pêche » planned lakes); « aller à la pêche » and « pêcher » stay the fishing activity.
+  ['aller a la peche', 'fishing'], ['pecher', 'fishing'], ['peche sur glace', 'ice fishing'], ['peche blanche', 'ice fishing'],
+  ['excursion de peche', 'fishing trip'], ['excursions de peche', 'fishing trips'], ['sortie de peche', 'fishing trip'], ['sorties de peche', 'fishing trips'], ['voyage de peche', 'fishing trip'],
+  ['peche au saumon', 'salmon fishing'], ['peche guidee', 'guided fishing'], ['guide de peche', 'fishing guide'], ['charte de peche', 'fishing charter'], ['bateau de peche', 'fishing charter'],
+  ['peche', 'fishing trip'], ['bateau nolise', 'boat charter'], ['bateaux nolises', 'boat charters'], ['nolisement', 'charter'], ['croisiere', 'cruise'], ['croisieres', 'cruises'],
+  // Every tour kind (2026-11-17): dog sledding, snowshoe tours, jet boats, bike tours, farm visits, heli-skiing, rentals.
+  ['traineau a chiens', 'dog sledding'], ['traineaux a chiens', 'dog sledding'], ['tour de traineau a chiens', 'dog sledding'], ['balade en traineau a chiens', 'dog sledding'],
+  ['sortie en raquettes', 'snowshoe tour'], ['sorties en raquettes', 'snowshoe tours'], ['excursion en raquettes', 'snowshoe tour'], ['sortie de raquette', 'snowshoe tour'], ['raquette guidee', 'guided snowshoeing'],
+  ['excursion en kayak', 'kayak tour'], ['sortie en kayak', 'kayak tour'], ['excursion en canot', 'canoe tour'], ['sortie en canot', 'canoe tour'], ['sortie en planche a pagaie', 'paddleboard tour'], ['kayak guide', 'guided kayak tour'],
+  ['sortie en jet boat', 'jet boat tour'], ['bateau a propulsion', 'jet boat'], ['bateau a reaction', 'jet boat'],
+  ['visite guidee a velo', 'guided bike tour'], ['visites guidees a velo', 'guided bike tours'], ['visite a velo', 'bike tour'], ['tour de velo', 'bike tour'], ['sortie a velo', 'bike tour'], ['sortie en velo', 'bike tour'],
+  ['visite de ferme', 'farm tour'], ['visites de ferme', 'farm tours'], ['visite a la ferme', 'farm tour'], ['autocueillette', 'u-pick'],
+  ['heliski', 'heli-skiing'], ['ski heliporte', 'heli-skiing'], ['ski en chenillette', 'cat skiing'],
+  ['location d equipement', 'equipment rentals'], ['location de materiel', 'equipment rentals'],
   ['jouer au golf', 'golf'], ['terrain de golf', 'golf course'], ['terrains de golf', 'golf courses'],
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],
   ['vue sur le lac', 'lake view'], ['vue sur lac', 'lake view'], ['vue sur la lac', 'lake view'],

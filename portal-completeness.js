@@ -841,9 +841,11 @@ function renderCompleteness(result, opts) {
   // d’ici un jour. », « Menu : envoyé. Nous l’ajouterons… », « Photos, menu et Facebook : envoyés. Nous les ajouterons… »).
   const FR_FEM = new Set(['photos', 'votre histoire', 'adresse', 'photo de la porte de la salle de dégustation', 'photo de la porte de la salle', 'photo de la devanture', 'photo du point de rencontre', 'caractéristiques']);
   const FR_PLURAL = new Set(['photos', 'spéciaux', 'caractéristiques', 'sorties et tarifs']);
+  // Tour test 5 (Whistler, 2026-11-17): "Address sent. We’ll add them within a day." ("address" ends in s): the plural names.
+  const EN_PLURAL = new Set(['photos', 'tours and prices', 'features']);
   const frMany = sentNames.length > 1 || FR_PLURAL.has(sentNames[0]), frFem = sentNames.length > 0 && sentNames.every((x) => FR_FEM.has(x));
   const frSent = `envoy${frFem ? 'ée' : 'é'}${frMany ? 's' : ''}`;
-  const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !/s$/.test(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : ${frSent}. Nous ${frMany ? 'les ajouterons' : 'l’ajouterons'} d’ici un jour.`) : '';
+  const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !EN_PLURAL.has(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : ${frSent}. Nous ${frMany ? 'les ajouterons' : 'l’ajouterons'} d’ici un jour.`) : '';
   const sub0 = r.complete
     ? L('Nothing left to add. Thank you!', 'Il n’y a plus rien à ajouter. Merci!')
     : nq
