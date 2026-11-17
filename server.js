@@ -59768,6 +59768,16 @@ function ownerDirectEmail() {
 // Friday to Sunday from What's On: the "this-weekend" window (the coming weekend Mon-Thu, the rest of it Fri-Sun),
 // scheduled events and dates only, a series moved past today's finished dates, ended events out, and months-long
 // exhibitions left out (as on the homepage's This Weekend row). One entry per event, on its first day this weekend.
+// The venue and the town, without saying the town twice when the venue text already ends in it
+// ("215 Shepherd Rd, Kelowna" + "Kelowna"; also "..., Kelowna, BC" or "..., Kelowna V1Y 2A1"). Nov 17 2026.
+function weekendEmailPlace(venue, town) {
+  const v = String(venue || '').trim(), t = String(town || '').trim();
+  if (!v) return t;
+  if (!t) return v;
+  const lt = t.toLowerCase();
+  const hasTown = v.split(',').some((part, i) => { const p = part.trim().toLowerCase(); return p === lt || (i > 0 && new RegExp(`^${lt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(bc\\b|[a-z]\\d[a-z])`).test(p)); });
+  return hasTown ? v : `${v}, ${t}`;
+}
 function weekendEmailEvents(now = new Date()) {
   const win = resolveWhatsOnWindow({ when: 'this-weekend' }, now);
   const list = withoutEndedEvents(whatsOnStillOn(getWhatsOnEvents(win), now), now, win.to);
@@ -59788,7 +59798,7 @@ function weekendEmailEvents(now = new Date()) {
     if (!path) continue;
     out.push({
       id: e.id, name: e.name, path, day, time, sortTime: untimed ? '' : o.start_time,
-      place: [e.venueName, e.valleyWide ? 'Across the Okanagan' : REGION_LABELS[e.region]].filter((x, i, a) => x && a.indexOf(x) === i).join(', '),
+      place: weekendEmailPlace(e.venueName, e.valleyWide ? 'Across the Okanagan' : REGION_LABELS[e.region]),
       also: otherDays.length ? `Also ${otherDays.map((d) => WEEKDAY_SHORT[localWeekday(d)]).join(', ')}` : '',
       categories: e.categories || [], free: e.priceKind === 'free',
     });
@@ -70258,6 +70268,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  weekendEmailPlace,
   // Tour test 4 (2026-11-17), for tests/tour-setup-fresh-eyes-wr4.test.js.
   tourFreeRead, tourFree, tourPriceValue, tourListVaries, tourRowsVaryNotes, visitInfoHtml, mergeOwnerVisitRows, ownerValueText, renderAdminPhotoCard, ownerVisitFoldedKeys,
   tripTourKindVenues, hoursExtraRangeText, TOUR_FOOD_BADGES_CLEARED, HELP_PHONE_EXAMPLE, TOUR_HELP_SEASONAL_TRIP, tourAddressIsMeetingPoint,
