@@ -205,3 +205,98 @@ test('tour test 7 words: ski touring, avalanche course, hut trip, mountaineering
   assert.ok(!(tr.extractTripRequirements({ text: 'ski touring in penticton' }).items || []).some((i) => i.kind === 'activity' && i.value === 'skiing'));
   assert.deepEqual(bad, []);
 });
+
+// Tour test 8 (Whistler, 2026-11-17; Linda, a dog-sledding and kennel-tour business). "Dogs" or "puppy" in her listing's
+// name, or in "sled dog tour", "puppy visit", "kennel tour", « chiens de traîneau », never mean a dog in the party; "husky
+// sled ride" and "mushing" are dog sledding; a kennel or puppy visit plans her summer product; a named place left out is
+// judged on the asked date; "mushing with our 14-year-old" says a 14-year-old can ride but not mush (her list: 16+).
+let sledFx = null;
+async function sledDogs() {
+  if (sledFx) return sledFx;
+  await fixtures();
+  const v = mk('tour', { name: 'Skaha Sled Dogs Words', cuisine: 'Dog sledding & kennel tours', description: 'Friendly huskies pull our sleds through the snowy forest. In summer, visit the kennel and meet the puppies.', rating: 4.8, reviews: 211, hours: JSON.stringify(WK('09:00', '16:30')) });
+  const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  let r = await change(t, { tour_info: { kinds: ['dogsled', 'farm'], length: '2-3h', age: 'all', year: 'seasonal' }, open_months: '12-10:09-15' });
+  assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body));
+  r = await change(t, { closures: [{ from: '04-01', to: '06-14', note: 'Between seasons', yearly: true }] });
+  assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body));
+  const db = require('../db.js');
+  db.prepare("INSERT INTO venue_menus (venue_id, status, data, published_at) VALUES (?, 'published', ?, '2026-11-17')").run(v.id, JSON.stringify({ sections: [
+    { name: 'Winter', items: [{ name: 'Sled ride', description: '$349 per sled (2 adults), ages 3+' }, { name: 'Mush your own team', description: '$299 per person, 16+' }] },
+    { name: 'Summer', items: [{ name: 'Kennel visit', description: '$35 adult, $20 child' }] }] }));
+  const pub = mk('pub', { name: 'Leash Pub Words', cuisine: 'Pub', description: 'A dog-friendly pub with a patio.', dog_friendly: 1, rating: 4.9, reviews: 900 });
+  const park = mk('outdoor', { name: 'Off Leash Park Words', cuisine: 'Dog park', description: 'An off-leash dog park.', activities: ['hiking'], dog_friendly: 1, rating: 4.9, reviews: 900 });
+  sledFx = { v, pub, park };
+  return sledFx;
+}
+
+test('tour test 8 words: sled dogs, huskies, mushing, puppy and kennel visits (EN + FR) plan the dog-sled operator, never a dog outing', async () => {
+  const { v, pub, park } = await sledDogs();
+  const bad = [];
+  const dogOuting = (p) => /with a dog|dog-friendly spots|Leash Pub Words|Off Leash Park Words/i.test(JSON.stringify([p.party, p.heading, p.summary, itemsOf(p).map((x) => x.venue.name)]));
+  const want = async (q, opts = {}) => {
+    const p = await plan(q), got = itemsOf(p).map((x) => x.venue.name);
+    if (!got.includes(v.name)) bad.push(`"${q}" lacks her -> ${JSON.stringify(got)} ${JSON.stringify(p.warnings || [])}`);
+    else if (opts.first && got[0] !== v.name) bad.push(`"${q}" not first -> ${JSON.stringify(got)}`);
+    if (got.includes(pub.name) || got.includes(park.name)) bad.push(`"${q}" plans a dog outing -> ${JSON.stringify(got)}`);
+    if (dogOuting(p)) bad.push(`"${q}" read as travelling with a dog: ${JSON.stringify(p.party)} ${JSON.stringify(p.heading)}`);
+    if ((p.warnings || []).some((w) => /closed for the season until/.test(w))) bad.push(`"${q}" false closed note ${JSON.stringify(p.warnings)}`);
+    return p;
+  };
+  // Her name, asked on a date she is open (asked in November, before her season starts on Dec 10).
+  for (const q of ['Skaha Sled Dogs Words on February 3', 'Skaha Sled Dogs Words in Penticton on February 3', 'Skaha Sled Dogs in Penticton on February 3']) await want(q);
+  for (const q of ['Book a sled dog tour in Penticton for February 3', 'sled dog ride in Penticton on January 16', 'Husky sled ride in Penticton on December 28', 'husky sled ride near Penticton on December 28', 'huskies in Penticton on January 16',
+    'mushing in Penticton on February 12', 'Mushing our own dog sled team in Penticton on February 12', 'dog sledding in Penticton on January 16',
+    'chiens de traîneau à Penticton le 13 février', 'traîneau à chiens à Penticton le 13 février', 'balade en traîneau à Penticton le 13 février']) await want(q);
+  // Her summer product, first (before the plain farm operator and the winter-only dog-sled operator).
+  for (const q of ['Puppy visit near Penticton on July 15', 'puppy visit in Penticton on July 15', 'kennel tour in Penticton on August 10 with kids', 'kennel visit in Penticton on July 15', 'visite du chenil à Penticton le 15 juillet', 'visite des chiots à Penticton le 15 juillet']) await want(q, { first: true });
+  // A real dog in the party still is one.
+  for (const q of ['Something to do with our dog in Penticton on January 16', 'a walk with our puppy in Penticton on July 15', 'quelque chose à faire avec notre chien à Penticton le 16 janvier']) {
+    const p = await plan(q);
+    if (!dogOuting(p)) bad.push(`"${q}" lost the dog: ${JSON.stringify([p.party, p.heading])}`);
+    if (itemsOf(p).some((x) => x.venue.id === v.id)) bad.push(`"${q}" plans her for a dog outing`);
+  }
+  // The planner's own reading.
+  for (const q of ['sled dog tour', 'puppy visit', 'Skaha Sled Dogs', 'husky sled ride']) {
+    const r = tr.extractTripRequirements({ text: q });
+    if ((r.items || []).some((i) => i.kind === 'feature' && i.value === 'dog_friendly')) bad.push(`requirements "${q}" -> dog_friendly`);
+  }
+  if (!(tr.extractTripRequirements({ text: 'husky sled ride in penticton' }).items || []).some((i) => i.kind === 'venue_kind' && i.value === 'snow_tour')) bad.push('husky sled ride is not the dog-sled kind');
+  if (!(tr.extractTripRequirements({ text: 'puppy visit in penticton' }).items || []).some((i) => i.kind === 'venue_kind' && i.value === 'kennel_visit')) bad.push('puppy visit is not a kennel visit');
+  if ((tr.extractTripRequirements({ text: 'a walk with our puppy in penticton' }).items || []).some((i) => i.value === 'kennel_visit')) bad.push('with our puppy read as a kennel visit');
+  assert.deepEqual(bad, []);
+});
+
+test('tour test 8: a named place left out is judged on the asked date (closed then: says so with the day it opens again; open then: the real reason)', async () => {
+  const { v } = await sledDogs();
+  // Inside her yearly break (Apr 1 - Jun 14): closed for the season that day.
+  const may = await plan('Skaha Sled Dogs Words on May 15');
+  assert.ok(!itemsOf(may).some((x) => x.venue.id === v.id));
+  assert.ok((may.warnings || []).some((w) => w.startsWith(`${v.name} is closed for the season on May 15`)), JSON.stringify(may.warnings));
+  // Not named: the dog-sled request in May says when she opens again after that date (June 15), not next winter.
+  const kind = await plan('dog sledding in Penticton on May 15');
+  assert.ok(!(kind.warnings || []).some((w) => /reopens December 10/.test(w)), JSON.stringify(kind.warnings));
+  // Open on Feb 3, but asked with a dog: not "closed for the season until December 10".
+  const dog = await plan('Skaha Sled Dogs Words with our dog on February 3');
+  assert.ok(!(dog.warnings || []).some((w) => /closed for the season/.test(w) && w.includes(v.name)), JSON.stringify(dog.warnings));
+  if (!itemsOf(dog).some((x) => x.venue.id === v.id)) assert.ok((dog.warnings || []).includes(`${v.name} isn’t listed as dog-friendly, so it isn’t in this plan with your dog.`), JSON.stringify(dog.warnings));
+  // The French wording of the new lines.
+  const fr = require('../trip-french-copy.js');
+  assert.match(fr.t3FrenchText(`${v.name} is closed for the season on October 10 (it opens again on December 10), so it isn’t in this plan.`), /est fermé pour la saison le 10 octobre \(il rouvre le 10 décembre\)/);
+  assert.match(fr.t3FrenchText(`${v.name} isn’t listed as dog-friendly, so it isn’t in this plan with your dog.`), /n’est pas indiqué comme acceptant les chiens/);
+  assert.match(fr.t3FrenchText('A 14-year-old can ride but not mush: “Mush your own team” is for 16 and up.'), /Un enfant de 14 ans peut monter dans le traîneau, mais pas le mener/);
+});
+
+// Needs server.js's tourListItemAges (the list items' own ages with their names).
+test('tour test 8: "mushing with our 14-year-old" keeps her in and says a 14-year-old can ride but not mush (her list: Mush your own team, 16+)', async () => {
+  const { v } = await sledDogs();
+  const p = await plan('Mushing our own dog sled team in Penticton on February 12 with our 14-year-old');
+  const stop = itemsOf(p).find((x) => x.venue.id === v.id);
+  assert.ok(stop, JSON.stringify(itemsOf(p).map((x) => x.venue.name)));
+  const notes = JSON.stringify(stop);
+  assert.match(notes, /A 14-year-old can ride but not mush: “Mush your own team” is for 16 and up\./);
+  assert.doesNotMatch(notes, /Some activities are 16\+/);
+  // A 16-year-old: no such note; a 2-year-old on a plain sled ride: the general line from her list (3+).
+  assert.doesNotMatch(JSON.stringify(itemsOf(await plan('mushing in Penticton on February 12 with our 16-year-old')).find((x) => x.venue.id === v.id) || {}), /can ride but not mush/);
+  assert.match(JSON.stringify(itemsOf(await plan('dog sledding in Penticton on February 12 with our 2-year-old')).find((x) => x.venue.id === v.id) || {}), /Some activities are 3\+/);
+});

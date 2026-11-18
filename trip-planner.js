@@ -7402,7 +7402,11 @@ function planTripCore(input) {
   const offSeason = !rec.items.length ? buildRecommendations(facts, { ...ctx, ignoreSeason: true }, 3).items.filter((s) => s.venue) : [];
   if (offSeason.length) {
     const names = offSeason.map((s) => s.venue.name);
-    const reopen = offSeason.map((s) => facts.find((f) => f.id === s.venue.id)).find((f) => f && f.seasonReopens);
+    // Tour test 8 (Whistler, 2026-11-17): with a date, the day it opens again after that date (a break inside the season
+    // reopens before the next season starts; "Callaghan Sled Dogs on May 15" said it reopens December 10, not June 15).
+    const isoTrip = /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? ctx.tripDate : null;
+    const reopenOn = (f) => (isoTrip && seasonClosedOnTrip(f, { date: isoTrip }) ? reopensAfter(f, isoTrip) : f.seasonReopens) || null;
+    const reopen = offSeason.map((s) => facts.find((f) => f.id === s.venue.id)).filter((f) => f && reopenOn(f)).map((f) => ({ name: f.name, seasonReopens: reopenOn(f) }))[0];
     const when = ctx.tripDate ? `in ${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]}` : 'right now';
     // Winery test 5 (2026-11-12): closed only by the owner's own closure that day (Boxing Day, New Year's Day) isn't
     // "closed for the season".
