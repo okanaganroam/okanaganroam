@@ -125,7 +125,9 @@ test('the operator’s category words for its kind match the planner kind (infer
   const bad = [];
   for (const [k, kind] of Object.entries(expect)) {
     const v = app.getVenue(ops[k].id);
-    const kinds = tr.inferPlannerKinds({ type: 'tour', name: v.name, description: v.description, cuisine: v.cuisine });
+    // Tour test 6 (2026-11-17): the adventure kind's page word is "Adventure" when her words name nothing narrower (it was
+    // the chip's whole "ATV, bungee…" label); the planner reads her picked kinds too (server.js plannerKinds), as it plans.
+    const kinds = tr.inferPlannerKinds({ type: 'tour', name: v.name, description: v.description, cuisine: v.cuisine, ...(k === 'adventure' ? { tourKinds: app.venueTourInfo(v.id).kinds } : {}) });
     if (!kinds.includes(kind)) bad.push(`${k} (${v.cuisine}) -> ${JSON.stringify(kinds)}`);
   }
   assert.deepEqual(bad, []);

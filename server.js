@@ -6858,7 +6858,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
+      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
       nights: nightsFact(v),
       specials: specialsFact(v),
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
@@ -22204,7 +22204,7 @@ const TOUR_KIND_LABELS_OWNER = {
   snowshoe: ['Snowshoe or ski touring', 'Raquette ou ski de randonnée'], jetboat: ['Jet boat tours', 'Bateau à propulsion (jet boat)'],
   boat: ['Boat tours and charters', 'Croisières et bateaux nolisés'], paddle: ['Kayak, canoe or SUP', 'Kayak, canot ou planche à pagaie'], raft: ['Rafting', 'Rafting'],
   fishing: ['Fishing', 'Pêche'], wildlife: ['Wildlife, whale and bear viewing', 'Observation de la faune, des baleines et des ours'], horseback: ['Horseback riding', 'Équitation'],
-  bike: ['Bike and e-bike tours', 'Vélo et vélo électrique'], zipline: ['Ziplines', 'Tyrolienne'], adventure: ['ATV, bungee, climbing or canyoning', 'VTT, saut à l’élastique, escalade ou canyonisme'],
+  bike: ['Bike and e-bike tours', 'Vélo et vélo électrique'], zipline: ['Ziplines', 'Tyrolienne'], adventure: ['ATV, bungee, climbing, ropes courses or canyoning', 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme'],
   flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm visits and u-pick', 'Visites de ferme et autocueillette'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
@@ -22264,6 +22264,7 @@ function tourKindCovers(k, part) { const h = TOUR_KIND_HINTS.find(([key]) => key
 // shown ("Helicopter tours" -> "Helicopter flights", never "scenic"; "heli-skiing" -> "Heli-skiing", never "cat-skiing");
 // when they name none or all, the kind's whole words. A site that renames a chip (Whistler) overrides this map's
 // `words`, not the code.
+const TOUR_TREETOP_RE = /tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre|parcours (?:dans les arbres|a[ée]rien)/;
 const TOUR_KIND_PUBLIC = {
   heli: { words: ['Heli-skiing', 'Héliski'], sides: [[/heli[- ]?(?:ski|board)/, 'Heli-skiing', 'Héliski'], [/cat[- ]?ski|snowcat ski/, 'Cat-skiing', 'Ski en chenillette (cat-ski)']] },
   flight: { words: ['Helicopter & scenic flights', 'Vols en hélicoptère et panoramiques'],
@@ -22275,9 +22276,21 @@ const TOUR_KIND_PUBLIC = {
   // Tour test 5 (Whistler, 2026-11-17): the chip says "Wildlife, whale and bear viewing" (whales had no chip); the page
   // keeps its short words, and a listing's own "Whale watching" now stays (the chip's name has "whale").
   wildlife: { words: ['Wildlife and bear viewing', 'Observation de la faune et des ours'] },
-  adventure: { sides: [[/\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|off[- ]?road|\bjeeps?\b|\brzr\b/, 'ATV tours', 'Sorties en quad (VTT)'], [/bungee/, 'Bungee jumping', 'Saut à l’élastique'],
-    [/climb|via ferrata/, 'Climbing', 'Escalade'], [/canyon/, 'Canyoning', 'Canyonisme'], [/paraglid|skydiv/, 'Paragliding and skydiving', 'Parapente et parachutisme']] },
+  // Tour test 6 (Whistler, 2026-11-17): a zipline park's card read "ATV, bungee, climbing or canyoning" (the chip's whole
+  // label). With nothing narrower in the listing's words, the page says "Adventure" / « Aventure »; treetop and ropes
+  // courses and adventure parks are a side of their own.
+  adventure: { words: ['Adventure', 'Aventure'], sides: [[/\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|off[- ]?road|\bjeeps?\b|\brzr\b/, 'ATV tours', 'Sorties en quad (VTT)'], [/bungee/, 'Bungee jumping', 'Saut à l’élastique'],
+    [/climb|via ferrata/, 'Climbing', 'Escalade'], [/canyon/, 'Canyoning', 'Canyonisme'], [/paraglid|skydiv/, 'Paragliding and skydiving', 'Parapente et parachutisme'],
+    [TOUR_TREETOP_RE, 'Treetop and ropes courses', 'Parcours dans les arbres (hébertisme)']] },
+  // Tour test 6: French words for a bike company that rents (her « location de vélos électriques »), not « Vélo et vélo électrique ».
+  bike: { sides: [[/e-?bike (?:rentals?|hire)|location de v[ée]los? [ée]lectriques?/, 'E-bike rentals', 'Location de vélos électriques'], [/(?<!e-)(?<!e)\bbikes? (?:rentals?|hire)|location de v[ée]los?(?! [ée]lec)/, 'Bike rentals', 'Location de vélos'],
+    [/\b(?:tours?|rides?|guided|sorties?)\b/, 'Bike tours', 'Sorties à vélo']] },
 };
+// Tour test 6: the leftover words we can say in French (a listing's own part no picked kind covers).
+const TOUR_PART_FR = [[/e-?bike (?:rentals?|hire)/, 'Location de vélos électriques'], [/bike (?:rentals?|hire)/, 'Location de vélos'], [/kayak (?:rentals?|hire)/, 'Location de kayaks'],
+  [/(?:paddle ?board|sup) (?:rentals?|hire)/, 'Location de planches à pagaie'], [/ski (?:rentals?|hire)/, 'Location de skis'], [/(?:gear|equipment) (?:rentals?|hire)|^rentals?$/, 'Location d’équipement'],
+  [/heli[- ]?hik/, 'Héli-randonnée'], [/\bhik(?:e|es|ing)\b/, 'Randonnée'], [/sightseeing/, 'Visites touristiques'], [/photography/, 'Photographie'], [/stargaz/, 'Observation des étoiles'],
+  [/gondola/, 'Télécabine'], [/team building/, 'Consolidation d’équipe'], [/birthday/, 'Fêtes d’anniversaire'], [/(?:shuttles?|transportation|transfers?)\b/, 'Navettes']];
 // The page words of one kind, given the listing's own words that kind covers (`mine`, possibly none).
 function tourKindPublic(k, fr, mine) {
   const pub = TOUR_KIND_PUBLIC[k] || {};
@@ -22317,7 +22330,16 @@ function tourKindsText(kinds, fr = false, was = '') {
     const own = fr ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     (own.length ? own : tourKindPublic(k, fr, mine)).forEach(push);
   }
-  for (const p of parts) if (!picked.some((k) => tourKindCovers(k, p))) push(cap(p));
+  // Tour test 6 (Whistler, 2026-11-17): a part no picked kind covers is kept in English on English pages only. On French
+  // ones it is said in French when we know the words (a kind that covers it, or TOUR_PART_FR), and left off otherwise
+  // (the French card read « … · TREETOP ADVENTURE COURSE »).
+  for (const p of parts) {
+    if (picked.some((k) => tourKindCovers(k, p))) continue;
+    if (!fr) { push(cap(p)); continue; }
+    const known = TOUR_PART_FR.find(([re]) => re.test(p.toLowerCase()));
+    const other = known ? null : TOUR_KIND_HINTS.find(([k2, re]) => re.test(p.toLowerCase()) && TOUR_KIND_LABELS_OWNER[k2]);
+    if (known) push(known[1]); else if (other) push(tourKindPublic(other[0], true, [p])[0]);
+  }
   if (!l.length) return '';
   const and = fr ? ' et ' : ' & ';
   // A name with "and", "or" or "&" in it ("Wildlife and bear viewing", "Helicopter & scenic flights") reads badly joined
@@ -55989,8 +56011,8 @@ const TOUR_SETUP_HELP_TOPICS = [
     q: 'Which kinds do I pick? We do more than one', qFr: 'Quels genres choisir? Nous en faisons plusieurs',
     keys: ['fishing or boat', 'fishing and boat', 'boat or fishing', 'boat and fishing', 'we do both', 'do both', 'both kinds', 'two kinds', 'more than one kind', 'several kinds', 'which kinds', 'what kind do i pick', 'what kinds do i pick', 'whale', 'whales', 'whale watching', 'whale watching too', 'orca', 'orcas', 'seals', 'sea lions', 'bear viewing', 'kinds', 'three kinds', '4th kind', 'fourth kind', 'more kinds', 'treetop', 'tree top', 'treetop course', 'ropes course', 'ropes courses', 'high ropes', 'adventure park', 'aerial park', 'zipline park', 'which kind'],
     keysFr: ['baleine', 'baleines', 'observation des baleines', 'epaulards', 'phoques', 'les deux genres', 'on fait les deux', 'nous faisons les deux', 'deux genres', 'plusieurs genres', 'quel genre', 'quels genres', 'genres', 'plus de genres', 'hebertisme', 'arbre en arbre', 'parcours d arbre en arbre', 'parcours dans les arbres', 'parcours d aventure', 'parc d aventure', 'parcours aerien', 'de la peche et', 'peche et bateau', 'peche ou bateau'],
-    a: '<p>In <strong>What you offer</strong>, tick up to <strong>3 kinds</strong>: fishing and boat tours together is fine. Whale watching is <strong>Wildlife, whale and bear viewing</strong>. Not in the first row? Tap <strong>More kinds</strong>.</p><p>Something not on the list? Tap <strong>Something else</strong> and say exactly what you run in your story.</p>',
-    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, cochez jusqu’à <strong>3 genres</strong> : la pêche et les croisières ensemble, c’est correct. L’observation des baleines est sous <strong>Observation de la faune, des baleines et des ours</strong>. Pas dans la première rangée? Touchez <strong>Autres genres</strong>.</p><p>Rien dans la liste? Touchez <strong>Autre chose</strong> et dites exactement ce que vous offrez dans votre histoire.</p>' },
+    a: '<p>In <strong>What you offer</strong>, tick up to <strong>3 kinds</strong>: fishing and boat tours together is fine. Whale watching is <strong>Wildlife, whale and bear viewing</strong>. Not in the first row? Tap <strong>More kinds</strong>. A treetop or ropes course, or an adventure park, is <strong>ATV, bungee, climbing, ropes courses or canyoning</strong>: your page then says only what your own words name (like “Treetop and ropes courses”).</p><p>Something not on the list? Tap <strong>Something else</strong> and say exactly what you run in your story.</p>',
+    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, cochez jusqu’à <strong>3 genres</strong> : la pêche et les croisières ensemble, c’est correct. L’observation des baleines est sous <strong>Observation de la faune, des baleines et des ours</strong>. Pas dans la première rangée? Touchez <strong>Autres genres</strong>. Un parcours dans les arbres (hébertisme) ou un parc d’aventure va sous <strong>VTT, saut à l’élastique, escalade, hébertisme ou canyonisme</strong> : votre page ne dit alors que ce que vos propres mots nomment (comme « Parcours dans les arbres »).</p><p>Rien dans la liste? Touchez <strong>Autre chose</strong> et dites exactement ce que vous offrez dans votre histoire.</p>' },
   // Tour test 4 (Whistler, 2026-11-17; Dev, a solo walking and food tour guide). Help missed 11 of 27 questions.
   // Tour times: "my tours go at different times" and "where do the times go" got the restaurant hours answer ("+ Add a
   // second time (lunch & dinner)… Open past midnight?").
@@ -56157,8 +56179,8 @@ const TOUR_SETUP_HELP_TOPICS = [
     q: 'My kind of tour isn’t on the list (ATV, jeep…)', qFr: 'Mon genre d’activité n’est pas dans la liste (quad, jeep…)',
     keys: ['atv', 'atvs', 'atv tour', 'atv tours', 'quad', 'quads', 'jeep', 'jeeps', 'jeep tour', 'side by side', 'side by sides', 'off road', 'offroad', 'rzr', 'not on the list', 'not in the list', 'not listed', 'isnt listed', 'something else', 'my kind', 'kind of tour', 'missing kind', 'none of these'],
     keysFr: ['vtt', 'quad', 'quads', 'jeep', 'cote a cote', 'hors route', 'pas dans la liste', 'pas sur la liste', 'autre chose', 'genre d activite', 'mon genre'],
-    a: '<p>ATV, quad, jeep and side-by-side tours go under <strong>ATV, bungee, climbing or canyoning</strong> in <strong>What you offer</strong>. Something not on the list at all? Tap <strong>Something else</strong>: the words already on your page stay (like “ATV tours”), and you can say exactly what you run in your story.</p>',
-    aFr: '<p>Les sorties en VTT, en quad, en jeep et en côte-à-côte vont sous <strong>VTT, saut à l’élastique, escalade ou canyonisme</strong> dans <strong>Ce que vous offrez</strong>. Rien dans la liste? Touchez <strong>Autre chose</strong> : les mots déjà sur votre page restent (comme « ATV tours »), et vous pouvez dire exactement ce que vous offrez dans votre histoire.</p>' },
+    a: '<p>ATV, quad, jeep and side-by-side tours (and treetop or ropes courses) go under <strong>ATV, bungee, climbing, ropes courses or canyoning</strong> in <strong>What you offer</strong>. Something not on the list at all? Tap <strong>Something else</strong>: the words already on your page stay (like “ATV tours”), and you can say exactly what you run in your story.</p>',
+    aFr: '<p>Les sorties en VTT, en quad, en jeep et en côte-à-côte (et les parcours dans les arbres) vont sous <strong>VTT, saut à l’élastique, escalade, hébertisme ou canyonisme</strong> dans <strong>Ce que vous offrez</strong>. Rien dans la liste? Touchez <strong>Autre chose</strong> : les mots déjà sur votre page restent (comme « ATV tours »), et vous pouvez dire exactement ce que vous offrez dans votre histoire.</p>' },
   { id: 'tour-lengths', pages: ['setup', 'edit'], over: ['tour-multiday', 'tour-two-prices'],
     q: 'Our trips are different lengths', qFr: 'Nos sorties n’ont pas toutes la même durée',
     keys: ['two lengths', 'different lengths', 'two trips', 'two tours', 'several tours', 'more than one tour', 'more than one trip', 'trip length', 'tour length', 'how long', 'which length', '2 hour and', 'two hour and', 'half day and', 'two and four hours', 'one length', 'tours are different lengths', 'different lengths which', 'not the same length', '75 minutes and', 'one hour and three hours', 'hrs', 'hr', 'hourrange', 'hour tours', 'hours fishing', 'cruise is', 'half day', 'full day', '2 hour and half day', 'hhmm hhmm', 'hhmm for', 'hhmm and'],
@@ -56965,7 +56987,7 @@ function tourResearchLength(venue) {
 const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|sled tours?\b|\bsleds?\b/], ['dogsled', /dog ?sled/], ['jetboat', /jet ?boat/],
   ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
   ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
-  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
+  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard/], ['rentals', /rentals?/]];
 function tourKindSuggestion(venue) {
   const t = `${venue.cuisine || ''} ${venue.name || ''}`.toLowerCase();

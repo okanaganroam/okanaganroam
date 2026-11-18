@@ -150,8 +150,8 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
 
 test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pre-picks, and a summer season drops "Winter"', async () => {
   const { v, t } = await jess();
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing or canyoning');
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade ou canyonisme');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning'); // tour test 6 adds ropes courses
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
   // Pre-picks: snowmobile and the ATV chip.
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.deepEqual(c.suggestKinds, ['snowmobile', 'adventure']);
@@ -169,7 +169,7 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours');
   assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours'.replace('Ziplines, RZR', 'Ziplines, RZR'));
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
-  assert.equal(app.tourKindsText(['adventure'], false, ''), 'ATV, bungee, climbing or canyoning');
+  assert.equal(app.tourKindsText(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, never the chip's whole label
   // The card's season word: "Winter" only while she runs in winter alone.
   const winterOnly = mk('tour', { name: 'Silver Star Snowmobile Tours', cuisine: 'Snowmobile tours', description: 'Guided snowmobile tours.' });
   ok(await change(tokenFor(winterOnly.id), { open_months: '12-15:03-31', tour_info: { year: 'seasonal', kinds: ['snowmobile'] } }));

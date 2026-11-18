@@ -123,3 +123,29 @@ test('7. saving "Who can come" also takes Lake view (and the other place badges 
   // Other types never get the list.
   assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).tourFoodBadges, undefined);
 });
+
+test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes course / adventure park are Adventure words; no English leftovers on French cards', () => {
+  const kt = app.tourKindsText;
+  const was = 'Ziplines, treetop adventure course & e-bike rentals';
+  const en = kt(['zipline', 'bike', 'adventure'], false, was), fr = kt(['zipline', 'bike', 'adventure'], true, was);
+  assert.doesNotMatch(en + fr, /ATV|bungee|VTT|élastique|canyon/i);
+  assert.equal(en, 'E-bike rentals, ziplines & treetop adventure course');
+  assert.equal(fr, 'Location de vélos électriques, tyrolienne et parcours dans les arbres (hébertisme)');
+  assert.doesNotMatch(fr, /treetop|rentals|course/i);
+  // Nothing narrower: the kind's short word.
+  assert.equal(kt(['adventure'], false, ''), 'Adventure'); assert.equal(kt(['adventure'], true, ''), 'Aventure');
+  assert.equal(kt(['adventure'], false, 'ATV tours'), 'ATV tours'); assert.equal(kt(['adventure'], true, 'ATV tours'), 'Sorties en quad (VTT)');
+  // The label (chip) names ropes courses; the words are on the adventure kind.
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
+  for (const w of ['Treetop adventure course', 'High ropes course', 'Adventure park', 'Parc d’aventure', 'Hébertisme', 'Parcours d’arbre en arbre'])
+    assert.ok(app.tourKindSuggestion({ cuisine: w, name: 'X' }).includes('adventure'), w);
+  // Leftovers no picked kind covers: English kept on English pages; French says it in French or leaves it off.
+  assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines & heli-hiking');
+  assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne et héli-randonnée');
+  assert.equal(kt(['zipline'], true, 'Ziplines & sunset yoga'), 'Tyrolienne');
+  assert.equal(kt(['zipline'], true, 'Ziplines & ATV tours'), 'Tyrolienne et sorties en quad (VTT)');
+  // The rest of the kinds keep their words.
+  assert.equal(kt(['bike'], false, ''), 'Bike and e-bike tours');
+  assert.equal(kt(['bike'], true, 'Guided bike tours'), 'Sorties à vélo');
+});
