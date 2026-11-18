@@ -25,7 +25,8 @@ const KINDS = {
   // (inferPlannerKinds). A bare "fishing" stays the fishing activity (lakes, rivers and the operators).
   fishing_tour: /\b(?:fishing (?:charters?|trips?|tours?|guides?|guiding|excursions?|adventures?|boats?)|guided fishing|salmon fishing|sturgeon fishing|sport ?fishing|charter fishing|fly fishing (?:trips?|tours?|guides?))\b/,
   // Every tour kind (2026-11-17): heli-skiing and cat-skiing are tours (they read as the skiing activity and found nothing).
-  heli_ski: /\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat (?:skiing|tours?))\b/,
+  // From Whistler Roam #188 (2026-11-17): a snowcat tour (sightseeing in a snowcat) is not cat-skiing; it found only heli-ski companies.
+  heli_ski: /\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat skiing)\b/,
   // Every tour kind (2026-11-17): guided bike and paddle tours ("guided bike tour", "guided kayak tour" listed every tour in town).
   bike_tour: /\b(?:(?:guided |mountain |road |gravel )?(?:e-?)?bike tours?|cycling tours?|guided (?:e-?)?(?:bike|biking|cycling) (?:rides?|trips?)|bike guid\w*|e-?bike tours?)\b/,
   paddle_tour: /\b(?:(?:guided )?(?:kayak(?:ing)?|canoe(?:ing)?|sup|paddle ?board(?:ing)?|paddling|paddle) (?:tours?|trips?|excursions?|lessons?|outings?)|guided (?:kayak|canoe|paddl)\w*)\b/,
@@ -82,6 +83,7 @@ const REQUEST_KINDS = {
   walking_tour: /\b(?:(?:winter |christmas |holiday )?(?:lights?|lantern|night|evening|guided|village|town|downtown|city) walks?)\b/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic (?:(?:helicopter|heli|plane|air) (?:flights?|tours?)|flights?)|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|rides?|sightseeing|trips?)|heli (?:tours?|flights?|rides?)|helicopters?|flightseeing|glacier landings?)\b/,
 };
+const HELI_SKI_LISTING_RE=/\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat skiing)\b/;
 // Every tour kind (2026-11-17): the setup's tour kinds (venue_tour_info.kinds) -> the planner kinds they are.
 const TOUR_KIND_PLANNER = { fishing: ['fishing_tour'], boat: ['boat_tour'], jetboat: ['boat_tour'], raft: ['rafting'], wildlife: ['wildlife_tour'], zipline: ['zipline'],
   flight: ['scenic_flight'], walking: ['walking_tour'], food: ['food_tour'], wine: ['wine_tour'], farm: ['farm'], snowmobile: ['snowmobile_tour'], dogsled: ['snow_tour'],
@@ -200,7 +202,12 @@ function inferPlannerKinds(v) {
     // Boat tours, Rafting…), whatever its name says; fishing trips, heli-skiing and rentals are tours only.
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     if (kind==='fishing_tour') return v.type==='tour'&&(re.test(text)||/\b(?:fishing|angling)\b/.test(text));
-    if (kind==='heli_ski'||kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||(kind==='snowshoe_tour'&&/\bsnowshoe\w*/.test(text)));
+    // From Whistler Roam #188 (2026-11-17, real-data check): heli-skiing is read from the listing's own name and category words (its
+    // description when it has no category), and a snowcat sightseeing tour is not cat-skiing. "Heli-skiing in Whistler"
+    // listed Canadian Wilderness Adventures ("… snowshoe & snowcat tours") and Coast Range Alpine Yurt (its description
+    // names "Coast Range Heli-Skiing's yurt") ahead of the three heli-ski companies.
+    if (kind==='heli_ski') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); return HELI_SKI_LISTING_RE.test(own)||(!String(v.cuisine||'').trim()&&HELI_SKI_LISTING_RE.test(text)); }
+    if (kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||/\bsnowshoe\w*/.test(text));
     if (kind==='rentals') return v.type==='tour'&&/\brentals?\b/.test(text);
     if (kind==='bike_tour') return v.type==='tour'&&(re.test(text)||/\b(?:e-?bikes?|bikes?|biking|bicycles?|cycling)\b/.test(text));
     if (kind==='paddle_tour') return v.type==='tour'&&(re.test(text)||/\b(?:kayak\w*|canoe\w*|sup|paddle ?board\w*|paddling)\b/.test(text));
@@ -541,6 +548,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // Budget bands guide suggestions; they never verify a total dollar cost.
   if (/\b(?:under|budget of|maximum|max)\s*\$\s*(?:100|[1-9]\d?)\b/i.test(original) || /\b(?:easy|simple|casual) (?:food|meals|dining)\b/.test(normalizedText)) add('price_limit',2,'Prefer lower price bands; total cost remains unverified.');
   if (items.some(i=>i.value==='easy_walk')) {for(let n=items.length-1;n>=0;n--)if(items[n].kind==='venue_kind'&&items[n].value==='walk'&&items.some(i=>i.kind==='venue_kind'&&i.value==='easy_walk'&&i.dayIndex===items[n].dayIndex&&i.weekday===items[n].weekday&&i.strength===items[n].strength))items.splice(n,1);}
+  // From Whistler Roam #188 (2026-11-17, real-data check): a snowshoe tour asked for is that tour, not also the
+  // snowshoeing and winter activities. The server builds the day's stops from these items before the planner runs, so
+  // "snowshoe tour in Whistler on January 20" had a "Snowshoeing" stop and planned Lost Lake Snowshoe Trails first, the
+  // operator second. Plain "snowshoeing" keeps the trails.
+  if(items.some(i=>i.kind==='venue_kind'&&i.value==='snowshoe_tour'&&i.strength==='must')){for(let n=items.length-1;n>=0;n--)if(items[n].kind==='activity'&&['snowshoeing','winter'].includes(items[n].value))items.splice(n,1);}
+  // The same for heli-skiing and cat-skiing: not also the skiing and winter activities and the outdoor places they bring
+  // ("heli-skiing in Whistler" with no date, in November, left out every Whistler heli-ski company for not being a ski
+  // area, and listed one in Brackendale). An outdoor place asked for in its own words (a hike, a trail) stays.
+  if(items.some(i=>i.kind==='venue_kind'&&i.value==='heli_ski'&&i.strength==='must')){for(let n=items.length-1;n>=0;n--)if(items[n].kind==='activity'&&['skiing','winter'].includes(items[n].value)||items[n].kind==='type'&&items[n].value==='outdoor'&&!/\b(?:hikes?|hiking|trails?|walks?|walking|parks?|beach\w*|lakes?|outdoors?|viewpoints?|waterfalls?|nordic|cross country|snowshoe\w*)\b/.test(items[n].sourceText||''))items.splice(n,1);}
   if(deadlineMinutes!=null && deadlineMinutes<=18*60 && items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper)\b/.test(i.sourceText))) conflicts.push('Dinner conflicts with the requested return deadline; choose an earlier meal or a later deadline.');
   if(calendar.days>0&&calendar.days<=7)add('days',calendar.days,calendar.source,{dayIndex:null,weekday:null});
   const lengths=new Set(items.filter(i=>i.kind==='days').map(i=>i.value));
@@ -674,7 +690,8 @@ function consumedTerms(requirements) {
     }
     if (i.kind === 'feature') add(`${i.value.replace(/_/g, ' ')} meals meal only must verified`);
     if (i.kind === 'activity') add(i.value==='viewpoints'?'sunset viewpoints viewpoint watch place to':i.value);
-    if (i.kind === 'venue_kind') add(`${LABELS[i.value]} ${i.value==='sunset'?'watch place to':i.value==='cooking'?'classes':i.value==='horseback'?'horse riding':i.value==='scenic_flight'?'helicopter helicopters heli flights flightseeing glacier landing landings float plane planes floatplane seaplane ride rides':i.value==='heli_hike'?'helihiking heli hike hikes':i.value==='food_tour'?'food foodie culinary tasting tours':i.value==='walking_tour'?'walking walk walks tours lights light lantern night evening ghost history historic historical heritage guided winter christmas holiday':''}`);
+    // From Whistler Roam #188 (2026-11-17): the new tour kinds' own words too ("cat skiing in Whistler" kept "cat" as a word to find).
+    if (i.kind === 'venue_kind') add(`${LABELS[i.value]} ${i.value==='sunset'?'watch place to':i.value==='cooking'?'classes':i.value==='horseback'?'horse riding':i.value==='scenic_flight'?'helicopter helicopters heli flights flightseeing glacier landing landings float plane planes floatplane seaplane ride rides':i.value==='heli_hike'?'helihiking heli hike hikes':i.value==='food_tour'?'food foodie culinary tasting tours':i.value==='walking_tour'?'walking walk walks tours lights light lantern night evening ghost history historic historical heritage guided winter christmas holiday':i.value==='heli_ski'?'heli ski skis skiing heliski heliskiing heliboarding board boarding cat catski catskiing snowcat snowcats':i.value==='snowshoe_tour'?'snowshoe snowshoes snowshoeing guided tours trips outings excursions':i.value==='fishing_tour'?'fishing charter charters trip trips tours guide guides guided guiding salmon sturgeon sport':i.value==='rentals'?'equipment gear outdoor adventure rental rentals':i.value==='bike_tour'?'guided bike bikes biking e ebike cycling mountain road gravel tours rides trips':i.value==='paddle_tour'?'guided kayak kayaking canoe canoeing sup paddle paddleboard paddling tours trips excursions lessons outings':''}`);
   }
   return terms;
 }

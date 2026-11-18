@@ -277,6 +277,11 @@ const PHRASES = [
   // Every tour kind (2026-11-17): dog sledding, snowshoe tours, jet boats, bike tours, farm visits, heli-skiing, rentals.
   ['traineau a chiens', 'dog sledding'], ['traineaux a chiens', 'dog sledding'], ['tour de traineau a chiens', 'dog sledding'], ['balade en traineau a chiens', 'dog sledding'],
   ['sortie en raquettes', 'snowshoe tour'], ['sorties en raquettes', 'snowshoe tours'], ['excursion en raquettes', 'snowshoe tour'], ['sortie de raquette', 'snowshoe tour'], ['raquette guidee', 'guided snowshoeing'],
+  // From Whistler Roam #188 (2026-11-17, real-data check): « randonnée guidée en raquettes » read as a hike plus the word « guidée »
+  // and found nothing. Guided is the tour; a plain « randonnée en raquettes » stays snowshoeing (the trails).
+  ['randonnee guidee en raquettes', 'guided snowshoe tour'], ['randonnees guidees en raquettes', 'guided snowshoe tours'], ['randonnee guidee en raquette', 'guided snowshoe tour'],
+  ['sortie guidee en raquettes', 'guided snowshoe tour'], ['excursion guidee en raquettes', 'guided snowshoe tour'], ['balade guidee en raquettes', 'guided snowshoe tour'],
+  ['raquettes guidees', 'guided snowshoeing'], ['randonnee en raquettes', 'snowshoeing'], ['randonnees en raquettes', 'snowshoeing'],
   ['excursion en kayak', 'kayak tour'], ['sortie en kayak', 'kayak tour'], ['excursion en canot', 'canoe tour'], ['sortie en canot', 'canoe tour'], ['sortie en planche a pagaie', 'paddleboard tour'], ['kayak guide', 'guided kayak tour'],
   ['sortie en jet boat', 'jet boat tour'], ['bateau a propulsion', 'jet boat'], ['bateau a reaction', 'jet boat'],
   ['visite guidee a velo', 'guided bike tour'], ['visites guidees a velo', 'guided bike tours'], ['visite a velo', 'bike tour'], ['tour de velo', 'bike tour'], ['sortie a velo', 'bike tour'], ['sortie en velo', 'bike tour'],

@@ -130,3 +130,32 @@ test('the operator’s category words for its kind match the planner kind (infer
   }
   assert.deepEqual(bad, []);
 });
+
+// From Whistler Roam #188 (2026-11-17), its real-data check on whistler.db, on Okanagan fixtures: a snowshoe tour plans
+// the snowshoe operator, not the snowshoe trail first (EN, FR, « randonnée guidée en raquettes »); plain "snowshoeing"
+// may still offer the trail. Heli-skiing is read from a listing's own name and category (a snowcat sightseeing tour and a
+// yurt whose description names a heli-ski company are not heli-skiing); "cat skiing" keeps the heli and cat-ski
+// companies; a "snowcat tour" is not cat-skiing.
+test('Whistler real-data fixes: snowshoe tour before trails, guided snowshoe in French, heli and cat skiing', async () => {
+  await fixtures();
+  const trail = mk('outdoor', { name: 'Snowshoe Trails Words', cuisine: 'Snowshoe trails', description: 'Marked snowshoe trails through the forest.', activities: ['snowshoeing', 'winter', 'hiking'], rating: 4.9, reviews: 900 });
+  const cat = mk('tour', { name: 'Big White Snowcat Words Adventures', cuisine: 'Snowmobile, dog sled, snowshoe & snowcat tours', description: 'Snowmobile, dog sled, snowshoe and snowcat tours.', rating: 4.9, reviews: 900 });
+  const yurt = mk('tour', { name: 'Monashee Yurt Words', cuisine: 'Heli-touring & backcountry yurt', description: "Words Heli-Skiing's six-bunk yurt.", rating: 4.9, reviews: 900 });
+  const catski = mk('tour', { name: 'SilverStar Powder Words Cat-Skiing', cuisine: 'Heli & cat skiing', description: 'Guided snowcat skiing.', rating: 4.7, reviews: 100 });
+  const names = async (q) => itemsOf(await plan(q)).map((x) => x.venue.name);
+  for (const q of ['snowshoe tour in Penticton on January 20', 'sortie en raquettes à Penticton le 20 janvier', 'randonnée guidée en raquettes à Penticton le 20 janvier']) {
+    const got = await names(q);
+    assert.ok(got.length && got[0] !== trail.name && !got.includes(trail.name), `${q}: ${JSON.stringify(got)}`);
+    assert.ok(got.includes(OP('snowshoe')), `${q}: ${JSON.stringify(got)}`);
+  }
+  assert.ok((tr.extractTripRequirements({ text: 'snowshoeing in penticton on january 20' }).items || []).some((i) => i.kind === 'activity' && i.value === 'snowshoeing'));
+  assert.ok(!(tr.extractTripRequirements({ text: 'snowshoe tour in penticton on january 20' }).items || []).some((i) => i.kind === 'activity' && i.value === 'snowshoeing'));
+  const kindsOf = (v) => tr.inferPlannerKinds({ type: 'tour', name: v.name, cuisine: v.cuisine, description: v.description });
+  assert.ok(!kindsOf(cat).includes('heli_ski')); assert.ok(!kindsOf(yurt).includes('heli_ski')); assert.ok(kindsOf(catski).includes('heli_ski'));
+  const heli = await names('heli-skiing in Penticton on February 10');
+  assert.ok(heli.includes(OP('heli')) && heli.includes(catski.name), JSON.stringify(heli));
+  assert.ok(!heli.includes(cat.name) && !heli.includes(yurt.name), JSON.stringify(heli));
+  const cs = await names('cat skiing in Penticton on February 10');
+  assert.ok(cs.includes(catski.name), JSON.stringify(cs));
+  assert.ok(!(tr.extractTripRequirements({ text: 'snowcat tour in penticton' }).items || []).some((i) => i.value === 'heli_ski'));
+});
