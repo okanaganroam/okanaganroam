@@ -2609,7 +2609,7 @@
       x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:door') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:door')) : '') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>'
+      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + (TOUR && T.doorPick ? big('🖼', T.doorPick, T.doorPickSub, true, 'doorPick') : '') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:door') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:door')) : '') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>'
         // Tour test 11: the pickup option of the meeting-spot question.
         + (TOUR && T.pickupBtn && TI.pickup ? '<p class="su-sent" id="suPickupDoor">' + h(T.pickupOn) + '</p>' : '');
     } else if (s === 'door:photo') {
@@ -2685,6 +2685,37 @@
 
   // ---------- Pictures ----------
   function goodPhotos(){ return S.photos.filter(function(ph){ return !ph.bad; }); }
+  // Tour test 12 (Whistler, 2026-11-18; Kayla's meeting spot is a gravel lot she isn't standing in): the GPS a JPEG carries
+  // in its EXIF (GPSLatitude / GPSLongitude with their N/S, E/W), or null. Read on the phone; nothing else is kept.
+  function exifGps(buf){
+    try {
+      var v = new DataView(buf); if (v.byteLength < 12 || v.getUint16(0) !== 0xFFD8) return null;
+      var o = 2;
+      while (o + 4 < v.byteLength) {
+        var m = v.getUint16(o); if ((m & 0xFF00) !== 0xFF00) return null;
+        var len = v.getUint16(o + 2);
+        if (m === 0xFFE1 && o + 10 < v.byteLength && v.getUint32(o + 4) === 0x45786966) {
+          var t = o + 10, le = v.getUint16(t) === 0x4949;
+          var u16 = function(p){ return v.getUint16(p, le); }, u32 = function(p){ return v.getUint32(p, le); };
+          var ifd = t + u32(t + 4), n = u16(ifd), g = 0, i;
+          for (i = 0; i < n; i++) if (u16(ifd + 2 + i * 12) === 0x8825) g = t + u32(ifd + 2 + i * 12 + 8);
+          if (!g) return null;
+          var gn = u16(g), r = {};
+          for (i = 0; i < gn; i++) {
+            var e = g + 2 + i * 12, tag = u16(e);
+            if (tag === 1 || tag === 3) r[tag] = String.fromCharCode(v.getUint8(e + 8));
+            else if (tag === 2 || tag === 4) { var p0 = t + u32(e + 8), a = [], j; for (j = 0; j < 3; j++) { var de = u32(p0 + j * 8 + 4); a.push(de ? u32(p0 + j * 8) / de : 0); } r[tag] = a[0] + a[1] / 60 + a[2] / 3600; }
+          }
+          if (r[2] == null || r[4] == null) return null;
+          var lat = r[2] * (r[1] === 'S' ? -1 : 1), lng = r[4] * (r[3] === 'W' ? -1 : 1);
+          return isFinite(lat) && isFinite(lng) && !(lat === 0 && lng === 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: lat, lng: lng } : null;
+        }
+        if (m === 0xFFDA) return null;
+        o += 2 + len;
+      }
+    } catch (e) { return null; }
+    return null;
+  }
   function loadImage(file){ return new Promise(function(ok, no){ var url = URL.createObjectURL(file), img = new Image(); img.onload = function(){ ok({ img: img, url: url }); }; img.onerror = function(){ URL.revokeObjectURL(url); no(new Error('read')); }; img.src = url; }); }
   function jpeg(img, maxEdge){ var w = img.naturalWidth, hh = img.naturalHeight, sc = Math.min(1, maxEdge / Math.max(w, hh)); var c = document.createElement('canvas'); c.width = Math.round(w * sc); c.height = Math.round(hh * sc); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
   function photoPayload(ph){
@@ -4110,6 +4141,8 @@
     if (k === 'socialBoth') return socialBoth();
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }
+    // Tour test 12: "Choose a photo I took there" (its own GPS, read from the photo).
+    if (k === 'doorPick') { var dp = el('suDoorPick'); return dp ? dp.click() : null; }
     if (k === 'doorSend') return doorSend();
   }
   function wire(){
@@ -4461,6 +4494,20 @@
     var f = (e.target.files || [])[0]; e.target.value = ''; if (!f) return;
     if (S.menuPages.length >= C.maxPages) { S.error = fill(T.tooManyPages, { n: C.maxPages }); return render(); }
     loadImage(f).then(function(r){ if (Math.max(r.img.naturalWidth, r.img.naturalHeight) < C.menuMinEdge) { S.error = T.pageSmall; return render(); } S.error = ''; S.menuPages.push({ file: f, img: r.img, thumb: r.url, name: f.name || 'page', pdf: false }); render(); }, function(){ S.error = T.cantOpen; render(); });
+  };
+  // Tour test 12: a photo she took at the meeting spot, from her photos. With GPS in it: the pin screen at that spot (sent
+  // like "Send with my address": it waits for our check, no phone reading). Without: say so; the other options stay.
+  var doorPickEl = el('suDoorPick');
+  if (doorPickEl) doorPickEl.onchange = function(e){
+    var f = (e.target.files || [])[0]; e.target.value = ''; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      var at = exifGps(rd.result);
+      if (!at) { S.nudge = T.doorPickNoGps; S.error = ''; var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
+      loadImage(f).then(function(r){ S.door.photo = jpeg(r.img, 1600).toDataURL('image/jpeg', 0.85); S.door.spot = { lat: at.lat, lng: at.lng }; S.door.moved = true; S.door.best = null; S.door.fromPhoto = true; S.error = ''; S.nudge = ''; go('door:pin'); }, function(){ S.error = T.cantOpen; render(); });
+    };
+    rd.onerror = function(){ S.error = T.cantOpen; render(); };
+    rd.readAsArrayBuffer(f);
   };
   el('suDoorCam').onchange = function(e){
     var f = (e.target.files || [])[0]; e.target.value = ''; if (!f) return;

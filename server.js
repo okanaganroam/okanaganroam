@@ -4506,7 +4506,9 @@ function buildDiscoverySearchVenues() {
       // (Good to know: "Hotel pickup available") are searched with its story ("village lights tour", "hotel pickup"); each
       // part is read on its own (the reader keeps about 500 characters of one text).
       textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: [row.description || '', ...(row.type === 'tour' ? [...tourListText(row.id).split(' ; '), ...tourVisitSearchText(row.id).split(' ; ')] : [])].filter(Boolean).map((x) => normalize(x)).join(' '), textDescFr: normalize(row.description_fr || ''),
-      features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
+      // Tour test 12 (Whistler, 2026-11-18; "bungee gift cards" listed only a gift shop): a tour is in the activities its
+      // tours filter puts it under (Adventure, Winter…), so a search that names one finds it (and its typed list).
+      features, collections: m.collections, activities: row.type === 'tour' ? [...new Set([...m.activities, ...OUTDOOR_ACTIVITIES.filter((a) => TOUR_ACTIVITIES.some((x) => x.slug === a.slug) && tourInActivity(row, a.slug)).map((a) => a.slug)])] : m.activities, fdTypes: m.fdTypes,
       rating: row.rating, reviews: row.reviews, price: row.price, row,
     });
   }
@@ -56857,7 +56859,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suMenuFile" accept="application/pdf,.pdf,image/*" multiple class="su-file" tabindex="-1" aria-hidden="true">
 <input type="file" id="suSheetFile" accept="application/pdf,.pdf,image/*" multiple class="su-file" tabindex="-1" aria-hidden="true">
 <input type="file" id="suSheetCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
-<input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
+<input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true"><input type="file" id="suDoorPick" accept="image/jpeg,image/*" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
 ${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), SETUP_SEASON_HELP_TOPIC] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
@@ -71958,6 +71960,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Tour test 12 (Whistler, 2026-11-18).
+  tourAdultRule, venueCloseByOrigin, ownerFrDescEnglishShown, queueFrStoryTranslation, tourStretchWeekendsText, tourTripItems, ownerUrlFromPaste, socialFlagHtml, venueWeatherToday, venueWeatherStretches, tourOwnSays, tourSearchExtraText, menuTripCount,
   // Tour test 10 (2026-11-18), for tests/tour-test10-fixes.test.js.
   sentenceCaps, typedAllLowercase, tourRiderAge, renderAdminMenuCard, planStopRegions, ownerFrDescState,
   weekendEmailPlace,

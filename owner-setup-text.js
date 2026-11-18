@@ -2222,6 +2222,8 @@ Object.assign(fr, {
 // he dictates and typed his pickup into the Address box). The pickup option of the meeting-spot questions (Basics and
 // "Where do people meet you?"), the hourly unit and minimum of the Private tours price, and the nudge on the Address box.
 Object.assign(en.tour, {
+  doorPick: 'Choose a photo I took there', doorPickSub: 'We read the spot from the photo’s location',
+  doorPickNoGps: 'That photo has no location saved in it. Tap “Yes, I’m here” next time you’re there, or “Not right now”.',
   pickupBtn: 'We pick you up (from hotels in the village)', pickupSub: 'Your page says “Pickup: hotels in the village”, with your office for directions',
   pickupOn: '✓ You pick people up from their hotels. Your address is your office.', pickupOff: 'We don’t pick people up',
   addrPickup: 'That reads like a pickup, not an address. Type your office’s street address here; then tap “We pick you up (from hotels in the village)”. Tap Save again to keep it as typed.',
@@ -2229,6 +2231,8 @@ Object.assign(en.tour, {
   tprivMinQ: 'Minimum hours?', tprivMins: { 2: '2 hours', 3: '3 hours', 4: '4 hours', 5: '5 hours', 6: '6 hours', 8: '8 hours' },
 });
 Object.assign(fr.tour, {
+  doorPick: 'Choisir une photo prise sur place', doorPickSub: 'Nous lisons l’endroit dans la position de la photo',
+  doorPickNoGps: 'Cette photo ne contient pas de position. Touchez « Oui, j’y suis » la prochaine fois que vous y êtes, ou « Pas maintenant ».',
   pickupBtn: 'Nous allons vous chercher (aux hôtels du village)', pickupSub: 'Votre page indique « Prise en charge : hôtels du village », avec votre bureau pour l’itinéraire',
   pickupOn: '✓ Vous allez chercher les gens à leur hôtel. Votre adresse est celle de votre bureau.', pickupOff: 'Nous n’allons pas chercher les gens',
   addrPickup: 'Cela ressemble à une prise en charge, pas à une adresse. Inscrivez ici l’adresse de votre bureau, puis touchez « Nous allons vous chercher (aux hôtels du village) ». Touchez Enregistrer de nouveau pour la garder telle quelle.',
