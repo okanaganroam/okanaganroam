@@ -140,6 +140,8 @@ function requestKidAges(text) {
 }
 // Tour test 2 (2026-11-16): the ages as typed (ctx.kidAges, read by the server before "10-year-old" becomes "kids").
 function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
+// Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
+const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
 function kidsAllowed(v) {
   if (!v) return false;
   const ctx = arguments[1]; // the trip's context when given (the ages it names), tour test 1
@@ -1249,7 +1251,14 @@ function scoreVenue(v, ctx) {
   // Tour test 6 (Whistler, 2026-11-17): a kids' birthday (« fête d'anniversaire pour enfants ») plans an activity the
   // children can do (a tour or attraction whose ages let them in) before a long hike; a restaurant only when food is asked.
   if (ctx.kids && /\b(?:birthday|birthdays|anniversaire)\b/.test(ctx.queryText || '')) {
-    if (['tour', 'indoor', 'sport'].includes(v.type) && kidsAllowed(v, ctx)) add('kids_birthday_activity', 35, 'A kids’ activity for the birthday');
+    // Whistler #190 (2026-11-17, real data): an adventure park listed as a sport place is planned as 'outdoor', so its own
+    // words count here too (plannerKinds are filled only for a request that names a kind). An active party place (adventure
+    // park, treetop/ropes/obstacle course, zipline, mini golf, climbing wall, trampolines) goes before a museum.
+    const activeParty = KIDS_PARTY_ACTIVE_RE.test(normWords(`${v.name || ''} ${v.cuisine || ''}`));
+    if ((['tour', 'indoor', 'sport'].includes(v.type) || activeParty) && kidsAllowed(v, ctx)) {
+      add('kids_birthday_activity', 35, 'A kids’ activity for the birthday');
+      if (activeParty) add('kids_birthday_active', 20, null);
+    }
     else if (v.type === 'outdoor' && /\b(?:hard|difficult|strenuous|steep|long|challenging|alpine)\b/.test(normWords(`${v.textDesc || ''} ${v.cuisine || ''}`))) add('kids_birthday_hard_hike', -40, null);
   }
   // Tour test 6 (Whistler, 2026-11-17): rentals asked for ("E-bike rental", « location de vélos électriques »): the tours
@@ -1262,9 +1271,9 @@ function scoreVenue(v, ctx) {
     const w = item ? item[1].replace(/^e[- ]?bike$/, 'bike').replace(/ /g, ' ?') : '';
     const hasItem = !item || new RegExp(`\\b(?:e ?-?)?${w}s?\\b`).test(own);
     if (v.type === 'tour' && /\brentals?\b/.test(own)) add('rental_outfitter', 35, hasItem ? 'Rents what you asked for' : null);
+    // Whistler #190 (2026-11-17): the item asked for is scored once (it was added twice).
     if (item) add(hasItem ? 'rental_item' : 'rental_other_item', hasItem ? 25 : -40, null);
     if (v.isShop) add('rental_shop_after_tours', -100, null);
-    if (item) { const w = item[1].replace(/^e-?bike$/, 'bike').replace(/ /g, ' ?'); if (new RegExp(`\\b(?:e-?)?${w}s?\\b`).test(own)) add('rental_item', 25, null); else add('rental_other_item', -40, null); }
   }
   if (v.isShop && SHOP_ASKED_RE.test(ctx.queryText || '')) {
     const rentalAsked = /\b(?:rentals?|rent|tuning|gear)\b/.test(ctx.queryText || '');
@@ -7241,6 +7250,7 @@ function planTripCore(input) {
     return result;
   }
   let rec = buildRecommendations(facts, ctx);
+  let borrowedTown = null; // the one town the list was borrowed from (below)
   // A descriptive word no listing mentions ("cafes with wifi") is reported rather than emptying the list (2026-10-14).
   const looseTerms = ctx.foodTerms.filter((f) => !f.cuisine && !DISH_WORDS_RE.test(f.term));
   if (!rec.items.length && looseTerms.length && (ctx.types.size || ctx.foodTerms.length > looseTerms.length)) {
@@ -7287,7 +7297,7 @@ function planTripCore(input) {
       if (wider.items.length) found.push({ r, wider, own: wider.items.some((i) => { const f = facts.find((x) => x.id === i.venue.id); return !!f && asked.some((w) => normWords(f.cuisine || '').includes(w)); }) });
     }
     for (const { r, wider } of found.filter((x) => x.own).concat(found.filter((x) => !x.own)).slice(0, 1)) {
-      rec = wider;
+      rec = wider; borrowedTown = r;
       const mins = Math.round(regionMinutes(cents, ctx.regions[0], r) / 5) * 5;
       result.notes.push(`Nothing in ${regionLabel(ctx, ctx.regions[0])} fits that, so these are the nearest, in ${regionLabel(ctx, r)}${Number.isFinite(mins) && mins > 0 ? `, about ${mins} minutes’ drive` : ''}.`);
       break;
@@ -7306,7 +7316,9 @@ function planTripCore(input) {
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").
   { const listDate = ctxPlanDate(ctx); if (listDate) result.listDate = listDate; }
-  result.summary = buildSummary(kind, ctx, null);
+  // Whistler #190 (2026-11-17): when the whole list comes from the nearest town that has it, the header names that town
+  // (the note above says why).
+  result.summary = buildSummary(kind, borrowedTown ? { ...ctx, regions: [borrowedTown] } : ctx, null);
   result.overview = buildOverview(kind, ctx, null);
   // 2026-10-25: when the only matches are closed for the season ("boat rental in Penticton" in October), say so and
   // name them, rather than "no listings match".
