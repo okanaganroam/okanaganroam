@@ -1577,7 +1577,7 @@
     var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
     return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '">' + h(T.frOnlyAddEn) + '</a></p>';
   }
-  function frOnlyFinish(){ var named = frOnlyNamed(); if (named) return named; var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
+  function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
     var out = [], seen = {};
     // Never an item she already answered or sent (pub fresh-eyes, 2026-11-10: Takeout ticked on "What you offer" and a
@@ -2496,7 +2496,7 @@
           // Brewery test 1 port (2026-11-16): "Add your tap list" stays in view (a no-kitchen brewery never saw it in the fold).
           + (left.some(tapItem) ? '<div class="su-stack" id="suTapOpen">' + left.filter(tapItem).map(leftItem).join('') + '</div>' : '')
           + (left.some(function(o){ return !tapItem(o); }) ? '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.filter(function(o){ return !tapItem(o); }).map(leftItem).join('') + '</div></details>' : '')
-          + frOnlyFinish()
+          + (frOnlyNamed() || frOnlyFinish())
           + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '') + changeLink;
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
@@ -2506,7 +2506,7 @@
         // Distillery test 1 (Whistler, 2026-11-16): "About 100% complete" sat over "To reach 100%" (a cocktail list isn't
         // part of the score without a kitchen, but its tile was still open). At 100 the open tiles are "You can still add".
         + (left.length ? '<h2 class="su-h2" id="suLeftH">' + h((sc.soon < sc.pct ? sc.soon : Math.max(sc.pct, sc.soon || 0)) >= 100 && T.stillAdd ? T.stillAdd : T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
-        + frOnlyFinish()
+        + (frOnlyNamed() || frOnlyFinish())
         // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
         + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
         + preview()

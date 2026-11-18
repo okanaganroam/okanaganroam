@@ -136,10 +136,10 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
   db.prepare("INSERT INTO venue_menus (venue_id, status, data, published_at) VALUES (?, 'published', ?, '2026-11-01')").run(v.id, JSON.stringify({ sections: [{ name: 'Cruises', items: [{ name: 'Sunset cruise', price: '$79' }, { name: 'Two-hour lake tour', price: '$59' }, { name: 'Private charter', price: '$900' }] }] }));
   const en = page(v, 'en');
   assert.match(en, /<h2><span aria-hidden="true">🎟️<\/span> Tours &amp; prices<\/h2>/);
-  assert.match(en, /See all tours &amp; prices \(3/);
+  assert.match(en, /See all tours &amp; prices \(2/); // tour test 6: the "Private charter" line is not counted as a trip
   const fr = page(v, 'fr');
   assert.match(fr, /<h2><span aria-hidden="true">🎟️<\/span> Sorties et tarifs<\/h2>/);
-  assert.match(fr, /Voir toutes les sorties et tarifs \(3/);
+  assert.match(fr, /Voir toutes les sorties et tarifs \(2/);
   assert.doesNotMatch(plain(en), /🍽|🍺/);
   // A link instead (from the setup's "on my website"): the row says Tours & prices.
   assert.deepEqual(app.venueTapListWords(app.getVenue(v.id), false), { label: 'Tours & prices', see: 'See tours & prices', lower: 'tours & prices' });

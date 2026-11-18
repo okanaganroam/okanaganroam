@@ -219,7 +219,8 @@ function inferPlannerKinds(v) {
     if (kind==='adventure_park') return re.test(norm([v.name,v.cuisine,v.textName].filter(Boolean).join(' ')));
     if (kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||/\bsnowshoe\w*/.test(text));
     // Tour test 6: a shop that rents is a rental place too (after the tours that rent: trip-planner.js scoreVenue).
-    if (kind==='rentals') return (v.type==='tour'&&/\brentals?\b/.test(text))||((v.type==='shop'||v.isShop)&&/\brentals?\b/.test(norm(`${text} ${v.cuisine||''}`)));
+    // A place listed outdoors whose own name or category says rentals ("Lakeside Boat Rentals") too.
+    if (kind==='rentals') return (v.type==='tour'&&/\brentals?\b/.test(text))||((v.type==='shop'||v.isShop)&&/\brentals?\b/.test(norm(`${text} ${v.cuisine||''}`)))||(['outdoor','beach','sport'].includes(v.type)&&/\brentals?\b/.test(norm(`${v.name||''} ${v.textName||''} ${v.cuisine||''}`)));
     if (kind==='bike_tour') return v.type==='tour'&&(re.test(text)||/\b(?:e-?bikes?|bikes?|biking|bicycles?|cycling)\b/.test(text));
     if (kind==='paddle_tour') return v.type==='tour'&&(re.test(text)||/\b(?:kayak\w*|canoe\w*|sup|paddle ?board\w*|paddling)\b/.test(text));
     if (['walk','easy_walk'].includes(kind)) {

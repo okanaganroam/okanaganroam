@@ -432,7 +432,8 @@ test('answers in French only: the score says so, and the last screen and the Sav
   assert.match(text.fr.frOnlyFinish.replace(/[  ]/g, ' '), /en français seulement : elles paraissent sur votre page française seulement\. .* ajoutez-les en anglais sur votre page de modification\./);
   const s = CLIENT();
   assert.match(s, /function frOnlyFinish\(\)\{ var noFr = !CUR\.description_fr && T\.frOnlyFinishNoStory; return T\.frOnlyFinish && frOnlyAny\(\) \? '<p class="su-hint" id="suFrOnlyFinish"'/);
-  assert.equal((s.match(/\+ frOnlyFinish\(\)/g) || []).length, 2, 'on both forms of the last screen');
+  // Tour test 6 (2026-11-17): the French-only lines are named first when the score names them (frOnlyNamed).
+  assert.equal((s.match(/\+ \(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\)/g) || []).length, 2, 'on both forms of the last screen');
   // The Saved message says it once for a French detail too.
   assert.match(s, /var any = \(out \|\| \[\]\)\.some\(function\(x\)\{ return \(!x\.title && x\.title_fr\) \|\| \(x\.detail_fr && !x\.detail\); \}\);/);
 });
