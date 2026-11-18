@@ -7280,7 +7280,12 @@ function planTripCore(input) {
     const near = townsNear(regionCentroids(facts), ctx.regions, 25);
     if (near.length) {
       const wider = buildRecommendations(facts, { ...ctx, regions: near });
-      if (wider.items.length) { rec = wider; result.notes.push(`Nothing in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))} fits that, so these are nearby in ${listText([...new Set(wider.items.map((i) => i.venue.regionLabel))])}.`); }
+      if (wider.items.length) {
+        rec = wider; result.notes.push(`Nothing in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))} fits that, so these are nearby in ${listText([...new Set(wider.items.map((i) => i.venue.regionLabel))])}.`);
+        // Whistler #190 (2026-11-17): all from one nearby town ("zipline in Summerland"): the header names that town.
+        const towns = [...new Set(wider.items.map((i) => i.venue.region).filter(Boolean))];
+        if (towns.length === 1 && wider.items.every((i) => i.venue.region)) borrowedTown = towns[0];
+      }
     }
   }
   // Still nothing (2026-10-25: "horseback riding in Whistler", "hot springs in Whistler"): the nearest town in the corridor
