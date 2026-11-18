@@ -3482,7 +3482,7 @@
       // offers (research ticked them on a snowmobile outfitter): saving "Who can come" takes them off, on this save only.
       // Tour test 4 (Whistler, 2026-11-17): and the food-only ones (Vegan, Vegetarian, Gluten-free, Non-alcoholic, Happy
       // hour) a wrong scrape left on a walking tour's page. The list comes from the page's config (C.tourFoodBadges).
-      if (TOUR) (C.tourFoodBadges || ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour']).forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
+      if (TOUR) (C.tourFoodBadges || ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour', 'lake_view']).forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
       if (Object.keys(sendB).length) list.push({ badges: sendB });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });

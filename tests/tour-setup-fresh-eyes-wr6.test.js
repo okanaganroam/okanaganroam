@@ -108,3 +108,18 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   ok(await change(t, { tour_info: { kinds: ['zipline', 'adventure', 'bike'] } }));
   assert.match(plain(page(app.getVenue(v.id))), /From \$69 a person/);
 });
+
+test('7. saving "Who can come" also takes Lake view (and the other place badges the tour setup never shows) off a tour', async () => {
+  const { v, t } = sky();
+  const c = cfgOf((await get(`/owner/${t}/setup`)).text);
+  for (const b of ['lake_view', 'beach_access', 'rv_parking', 'heated_patio', 'fireplace', 'local_drinks', 'takeout']) assert.ok(c.tourFoodBadges.includes(b), b);
+  for (const b of ['great_groups', 'kid_friendly', 'dog_friendly', 'free_parking', 'wheelchair_accessible', 'service_dogs', 'locally_owned']) assert.ok(!c.tourFoodBadges.includes(b), b);
+  assert.ok(app.getVenue(v.id).lake_view);
+  const on = c.tourFoodBadges.filter((b) => c.cur.badges[b]);
+  assert.ok(on.includes('lake_view'), JSON.stringify(on));
+  ok(await change(t, { tour_info: { age: '6', adult: true }, badges: Object.fromEntries(on.map((b) => [b, false])) }, true));
+  const after = app.getVenue(v.id);
+  for (const b of ['lake_view', 'vegan', 'patio', 'happy_hour']) assert.ok(!after[b], b);
+  // Other types never get the list.
+  assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).tourFoodBadges, undefined);
+});

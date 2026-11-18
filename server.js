@@ -20532,7 +20532,9 @@ const OWNER_FEATURE_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'bre
 const TOUR_OWNER_BADGES = ['free_parking', 'wheelchair_accessible', 'locally_owned', 'service_dogs'];
 // Tour test 4 (Whistler, 2026-11-17): food and drink badges a tour never has (the portal's food-only set, with Patio,
 // Live music and Happy hour): cleared when "Who can come" is saved in the setup.
-const TOUR_FOOD_BADGES_CLEARED = ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour'];
+// Tour test 6 (Whistler, 2026-11-17): and the place badges the tour setup never shows (Lake view stayed on a zipline park:
+// « Vue sur le lac ou le vignoble »): Lake view, Beach access, RV parking, Heated patio, Fireplace, Local drinks, Takeout.
+const TOUR_FOOD_BADGES_CLEARED = ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour', 'lake_view', 'beach_access', 'rv_parking', 'heated_patio', 'fireplace', 'local_drinks', 'takeout'];
 const COCKTAIL_OWNER_BADGES = ['local_drinks', 'heated_patio', 'fireplace', 'beach_access', 'free_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'service_dogs'];
 const BREWERY_OWNER_BADGES = ['heated_patio', 'picnic_area', 'free_parking', 'rv_parking', 'wheelchair_accessible', 'locally_owned', 'takes_reservations', 'takeout', 'service_dogs', 'pool', 'darts', 'shuffleboard', 'arcade', 'board_games'];
 // Wineries (Dayton, 2026-11-12): heated or covered patio, free parking, room for RVs, wheelchair accessible, locally owned,
