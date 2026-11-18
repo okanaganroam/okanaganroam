@@ -655,3 +655,77 @@ test("tour test 9 answers: the cultural kind, one side of a kind, Indigenous-own
   assert.match(plain(en.topic("tour-meeting-varies").a), /Where do people meet you\?/);
   assert.match(plain(en.topic("fr-desc-old").a), /Leave it to us/); assert.match(plain(en.topic("menu-add").a), /Type them in myself/); assert.match(plain(fr.topic("menu-add").aFr), /Je les tape moi-même/);
 });
+
+// Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch in the Pemberton Meadows: trail rides for riders 8+, pony
+// rides for little ones, summer pack trips, winter sleigh rides on weekends and holidays, closed Mondays in spring and
+// fall; Android tablet, short answers, no capitals). His 19 questions as typed (shots 008-037 and help-log.json), each with
+// a French twin, and rephrasings. Help missed or answered wrong 12 of 19 (three seasons, holidays, sleigh rides, what a
+// kind is, an 8+ age, a 2-person minimum, a price per sleigh, what a badge is, his daughter, one trip's season).
+const ASKED10 = [
+  ["10-008", "closed mondays in spring n fall only not summer", ["hours-third-stretch"], "fermé les lundis au printemps et à l'automne seulement, pas l'été"],
+  ["10-009", "winter is only sleigh rides weekends", ["tour-one-trip-season","hours-third-stretch","seasonal-hours"], "l'hiver c'est seulement les promenades en traîneau les fins de semaine"],
+  ["10-018", "how do i put fall too closed mondays oct nov", ["hours-third-stretch"], "comment je mets l'automne aussi, fermé les lundis en oct et nov"],
+  ["10-019", "we do sleighs on holidays to like xmas week and family day", ["hours-open-holidays"], "on fait le traîneau les jours fériés aussi comme la semaine de Noël et le jour de la Famille"],
+  ["10-023", "wheres sleigh rides", ["tour-kinds-sleigh"], "où sont les promenades en traîneau"],
+  ["10-024", "what do i pick rides r 1 hr 2 hr half day n overnite", ["tour-lengths","tour-several-prices"], "je choisis quoi, les randonnées c'est 1 h, 2 h, une demi-journée et une nuit"],
+  ["10-025", "whats a kind", ["tour-kinds-what"], "c'est quoi un genre"],
+  ["10-026", "sleigh rides r only winter", ["tour-one-trip-season"], "les promenades en traîneau c'est seulement l'hiver"],
+  ["10-027", "horse drawn sleigh which one do i tick", ["tour-kinds-sleigh"], "traîneau tiré par des chevaux, lequel je coche"],
+  ["10-035", "riders gotta be 8 but pony rides r for little kids under 8", ["tour-ages-per-trip"], "les cavaliers doivent avoir 8 ans mais les tours de poney c'est pour les petits enfants de moins de 8 ans"],
+  ["10-036", "theres no 8", ["tour-age"], "il n'y a pas de 8"],
+  ["10-037", "do i put the weight limit somewhere", ["tour-weight"], "est-ce que je mets la limite de poids quelque part"],
+  ["10-125", "pony rides r per kid not per person", ["tour-kids-price"], "les tours de poney c'est par enfant pas par personne"],
+  ["10-126", "pack trip is 2 person minimum where do i put that", ["tour-price-rules","tour-several-prices"], "la sortie avec chevaux de bât c'est 2 personnes minimum, je le mets où"],
+  ["10-127", "sleigh is priced per sleigh up to 10 ppl", ["tour-price-rules","tour-per-unit"], "le traîneau c'est un prix par traîneau jusqu'à 10 personnes"],
+  ["10-128", "whats a badge", ["tour-badges-what"], "c'est quoi un badge"],
+  ["10-129", "my daughter does my email can she get in to", ["not-owner","staff"], "ma fille s'occupe de mes courriels, peut-elle y accéder"],
+  ["10-130", "closed mondays spring n fall", ["hours-third-stretch"], "fermé les lundis printemps et automne"],
+  ["10-131", "riders must be under 230 lb", ["tour-weight"], "les cavaliers doivent peser moins de 230 lb"],
+];
+const MORE10 = [
+  ["en","we need a third stretch of hours",["hours-third-stretch"]],
+  ["en","can i add three seasons",["hours-third-stretch"]],
+  ["en","we are open on stat holidays too",["hours-open-holidays"]],
+  ["en","open christmas week",["hours-open-holidays"]],
+  ["en","where is sleigh rides",["tour-kinds-sleigh"]],
+  ["en","what is a kind",["tour-kinds-what"]],
+  ["en","hay rides are only summer",["tour-one-trip-season"]],
+  ["en","2 person min on the overnight trip",["tour-price-rules"]],
+  ["en","priced per sleigh",["tour-price-rules","tour-per-unit"]],
+  ["en","what is a badge",["tour-badges-what"]],
+  ["en","my wife does the email, can she get in",["not-owner","staff"]],
+  ["fr","troisième période d'heures",["hours-third-stretch"]],
+  ["fr","ouvert les jours fériés",["hours-open-holidays"]],
+  ["fr","promenade en traîneau",["tour-kinds-sleigh"]],
+  ["fr","qu'est-ce qu'un genre",["tour-kinds-what"]],
+  ["fr","prix par traîneau",["tour-price-rules","tour-per-unit"]],
+  ["fr","qu'est-ce qu'un badge",["tour-badges-what"]],
+];
+test("tour test 10: every Help question (EN + its French twin) and rephrasings land on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Trail rides & sleigh rides" });
+  assert.equal(ASKED10.length, 19);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED10) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  for (const [lang, q, want] of MORE10) { const r = (lang === "fr" ? fr : en).best(q); if (!want.includes(r.id)) wrong.push(`"${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 10 answers: three stretches with the spring-and-fall tip, Open on holidays, Sleigh rides, what a kind and a badge are, 8+ and 10+, price rules, a family member", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("hours-third-stretch").a), /three stretches/); assert.match(plain(en.topic("hours-third-stretch").a), /usual hours your spring and fall hours/);
+  assert.match(plain(fr.topic("hours-third-stretch").aFr), /trois périodes/);
+  assert.match(plain(en.topic("hours-open-holidays").a), /Open on holidays/); assert.match(plain(en.topic("hours-open-holidays").a), /Christmas week \(December 24 to January 1\)/);
+  assert.match(plain(fr.topic("hours-open-holidays").aFr), /Ouvert les jours fériés/);
+  assert.match(plain(en.topic("tour-kinds-sleigh").a), /Sleigh rides/); assert.match(plain(en.topic("tour-kinds-sleigh").a), /closest kind/); assert.match(plain(fr.topic("tour-kinds-sleigh").aFr), /Promenades en traîneau/);
+  assert.match(plain(en.topic("tour-kinds-what").a), /tiles on What do you offer\?/);
+  assert.match(plain(en.topic("tour-badges-what").a), /Kid friendly/); assert.doesNotMatch(plain(en.topic("tour-badges-what").a), /<code>|footer/);
+  assert.match(plain(en.topic("tour-age").a), /8\+, 10\+/); assert.match(plain(fr.topic("tour-age").aFr), /8\+, 10\+/);
+  assert.match(plain(en.topic("tour-ages-per-trip").a), /Riders 8\+ \(pony rides under 8\)/);
+  assert.match(plain(en.topic("tour-price-rules").a), /Your tours and prices/); assert.match(plain(en.topic("tour-price-rules").a), /2 person minimum/);
+  assert.match(plain(en.topic("not-owner").a), /Managers, marketing and staff can update the page too/);
+  assert.match(plain(en.topic("tour-one-trip-season").a), /Stay “all year”/);
+});
