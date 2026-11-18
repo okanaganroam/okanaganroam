@@ -32,7 +32,9 @@ const KINDS = {
   paddle_tour: /\b(?:(?:guided )?(?:kayak(?:ing)?|canoe(?:ing)?|sup|paddle ?board(?:ing)?|paddling|paddle) (?:tours?|trips?|excursions?|lessons?|outings?)|guided (?:kayak|canoe|paddl)\w*)\b/,
   // Every tour kind: a rental shop listed as a tour ("Rentals"); "equipment rentals" planned a museum. Only plain rental
   // words: "bike rental", "boat rental" keep what they found before.
-  rentals: /\b(?:(?:equipment|gear|outdoor gear|adventure gear) rentals?|rentals)\b/,
+  // Tour test 6 (Whistler, 2026-11-17): "E-bike rental", "kayak rental", "ski rental" (and « location de vélos électriques »,
+  // which reads "e-bike rental") are rentals too: the rental outfitters first, shops that rent after (it planned ski shops).
+  rentals: /\b(?:(?:equipment|gear|outdoor gear|adventure gear|(?:e-?)?bikes?|bicycles?|kayaks?|canoes?|sups?|paddle ?boards?|skis?|snowboards?|snowshoes?|boats?) (?:rentals?|hire)|rentals)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
@@ -208,7 +210,8 @@ function inferPlannerKinds(v) {
     // names "Coast Range Heli-Skiing's yurt") ahead of the three heli-ski companies.
     if (kind==='heli_ski') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); return HELI_SKI_LISTING_RE.test(own)||(!String(v.cuisine||'').trim()&&HELI_SKI_LISTING_RE.test(text)); }
     if (kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||/\bsnowshoe\w*/.test(text));
-    if (kind==='rentals') return v.type==='tour'&&/\brentals?\b/.test(text);
+    // Tour test 6: a shop that rents is a rental place too (after the tours that rent: trip-planner.js scoreVenue).
+    if (kind==='rentals') return (v.type==='tour'&&/\brentals?\b/.test(text))||((v.type==='shop'||v.isShop)&&/\brentals?\b/.test(norm(`${text} ${v.cuisine||''}`)));
     if (kind==='bike_tour') return v.type==='tour'&&(re.test(text)||/\b(?:e-?bikes?|bikes?|biking|bicycles?|cycling)\b/.test(text));
     if (kind==='paddle_tour') return v.type==='tour'&&(re.test(text)||/\b(?:kayak\w*|canoe\w*|sup|paddle ?board\w*|paddling)\b/.test(text));
     if (['walk','easy_walk'].includes(kind)) {

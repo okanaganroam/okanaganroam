@@ -641,6 +641,9 @@ function indoorAskedLabel(text, form) {
   if (gallery && museum) return form === 'singular' ? 'Museum or Gallery' : 'Museums & Galleries';
   if (gallery) return form === 'singular' ? 'Art Gallery' : 'Art Galleries';
   if (museum) return form === 'singular' ? 'Museum' : 'Museums';
+  // Tour test 6 (Whistler, 2026-11-17): "E-bike rental" read "Shops in Whistler" (and French « Boutiques et « electriques » »).
+  const rent = /\b(?:(e[- ]?bike|bike|bicycle|kayak|canoe|sup|paddleboard|paddle board|ski|snowboard|snowshoe|boat|equipment|gear)s? )?(?:rentals?|hire)\b/.exec(q);
+  if (rent) { const what = rent[1] ? `${rent[1].replace(/^e[- ]?bike$/, 'E-bike').replace(/^sup$/, 'SUP').replace(/^./, (c) => c.toUpperCase())} ` : ''; return what ? `${what}${form === 'singular' ? 'rental' : 'rentals'}` : form === 'singular' ? 'Rental' : 'Rentals'; }
   if (SHOP_ASKED_RE.test(q)) return form === 'singular' ? 'Shop' : 'Shops';
   if (/\b(?:yoga|pilates)\b/.test(q)) return form === 'singular' ? 'Yoga Studio' : 'Yoga Studios';
   if (/\b(?:spa|spas|nordic spa|sauna|saunas|massage|massages)\b/.test(q)) return form === 'singular' ? 'Spa' : 'Spas';
@@ -1240,6 +1243,20 @@ function scoreVenue(v, ctx) {
   if (v.type === 'brewery' && ciderAsked(ctx.queryText)) { if (breweryIsCidery(v)) add('cider_asked', 30, 'A cidery, as you asked'); else add('beer_not_cider', -30, null); }
   // Shopping asked for (2026-10-25): shops come before museums and galleries, and gift, book and clothing shops before
   // rental and tuning counters unless rentals were asked for.
+  // Tour test 6 (Whistler, 2026-11-17): rentals asked for ("E-bike rental", « location de vélos électriques »): the tours
+  // that rent (an outfitter, a park with e-bikes) before the shops that rent; and the place that rents what was named
+  // (bikes, kayaks, skis) before one that rents something else.
+  const rentalsKind = (ctx.plannerKinds || []).includes('rentals');
+  if (rentalsKind) {
+    const item = (ctx.queryText || '').match(/\b(e[- ]?bike|bike|bicycle|kayak|canoe|sup|paddle ?board|ski|snowboard|snowshoe|boat)s? (?:rentals?|hire)\b/);
+    const own = normWords(`${v.cuisine || ''} ${v.name || ''} ${v.textDesc || ''}`);
+    const w = item ? item[1].replace(/^e[- ]?bike$/, 'bike').replace(/ /g, ' ?') : '';
+    const hasItem = !item || new RegExp(`\\b(?:e ?-?)?${w}s?\\b`).test(own);
+    if (v.type === 'tour' && /\brentals?\b/.test(own)) add('rental_outfitter', 35, hasItem ? 'Rents what you asked for' : null);
+    if (item) add(hasItem ? 'rental_item' : 'rental_other_item', hasItem ? 25 : -40, null);
+    if (v.isShop) add('rental_shop_after_tours', -100, null);
+    if (item) { const w = item[1].replace(/^e-?bike$/, 'bike').replace(/ /g, ' ?'); if (new RegExp(`\\b(?:e-?)?${w}s?\\b`).test(own)) add('rental_item', 25, null); else add('rental_other_item', -40, null); }
+  }
   if (v.isShop && SHOP_ASKED_RE.test(ctx.queryText || '')) {
     const rentalAsked = /\b(?:rentals?|rent|tuning|gear)\b/.test(ctx.queryText || '');
     const rentalShop = /\b(?:rentals?|tuning|repairs?)\b/.test(normWords(v.cuisine || ''));

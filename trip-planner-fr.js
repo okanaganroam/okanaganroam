@@ -399,6 +399,15 @@ const PHRASES = [
   ['toutes', 'all'], ['tres', 'very'], ['bien', ''], ['peu', ''], ['un peu', ''], ['petit', ''], ['petite', ''], ['petits', ''],
   // 2026-10-25 (last, after every longer phrase): « un brunch puis une promenade à Kelowna » kept « promenade ».
   ['promenade', 'walk'], ['promenades', 'walks'], ['balade', 'walk'], ['balades', 'walks'], ['se promener', 'walk'],
+  // Tour test 6 (Whistler, 2026-11-17): rentals by what is rented (« location de vélos électriques » read « electriques »
+  // as a search word), adventure parks and treetop courses, children's birthday parties.
+  ['location de velos electriques', 'e-bike rentals'], ['location de velo electrique', 'e-bike rental'], ['location de velo', 'bike rental'],
+  ['location de vtt electriques', 'e-bike rentals'], ['location de kayaks', 'kayak rentals'], ['location de kayak', 'kayak rental'], ['location de canots', 'canoe rentals'],
+  ['location de planches a pagaie', 'paddleboard rentals'], ['location de planche a pagaie', 'paddleboard rental'], ['location de ski', 'ski rental'], ['location de raquettes', 'snowshoe rentals'],
+  ['velos electriques', 'e-bikes'], ['velo electrique', 'e-bike'],
+  ['parc d aventure', 'adventure park'], ['parcs d aventure', 'adventure parks'], ['parc d aventures', 'adventure park'], ['parcours dans les arbres', 'treetop course'],
+  ['parcours d arbre en arbre', 'treetop course'], ['parcours aerien', 'treetop course'], ['hebertisme', 'treetop course'],
+  ['fete d anniversaire', 'birthday party'], ['fetes d anniversaire', 'birthday parties'], ['fete d enfants', 'kids birthday party'],
 ];
 const PHRASE_MAP = new Map();
 for (const [fr, en] of PHRASES) if (!PHRASE_MAP.has(fr)) PHRASE_MAP.set(fr, en);
