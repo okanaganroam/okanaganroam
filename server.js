@@ -7536,7 +7536,9 @@ function tripFullVenueNames(text, taxonomy) {
     // without its bracket part was not recognised), and the full name goes in at that place.
     const flat = out.split('').map((ch) => { const d = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return d.length === 1 ? d : ch; }).join('');
     const m = re.exec(flat);
-    if (m) out = out.slice(0, m.index) + e.full + out.slice(m.index + m[0].length);
+    // Tour test 9 (Whistler, 2026-11-18): a name just put in is held whole, so a shorter name inside it isn't expanded too
+    // ("Owl Creek Cultural Tours" became "Owl Creek Recreation Site Cultural Tours (test)" and planned the campsite).
+    if (m) { out = `${out.slice(0, m.index)}\u0002${keep.length}\u0002${out.slice(m.index + m[0].length)}`; keep.push(e.full); }
   }
   for (const e of oneWord) {
     const lower = norm(out);
@@ -22672,6 +22674,27 @@ function tourOpenSeason(venueId) {
 }
 // The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
 // answered, and its row is left as research has it.
+// Tour test 9 (Whistler, 2026-11-18; Tanis): "Season: All year." sat above her April and November closures. Her yearly
+// breaks of a week or more ("every year" closures; holidays are single days) are named: whole months by name ("April and
+// November", « en avril et en novembre »), other stretches by their dates. -> { en, fr } or null.
+function tourYearlyBreaksText(venueId) {
+  try {
+    const LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const md = (x) => { const [m, d] = String(x).split('-').map(Number); return { m, d }; };
+    const len = (a, b) => { const A = Date.UTC(2001, a.m - 1, a.d), B = Date.UTC(b.m < a.m || (b.m === a.m && b.d < a.d) ? 2002 : 2001, b.m - 1, b.d); return Math.round((B - A) / 86400000) + 1; };
+    const raw = ((venueHoursExtras(venueId) || {}).raw || []).filter((c) => c && hoursModule && hoursModule.isYearlyClosure(c));
+    const breaks = raw.map((c) => ({ a: md(c.from), b: md(c.to || c.from) })).filter((x) => len(x.a, x.b) >= 7)
+      .sort((x, y) => x.a.m - y.a.m || x.a.d - y.a.d);
+    if (!breaks.length) return null;
+    const enM = MONTH_NAMES.en, frM = MONTH_NAMES.fr;
+    const parts = breaks.map(({ a, b }) => (a.m === b.m && a.d === 1 && b.d >= LAST[b.m - 1] - (b.m === 2 ? 1 : 0)
+      ? { en: enM[a.m - 1], fr: `en ${frM[a.m - 1]}` }
+      : { en: `${wineryMd(`${String(a.m).padStart(2, '0')}-${String(a.d).padStart(2, '0')}`, false)} – ${wineryMd(`${String(b.m).padStart(2, '0')}-${String(b.d).padStart(2, '0')}`, false)}`,
+        fr: `du ${wineryMd(`${String(a.m).padStart(2, '0')}-${String(a.d).padStart(2, '0')}`, true)} ${frAuDay(wineryMd(`${String(b.m).padStart(2, '0')}-${String(b.d).padStart(2, '0')}`, true))}` }));
+    const join = (xs, and) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} ${and} ${xs[xs.length - 1]}`);
+    return { en: join(parts.map((x) => x.en), 'and'), fr: join(parts.map((x) => x.fr), 'et') };
+  } catch (e) { return null; }
+}
 function tourRentalsOnly(t) { const ks = t && Array.isArray(t.kinds) ? t.kinds : []; return ks.length > 0 && ks.every((k) => k === 'rentals'); }
 function tourVisitLines(venue, info) {
   const t = info || venueTourInfo(venue.id);
@@ -22680,7 +22703,7 @@ function tourVisitLines(venue, info) {
   // Tour test 1 (Whistler, 2026-11-16): with its break when a yearly closure splits it ("Dec 15 – Mar 31 and Jun 1 – Sep 30.").
   const parts = open ? (openSeasonStretches(venue.id, (venueLinks(venue.id) || {}).open_months) || [open]) : null;
   if (parts) out.Season = { en: `${parts.map((r) => `${wineryMd(r.from, false)} – ${wineryMd(r.to, false)}`).join(' and ')}.`, fr: `${parts.map((r, i) => `${i ? 'du' : 'Du'} ${wineryMd(r.from, true)} ${frAuDay(wineryMd(r.to, true))}`).join(' et ')}.`.replace(/\.\.$/, '.') };
-  else if (t.year === 'all') out.Season = { en: 'All year.', fr: 'Toute l’année.' };
+  else if (t.year === 'all') { const ex = tourYearlyBreaksText(venue.id); out.Season = ex ? { en: `All year except ${ex.en}.`, fr: `Toute l’année sauf ${ex.fr}.` } : { en: 'All year.', fr: 'Toute l’année.' }; }
   if (TOUR_LENGTHS.includes(t.length)) out['Time needed'] = { en: TOUR_LENGTH_LINES[t.length][0], fr: TOUR_LENGTH_LINES[t.length][1] };
   const price = typeof t.price === 'number' && t.price > 0 ? t.price : null, priv = typeof t.private === 'number' && t.private > 0 ? t.private : null;
   // Tour test 4: "Free." or "Free (pay what you want).", then the private price if any.
@@ -59624,6 +59647,16 @@ const OWNER_HELP_SCRIPT = String.raw`
   // Distillery test 3 (2026-11-13): a link in an answer to a part of this page ("#tours-events") closes the help so that part shows.
   panel.addEventListener('click', function(e){ var a = e.target.closest ? e.target.closest('a[href^="#"]') : null; if (a && a.getAttribute('href').length > 1) { panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); } });
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  // Tour test 9 (keyboard pass): Tab left the open Help dialog for the page behind it. Tab and Shift+Tab now go round
+  // inside it while it is open.
+  panel.addEventListener('keydown', function(e){
+    if (e.key !== 'Tab' || panel.hidden) return;
+    var f = Array.prototype.filter.call(panel.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), textarea:not([disabled]), select:not([disabled]), [tabindex="0"]'), function(x){ return x.offsetParent !== null && !x.classList.contains('ohb-hp'); });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
   // Esc closes it from anywhere while it is open (the focus may be on the page behind it).
   if (typeof document.addEventListener === 'function') document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !(panel.contains && panel.contains(e.target))) close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
@@ -71289,7 +71322,7 @@ module.exports = {
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
-  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
+  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, tourTextMonths, tourWaterMonths, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,

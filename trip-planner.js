@@ -7430,7 +7430,10 @@ function planTripCore(input) {
     // "closed for the season".
     const onlyDay = ctx.tripDate && offSeason.every((st) => { const f = facts.find((x) => x.id === st.venue.id); return f && f.ownerClosures && !seasonClosedOnTrip({ ...f, ownerClosures: undefined }, { date: ctx.tripDate }); });
     const dayText = ctx.tripDate ? `${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]} ${Number(ctx.tripDate.slice(8, 10))}` : '';
-    if (onlyDay) result.warnings.push(names.length === 1 ? `${names[0]} matches but is closed on ${dayText}. Ask again with another date to plan it.` : `These places match but are closed on ${dayText}: ${listText(names)}. Ask again with another date to plan them.`);
+    // Tour test 9 (Whistler, 2026-11-18; Tanis, closed every November): a closure longer than the day says when it opens
+    // again ("It reopens December 1."), as a season does.
+    const dayReopen = (() => { if (!onlyDay || names.length !== 1) return ''; const f = facts.find((x) => x.id === offSeason[0].venue.id); const ro = f && reopensAfter(f, ctx.tripDate); if (!ro) return ''; const next = new Date(`${ctx.tripDate}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1); return ro > next.toISOString().slice(0, 10) ? ` It reopens ${MONTH_NAMES[Number(ro.slice(5, 7)) - 1]} ${Number(ro.slice(8, 10))}.` : ''; })();
+    if (onlyDay) result.warnings.push(names.length === 1 ? `${names[0]} matches but is closed on ${dayText}.${dayReopen} Ask again with another date to plan it.` : `These places match but are closed on ${dayText}: ${listText(names)}. Ask again with another date to plan them.`);
     else {
     const reopens = reopen ? ` ${names.length === 1 ? 'It' : reopen.name} reopens ${MONTH_NAMES[Number(reopen.seasonReopens.slice(5, 7)) - 1]} ${Number(reopen.seasonReopens.slice(8, 10))}.` : '';
     result.warnings.push(names.length === 1

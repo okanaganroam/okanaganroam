@@ -147,9 +147,6 @@ function venueAliases(venues) {
       while (end > 2 && ALIAS_TRAILING.has(words[end - 1])) end--;
       if (end < words.length && end >= 2) alias = words.slice(0, end).join(' ');
     }
-    // Tour test 9 (Whistler, 2026-11-18): a name ending in a note in brackets ("Owl Creek Cultural Tours (test)", "Joffre
-    // Lakes Provincial Park (Pipi7íyekw)") is that place when asked for without it (it planned Owl Creek Recreation Site).
-    if (!alias && /\([^)]*\)\s*$/.test(String(v.name))) { const bare = norm(String(v.name).replace(/\s*\([^)]*\)\s*$/, '')); if (bare.split(' ').length >= 2) alias = bare; }
     if (!alias || alias.length < 8 || full.has(alias) || /^happy hours?$/.test(alias)) continue;
     count.set(alias, (count.get(alias) || 0) + 1); owner.set(alias, v);
   }
