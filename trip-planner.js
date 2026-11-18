@@ -147,6 +147,23 @@ function tourTooYoung(v, ctx) {
   const young = kidsYoungest(ctx);
   return young != null && young < Number(v.tourMinAge);
 }
+// Tour test 8 (Whistler, 2026-11-17): a list item (v.tourListItemAges: [{ name, age }], from the operator's published
+// Tours & prices) whose name shares an activity word with the request ("mushing" / "Mush your own team") and whose own
+// age is above the youngest child named. Returns { name, age, young, word } or null.
+const ITEM_AGE_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'ride', 'rides', 'visit', 'visits', 'with', 'your', 'our', 'own', 'the', 'and', 'for', 'kid', 'kids', 'child', 'children', 'adult', 'adults', 'year', 'years', 'old', 'family', 'day', 'days', 'hour', 'hours', 'half', 'full', 'guided', 'private', 'group', 'from', 'per', 'person', 'people']);
+function itemAgeStem(w) { return String(w || '').replace(/(?:ing|ers?|es|s|ed)$/, ''); }
+function tourItemTooYoung(v, ctx) {
+  const young = kidsYoungest(ctx);
+  if (young == null || !Array.isArray(v.tourListItemAges) || !v.tourListItemAges.length) return null;
+  const asked = new Set(normWords(ctx.queryText || '').split(' ').filter((w) => w.length >= 4 && !ITEM_AGE_SKIP.has(w) && !/\d/.test(w)).map(itemAgeStem).filter((w) => w.length >= 3));
+  if (!asked.size) return null;
+  for (const it of v.tourListItemAges) {
+    if (!it || !it.name || !(Number(it.age) > young) || Number(it.age) >= 19) continue;
+    const word = normWords(it.name).split(' ').filter((w) => w.length >= 4 && !ITEM_AGE_SKIP.has(w)).find((w) => asked.has(itemAgeStem(w)));
+    if (word) return { name: String(it.name).replace(/\s*[,(]?\s*(?:ages?\s*)?\d{1,2}\s*(?:\+|and (?:over|up|older))\s*\)?\s*$/i, '').trim() || String(it.name), age: Number(it.age), young, word };
+  }
+  return null;
+}
 function kidsAllowed(v) {
   if (!v) return false;
   const ctx = arguments[1]; // the trip's context when given (the ages it names), tour test 1
@@ -1998,7 +2015,13 @@ function stopFrom(v, scored, extra, ctx) {
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   // Tour test 6 (Whistler, 2026-11-17): the request names a child's age and the operator's published list has a trip for
   // older children only ("Treetop course, ages 7+" with a 6-year-old): say so, the lowest such age.
-  if (ctx && v && v.type === 'tour' && kidsYoungest(ctx) != null && Array.isArray(v.tourListAges)) {
+  // Tour test 8 (Whistler, 2026-11-17): the request names the activity a list item is for ("mushing with our 14-year-old",
+  // her list: "Mush your own team, 16+"): that item's own age, said plainly, in place of the general line.
+  const itemAge = ctx && v && v.type === 'tour' ? tourItemTooYoung(v, ctx) : null;
+  if (itemAge) {
+    const note = /^mush/.test(itemAge.word) ? `A ${itemAge.young}-year-old can ride but not mush: “${itemAge.name}” is for ${itemAge.age} and up.` : `A ${itemAge.young}-year-old can come, but “${itemAge.name}” is for ${itemAge.age} and up.`;
+    if (!caveats.includes(note)) caveats.push(note);
+  } else if (ctx && v && v.type === 'tour' && kidsYoungest(ctx) != null && Array.isArray(v.tourListAges)) {
     const older = v.tourListAges.filter((n) => n > kidsYoungest(ctx) && n < 19)[0];
     const note = older ? `Some activities are ${older}+: check Tours & prices.` : '';
     if (note && !caveats.includes(note)) caveats.push(note);
@@ -6385,15 +6408,37 @@ function namedLeftOutNotes(result, input) {
   const ctx = buildContext((input && input.intent) || {}, (input && input.labels) || {}, input);
   const month = tripMonthOf(ctx), monthName = MONTH_NAMES[month - 1];
   const dateText = (iso) => `${MONTH_NAMES[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+  const isoOf = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? String(x) : null);
+  const askedDate = isoOf(input && input.requirements && input.requirements.startDate) || isoOf(ctx.tripDate);
   for (const i of items) {
     if (used.has(i.value)) continue;
     const v = (input.facts || []).find((f) => f.id === i.value);
     if (!v) continue;
     let text = null;
     if (offSeasonBlocked(v, ctx) || snowBoundTrail(v, ctx)) text = `${v.name} is out of season${monthName ? ` in ${monthName}` : ' then'}, so it isn’t in this plan.`;
+    // Tour test 8 (Whistler, 2026-11-17): a request with a date is judged on that date, not on today's season ("Callaghan
+    // Sled Dogs on February 3", asked in November, said "closed for the season until December 10"). Closed then: say so,
+    // with the day it opens again after that date. Open then: the real reason when it is one we know (a dog in the party
+    // at a place not listed as dog-friendly); a child under the minimum age has its own note (tooYoungNotes).
+    else if (askedDate) {
+      if (seasonClosedOnTrip(v, { date: askedDate })) {
+        const back = reopensAfter(v, askedDate);
+        text = `${v.name} is closed for the season on ${dateText(askedDate)}${back ? ` (it opens again on ${dateText(back)})` : ''}, so it isn’t in this plan.`;
+      } else if (isDogTrip(ctx) && !((v.features && v.features.dog_friendly) || (v.collections || []).includes('dog_friendly'))) text = `${v.name} isn’t listed as dog-friendly, so it isn’t in this plan with your dog.`;
+    }
     else if (v.seasonClosedToday && !(ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month))) text = v.seasonReopens ? `${v.name} is closed for the season until ${dateText(v.seasonReopens)}, so it isn’t in this plan.` : `${v.name} is closed for the season with no reopening date listed, so it isn’t in this plan.`;
     if (text && !(result.warnings || []).includes(text) && !(result.notes || []).some((n) => n.startsWith(`${v.name} was left out`))) result.warnings = [text].concat(result.warnings || []);
   }
+}
+// Tour test 8: the first day after `iso` (within a year) on which the place's own season has it open, or null.
+function reopensAfter(v, iso) {
+  const d = new Date(`${iso}T12:00:00Z`);
+  for (let k = 1; k <= 366; k++) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.toISOString().slice(0, 10);
+    if (!seasonClosedOnTrip(v, { date: day })) return day;
+  }
+  return null;
 }
 // Tour test 7 (Whistler, 2026-11-17): a tour of the kind asked for, in the asked town, left out because the child named
 // ("our 15-year-old") is under its own minimum age (16+): say so, for at most two of them.
@@ -6677,7 +6722,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6711,7 +6756,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
@@ -8885,6 +8930,7 @@ module.exports = {
   advisoryUnavailable,
   ADVISORY_NOT_OPERATING_RE,
   seasonClosedOnTrip,
+  reopensAfter,
   scoreVenue,
   buildContext,
   chooseDayRegions,
