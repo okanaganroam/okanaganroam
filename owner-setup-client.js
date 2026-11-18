@@ -125,12 +125,19 @@
   function seaNamed(o){ o = o || S.sea; var si = (S.seaList || [S.sea]).indexOf(o), s0 = o.src || (CUR.hours_seasons || [])[si < 0 ? 0 : si]; return !!(s0 && seaLabelKind(s0.label) && o.kind === o.storedKind); }
   function capF(x){ x = String(x || ''); return x.charAt(0).toUpperCase() + x.slice(1); }
   // The season screen's title: "Your hours from Oct 15 to Nov 25", or "Your other hours" before any dates.
-  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
+  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : S.seaI === 2 && T.seasonEditQThird ? T.seasonEditQThird : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
   // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
   function seaWhen(o){ o = o || S.sea; if (seaNamed(o)) return fill(T.closedWarnSeason, { kind: T.seasonWord[o.kind] || T.seasonWord.summer }); var sp = seaSpan(o); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
   // Two yearly spans that share a day (either may run over New Year).
   function mdOverlap(x, y){ return mdInRange(x.from, y.from, y.to) || mdInRange(x.to, y.from, y.to) || mdInRange(y.from, x.from, x.to) || mdInRange(y.to, x.from, x.to); }
-  function seaIsStep(s){ return s === 'hours:season' || s === 'hours:season2'; }
+  // Tour test 10 (Whistler, 2026-11-18; Gord: summer, winter, and closed Mondays in spring and fall; Dayton approved): up to
+  // three stretches ('hours:season3' the third; the server's HOURS_SEASON_MAX).
+  var SEA_MAX = 3;
+  function seaIsStep(s){ return s === 'hours:season' || s === 'hours:season2' || s === 'hours:season3'; }
+  function seaStepOf(i){ return i > 0 ? 'hours:season' + (i + 1) : 'hours:season'; }
+  function seaIndexOf(s){ return s === 'hours:season3' ? 2 : s === 'hours:season2' ? 1 : 0; }
+  // The other stretch on screen's "Copy the hours from …": the nearest other one with days.
+  function seaOtherOf(i){ var l = S.seaList || [], c = [i - 1, i + 1, i - 2, i + 2]; for (var j = 0; j < c.length; j++) { var o = l[c[j]]; if (c[j] >= 0 && o && o.on && o.week) return o; } return null; }
   function seaUse(i){ if (S.seaList && S.seaList[i]) { S.seaI = i; S.sea = S.seaList[i]; } }
   // The stored season's dates for the year question's "Change my {a} – {b} hours", or null when none is stored.
   function storedSea(o){ o = o || S.sea; var has = o.src || ((!S.seaList || S.seaList[0] === o) && (CUR.hours_seasons || []).length); if (!o.on || !has || !o.week) return null; var r = seaOut(o); return r && r.ok && r.from && r.to ? { a: mdLabel(r.from), b: mdLabel(r.to) } : null; }
@@ -816,13 +823,15 @@
     var lab = String(s.label || '').toLowerCase();
     o.kind = /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : o.months[7] ? 'summer' : o.months[1] ? 'winter' : 'summer';
     o.storedKind = o.kind; o.src = s; o.dirty = false; o.monthsWas = JSON.stringify(o.months);
+    // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch (stored holidays: true).
+    o.holidays = s.holidays === true;
     return o;
   }
   (function(){
-    var st = (CUR.hours_seasons || []).slice(0, 2);
+    var st = (CUR.hours_seasons || []).slice(0, SEA_MAX);
     S.seaList = [S.sea]; S.seaI = 0;
     if (st[0]) seaLoad(S.sea, st[0]);
-    if (st[0] && st[1]) S.seaList.push(seaLoad(seaBlank(), st[1]));
+    for (var i = 1; i < st.length && st[0]; i++) S.seaList.push(seaLoad(seaBlank(), st[i]));
   })();
   S.sea.monthsWas = JSON.stringify(S.sea.months); S.seaTouched = false;
   var SEA_MONTHS = { summer: [6, 7, 8], winter: [11, 12, 1, 2, 3, 4] };
@@ -1690,7 +1699,7 @@
   function unsaved(){ return !!(S.dirty || S.photos.length || S.menuFiles.length || S.menuPages.length || S.sheetFiles.length); }
   function exitAction(){
     var st = S.step, b = base(st);
-    var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:season2': 'hoursSave', 'hours:year': noSetYear() ? 'noSetKeep' : 'hoursSave', 'hours:yeardrop': 'yearDropKeep', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
+    var here = { 'hours:edit': 'hoursSave', 'hours:season': 'hoursSave', 'hours:season2': 'hoursSave', 'hours:season3': 'hoursSave', 'hours:year': noSetYear() ? 'noSetKeep' : 'hoursSave', 'hours:yeardrop': 'yearDropKeep', 'basics:edit': 'basicsSave', 'happy:type': 'happySave', 'specials:type': 'specialsSave', 'music:yes': 'musicSave', story: 'storySave', 'book:yes': 'lineSave:book:reservations',
       'takeout:yes': 'lineSave:takeout:takeout', 'groups:yes': 'lineSave:groups:groups', known: 'lineSave:known:known_for', 'offer:dogs': 'dogSave', instagram: 'socialSave:instagram', facebook: 'socialSave:facebook', social: 'socialBoth',
       'menu:web': 'menuWebSave', 'menu:social': 'menuSocialSave', 'happy:web': 'sheetWebSave:happy', 'specials:web': 'sheetWebSave:specials', 'photos:review': 'sendPhotos', 'menu:upload': 'sendMenuFiles', 'menu:cam': 'sendMenuPages',
       'happy:sheet': 'sendSheet:happy', 'specials:sheet': 'sendSheet:specials', 'closures:add': 'closureAddSave', 'closures:months': 'monthsUseSave', 'hours:open': 'openSave:keep',
@@ -1841,8 +1850,9 @@
     var s = S.step, p = s.split(':'), x = '';
     // Brewery test 1 (Whistler, 2026-11-15): which "other hours" period the season screen works on; a second one started
     // but never saved is dropped once she leaves its screen.
-    if (s !== 'hours:season2' && s !== 'hours:yeardrop' && S.seaList && S.seaList[1] && !S.seaList[1].src && !S.busy) S.seaList.length = 1;
-    seaUse(s === 'hours:season2' && S.seaList[1] ? 1 : 0);
+    // Tour test 10: a third one too ('hours:season3').
+    if (s !== 'hours:yeardrop' && S.seaList && S.seaList.length > 1 && !S.busy) { var lastSea = S.seaList.length - 1; if (!S.seaList[lastSea].src && s !== seaStepOf(lastSea)) S.seaList.length = lastSea; }
+    seaUse(seaIsStep(s) && S.seaList[seaIndexOf(s)] ? seaIndexOf(s) : 0);
     if (seaIsStep(s)) S.sea.dirty = true; else S.seaStaleDone = S.seaStaleDone && ['hours', 'closures', 'saved'].indexOf(base(s)) >= 0 ? S.seaStaleDone : '';
     if (base(s) !== 'closures') S.hoursJust = false;
     if (['hours', 'closures', 'saved'].indexOf(base(s)) < 0) S.seaStale = null;
@@ -1919,19 +1929,20 @@
     } else if (s === 'hours:year') {
       // Pub test 6 (2026-11-10): after the usual hours, one question. Most places tap Yes and are done; the other season
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
-      var mrN = S.sea.on ? monthRun(S.sea.months) : null, stS = storedSeas(), sea2 = S.seaList[1] && S.seaList[1].on && S.seaList[1].src ? S.seaList[1] : null;
+      var mrN = S.sea.on ? monthRun(S.sea.months) : null, stS = storedSeas(), sea2 = S.seaList[1] && S.seaList[1].on && S.seaList[1].src ? S.seaList[1] : null, sea3 = S.seaList[2] && S.seaList[2].on && S.seaList[2].src ? S.seaList[2] : null;
       // Tour test 2 (Whistler, 2026-11-16): by booking only (no weekly hours): "Do you run trips all year?" Two choices.
       if (noSetYear()) x = q(T.yearNoSetQ, T.yearNoSetLead) + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + msgs()
         + '<div class="su-stack" id="suYearNoSet">' + (S.openSea ? big('✓', T.yearNoSetKeep, '', false, 'noSetKeep') + big('✎', T.yearNoSetChange, '', true, 'yearClosed') + big('✕', T.yearNoSetYes, '', true, 'noSetAll')
           : (S.savedWYear === 'all' && T.youSaid ? '<p class="su-sent" id="suYearSaid">' + h(fill(T.youSaid, { a: T.yearNoSetYes })) + '</p>' : '') + big('✓', T.yearNoSetYes, '', false, 'noSetAll', S.savedWYear === 'all' ? ' aria-pressed="true"' : '') + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')) + '</div>';
-      else x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + (sea2 && seaSpan(sea2) ? '<p class="su-sent su-seasonnow" id="suSeasonNow2">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea2) })) + '</p>' : '') + msgs()
+      else x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + (sea2 && seaSpan(sea2) ? '<p class="su-sent su-seasonnow" id="suSeasonNow2">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea2) })) + '</p>' : '') + (sea3 && seaSpan(sea3) ? '<p class="su-sent su-seasonnow" id="suSeasonNow3">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea3) })) + '</p>' : '') + msgs()
         // Pub test 3 (Whistler, 2026-11-14): with a season stored, "Change my Apr 20 – Jun 30 hours" opens it with its own
         // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
         // Brewery test 3 (Whistler, 2026-11-16): back to change one day with stretches stored, the first button keeps them
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TOUR && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), the same screen again.
-          + (stS.length < 2 && S.seaList.length < 2 && T.seaAdd ? big('🍂', T.seaAdd, T.seaAddSub, true, 'yearSeasonAdd') : '') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+          // Tour test 10: and a third (a summer, a winter, and the usual hours for spring and fall).
+          + (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? (stS.length >= 2 && T.seaAdd3 ? big('🍂', T.seaAdd3, T.seaAdd3Sub, true, 'yearSeasonAdd') : big('🍂', T.seaAdd, T.seaAddSub, true, 'yearSeasonAdd')) : '') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
           // months set, the date boxes open, and she picks the dates.
           + (T.allYearPart ? big('🍂', T.allYearPart, T.allYearPartSub, true, 'yearSeason:part') : ''))
@@ -1959,7 +1970,7 @@
         + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || seaIsStep(s)) {
-      var seas = seaIsStep(s), seaOther = seas ? S.seaList[1 - S.seaI] : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
+      var seas = seaIsStep(s), seaOther = seas ? seaOtherOf(S.seaI) : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
       if (!S.week) { S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); }
       if (!seas && APPT) weekRestore();
       if (seas && !S.sea.week) S.sea.week = clone(S.week);
@@ -2023,9 +2034,15 @@
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('')
+        // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch, one choice (stat holidays like Family Day and
+        // Christmas week then show open with this stretch's weekend hours). Only when the stretch has a closed day.
+        + (seas && T.seaHolidays && DAYS.some(function(d){ return !(wk[d] || []).length; }) ? '<div class="su-chips" role="group" aria-labelledby="suSeaHolH" style="margin:4px 0 10px"><p class="su-hint" id="suSeaHolH" style="width:100%;margin:0 0 4px">' + h(T.seaHolidaysQ) + '</p><button type="button" class="su-chip su-chip-wide" id="suSeaHol" aria-pressed="' + (S.sea.holidays ? 'true' : 'false') + '" data-act="seaHolidays">' + h(T.seaHolidays) + '</button></div>' : '')
+        // Tour test 10: summer first, then a winter stretch: the usual hours are the rest of the year (spring and fall here).
+        + (seas && S.seaI >= 1 && T.seaSpringFallTip && S.seaList[0] && S.seaList[0].on && (S.seaList[0].kind === 'summer' || (S.seaList[0].months || {})[7]) ? '<p class="su-hint" id="suSeaSpringFall">' + h(T.seaSpringFallTip) + '</p>' : '')
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>'
         // Brewery test 1 (Whistler, 2026-11-15): the first period's screen says a second can follow; with two stored, either can go.
-        + (seas && S.seaI === 0 && S.seaList.length < 2 && T.seaAddLink ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaAddLink" data-act="hoursSaveAdd">' + h(T.seaAddLink) + '</button></div>' : '')
+        // Tour test 10: the second's screen says a third can follow.
+        + (seas && S.seaI === S.seaList.length - 1 && S.seaList.length < SEA_MAX && T.seaAddLink ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaAddLink" data-act="hoursSaveAdd">' + h(S.seaI >= 1 && T.seaAddLink3 ? T.seaAddLink3 : T.seaAddLink) + '</button></div>' : '')
         + (seas && S.sea.src && seaOther && seaOther.on && seaOther.src && T.seaRemove ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaRemove" data-act="seaRemove">' + h(T.seaRemove) + '</button></div>' : '');
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
@@ -2366,7 +2383,7 @@
       // Tour test 8: research's "dogs welcome" on a sled-dog or kennel business is not pre-ticked (it read as her own dogs).
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
-      var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+      var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '8', '10', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
         // Tour test 8: "Under 18s come with an adult" beside "All ages" only when it was picked (it read like a rule for babies).
         + (S.tour.age && S.tour.age !== '19' && (S.tour.age !== 'all' || S.tour.adult) ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
       x = doneLine('offer') + q(T.offerQ, ownDogsBiz() && T.offerLeadOwnDogs ? T.offerLeadOwnDogs : T.offerLead) + (S.dogNoPicked && S.noDogs && T.dogLineNoDone ? '<p class="su-sent" id="suDogNoPicked" role="status">' + h(T.dogLineNoDone) + '</p>' : '') + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
@@ -2806,12 +2823,12 @@
     if (S.seaTouched) {
       // Brewery test 1 (Whistler, 2026-11-15): one or two periods. A stored one not opened on this visit is sent back exactly
       // as stored; two that share a day are refused in plain words.
-      var stored = CUR.hours_seasons || [], rest = stored.slice(2), list = [];
-      if (!seaIsStep(S.step) && S.seaList[1] && !S.seaList[1].src) S.seaList.length = 1;
+      var stored = CUR.hours_seasons || [], rest = stored.slice(SEA_MAX), list = [];
+      if (!seaIsStep(S.step) && S.seaList.length > 1 && !S.seaList[S.seaList.length - 1].src) S.seaList.length = S.seaList.length - 1;
       for (var si = 0; si < S.seaList.length; si++) {
         var so = S.seaList[si], s0 = so.src;
         if (!so.on) continue;
-        if (s0 && !so.dirty) { list.push(s0); continue; }
+        if (s0 && !so.dirty && (s0.holidays === true) === !!so.holidays) { list.push(s0); continue; }
         var r = monthRun(so.months);
         if (so.exact) { var xo = seaOut({ on: true, exact: so.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
         else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
@@ -2829,8 +2846,10 @@
         // The same months as stored keep their exact dates (a set from Jun 15 stays Jun 15).
         var keepDates = same && JSON.stringify(so.months) === so.monthsWas;
         list.push({ from: so.exact ? so.exact.from : keepDates ? s0.from : pad(r.a) + '-01', to: so.exact ? so.exact.to : keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : '', hours: sw });
+        if (so.holidays) list[list.length - 1].holidays = true;
       }
-      if (list.length > 1 && mdOverlap(list[0], list[1])) { S.nudge = fill(T.seasonOverlap, { a: mdLabel(list[1 - S.seaI].from), b: mdLabel(list[1 - S.seaI].to) }); S.overlapNudge = S.nudge; return render(); }
+      // Tour test 10: any two of three; the message names the other one (the one not on screen when it can).
+      for (var oa = 0; oa < list.length; oa++) for (var ob = oa + 1; ob < list.length; ob++) if (mdOverlap(list[oa], list[ob])) { var oz = list[oa === S.seaI ? ob : oa]; S.nudge = fill(T.seasonOverlap, { a: mdLabel(oz.from), b: mdLabel(oz.to) }); S.overlapNudge = S.nudge; return render(); }
       list = list.concat(rest);
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
@@ -2845,7 +2864,7 @@
     if (tourApptOff) listH.push({ tour_info: { visit: null } });
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
-    saveAll('hours', listH, null, addNext ? 'hours:season2' : KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
+    saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
@@ -2866,7 +2885,9 @@
   // A new second period: the date boxes open, the usual week to start from ("Copy the hours from …" is one tap away).
   function seaAddStart(){
     var o = seaBlank(); o.on = true; o.kind = 'part'; o.exact = { from: '', to: '' }; o.week = clone(S.week); o.dirty = true;
-    S.seaList = [S.seaList[0], o]; S.seaTouched = true; S.dirty = 'hours'; if (APPT) S.wYearPick = 'all';
+    // Tour test 10: after every stored one (up to SEA_MAX); a new one not saved yet is replaced.
+    var keep = S.seaList.filter(function(x, i){ return i === 0 || x.src; }).slice(0, SEA_MAX - 1);
+    S.seaList = keep.concat([o]); S.seaTouched = true; S.dirty = 'hours'; if (APPT) S.wYearPick = 'all';
   }
   // -> [{ i, days: ['sun'], text: 'Sun 12 PM – 10 PM' }] for each stored period that still has a day's old usual time.
   function seaStaleOf(seasons){
@@ -2874,7 +2895,7 @@
     var key = function(x){ return JSON.stringify(x || null); }, txt = function(x){ return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; };
     var changed = DAYS.filter(function(d){ return old[d] && S.week[d] && key(old[d]) !== key(S.week[d]); });
     if (!changed.length) return out;
-    (seasons || []).slice(0, 2).forEach(function(sz, i){
+    (seasons || []).slice(0, SEA_MAX).forEach(function(sz, i){
       if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return;
       var w = parseWeek(sz.hours); if (!w) return;
       var ds = changed.filter(function(d){ return w[d] && key(w[d]) === key(old[d]); });
@@ -2890,7 +2911,7 @@
   function seaStaleFix(i){
     var x = (S.seaStale || []).filter(function(z){ return z.i === i; })[0], list = (CUR.hours_seasons || []).map(function(z){ return z; }); if (!x || !list[i] || S.busy) return;
     var w = parseWeek(list[i].hours), hw = {}; x.days.forEach(function(d){ w[d] = clone(S.week[d]); }); DAYS.forEach(function(d){ hw[d] = w[d] || []; });
-    list[i] = { from: list[i].from, to: list[i].to, label: list[i].label || '', hours: hw };
+    var hol0 = list[i].holidays === true; list[i] = { from: list[i].from, to: list[i].to, label: list[i].label || '', hours: hw }; if (hol0) list[i].holidays = true;
     S.busy = true; render();
     change({ hours_seasons: list }).then(function(r){
       S.busy = false; if (!r) return render();
@@ -3343,9 +3364,11 @@
     if (k === 'yearKeep' || k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
     if (k === 'yearDropYes') k = 'yearAll';
     // Brewery test 1 (Whistler, 2026-11-15): a second period; "Copy the hours from …"; removing one of two (asked first).
-    if (k === 'yearSeasonAdd') { seaAddStart(); return go('hours:season2'); }
+    if (k === 'yearSeasonAdd') { seaAddStart(); return go(seaStepOf(S.seaList.length - 1)); }
+    // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch on screen.
+    if (k === 'seaHolidays') { readTimes(); S.sea.holidays = !S.sea.holidays; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var hy = window.scrollY; render(); window.scrollTo(0, hy); var hb = el('suSeaHol'); if (hb) hb.focus(); return; }
     if (k === 'hoursSaveAdd') { S.seaAddNext = true; hoursSave(); S.seaAddNext = false; return; }
-    if (k === 'seaCopy') { readTimes(); var co = S.seaList[1 - S.seaI]; if (co && co.week) { S.sea.week = clone(co.week); S.sea.open = {}; S.seaTouched = true; S.nudge = ''; mark(); var cy = window.scrollY; render(); window.scrollTo(0, cy); } return; }
+    if (k === 'seaCopy') { readTimes(); var co = seaOtherOf(S.seaI); if (co && co.week) { S.sea.week = clone(co.week); S.sea.open = {}; S.seaTouched = true; S.nudge = ''; mark(); var cy = window.scrollY; render(); window.scrollTo(0, cy); } return; }
     if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; return go('hours:yeardrop'); }
     // Distillery test 1 (Whistler, 2026-11-16): "Skip these dates and keep going" under the all-closed message. A new
     // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
@@ -3362,7 +3385,7 @@
     if (k === 'seaSkipClosed') {
       var zi = S.seaI, zo = S.seaList[zi]; S.nudge = ''; S.seaClosedNudge = '';
       if (zo && zo.src) S.seaList[zi] = seaLoad(seaBlank(), zo.src);
-      else if (zi === 1) S.seaList.length = 1;
+      else if (zi >= 1) S.seaList.length = zi;
       else if (zo) S.seaList[0] = seaBlank();
       seaUse(S.seaList[zi] ? zi : 0);
       return hoursSave();
@@ -3411,7 +3434,7 @@
       return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
     }
     // Pub test 3 (Whistler, 2026-11-14): the stored season, as it is (its dates and its own day hours).
-    if (k === 'yearSeasonEdit') { seaUse(+v === 1 && S.seaList[1] ? 1 : 0); if (APPT) S.wYearPick = 'all'; S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; return go(S.seaI === 1 ? 'hours:season2' : 'hours:season'); }
+    if (k === 'yearSeasonEdit') { seaUse(S.seaList[+v] ? +v : 0); if (APPT) S.wYearPick = 'all'; S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; return go(seaStepOf(S.seaI)); }
     if (k === 'yearSeason') {
       if (S.sea.kind !== v || !S.sea.week) {
         // A new season (or the other one): its usual months, and the usual week to start from (every day, closed ones too).
@@ -3654,7 +3677,8 @@
         var ta = {}; if (S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
         var adult0 = S.tour.age !== '19' && S.tour.adult; if (adult0 !== (TI.adult === true)) ta.adult = adult0 ? true : null;
         if (Object.keys(ta).length) list.unshift({ tour_info: ta });
-        var kidsOn = S.tour.age === 'all' || S.tour.age === '5' || S.tour.age === '6';
+        // Tour test 10 (Whistler, 2026-11-18; Gord, riders 8+; Dayton approved): 8+ and 10+ keep Kids welcome too.
+        var kidsOn = S.tour.age === 'all' || S.tour.age === '5' || S.tour.age === '6' || S.tour.age === '8' || S.tour.age === '10';
         if (kidsOn !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: kidsOn } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = kidsOn; });
       }

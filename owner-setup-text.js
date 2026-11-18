@@ -1821,7 +1821,7 @@ en.tour = {
   tbookSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Who can come
   offerQ: 'Who can come?', offerLead: 'Families and dog owners check this before they book.',
-  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
   tageNeed: 'Please tap the youngest age you take (or All ages).',
   // Good to know
   bringQ: 'Good to know', bringLead: 'What should people bring or wear? Anything about the weather? Two or three short lines.',
@@ -1877,7 +1877,7 @@ fr.tour = {
   taheadNeed: 'Touchez combien de temps à l’avance réserver.', tbookNeed: 'Ajoutez votre lien de réservation, ou répondez à « Faut-il réserver à l’avance? ».',
   tbookSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   offerQ: 'Qui peut venir?', offerLead: 'Les familles et les propriétaires de chiens le vérifient avant de réserver.',
-  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 6: '6+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
   tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
   bringQ: 'Bon à savoir', bringLead: 'Quoi apporter ou porter? Quelque chose à savoir sur la météo? Deux ou trois courtes lignes.',
   bringEx: 'Habillez-vous chaudement : nous fournissons casques et gants. Nous vous appelons si la météo annule une sortie.',
@@ -2191,6 +2191,23 @@ Object.assign(fr.tour, {
   groupsChipBig: '21+ ou classes entières', groupsLineBig: 'Groupes de 21 personnes ou plus, comme des classes entières : réservez à l’avance', groupsLineBigBooked: 'Groupes de 21 personnes ou plus, comme des classes entières',
   menuType: 'Je les tape moi-même', menuTypeSub: 'Chaque sortie et son prix, une ligne à la fois',
   photosLeadCultural: 'Vos guides, les lieux que vous faites découvrir, une marche ou un canot sur l’eau. Trois photos, c’est parfait.',
+});
+// Tour test 10 (Whistler fresh eyes, Gord, a horseback ranch in the Pemberton Meadows, 2026-11-18; Dayton approved): a third
+// stretch of other hours (with the spring-and-fall tip), "Open on holidays" inside a stretch, and Good to know chips that
+// end with ". " before the owner types.
+Object.assign(en, {
+  seasonEditQThird: 'Your third stretch of other hours',
+  seaAdd3: '+ Add a third stretch with different hours', seaAdd3Sub: 'Like summer, winter, and your usual hours for spring and fall. You pick the dates next',
+  seaAddLink3: 'A third stretch with different hours too? Save these and add it',
+  seaSpringFallTip: 'Tip: your usual hours are the rest of the year. Closed some days in spring and fall too? Set your usual hours to your spring and fall hours.',
+  seaHolidaysQ: 'Open on a holiday that falls on a closed day?', seaHolidays: 'Open on holidays (stat holidays and Christmas week)',
+});
+Object.assign(fr, {
+  seasonEditQThird: 'Votre troisième période d’autres heures',
+  seaAdd3: '+ Ajouter une troisième période aux heures différentes', seaAdd3Sub: 'Comme l’été, l’hiver, et vos heures habituelles pour le printemps et l’automne. Vous choisissez les dates ensuite',
+  seaAddLink3: 'Une troisième période aux heures différentes aussi? Enregistrez celles-ci et ajoutez-la',
+  seaSpringFallTip: 'Astuce : vos heures habituelles valent pour le reste de l’année. Fermé certains jours au printemps et à l’automne aussi? Réglez vos heures habituelles sur vos heures du printemps et de l’automne.',
+  seaHolidaysQ: 'Ouvert un jour férié qui tombe un jour de fermeture?', seaHolidays: 'Ouvert les jours fériés (et la semaine de Noël)',
 });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {

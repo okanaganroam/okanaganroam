@@ -7320,6 +7320,12 @@ function buildTripPlannerTaxonomy() {
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
 const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
+// The regions of a plan's stops and listed places (its matches), for the near-towns check.
+function planStopRegions(p) {
+  if (!p) return [];
+  const xs = [...(p.recommendations || []), ...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || [])];
+  return [...new Set(xs.map((x) => x && x.venue && x.venue.region).filter(Boolean))];
+}
 function runTripPlan(args, now = new Date()) {
   const first = runTripPlanCore(args, now);
   let plan = first;
@@ -7331,7 +7337,12 @@ function runTripPlan(args, now = new Date()) {
     const m = /\b(?:near|around|close to|nearby|pr[eè]s de|proche de|autour de)\s+([a-zà-ÿ .'’-]+?)(?:\s+(?:in|on|this|next|for|with|le|la|les|en|ce|cet|cette|pour|avec|au|du)\b|[,.!?]|$)/i.exec(String(args.text || ''));
     const town = m && Object.keys(REGION_LABELS).find((r) => REGION_LABELS[r].toLowerCase() === m[1].trim().toLowerCase());
     const listPlan = (p) => !!p && (p.kind === 'recommendations' || p.kind === 'discover');
-    if (town && TRIP_NEAR_TOWNS[town] && TRIP_NEAR_TOWNS[town].length && (tripPlanEmpty(first) || listPlan(first)) && !args.swap && !args.pinned) {
+    // Tour test 10 (Whistler, 2026-11-18): a named kind of place ("Indigenous culture centre near Pemberton") was planned in
+    // Whistler, the next region with one, past the Líl̓wat centre in Mount Currie right next to Pemberton: a plan whose
+    // stops are all outside the town and the towns right around it is tried with those towns too (planStopRegions).
+    const awayFrom = (p, set) => { const rs = planStopRegions(p); return rs.length > 0 && rs.every((r) => !set.has(r)); };
+    const aroundSet = town ? new Set([town, ...(TRIP_NEAR_TOWNS[town] || [])]) : null;
+    if (town && TRIP_NEAR_TOWNS[town] && TRIP_NEAR_TOWNS[town].length && (tripPlanEmpty(first) || listPlan(first) || awayFrom(first, aroundSet)) && !args.swap && !args.pinned) {
       const frReq = /^pr|^proche|^autour/i.test(m[0].trim());
       const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
       const tail = (m[0].match(/\s+(in|on|this|next|for|with|le|la|les|en|ce|cet|cette|pour|avec|au|du)$/i) || [''])[0];
@@ -7339,9 +7350,10 @@ function runTripPlan(args, now = new Date()) {
       const nearIds = new Set(TRIP_NEAR_TOWNS[town]);
       const firstIds = new Set((first.recommendations || []).map((x) => x && x.venue && x.venue.id));
       const addsNear = (wider.recommendations || []).some((x) => x && x.venue && nearIds.has(x.venue.region) && !firstIds.has(x.venue.id));
-      if (!tripPlanEmpty(wider) && (tripPlanEmpty(first) || (listPlan(wider) && addsNear))) {
+      const nearNow = !tripPlanEmpty(wider) && awayFrom(first, aroundSet) && planStopRegions(wider).some((r) => nearIds.has(r));
+      if (!tripPlanEmpty(wider) && (tripPlanEmpty(first) || (listPlan(wider) && addsNear) || nearNow)) {
         const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
-        const note = tripPlanEmpty(first) ? `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${REGION_LABELS[town]}.`;
+        const note = tripPlanEmpty(first) || (nearNow && !listPlan(wider)) ? `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${REGION_LABELS[town]}.`;
         wider.notes = [note].concat(wider.notes || []);
         wider.contextNotes = [note].concat(wider.contextNotes || []);
         wider.query = first.query;
@@ -8149,6 +8161,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   // turns them into "kids" or "teenagers", so a tour's minimum age can be checked and said ("Ages 12 and up").
   let tripKidAges = [];
   try { tripKidAges = tripPlannerModule().requestKidAges(String(maskedPlan).toLowerCase().replace(/-/g, ' ')); } catch (e) { tripKidAges = []; }
+  // Tour test 10 (Whistler, 2026-11-18): the request's own words, before "trail ride" and "pony ride" both become
+  // "horseback riding", so the trip it names can be checked against the child's age (trip-planner.js tourAgeFit).
+  const tripAskText = String(maskedPlan || '').replace(/\u0001(\d+)\u0001/g, ' ').toLowerCase();
   const synonymText = require('./trip-requirements').tripRequestSynonyms(maskedPlan).replace(/\u0001(\d+)\u0001/g, (_, k) => maskedNames[Number(k)]);
   let datedPlanText = wineText(tripFullVenueNames(require('./trip-requirements').holidayDateText(synonymText, todayLocal(now)), taxonomy));
   // "A day in Squamish but not the Chief" (2026-10-25): a place named after no/not/skip/avoid is left out of the plan, and
@@ -8644,7 +8659,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       startWeekday: rolledWindow ? localWeekdayKey(requirements.startDate) : tripStartWeekday(trip.when, now),
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
-      kidAges: tripKidAges,
+      kidAges: tripKidAges, askText: tripAskText,
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -8693,7 +8708,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     familyEvents: !!familyEvents,
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
-    kidAges: tripKidAges,
+    kidAges: tripKidAges, askText: tripAskText,
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
@@ -21925,11 +21940,21 @@ function visitRowsWithoutEchoedTastingPrice(info) {
 function tourListVaries(venueId) { const x = tourListInfo(venueId); return { length: x.length, ages: x.ages }; }
 // Tour test 5: the same reading with the trip lengths in minutes (for the card's range).
 function tourListInfo(venueId) {
-  const out = { length: false, ages: false, mins: [], listAges: [], itemAges: [] };
+  const out = { length: false, ages: false, mins: [], listAges: [], itemAges: [], items: [] };
   try {
     const m = publishedMenu(venueId);
     if (!m || menuIsUnconfirmedResearch(m)) return out;
     const items = (m.data.sections || []).flatMap((x) => x.items || []);
+    // Tour test 10 (Whistler, 2026-11-18; Gord): every trip's own age for Build My Trip (trip-planner.js tourAgeFit): its
+    // "8+" / "ages 8 and up" / « 8 ans et plus », or a kids' trip ("kids under 8", "pony", "all ages", « enfants »), one list
+    // item at a time, a one-trip list too.
+    for (const it of items) {
+      if (!it || !it.name) continue;
+      const t = `${it.name || ''} ${it.description || ''}`.toLowerCase();
+      const own = [...t.matchAll(/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus|ans \+)|\bages? (\d{1,2})\s*(?:\+|and (?:over|up|older)|to)\b|\b[àa] partir de (\d{1,2}) ans\b/g)].map((mm) => Number(mm[1] || mm[2] || mm[3])).filter((n) => n >= 2 && n <= 19);
+      const kids = !own.length && /\b(?:pony|ponies|poney|poneys|under \d{1,2}|kids?|children|child|little ones?|toddlers?|all ages|enfants?|tous les [âa]ges|moins de \d{1,2} ans)\b/.test(t);
+      out.items.push({ name: String(it.name).slice(0, 80), ...(own.length ? { age: Math.max(...own) } : {}), ...(kids ? { kids: true } : {}) });
+    }
     if (items.length < 2) return out;
     const mins = [], ages = [];
     for (const it of items) {
@@ -21979,7 +22004,12 @@ function tourTextMonths(text) {
   if (/\b(?:fall|autumn)\b|\bautomne\b/.test(t)) [9, 10, 11].forEach((m) => out.add(m));
   return out.size ? [...out].sort((a, b) => a - b) : null;
 }
-function tourWaterMonths(venueId) {
+// Tour test 10 (Whistler, 2026-11-18; Gord): the same for the horseback trips on the list ("Overnight pack trip (summer)",
+// "Trail rides June to September"). Null unless every horseback trip names its months.
+const TOUR_HORSE_ITEM_RE = /\b(?:trail rides?|horse\w*|horseback|riding|rides?|pack trips?|pony|ponies|chevaux|cheval|[ée]quitation|randonn[ée]es? [àa] cheval)\b/i;
+function tourHorseMonths(venueId) { return tourItemMonths(venueId, TOUR_HORSE_ITEM_RE, /\bsleighs?\b|tra[iî]neau/i); }
+function tourWaterMonths(venueId) { return tourItemMonths(venueId, TOUR_WATER_ITEM_RE, null); }
+function tourItemMonths(venueId, ITEM_RE, NOT_RE) {
   try {
     const m = publishedMenu(venueId);
     if (!m || menuIsUnconfirmedResearch(m)) return null;
@@ -21987,7 +22017,7 @@ function tourWaterMonths(venueId) {
     for (const sec of m.data.sections || []) {
       for (const it of sec.items || []) {
         const own = `${it.name || ''} ${it.description || ''} ${it.duration || ''}`;
-        if (!TOUR_WATER_ITEM_RE.test(`${own} ${sec.name || ''}`)) continue;
+        if (!ITEM_RE.test(`${own} ${sec.name || ''}`) || (NOT_RE && NOT_RE.test(own))) continue;
         water++;
         const got = tourTextMonths(own) || tourTextMonths(sec.name) || tourTextMonths(sec.note);
         if (!got) return null;
@@ -22293,7 +22323,7 @@ function breweryCardPrice(venueId) {
 //   kinds    ['snowmobile', 'dogsled', ...]   up to 3 kinds of tour (TOUR_KINDS); the first sets venues.cuisine's words
 //   length   '1h' | '2-3h' | 'half' | 'full' | 'multi'   how long a trip takes
 //   book     'same_day' | 'day' | '48h' | 'week' | 'no'           how far ahead to book ('no': no booking needed)
-//   age      'all' | '5' | '6' | '12' | '16' | '19'           who can come (the minimum age)
+//   age      'all' | '5' | '6' | '8' | '10' | '12' | '16' | '19'   who can come (the minimum age; 8 and 10 since tour test 10)
 //   adult    true                                         under 18s come with an adult
 //   private  a number                                     private tours from $X (optional)
 //   year     'all' | 'seasonal'                           the season answer from the Hours step
@@ -22344,7 +22374,7 @@ const TOUR_BOOK_LINES = { same_day: ['Same-day bookings are often fine.', 'Rése
 // Tour test 4 (Whistler, 2026-11-17): the Prices line of a free tour, and the card's word.
 const TOUR_FREE_LINES = { free: ['Free.', 'Gratuit.'], donation: ['Free (pay what you want).', 'Gratuit (contribution volontaire).'] };
 const TOUR_FREE_CARD_LABEL = 'Free';
-const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
+const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 8: ['Ages 8 and up.', 'À partir de 8 ans.'], 10: ['Ages 10 and up.', 'À partir de 10 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
 let venueTourInfoCache = null;
 let tourCuisineFrMap = null;
 function clearVenueTourInfoCache() { venueTourInfoCache = null; tourCuisineFrMap = null; }
@@ -22841,7 +22871,33 @@ function tourPlannerFacts(venueId) {
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
     // Tour test 9: the months her list's water trips run (a summer-only canoe is never planned in January).
     ...(() => { const w = tourWaterMonths(venueId); return w ? { tourWaterMonths: w } : {}; })(),
+    // Tour test 10 (Whistler, 2026-11-18; Gord): each trip's own age, and his "Riders 8+" line (trip-planner.js tourAgeFit);
+    // the months his list's horseback trips run (pack trips "(summer)").
+    ...(() => { const it = tourListInfo(venueId).items; return it && it.length ? { tourItems: it.slice(0, 30) } : {}; })(),
+    ...(() => { const r = tourRiderAge(venueId); return r ? { tourRiderAge: r } : {}; })(),
+    ...(() => { const w = tourHorseMonths(venueId); return w ? { tourHorseMonths: w } : {}; })(),
   };
+}
+// Tour test 10 (Whistler, 2026-11-18; Gord, a ranch; Dayton approved, no new field): his own line under Good to know (or
+// Ages) that gives every rider's age, "Riders 8+ (pony rides under 8)", "riders must be 8", « cavaliers de 8 ans et plus ».
+// Only the operator's own line (owner_labels), never research's. -> the age, or 0.
+const TOUR_RIDER_AGE_RES = [
+  /\b(?:riders?|participants?|guests?|cavaliers?|cavali[eè]res?)\s*(?:must be|have to be|gotta be|need to be|should be|doivent avoir)\s*(?:at least\s*|aged?\s*|au moins\s*)?(\d{1,2})(?![\d.,]|\s*(?:lb|lbs|kg|pounds?|min|minutes?|hours?|hrs?|people|ppl|per)\b)/i,
+  /\b(?:riders?|participants?|guests?|cavaliers?|cavali[eè]res?)\s*:?\s*(?:aged?\s*)?(\d{1,2})\s*(?:\+|and (?:up|over|older)|years? (?:old )?and (?:up|over|older)|ans et plus|ans \+)/i,
+];
+function tourRiderAge(venueId) {
+  try {
+    const info = venueVisitInfo(venueId);
+    if (!info || !Array.isArray(info.rows)) return 0;
+    const own = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    for (const r of info.rows) {
+      if (!r || !own.has(r.label) || !['Good to know', 'Ages'].includes(r.label) || typeof r.text !== 'string') continue;
+      const m = TOUR_RIDER_AGE_RES.map((re) => re.exec(r.text)).find(Boolean);
+      const n = m ? Number(m[1]) : 0;
+      if (n >= 3 && n <= 18) return n;
+    }
+  } catch (e) { /* no box */ }
+  return 0;
 }
 // Tour test 4 (Whistler, 2026-11-17): the live tours as the planner's kind check reads them (the operator's own kinds,
 // name, category words and description), to tell whether a town has a food-tour or walking-tour company.
@@ -37571,11 +37627,13 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
 //   Jun 21 – Sep 1: Daily 11 AM – 10 PM
 // From the owner's open season (open_months, exact days or whole months) and seasonal sets (venue_hours_extra.seasons).
 // '' when the place has no seasonal set and isn't closed for the season (nothing to add to the usual list).
+// Tour test 10: a stretch whose week has a closed day (so "Open on holidays" changes something on its holidays).
+function stretchHasClosedDay(days) { return !!days && ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].some((d) => days[d] && days[d].status === 'closed'); }
 function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
   if (!hoursModule || !parsed || !parsed.known) return '';
   const x = hoursExtrasMap().get(venueId);
   const seasons = ((x && x.seasons) || []).filter((z) => z && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to) && z.hours)
-    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days }));
+    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days, holidays: z.holidays === true }));
   // Restaurant test 1 (Whistler, 2026-11-14): the owner's yearly closures of a week or more (a spring and a fall shoulder
   // season, "04-19" to "05-14" every year) are part of the year too: "Apr 19 – May 14: Closed every year".
   const MD_DAYS = (md) => { const m = Number(md.slice(0, 2)), d = Number(md.slice(3, 5)); return Math.round((Date.UTC(2028, m - 1, d) - Date.UTC(2028, 0, 1)) / 86400000); };
@@ -37616,7 +37674,9 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
     const ws = runs.filter((r) => r.k === k).map((r) => (r.from === r.to ? hoursExtraDayText(r.from, fr) : hoursExtraRangeText(r.from, r.to, fr)));
     const when = ws.length > 2 ? `${ws.slice(0, -1).join(', ')}${and}${ws[ws.length - 1]}` : ws.join(and);
     if (k <= -2) { const note = String(yearlyShut[-2 - k].note || '').trim(); return `<li><span>${escapeHtml(when)}</span><span>${fr ? 'Fermé chaque année' : 'Closed every year'}${note && !fr ? ` (${escapeHtml(note)})` : ''}</span></li>`; }
-    return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days))}</span></li>`;
+    // Tour test 10: a stretch that is "Open on holidays" says so ("Mon–Fri Closed · Sat, Sun 10 AM – 4 PM · Holidays too").
+    const hol = k >= 0 && seasons[k].holidays && stretchHasClosedDay(seasons[k].days) ? (fr ? ' · Jours fériés et semaine de Noël aussi' : ' · Holidays and Christmas week too') : '';
+    return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days) + hol)}</span></li>`;
   });
   return `<div class="venue-hours-year"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list">${lines.join('')}</ul></div>`;
 }
@@ -48986,8 +49046,10 @@ function venueLinks(venueId) {
 // hours JSON (_seasons / _closures), so every surface that reads hours through hours.js (Open Now on cards and the
 // map, the venue page, Build My Trip, the classic browse cards) applies them on the right dates. Read once a minute
 // from the small table and dropped on every write, like venueSocialLinks.
-const HOURS_SEASON_MAX = 2;
-const OWNER_SEASONS_OVERLAP = 'Your two sets of other hours share some dates. Please pick dates that don’t overlap.';
+// Tour test 10 (Whistler, 2026-11-18; Gord: summer, winter and a spring-and-fall closed Monday; Dayton approved): three
+// stretches of other hours (it was two).
+const HOURS_SEASON_MAX = 3;
+const OWNER_SEASONS_OVERLAP = 'Two of your sets of other hours share some dates. Please pick dates that don’t overlap.';
 const HOURS_CLOSURE_MAX = 20;
 const HOURS_EXTRA_NOTE_MAX = 60;
 let hoursExtraCache = null;
@@ -49051,6 +49113,17 @@ function hoursWithExtras(v, now = new Date()) {
 // (Build My Trip). Closures are handled separately (venueClosedOn).
 function weekJsonOn(v, date) {
   const s = weekSeasonOn(v, date);
+  // Tour test 10: a stretch that is "Open on holidays" opens its closed weekday on a holiday (hours.js holidayOn), with
+  // the hours of its Saturday (else Sunday, else its first open day).
+  if (s && s.holidays === true && hoursModule && hoursModule.holidayOn(String(date).slice(0, 10))) {
+    try {
+      const wd = localWeekdayKey(String(date).slice(0, 10)), week = { ...s.hours };
+      if (!Array.isArray(week[wd]) || !week[wd].length) {
+        const src = ['sat', 'sun', 'fri', 'mon', 'tue', 'wed', 'thu'].find((d) => Array.isArray(week[d]) && week[d].length);
+        if (src) { week[wd] = week[src]; return JSON.stringify(week); }
+      }
+    } catch (e) { /* the stretch as stored */ }
+  }
   return s ? JSON.stringify(s.hours) : v ? v.hours : null;
 }
 // The owner's seasonal set that applies on a date, or null (the usual hours).
@@ -50338,7 +50411,9 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         if (label.length > 40 || /[<>&]/.test(label)) { errors.hours_seasons = 'Please keep the name of your seasonal hours short (up to 40 characters), without < > or &.'; break; }
         const w = ownerWeekJson(x.hours, 'Seasonal hours', { allowEmptyWeek: false });
         if (!w.ok) { errors.hours_seasons = w.detail; break; }
-        out.push({ from, to, label, hours: JSON.parse(w.json) });
+        // Tour test 10 (Dayton approved): "Open on holidays" inside a stretch (hours.js holidayOn), a single choice.
+        if (x.holidays != null && typeof x.holidays !== 'boolean') { errors.hours_seasons = 'The seasonal hours could not be read. Please reload the page and try again.'; break; }
+        out.push({ from, to, label, hours: JSON.parse(w.json), ...(x.holidays === true ? { holidays: true } : {}) });
       }
       // Brewery test 1 (Whistler, 2026-11-15): two sets (a spring and a fall shoulder season) may not share a day; the engine
       // would only ever use the first.

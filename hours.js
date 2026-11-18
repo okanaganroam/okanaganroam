@@ -110,7 +110,7 @@ function parseHours(raw) {
   // them when the clock carries a date.
   if (Array.isArray(obj._seasons)) {
     const seasons = obj._seasons.filter((x) => x && /^\d{2}-\d{2}$/.test(x.from) && /^\d{2}-\d{2}$/.test(x.to) && x.hours && typeof x.hours === 'object')
-      .map((x) => ({ from: x.from, to: x.to, label: typeof x.label === 'string' ? x.label : '', days: parseHours(x.hours).days }));
+      .map((x) => ({ from: x.from, to: x.to, label: typeof x.label === 'string' ? x.label : '', days: parseHours(x.hours).days, ...(x.holidays === true ? { holidays: true } : {}) }));
     if (seasons.length) out.seasons = seasons;
   }
   if (Array.isArray(obj._closures)) {
@@ -214,6 +214,39 @@ function expandYearlyClosures(list, firstYear, lastYear) {
   });
   return out.sort(function(a, b) { return String(a.from).localeCompare(String(b.from)) || String(a.to).localeCompare(String(b.to)); });
 }
+// ---- Holidays inside a stretch (tour test 10, Whistler, 2026-11-18; Gord, winter sleigh rides "weekends and holidays";
+// Dayton approved) ----
+// A stretch of other hours may say "Open on holidays" (stored `holidays: true` on the season). Then a day the stretch
+// lists as closed is open on a holiday from the site's own list (the closures screen's holiday tiles: Christmas Eve and
+// Day, Boxing Day, New Year's Eve and Day, Family Day, Good Friday, Easter Monday, Victoria Day, Canada Day, BC Day,
+// Labour Day, Truth and Reconciliation, Thanksgiving, National Indigenous Peoples Day, Remembrance Day) and every day
+// of Christmas week (December 24 to January 1), with the stretch's own hours for the day it opens (its Saturday, else
+// Sunday, else its first open day). A special closure still wins (closed on Christmas Day stays closed).
+function holidayNth(y, m, wd, n) { var d = new Date(Date.UTC(y, m - 1, 1)), c = 0; while (true) { if (d.getUTCDay() === wd && ++c === n) return d; d.setUTCDate(d.getUTCDate() + 1); } }
+function holidayKeyOf(d) { return d.toISOString().slice(0, 10); }
+function holidayOn(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return false;
+  var y = Number(date.slice(0, 4)), md = date.slice(5);
+  if (md >= '12-24' || md === '01-01') return true;
+  if (['07-01', '09-30', '06-21', '11-11'].indexOf(md) >= 0) return true;
+  // Canada Day on a Sunday is kept on Monday July 2.
+  if (md === '07-02' && new Date(Date.UTC(y, 6, 1)).getUTCDay() === 0) return true;
+  var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+    i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  var easter = Date.UTC(y, mo - 1, da), day = 86400000;
+  var victoria = new Date(Date.UTC(y, 4, 24)); while (victoria.getUTCDay() !== 1) victoria.setUTCDate(victoria.getUTCDate() - 1);
+  var list = [holidayKeyOf(holidayNth(y, 2, 1, 3)), holidayKeyOf(new Date(easter - 2 * day)), holidayKeyOf(new Date(easter + day)), holidayKeyOf(victoria),
+    holidayKeyOf(holidayNth(y, 8, 1, 1)), holidayKeyOf(holidayNth(y, 9, 1, 1)), holidayKeyOf(holidayNth(y, 10, 1, 2))];
+  return list.indexOf(date) >= 0;
+}
+// The day a stretch that is "Open on holidays" runs on a holiday its week lists as closed: its Saturday, else Sunday,
+// else its first open day. `days`: a parsed week ({ mon: { status, ranges } ... }) or null.
+function holidayDayOf(days) {
+  if (!days) return null;
+  var order = ['sat', 'sun', 'fri', 'mon', 'tue', 'wed', 'thu'];
+  for (var i = 0; i < order.length; i++) { var x = days[order[i]]; if (x && x.status === 'open') return x; }
+  return null;
+}
 // One calendar day: a closure wins, then a seasonal set, then the usual week. A happy-hour week built by happyHourState()
 // also carries the place's own closed days (`gate`): those are closed like a closure (stepped over, not counted).
 function dayOnDate(parsed, date) {
@@ -223,6 +256,7 @@ function dayOnDate(parsed, date) {
   if (c) return { status: 'closed', closure: c };
   if (parsed.gate && gateClosedOn(parsed.gate, date)) return { status: 'closed', closure: { from: date, to: date, note: '' }, placeClosed: true };
   const s = seasonOn(parsed, date);
+  if (s && s.holidays && s.days[wd] && s.days[wd].status === 'closed' && holidayOn(date)) { var hd = holidayDayOf(s.days); if (hd) return { status: 'open', ranges: hd.ranges, holiday: true }; }
   return s ? s.days[wd] : parsed.days[wd];
 }
 // The week as it really runs from `clock.date`: today and the next five days by date, and yesterday (for a night
@@ -587,11 +621,13 @@ const HOURS_CLIENT_SRC = [
   // 2026-11-14: happyHourState (copied to the map page on its own) calls parseOpenSeason since café test 2 (#835);
   // without it here every happy hour threw in the browser and Roam Now's Happy hour filter showed 0 places.
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES}; var OPEN_SEASON_LAST = ${JSON.stringify(OPEN_SEASON_LAST)};`,
-  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
+  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, mdInRange, seasonOn, holidayNth, holidayKeyOf, holidayOn, holidayDayOf, gateClosedOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
     validClock, resolveClose, nextOpening, nextOpeningByDate, statusAt, formatClockMinutes, hoursStatusLabel, happyHourUntilClose, happyHourSlotsOn, parseOpenSeason].map((fn) => fn.toString()),
 ].join('\n');
 
 module.exports = {
+  holidayOn,
+  holidayDayOf,
   happyHourSlotsOn,
   HOURS_WEEKDAYS: WEEKDAYS,
   HOURS_CLIENT_SRC,
