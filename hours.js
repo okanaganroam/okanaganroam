@@ -115,7 +115,7 @@ function parseHours(raw) {
   }
   if (Array.isArray(obj._closures)) {
     const closures = obj._closures.filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.from) && /^\d{4}-\d{2}-\d{2}$/.test(x.to || x.from))
-      .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '' }));
+      .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '', ...(x.yearly === true ? { yearly: true } : {}) }));
     if (closures.length) out.closures = closures;
   }
   return out;
@@ -351,6 +351,14 @@ function statusAt(parsed, clock) {
   // Round 8 (2026-10-19): a closure of three days or more without a note is "(temporary closure)", not a holiday
   // (Christmas and Boxing Day stay a holiday).
   if (current.closure) out.closedNote = current.closure.note || (isTemporaryClosure(current.closure) ? 'temporary closure' : 'holiday');
+  // Tour test 7 (Whistler, 2026-11-17): a yearly closure of two weeks or more is the break between two seasons ("Closed
+  // between seasons · Reopens Jul 1", one line; it read "Closed today (Between seasons. Back July 1.)" beside a second
+  // "Closed May 1–Jun 30, reopens Jul 1."). Written for the browser copy too (HOURS_CLIENT_SRC).
+  if (current.closure && current.closure.yearly && current.closure.from && current.closure.to) {
+    var cf = Date.UTC(Number(current.closure.from.slice(0, 4)), Number(current.closure.from.slice(5, 7)) - 1, Number(current.closure.from.slice(8, 10)));
+    var ct = Date.UTC(Number(current.closure.to.slice(0, 4)), Number(current.closure.to.slice(5, 7)) - 1, Number(current.closure.to.slice(8, 10)));
+    if ((ct - cf) / 86400000 >= 13) { var back = new Date(ct + 86400000); out.betweenSeasons = { reopens: back.toISOString().slice(0, 10) }; }
+  }
   return out;
 }
 
@@ -391,6 +399,11 @@ function hoursStatusLabel(status, clock) {
       ? formatClockMinutes(status.closesAt.minutes)
       : when(status.closesAt);
     return { state: 'open', text: 'Open now · Closes ' + closes };
+  }
+  if (status.betweenSeasons && status.betweenSeasons.reopens) {
+    // The owner's own note follows when it says something else than the break itself ("Between seasons. Back July 1.").
+    var bn = status.closedNote && !/^(?:holiday|temporary closure)$/.test(status.closedNote) && !/\b(?:seasons?|back|reopen\w*|return\w*|closed)\b/i.test(status.closedNote) ? ' (' + status.closedNote + ')' : '';
+    return { state: 'closed', text: 'Closed between seasons' + bn + ' · Reopens ' + MONTHS[Number(status.betweenSeasons.reopens.slice(5, 7)) - 1] + ' ' + Number(status.betweenSeasons.reopens.slice(8, 10)) };
   }
   const today = status.closedNote ? 'Closed today (' + status.closedNote + ')' : 'Closed today';
   const lead = status.closedToday ? today : 'Closed';

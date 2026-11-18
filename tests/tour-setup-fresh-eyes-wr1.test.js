@@ -157,17 +157,21 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   assert.deepEqual(c.suggestKinds, ['snowmobile', 'adventure']);
   for (const w of ['Jeep tours', 'Quad rides', 'Side-by-side tours', 'Off-road adventures']) assert.deepEqual(app.tourKindSuggestion({ name: 'X', cuisine: w }), ['adventure'], w);
   // Snowmobile + Something else: ATV stays on her page.
+  // Tour test 7 (2026-11-17): the ATV chip was pre-picked from her ATV words; with it unticked, they go (Erik's wrong
+  // "heli-skiing" could not be removed otherwise).
   ok(await change(t, { tour_info: { kinds: ['snowmobile', 'other'] } }));
-  assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile tours & ATV tours');
+  assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile tours');
   // Snowmobile + the ATV chip: her own ATV words, not the chip's long name.
   ok(await change(t, { tour_info: { kinds: ['snowmobile', 'adventure'] } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile tours & ATV tours');
   // Only "Something else": her words exactly.
   ok(await change(t, { tour_info: { kinds: ['other'] } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile & ATV tours');
-  ok(await change(t, { tour_info: { kinds: ['snowmobile', 'other'] } }));
-  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours');
-  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours'.replace('Ziplines, RZR', 'Ziplines, RZR'));
+  ok(await change(t, { tour_info: { kinds: ['snowmobile', 'adventure', 'other'] } }));
+  // Tour test 7: the chips pre-picked from these words (snowmobile, ziplines, snowshoe) that are left unticked take their
+  // words off; words no pre-picked chip covered (RZR, rafting) stay.
+  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, RZR & rafting');
+  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR & rafting');
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
   assert.equal(app.tourKindsText(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, never the chip's whole label
   // The card's season word: "Winter" only while she runs in winter alone.

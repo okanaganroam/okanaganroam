@@ -325,7 +325,8 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
   function ownerHidden(id) {
     try { const r = db.prepare('SELECT reviewer, hidden FROM price_overrides WHERE venue_id = ?').get(Number(id)); return !!r && r.reviewer === OWNER_REVIEWER && !!r.hidden; } catch (e) { return false; }
   }
-  function setOwnerPrice(id, fee, basis = null) {
+  // Tour test 7 (2026-11-17): `per` for a private-only tour's card ("From $750 / group").
+  function setOwnerPrice(id, fee, basis = null, per = null) {
     const key = String(Number(id));
     if (fee === 'hidden') {
       db.prepare(`INSERT INTO price_overrides (venue_id, from_price, per, basis, hidden, decided_at, reviewer) VALUES (?, 0, NULL, NULL, 1, ?, ?)
@@ -342,7 +343,7 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
     }
     db.prepare(`INSERT INTO price_overrides (venue_id, from_price, per, basis, hidden, decided_at, reviewer) VALUES (?, ?, ?, ?, 0, ?, ?)
       ON CONFLICT(venue_id) DO UPDATE SET from_price = excluded.from_price, per = excluded.per, basis = excluded.basis, hidden = 0,
-        decided_at = excluded.decided_at, reviewer = excluded.reviewer`).run(Number(id), Number(fee), null, basis || null, iso(), OWNER_REVIEWER);
+        decided_at = excluded.decided_at, reviewer = excluded.reviewer`).run(Number(id), Number(fee), per || null, basis || null, iso(), OWNER_REVIEWER);
     applyOverrides();
   }
   return { runAll, tick, checkOne, listFlagged, decide, cardHtml, lastRun, quietCount, isRunning: () => !!running, applyOverrides, setOwnerPrice, isOwnerPrice };

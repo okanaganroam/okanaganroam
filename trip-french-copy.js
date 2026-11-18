@@ -12,6 +12,8 @@ const FR_HEADING_NAMES={'e-bike rentals':'location de vélos électriques','e-bi
  'waterfalls & canyons':'chutes et canyons','huts & cabins':'refuges et cabanes','parks & picnic spots':'parcs et aires de pique-nique','off-leash dog areas':'aires sans laisse pour chiens',lakes:'lacs','shopping':'magasins','zipline':'tyrolienne','ziplining':'tyrolienne','bungee jumping':'saut à l’élastique','rafting':'rafting','scenic flight':'vol panoramique','wildlife tour':'observation de la faune','wildlife tours':'observation de la faune','farm':'fermes',
  'hidden gems':'trésors cachés','local favourites':'coups de cœur locaux','dog-friendly beaches':'plages qui acceptent les chiens','lake time':'temps au bord du lac',
  // Cocktail test 2 (2026-11-13): meals and drinks, for « Aucun lieu (souper) ne correspond… » (it read « (dinner) »).
+ // Tour test 7 (2026-11-17): the new tour kinds.
+ 'ski touring':'ski de randonnée','avalanche course':'cours d’avalanche','multi-day trip':'sortie de plusieurs jours','mountain guide':'guide de montagne',
  dinner:'souper',supper:'souper',lunch:'dîner',breakfast:'déjeuner',brunch:'brunch',drinks:'verres',drink:'verre','a drink':'un verre',coffee:'café',dessert:'dessert','happy hour':'5 à 7','après':'après-ski',apres:'après-ski','late-night food':'repas tard le soir',tasting:'dégustation',tastings:'dégustations',cocktails:'cocktails'};
 const FR_HEADING_DAYS={Monday:'lundi',Tuesday:'mardi',Wednesday:'mercredi',Thursday:'jeudi',Friday:'vendredi',Saturday:'samedi',Sunday:'dimanche'};
 const FR_HEADING_PARTS={morning:'matin',afternoon:'après-midi',evening:'soir'};
@@ -412,6 +414,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Length, ages and booking can differ by tour: see this operator’s Tours & prices\.$/,'La durée, l’âge et la réservation peuvent varier selon la sortie : voyez Sorties et tarifs de cette entreprise.');
  text=text.replace(/^All ages welcome \(the operator’s own answer\)\.$/,'Tous les âges sont bienvenus (réponse de l’entreprise).');
  text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
+ // Tour test 7 (2026-11-17): a tour left out for a child under its minimum age.
+ text=text.replace(/^(.+) is for ages (\d{1,2}) and up, so it isn’t in this plan for your (\d{1,2})-year-old\.$/,(_,n,a,y)=>`${n} est pour les ${a} ans et plus : nous l’avons laissé de côté pour votre enfant de ${y} ans.`);
  text=text.replace(/^Some activities are (\d{1,2})\+: check Tours & prices\.$/,(_,n)=>'Certaines activités sont pour les '+n+' ans et plus : voyez Sorties et tarifs.');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.
  text=text.replace(/^Kids are welcome until (\d{1,2}(?::\d{2})? [AP]M|midnight) only$/,(_,t)=>'Enfants bienvenus jusqu’à '+(t==='midnight'?'minuit':frNightClock(t))+' seulement');

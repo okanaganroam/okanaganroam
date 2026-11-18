@@ -202,11 +202,13 @@ test('4 + 5. the French status line, and the off-season hours block of a by-book
   // Out of season: the season stretch says book ahead, never "Daily Closed" or seven "Closed" rows.
   const enN = plain(page(v, 'en', nov)), frN = plain(page(v, 'fr', nov));
   assert.match(enN, /Closed for the season/);
-  assert.match(enN, /Hours through the year May 15 – Sep 30 Book ahead · tours by reservation/);
+  // Tour test 7 (2026-11-17): the dates once (the season line), then the one booking line (no table saying them again).
+  assert.match(enN, /Open May 15 – September 30 each year .{0,80}Book ahead · tours by reservation/);
+  assert.doesNotMatch(enN, /Hours through the year/);
   assert.doesNotMatch(enN, /Daily Closed/);
   assert.doesNotMatch(enN, /Usual hours when open/);
   assert.doesNotMatch(enN, /Monday Closed/);
-  assert.match(frN, /Heures selon la saison .{5,30} Réservez à l’avance · sorties sur réservation/);
+  assert.match(frN, /Ouvert du .{5,40} chaque année .{0,80}Réservez à l’avance · sorties sur réservation/);
   assert.doesNotMatch(frN, /Tous les jours Fermé/);
   assert.doesNotMatch(frN, /lundi Fermé/i);
   // A seasonal tour WITH hours keeps its week under "Usual hours when open".
@@ -268,7 +270,8 @@ test('12. kinds keep her own words ("Whitewater"), read naturally, and French ca
   assert.equal(app.tourKindsText(['raft', 'wildlife'], true), 'Observation de la faune et des ours · Rafting');
   // Test 1's results stand.
   assert.equal(app.tourKindsText(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
-  assert.equal(app.tourKindsText(['snowmobile'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
+  // Tour test 7 (2026-11-17): the ATV chip pre-picked from these words, left unticked, takes them off.
+  assert.equal(app.tourKindsText(['snowmobile'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours');
   assert.equal(app.tourKindsText(['heli'], false, ''), 'Heli-skiing');
   assert.equal(app.tourKindsText(['raft'], false, 'Rafting'), 'Rafting');
   assert.equal(app.tourKindsText(['other'], false, 'ATV tours'), '');

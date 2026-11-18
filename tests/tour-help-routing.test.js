@@ -400,3 +400,73 @@ test("bare 'how do I say that' / 'comment le dire' no longer picks the one-trip 
   assert.notEqual(en.best("how do i say that?").id, "tour-one-trip-season");
   assert.match(String(en.topic("tour-per-unit").a), /Your tours and prices/); assert.match(String(fr.topic("tour-per-unit").aFr), /Vos sorties et tarifs/);
 });
+
+// Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG mountain guide in Pemberton, desktop, English). His 16 questions as
+// typed (shots 008-084), each with a French twin, and a few rephrasings. The 7 he found good still land where they did.
+const ASKED7 = [
+  ["7-008", "Courses meet at my office in Pemberton but ski tours meet at different trailheads depending on conditions. Which address do I put?", ["tour-meeting-varies"],
+    "Les cours ont lieu à mon bureau, mais le ski de randonnée part de différents départs de sentier selon les conditions. Quelle adresse mettre?"],
+  ["7-009", "I only do private guiding, there are no scheduled group tours. Is this site for me?", ["tour-private-only"],
+    "Je fais seulement des sorties privées, pas de sorties de groupe. Ce site est-il pour moi?"],
+  ["7-011", "We have no set hours, everything is by booking. Two seasons: winter Dec 15 to Apr 30 and summer Jul 1 to Sep 15, closed in between. How do I set that up?", ["tour-season", "setup-season"],
+    "Pas d’heures fixes, tout est sur réservation. Deux saisons : l’hiver du 15 déc. au 30 avril et l’été du 1er juillet au 15 sept., fermé entre les deux. Comment faire?"],
+  ["7-026", "I do glacier mountaineering and avalanche courses (AST 1 and AST 2). None of these buttons fit. Which do I pick?", ["tour-kinds-guide"],
+    "Je fais de l’alpinisme sur glacier et des cours d’avalanche (AST 1 et AST 2). Aucun bouton ne convient. Lequel choisir?"],
+  ["7-027", "Hut trips are 3 or 5 days, ski tours are one day, AST 1 is 2 days. What do I pick for how long?", ["tour-lengths", "tour-multiday"],
+    "Les sorties en refuge durent 3 ou 5 jours, le ski de randonnée une journée, l’AST 1 deux jours. Quelle durée je choisis?"],
+  ["7-030", "My prices are per day, not per person. Private guiding is $750 a day for up to 4 people. What do I put here?", ["tour-per-boat"],
+    "Mes prix sont par jour, pas par personne. Le guide privé coûte 750 $ par jour jusqu’à 4 personnes. Qu’est-ce que je mets ici?"],
+  ["7-031", "Can I hide the per person price? Most of my work is private.", ["tour-hide-price"],
+    "Puis-je cacher le prix par personne? La plupart de mes sorties sont privées."],
+  ["7-037", "Private days need a week notice but the AST courses fill up months ahead. How do I say that?", ["tour-lead-time"],
+    "Les journées privées demandent une semaine de préavis, mais les cours AST sont complets des mois à l’avance. Comment le dire?"],
+  ["7-038", "I take a 30% deposit, full refund up to 30 days before. Where does that go?", ["tour-weather"],
+    "Je prends un dépôt de 30 %, remboursement complet jusqu’à 30 jours avant. Où est-ce que ça va?"],
+  ["7-039", "AST 1 runs on scheduled dates, like Jan 10-11 and Feb 7-8. Where do I list the course dates?", ["tour-course-dates"],
+    "L’AST 1 a lieu à des dates fixes, comme les 10-11 janvier et 7-8 février. Où inscrire les dates des cours?"],
+  ["7-042", "Minimum age 16, but glacier trips are 18+ unless a parent comes along. What do I pick?", ["tour-age", "tour-ages-per-trip"],
+    "Âge minimum 16 ans, mais 18 ans pour les glaciers sauf avec un parent. Je choisis quoi?"],
+  ["7-043", "Guests need a good fitness level, 1000 m of climbing a day. Where do I say that?", ["tour-fitness"],
+    "Les clients doivent être en bonne forme, 1000 m de dénivelé par jour. Où le dire?"],
+  ["7-060", "Where do I show my certifications? I am an ACMG / IFMGA mountain guide.", ["tour-certs"],
+    "Où indiquer mes certifications? Je suis guide de montagne ACMG / IFMGA."],
+  ["7-061", "Do you rent gear? We have skis, skins, harnesses and crampons for rent, and avalanche safety gear is included. Where does that go?", ["tour-gear"],
+    "Nous louons des skis, des peaux, des harnais et des crampons, et l’équipement de sécurité en avalanche est inclus. Où le mettre?"],
+  ["7-065", "If avalanche conditions are bad I change the objective or cancel the day. How do I say that?", ["tour-weather"],
+    "Si les conditions d’avalanche sont mauvaises, je change l’objectif ou j’annule la journée. Comment le dire?"],
+  ["7-084", "My category says heli-skiing. I do not do heli-skiing and I unticked it. How do I get it off my page?", ["tour-category-word"],
+    "Ma catégorie dit héliski. Je ne fais pas d’héliski et je l’ai décoché. Comment l’enlever de ma page?"],
+];
+const MORE7 = [
+  ["en", "$750 per day for the group", ["tour-per-boat"]], ["en", "we charge a day rate", ["tour-per-boat"]], ["en", "daily rate for private guiding", ["tour-per-boat"]],
+  ["en", "is this site for me if i only do private trips", ["tour-private-only"]], ["en", "do i have to show a per person price", ["tour-hide-price", "tour-private-only"]],
+  ["en", "where do I put my ACMG certification", ["tour-certs"]], ["en", "how fit do guests need to be", ["tour-fitness"]], ["en", "is the gear included", ["tour-gear"]],
+  ["en", "our courses run on set dates", ["tour-course-dates"]], ["en", "remove a wrong word from my category", ["tour-category-word"]], ["en", "I don't do heli-skiing", ["tour-category-word"]],
+  ["en", "mountaineering", ["tour-kinds-guide"]], ["en", "avalanche courses", ["tour-kinds-guide"]],
+  ["fr", "tarif à la journée pour le groupe", ["tour-per-boat"]], ["fr", "où mettre ma certification ACMG", ["tour-certs"]], ["fr", "l’équipement est inclus", ["tour-gear"]],
+  ["fr", "enlever un mauvais mot de ma catégorie", ["tour-category-word"]], ["fr", "cours d’avalanche", ["tour-kinds-guide"]],
+];
+test("tour test 7: every Help question (EN + its French twin) and rephrasings land on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ski touring, heli-skiing & avalanche courses" });
+  assert.equal(ASKED7.length, 16);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED7) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  for (const [lang, q, want] of MORE7) { const r = (lang === "fr" ? fr : en).best(q); if (!want.includes(r.id)) wrong.push(`"${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 7 answers: group words for a day rate (no boat), private-only says yes, course dates are not closures", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const pb = plain(en.topic("tour-per-boat").a);
+  assert.match(pb, /whole group/); assert.match(pb, /day rate/i); assert.doesNotMatch(pb, /\$650 for 4|163/);
+  assert.match(plain(en.topic("tour-private-only").a), /^ ?Yes\b/); assert.match(plain(fr.topic("tour-private-only").aFr), /^ ?Oui\b/);
+  assert.match(plain(en.topic("tour-hide-price").a), /^ ?Yes, if you have a private price/);
+  assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Holidays/);
+  assert.match(plain(en.topic("tour-certs").a), /story/); assert.match(plain(en.topic("tour-fitness").a), /Good to know/); assert.match(plain(en.topic("tour-gear").a), /Good to know/);
+  assert.match(plain(en.topic("tour-meeting-varies").a), /Keep your office/);
+  assert.match(plain(en.topic("tour-kinds-guide").a), /Mountain guiding, mountaineering or avalanche courses/);
+});
