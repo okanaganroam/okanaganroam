@@ -22601,7 +22601,12 @@ const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-com
 //   pickup   true             Tour test 11: "We pick you up (from hotels in the village)", an option of the meeting-spot
 //                             questions (Basics and Where do people meet you?). The page says "Pickup: hotels in …
 //                             (office: <address>)", and Directions goes to the office, named as the office.
-const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup'];
+//   adult_age    '19'         Tour test 12 (Whistler, 2026-11-18; Kayla, a bungee site: 14+, under 19s need a parent or
+//                             guardian to sign the waiver; Dayton approved): the "under 18s" rule is for under 19s.
+//   adult_waiver true         … and they need a parent or guardian to sign the waiver (not "come with an adult").
+//   weather  true             Tour test 12: "Weather permitting" on the different-in-winter / stretch hours (a planner
+//                             note on those dates, "Open now · weather permitting", and the hours block, EN + FR).
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather'];
 const TOUR_KINDS_MAX = 3;
 const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
@@ -22642,7 +22647,7 @@ const TOUR_BOOK_LINES = { same_day: ['Same-day bookings are often fine.', 'Rése
 // Tour test 4 (Whistler, 2026-11-17): the Prices line of a free tour, and the card's word.
 const TOUR_FREE_LINES = { free: ['Free.', 'Gratuit.'], donation: ['Free (pay what you want).', 'Gratuit (contribution volontaire).'] };
 const TOUR_FREE_CARD_LABEL = 'Free';
-const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 8: ['Ages 8 and up.', 'À partir de 8 ans.'], 10: ['Ages 10 and up.', 'À partir de 10 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
+const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 8: ['Ages 8 and up.', 'À partir de 8 ans.'], 10: ['Ages 10 and up.', 'À partir de 10 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 14: ['Ages 14 and up.', 'À partir de 14 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
 let venueTourInfoCache = null;
 let tourCuisineFrMap = null;
 function clearVenueTourInfoCache() { venueTourInfoCache = null; tourCuisineFrMap = null; }
@@ -22974,6 +22979,8 @@ function cleanTourInfoPart(key, x) {
   if (key === 'private_per') return x === 'hour' ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'private_min') return Number.isInteger(x) && x >= 2 && x <= 12 ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'pickup') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'adult_age') return String(x) === '19' ? { value: '19' } : { error: TOUR_INFO_ERROR };
+  if (key === 'adult_waiver' || key === 'weather') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   return { error: TOUR_INFO_ERROR };
 }
 // "$129" / "129 $", "$1,500" / "1 500 $".
@@ -23033,6 +23040,15 @@ function tourListText(venueId) {
 function tourVisitSearchText(venueId) {
   try { const info = venueVisitInfo(venueId) || {}; return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know|groups)$/i.test(String(r.label || ''))).map((r) => r.text).join(' ; '); } catch (e) { return ''; }
 }
+// Tour test 12 (Whistler, 2026-11-18; Kayla): the rule for younger guests, as the owner chose it: under 18s or under 19s,
+// "come with an adult" or "need a parent or guardian to sign the waiver". -> { en, fr, age, waiver } or null.
+function tourAdultRule(t) {
+  if (!t || t.adult !== true || String(t.age || '') === '19' || !TOUR_AGES.includes(String(t.age || ''))) return null;
+  const age = t.adult_age === '19' ? 19 : 18, waiver = t.adult_waiver === true;
+  return { age, waiver,
+    en: waiver ? `Under ${age}s need a parent or guardian to sign the waiver.` : `Under ${age}s come with an adult.`,
+    fr: waiver ? `Les moins de ${age} ans ont besoin qu’un parent ou tuteur signe la décharge.` : `Les moins de ${age} ans viennent avec un adulte.` };
+}
 function tourRentalsOnly(t) { const ks = t && Array.isArray(t.kinds) ? t.kinds : []; return ks.length > 0 && ks.every((k) => k === 'rentals'); }
 function tourVisitLines(venue, info) {
   const t = info || venueTourInfo(venue.id);
@@ -23057,8 +23073,8 @@ function tourVisitLines(venue, info) {
   }
   if (TOUR_AGES.includes(String(t.age || ''))) {
     const a = TOUR_AGE_LINES[String(t.age)];
-    const adult = t.adult === true && String(t.age) !== '19' ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
-    out.Ages = { en: a[0] + adult[0], fr: a[1] + adult[1] };
+    const ad = tourAdultRule(t);
+    out.Ages = { en: a[0] + (ad ? ` ${ad.en}` : ''), fr: a[1] + (ad ? ` ${ad.fr}` : '') };
   }
   if (TOUR_BOOK.includes(t.book)) out.Booking = { en: TOUR_BOOK_LINES[t.book][0], fr: TOUR_BOOK_LINES[t.book][1] };
   return out;
@@ -23144,6 +23160,9 @@ function tourPlannerFacts(venueId) {
   const t = venueTourInfo(venueId);
   return {
     ...(TOUR_AGES.includes(String(t.age || '')) ? { tourMinAge: String(t.age) } : {}),
+    // Tour test 12: the rule for younger guests ("Under 19s need a parent or guardian to sign the waiver"), for the trip card.
+    ...(() => { const ad = tourAdultRule(t); return ad ? { tourAdultRule: { age: ad.age, waiver: ad.waiver } } : {}; })(),
+    ...(t.weather === true ? { tourWeather: true } : {}),
     ...(TOUR_BOOK.includes(t.book) ? { tourBookAhead: t.book } : {}),
     ...(TOUR_LENGTHS.includes(t.length) ? { tourLength: t.length } : {}),
     // Tour test 3 (Whistler, 2026-11-17): the operator's own "Yes, all year" answer, so Build My Trip's winter-words rule
@@ -51003,6 +51022,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       }
       // "Under 18s with an adult" goes with an age under 19 only.
       if (next.adult && (!next.age || next.age === '19')) delete next.adult;
+      // Tour test 12: under 19s / the waiver go with that rule only.
+      if (!next.adult) { delete next.adult_age; delete next.adult_waiver; }
       // Tour test 11: an hourly unit and its minimum go with a private price only (the minimum with the hourly unit).
       if (!(typeof next.private === 'number' && next.private > 0)) { delete next.private_per; delete next.private_min; }
       if (next.private_per !== 'hour') delete next.private_min;
@@ -51169,7 +51190,8 @@ function ownerValueText(field, value) {
     if (Array.isArray(o.kinds)) parts.push(`Kind: ${o.kinds.map((k) => (TOUR_KIND_LABELS_OWNER[k] || [k])[0]).join(', ')}`);
     if (o.length) parts.push(`How long: ${TOUR_LENGTH_LINES[o.length] ? TOUR_LENGTH_LINES[o.length][0].replace(/\.$/, '') : o.length}`);
     if (o.book) parts.push(TOUR_BOOK_LINES[o.book] ? TOUR_BOOK_LINES[o.book][0].replace(/\.$/, '') : o.book);
-    if (o.age) parts.push(`${TOUR_AGE_LINES[o.age] ? TOUR_AGE_LINES[o.age][0].replace(/\.$/, '') : o.age}${o.adult ? ', under 18s with an adult' : ''}`);
+    if (o.age) { const ad = tourAdultRule(o); parts.push(`${TOUR_AGE_LINES[o.age] ? TOUR_AGE_LINES[o.age][0].replace(/\.$/, '') : o.age}${ad ? `, ${ad.en.charAt(0).toLowerCase()}${ad.en.slice(1).replace(/\.$/, '')}` : ''}`); }
+    if (o.weather) parts.push('Weather permitting');
     if (o.private) parts.push(`Private tours from ${tourMoney(Number(o.private), false)}`);
     if (o.visit === 'appointment') parts.push('By booking only (no set hours)');
     if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
@@ -57274,8 +57296,8 @@ const TOUR_SETUP_HELP_TOPICS = [
   { id: 'tour-age', pages: ['setup', 'edit'], q: 'Minimum age, and kids', qFr: 'Âge minimum, et les enfants',
     keys: ['age', 'ages', 'minimum age', 'min age', 'how old', 'kids', 'children', 'child', 'family', 'families', 'teens', 'adults only', '19+', '18+', 'under 18', 'with an adult', '5+', '6+', '12+', '8+', '10+', 'theres no 8', 'there s no 8', 'there is no 8', 'no 8', 'no 10', '8 and up', '10 and up'],
     keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', '5 ans', '6 ans', '12 ans', '8 ans', '10 ans', 'pas de 8', 'il n y a pas de 8', 'pas de 10'],
-    a: '<p>In <strong>Who can come</strong>, tap your minimum age: All ages, 5+, 6+, 8+, 10+, 12+, 16+ or 19+. Tap <strong>Under 18s come with an adult</strong> if they do. It shows as “Ages” in “Plan your visit”, and Build My Trip leaves you out of family plans when your minimum is 12 or more.</p><p>Different ages for different trips? Tap the <strong>youngest</strong>, and list each trip’s age in <strong>Your tours and prices</strong>. A height or weight limit? Add it under <strong>Good to know</strong>.</p>',
-    aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez votre âge minimum : Tous les âges, 5+, 6+, 8+, 10+, 12+, 16+ ou 19+. Touchez <strong>Les moins de 18 ans viennent avec un adulte</strong> si c’est le cas. Il paraît comme « Âges » dans « Planifiez votre visite », et Planifier mon voyage ne vous propose pas aux familles si votre minimum est de 12 ans ou plus.</p><p>Des âges différents selon la sortie? Touchez le <strong>plus jeune</strong>, et indiquez l’âge de chaque sortie dans <strong>Vos sorties et tarifs</strong>. Une limite de taille ou de poids? Ajoutez-la sous <strong>Bon à savoir</strong>.</p>' },
+    a: '<p>In <strong>Who can come</strong>, tap your minimum age: All ages, 5+, 6+, 8+, 10+, 12+, 14+, 16+ or 19+. Tap <strong>Under 18s come with an adult</strong> if they do; then choose <strong>Under 18s</strong> or <strong>Under 19s</strong>, and <strong>come with an adult</strong> or <strong>need a parent or guardian to sign the waiver</strong>. It shows as “Ages” in “Plan your visit”, and Build My Trip leaves you out of family plans when your minimum is 12 or more.</p><p>Different ages for different trips? Tap the <strong>youngest</strong>, and list each trip’s age in <strong>Your tours and prices</strong>. A height or weight limit? Add it under <strong>Good to know</strong>.</p>',
+    aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez votre âge minimum : Tous les âges, 5+, 6+, 8+, 10+, 12+, 14+, 16+ ou 19+. Touchez <strong>Les moins de 18 ans viennent avec un adulte</strong> si c’est le cas; choisissez ensuite <strong>Moins de 18 ans</strong> ou <strong>Moins de 19 ans</strong>, et <strong>viennent avec un adulte</strong> ou <strong>un parent ou tuteur doit signer la décharge</strong>. Il paraît comme « Âges » dans « Planifiez votre visite », et Planifier mon voyage ne vous propose pas aux familles si votre minimum est de 12 ans ou plus.</p><p>Des âges différents selon la sortie? Touchez le <strong>plus jeune</strong>, et indiquez l’âge de chaque sortie dans <strong>Vos sorties et tarifs</strong>. Une limite de taille ou de poids? Ajoutez-la sous <strong>Bon à savoir</strong>.</p>' },
   { id: 'tour-multiday', pages: ['setup', 'edit'], over: ['tour-kinds-sightseeing'], q: 'We run multi-day trips', qFr: 'Nous offrons des sorties de plusieurs jours',
     keys: ['multi day', 'multi-day', 'multiday', 'several days', 'overnight', 'two days', 'three days', 'week long', 'lodge', 'camping trip', 'packages', 'package'],
     keysFr: ['plusieurs jours', 'deux jours', 'trois jours', 'nuit', 'forfait', 'forfaits', 'chalet', 'sejour'],

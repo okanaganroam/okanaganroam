@@ -1905,6 +1905,7 @@ const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
 // Tour test 3 (Whistler, 2026-11-17): "All ages" is said too when the request names an age ("with our 10-year-old").
+const tourAdultNote = (r) => (r.waiver ? `Under ${r.age}s need a parent or guardian to sign the waiver.` : `Under ${r.age}s come with an adult.`);
 const tourAgeNote = (age) => (age === 'all' ? 'All ages welcome (the operator’s own answer).' : age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
 // Charters) is booked too, not a walk-in stop: it gets the booking note and is not a first pick for an open slot.
@@ -2123,7 +2124,13 @@ function stopFrom(v, scored, extra, ctx) {
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
-  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  // Tour test 12 (Whistler, 2026-11-18; Kayla, 14+, under 19s need a parent or guardian to sign the waiver): the operator's
+  // own rule for younger guests, on the stop of a trip with kids or teens younger than the rule's age (or of unknown age).
+  if (ctx && v && v.type === 'tour' && v.tourAdultRule && (ctx.kids || kidsYoungest(ctx) != null) && (kidsYoungest(ctx) == null || kidsYoungest(ctx) < v.tourAdultRule.age)) {
+    const an = tourAdultNote(v.tourAdultRule);
+    if (!caveats.includes(an)) caveats.push(an);
+  }
   // Tour test 6 (Whistler, 2026-11-17): the request names a child's age and the operator's published list has a trip for
   // older children only ("Treetop course, ages 7+" with a 6-year-old): say so, the lowest such age.
   // Tour test 8 (Whistler, 2026-11-17): the request names the activity a list item is for ("mushing with our 14-year-old",

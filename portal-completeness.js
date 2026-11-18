@@ -303,7 +303,7 @@ const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
 const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
 // Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch; Dayton approved): 8+ and 10+ (riders 8 and up).
-const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '16', '19'];
+const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '14', '16', '19'];
 const TOUR_ITEMS = [
   R('address_pin', { w: 3, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
   R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),

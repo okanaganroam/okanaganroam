@@ -1821,7 +1821,10 @@ en.tour = {
   tbookSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
   // Who can come
   offerQ: 'Who can come?', offerLead: 'Families and dog owners check this before they book.',
-  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 14: '14+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  // Tour test 12 (Whistler, 2026-11-18; Kayla): the rule's small choice.
+  tadultAges: { 18: 'Under 18s', 19: 'Under 19s' }, tadultHows: { adult: 'come with an adult', waiver: 'need a parent or guardian to sign the waiver' },
+  tadultRule: { adult: 'Under {age}s come with an adult', waiver: 'Under {age}s need a parent or guardian to sign the waiver' },
   tageNeed: 'Please tap the youngest age you take (or All ages).',
   // Good to know
   bringQ: 'Good to know', bringLead: 'What should people bring or wear? Anything about the weather? Two or three short lines.',
@@ -1877,7 +1880,9 @@ fr.tour = {
   taheadNeed: 'Touchez combien de temps à l’avance réserver.', tbookNeed: 'Ajoutez votre lien de réservation, ou répondez à « Faut-il réserver à l’avance? ».',
   tbookSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
   offerQ: 'Qui peut venir?', offerLead: 'Les familles et les propriétaires de chiens le vérifient avant de réserver.',
-  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 6: '6+', 8: '8+', 10: '10+', 12: '12+', 14: '14+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tadultAges: { 18: 'Moins de 18 ans', 19: 'Moins de 19 ans' }, tadultHows: { adult: 'viennent avec un adulte', waiver: 'un parent ou tuteur doit signer la décharge' },
+  tadultRule: { adult: 'Les moins de {age} ans viennent avec un adulte', waiver: 'Les moins de {age} ans : un parent ou tuteur doit signer la décharge' },
   tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
   bringQ: 'Bon à savoir', bringLead: 'Quoi apporter ou porter? Quelque chose à savoir sur la météo? Deux ou trois courtes lignes.',
   bringEx: 'Habillez-vous chaudement : nous fournissons casques et gants. Nous vous appelons si la météo annule une sortie.',

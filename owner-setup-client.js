@@ -612,7 +612,7 @@
   // ---------- Tours (2026-11-16) ----------
   // The operator's own answers (venue_tour_info) and the price per person, as stored. Research's price and trip length are
   // offered as a starting point only ("We picked this from your page — check it"); nothing is saved until she taps Save.
-  S.tour = { kinds: (TI.kinds || []).slice(), length: TI.length || '', book: TI.book || '', bookYes: TI.book ? (TI.book === 'no' ? 'no' : 'yes') : '', age: TI.age || '', adult: TI.adult === true,
+  S.tour = { kinds: (TI.kinds || []).slice(), length: TI.length || '', book: TI.book || '', bookYes: TI.book ? (TI.book === 'no' ? 'no' : 'yes') : '', age: TI.age || '', adult: TI.adult === true, adultAge: TI.adult_age === '19' ? '19' : '18', adultHow: TI.adult_waiver === true ? 'waiver' : 'adult',
     price: CUR.tour_price == null ? null : CUR.tour_price, priv: typeof TI.private === 'number' ? TI.private : null, noBook: (CUR.not_offered || []).indexOf('booking_link') >= 0,
     // Tour test 11 (Whistler, 2026-11-18): the private price per hour and its minimum hours.
     privPer: TI.private_per === 'hour' ? 'hour' : (typeof TI.private === 'number' ? 'trip' : ''), privMin: TI.private_min ? String(TI.private_min) : '' };
@@ -704,6 +704,8 @@
     if ((x = v('suBring')) !== null) S.tour.bring = x;
   }
   // One-of-a-few answers and chips on S.tour (data-tpick="length:half"); the kinds are on/off chips (data-tkind).
+  // Tour test 12: the rule for younger guests as chosen ("Under 19s need a parent or guardian to sign the waiver").
+  function tadultText(){ var a = S.tour.adultAge === '19' ? '19' : '18'; return (T.tadultRule && T.tadultRule[S.tour.adultHow === 'waiver' ? 'waiver' : 'adult'] || T.tadult).replace('{age}', a); }
   function tchips(key, keys, labels, aria, lb){ return '<div class="su-chips" role="group" ' + (lb ? 'aria-labelledby="' + lb + '"' : 'aria-label="' + h(aria) + '"') + '>' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-chip' + (String(labels[k]).length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '">' + h(labels[k]) + '</button>'; }).join('') + '</div>'; }
   function tbig(key, keys, labels, subs, lb){ return '<div class="su-stack" role="group"' + (lb ? ' aria-labelledby="' + lb + '"' : '') + '>' + keys.map(function(k){ var on = String(S.tour[key]) === String(k); return '<button type="button" class="su-big' + (on ? '' : ' su-alt') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tpick="' + key + ':' + k + '"><span class="su-ico" aria-hidden="true">' + (on ? '✓' : '○') + '</span><span>' + h(labels[k]) + (subs && subs[k] ? '<small>' + h(subs[k]) + '</small>' : '') + '</span></button>'; }).join('') + '</div>'; }
   var PRICE_BOXES = ['suTprice', 'suTpriv', 'suCfee', 'suFee'];
@@ -2398,9 +2400,12 @@
       // Tour test 8: research's "dogs welcome" on a sled-dog or kennel business is not pre-ticked (it read as her own dogs).
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
-      var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '8', '10', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+      var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '8', '10', '12', '14', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
         // Tour test 8: "Under 18s come with an adult" beside "All ages" only when it was picked (it read like a rule for babies).
-        + (S.tour.age && S.tour.age !== '19' && (S.tour.age !== 'all' || S.tour.adult) ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
+        // Tour test 12 (Kayla, a bungee site): once on, a small choice: under 18s or under 19s, "come with an adult" or "need a
+        // parent or guardian to sign the waiver" (the chip reads as the rule chosen).
+        + (S.tour.age && S.tour.age !== '19' && (S.tour.age !== 'all' || S.tour.adult) ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1" id="suAdultRule">' + h(S.tour.adult ? tadultText() : T.tadult) + '</button></div>'
+          + (S.tour.adult && T.tadultAges ? tchips('adultAge', ['18', '19'], T.tadultAges, T.tadult) + tchips('adultHow', ['adult', 'waiver'], T.tadultHows, T.tadult) : '') : '') : '';
       x = doneLine('offer') + q(T.offerQ, ownDogsBiz() && T.offerLeadOwnDogs ? T.offerLeadOwnDogs : T.offerLead) + (S.dogNoPicked && S.noDogs && T.dogLineNoDone ? '<p class="su-sent" id="suDogNoPicked" role="status">' + h(T.dogLineNoDone) + '</p>' : '') + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
         + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.filter(tileShown).map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 && !C.brewery ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
@@ -3709,11 +3714,15 @@
         if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
         var ta = {}; if (S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
         var adult0 = S.tour.age !== '19' && S.tour.adult; if (adult0 !== (TI.adult === true)) ta.adult = adult0 ? true : null;
+        // Tour test 12: under 19s, and the waiver (each only with the rule on).
+        var aa0 = adult0 && S.tour.adultAge === '19', aw0 = adult0 && S.tour.adultHow === 'waiver';
+        if (aa0 !== (TI.adult_age === '19')) ta.adult_age = aa0 ? '19' : null;
+        if (aw0 !== (TI.adult_waiver === true)) ta.adult_waiver = aw0 ? true : null;
         if (Object.keys(ta).length) list.unshift({ tour_info: ta });
         // Tour test 10 (Whistler, 2026-11-18; Gord, riders 8+; Dayton approved): 8+ and 10+ keep Kids welcome too.
         var kidsOn = S.tour.age === 'all' || S.tour.age === '5' || S.tour.age === '6' || S.tour.age === '8' || S.tour.age === '10';
         if (kidsOn !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: kidsOn } });
-        return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = kidsOn; });
+        return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } if ('adult_age' in ta) { if (ta.adult_age) TI.adult_age = '19'; else delete TI.adult_age; } if ('adult_waiver' in ta) { if (ta.adult_waiver) TI.adult_waiver = true; else delete TI.adult_waiver; } S.badges.kid_friendly = kidsOn; });
       }
       return saveAll('offer', list, null, offerNext('offer'));
     }
@@ -4246,7 +4255,7 @@
     // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tpick]'), function(b){ b.onclick = function(){
       readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
-      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' ? '' : vt;
+      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' ? '' : vt;
       if (kt === 'length') S.tour.lengthGuessed = false;
       if (kt === 'privPer') S.tour.privPerTapped = true;
       if (kt === 'privMin') S.tour.privMinTapped = true;

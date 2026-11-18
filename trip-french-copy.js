@@ -425,6 +425,9 @@ function t3FrenchTextCore(value){
  // Tour test 4 (2026-11-17): several unlike trips behind one answer.
  text=text.replace(/^Length, ages and booking can differ by tour: see this operator’s Tours & prices\.$/,'La durée, l’âge et la réservation peuvent varier selon la sortie : voyez Sorties et tarifs de cette entreprise.');
  text=text.replace(/^All ages welcome \(the operator’s own answer\)\.$/,'Tous les âges sont bienvenus (réponse de l’entreprise).');
+ // Tour test 12: the operator's rule for younger guests.
+ text=text.replace(/^Under (18|19)s need a parent or guardian to sign the waiver\.$/,(_,n)=>'Les moins de '+n+' ans ont besoin qu’un parent ou tuteur signe la décharge.');
+ text=text.replace(/^Under (18|19)s come with an adult\.$/,(_,n)=>'Les moins de '+n+' ans viennent avec un adulte.');
  text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
  // Tour test 11 (2026-11-18): a sightseeing tour that goes to the place asked for, its hotel pickup, its own season.
  const frMonth11=m=>({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m;

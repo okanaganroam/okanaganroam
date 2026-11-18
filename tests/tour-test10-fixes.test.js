@@ -188,7 +188,7 @@ test('4. "Open on holidays" inside a stretch: Family Day and Christmas week open
 });
 
 test('5. 8+ and 10+ ages; a trip\'s own age ("Riders 8+ (pony rides under 8)" under Good to know, or "8+" on the trip): no trail ride for a 6-year-old, pony rides for a 5-year-old', async () => {
-  assert.deepEqual(completeness.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '16', '19']);
+  assert.deepEqual(completeness.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '14', '16', '19']);
   assert.equal(text.en.tour.tages[8], '8+'); assert.equal(text.fr.tour.tages[10], '10+');
   assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\]/);
   const kid = mk('tour', { name: 'Eight Plus Canoe', cuisine: 'Canoe tours' });
