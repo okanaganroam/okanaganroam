@@ -119,6 +119,9 @@ test('2. category words: a pre-picked kind he unticks takes its research words o
   assert.equal(r.body.tour_words.fr, 'Ski de randonnée et cours d’avalanche');
   const metaFr = (/<p class="venue-meta">([\s\S]*?)<\/p>/.exec(cardOf((await get('/fr/penticton/tours')).text, v.name)) || [])[1] || '';
   assert.match(plain(metaFr), /Ski de randonnée et cours d’avalanche/i); assert.doesNotMatch(plain(metaFr), /h[ée]li/i);
+  // Research's Known for loses the unticked kind's words too (page and card): "Backcountry ski touring".
+  assert.match(plain(page(v)), /Backcountry ski touring/); assert.doesNotMatch(plain(page(v)), /Heli-skiing and backcountry/);
+  assert.doesNotMatch(plain(cardOf((await get('/penticton/tours')).text, v.name)), /Heli-skiing/);
   // Untick everything: the listing's own words come back (an Undo of the kinds).
   ok(await change(t, { tour_info: { kinds: null } }));
   assert.equal(app.getVenue(v.id).cuisine, was);
