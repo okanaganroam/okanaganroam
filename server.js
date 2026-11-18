@@ -7896,6 +7896,9 @@ function tripClosedNamedNotes(list, date, dayDated = false) {
     else if (wd) dated.push(`${f.name} is closed on ${TRIP_WEEKDAY_NAMES[wd]}, ${monthDay(date)}, so it isn’t in this plan.`);
     else if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
     else if (closedSeason) undated.push(f.name);
+    // Tour test 8 (Whistler, 2026-11-17): closed by its own season on the asked date ("Callaghan Sled Dogs on October 10"
+    // said "closed right now"): say so, with the day it opens again.
+    else if (date && parseLocalDate(date) && tripPlannerModule().seasonClosedOnTrip(f, { date })) { const back = tripPlannerModule().reopensAfter(f, date); dated.push(`${f.name} is closed for the season on ${monthDay(date)}${back ? ` (it opens again on ${monthDay(back)})` : ''}, so it isn’t in this plan.`); }
     else now.push(f.name);
   }
   const out = dated.slice();
@@ -21888,7 +21891,7 @@ function visitRowsWithoutEchoedTastingPrice(info) {
 function tourListVaries(venueId) { const x = tourListInfo(venueId); return { length: x.length, ages: x.ages }; }
 // Tour test 5: the same reading with the trip lengths in minutes (for the card's range).
 function tourListInfo(venueId) {
-  const out = { length: false, ages: false, mins: [], listAges: [] };
+  const out = { length: false, ages: false, mins: [], listAges: [], itemAges: [] };
   try {
     const m = publishedMenu(venueId);
     if (!m || menuIsUnconfirmedResearch(m)) return out;
@@ -21913,6 +21916,9 @@ function tourListInfo(venueId) {
       // Tour test 6 (Whistler, 2026-11-17): every "N+" / "ages N and up" / « N ans et plus » on the list (a trip card with a
       // 6-year-old said only "Ages 6 and up" when the treetop course on her list is 7+).
       for (const mm of t.matchAll(/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus|ans \+)|\bages? (\d{1,2})\s*(?:\+|and (?:over|up|older)|to)\b|\b[àa] partir de (\d{1,2}) ans\b/g)) { const n = Number(mm[1] || mm[2] || mm[3]); if (n >= 2 && n <= 19 && !out.listAges.includes(n)) out.listAges.push(n); }
+      // Tour test 8 (Whistler, 2026-11-17): each item's own age with its name ("Mush your own team, 16+"), for Build My Trip's
+      // note on the asked activity ("mushing with our 14-year-old": a 14-year-old can ride but not mush).
+      { const own = [...t.matchAll(/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus|ans \+)|\bages? (\d{1,2})\s*(?:\+|and (?:over|up|older)|to)\b|\b[àa] partir de (\d{1,2}) ans\b/g)].map((mm) => Number(mm[1] || mm[2] || mm[3])).filter((n) => n >= 2 && n <= 19); if (own.length && it.name) out.itemAges.push({ name: String(it.name).slice(0, 80), age: Math.max(...own) }); }
     }
     out.length = mins.length >= 2 && new Set(mins).size >= 2;
     out.ages = ages.length >= 2 && new Set(ages).size >= 2;
@@ -22675,6 +22681,8 @@ function tourPlannerFacts(venueId) {
     ...((TOUR_BOOK.includes(t.book) || TOUR_AGES.includes(String(t.age || ''))) && (() => { const v = tourListVaries(venueId); return v.length || v.ages; })() ? { tourVaries: true } : {}),
     // Tour test 6: the ages her published list names ("Ages 7+"), for the kids note on a trip card.
     ...(() => { const a = tourListInfo(venueId).listAges; return a && a.length ? { tourListAges: a.slice().sort((x, y) => x - y) } : {}; })(),
+    // Tour test 8: the list items' own ages with their names (trip-planner.js tourItemTooYoung).
+    ...(() => { const a = tourListInfo(venueId).itemAges; return a && a.length ? { tourListItemAges: a.slice(0, 20) } : {}; })(),
     // Tour test 7 (Whistler, 2026-11-17): a list of whole-day trips ("Hut trip, 3 days") is a multi-day operator too, for
     // "hut trip" and "multi-day" requests (as the operator's own "Several days").
     ...(tourListInfo(venueId).mins.some((m) => m >= 1440) ? { tourMultiDay: true } : {}),
