@@ -135,7 +135,7 @@ test('all-closed stretch: the message says where a closure goes and a button dro
   assert.ok(s.indexOf('T.seasonAllClosed && DAYS.every') < s.indexOf('S.nudge = T.seasonNeedOpenDay'), 'checked before the old message');
   assert.match(s, /S\.nudge === S\.seaClosedNudge && seaIsStep\(S\.step\) \? '<div class="su-stack su-seaskip">' \+ big\('➜', T\.seasonAllClosedBtn, '', true, 'seaSkipClosed'\)/);
   // The button: a new stretch is dropped, a saved one goes back to what is stored, and the hours save as usual.
-  assert.match(s, /if \(k === 'seaSkipClosed'\) \{[\s\S]{0,200}if \(zo && zo\.src\) S\.seaList\[zi\] = seaLoad\(seaBlank\(\), zo\.src\);\s+else if \(zi === 1\) S\.seaList\.length = 1;\s+else if \(zo\) S\.seaList\[0\] = seaBlank\(\);[\s\S]{0,80}return hoursSave\(\);/);
+  assert.match(s, /if \(k === 'seaSkipClosed'\) \{[\s\S]{0,200}if \(zo && zo\.src\) S\.seaList\[zi\] = seaLoad\(seaBlank\(\), zo\.src\);\s+else if \(zi >= 1\) S\.seaList\.length = zi;\s+else if \(zo\) S\.seaList\[0\] = seaBlank\(\);[\s\S]{0,80}return hoursSave\(\);/);
   for (const [type, fr] of [['pub', false], ['restaurant', true], ['cafe', false], ['winery', true], ['brewery', false], ['cocktail', false], ['distillery', true]]) {
     const v = mk(type); const html = (await get(`${fr ? '/fr' : ''}/owner/${tokenFor(v.id)}/setup`)).text;
     assert.ok(html.includes(fr ? 'Passer ces dates et continuer' : 'Skip these dates and keep going'), type);

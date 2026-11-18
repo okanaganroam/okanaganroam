@@ -468,7 +468,8 @@ test('an event on a day closed in a stretch: the setup warns and names the stret
 // ====================== 9. The overlap message ======================
 test('the "these dates overlap" message goes as soon as a date changes', () => {
   const s = CLIENT();
-  assert.match(s, /S\.nudge = fill\(T\.seasonOverlap, \{ a: mdLabel\(list\[1 - S\.seaI\]\.from\), b: mdLabel\(list\[1 - S\.seaI\]\.to\) \}\); S\.overlapNudge = S\.nudge; return render\(\);/);
+  // Tour test 10 (2026-11-18): any two of up to three; it names the other one.
+  assert.match(s, /S\.nudge = fill\(T\.seasonOverlap, \{ a: mdLabel\(oz\.from\), b: mdLabel\(oz\.to\) \}\); S\.overlapNudge = S\.nudge; return render\(\);/);
   assert.match(s, /if \(S\.overlapNudge && S\.nudge === S\.overlapNudge\) \{ S\.nudge = ''; S\.overlapNudge = ''; var oe = screen\.querySelector\('\.su-error'\); if \(oe && oe\.parentNode\) oe\.parentNode\.removeChild\(oe\); \}/);
 });
 

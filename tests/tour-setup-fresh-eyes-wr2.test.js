@@ -219,11 +219,13 @@ test('4 + 5. the French status line, and the off-season hours block of a by-book
 
 test('8 + 9 (approved): a 5+ age and "48 hours ahead", their page lines and Build My Trip notes', async () => {
   const { v, t } = await marc();
-  assert.deepEqual(pc.TOUR_AGES, ['all', '5', '6', '12', '16', '19']);
+  // Tour test 10 (2026-11-18): 8+ and 10+ too.
+  assert.deepEqual(pc.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '16', '19']);
   assert.deepEqual(pc.TOUR_BOOK, ['same_day', 'day', '48h', 'week', 'no']);
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '12', '16', '19'\]/);
+  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\]/);
   assert.match(CLIENT, /tchips\('book', \['same_day', 'day', '48h', 'week'\]/);
-  assert.match(CLIENT, /var kidsOn = S\.tour\.age === 'all' \|\| S\.tour\.age === '5' \|\| S\.tour\.age === '6';/);
+  // Tour test 10 (2026-11-18): 8+ and 10+ keep Kids welcome too.
+  assert.match(CLIENT, /var kidsOn = S\.tour\.age === 'all' \|\| S\.tour\.age === '5' \|\| S\.tour\.age === '6' \|\| S\.tour\.age === '8' \|\| S\.tour\.age === '10';/);
   assert.equal(text.en.tour.tages[5], '5+');
   assert.equal(text.en.tour.taheads['48h'], '48 hours ahead');
   assert.match(text.fr.tour.taheads['48h'], /^48\s?heures à l’avance$/);

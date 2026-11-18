@@ -134,7 +134,8 @@ test('kitchen: restaurants are asked "When does the kitchen close / last seating
   assert.equal(pub.t.kitchenQ, 'Does your kitchen close before the bar?'); assert.equal(pub.t.kitchenNone, 'We don’t serve food'); assert.ok(!pub.restaurant);
   const s = CLIENT();
   assert.match(s, /var KITCHEN_Q = !!\(C\.pub \|\| C\.restaurant\);/);
-  assert.match(s, /saveAll\('hours', listH, null, addNext \? 'hours:season2' : KITCHEN_Q \? 'hours:kitchen' : COMBO \? 'closures' : null,/);
+  // Tour test 10 (2026-11-18): the next stretch's own screen (a second or a third).
+  assert.match(s, /saveAll\('hours', listH, null, addNext \? seaStepOf\(Math\.min\(S\.seaList\.filter\(function\(o\)\{ return o\.on; \}\)\.length, SEA_MAX - 1\)\) : KITCHEN_Q \? 'hours:kitchen' : COMBO \? 'closures' : null,/);
   assert.match(s, /\(C\.restaurant \? '' : big\('✕', T\.kitchenNone, '', true, 'kitchenNone'\)\)/, 'no "We don’t serve food" for a restaurant');
 });
 

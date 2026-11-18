@@ -296,11 +296,14 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // their check and the season, as for a winery by appointment). Happy hour, specials and events are never asked of
 // tours; the menu is "Your tours and prices" (tour test 1, 2026-11-16). Every answer is the operator's own (venue_tour_info, never researched).
 // The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
-const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'cultural', 'snowshoe', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'other'];
+// Tour test 10 (Whistler, 2026-11-18; Gord; Dayton approved): "Sleigh rides" (horse-drawn), after snowshoe (More kinds on
+// Okanagan; Whistler orders its chips with TOUR_KINDS_SHOWN).
+const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'cultural', 'snowshoe', 'sleigh', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'other'];
 const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
 const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
-const TOUR_AGES = ['all', '5', '6', '12', '16', '19'];
+// Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch; Dayton approved): 8+ and 10+ (riders 8 and up).
+const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '16', '19'];
 const TOUR_ITEMS = [
   R('address_pin', { w: 3, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
   R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),

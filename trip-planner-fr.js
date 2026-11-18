@@ -279,6 +279,10 @@ const PHRASES = [
   // Tour test 8 (Whistler, 2026-11-17): « chiens de traîneau » read as a dog in the party; « huskys », « chenil » and
   // « visite des chiots » found nothing.
   ['chiens de traineau', 'dog sledding'], ['chien de traineau', 'dog sledding'], ['sortie en chiens de traineau', 'dog sledding'], ['balade en traineau', 'sled ride'], ['tour de traineau', 'sled ride'],
+  // Tour test 10 (Whistler, 2026-11-18; Gord): « promenade en traîneau » (a horse-drawn sleigh) found nothing; the dog-sled
+  // phrases above (« traîneau à chiens », « balade en traîneau ») keep going to dog sledding.
+  ['promenade en traineau', 'sleigh ride'], ['promenades en traineau', 'sleigh rides'], ['tour en traineau', 'sleigh ride'], ['traineau tire par des chevaux', 'horse-drawn sleigh ride'],
+  ['traineau tire par un cheval', 'horse-drawn sleigh ride'], ['traineaux tires par des chevaux', 'horse-drawn sleigh rides'], ['promenade en traineau tire par des chevaux', 'horse-drawn sleigh ride'], ['traineau', 'sleigh ride'], ['traineaux', 'sleigh rides'],
   ['huskys', 'huskies'], ['huskies', 'huskies'], ['husky', 'husky'], ['conduire son attelage', 'mushing'], ['conduire un attelage', 'mushing'], ['meneur de chiens', 'mushing'],
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],

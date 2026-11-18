@@ -168,6 +168,9 @@ function t3ClosedDayText(c,fr){
   var mo=function(md,L){var n=Number(String(md||'').slice(0,2));return n>=1&&n<=12?L[n-1]:null;};
   var a=mo(c.from,fr?MFR:MEN),b=mo(c.to,fr?MFR:MEN),sea=a&&b?' ('+a+'–'+b+')':'';
   var days=fr?(run&&inOrder.length>2?'du '+FRL[inOrder[0]]+' au '+FRL[inOrder[inOrder.length-1]]:open.map(function(d){return FRS[d];}).join(', ')):(run&&inOrder.length>2?EN[inOrder[0]]+'–'+EN[inOrder[inOrder.length-1]]:open.map(function(d){return EN[d];}).join(', '));
+  // Tour test 10 (Whistler, 2026-11-18; Gord, winter sleigh rides on weekends only): open two days in a row reads as those
+  // days ("Sat–Sun only (Dec–Mar)"), not "Closed Fridays (Dec–Mar) · try Sat, Sun".
+  if(open.length===2&&run)return fr?'Seulement du '+FRL[inOrder[0]]+' au '+FRL[inOrder[1]]+sea:EN[inOrder[0]]+'–'+EN[inOrder[1]]+' only'+sea;
   return fr?'Fermé le '+FRL[c.day]+sea+' · essayez '+(run&&inOrder.length>2?'':'le ')+days:'Closed '+ENL[c.day]+sea+' · try '+days;
 }
 
@@ -179,7 +182,7 @@ function t3MissingClosedText(step,fr){
   var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
   var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
   if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
-  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+t.charAt(0).toLowerCase()+t.slice(1));}).join(fr?' ; ':'; ')+'.';
+  return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+(/ only/.test(t)?'open '+t:t.charAt(0).toLowerCase()+t.slice(1)));}).join(fr?' ; ':'; ')+'.';
 }
 
 function t3OptionalAlternativesHtml(step,fr,esc){

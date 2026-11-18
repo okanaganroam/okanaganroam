@@ -146,7 +146,8 @@ test('saving the tour answers: kinds and length, price per person, booking, who 
   assert.equal((await change(t, { tour_info: { book: 'month' } })).status, 400);
   // Who can come: the minimum age, and under 18s with an adult.
   ok(await change(t, { tour_info: { age: '12', adult: true } }));
-  assert.equal((await change(t, { tour_info: { age: '10' } })).status, 400);
+  // Tour test 10 (2026-11-18): 8+ and 10+ are answers now; 11 is not.
+  assert.equal((await change(t, { tour_info: { age: '11' } })).status, 400);
   info = app.venueTourInfo(v.id);
   assert.deepEqual({ age: info.age, adult: info.adult, book: info.book, private: info.private }, { age: '12', adult: true, book: 'day', private: 900 });
   // 19+ never keeps "with an adult".

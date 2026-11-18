@@ -143,9 +143,45 @@ function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.
 // Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
 const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
 function tourTooYoung(v, ctx) {
-  if (!v || v.type !== 'tour' || !/^\d+$/.test(String(v.tourMinAge || '')) || namedInRequest(v, ctx)) return false;
+  if (!v || v.type !== 'tour' || namedInRequest(v, ctx)) return false;
   const young = kidsYoungest(ctx);
-  return young != null && young < Number(v.tourMinAge);
+  if (young != null && /^\d+$/.test(String(v.tourMinAge || '')) && young < Number(v.tourMinAge)) return true;
+  return !!tourAgeFit(v, ctx).out;
+}
+// Tour test 10 (Whistler, 2026-11-18; Gord, a ranch: trail rides for riders 8 and up, pony rides for kids under 8; Dayton
+// approved): the age of each trip on the operator's own published Tours & prices (v.tourItems: { name, age, kids }: "8+" on
+// the trip's own line, or "kids under 8" / "pony" / "all ages" for a kids' trip) and one line of his own under Good to know
+// ("Riders 8+ (pony rides under 8)", v.tourRiderAge: the age for every trip that names none and isn't a kids' trip). No new
+// field. The trips the request names ("trail ride" -> the trail rides) must take the youngest child named; a request that
+// names none of them ("horse ride for my 5-year-old") is fine when any trip takes that child, and says which ("pony rides").
+// -> { out: true, item, age } (no trip fits) | { fit: item } (a kids' trip fits where the rest don't) | {}.
+const TOUR_AGE_ASK_SKIP_WORDS = ['horse', 'horses', 'horseback', 'riding', 'rider', 'riders', 'near', 'july', 'june', 'august', 'january', 'february', 'march', 'april', 'september', 'october', 'november', 'december', 'weekend', 'week', 'morning', 'afternoon', 'evening', 'daughter', 'son', 'grandson', 'granddaughter', 'nephew', 'niece', 'little', 'plan', 'trip', 'some', 'want', 'like', 'would', 'take', 'there', 'where', 'this', 'that', 'what', 'good', 'best'];
+let tourAgeAskSkip = null;
+function tourAgeFit(v, ctx) {
+  if (!v || v.type !== 'tour' || !ctx || namedInRequest(v, ctx)) return {};
+  const young = kidsYoungest(ctx);
+  const items = Array.isArray(v.tourItems) ? v.tourItems.filter((x) => x && x.name) : [];
+  if (young == null || !items.length) return {};
+  const rider = Number(v.tourRiderAge) || 0;
+  const ageOf = (it) => (Number(it.age) > 0 ? Number(it.age) : it.kids ? 0 : rider || null);
+  if (!tourAgeAskSkip) tourAgeAskSkip = new Set([...ITEM_AGE_SKIP, ...TOUR_AGE_ASK_SKIP_WORDS]);
+  const asked = new Set(normWords(ctx.askText || ctx.queryText || '').split(' ').filter((w) => w.length >= 4 && !tourAgeAskSkip.has(w) && !/\d/.test(w)).map(itemAgeStem).filter((w) => w.length >= 3));
+  const named = items.filter((it) => normWords(it.name).split(' ').some((w) => w.length >= 4 && asked.has(itemAgeStem(w))));
+  const fits = (it) => { const a = ageOf(it); return a == null || a <= young; };
+  if (named.length) {
+    if (named.some(fits)) return {};
+    // A trip's own "16+" while another trip on the list takes the child keeps the operator in, with the trip's own note
+    // (tour test 8: "a 14-year-old can ride but not mush"). His riders' line ("Riders 8+") is for every ride but the kids'
+    // one, so a trail ride for a 6-year-old is left out.
+    if (named.some((it) => Number(it.age) > 0) && items.some(fits)) return {};
+    const it = named[0];
+    return { out: true, item: it.name, age: ageOf(it) };
+  }
+  if (!rider || rider <= young) return {};
+  const kids = items.filter((it) => fits(it) && ageOf(it) === 0);
+  if (kids.length) return { fit: kids[0] };
+  if (items.some(fits)) return {};
+  return { out: true, item: '', age: rider };
 }
 // Tour test 8 (Whistler, 2026-11-17): a list item (v.tourListItemAges: [{ name, age }], from the operator's published
 // Tours & prices) whose name shares an activity word with the request ("mushing" / "Mush your own team") and whose own
@@ -178,12 +214,15 @@ function kidsAllowed(v) {
   // (a kids trip doesn't say how old the kids are, so the safe read). Unanswered: as before.
   // Tour test 1: with the kids' ages named, a tour whose minimum is at or below the youngest is fine ("our 14-year-old" and
   // a 12+ tour); one above it is not.
+  // Tour test 10: a trip the request names that is for older riders than the youngest child (tourAgeFit).
+  if (v.type === 'tour' && tourAgeFit(v, ctx).out) return false;
   if (v.type === 'tour' && v.tourMinAge) {
     if (v.tourMinAge === 'all') return true;
     const young = kidsYoungest(ctx);
     if (young != null && /^\d+$/.test(v.tourMinAge)) return young >= Number(v.tourMinAge);
     // Tour test 2 (2026-11-16): 5+ is fine for a family too, like 6+.
-    return v.tourMinAge === '6' || v.tourMinAge === '5';
+    // Tour test 10 (2026-11-18): 8+ and 10+ too (a family's ages unknown; under 12, as the Help says).
+    return ['5', '6', '8', '10'].includes(v.tourMinAge);
   }
   return !KIDS_EXCLUDED_TYPES.includes(v.type);
 }
@@ -494,6 +533,9 @@ function buildContext(intent, labels, options) {
     plannerKinds: opts.requirements ? opts.requirements.items.filter(i => i.kind === 'venue_kind' && i.strength === 'must').map(i => i.value) : intent.plannerKinds || [],
     requirements: opts.requirements || null,
     queryText: normWords(opts.text || ''),
+    // Tour test 10: the request's own words before the shorthand ("trail ride", "pony ride" both read "horseback riding"),
+    // for the trips it names (tourAgeFit).
+    askText: normWords(opts.askText || opts.text || ''),
     kidAges: Array.isArray(opts.kidAges) ? opts.kidAges.filter((x) => Number.isInteger(x) && x >= 0 && x < 19) : [],
     ownTourAsked: ownTourAsked(opts),
     niceDinnerOnce: !!opts.niceDinnerOnce,
@@ -989,7 +1031,7 @@ function ownerSeasonOpenOn(v, ctx) {
 // every July scenic flight and heli-hiking request by their ski words. Its category words only (never its name or
 // description), and only for a request that asks for that kind: a general "tours in July" request and a snow-only
 // company keep the rule.
-const SNOW_PLANNER_KINDS = new Set(['snow_tour', 'snowmobile_tour']);
+const SNOW_PLANNER_KINDS = new Set(['snow_tour', 'sleigh_ride', 'snowmobile_tour']);
 function namesAskedOffSnowKind(v, ctx) {
   const asked = ((ctx && ctx.plannerKinds) || []).filter((k) => !SNOW_PLANNER_KINDS.has(k));
   if (!asked.length || !v || v.type !== 'tour' || !v.cuisine) return false;
@@ -1007,6 +1049,31 @@ function tourWaterOff(v, m, ctx) {
   if (/\b(?:winter|year round|all year|eagle\w*)\b/.test(sub)) return false;
   if (kinds.length && kinds.every((k) => WATER_TOUR_KINDS.includes(k) || k === 'other') && ownerSeasonOpenOn(v, ctx)) return false;
   return true;
+}
+// Tour test 10 (Whistler, 2026-11-18; Gord, a ranch: trail rides most of the year, only weekend sleigh rides from December
+// to March): a horseback request in January planned him as an optional idea. His list's months for his horseback trips
+// win ("Pack trip (summer)"); with none, an operator that also picked a winter kind (sleigh rides, dog sledding…) isn't
+// planned for riding from December to March, unless its own category says winter or all year.
+const TOUR_WINTER_KINDS = ['sleigh', 'dogsled', 'snowmobile', 'snowshoe', 'heli'];
+// Tour test 10: a ranch whose operator picked Horseback riding and answered his own season (open on the date) is planned for
+// riding in the cold months (Gord's pony rides in November) unless only his winter kind runs then (tourHorseOff).
+function ownerRidesThen(v, m, ctx) {
+  return (ctx.plannerKinds || []).includes('horseback') && !(ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting'].includes(k))
+    && Array.isArray(v.tourKinds) && v.tourKinds.includes('horseback') && !tourHorseOff(v, m);
+}
+function tourHorseOff(v, m) {
+  if (Array.isArray(v.tourHorseMonths) && v.tourHorseMonths.length) return !v.tourHorseMonths.includes(m);
+  if (![12, 1, 2, 3].includes(m)) return false;
+  const kinds = Array.isArray(v.tourKinds) ? v.tourKinds : [];
+  if (!kinds.some((k) => TOUR_WINTER_KINDS.includes(k))) return false;
+  return !/\b(?:winter|year round|all year)\b/.test(normWords(v.cuisine || ''));
+}
+// A horseback request in a month when only the operator's winter kind runs: left out, and never offered as "closed for the
+// season" or an optional idea (he isn't closed: his sleigh rides run).
+function horseOffBlocked(v, ctx) {
+  if (!v || v.type !== 'tour' || !ctx || !(ctx.plannerKinds || []).includes('horseback') || (ctx.plannerKinds || []).includes('sleigh_ride') || namedInRequest(v, ctx)) return false;
+  const m = tripMonthOf(ctx);
+  return !!m && tourHorseOff(v, m);
 }
 function offSeasonBlocked(v, ctx) {
   if (namedInRequest(v, ctx) || (ctx.pinnedIds && ctx.pinnedIds.has(v.id))) return false;
@@ -1033,7 +1100,7 @@ function offSeasonBlocked(v, ctx) {
   // Tour test 6 (Whistler, 2026-11-17): and the operator's own season answer ("all year", or open on the date) wins, as for
   // the winter-only words: a zipline park with summer e-bike rentals that runs all year was "closed for the season". A
   // request for the summer thing itself (a bike tour, rentals, paddling, rafting, riding) keeps the rule.
-  if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m) && !(ownerSeasonOpenOn(v, ctx) && !((ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting', 'horseback'].includes(k))))) return true;
+  if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m) && !(ownerSeasonOpenOn(v, ctx) && (!((ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting', 'horseback'].includes(k))) || ownerRidesThen(v, m, ctx)))) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;
   // Outdoor golf in winter only when golf was asked for (it then gets the course's own season caveat).
   if (v.type === 'golf') return !v.indoorGolf && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
@@ -1147,10 +1214,11 @@ function eligible(v, ctx, strict) {
   if (v.type === 'indoor' && /\blibrary\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:library|libraries|rain|rainy|raining|books?)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
-  if (ctx.kids && v.type === 'tour' && !(v.tourMinAge === 'all' || v.tourMinAge === '6' || v.tourMinAge === '5') && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
+  if (ctx.kids && v.type === 'tour' && !['all', '5', '6', '8', '10'].includes(v.tourMinAge) && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
   if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
+  if (horseOffBlocked(v, ctx)) return false;
   // A restaurant or café closed with no reopening date is not planned for any date (2026-10-25: a September honeymoon got
   // Alta Bistro, closed with no reopening announced). Seasonal sights keep the usual closed-season window.
   if (!ctx.ignoreSeason && DINING_TYPES.includes(v.type) && v.seasonClosedToday && v.seasonReopens === null && !(SKI_HILL_REGIONS.includes(v.region) && skiWordsAsked(ctx.queryText || ''))) return false;
@@ -2030,7 +2098,7 @@ function stopFrom(v, scored, extra, ctx) {
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
-  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   // Tour test 6 (Whistler, 2026-11-17): the request names a child's age and the operator's published list has a trip for
   // older children only ("Treetop course, ages 7+" with a 6-year-old): say so, the lowest such age.
   // Tour test 8 (Whistler, 2026-11-17): the request names the activity a list item is for ("mushing with our 14-year-old",
@@ -6471,7 +6539,10 @@ function tooYoungNotes(result, input) {
   const regions = (input.intent && input.intent.regions) || [];
   const out = (input.facts || []).filter((v) => v.type === 'tour' && !used.has(v.id) && tourTooYoung(v, ctx) && (!regions.length || regions.includes(v.region)) && kinds.some((k) => (v.plannerKinds || []).includes(k))).slice(0, 2);
   for (const v of out) {
-    const text = `${v.name} is for ages ${v.tourMinAge} and up, so it isn’t in this plan for your ${young}-year-old.`;
+    // Tour test 10: the trip the request names is the one for older riders ("Trail rides are for ages 8 and up").
+    const fit = /^\d+$/.test(String(v.tourMinAge || '')) && young < Number(v.tourMinAge) ? null : tourAgeFit(v, ctx);
+    const text = fit && fit.out ? (fit.item ? `${v.name}’s “${fit.item}” is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.` : `${v.name} is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.`)
+      : `${v.name} is for ages ${v.tourMinAge} and up, so it isn’t in this plan for your ${young}-year-old.`;
     if (!(result.notes || []).includes(text)) result.notes = [text].concat(result.notes || []);
     // Up front with what the visitor asked for (the page's Planning notes), not only under How this plan was made.
     if (!(result.contextNotes || []).includes(text)) result.contextNotes = [text].concat(result.contextNotes || []);
@@ -6722,7 +6793,7 @@ function planTripUnchecked(input) {
     : skiOffSeasonMonth(requirements.text || input.text || '', intent, requirements, input.tripDate, namedDay, skiOpening);
   if (skiOff && skiOpening) input = { ...input, skiOpening };
   if (skiOff) {
-    const kept = (i) => !(i.kind === 'activity' && ['skiing', 'winter', 'snowshoeing'].includes(i.value)) && !(i.kind === 'venue_kind' && i.value === 'snow_tour') && !(i.kind === 'type' && i.value === 'outdoor' && !(intent.types || []).includes('outdoor'));
+    const kept = (i) => !(i.kind === 'activity' && ['skiing', 'winter', 'snowshoeing'].includes(i.value)) && !(i.kind === 'venue_kind' && (i.value === 'snow_tour' || i.value === 'sleigh_ride')) && !(i.kind === 'type' && i.value === 'outdoor' && !(intent.types || []).includes('outdoor'));
     requirements = { ...requirements, items: requirements.items.filter(kept) };
     intent.activities = (intent.activities || []).filter((a) => !['winter', 'skiing'].includes(a));
     input = { ...input, requirements, skiOffSeason: skiOff };
@@ -6740,7 +6811,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6774,7 +6845,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
@@ -6987,6 +7058,8 @@ function closedDayEnglish(c) {
   const mo = (md) => { const n = Number(String(md || '').slice(0, 2)); return n >= 1 && n <= 12 ? MEN[n - 1] : null; };
   const sea = mo(c.from) && mo(c.to) ? ` (${mo(c.from)}–${mo(c.to)})` : '';
   const days = run && inOrder.length > 2 ? `${EN[inOrder[0]]}–${EN[inOrder[inOrder.length - 1]]}` : WEEKDAYS.filter((d) => c.open.includes(d)).map((d) => EN[d]).join(', ');
+  // Tour test 10: open two days in a row only: "open Sat–Sun only (Dec–Mar)".
+  if (c.open.length === 2 && run) return `open ${EN[inOrder[0]]}–${EN[inOrder[1]]} only${sea}`;
   return `closed ${ENL[c.day]}${sea} · try ${days}`;
 }
 // The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the
@@ -7040,6 +7113,8 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // Audit fix (2026-10-27): a place closed for the season or under a closed advisory is never offered under "Not
       // included" (the closed Terrace Restaurant was offered as its own alternative).
       if (seasonClosedOnTrip(venue, { date: /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null }) || (venue.seasonClosedToday && !visitDate) || (venue.advisory && advisoryUnavailable(venue.advisory.note))) continue;
+      // Tour test 10: a ranch whose winter is sleigh rides only is not offered for riding then ("Closed Fridays · try Sat, Sun").
+      if (item.kind === 'venue_kind' && item.value === 'horseback' && venue.type === 'tour' && /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') && tourHorseOff(venue, Number(visitDate.slice(5, 7)))) continue;
       // Winery test 5 (2026-11-12): with no time of day asked, a place whose own week has the trip's day closed (a winery
       // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
       // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
