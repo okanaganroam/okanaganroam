@@ -3164,10 +3164,30 @@
 
   // Instagram / Facebook: a link or @name is checked and goes on the page; a plain page name is a note for us to find
   // the link (never published as typed). Never an error for a name: anything that isn't a link is treated as the name.
+  // Tour test 12 (Whistler, 2026-11-18; Kayla pasted "instagram.com/cheakamusbungee 🤙 #linkinbio"): the link or @name inside
+  // pasted text with emojis or hashtags; an instagram.com/<name> link becomes "@name". Anything else is left as typed.
+  // The booking link inside pasted text ("book.example.com/jump 🔥 #linkinbio" -> the link); text with no space as typed.
+  function urlFromPaste(v){
+    var t = String(v == null ? '' : v).trim(); if (!/\s/.test(t)) return t;
+    var toks = t.split(/\s+/), i, x;
+    for (i = 0; i < toks.length; i++) { x = toks[i].replace(/^[("'«\[]+|[)"'».,;:!?\]]+$/g, ''); if (/^https?:\/\/\S+$/i.test(x) || /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/\S*)?$/i.test(x)) return x; }
+    return t;
+  }
+  function socFromPaste(val, ig){
+    var t = String(val == null ? '' : val).trim(), toks = t.split(/\s+/), i, x;
+    for (i = 0; i < toks.length; i++) {
+      x = toks[i].replace(/^[("'«\[]+|[)"'».,;:!?\]]+$/g, '');
+      if (ig && igFromSite(x)) return igFromSite(x);
+      if (ig && toks.length > 1 && /^@[A-Za-z0-9._]{2,30}$/.test(x)) return x;
+      if (!ig && /^(?:https?:\/\/)?(?:www\.|m\.|web\.)?facebook\.com\/\S+$/i.test(x)) return x;
+    }
+    return t;
+  }
   function socialSave(v, val){
     if (S.busy) return;
     var ig = v === 'instagram', link = '';
-    if (ig) { if (/^@?[A-Za-z0-9._]{2,30}$/.test(val)) link = val.charAt(0) === '@' ? val : '@' + val; else if (/instagram\.com\//i.test(val) && !/\s/.test(val)) link = val; }
+    val = socFromPaste(val, ig);
+    if (ig) { if (/^@?[A-Za-z0-9._]{2,30}$/.test(val)) link = val.charAt(0) === '@' ? val : '@' + val; else if (igFromSite(val)) link = igFromSite(val); else if (/instagram\.com\//i.test(val) && !/\s/.test(val)) link = val; }
     else if (/facebook\.com\//i.test(val) && !/\s/.test(val)) link = val;
     var asName = function(){
       S.error = '';
@@ -3223,7 +3243,8 @@
     // The same as what's saved: kept as it is.
     if (val === S.socSaved[n] && answered(n)) return Promise.resolve(S.done[n]);
     var link = '';
-    if (ig) { if (/^@?[A-Za-z0-9._]{2,30}$/.test(val)) link = val.charAt(0) === '@' ? val : '@' + val; else if (/instagram\.com\//i.test(val) && !/\s/.test(val)) link = val; }
+    val = socFromPaste(val, ig);
+    if (ig) { if (/^@?[A-Za-z0-9._]{2,30}$/.test(val)) link = val.charAt(0) === '@' ? val : '@' + val; else if (igFromSite(val)) link = igFromSite(val); else if (/instagram\.com\//i.test(val) && !/\s/.test(val)) link = val; }
     else if (/facebook\.com\//i.test(val) && !/\s/.test(val)) link = val;
     var asName = function(){
       S.error = '';
@@ -3879,7 +3900,7 @@
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
-      readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? el('suBookUrl').value.trim() : null;
+      readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
       if (gbu && !siteOk(gbu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       if (gline && linkIn(gline)) { S.nudge = T.groupsNoLink; return render(); }
       var glinkCh = gbu !== null && !!gbu && gbu !== (CUR.booking_url || C.bookingKnown || '');
@@ -3956,7 +3977,7 @@
       return saveAll('price', pl, null, null, function(){ px2(); if (pp == null || pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
     }
     if (k === 'bookingSave') {
-      readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu1 !== null) S.bookUrl = bu1;
+      readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bu1 !== null) S.bookUrl = bu1;
       var bk0 = tb0.bookYes === 'no' ? 'no' : tb0.bookYes === 'yes' ? tb0.book : '';
       if (tb0.bookYes === 'yes' && !tb0.book) { S.nudge = T.taheadNeed; return render(); }
       if (!bk0 && !bu1 && !tb0.noBook) { S.nudge = T.tbookNeed; return render(); }
@@ -4013,7 +4034,7 @@
     if (k === 'visitSave') {
       readWine(); var wv2 = S.wine;
       if (!wv2.visit && !wv2.groups && !wv2.buses) { S.nudge = T.visitNeed; return render(); }
-      var bu = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu !== null) S.bookUrl = bu;
+      var bu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bu !== null) S.bookUrl = bu;
       var vl = [], wi2 = {};
       ['visit', 'groups', 'buses'].forEach(function(kk){ if (wv2[kk] && wv2[kk] !== (WI[kk] || '')) wi2[kk] = wv2[kk]; });
       // Winery test 4 (2026-11-12): "By appointment only" newly picked takes the old weekly hours off the page in the same
@@ -4062,7 +4083,7 @@
     if (k === 'lineSave') {
       var step = p[1], key = p[2], line = el('suLine').value.trim();
       // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
-      var bkUrl = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bkUrl !== null) S.bookUrl = bkUrl;
+      var bkUrl = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bkUrl !== null) S.bookUrl = bkUrl;
       if (bkUrl !== null) { var inl = linkIn(line); if (inl) { S.visit[key] = el('suLine').value; S.linkOffer = inl.url; S.nudge = ''; render(); var mv0 = el('suMoveLink'); if (mv0) mv0.scrollIntoView({ block: 'center' }); return; } S.linkOffer = ''; }
       var linkChanged = bkUrl !== null && bkUrl !== (CUR.booking_url || '');
       if (!line && !(bkUrl && step === 'book')) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
@@ -4328,7 +4349,8 @@
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
-      if (qk === 'good_to_know') { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
+      // Tour test 12 (Whistler, 2026-11-18; Kayla tapped a Groups chip and typed: her words went nowhere): Groups too.
+      if (qk === 'good_to_know' || qk === 'groups') { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });

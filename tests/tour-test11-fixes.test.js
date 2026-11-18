@@ -318,5 +318,5 @@ test('8c. French page: Good to know chip phrases in French; Time needed from the
 });
 
 test('8d. tapping a Good to know chip puts the cursor in the box, at the end', () => {
-  assert.match(CLIENT, /if \(qk === 'good_to_know'\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
+  assert.match(CLIENT, /if \(qk === 'good_to_know' \|\| qk === 'groups'\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
 });

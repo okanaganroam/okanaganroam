@@ -12392,6 +12392,16 @@ function getRelatedVenues(venue, limit = 6) {
   return rows.sort((a, b) => score.get(b.id) - score.get(a.id) || String(a.name).localeCompare(String(b.name))).slice(0, limit);
 }
 
+// Tour test 12 (Whistler, 2026-11-18; Kayla meets people at a gravel lot 5.5 km from her office): "Close by" and its
+// distances start from the approved meeting or storefront spot when there is one (an operator who picks people up keeps
+// the office: that is where Directions goes).
+function venueCloseByOrigin(venue) {
+  try {
+    if (!venue || !venue.id || tourPickup(venue)) return venue;
+    const p = venueMapsPoint(venue);
+    return p && (Number(p.lat) !== Number(venue.latitude) || Number(p.lng) !== Number(venue.longitude)) ? { ...venue, latitude: p.lat, longitude: p.lng } : venue;
+  } catch (e) { return venue; }
+}
 function getNearbyVenues(venue, limit = 6) {
   // Same region, any other category, excluding itself — a broader
   // "explore this region more" set distinct from same-category related venues
@@ -12399,7 +12409,8 @@ function getNearbyVenues(venue, limit = 6) {
     .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL')
     .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
-  const dist = new Map(rows.map((v) => [v.id, venueDistanceKm(venue, v)]));
+  const origin = venueCloseByOrigin(venue);
+  const dist = new Map(rows.map((v) => [v.id, venueDistanceKm(origin, v)]));
   const score = new Map(rows.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
   // Closest first (within a 0.5 km band the better-rated place leads); places
   // without coordinates follow, best rated first.
@@ -39670,8 +39681,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const nearbyStripHtml = (() => {
     if (venue.redirect_to) return '';
     const seen = new Set([venue.id]);
+    // Tour test 12: from the approved meeting spot when there is one (venueCloseByOrigin).
+    const closeOrigin = venueCloseByOrigin(venue), movedOrigin = closeOrigin !== venue;
     const pool = [...nearbyVenues.slice(0, 6), ...relatedVenues].map((v) => {
-      const km = typeof v.distance_km === 'number' ? v.distance_km : venueDistanceKm(venue, v);
+      const km = movedOrigin ? venueDistanceKm(closeOrigin, v) : typeof v.distance_km === 'number' ? v.distance_km : venueDistanceKm(venue, v);
       return km === null || km === undefined ? null : { v, km };
     }).filter((x) => x && x.km <= 15 && x.v.slug && CATEGORY_SLUGS[x.v.type] && !seen.has(x.v.id) && seen.add(x.v.id))
       .sort((a, b) => a.km - b.km).slice(0, 6);
@@ -49503,6 +49516,19 @@ function websiteIsInstagramLink(website, instagramUrl) {
   return !!w && /^instagram\.com\/./.test(w) && w === norm(instagramUrl);
 }
 const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url'];
+// Tour test 12: the first link in pasted text ("https://book.example.com/jump 🔥 #linkinbio" -> the link; "@name 🤙" -> "@name"
+// for Instagram and TikTok). Text with no space is returned as it is.
+function ownerUrlFromPaste(raw, field) {
+  const t = String(raw || '').trim();
+  if (!/\s/.test(t)) return t;
+  const toks = t.split(/\s+/).map((x) => x.replace(/^[("'«[]+|[)"'».,;:!?\]]+$/g, ''));
+  const social = field === 'instagram_url' || field === 'tiktok_url';
+  for (const x of toks) {
+    if (/^https?:\/\/\S+$/i.test(x) || /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/\S*)?$/i.test(x)) return x;
+    if (social && /^@[A-Za-z0-9._]{2,30}$/.test(x)) return x;
+  }
+  return t;
+}
 function ownerLastHttp(raw) {
   const s = String(raw || ''); let last = -1, n = 0;
   for (const m of s.matchAll(/https?:\/\//gi)) { n += 1; last = m.index; }
@@ -50658,6 +50684,9 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     // Brewery test 3 (Whistler, 2026-11-16): a menu or booking address pasted after the pre-filled one
     // ("https://a.com/https://a.com/on-tap") keeps the last address. One inside a query (…?u=https://…) is left alone.
     if (f === 'menu_url' || f === 'booking_url') raw = ownerLastHttp(raw);
+    // Tour test 12 (Whistler, 2026-11-18; Kayla pasted "book.example.com/jump 🔥 #linkinbio"): the link inside pasted text
+    // with emojis, hashtags or words is what is saved.
+    raw = ownerUrlFromPaste(raw, f);
     let url = '';
     if (raw) {
       // Instagram and Facebook go live straight away (Dayton, 2026-11-09), so only a real profile or page is accepted.
