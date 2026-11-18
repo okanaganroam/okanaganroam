@@ -22913,6 +22913,7 @@ const TOUR_RATE_STRIP_RE = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the
 const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
 const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
 const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
+const TOUR_PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
 function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
   const raw = tourPriceTrim(x);
@@ -22923,6 +22924,11 @@ function tourPriceWhy(x, priv = false) {
   if (!m) return '';
   const head = m[1].replace(/[.,\s  ]+$/, '');
   let rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  // Tour test 12 (Whistler, 2026-11-18; Kayla: "$139 per jump 🔥 2nd jump same day $69"): per jump / per person / pp right
+  // after the first amount, then another price: the first is the price for one person ('first', saved; the setup nudges
+  // "Second-jump or combo prices? Add them in Your tours and prices."). "same day" is never a day rate.
+  rest = rest.replace(/\bsame[\s-]+day\b/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!priv && TOUR_PER_ONE_RE.test(rest) && /\$\s*\d|\d\s*\$/.test(rest.replace(TOUR_PER_ONE_RE, ''))) return 'first';
   if (TOUR_LENGTH_PRICE_RE.test(rest)) return 'length';
   if (!TOUR_UNIT_RE.test(rest) && (TOUR_DAY_RATE_RE.test(rest) || TOUR_HOUR_RATE_RE.test(rest))) {
     if (priv) rest = rest.replace(TOUR_RATE_STRIP_RE, ' ').replace(/\s+/g, ' ').trim();
@@ -22950,7 +22956,7 @@ const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neau
 TOUR_PRICE_WHY_ERRORS.vehicle = 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.';
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
-  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why === 'unit' && TOUR_VEHICLE_WORDS_RE.test(x) ? 'vehicle' : why], why }; }
+  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why && why !== 'first') return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why === 'unit' && TOUR_VEHICLE_WORDS_RE.test(x) ? 'vehicle' : why], why }; }
   // Tour test 4: "free", "0", "by donation"… in the per-person box (never the private price).
   if (allowFree) { const f = tourFreeRead(x); if (f) return { value: f }; }
   // Tour test 6: "from 1500" / « 1500 $ et plus » -> 1500.

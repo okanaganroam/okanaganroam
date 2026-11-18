@@ -650,12 +650,18 @@
     var HOUR_RE = /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\bhoraire\b/;
     var RATE_STRIP = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the|[àa] la|[àa] l|de l|pour la|pour une?)\s+)?(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?|hours?|hrs?|hr|h|heures?)\b(?:\s+rate)?|\b(?:daily|nightly|hourly)(?:\s+rate)?\b|\b(?:day|hour) rate\b|\b(?:tarif|taux) (?:journalier|quotidien|horaire)\b|\bhoraire\b/g;
     var LEN_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
+    var PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
     var TOUR_GROUP_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
     var raw = priceTrim(x); if (!raw || !/\d/.test(raw)) return '';
     if (feeHours(raw)) return 'hours';
     if (/^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i.test(raw)) return 'length';
     var head = moneyHead(raw); if (head === raw) return '';
     var rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Tour test 12 (Kayla: "$139 per jump 🔥 2nd jump same day $69"): per jump / per person / pp right after the first amount,
+    // then another price: the first is the price for one person ('first'; the rest goes in Your tours and prices).
+    // "same day" is never a day rate. (server.js tourPriceWhy, the same rule.)
+    rest = rest.replace(/\bsame[\s-]+day\b/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!priv && PER_ONE_RE.test(rest) && /\$\s*\d|\d\s*\$/.test(rest.replace(PER_ONE_RE, ''))) return 'first';
     if (LEN_RE.test(rest)) return 'length';
     if (!TOUR_UNIT_RE.test(rest) && (DAY_RE.test(rest) || HOUR_RE.test(rest))) {
       if (priv) rest = rest.replace(RATE_STRIP, ' ').replace(/\s+/g, ' ').trim();
@@ -674,7 +680,7 @@
     if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
     return 'many';
   }
-  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  function tourPriceRead(x, priv){ var why0 = tourPriceWhy(x, priv); if (why0 && why0 !== 'first') return NaN; x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
   // The number a refused per-boat price starts with ("650 per boat" -> 650), to offer it for the Private tours box.
   function tourPriceNumber(x){ x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
   // Tour test 4: the per-person box read as free: "free", "0", "$0", « gratuit » -> 'free'; "by donation", "pay what you
@@ -691,7 +697,7 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
+    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
     if ((x = v('suTpriv')) !== null) {
       S.tour.priv = tourPriceRead(x, true);
       // Tour test 11: "150 per hour … minimum 3 hours" typed in the box picks Per hour and 3 hours (a tap can change them).
@@ -725,7 +731,9 @@
   // The card's price line as she types it ("Your card will say “From $129”").
   // Tour test 6: a rentals-only company (its only kind is Rentals): the card says "From $69" without "a person".
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
-  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
+  // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
+  function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
+  function tourPriceLead0(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }

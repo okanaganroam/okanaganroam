@@ -2138,6 +2138,7 @@ Object.assign(fr, {
 // group (Private tours, with the move button); "1450 for 3 days" is a trip length, not a group count; a bare hourly
 // rate goes in Your tours and prices. The private box takes a day rate and says so.
 Object.assign(en.tour, {
+  tpriceFirst: 'Second-jump or combo prices? Add them in Your tours and prices.',
   tpriceDay: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.',
   tpriceLength: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.',
   tpriceHourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
@@ -2147,6 +2148,7 @@ Object.assign(en.tour, {
   twoSeasonHint: 'Two seasons with a break? Make one season from the first day to the last, then add the break below and tick Every year.',
 });
 Object.assign(fr.tour, {
+  tpriceFirst: 'Un deuxième saut ou un forfait combiné? Ajoutez-les dans Vos sorties et tarifs.',
   tpriceDay: 'Un tarif à la journée pour votre groupe? Mettez-le dans Sorties privées, plus bas, et votre prix le plus bas pour une personne ici.',
   tpriceLength: 'Ça, c’est une durée. Écrivez seulement le prix pour une personne, par exemple 1450, et inscrivez chaque sortie dans Vos sorties et tarifs.',
   tpriceHourly: 'Un tarif à l’heure? Écrivez votre prix le plus bas pour une personne ici, et inscrivez les tarifs à l’heure dans Vos sorties et tarifs.',
