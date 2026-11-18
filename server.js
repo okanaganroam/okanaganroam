@@ -55265,7 +55265,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   render();
   // Tour test 9 (Whistler, 2026-11-18): the setup's "Type them in myself" opens this screen at #type: typing starts at once
   // (only from the start screen, where that button is).
-  if (location.hash === '#type') { var tyb = app.querySelector('[data-act="type"]'); if (tyb) tyb.click(); }
+  try { if (location.hash === '#type') { var tyb = app.querySelector('[data-act="type"]'); if (tyb) tyb.click(); } } catch (e) { /* no page address */ }
 })();`;
 
 // The site header in French for the French menu screen (2026-10-18): the same translation French twin pages use
@@ -56100,6 +56100,8 @@ function renderOwnerSetupPage(found, opts) {
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
+    // Tour test 9: the French story screen's English line (for an owner who doesn't read French).
+    frDescEn: fr ? { lead: OWNER_SETUP_STRINGS.en.frDescEnLead, leave: OWNER_SETUP_STRINGS.en.frDescLeave } : null,
     badgeChip: portalCompleteness.badgeChipHtml(fr), t,
     // Owner stats (pub test 9, 2026-11-10): the short "your page in the last 30 days" box on the finish screen.
     statsHtml: (() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { short: true, id: 'suStats', listKind: venue.type === 'tour' ? 'tours' : isPriceList(venue) ? 'prices' : '' }); } catch (e) { return ''; } })(),

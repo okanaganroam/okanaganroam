@@ -1636,9 +1636,10 @@
   // Tour test 9: on the French story screen, while the French description is still our research's, one English line for
   // an owner who doesn't speak French: paste the English story, or leave the French one as it is (nothing is saved).
   function frDescEnLead(){
-    if (C.lang !== 'fr' || !T.frDescEnLead || !(C.frDescFr === 'old' || C.frDescFr === 'research')) return '';
+    var E = C.frDescEn;
+    if (C.lang !== 'fr' || !E || !E.lead || !(C.frDescFr === 'old' || C.frDescFr === 'research')) return '';
     var en = location.pathname.replace(/^\/fr(?=\/)/, '');
-    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(T.frDescEnLead) + ' <a class="su-link" id="suFrDescLeave" href="' + h(en) + '">' + h(T.frDescLeave) + '</a></p>';
+    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
@@ -2609,9 +2610,9 @@
     // Tour test 9 (keyboard pass): a single-choice chip pressed with Enter or Space redrew the screen and the focus fell
     // to the page (the kinds, age, length, booking, group size, social and holiday chips). The same chip (or box) keeps it.
     var keepSel = focusKey(), keepNudge = S.keepNudgeFocus; S.keepNudgeFocus = false;
-    screen.innerHTML = x; S.renderedStep = S.step;
+    screen.innerHTML = x;
     wire();
-    navSync();
+    navSync(); S.renderedStep = S.step;
     if (drAfter()) return;
     var e2 = screen.querySelector('.su-error');
     if (e2 && !(keepNudge && keepSel)) { e2.setAttribute('tabindex', '-1'); try { e2.focus({ preventScroll: true }); } catch (e) {} e2.scrollIntoView({ block: 'center' }); }

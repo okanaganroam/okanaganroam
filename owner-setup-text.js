@@ -2178,7 +2178,8 @@ Object.assign(fr, { frDescOld: 'Votre description en français est l’ancienne,
 // screen's English lead, the "21+ or whole classes" group size, "Type them in myself" on Your tours and prices, the
 // closure ✕ that names its dates, the photo lead for cultural tours, and the official holiday names.
 Object.assign(en, { frDescEnLead: 'Not a French speaker? Paste your English story, or tap Leave it to us.', frDescLeave: 'Leave it to us', closeRemove: 'Remove {x}' });
-Object.assign(fr, { closeRemove: 'Retirer {x}' });
+// (The French setup shows the English words, passed as SETUP_CFG.frDescEn; these French ones are the key's twins.)
+Object.assign(fr, { frDescEnLead: 'Vous ne parlez pas français? Collez votre histoire en anglais, ou touchez Laissez-nous faire.', frDescLeave: 'Laissez-nous faire', closeRemove: 'Retirer {x}' });
 Object.assign(en.holidays, { truth: 'National Day for Truth and Reconciliation', indigenous: 'National Indigenous Peoples Day' });
 Object.assign(fr.holidays, { truth: 'Journée nationale de la vérité et de la réconciliation', indigenous: 'Journée nationale des peuples autochtones' });
 Object.assign(en.tour, {
@@ -2198,9 +2199,5 @@ Object.assign(fr.tour, {
     else if (o[k] && typeof o[k] === 'object') frSpaces(o[k]);
   }
 })(fr);
-
-// Tour test 9: the French story screen's lead is in English (for an owner who doesn't read French), so it is set after the
-// French spacing.
-Object.assign(fr, { frDescEnLead: en.frDescEnLead, frDescLeave: en.frDescLeave });
 
 module.exports = { en, fr, frSpacing };

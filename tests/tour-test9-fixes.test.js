@@ -147,15 +147,15 @@ test('3. the French description link opens the French story box without saving F
   assert.doesNotMatch(SERVER, /#story" lang="fr" onclick=/);
   const lead = clientFn('frDescEnLead');
   assert.match(lead, /C\.lang !== 'fr'/); assert.doesNotMatch(lead, /localStorage/);
-  assert.equal(text.en.frDescEnLead, 'Not a French speaker? Paste your English story, or tap Leave it to us.');
-  assert.equal(text.fr.frDescEnLead, text.en.frDescEnLead); assert.equal(text.fr.frDescLeave, 'Leave it to us');
+  assert.equal(text.en.frDescEnLead, 'Not a French speaker? Paste your English story, or tap Leave it to us.'); assert.equal(text.en.frDescLeave, 'Leave it to us');
   assert.match(CLIENT, /q\(T\.storyQ, T\.storyLead\) \+ frDescOld\(\) \+ frDescEnLead\(\)/);
   const { v, t } = tanis();
   ok(await change(t, { description: 'Indigenous-owned cultural walks and a summer canoe, guided by members of our Nation. Elders share stories on the land.' }));
-  assert.equal(cfgOf((await get(`/fr/owner/${t}/setup`)).text).frDescFr, 'old');
+  const frCfg = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
+  assert.equal(frCfg.frDescFr, 'old'); assert.deepEqual(frCfg.frDescEn, { lead: text.en.frDescEnLead, leave: 'Leave it to us' });
   assert.equal(cfgOf((await get(`/owner/${t}/setup`)).text).frDescFr, '');
   // Run in a page: the line and its link back to the English setup.
-  const ctx = { C: { lang: 'fr', frDescFr: 'old' }, T: text.fr, location: { pathname: `/fr/owner/${t}/setup` }, h: (x) => String(x) }; vm.createContext(ctx); vm.runInContext(lead, ctx);
+  const ctx = { C: { lang: 'fr', frDescFr: 'old', frDescEn: frCfg.frDescEn }, T: text.fr, location: { pathname: `/fr/owner/${t}/setup` }, h: (x) => String(x) }; vm.createContext(ctx); vm.runInContext(lead, ctx);
   const html = vm.runInContext('frDescEnLead()', ctx);
   assert.match(html, /lang="en"/); assert.match(html, new RegExp(`href="/owner/${t}/setup"`)); assert.match(html, /Leave it to us/);
   void v;
