@@ -173,3 +173,35 @@ test('tour test 6 words: "e-bike rental", « location de vélos », "adventure p
   if (!bday.length || !['tour', 'indoor', 'sport'].includes(bday[0].venue.type)) bad.push(`kids birthday -> ${JSON.stringify(bday.map((x) => x.venue.name))}`);
   assert.deepEqual(bad, []);
 });
+
+// Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG mountain guide): ski touring, backcountry skiing, splitboarding,
+// avalanche courses (one course too), AST, hut and multi-day trips and mountaineering, EN and FR, plan the guide in the
+// asked town before another town's operator or a heli-ski company; a 15-year-old is never planned on his 16+ trips.
+test('tour test 7 words: ski touring, avalanche course, hut trip, mountaineering (EN + FR); a child under the minimum age', async () => {
+  await fixtures();
+  const erik = mk('tour', { name: 'Okanagan Mountain Guiding Words', cuisine: 'Ski touring, heli-skiing & avalanche courses', description: 'Certified mountain guides: ski touring, mountaineering and avalanche courses.', rating: 4.9, reviews: 143 });
+  const t = app.createOwnerLink(erik.id, {}).url.split('/owner/')[1];
+  const r = await change(t, { tour_info: { kinds: ['snowshoe', 'guide'], length: 'multi', age: '16', year: 'all' } });
+  assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body));
+  assert.doesNotMatch(app.getVenue(erik.id).cuisine, /heli/i);
+  const heli = mk('tour', { name: 'Penticton Heli-Skiing Words', cuisine: 'Heli-skiing', description: 'Heli-skiing.', rating: 4.9, reviews: 900 });
+  const away = mk('tour', { name: 'Kelowna Backcountry Words', region: 'kelowna', cuisine: 'Backcountry ski touring lodge', description: 'Guided ski touring.', rating: 5, reviews: 900 });
+  const names = async (q) => itemsOf(await plan(q)).map((x) => x.venue.name);
+  const bad = [];
+  // The setup's own snowshoe operator (its chip is "Snowshoe or ski touring", so its words say ski touring) may come first.
+  const firstIs = async (q) => { const got = (await names(q)).filter((x) => x !== OP('snowshoe')); if (got[0] !== erik.name && !(/\bnear\b/.test(q) && got.includes(erik.name))) bad.push(`"${q}" -> ${JSON.stringify(got)}`); if (got.includes(heli.name)) bad.push(`"${q}" plans heli-skiing ${JSON.stringify(got)}`); if (got.includes(away.name) && !/\bnear\b|près/.test(q)) bad.push(`"${q}" borrows Kelowna ${JSON.stringify(got)}`); };
+  for (const q of ['ski touring in Penticton on February 10', 'Ski touring near Penticton on February 10', 'backcountry skiing in Penticton on February 10', 'backcountry ski day in Penticton on February 10', 'splitboard in Penticton on February 10', 'ski touring guide in Penticton on February 10',
+    'avalanche course in Penticton on January 16', 'avalanche courses in Penticton on January 16', 'AST 1 in Penticton on January 16', 'avalanche training in Penticton on January 16',
+    'hut trip near Penticton in August', 'multi-day hut trip from Penticton in August', '3 day hut trip near Penticton August 10 to 12', 'overnight hike in Penticton on August 10', 'glacier mountaineering in Penticton on August 12',
+    'ski de randonnée à Penticton le 10 février', 'ski hors-piste à Penticton le 10 février', 'randonnée alpine guidée à Penticton le 10 août', 'cours d’avalanche à Penticton le 16 janvier', 'formation avalanche à Penticton le 16 janvier',
+    'randonnée de plusieurs jours à Penticton en août', 'nuit en refuge à Penticton en août']) await firstIs(q);
+  // A 15-year-old: left out, and the plan says why.
+  const p = await plan('mountaineering in Penticton on August 12 with our 15-year-old');
+  if (itemsOf(p).some((x) => x.venue.id === erik.id)) bad.push('15-year-old planned on a 16+ guide');
+  if (!(p.notes || []).some((n) => n.startsWith(`${erik.name} is for ages 16 and up`))) bad.push(`no age note: ${JSON.stringify(p.notes)}`);
+  // A 16-year-old is fine; "a 3 day trip to Penticton" is still a 3-day plan, not a hut trip.
+  if (!itemsOf(await plan('mountaineering in Penticton on August 12 with our 16-year-old')).some((x) => x.venue.id === erik.id)) bad.push('16-year-old left out');
+  assert.ok(!(tr.extractTripRequirements({ text: '3 day trip to penticton' }).items || []).some((i) => i.value === 'multi_day_tour'));
+  assert.ok(!(tr.extractTripRequirements({ text: 'ski touring in penticton' }).items || []).some((i) => i.kind === 'activity' && i.value === 'skiing'));
+  assert.deepEqual(bad, []);
+});
