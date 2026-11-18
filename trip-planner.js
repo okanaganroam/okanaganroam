@@ -170,6 +170,10 @@ function tourAgeFit(v, ctx) {
   const fits = (it) => { const a = ageOf(it); return a == null || a <= young; };
   if (named.length) {
     if (named.some(fits)) return {};
+    // A trip's own "16+" while another trip on the list takes the child keeps the operator in, with the trip's own note
+    // (tour test 8: "a 14-year-old can ride but not mush"). His riders' line ("Riders 8+") is for every ride but the kids'
+    // one, so a trail ride for a 6-year-old is left out.
+    if (named.some((it) => Number(it.age) > 0) && items.some(fits)) return {};
     const it = named[0];
     return { out: true, item: it.name, age: ageOf(it) };
   }

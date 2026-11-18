@@ -86,7 +86,9 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   for (const x of UNIT) { assert.equal(why(x), 'unit', x); assert.ok(Number.isNaN(rd(x)), x); assert.equal(app.tourPriceWhy(x), 'unit', `server ${x}`); }
   for (const x of ['650 per boat', '$650 per group', '1100 for the whole raft', '650 per charter']) { assert.equal(why(x), 'group', x); assert.equal(app.tourPriceWhy(x), 'group', x); }
   for (const [x, want] of [['69', 69], ['$159 pp', 159], ['159 $ par personne', 159], ['95 per seat', 95], ['from 79', 79], ['à partir de 79 $', 79]]) { assert.equal(rd(x), want, x); }
-  for (const x of ['95 per child', '95 per tour']) assert.equal(why(x), 'many', x);
+  // Tour test 10 (2026-11-18; Dayton): per rider, child, kid or adult is per person now ("75 per rider" couldn't be saved).
+  for (const x of ['95 per tour']) assert.equal(why(x), 'many', x);
+  for (const x of ['95 per child', '75 per rider']) assert.equal(why(x), '', x);
   // The private box: "1500$ et plus", "from 1500", "1 500 $ et plus" read as the number (they were refused).
   for (const [x, want] of [['1500$ et plus', 1500], ['from 1500', 1500], ['1 500 $ et plus', 1500], ['$1,500+', 1500], ['1500 and up', 1500], ['à partir de 1500', 1500]]) { assert.equal(rd(x, true), want, x); assert.deepEqual(app.cleanTourPrice(x), { value: want }, `server ${x}`); }
   // Server: refused with the per-bike reason; nothing saved.
