@@ -22275,7 +22275,7 @@ function venueTourInfo(venueId) {
 // tours"). A part of them no picked kind covers ("ATV tours") is kept after the kinds' names, whatever is picked
 // ("Something else" too), so saving the kinds never takes a word off the page; the adventure chip ("ATV, bungee, climbing
 // or canyoning") writes the words of hers it covers ("ATV tours") rather than its own long name.
-const TOUR_WORDS_GENERIC = /^(?:and|&|the|guided|guides?|local|private|tours?|trips?|experiences?|adventures?|activities|excursions?|outfitters?|operators?|company|co|in|of|from|with|year[- ]round|summer|winter|spring|fall|day|days|all|seasons?)$/i;
+const TOUR_WORDS_GENERIC = /^(?:and|&|the|guided|guides?|guiding|local|private|tours?|trips?|experiences?|adventures?|activities|excursions?|outfitters?|operators?|company|co|in|of|from|with|year[- ]round|summer|winter|spring|fall|day|days|all|seasons?)$/i;
 function tourWordParts(was) {
   return String(was || '').replace(/\([^)]*\)/g, ' ').split(/\s*(?:,|;|\/|&|\+|\band\b|·)\s*/i).map((x) => x.trim().replace(/\s{2,}/g, ' ')).filter(Boolean);
 }
@@ -22365,7 +22365,8 @@ function tourKindsText(kinds, fr = false, was = '') {
   const before = (k2, k, p) => namePos(k2, p) < namePos(k, p) || (namePos(k2, p) === namePos(k, p) && picked.indexOf(k2) < picked.indexOf(k));
   for (const k of picked) {
     const mine = parts.filter((p) => tourKindCovers(k, p) && !picked.some((k2) => k2 !== k && tourKindCovers(k2, p) && before(k2, k, p)));
-    const own = fr ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
+    // Tour test 7: the guide kind always says its public word ("Mountain guiding", or "Avalanche courses" when that is all).
+    const own = fr || k === 'guide' ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     (own.length ? own : tourKindPublic(k, fr, mine)).forEach(push);
   }
   // Tour test 6 (Whistler, 2026-11-17): a part no picked kind covers is kept in English on English pages only. On French

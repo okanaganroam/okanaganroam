@@ -115,7 +115,7 @@ function parseHours(raw) {
   }
   if (Array.isArray(obj._closures)) {
     const closures = obj._closures.filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.from) && /^\d{4}-\d{2}-\d{2}$/.test(x.to || x.from))
-      .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '' }));
+      .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '', ...(x.yearly === true ? { yearly: true } : {}) }));
     if (closures.length) out.closures = closures;
   }
   return out;

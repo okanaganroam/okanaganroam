@@ -78,8 +78,11 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
-  const UNIT = ['69 par vélo', '$69/bike', '69$ / vélo', '69 $ par vélo électrique', '$69 per e-bike', '$40 per hour', '40/hr', '45 $ de l’heure', '$45 kayak rental', '35 per kayak', '30 per board', '25 / SUP',
-    '120 per canoe', '50 per pair of skis', '20 per snowshoe set', '15 per helmet', '200 per vehicle', '250 per sled', '90 per horse', '180 per room', '69 per unit', '150 per day', '69 par location', '69/rental'];
+  // Tour test 7 (2026-11-17): a bare hourly or day rate is its own case now ('hourly' / 'day'), still never a price per person.
+  for (const x of ['$40 per hour', '40/hr', '45 $ de l’heure']) { assert.equal(why(x), 'hourly', x); assert.ok(Number.isNaN(rd(x)), x); }
+  assert.equal(why('150 per day'), 'day');
+  const UNIT = ['69 par vélo', '$69/bike', '69$ / vélo', '69 $ par vélo électrique', '$69 per e-bike', '$45 kayak rental', '35 per kayak', '30 per board', '25 / SUP',
+    '120 per canoe', '50 per pair of skis', '20 per snowshoe set', '15 per helmet', '200 per vehicle', '250 per sled', '90 per horse', '180 per room', '69 per unit', '69 par location', '69/rental'];
   for (const x of UNIT) { assert.equal(why(x), 'unit', x); assert.ok(Number.isNaN(rd(x)), x); assert.equal(app.tourPriceWhy(x), 'unit', `server ${x}`); }
   for (const x of ['650 per boat', '$650 per group', '1100 for the whole raft', '650 per charter']) { assert.equal(why(x), 'group', x); assert.equal(app.tourPriceWhy(x), 'group', x); }
   for (const [x, want] of [['69', 69], ['$159 pp', 159], ['159 $ par personne', 159], ['95 per seat', 95], ['from 79', 79], ['à partir de 79 $', 79]]) { assert.equal(rd(x), want, x); }
@@ -144,7 +147,9 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines & heli-hiking');
   assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne et héli-randonnée');
   assert.equal(kt(['zipline'], true, 'Ziplines & sunset yoga'), 'Tyrolienne');
-  assert.equal(kt(['zipline'], true, 'Ziplines & ATV tours'), 'Tyrolienne et sorties en quad (VTT)');
+  // Tour test 7 (2026-11-17): ATV words pre-pick the adventure chip; with only Ziplines saved, he unticked it, so they go.
+  assert.equal(kt(['zipline'], true, 'Ziplines & ATV tours'), 'Tyrolienne');
+  assert.equal(kt(['zipline', 'adventure'], true, 'Ziplines & ATV tours'), 'Tyrolienne et sorties en quad (VTT)');
   // The rest of the kinds keep their words.
   assert.equal(kt(['bike'], false, ''), 'Bike and e-bike tours');
   assert.equal(kt(['bike'], true, 'Guided bike tours'), 'Sorties à vélo');
