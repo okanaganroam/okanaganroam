@@ -113,10 +113,10 @@ test('two periods are stored in the same list and read back; a one-period venue 
   const cfg = await setupCfg(t);
   assert.deepEqual(cfg.cur.hours_seasons, [stored(FALL), stored(SPRING)]);
   assert.deepEqual(app.venueHoursExtras(v.id).seasons, [stored(FALL), stored(SPRING)]);
-  // Removing the first keeps the second; a third is still refused (two at most, as before).
+  // Removing the first keeps the second; a fourth is refused (three at most since tour test 10, 2026-11-18).
   ok(await change(t, { hours_seasons: [SPRING] }));
   assert.deepEqual(app.venueHoursExtras(v.id).seasons, [stored(SPRING)]);
-  assert.equal((await change(t, { hours_seasons: [FALL, SPRING, { from: '07-01', to: '07-31', label: '', hours: WK('11:00', '22:00') }] })).status, 400);
+  assert.equal((await change(t, { hours_seasons: [FALL, SPRING, { from: '07-01', to: '07-31', label: '', hours: WK('11:00', '22:00') }, { from: '08-01', to: '08-31', label: '', hours: WK('11:00', '22:00') }] })).status, 400);
   // No new table or column: the list lives where it always did.
   const cols = db.prepare('PRAGMA table_info(venue_hours_extra)').all().map((c) => c.name);
   assert.deepEqual(cols.filter((c) => /season/.test(c)), ['seasons']);
@@ -147,7 +147,8 @@ test('two periods that share a day are refused in plain words (EN and FR); a yea
   assert.equal(ctx.mdOverlap({ from: '11-20', to: '01-10' }, { from: '01-11', to: '02-01' }), false);
   assert.equal(ctx.mdOverlap({ from: '03-01', to: '03-31' }, { from: '02-01', to: '04-30' }), true, 'one inside the other');
   const s = CLIENT();
-  assert.match(s, /if \(list\.length > 1 && mdOverlap\(list\[0\], list\[1\]\)\) \{ S\.nudge = fill\(T\.seasonOverlap, /);
+  // Tour test 10 (2026-11-18): any two of up to three.
+  assert.match(s, /for \(var oa = 0; oa < list\.length; oa\+\+\) for \(var ob = oa \+ 1; ob < list\.length; ob\+\+\) if \(mdOverlap\(list\[oa\], list\[ob\]\)\) \{ var oz = list\[oa === S\.seaI \? ob : oa\]; S\.nudge = fill\(T\.seasonOverlap, /);
   assert.equal(text.en.seasonOverlap, 'These dates overlap your {a} – {b} hours. Please pick dates that don’t overlap.');
   assert.match(text.fr.seasonOverlap, /^Ces dates chevauchent vos heures du \{a\} au \{b\}\./);
 });
@@ -242,18 +243,21 @@ test('Build My Trip plans by the period’s week: a shoulder Monday in either pe
 test('the setup’s year question, the second period’s screen and its words (EN and FR)', async () => {
   const s = CLIENT();
   // The stored periods are read into S.seaList; the season screen works on the one its step names.
-  assert.match(s, /if \(st\[0\] && st\[1\]\) S\.seaList\.push\(seaLoad\(seaBlank\(\), st\[1\]\)\);/);
-  assert.match(s, /function seaIsStep\(s\)\{ return s === 'hours:season' \|\| s === 'hours:season2'; \}/);
-  assert.match(s, /seaUse\(s === 'hours:season2' && S\.seaList\[1\] \? 1 : 0\);/);
+  // Tour test 10 (2026-11-18): up to three ('hours:season3').
+  assert.match(s, /for \(var i = 1; i < st\.length && st\[0\]; i\+\+\) S\.seaList\.push\(seaLoad\(seaBlank\(\), st\[i\]\)\);/);
+  assert.match(s, /function seaIsStep\(s\)\{ return s === 'hours:season' \|\| s === 'hours:season2' \|\| s === 'hours:season3'; \}/);
+  assert.match(s, /seaUse\(seaIsStep\(s\) && S\.seaList\[seaIndexOf\(s\)\] \? seaIndexOf\(s\) : 0\);/);
   // The year question: "Change my … hours" for each stored period, "+ Add a second stretch" with only one.
   assert.match(s, /stS\.map\(function\(st\)\{ return big\('✎', fill\(T\.seaChange, st\), T\.seaChangeSub, true, 'yearSeasonEdit:' \+ st\.i\); \}\)\.join\(''\)/);
-  assert.match(s, /\(stS\.length < 2 && S\.seaList\.length < 2 && T\.seaAdd \? big\('🍂', T\.seaAdd, T\.seaAddSub, true, 'yearSeasonAdd'\) : ''\)/);
+  assert.match(s, /\(stS\.length < SEA_MAX && S\.seaList\.length < SEA_MAX && T\.seaAdd \? big\('🍂', stS\.length > 1 \? T\.seaAdd3 : T\.seaAdd, stS\.length > 1 \? T\.seaAdd3Sub : T\.seaAddSub, true, 'yearSeasonAdd'\) : ''\)/);
   // "Copy the hours from …", and removing one of two is asked first.
   assert.match(s, /id="suSeaCopy" data-act="seaCopy">' \+ h\(fill\(T\.seaCopy, seaOtherAB\)\)/);
-  assert.match(s, /if \(k === 'seaCopy'\) \{ readTimes\(\); var co = S\.seaList\[1 - S\.seaI\]; if \(co && co\.week\) \{ S\.sea\.week = clone\(co\.week\);/);
+  // Tour test 10 (2026-11-18): with three, the nearest other stretch (seaOtherOf).
+  assert.match(s, /if \(k === 'seaCopy'\) \{ readTimes\(\); var co = seaOtherOf\(S\.seaI\); if \(co && co\.week\) \{ S\.sea\.week = clone\(co\.week\);/);
   assert.match(s, /if \(k === 'seaRemove'\) \{ readTimes\(\); S\.dropI = S\.seaI; return go\('hours:yeardrop'\); \}/);
   // A stored period she didn't open on this visit is sent back exactly as stored.
-  assert.match(s, /if \(s0 && !so\.dirty\) \{ list\.push\(s0\); continue; \}/);
+  // (Tour test 10: and its "Open on holidays" unchanged.)
+  assert.match(s, /if \(s0 && !so\.dirty && \(s0\.holidays === true\) === !!so\.holidays\) \{ list\.push\(s0\); continue; \}/);
   // "Yes, all year" with periods stored names every one that would go.
   assert.match(s, /if \(k === 'yearAll' && storedSeas\(\)\.length\) \{ S\.dropI = null; return go\('hours:yeardrop'\); \}/);
   for (const L of ['en', 'fr']) for (const k of ['seasonEditQSecond', 'seasonEditLeadDates', 'seaAdd', 'seaAddSub', 'seaAddLink', 'seaCopy', 'seaRemove', 'seaDropQ', 'seaDropLead', 'seaDropYes', 'seasonOverlap', 'seaStale', 'seaStaleYes', 'seaStaleDone']) {
