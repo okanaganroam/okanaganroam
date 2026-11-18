@@ -261,7 +261,7 @@ test('9. keyboard: a chip keeps the focus after the screen redraws; the 3-kind l
   assert.match(CLIENT, /role="group" aria-labelledby="suQ" id="suTourKinds"/);
   assert.match(CLIENT, /tchips\('length', \['1h', '2-3h', 'half', 'full', 'multi'\], T\.tlengths, T\.tlengthQ, 'suLenQ'\)/);
   // Tour test 10 (2026-11-18): with 8+ and 10+.
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\], T\.tages, T\.tageQ, 'suAgeQ'\)/);
+  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\], T\.tages, T\.tageQ, 'suAgeQ'\)/);
   assert.match(CLIENT, /\.su-closures-save'\); if \(csave\) csave\.addEventListener\('focusin'/);
   // Help: Tab and Shift+Tab stay inside the open dialog.
   assert.match(SERVER, /if \(e\.key !== 'Tab' \|\| panel\.hidden\) return;/);

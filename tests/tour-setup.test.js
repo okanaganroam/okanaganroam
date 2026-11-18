@@ -280,7 +280,7 @@ test('Build My Trip: the season, the minimum age with kids, and the operator’s
   assert.match(famNotes, /Ages 6 and up \(the operator’s own answer\)\./);
   assert.match(famNotes, /Same-day bookings are often fine/);
   // The planner's facts for a tour, and the kids rule itself.
-  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189, tourKinds: ['snowmobile'] });
+  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourAdultRule: { age: 18, waiver: false }, tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189, tourKinds: ['snowmobile'] });
   const tp = require('../trip-planner.js');
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '16' }), false);
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '12' }), false);
