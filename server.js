@@ -21019,10 +21019,9 @@ function kidFriendlyPublic(row) {
 }
 const BREWERY_MINORS_ANSWERED_SQL = `SELECT venue_id FROM venue_brewery_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_MINORS_POLICIES.map((p) => `'${p}'`).join(', ')})`;
 const COCKTAIL_MINORS_ANSWERED_SQL = `SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_MINORS_POLICIES.map((p) => `'${p}'`).join(', ')})`;
-const KID_FRIENDLY_SQL = `((kid_friendly = 1 AND type NOT IN ('pub', 'brewery', 'distillery', 'cocktail', 'tour'))`
+const KID_FRIENDLY_SQL = `((kid_friendly = 1 AND type NOT IN ('pub', 'brewery', 'distillery', 'cocktail', 'tour')) OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')})))`
   // Tour test 11: a tour's own age answer when it gave one, otherwise the researched badge.
   + ` OR (type = 'tour' AND ((kid_friendly = 1 AND id NOT IN (SELECT venue_id FROM venue_tour_info WHERE json_extract(info, '$.age') IS NOT NULL)) OR id IN (SELECT venue_id FROM venue_tour_info WHERE json_extract(info, '$.age') IN (${TOUR_KIDS_AGES.map((a) => `'${a}'`).join(', ')}))))`
-  + ` OR (type = 'pub' AND id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')})))`
   + ` OR (type IN ('brewery', 'distillery') AND ((kid_friendly = 1 AND id NOT IN (${BREWERY_MINORS_ANSWERED_SQL})) OR id IN (SELECT venue_id FROM venue_brewery_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')}))))`
   // Cocktail lounges (Decided 4, 2026-11-13): their own answer when they gave one, otherwise the researched badge.
   + ` OR (type = 'cocktail' AND ((kid_friendly = 1 AND id NOT IN (${COCKTAIL_MINORS_ANSWERED_SQL})) OR id IN (SELECT venue_id FROM venue_pub_info WHERE json_extract(info, '$.minors.policy') IN (${PUB_KIDS_WELCOME_POLICIES.map((p) => `'${p}'`).join(', ')})))))`;
