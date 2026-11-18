@@ -22279,6 +22279,12 @@ function tourLengthWords(mins) {
     const h = m / 60; const hs = String(h).replace('.', fr ? ',' : '.');
     return fr ? `${hs} heure${h >= 2 ? 's' : ''}` : `${hs} hour${h === 1 ? '' : 's'}`;
   };
+  // Tour test 12 (Whistler, 2026-11-18; Kayla: "1 hour to 90 minutes"): two lengths of an hour or more under a full day, in
+  // whole or half hours, are said in hours only: "1 to 1½ hours" (« De 1 à 1,5 heure »).
+  if (lo >= 60 && hi < 480 && lo % 30 === 0 && hi % 30 === 0) {
+    const hEn = (m) => `${Math.floor(m / 60) || ''}${m % 60 ? '½' : ''}`, hFr = (m) => String(m / 60).replace('.', ',');
+    return { en: `${hEn(lo)} to ${hEn(hi)} hours.`, fr: `De ${hFr(lo)} à ${hFr(hi)} heure${hi >= 120 ? 's' : ''}.` };
+  }
   const a = say(lo, false), b = say(hi, false);
   if (a === b) return null;
   const af = say(lo, true), bf = say(hi, true);
@@ -22668,7 +22674,7 @@ function tourCuisineFr(text) {
     try {
       for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, v.description AS d, t.info AS info FROM venue_tour_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'tour' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
-        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', tourStoryWords(r.id, r.d)) : '';
+        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', tourStoryWords(r.id, r.d), tourOwnWords(r.id)) : '';
         if (fr && fr !== r.c) tourCuisineFrMap.set(String(r.c), fr);
       }
     } catch (e) { /* no table yet */ }
@@ -22772,7 +22778,7 @@ const TOUR_KIND_ORDER = TOUR_KINDS;
 // Mountain School and Black Sheep Adventure Sports went "Ski touring" -> "Mountain guiding" on save.
 const TOUR_KIND_ALSO_DOES = { guide: [[/ski[- ]?tour|backcountry ski|splitboard|ski mountaineering/, 'Ski touring', 'Ski de randonnée']] };
 const TOUR_KINDS_REPLACE_RESEARCH = true;
-function tourKindsText(kinds, fr = false, was = '', story = '') {
+function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
   const picked = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).sort((a, b) => TOUR_KIND_ORDER.indexOf(a) - TOUR_KIND_ORDER.indexOf(b));
   // Tour test 3: the French words use the listing's own words too (which side of a chip they name, and the parts no kind
   // covers, kept as typed: "Heli-hiking"), so the French card and page show the same set as the English ones.
@@ -22821,7 +22827,9 @@ function tourKindsText(kinds, fr = false, was = '', story = '') {
   // (the French card read « … · TREETOP ADVENTURE COURSE »).
   // Tour test 11 (Whistler, 2026-11-18; Min-jun picked a kind, and research's "airport shuttles" stayed on his card):
   // picking any kind of ours replaces research's category words. A part no picked kind covers is no longer kept.
-  for (const p of TOUR_KINDS_REPLACE_RESEARCH ? [] : parts) {
+  // Tour test 12 (Whistler, 2026-11-18; Kayla picked Bungee / Adventure and research's "giant swing" left her card): a
+  // research part the owner's own story or Known for says too stays (her own words back it up).
+  for (const p of TOUR_KINDS_REPLACE_RESEARCH ? parts.filter((p) => tourOwnSays(ownWords, p)) : parts) {
     if (picked.some((k) => tourKindCovers(k, p))) continue;
     if (!fr) { push(cap(p)); continue; }
     const known = TOUR_PART_FR.find(([re]) => re.test(p.toLowerCase()));
@@ -22857,7 +22865,7 @@ function writeVenueTourInfo(venueId, info) {
   if (TOUR_FREE_WORDS.includes(clean.free)) clean.price = 0; else { delete clean.free; if (!(clean.price > 0)) delete clean.price; }
   let v = null; try { v = db.prepare('SELECT cuisine, description FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
   const was0 = 'cuisine_was' in cur ? cur.cuisine_was : (v && v.cuisine != null ? String(v.cuisine) : '');
-  const words = tourKindsText(clean.kinds, false, was0, tourStoryWords(venueId, v && v.description));
+  const words = tourKindsText(clean.kinds, false, was0, tourStoryWords(venueId, v && v.description), tourOwnWords(venueId));
   if (v && words) {
     clean.cuisine_was = was0;
     if ((v.cuisine || '') !== words) db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(words, venueId);
@@ -22871,6 +22879,21 @@ function writeVenueTourInfo(venueId, info) {
 }
 // Tour test 9 (Whistler, 2026-11-18): the words that say which side of a chip a tour does when its category says none:
 // its story and its Known for line.
+// Tour test 12: the owner's own words only (her approved story and her own Known for line), for tourKindsText's `own`.
+function tourOwnWords(venueId) {
+  try {
+    const v = db.prepare('SELECT id, description FROM venues WHERE id = ?').get(venueId);
+    const info = venueVisitInfo(venueId) || {};
+    const mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    const known = mine.has('Known for') ? ((info.rows || []).find((r) => r && r.label === 'Known for') || {}).text || '' : '';
+    return [v && ownerDescriptionWasHers(v) ? v.description : '', known].filter(Boolean).join(' ; ');
+  } catch (e) { return ''; }
+}
+const tourWordNorm = (x) => ` ${String(x || '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').split(' ').filter(Boolean).map((w) => w.replace(/(?<=[a-z]{3})s$/, '')).join(' ')} `;
+function tourOwnSays(own, part) {
+  const p = tourWordNorm(part).trim();
+  return !!(own && p && tourWordNorm(own).includes(` ${p} `));
+}
 function tourStoryWords(venueId, description) {
   let known = ''; try { known = String(ownerVisitRows(venueId).known_for || ''); } catch (e) { known = ''; }
   return [description ? String(description) : '', known].filter(Boolean).join(' ; ');
@@ -23053,6 +23076,8 @@ function tourListText(venueId) {
     return (m.data.sections || []).flatMap((x) => [x.name || '', ...(x.items || []).map((it) => `${it.name || ''} ${it.duration || ''} ${it.description || ''}`)]).join(' ; ');
   } catch (e) { return ''; }
 }
+// Tour test 12: the typed list and the owner's own lines as one search text (for /browse and the category search box).
+function tourSearchExtraText(venueId) { return [tourListText(venueId), tourVisitSearchText(venueId)].filter(Boolean).join(' ; '); }
 function tourVisitSearchText(venueId) {
   try { const info = venueVisitInfo(venueId) || {}; return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know|groups)$/i.test(String(r.label || ''))).map((r) => r.text).join(' ; '); } catch (e) { return ''; }
 }
@@ -23065,6 +23090,27 @@ function tourAdultRule(t) {
     en: waiver ? `Under ${age}s need a parent or guardian to sign the waiver.` : `Under ${age}s come with an adult.`,
     fr: waiver ? `Les moins de ${age} ans ont besoin qu’un parent ou tuteur signe la décharge.` : `Les moins de ${age} ans viennent avec un adulte.` };
 }
+// Tour test 12 (Whistler, 2026-11-18; Kayla: winter is weekends only): a saved stretch of other hours open on Saturday and
+// Sunday only, for the Season line: { en: 'Nov–Apr: weekends only', fr: 'nov.–avr. : fins de semaine seulement' } or null.
+function tourStretchWeekendsText(venueId) {
+  try {
+    const x = hoursExtrasMap().get(venueId);
+    const EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    const LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const parts = [];
+    for (const z of (x && x.seasons) || []) {
+      if (!z || !/^\d{2}-\d{2}$/.test(z.from) || !/^\d{2}-\d{2}$/.test(z.to) || !z.hours || !hoursModule) continue;
+      const days = hoursModule.parseHours(z.hours).days || {};
+      const open = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter((d) => days[d] && days[d].status !== 'closed');
+      if (open.join() !== 'sat,sun') continue;
+      const [fm, fd] = z.from.split('-').map(Number), [tm, td] = z.to.split('-').map(Number);
+      const whole = fd === 1 && td >= LAST[tm - 1] - (tm === 2 ? 1 : 0);
+      parts.push(whole ? { en: `${EN[fm - 1]}–${EN[tm - 1]}`, fr: `${FR[fm - 1]}–${FR[tm - 1]}` } : { en: `${hoursExtraRangeText(z.from, z.to, false)}`, fr: `${hoursExtraRangeText(z.from, z.to, true)}` });
+    }
+    if (!parts.length) return null;
+    return { en: `${parts.map((p) => p.en).join(', ')}: weekends only`, fr: `${parts.map((p) => p.fr).join(', ')} : fins de semaine seulement` };
+  } catch (e) { return null; }
+}
 function tourRentalsOnly(t) { const ks = t && Array.isArray(t.kinds) ? t.kinds : []; return ks.length > 0 && ks.every((k) => k === 'rentals'); }
 function tourVisitLines(venue, info) {
   const t = info || venueTourInfo(venue.id);
@@ -23073,7 +23119,10 @@ function tourVisitLines(venue, info) {
   // Tour test 1 (Whistler, 2026-11-16): with its break when a yearly closure splits it ("Dec 15 – Mar 31 and Jun 1 – Sep 30.").
   const parts = open ? (openSeasonStretches(venue.id, (venueLinks(venue.id) || {}).open_months) || [open]) : null;
   if (parts) out.Season = { en: `${parts.map((r) => `${wineryMd(r.from, false)} – ${wineryMd(r.to, false)}`).join(' and ')}.`, fr: `${parts.map((r, i) => `${i ? 'du' : 'Du'} ${wineryMd(r.from, true)} ${frAuDay(wineryMd(r.to, true))}`).join(' et ')}.`.replace(/\.\.$/, '.') };
-  else if (t.year === 'all') { const ex = tourYearlyBreaksText(venue.id); out.Season = ex ? { en: `All year except ${ex.en}.`, fr: `Toute l’année sauf ${ex.fr}.` } : { en: 'All year.', fr: 'Toute l’année.' }; }
+  else if (t.year === 'all') {
+    const ex = tourYearlyBreaksText(venue.id), wk = ex ? null : tourStretchWeekendsText(venue.id);
+    out.Season = ex ? { en: `All year except ${ex.en}.`, fr: `Toute l’année sauf ${ex.fr}.` } : wk ? { en: `All year (${wk.en}).`, fr: `Toute l’année (${wk.fr}).` } : { en: 'All year.', fr: 'Toute l’année.' };
+  }
   if (TOUR_LENGTHS.includes(t.length)) out['Time needed'] = { en: TOUR_LENGTH_LINES[t.length][0], fr: TOUR_LENGTH_LINES[t.length][1] };
   const price = typeof t.price === 'number' && t.price > 0 ? t.price : null, priv = typeof t.private === 'number' && t.private > 0 ? t.private : null;
   // Tour test 4: "Free." or "Free (pay what you want).", then the private price if any.
@@ -34367,7 +34416,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const notes = cfg.cardNotes || new Map();
   const payload = {};
   for (const v of list) {
-    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: mixedRank.get(v.id) };
+    // Tour test 12: a tour's typed list and own lines are searched too (the category search box, as /search).
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''} ${v.type === 'tour' ? tourSearchExtraText(v.id) : ''}`), o: mixedRank.get(v.id) };
     const st = openInfo.byId.get(v.id);
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
@@ -44284,7 +44334,7 @@ function browseRestPayload(venues, now = new Date()) {
   const html = withVersionedImages(browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true })
     .replace(/\s*<button type="button" class="desc-toggle"[^>]*\shidden>[^<]*<\/button>/g, ''));
   const k = {};
-  for (const v of venues) { const w = descSearchWords(v.description || ''); if (w) k[String(v.id)] = w; }
+  for (const v of venues) { const w = descSearchWords(`${v.description || ''} ${v.type === 'tour' ? tourSearchExtraText(v.id) : ''}`); if (w) k[String(v.id)] = w; }
   return { html, k };
 }
 function browseRestVersion(venues, now = new Date()) {
@@ -44317,13 +44367,15 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const catsById = browseCategoriesByVenue(venues, also);
   const featsById = browseFeaturesByVenue(venues);
   const noteOf = (v) => (also.has(v.id) ? also.get(v.id).notes.join(' ') : '');
+  // Tour test 12 (Whistler, 2026-11-18): /browse searches a tour's typed list and its own lines too, as /search does.
+  const tourTextOf = (v) => (v.type === 'tour' ? tourSearchExtraText(v.id) : '');
   const dataById = new Map(venues.map((v) => [v.id, {
     c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, cu: v.cuisine || '', p: Number(v.price) || 0, rt: Number(v.rating) || 0,
   }]));
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   const q = f.q.toLowerCase();
-  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || [], noteOf(v)).includes(q);
+  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || [], `${noteOf(v)} ${tourTextOf(v)}`).includes(q);
   const pool = f.openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
   // Favourites live in the visitor's browser: the server cannot apply them, the
   // page script does on load.
@@ -44349,6 +44401,8 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
     payload[String(v.id)] = { c: d.c, f: d.f, r: d.r, cu: d.cu, p: d.p, rt: d.rt };
     const note = noteOf(v);
     if (note) payload[String(v.id)].n = note;
+    const tt = tourTextOf(v);
+    if (tt) payload[String(v.id)].k = descSearchWords(`${v.description || ''} ${tt}`);
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = st.hours;
   }
@@ -58897,10 +58951,19 @@ const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|pe
 // Tour test 8 (Whistler, 2026-11-17): the count of trips on a tour's list, the same on the page, the /prices page and the
 // edit page (the page said "(5 tours)", the edit page "6 tours"): add-on lines (an extra person, a shuttle, a snowsuit or
 // gear rental, a licence, private groups) are not trips. Other types: every item.
+// Tour test 12 (Whistler, 2026-11-18; Kayla's list has an "Extras" section: a GoPro package "+$59 add on" and gift cards,
+// counted as tours): a section named Extras / Add-ons / Add on / Gift cards, and an item priced "+$…" or saying "add on",
+// or a gift card, isn't a trip either.
+const TOUR_EXTRAS_SECTION_RE = /^\s*(?:extras?|add[- ]?ons?|optional extras|upgrades?|gift ?cards?|gift certificates?|vouchers?|suppl[ée]ments?|options?|cartes?[- ]cadeaux?|certificats?[- ]cadeaux?)\s*$/i;
+const TOUR_EXTRA_ITEM_RE = /^\s*\+\s*\$|\badd[- ]?on\b|^\s*gift ?cards?\b|^\s*gift certificates?\b|^\s*cartes?[- ]cadeaux?\b/i;
+function tourTripItems(data) {
+  return ((data || {}).sections || []).flatMap((x) => (x && TOUR_EXTRAS_SECTION_RE.test(String(x.name || '').replace(/[^\p{L}\s'-]/gu, ' ').trim()) ? [] : (x && x.items) || []))
+    .filter((it) => it && !TOUR_ADDON_LINE_RE.test(String(it.name || '').replace(/^[^\p{L}\p{N}]+/u, '').trim()) && !TOUR_EXTRA_ITEM_RE.test(String(it.price || '')) && !TOUR_EXTRA_ITEM_RE.test(String(it.name || '').replace(/^[^\p{L}\p{N}+$]+/u, '')));
+}
 function menuTripCount(venue, menu) {
   if (!menu) return 0;
   if (!venue || venue.type !== 'tour') return menu.items;
-  const n = ((menu.data || {}).sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length;
+  const n = tourTripItems(menu.data).length;
   return n || menu.items;
 }
 // The short menu on the place page: the first few dishes and a link to the full menu page.
@@ -63285,7 +63348,8 @@ function typedTourFlagsHtml(venue, data) {
 function renderAdminMenuCard(m) {
   const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(m.venue_id);
   const pages = menuFiles(m.id);
-  const items = menuItemCount(parseMenuData(m.data));
+  // Tour test 12: a tour's card counts its trips only (no Extras, add-ons or gift cards).
+  const items = v && v.type === 'tour' ? (tourTripItems(parseMenuData(m.data)).length || menuItemCount(parseMenuData(m.data))) : menuItemCount(parseMenuData(m.data));
   const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
