@@ -21898,7 +21898,12 @@ function tourListInfo(venueId) {
       // were missed when they were typed there instead of in the description.
       const t = `${it.duration || ''} ${it.name || ''} ${it.description || ''}`.toLowerCase();
       const d = /(\d+(?:[.,]\d)?)\s*(hours?|hrs?|heures?|minutes?|mins?\b|min\b|h\b)/.exec(t);
-      if (d) mins.push(Math.round(Number(d[1].replace(',', '.')) * (/^h/.test(d[2]) ? 60 : 1)));
+      // Tour test 7 (Whistler, 2026-11-17): trips of whole days ("1 day", "2 days", « 3 jours », "5-day hut trip", "one
+      // day") count as N x 1,440 minutes, so the card says "1–5 days" (it said "8 hr" for 1- to 5-day trips).
+      const dd = /\b(\d{1,2}|one|two|three|four|five|six|seven)[\s-]*(?:days?|jours?)\b/.exec(t);
+      const WORDN = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+      if (dd && (!d || dd.index < d.index)) mins.push((WORDN[dd[1]] || Number(dd[1])) * 1440);
+      else if (d) mins.push(Math.round(Number(d[1].replace(',', '.')) * (/^h/.test(d[2]) ? 60 : 1)));
       else if (/\bhalf[- ]day\b|\bdemi[- ]journ[ée]e\b/.test(t)) mins.push(240);
       else if (/\b(?:full|all)[- ]day\b|\bjourn[ée]e (?:compl[èe]te|enti[èe]re)\b/.test(t)) mins.push(480);
       const a = /\ball ages\b|\btous les [âa]ges\b/.test(t) ? 'all' : (/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus)/.exec(t) || /\bages? (\d{1,2})\b/.exec(t) || [])[1];
@@ -22704,6 +22709,9 @@ function tourLengthRange(mins) {
   const lo = Math.min(...m), hi = Math.max(...m);
   if (lo === hi) return null;
   const hr = (x) => String(Math.round((x / 60) * 10) / 10);
+  // Tour test 7 (Whistler, 2026-11-17): whole-day trips read in days ("1–5 days", "4 hr–3 days").
+  const days = (x) => Math.round(x / 1440);
+  if (hi >= 1440) return lo >= 1440 ? `${days(lo)}\u2013${days(hi)} days` : `${lo >= 60 ? `${hr(lo)} hr` : `${lo} min`}\u2013${days(hi)} day${days(hi) > 1 ? 's' : ''}`;
   if (lo >= 60) return `${hr(lo)}\u2013${hr(hi)} hr`;
   return `${lo} min\u2013${hi >= 60 ? `${hr(hi)} hr` : `${hi} min`}`;
 }
@@ -22725,6 +22733,10 @@ function tourCardFacts(info) {
     out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${/\bup to\s*$/i.test(before) ? 'Up to ' : ''}${t[1]} ${unit}`;
     break;
   }
+  // Tour test 7 (Whistler, 2026-11-17): the owner's "A full day" is "Full day" on the card ("8 hr" read like a fixed
+  // eight hours for a guiding day); "Several days" is "Multi-day".
+  if (/^A full day\b/.test(timeText)) out.time = 'Full day';
+  else if (/^Several days\b/.test(timeText)) out.time = 'Multi-day';
   return out;
 }
 // The `<li class="venue-card">` list-item used on category and guide
@@ -29003,9 +29015,16 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
 // fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
 const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
   zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
+// Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
+// story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
+// under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
+// which has none, to Adventure.
+const TOUR_GUIDE_WORDS_RE = /\b(?:mountain guid\w*|guiding|mountaineer\w*|avalanche (?:courses?|skills|training|safety)|ast ?[12]\b|acmg|ifmga|glaciers?|alpine climb\w*|alpinism)\b/i;
+const TOUR_ACTIVITY_ALSO = { adventure: TOUR_GUIDE_WORDS_RE };
 function tourInActivity(venue, slug) {
   if (tourActivityOf(venue) === slug) return true;
   if (!venue || venue.type !== 'tour' || !slug) return false;
+  if (TOUR_ACTIVITY_ALSO[slug] && TOUR_ACTIVITY_ALSO[slug].test(`${venue.name || ''} ${venue.cuisine || ''} ${venue.description || ''}`)) return true;
   try { const k = venueTourInfo(venue.id).kinds; return Array.isArray(k) && k.some((x) => TOUR_KIND_ACTIVITY[x] === slug); } catch (e) { return false; }
 }
 function tourActivityOf(venue) {
@@ -37031,6 +37050,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   html = html.replace(/(<span class="chip complete-verified-badge"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?)Complete &amp; Verified(<\/span>)/g, '$1Compl\u00e8te et v\u00e9rifi\u00e9e$2');
   // Tour test 3 (Whistler, 2026-11-17): a tour card's trip length in French (« Jusqu’à 1 h », « 2–3 h »; it read "Up to 1 hr").
   html = html.replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)(Up to )?(\d+(?:\.\d+)?(?:\u2013\d+(?:\.\d+)?)?) (hr|min)(<\/span>)/g, (m, a, up, n, u, e) => `${a}${up ? 'Jusqu\u2019\u00e0 ' : ''}${n.replace('.', ',')} ${u === 'hr' ? 'h' : 'min'}${e}`);
+  // Tour test 7: day lengths and the full-day / multi-day words (« 1 à 5 jours », « Journée complète », « Plusieurs jours »).
+  html = html.replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)(?:(\d+(?:\.\d+)?) (hr|min)\u2013)?(\d+)(?:\u2013(\d+))? days?(<\/span>)/g, (m, a, n0, u0, d1, d2, e) => `${a}${n0 ? `${n0.replace('.', ',')} ${u0 === 'hr' ? 'h' : 'min'} \u00e0 ${d1} jour${Number(d1) > 1 ? 's' : ''}` : d2 ? `${d1} \u00e0 ${d2} jours` : `${d1} jour${Number(d1) > 1 ? 's' : ''}`}${e}`)
+    .replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)Full day(<\/span>)/g, '$1Journ\u00e9e compl\u00e8te$2').replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)Multi-day(<\/span>)/g, '$1Plusieurs jours$2');
   const frPath = frTwinPath(enPath);
   const frEvent = frEventPageForPath(enPath);
   if (frEvent) html = frEventHead(html, frEvent);
