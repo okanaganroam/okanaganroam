@@ -22208,6 +22208,9 @@ const TOUR_KIND_LABELS_OWNER = {
   boat: ['Boat tours and charters', 'Croisières et bateaux nolisés'], paddle: ['Kayak, canoe or SUP', 'Kayak, canot ou planche à pagaie'], raft: ['Rafting', 'Rafting'],
   fishing: ['Fishing', 'Pêche'], wildlife: ['Wildlife, whale and bear viewing', 'Observation de la faune, des baleines et des ours'], horseback: ['Horseback riding', 'Équitation'],
   bike: ['Bike and e-bike tours', 'Vélo et vélo électrique'], zipline: ['Ziplines', 'Tyrolienne'], adventure: ['ATV, bungee, climbing, ropes courses or canyoning', 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme'],
+  // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG mountain guide): no chip fitted mountaineering, guiding or avalanche
+  // courses (a list entry, not a new field; its page words are TOUR_KIND_PUBLIC.guide).
+  guide: ['Mountain guiding, mountaineering or avalanche courses', 'Guide de montagne, alpinisme ou cours d’avalanche'],
   flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm visits and u-pick', 'Visites de ferme et autocueillette'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
@@ -22285,6 +22288,9 @@ const TOUR_KIND_PUBLIC = {
   adventure: { words: ['Adventure', 'Aventure'], sides: [[/\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|off[- ]?road|\bjeeps?\b|\brzr\b/, 'ATV tours', 'Sorties en quad (VTT)'], [/bungee/, 'Bungee jumping', 'Saut à l’élastique'],
     [/climb|via ferrata/, 'Climbing', 'Escalade'], [/canyon/, 'Canyoning', 'Canyonisme'], [/paraglid|skydiv/, 'Paragliding and skydiving', 'Parapente et parachutisme'],
     [TOUR_TREETOP_RE, 'Treetop and ropes courses', 'Parcours dans les arbres (hébertisme)']] },
+  // Tour test 7 (Whistler, 2026-11-17): a mountain guide's page word is "Mountain guiding" / « Guide de montagne »;
+  // a listing whose own words name only avalanche courses says that.
+  guide: { words: ['Mountain guiding', 'Guide de montagne'], sides: [[/guid|mountaineer|alpinis|glacier|\bacmg\b|\bifmga\b/, 'Mountain guiding', 'Guide de montagne'], [/avalanche|\bast ?[12]?\b/, 'Avalanche courses', 'Cours d’avalanche']] },
   // Tour test 6: French words for a bike company that rents (her « location de vélos électriques »), not « Vélo et vélo électrique ».
   bike: { sides: [[/e-?bike (?:rentals?|hire)|location de v[ée]los? [ée]lectriques?/, 'E-bike rentals', 'Location de vélos électriques'], [/(?<!e-)(?<!e)\bbikes? (?:rentals?|hire)|location de v[ée]los?(?! [ée]lec)/, 'Bike rentals', 'Location de vélos'],
     [/\b(?:tours?|rides?|guided|sorties?)\b/, 'Bike tours', 'Sorties à vélo']] },
@@ -22293,6 +22299,7 @@ const TOUR_KIND_PUBLIC = {
 const TOUR_PART_FR = [[/e-?bike (?:rentals?|hire)/, 'Location de vélos électriques'], [/bike (?:rentals?|hire)/, 'Location de vélos'], [/kayak (?:rentals?|hire)/, 'Location de kayaks'],
   [/(?:paddle ?board|sup) (?:rentals?|hire)/, 'Location de planches à pagaie'], [/ski (?:rentals?|hire)/, 'Location de skis'], [/(?:gear|equipment) (?:rentals?|hire)|^rentals?$/, 'Location d’équipement'],
   [/heli[- ]?hik/, 'Héli-randonnée'], [/\bhik(?:e|es|ing)\b/, 'Randonnée'], [/sightseeing/, 'Visites touristiques'], [/photography/, 'Photographie'], [/stargaz/, 'Observation des étoiles'],
+  [/avalanche|\bast ?[12]\b/, 'Cours d’avalanche'], [/mountaineer/, 'Alpinisme'], [/mountain guid|\bguiding\b/, 'Guide de montagne'], [/ski touring|backcountry ski/, 'Ski de randonnée'], [/hut trips?/, 'Sorties en refuge'],
   [/gondola/, 'Télécabine'], [/team building/, 'Consolidation d’équipe'], [/birthday/, 'Fêtes d’anniversaire'], [/(?:shuttles?|transportation|transfers?)\b/, 'Navettes']];
 // The page words of one kind, given the listing's own words that kind covers (`mine`, possibly none).
 function tourKindPublic(k, fr, mine) {
@@ -22309,11 +22316,21 @@ function tourKindPublic(k, fr, mine) {
 const TOUR_KIND_ORDER = TOUR_KINDS;
 function tourKindsText(kinds, fr = false, was = '') {
   const picked = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).sort((a, b) => TOUR_KIND_ORDER.indexOf(a) - TOUR_KIND_ORDER.indexOf(b));
-  // No kind of ours picked (nothing, or only "Something else"): the listing keeps its own words exactly.
-  if (!picked.length) return '';
   // Tour test 3: the French words use the listing's own words too (which side of a chip they name, and the parts no kind
   // covers, kept as typed: "Heli-hiking"), so the French card and page show the same set as the English ones.
-  const parts = tourWordParts(was).filter((p) => p.split(/\s+/).some((w) => !TOUR_WORDS_GENERIC.test(w)));
+  // Tour test 7 (Whistler, 2026-11-17; Erik): a part of the listing's words that a chip we pre-picked from them covers
+  // ("heli-skiing" -> Heli-skiing), when the owner unticked that chip, is dropped: he said it isn't what he does. Only
+  // the parts no pre-picked chip covered stay in the listing's own words ("avalanche courses" before its chip existed).
+  const pre = tourKindSuggestion({ cuisine: was, name: '' }).filter((k) => TOUR_KIND_ORDER.includes(k));
+  const unticked = (p) => pre.some((k) => !picked.includes(k) && tourKindCovers(k, p));
+  const parts0 = tourWordParts(was).filter((p) => p.split(/\s+/).some((w) => !TOUR_WORDS_GENERIC.test(w)));
+  const parts = parts0.filter((p) => !unticked(p));
+  // No kind of ours picked (nothing, or only "Something else"): the listing keeps its own words exactly, less the parts
+  // of a chip he unticked (when anything else is left).
+  if (!picked.length) {
+    if (!fr && (kinds || []).includes('other') && parts.length && parts.length < parts0.length) { const cap1 = (p) => p.charAt(0).toUpperCase() + p.slice(1); return parts.length === 1 ? cap1(parts[0]) : `${cap1(parts.slice(0, -1).join(', '))} & ${parts[parts.length - 1]}`; }
+    return '';
+  }
   // Tour test 2 (Whistler, 2026-11-16): "Whitewater rafting & bear viewing tours" with Rafting and Wildlife picked became
   // "Rafting & Wildlife and bear viewing" ("Whitewater" gone). A part of hers a kind covers that says more than the
   // kind's own name (a word the name doesn't have: "Whitewater") is kept in her words, in the kind's place.
@@ -22592,7 +22609,10 @@ function writeTourVisitRows(venueId, now = new Date()) {
 // Tour test 4: a free tour's card says "Free" (a price of 0 with the basis 'Free'; price-check.js reads it).
 function tourCardPrice(venueId) {
   const p = tourPrice(venueId), free = tourFree(venueId);
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, TOUR_FREE_CARD_LABEL); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Per person'); } catch (e) { console.error(`[owner-portal] card price for tour #${venueId} failed: ${e.message}`); }
+  // Tour test 7 (Whistler, 2026-11-17): no price per person but a private (day) rate: the card says "From $750 / group"
+  // (it showed research's old per-person price).
+  const priv = venueTourInfo(venueId).private, privN = typeof priv === 'number' && Number.isFinite(priv) && priv > 0 ? priv : null;
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, TOUR_FREE_CARD_LABEL); else if (p == null && privN != null) priceCheck.setOwnerPrice(venueId, privN, 'Private tours', 'group'); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Per person'); } catch (e) { console.error(`[owner-portal] card price for tour #${venueId} failed: ${e.message}`); }
 }
 // The card's duration chip (tourCardFacts reads "Time needed"); and Build My Trip's facts: the minimum age, how far ahead
 // to book and how long a trip takes, from the operator's own answers (null when not answered).
@@ -28982,7 +29002,7 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
 // and words (tourActivityOf), and ALSO under a filter when its operator picked a kind of that filter in the setup (a
 // fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
 const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
-  zipline: 'adventure', adventure: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
+  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
 function tourInActivity(venue, slug) {
   if (tourActivityOf(venue) === slug) return true;
   if (!venue || venue.type !== 'tour' || !slug) return false;
@@ -57032,7 +57052,7 @@ function tourResearchLength(venue) {
 const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|sled tours?\b|\bsleds?\b/], ['dogsled', /dog ?sled/], ['jetboat', /jet ?boat/],
   ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
   ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
-  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
+  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard/], ['rentals', /rentals?/]];
 function tourKindSuggestion(venue) {
   const t = `${venue.cuisine || ''} ${venue.name || ''}`.toLowerCase();
@@ -60883,8 +60903,9 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
           // Tour test 4: 'free' / 'donation' (a free tour) is stored as price 0 with the word; a paid price replaces it.
           const p = typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
           writeVenueTourInfo(venue.id, { ...tourInfoAnswers(venue.id), ...(p != null ? { price: p } : TOUR_FREE_WORDS.includes(value) ? { price: 0, free: value } : {}) });
-          tourCardPrice(venue.id);
         }
+        // Tour test 7: the private price changes the card too when there is no price per person.
+        tourCardPrice(venue.id);
         const after = field === 'tour_info' ? tourInfoAnswers(venue.id) : tourPriceValue(venue.id);
         if (JSON.stringify(before) !== JSON.stringify(after)) log.run(venue.id, field, before == null ? null : JSON.stringify(before), after == null ? null : JSON.stringify(after), meta.reason, meta.batch_id, reviewer);
         try { const vc = db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(venue.id); if (vc) venue.cuisine = vc.cuisine; } catch (e) { /* keep */ }

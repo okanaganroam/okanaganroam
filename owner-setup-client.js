@@ -3735,7 +3735,10 @@
     }
     if (k === 'priceSave') {
       readTour(); var pp = S.tour.price, pv = S.tour.priv, pfree = S.tour.free;
-      if (!pfree && (pp == null || isNaN(pp))) {
+      // Tour test 7 (Whistler, 2026-11-17): a private-only guide may leave the per-person box empty when the private box
+      // has a price (the card then says "From $750 / group").
+      var privOnly = !pfree && pp == null && pv != null && !isNaN(pv);
+      if (!pfree && !privOnly && (pp == null || isNaN(pp))) {
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
         // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).

@@ -296,7 +296,7 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // their check and the season, as for a winery by appointment). Happy hour, specials and events are never asked of
 // tours; the menu is "Your tours and prices" (tour test 1, 2026-11-16). Every answer is the operator's own (venue_tour_info, never researched).
 // The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
-const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'snowshoe', 'paddle', 'raft', 'adventure', 'flight', 'food', 'farm', 'rentals', 'other'];
+const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'snowshoe', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'other'];
 const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
 const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
@@ -586,7 +586,8 @@ function doneMap(input, today) {
         tour_length: TOUR_LENGTHS.includes(t.length),
         season: nonBlank(i.openMonths) || !!i.hasSeasons || t.year === 'all' || apptOnly,
         // Tour test 4 (2026-11-17): a free or by-donation tour ('free' / 'donation') is answered too.
-        tour_price: (typeof i.tourPrice === 'number' && Number.isFinite(i.tourPrice) && i.tourPrice > 0) || i.tourPrice === 'free' || i.tourPrice === 'donation',
+        // Tour test 7 (2026-11-17): a private-only guide (no per-person price, a private or day rate) is answered too.
+        tour_price: (typeof i.tourPrice === 'number' && Number.isFinite(i.tourPrice) && i.tourPrice > 0) || i.tourPrice === 'free' || i.tourPrice === 'donation' || (typeof t.private === 'number' && Number.isFinite(t.private) && t.private > 0),
         booking_link: nonBlank(i.bookingUrl),
         book_ahead: TOUR_BOOK.includes(t.book),
         tour_ages: TOUR_AGES.includes(String(t.age || '')),
