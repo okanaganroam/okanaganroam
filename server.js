@@ -5215,6 +5215,11 @@ const SEARCH_PHRASE_REWRITES = [
   ['sleigh ride', 'sleigh'], ['sleigh rides', 'sleigh'], ['sleigh riding', 'sleigh'], ['horse drawn sleigh', 'sleigh'], ['horse drawn sleigh ride', 'sleigh'],
   ['horse drawn sleigh rides', 'sleigh'], ['dog sled', 'sled'], ['dog sleds', 'sled'], ['dog sledding', 'sled'], ['dogsled', 'sled'], ['dogsledding', 'sled'],
   ['dog sled tour', 'sled'], ['dog sled tours', 'sled'], ['dog sled ride', 'sled'], ['dog sled rides', 'sled'], ['mushing', 'sled'],
+  // Tour test 10 (Whistler, 2026-11-18; Gord): « équitation » (read as "horseback riding") listed every tour, the ranches
+  // among them: the words are the horseback kind and category ("horseback" also finds trail rides, horses, stables and
+  // ranches: descriptionSynonyms). A horse-drawn sleigh stays a sleigh (above).
+  ['horseback riding', 'horseback'], ['horseback rides', 'horseback'], ['horseback ride', 'horseback'], ['horse riding', 'horseback'], ['horse rides', 'horseback'], ['horse ride', 'horseback'],
+  ['trail riding', 'horseback'], ['horseback trail rides', 'horseback'], ['horseback trail ride', 'horseback'],
   ['u pick', 'u-pick orchard'], ['upick', 'u-pick orchard'], ['u picks', 'u-pick orchard'], ['pick your own', 'u-pick orchard'],
   // Round 9 (2026-10-19): "apple picking" listed a distillery and a bakery first; it means the U-picks.
   ['apple picking', 'u-pick orchard'], ['pick apples', 'u-pick orchard'], ['fruit picking', 'u-pick orchard'], ['pick fruit', 'u-pick orchard'], ['cherry picking', 'u-pick orchard'],
@@ -22326,6 +22331,9 @@ const TOUR_KIND_LABELS_OWNER = {
   // a cultural walk with Elders' storytelling ("Walking & history tours" went public: "our culture is not history, it is
   // living"). A list entry, not a new field; its page words are TOUR_KIND_PUBLIC.cultural, its filter Culture.
   cultural: ['Indigenous and cultural tours', 'Visites autochtones et culturelles'],
+  // Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch with winter sleigh rides; Dayton approved): no chip fitted
+  // horse-drawn sleigh rides ("Something else" had no box, and the French category dropped them). Under Winter & Snow.
+  sleigh: ['Sleigh rides', 'Promenades en traîneau'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm, ranch or kennel visits', 'Visites de ferme, de ranch ou de chenil'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
 // Tour test 3 (Whistler, 2026-11-17): the first length is "Up to 1 hour" (a 20-minute flight read "About 1 hour").
@@ -22426,7 +22434,7 @@ const TOUR_KIND_PUBLIC = {
 // Tour test 6: the leftover words we can say in French (a listing's own part no picked kind covers).
 const TOUR_PART_FR = [[/e-?bike (?:rentals?|hire)/, 'Location de vélos électriques'], [/bike (?:rentals?|hire)/, 'Location de vélos'], [/kayak (?:rentals?|hire)/, 'Location de kayaks'],
   [/(?:paddle ?board|sup) (?:rentals?|hire)/, 'Location de planches à pagaie'], [/ski (?:rentals?|hire)/, 'Location de skis'], [/(?:gear|equipment) (?:rentals?|hire)|^rentals?$/, 'Location d’équipement'],
-  [/heli[- ]?hik/, 'Héli-randonnée'], [/\bhik(?:e|es|ing)\b/, 'Randonnée'], [/sightseeing/, 'Visites touristiques'], [/photography/, 'Photographie'], [/stargaz/, 'Observation des étoiles'],
+  [/sleigh/, 'Promenades en traîneau'], [/heli[- ]?hik/, 'Héli-randonnée'], [/\bhik(?:e|es|ing)\b/, 'Randonnée'], [/sightseeing/, 'Visites touristiques'], [/photography/, 'Photographie'], [/stargaz/, 'Observation des étoiles'],
   [/avalanche|\bast ?[12]\b/, 'Cours d’avalanche'], [/mountaineer/, 'Alpinisme'], [/mountain guid|\bguiding\b/, 'Guide de montagne'], [/ski touring|backcountry ski/, 'Ski de randonnée'], [/hut trips?/, 'Sorties en refuge'],
   [/gondola/, 'Télécabine'], [/team building/, 'Consolidation d’équipe'], [/birthday/, 'Fêtes d’anniversaire'], [/(?:shuttles?|transportation|transfers?)\b/, 'Navettes']];
 // The page words of one kind, given the listing's own words that kind covers (`mine`, possibly none).
@@ -22515,7 +22523,9 @@ function tourKindsText(kinds, fr = false, was = '', story = '') {
   if (l.length > 1 && l.some((x) => / (?:and|or|et|ou|&) /i.test(x))) return l.join(' · ');
   // Tour test 4 (Whistler, 2026-11-17): one list, one capital: "Walking tours & food tours" (it read "Walking tours & Food
   // tours"). A word that is all capitals or has one inside stays ("ATV tours", "RZR", "SUP", "E-bike").
-  const lower = (x) => (/^[A-ZÀ-Þ][a-zà-ÿ’' -]/.test(x) && !/^[A-ZÀ-Þ]-/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
+  // Tour test 9 port (Whistler, 2026-11-18): "Indigenous" and "First Nations" keep their capital after another kind
+  // ("Snowshoeing, Indigenous cultural tours & canoeing": Whistler lists snowshoe before cultural).
+  const lower = (x) => (/^[A-ZÀ-Þ][a-zà-ÿ’' -]/.test(x) && !/^[A-ZÀ-Þ]-/.test(x) && !/^(?:Indigenous|First Nations?)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
   const ll = l.map((x, i) => (i ? lower(x) : x));
   return ll.length === 1 ? ll[0] : `${ll.slice(0, -1).join(', ')}${and}${ll[ll.length - 1]}`;
 }
@@ -22854,7 +22864,7 @@ const TOUR_KIND_LABELS = { wine: 'Wine tour', lake: 'Lake & boats', bike: 'Bike 
 // Tour test 1 (Whistler, 2026-11-16): "Winter" only for a tour that runs in winter alone. One whose own season reaches
 // into June, July or August (open_months, or its other hours), or whose operator picked a kind that isn't a snow one
 // (a summer ATV trip beside the sleds), gets no season word ("SNOWMOBILE TOURS · WINTER" showed in July).
-const TOUR_SNOW_KINDS = ['heli', 'snowmobile', 'dogsled', 'snowshoe', 'other'];
+const TOUR_SNOW_KINDS = ['heli', 'snowmobile', 'dogsled', 'snowshoe', 'sleigh', 'other'];
 function tourRunsInSummer(venue) {
   try {
     const kinds = venueTourInfo(venue.id).kinds || [];
@@ -29203,7 +29213,7 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
 // and words (tourActivityOf), and ALSO under a filter when its operator picked a kind of that filter in the setup (a
 // fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
 const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
-  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture', cultural: 'culture' };
+  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', sleigh: 'winter', walking: 'culture', cultural: 'culture' };
 // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
@@ -57521,8 +57531,10 @@ function tourResearchLength(venue) {
 }
 // Tours: the kinds of tour research's words name ("Snowmobile & dog sled tours" -> snowmobile, dogsled), up to 3, as the
 // What you offer screen's starting picks ("We picked these from your page"). Saved only when the owner taps Save.
-const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<!(?:dog|husky|huskies) )\bsled tours?\b|(?<!(?:dog|husky|huskies) )\bsleds?\b(?! dogs?)/], ['dogsled', /dog ?sled|sled dogs?|husk(?:y|ies) (?:tours?|rides?|sled)|mushing/], ['jetboat', /jet ?boat/],
-  ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
+const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<!(?:dog|husky|huskies) )\bsled tours?\b|(?<!(?:dog|husky|huskies) )\bsleds?\b(?! dogs?)/], ['dogsled', /dog ?sled|sled dogs?|husk(?:y|ies) (?:tours?|rides?|sled)|mushing|tra[iî]neaux? [àa] chiens/],
+  // Tour test 10: a horse-drawn sleigh is the sleigh kind (never dog sledding), and "horse-drawn" alone is not horseback.
+  ['sleigh', /sleigh|horse[- ]drawn|(?:promenades?|balades?|tours?) en tra[iî]neaux?(?! [àa] chiens)|tra[iî]neaux? tir[ée]s? par des chevaux/], ['jetboat', /jet ?boat/],
+  ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse(?![- ]drawn)|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
   ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['cultural', /indigenous|first nations?|cultural (?:tours?|walks?|experiences?|programs?|centres?|centers?|visits?)|storytell|autochtone|premi[eè]res nations|visites? culturelles?/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
   ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|backcountry guiding|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard|kennel|pupp(?:y|ies) (?:visits?|cuddles|tours?)|meet the (?:dogs|huskies|puppies)|ranch (?:visits?|tours?)/], ['rentals', /rentals?/]];
