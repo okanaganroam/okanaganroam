@@ -22264,6 +22264,10 @@ const TOUR_KIND_LABELS_OWNER = {
   // courses (a list entry, not a new field; its page words are TOUR_KIND_PUBLIC.guide).
   guide: ['Mountain guiding, mountaineering or avalanche courses', 'Guide de montagne, alpinisme ou cours d’avalanche'],
   flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
+  // Tour test 9 (Whistler, 2026-11-18; Tanis, an Indigenous-owned cultural tour business; Dayton approved): no chip fitted
+  // a cultural walk with Elders' storytelling ("Walking & history tours" went public: "our culture is not history, it is
+  // living"). A list entry, not a new field; its page words are TOUR_KIND_PUBLIC.cultural, its filter Culture.
+  cultural: ['Indigenous and cultural tours', 'Visites autochtones et culturelles'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm, ranch or kennel visits', 'Visites de ferme, de ranch ou de chenil'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
 // Tour test 3 (Whistler, 2026-11-17): the first length is "Up to 1 hour" (a 20-minute flight read "About 1 hour").
@@ -22283,9 +22287,9 @@ function tourCuisineFr(text) {
   if (!tourCuisineFrMap) {
     tourCuisineFrMap = new Map();
     try {
-      for (const r of db.prepare("SELECT v.cuisine AS c, v.description AS d, t.info AS info FROM venue_tour_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'tour' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
+      for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, v.description AS d, t.info AS info FROM venue_tour_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'tour' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
-        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', r.d || '') : '';
+        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', tourStoryWords(r.id, r.d)) : '';
         if (fr && fr !== r.c) tourCuisineFrMap.set(String(r.c), fr);
       }
     } catch (e) { /* no table yet */ }
@@ -22322,6 +22326,8 @@ function tourKindCovers(k, part) { const h = TOUR_KIND_HINTS.find(([key]) => key
 // shown ("Helicopter tours" -> "Helicopter flights", never "scenic"; "heli-skiing" -> "Heli-skiing", never "cat-skiing");
 // when they name none or all, the kind's whole words. A site that renames a chip (Whistler) overrides this map's
 // `words`, not the code.
+// Tour test 9: the words that say a listing is Indigenous (never guessed from "native" or "tribal": research's words).
+const TOUR_INDIGENOUS_RE = /\bindigenous|first nations?\b|autochtone|premi[eè]res nations|\bm[ée]tis\b|\binuit\b/;
 const TOUR_TREETOP_RE = /tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre|parcours (?:dans les arbres|a[ée]rien)/;
 const TOUR_KIND_PUBLIC = {
   heli: { words: ['Heli-skiing', 'Héliski'], sides: [[/heli[- ]?(?:ski|board)/, 'Heli-skiing', 'Héliski'], [/cat[- ]?ski|snowcat ski/, 'Cat-skiing', 'Ski en chenillette (cat-ski)']] },
@@ -22330,7 +22336,11 @@ const TOUR_KIND_PUBLIC = {
   snowshoe: { words: ['Snowshoe & ski touring', 'Raquette et ski de randonnée'],
     sides: [[/snowshoe/, 'Snowshoeing', 'Raquette'], [/ski touring|backcountry (?:ski|guiding)|splitboard|heli-touring/, 'Ski touring', 'Ski de randonnée'], [/snowcat(?! ski| access)/, 'Snowcat tours', 'Sorties en chenillette']] },
   paddle: { words: ['Kayak, canoe & SUP', 'Kayak, canot et planche à pagaie'], sides: [[/kayak/, 'Kayaking', 'Kayak'], [/canoe/, 'Canoeing', 'Canot'], [/\bsup\b|paddle ?board/, 'Paddleboarding', 'Planche à pagaie']] },
-  walking: { words: ['Walking & history tours', 'Visites à pied et historiques'], sides: [[/walking|ghost/, 'Walking tours', 'Visites à pied'], [/histor|heritage|indigenous cultur/, 'History tours', 'Visites historiques']] },
+  // Tour test 9 (Whistler, 2026-11-18; Tanis): "indigenous cultur" no longer reads as "History tours" (it is the cultural kind).
+  walking: { words: ['Walking & history tours', 'Visites à pied et historiques'], sides: [[/walking|ghost/, 'Walking tours', 'Visites à pied'], [/histor|heritage/, 'History tours', 'Visites historiques']] },
+  // Tour test 9: the cultural kind says "Indigenous" only when the listing's own words (its category, else its story)
+  // say Indigenous or First Nations; otherwise "Cultural tours" / « Visites culturelles ».
+  cultural: { words: ['Cultural tours', 'Visites culturelles'], eachSide: true, sides: [[TOUR_INDIGENOUS_RE, 'Indigenous cultural tours', 'Visites culturelles autochtones']] },
   // Tour test 5 (Whistler, 2026-11-17): the chip says "Wildlife, whale and bear viewing" (whales had no chip); the page
   // keeps its short words, and a listing's own "Whale watching" now stays (the chip's name has "whale").
   wildlife: { words: ['Wildlife and bear viewing', 'Observation de la faune et des ours'] },
@@ -22417,7 +22427,10 @@ function tourKindsText(kinds, fr = false, was = '', story = '') {
     // Tour test 7: the guide kind always says its public word ("Mountain guiding", or "Avalanche courses" when that is all).
     const own = fr || k === 'guide' ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     // Tour test 8: a kind whose sides may come from the story (farm: "kennel visits with puppies") when its category names none.
-    const mineOrStory = !mine.length && (TOUR_KIND_PUBLIC[k] || {}).storySides && story ? [String(story)] : mine;
+    // Tour test 9 (Whistler, 2026-11-18; Tanis): every kind with sides does this now. Her card read "Snowshoe, snowcat &
+    // ski touring" for a snowshoe storytelling walk: when the category names none of a kind's sides, the story (and her
+    // Known for line) decides which sides show; only when neither names any does the kind's whole label show.
+    const mineOrStory = !mine.length && Array.isArray((TOUR_KIND_PUBLIC[k] || {}).sides) && story ? [String(story)] : mine;
     (own.length ? own : tourKindPublic(k, fr, mineOrStory)).forEach(push);
   }
   // Tour test 6 (Whistler, 2026-11-17): a part no picked kind covers is kept in English on English pages only. On French
@@ -22457,7 +22470,7 @@ function writeVenueTourInfo(venueId, info) {
   if (TOUR_FREE_WORDS.includes(clean.free)) clean.price = 0; else { delete clean.free; if (!(clean.price > 0)) delete clean.price; }
   let v = null; try { v = db.prepare('SELECT cuisine, description FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
   const was0 = 'cuisine_was' in cur ? cur.cuisine_was : (v && v.cuisine != null ? String(v.cuisine) : '');
-  const words = tourKindsText(clean.kinds, false, was0, v && v.description ? String(v.description) : '');
+  const words = tourKindsText(clean.kinds, false, was0, tourStoryWords(venueId, v && v.description));
   if (v && words) {
     clean.cuisine_was = was0;
     if ((v.cuisine || '') !== words) db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(words, venueId);
@@ -22468,6 +22481,17 @@ function writeVenueTourInfo(venueId, info) {
   else db.prepare('INSERT INTO venue_tour_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, JSON.stringify(clean));
   clearVenueTourInfoCache();
   try { clearVenueCuisinesCache(); } catch (e) { /* not loaded yet */ }
+}
+// Tour test 9 (Whistler, 2026-11-18): the words that say which side of a chip a tour does when its category says none:
+// its story and its Known for line.
+function tourStoryWords(venueId, description) {
+  let known = ''; try { known = String(ownerVisitRows(venueId).known_for || ''); } catch (e) { known = ''; }
+  return [description ? String(description) : '', known].filter(Boolean).join(' ; ');
+}
+// Tour test 9: her story or Known for, once live, may name a side of a picked chip ("snowshoe storytelling walk"): the
+// category words are worked out again (nothing else changes).
+function refreshTourKindWords(venueId) {
+  try { const i = venueTourInfo(venueId); if (Array.isArray(i.kinds) && i.kinds.length) writeVenueTourInfo(venueId, i); } catch (e) { /* keep the words */ }
 }
 // The answers without the price and the kept research words (what the instant 'tour_info' field holds).
 function tourInfoAnswers(venueId) { const o = { ...venueTourInfo(venueId) }; delete o.price; delete o.free; delete o.cuisine_was; return o; }
@@ -22500,7 +22524,7 @@ function tourFreeRead(x) {
 // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
 // is 'unit': never saved as a price per person (Your tours and prices takes it). Vehicles, cars, sleds and canoes moved
 // from the group words to these. "from 1500" / « 1500 $ et plus » read as the number (tourPriceTrim).
-const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
+const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|rafts?|radeaux?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
 // Tour test 7 (Whistler, 2026-11-17; Erik, a mountain guide): days, nights and hours are not units. "$750/day", "750 per
 // day", "daily rate" is a day rate for the group ('day': Private tours); a bare "/hour" is an hourly rate ('hourly': Your
 // tours and prices, like a per-unit price; "$30/hour per bike" stays 'unit'); "1450 for 3 days", "3-day", "2 nights" is a
@@ -22511,7 +22535,7 @@ const TOUR_HOUR_RATE_RE = /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b
 const TOUR_RATE_STRIP_RE = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the|[àa] la|[àa] l|de l|pour la|pour une?)\s+)?(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?|hours?|hrs?|hr|h|heures?)\b(?:\s+rate)?|\b(?:daily|nightly|hourly)(?:\s+rate)?\b|\b(?:day|hour) rate\b|\b(?:tarif|taux) (?:journalier|quotidien|horaire)\b|\bhoraire\b/g;
 const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
 const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
-const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
+const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
 function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
   const raw = tourPriceTrim(x);
@@ -22545,7 +22569,7 @@ const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in 
   day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
   length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
 // Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
-const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?)\b/i;
+const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i;
 TOUR_PRICE_WHY_ERRORS.vehicle = 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.';
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
@@ -29083,7 +29107,7 @@ const TOUR_ACTIVITIES = [
   { slug: 'farm', label: 'Farms & Food', pattern: /farm|u-pick|orchard|food tour|petting|goat|fruit|mushroom|flower/i, banner: { src: '/images/tours/activity-farm.jpg', alt: 'A woman and a girl picking apples in an orchard', pos: 35 }, heading: 'Farms & Food Experiences in the Okanagan', intro: 'U-pick orchards, farm visits, food tours and foraging — a taste of the valley straight from where it grows.' },
   { slug: 'adventure', label: 'Adventure', pattern: /canyon|helicopter|heli|zipline|zip tour|atv|utv|4x4|skydiv|paraglid|balloon|climb|kart|riding|stables|horse|adventure park/i, banner: { src: '/images/tours/activity-adventure.jpg', alt: 'A woman flying along a zipline through the forest', pos: 40 }, heading: 'Adventure Experiences in the Okanagan', intro: 'Ziplines, heli flights, canyoning, paragliding, ATV tours, horseback rides and more — for when you want your heart racing.' },
   { slug: 'winter', label: 'Winter', pattern: /snowshoe|sleigh|catski|snowcat|snowmobile|dog sled|ice[- ]fishing|winter ebike|winter e-bike/i, banner: { src: '/images/tours/activity-winter.jpg', alt: 'A team of huskies racing through the snow', pos: 45 }, heading: 'Winter Experiences in the Okanagan', intro: 'Dog sledding, sleigh rides, snowmobile and snowcat tours, snowshoeing and ice fishing — the best of the valley’s snowy season.' },
-  { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
+  { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling|indigenous|first nations|cultural tour/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
 ];
 // Rule order matters: winter first (a winter e-bike tour is a winter tour).
 const TOUR_ACTIVITY_ORDER = ['winter', 'wine', 'lake', 'bike', 'farm', 'adventure', 'culture'];
@@ -29098,7 +29122,7 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
 // and words (tourActivityOf), and ALSO under a filter when its operator picked a kind of that filter in the setup (a
 // fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
 const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
-  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
+  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture', cultural: 'culture' };
 // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
@@ -55145,6 +55169,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
   });
   render();
+  // Tour test 9 (Whistler, 2026-11-18): the setup's "Type them in myself" opens this screen at #type: typing starts at once
+  // (only from the start screen, where that button is).
+  if (location.hash === '#type') { var tyb = app.querySelector('[data-act="type"]'); if (tyb) tyb.click(); }
 })();`;
 
 // The site header in French for the French menu screen (2026-10-18): the same translation French twin pages use
@@ -55931,7 +55958,7 @@ function renderOwnerSetupPage(found, opts) {
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '',
     // Tour test 8: the French description is still research's ('old' once her English story is hers), every type.
-    frDesc: fr ? '' : ownerFrDescState(venue), storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
     // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs
@@ -57342,7 +57369,7 @@ function tourResearchLength(venue) {
 // What you offer screen's starting picks ("We picked these from your page"). Saved only when the owner taps Save.
 const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<!(?:dog|husky|huskies) )\bsled tours?\b|(?<!(?:dog|husky|huskies) )\bsleds?\b(?! dogs?)/], ['dogsled', /dog ?sled|sled dogs?|husk(?:y|ies) (?:tours?|rides?|sled)|mushing/], ['jetboat', /jet ?boat/],
   ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
-  ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
+  ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['cultural', /indigenous|first nations?|cultural (?:tours?|walks?|experiences?|programs?|centres?|centers?|visits?)|storytell|autochtone|premi[eè]res nations|visites? culturelles?/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
   ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|backcountry guiding|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard|kennel|pupp(?:y|ies) (?:visits?|cuddles|tours?)|meet the (?:dogs|huskies|puppies)|ranch (?:visits?|tours?)/], ['rentals', /rentals?/]];
 function tourKindSuggestion(venue) {
@@ -61389,6 +61416,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         if ((venue[f] || null) !== next[f]) log.run(venue.id, f, venue[f] == null ? null : String(venue[f]), next[f], meta.reason, meta.batch_id, reviewer);
       }
     }
+    // Tour test 9 (Whistler, 2026-11-18): a tour's story or Known for going live may say which side of a picked chip it does.
+    if (venue.type === 'tour' && (chosen.includes('description') || chosen.includes('visit_rows')) && !chosen.includes('tour_info')) refreshTourKindWords(venue.id);
     db.exec('RELEASE owner_approve');
   } catch (err) {
     try { db.exec('ROLLBACK TO owner_approve'); db.exec('RELEASE owner_approve'); } catch (_) { /* already gone */ }
@@ -64671,7 +64700,7 @@ ${renderGolfHeaderHtml()}
         <p class="op-hint">${L(`A few sentences about what makes your ${venue.type === 'tour' ? 'trips worth booking' : 'place worth a visit'}. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui ${venue.type === 'tour' ? 'donne envie de réserver vos sorties' : 'rend votre endroit intéressant'}. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>${completeOn ? `
         <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('✓ Long enough for your score', '✓ Assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
-        ${!fr && ownerFrDescState(venue) === 'old' ? `<p class="op-hint" id="opFrDescOld">Your French description is the old one from our research: <a href="${escapeHtml(ownerPath(token ? `${OWNER_LINK_PATH}${token}/setup` : `/owner/account/venue/${venue.id}/setup`, 'fr'))}#story" lang="fr" onclick="try{localStorage.setItem('okanaganLang','fr')}catch(e){}">update it?</a></p>` : ''}
+        ${!fr && ownerFrDescState(venue) === 'old' ? `<p class="op-hint" id="opFrDescOld">Your French description is the old one from our research: <a href="${escapeHtml(ownerPath(token ? `${OWNER_LINK_PATH}${token}/setup` : `/owner/account/venue/${venue.id}/setup`, 'fr'))}#story" lang="fr">update it?</a></p>` : ''}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
