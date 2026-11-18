@@ -1997,6 +1997,9 @@
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
+        // Tour test 7 (Whistler, 2026-11-17): after the first season, how to add a second one (Erik saved Dec 15 – Apr 30
+        // and looked for a second season; one long season with the break as a yearly closure is the way).
+        + (S.openSea && T.twoSeasonHint && !S.extra.some(function(c){ return c.yearly; }) ? '<p class="su-hint" id="suTwoSeasonHint">' + h(T.twoSeasonHint) + '</p>' : '')
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         // Café test 4 (2026-11-11): "We're closed part of the year" is asked once, in Hours ("Are these your hours all
         // year?"). This screen only shows a saved open season, with Change.
@@ -2461,10 +2464,11 @@
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
       // Cocktail test 3 (2026-11-14): the pressed size is the one in the "book ahead" sentence, not "for 20" of a room.
       var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1];
+      // Tour test 7 (Whistler, 2026-11-17): a booked tour's sizes start at "Up to 4" (a guide takes 4 a day; it started at 6).
       // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
-        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + (S.groupsBooked && T.groupsChipBooked ? [4].concat(GROUP_SIZES) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
         + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.

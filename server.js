@@ -9585,6 +9585,8 @@ function statusSaysClosureToday(line) { return !!line && STATUS_SAYS_CLOSURE_RE.
 // ("Closed Oct 21–28, reopens Oct 29.").
 const ONE_DAY_CLOSURE_TAG_RE = /\s*<p class="season-tag season-tag-temp_closed">(?:<span[^>]*>[\s\S]*?<\/span>)?\s*Closed [A-Za-z]+\.? \d{1,2}, reopens [^<\u2013-]*<\/p>/;
 function cardSeasonOnce(chunk, line) {
+  // Tour test 7: "Closed between seasons · Reopens Jul 1" says the break and its end: no second "Closed May 1–Jun 30" line.
+  if (line && /^Closed between seasons\b/.test(String(line.text || ''))) return chunk.replace(/\s*<p class="season-tag season-tag-temp_closed">[\s\S]*?<\/p>/, '');
   if (statusSaysClosureToday(line)) return chunk.replace(ONE_DAY_CLOSURE_TAG_RE, '');
   return line && line.state === 'seasonal' ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
 }
@@ -22885,7 +22887,7 @@ function venueCardHtml(venue, opts = {}) {
   // Reopens Dec 15", "Closed today (Between seasons…)") drops the closed pill on its photo, so it is said once (all types,
   // as winery and brewery cards on the Food & Drink pages already did).
   const statusSaysClosed = !!(opts.statusLine && (opts.statusLine.state === 'seasonal' || /^Closed\b/i.test(String(opts.statusLine.text || ''))));
-  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to) && !(cardSeasonTag && cardSeasonTag.kind === 'closed' && statusSaysClosed) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && cardSeasonTag.from === cardSeasonTag.to && statusSaysClosureToday(opts.statusLine))
+  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to) && !(cardSeasonTag && cardSeasonTag.kind === 'closed' && statusSaysClosed) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && cardSeasonTag.from === cardSeasonTag.to && statusSaysClosureToday(opts.statusLine)) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && opts.statusLine && /^Closed between seasons\b/.test(String(opts.statusLine.text || '')))
     ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag, opts.seasonEndLabel) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
@@ -37287,6 +37289,8 @@ function frStatusText(text) {
     .replace('By appointment \u00b7 call ahead', 'Sur rendez-vous \u00b7 appelez avant')
     // Tour test 2 (Whistler, 2026-11-16): a by-booking tour's line under its name on the French page.
     .replace(TOUR_APPOINTMENT_LINE, TOUR_APPOINTMENT_LINE_FR)
+    // Tour test 7: the break between two seasons (« Fermé entre les saisons · Réouverture le 1er juil. »).
+    .replace(/^Closed between seasons((?: \([^()]*\))?) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m, note, mo, d) => `Ferm\u00e9 entre les saisons${note} \u00b7 R\u00e9ouverture le ${d === '1' ? '1er' : d} ${FR_STATUS_MONTHS[mo]}`)
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
@@ -52638,8 +52642,10 @@ function menuPriceLabel(price, lang = 'en') {
   return lang === 'fr' ? `${n} $` : `$${n}`;
 }
 // One decimal digit is padded to cents ("2.5" -> "2.50"); whole numbers stay whole.
+// Tour test 7 (Whistler, 2026-11-17): thousands get their comma ("$1,450"; French « 1 450 $ »; they read "$1450").
 function menuPriceAmount(n, lang = 'en') {
-  const s = String(n).replace(',', '.');
+  const s0 = String(n).replace(',', '.');
+  const s = s0.replace(/^(\d{4,})/, (w) => w.replace(/\B(?=(\d{3})+(?!\d))/g, lang === 'fr' ? '\u00a0' : ','));
   const out = /\.\d$/.test(s) ? `${s}0` : s;
   return lang === 'fr' ? out.replace('.', ',') : out;
 }
@@ -52652,7 +52658,9 @@ function menuPriceAmount(n, lang = 'en') {
 // French too: per bike, per e-bike, per hour, per day, per rental, per kayak, per boat… (known words only).
 const MENU_UNIT_WORDS_FR = [[/\bper e-?bike\b/i, 'par vélo électrique'], [/\bper bike\b/i, 'par vélo'], [/\bper bicycle\b/i, 'par vélo'], [/\bper hour\b|\/ ?(?:hr|hour)\b/i, 'de l’heure'], [/\bper day\b/i, 'par jour'],
   [/\bper half[- ]day\b/i, 'par demi-journée'], [/\bper rental\b/i, 'par location'], [/\bper kayak\b/i, 'par kayak'], [/\bper canoe\b/i, 'par canot'], [/\bper (?:sup|paddle ?board)\b/i, 'par planche'],
-  [/\bper boat\b/i, 'par bateau'], [/\bper vehicle\b/i, 'par véhicule'], [/\bper sled\b/i, 'par traîneau'], [/\bper snowmobile\b/i, 'par motoneige'], [/\bper couple\b/i, 'par couple'], [/\bper family\b/i, 'par famille'], [/\bper room\b/i, 'par chambre']];
+  [/\bper boat\b/i, 'par bateau'], [/\bper vehicle\b/i, 'par véhicule'], [/\bper sled\b/i, 'par traîneau'], [/\bper snowmobile\b/i, 'par motoneige'], [/\bper couple\b/i, 'par couple'], [/\bper family\b/i, 'par famille'], [/\bper room\b/i, 'par chambre'],
+  // Tour test 7: a group size after a day rate (« 750 $ par jour, jusqu’à 4 personnes »).
+  [/\bup to (\d{1,2})(?: people| persons| guests)?\b/i, 'jusqu’à $1 personnes']];
 const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de'], ...MENU_UNIT_WORDS_FR];
 // A typed-up trip length in French (« 2.5 hours » -> « 2,5 heures », "half day" -> « demi-journée »): known words only.
 function menuDurationFr(d) {
@@ -52667,11 +52675,13 @@ function menuDurationFr(d) {
 }
 function menuPriceWithWords(p, lang = 'en') {
   if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) { let q = p; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word); return q; }
-  const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*)$/i.exec(p);
+  // Tour test 7: a group size after the words is fine ("750 per day, up to 4 people" -> "$750 per day, up to 4 people").
+  const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*?(?:(?:up to|max(?:imum)?|for up to|jusqu.à|jusqu.a)\s+\d{1,2}\b\D*)?)$/i.exec(p);
   if (!m || (!m[1] && !m[4].trim())) return p;
   if (/^\s*(?:hours?|hrs?|h\b|min|mins|minutes?|days?|nights?|km|kms|miles?|holes?|%|people|persons|guests|pieces?|pcs|oz|ml|l\b|g\b|kg|x\b)/i.test(m[4])) return p;
   const fr = lang === 'fr';
-  const whole = fr ? m[2].replace(/,/g, ' ') : m[2];
+  const whole0 = m[2].replace(/,/g, '');
+  const whole = whole0.length >= 4 ? whole0.replace(/\B(?=(\d{3})+(?!\d))/g, fr ? '\u00a0' : ',') : whole0;
   const amount = fr ? `${whole}${m[3].replace('.', ',')} $` : `$${whole}${m[3].replace(',', '.')}`;
   let before = m[1] || '', after = m[4];
   if (fr) for (const [re, word] of MENU_PRICE_WORDS_FR) { before = before.replace(re, word); after = after.replace(re, word); }
@@ -59233,13 +59243,18 @@ const OWNER_HELP_SCRIPT = String.raw`
         .catch(function(){ send.disabled = false; send.textContent = ui('send', lang); errEl.textContent = ui('errNet', lang); });
     });
   }
-  function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); setTimeout(function(){ input.focus(); }, 30); }
+  // Tour test 7 (Whistler, 2026-11-17): opened with Enter on a desktop, the focus was left on the page (the button it was
+  // on is hidden), so typing went nowhere and Esc did nothing. The input takes it, again if the page took it back.
+  function focusInput(){ try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); } }
+  function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); focusInput(); setTimeout(focusInput, 30); setTimeout(function(){ if (!panel.hidden && !panel.contains(document.activeElement)) focusInput(); }, 200); }
   function close(){ panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
   btn.addEventListener('click', open);
   document.getElementById('ohbClose').addEventListener('click', close);
   // Distillery test 3 (2026-11-13): a link in an answer to a part of this page ("#tours-events") closes the help so that part shows.
   panel.addEventListener('click', function(e){ var a = e.target.closest ? e.target.closest('a[href^="#"]') : null; if (a && a.getAttribute('href').length > 1) { panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); } });
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  // Esc closes it from anywhere while it is open (the focus may be on the page behind it).
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !panel.contains(e.target)) close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
   window.__ohbMatch = match; window.__ohbBest = best;
 })();

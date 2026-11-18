@@ -2138,6 +2138,7 @@ Object.assign(en.tour, {
   tpriceHourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
   tprivLead: 'The price for a private trip or a guiding day, for the whole group: a day rate is fine here. It shows on your page right away. Leave it empty if you don’t run them.',
   tprivNeed: 'Just the number, like 750. Say “a day, up to 4” in Your tours and prices.',
+  twoSeasonHint: 'Two seasons with a break? Make one season from the first day to the last, then add the break below and tick Every year.',
 });
 Object.assign(fr.tour, {
   tpriceDay: 'Un tarif à la journée pour votre groupe? Mettez-le dans Sorties privées, plus bas, et votre prix le plus bas pour une personne ici.',
@@ -2145,6 +2146,7 @@ Object.assign(fr.tour, {
   tpriceHourly: 'Un tarif à l’heure? Écrivez votre prix le plus bas pour une personne ici, et inscrivez les tarifs à l’heure dans Vos sorties et tarifs.',
   tprivLead: 'Le prix d’une sortie privée ou d’une journée de guide, pour tout le groupe : un tarif à la journée convient ici. Il s’affiche sur votre page tout de suite. Laissez vide si vous n’en offrez pas.',
   tprivNeed: 'Seulement le chiffre, par exemple 750. Écrivez « par jour, jusqu’à 4 » dans Vos sorties et tarifs.',
+  twoSeasonHint: 'Deux saisons avec une pause? Faites une seule saison du premier au dernier jour, puis ajoutez la pause plus bas et cochez Chaque année.',
 });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
