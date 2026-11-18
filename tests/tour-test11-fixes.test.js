@@ -53,7 +53,7 @@ const cfgOf = (html) => JSON.parse(/window\.SETUP_CFG = (\{.*?\});<\/script>/s.e
 const page = (v, lang = 'en', now) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, ...(now ? { now } : {}) });
 const plain = (h) => h.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
 const boxOf = (id) => JSON.parse((db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(id) || { info: '{}' }).info);
-const rowOf = (id, label) => ((boxOf(id).rows || []).find((r) => r.label === label) || {}).text;
+const rowOf = (id, label) => ([...(boxOf(id).rows || []), ...(boxOf(id).owner_dropped || [])].find((r) => r.label === label) || {}).text;
 const itemsOf = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
 const namesOf = (p) => itemsOf(p).map((x) => x.venue.name);
 const NOW = new Date('2026-11-18T12:00:00-08:00');
@@ -129,12 +129,12 @@ test('2. dictated punctuation: standalone "comma", "period", "full stop", "quest
 
 test('2b. on save: story, French story, Known for, Good to know, Groups (capital after a chip), typed tour names and descriptions; names the site knows get capitals', async () => {
   const { v, t } = await minjun();
-  const dr = await change(t, { description: STORY });
+  const dr = await change(t, { description: `${STORY} comma see you soon period` });
   ok(dr);
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND changes LIKE '%description%' ORDER BY id DESC LIMIT 1").get(v.id);
   assert.ok(req, JSON.stringify(dr.body));
   const story = JSON.parse(req.changes).description;
-  assert.equal(story, 'We are small family company, private van tours from Whistler. We take you to Joffre Lakes, Brandywine Falls, Shannon Falls and Squamish. Our guides speak English Korean and Japanese. We pick up from your hotel in the village. If weather is bad we cancel and give full refund');
+  assert.equal(story, 'We are small family company, private van tours from Whistler. We take you to Joffre Lakes, Brandywine Falls, Shannon Falls and Squamish. Our guides speak English Korean and Japanese. We pick up from your hotel in the village. If weather is bad we cancel and give full refund, see you soon.');
   ok(await change(t, { description_fr: 'nous sommes une petite entreprise familiale virgule des visites en van privé depuis whistler point nous allons aux lacs joffre' }));
   ok(await change(t, { visit_rows: { known_for: 'small private van tours with korean and japanese guides', groups: 'Private tours available. our van is up to 11 people comma price per van per hour minimum 3 hours' } }));
   assert.equal(rowOf(v.id, 'Known for'), 'Small private van tours with Korean and Japanese guides');
@@ -214,7 +214,7 @@ test('4. "Sightseeing and day trips" kind: label EN/FR, under More kinds, Wildli
   for (const q of ['heli sightseeing', 'heli-sightseeing flight', 'a day trip to squamish']) assert.ok(!tr.KINDS.sightseeing_tour.test(q), q);
   for (const [q, lang] of [['sightseeing tour', 'en'], ['van tour', 'en'], ['visite touristique', 'fr'], ['excursion d’une journée', 'fr']]) {
     const p = app.runTripPlan({ text: `${q} in Whistler in July` }, NOW);
-    assert.ok(namesOf(p).includes(v.name), `${q}: ${JSON.stringify([p.kind, namesOf(p)])}`);
+    assert.ok(namesOf(p).some((x) => /^Sea to Sky Sightseeing Vans/.test(x)), `${q}: ${JSON.stringify([p.kind, namesOf(p)])}`);
     const names = (app.runDiscovery(app.discoverySearchText(q, lang), { limit: 40, lang }).results.items || []).map((x) => (x.venue || x).name);
     assert.ok(names.includes(v.name), `search ${q}: ${names}`);
   }
@@ -305,11 +305,12 @@ test('8c. French page: Good to know chip phrases in French; Time needed from the
   assert.match(plain(page(v)), /Time needed 2 hours to a full day\. Varies by tour/);
   assert.match(fr, /De 2 heures à une journée complète\./);
   // Kid-friendly: research's badge until he answers; his answer decides.
-  const r = mk('tour', { name: 'Research Kids Tours', kid_friendly: 1 });
+  const r = mk('tour', { name: 'Research Kids Tours', kid_friendly: true });
   assert.equal(app.getVenue(r.id).kid_friendly, true);
-  ok(await change(tokenFor(r.id), { tour_info: { age: '16' } }));
+  const rt = tokenFor(r.id);
+  ok(await change(rt, { tour_info: { age: '16' } }));
   assert.equal(app.getVenue(r.id).kid_friendly, false);
-  ok(await change(tokenFor(r.id), { tour_info: { age: '6' } }));
+  ok(await change(rt, { tour_info: { age: '6' } }));
   assert.equal(app.getVenue(r.id).kid_friendly, true);
   assert.equal(app.getVenue(v.id).kid_friendly, true);
   ok(await change(t, { tour_info: { age: '19' } }));

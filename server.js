@@ -4503,8 +4503,9 @@ function buildDiscoverySearchVenues() {
       cuisine: String(row.cuisine || '').toLowerCase().trim(),
       cuisines: venueCuisineList(row).map((c) => String(c).toLowerCase().trim()),
       // Tour test 11 (Whistler, 2026-11-18): a tour's own typed tours (names and descriptions) and its Plan your visit lines
-      // (Good to know: "Hotel pickup available") are searched with its story ("village lights tour", "hotel pickup").
-      textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: normalize([row.description || '', ...(row.type === 'tour' ? [tourListText(row.id), tourVisitSearchText(row.id)] : [])].join(' ; ')), textDescFr: normalize(row.description_fr || ''),
+      // (Good to know: "Hotel pickup available") are searched with its story ("village lights tour", "hotel pickup"); each
+      // part is read on its own (the reader keeps about 500 characters of one text).
+      textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: [row.description || '', ...(row.type === 'tour' ? [...tourListText(row.id).split(' ; '), ...tourVisitSearchText(row.id).split(' ; ')] : [])].filter(Boolean).map((x) => normalize(x)).join(' '), textDescFr: normalize(row.description_fr || ''),
       features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
       rating: row.rating, reviews: row.reviews, price: row.price, row,
     });
@@ -4969,7 +4970,7 @@ const FR_SEARCH_SYNONYMS = [
   // The language words, French to English (an English story says "Korean"; a French one « coréen » is matched as well).
   ['coreen', 'korean'], ['coreenne', 'korean'], ['en coreen', 'korean'], ['japonais', 'japanese'], ['japonaise', 'japanese'], ['en japonais', 'japanese'], ['mandarin', 'mandarin'], ['chinois', 'chinese'],
   ['cantonais', 'cantonese'], ['allemand', 'german'], ['en allemand', 'german'], ['espagnol', 'spanish'], ['en espagnol', 'spanish'], ['en anglais', 'english'], ['italien', 'italian'],
-  ['visite touristique', 'sightseeing tour'], ['visites touristiques', 'sightseeing tours'], ['excursion d une journee', 'day trip'], ['excursions d une journee', 'day trips'],
+  ['visite touristique', 'sightseeing tour'], ['visites touristiques', 'sightseeing tours'], ['excursion d une journee', 'sightseeing tours'], ['excursions d une journee', 'sightseeing tours'],
   ['prise en charge a l hotel', 'hotel pickup'], ['cueillette a l hotel', 'hotel pickup'],
   // winter
   ['patin', 'skating'], ['patins', 'skating'], ['patinage', 'skating'], ['patiner', 'skating'], ['patin a glace', 'skating'], ['patins a glace', 'skating'],
@@ -22262,8 +22263,9 @@ function tourLengthWords(mins) {
   const say = (m, fr) => {
     if (m >= 1440) { const d = Math.round(m / 1440); return fr ? `${d} jour${d > 1 ? 's' : ''}` : `${d} day${d > 1 ? 's' : ''}`; }
     if (m >= 480) return fr ? 'une journée complète' : 'a full day';
-    if (m < 60) return fr ? `${m} minutes` : `${m} minutes`;
-    const h = Math.round(m / 30) / 2; const hs = String(h).replace('.', fr ? ',' : '.');
+    // Whole hours, or half hours from 2 hours ("2.5 hours"); "75 minutes" otherwise.
+    if (m < 60 || (m % 60 && (m < 120 || m % 30))) return `${m} minutes`;
+    const h = m / 60; const hs = String(h).replace('.', fr ? ',' : '.');
     return fr ? `${hs} heure${h >= 2 ? 's' : ''}` : `${hs} hour${h === 1 ? '' : 's'}`;
   };
   const a = say(lo, false), b = say(hi, false);
@@ -49145,7 +49147,8 @@ function ownerGroupsChips() {
 function groupsChipStops(text) {
   let t = String(text || '');
   for (const c of ownerGroupsChips()) {
-    const re = new RegExp(`(${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[ \t]+(?=[a-zà-ÿ])`, 'gi');
+    // Only before a word that starts a sentence ("our van…"), never one that carries the phrase on ("Private room for 30").
+    const re = new RegExp(`(${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[ \t]+(?=(?:our|we|you|they|it|i|the|price|prices|call|book|please|max|maximum|minimum|notre|nous|vous|le|la|les|prix|appelez|r[ée]servez)\\b)`, 'gi');
     t = t.replace(re, '$1. ');
   }
   return t;
@@ -49175,7 +49178,10 @@ function ownerTextFlagsHtml(texts) {
 function typedAllLowercase(text) {
   const t = String(text || '').trim();
   if (t.length < 20 || !/[a-zà-ÿ]{3}/.test(t)) return false;
-  return !/[A-ZÀ-Þ]/.test(t.replace(/(^|[.!?…]\s+|\n\s*)([A-ZÀ-Þ])/g, '$1'));
+  // Tour test 11: the capitals we gave the names this site knows ("Pemberton", "BC", "Korean") don't count either.
+  let u = t;
+  try { const k = ownerKnownNames(); for (const w of [...(k.phrases || []), ...(k.words || []), ...ownerTextCleanLib.LANGUAGE_NAMES]) u = u.split(w).join(w.toLowerCase()); } catch (e) { u = t; }
+  return !/[A-ZÀ-Þ]/.test(u.replace(/(^|[.!?…]\s+|\n\s*)([A-ZÀ-Þ])/g, '$1'));
 }
 // One line, cleaned: { text } or { error }.
 function ownerVisitText(raw, max = VISIT_TEXT_MAX) {
@@ -57271,7 +57277,7 @@ const TOUR_SETUP_HELP_TOPICS = [
     keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', '5 ans', '6 ans', '12 ans', '8 ans', '10 ans', 'pas de 8', 'il n y a pas de 8', 'pas de 10'],
     a: '<p>In <strong>Who can come</strong>, tap your minimum age: All ages, 5+, 6+, 8+, 10+, 12+, 16+ or 19+. Tap <strong>Under 18s come with an adult</strong> if they do. It shows as “Ages” in “Plan your visit”, and Build My Trip leaves you out of family plans when your minimum is 12 or more.</p><p>Different ages for different trips? Tap the <strong>youngest</strong>, and list each trip’s age in <strong>Your tours and prices</strong>. A height or weight limit? Add it under <strong>Good to know</strong>.</p>',
     aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez votre âge minimum : Tous les âges, 5+, 6+, 8+, 10+, 12+, 16+ ou 19+. Touchez <strong>Les moins de 18 ans viennent avec un adulte</strong> si c’est le cas. Il paraît comme « Âges » dans « Planifiez votre visite », et Planifier mon voyage ne vous propose pas aux familles si votre minimum est de 12 ans ou plus.</p><p>Des âges différents selon la sortie? Touchez le <strong>plus jeune</strong>, et indiquez l’âge de chaque sortie dans <strong>Vos sorties et tarifs</strong>. Une limite de taille ou de poids? Ajoutez-la sous <strong>Bon à savoir</strong>.</p>' },
-  { id: 'tour-multiday', pages: ['setup', 'edit'], q: 'We run multi-day trips', qFr: 'Nous offrons des sorties de plusieurs jours',
+  { id: 'tour-multiday', pages: ['setup', 'edit'], over: ['tour-kinds-sightseeing'], q: 'We run multi-day trips', qFr: 'Nous offrons des sorties de plusieurs jours',
     keys: ['multi day', 'multi-day', 'multiday', 'several days', 'overnight', 'two days', 'three days', 'week long', 'lodge', 'camping trip', 'packages', 'package'],
     keysFr: ['plusieurs jours', 'deux jours', 'trois jours', 'nuit', 'forfait', 'forfaits', 'chalet', 'sejour'],
     a: '<p>In <strong>What you offer</strong>, under “How long does a trip take?”, tap <strong>Several days</strong>. Shorter trips too? Pick the shortest, and name the others in your story or in <strong>Your tours and prices</strong>. Your price is the lowest per person, for whichever trip it is.</p>',
@@ -71735,7 +71741,7 @@ module.exports = {
   weekendEmailPlace,
   // Tour test 4 (2026-11-17), for tests/tour-setup-fresh-eyes-wr4.test.js.
   tourFreeRead, tourFree, tourPriceValue, tourListVaries, tourRowsVaryNotes, visitInfoHtml, mergeOwnerVisitRows, ownerValueText, renderAdminPhotoCard, ownerVisitFoldedKeys,
-  tripTourKindVenues, hoursExtraRangeText, TOUR_FOOD_BADGES_CLEARED, HELP_PHONE_EXAMPLE, TOUR_HELP_SEASONAL_TRIP, tourAddressIsMeetingPoint, ownerTextClean, ownerTextFlags, clearOwnerKnownNames, tourPickup, tourPickupText, tourPrivateLine, tourLengthWords, typedTourFlagsHtml,
+  tripTourKindVenues, hoursExtraRangeText, TOUR_FOOD_BADGES_CLEARED, HELP_PHONE_EXAMPLE, TOUR_HELP_SEASONAL_TRIP, tourAddressIsMeetingPoint, ownerTextClean, ownerTextFlags, clearOwnerKnownNames, tourPickup, tourPickupText, tourPrivateLine, tourLengthWords, typedTourFlagsHtml, tourListText, tourVisitSearchText, discoverySearchVenues,
   // Distillery test 2 (Whistler, 2026-11-16).
   happyHourSlotSeasonsOf, happyHourTimesOn, happyHourDealSeason, happyHourDealDays, happyHourJoinedRangesText, happyHourJoinToday, frCuisineShown, kitchenSeasonsInStep, visitRowsOwnerCovered, tripSwapBadgeReason,
   // Brewery test 1 (Whistler, 2026-11-15).

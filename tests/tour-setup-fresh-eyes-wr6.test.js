@@ -146,8 +146,9 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   for (const w of ['Treetop adventure course', 'High ropes course', 'Adventure park', 'Parc d’aventure', 'Hébertisme', 'Parcours d’arbre en arbre'])
     assert.ok(app.tourKindSuggestion({ cuisine: w, name: 'X' }).includes('adventure'), w);
   // Leftovers no picked kind covers: English kept on English pages; French says it in French or leaves it off.
-  assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines & heli-hiking');
-  assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne et héli-randonnée');
+  // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines');
+  assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne');
   assert.equal(kt(['zipline'], true, 'Ziplines & sunset yoga'), 'Tyrolienne');
   // Tour test 7 (2026-11-17): ATV words pre-pick the adventure chip; with only Ziplines saved, he unticked it, so they go.
   assert.equal(kt(['zipline'], true, 'Ziplines & ATV tours'), 'Tyrolienne');

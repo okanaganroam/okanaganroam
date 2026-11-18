@@ -331,7 +331,7 @@ test('help topics for tours, in English and French, on the setup and the edit pa
     'private tour price': 'tour-price', 'price per person': 'tour-price',
     'minimum age': 'tour-age', 'can kids come': 'tour-age',
     'we run multi-day trips': 'tour-multiday',
-    'our office is not the meeting point': 'tour-meeting', 'hotel pickup': 'tour-meeting',
+    'our office is not the meeting point': 'tour-meeting', 'hotel pickup': 'tour-pickup', // tour test 11: the pickup option's own answer
     'we sell gift cards': 'tour-gift',
     'private bookings for groups': 'tour-groups',
     'how long until it shows on my page': 'setup-live-when',

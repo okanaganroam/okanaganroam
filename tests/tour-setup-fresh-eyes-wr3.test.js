@@ -313,8 +313,8 @@ test('5. "by booking only" keeps the weekly hours for "Add my hours" (every type
 test('6. public category words: short page words per kind, never a side of a chip her words don’t say; the same set on the preview, the cards and both pages', async () => {
   const kt = app.tourKindsText;
   // Karen: research "Helicopter tours, heli-skiing & heli-hiking", Scenic or helicopter flights + Heli-skiing + Something else.
-  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Heli-skiing, helicopter flights & heli-hiking'); // list order (tour test 5)
-  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Héliski, vols en hélicoptère et héli-randonnée'); // list order (tour test 5); tour test 6: leftovers in French
+  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Heli-skiing & helicopter flights'); // list order (tour test 5); // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Héliski et vols en hélicoptère'); // list order (tour test 5); tour test 11: research's leftover words go once a kind is picked
   // A chip that covers several things: only the side her words name; all of it when they name none or every side.
   assert.equal(kt(['flight'], false, ''), 'Helicopter & scenic flights');
   assert.equal(kt(['flight'], true, ''), 'Vols en hélicoptère et panoramiques');
@@ -340,7 +340,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   // The whole way through: saved kinds -> the listing's words, the save's answer, the setup's preview, the cards, the pages.
   const { v, t } = karen();
   const saved = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
-  const EN = 'Heli-skiing, helicopter flights & heli-hiking', FR = 'Héliski, vols en hélicoptère et héli-randonnée'; // tour test 6: leftovers said in French; // tour test 5: list order; // tour test 4: one capital in the list
+  const EN = 'Heli-skiing & helicopter flights', FR = 'Héliski et vols en hélicoptère'; // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes. // tour test 6: leftovers said in French; // tour test 5: list order; // tour test 4: one capital in the list
   assert.equal(app.getVenue(v.id).cuisine, EN);
   if (saved.body.tour_words) assert.deepEqual(saved.body.tour_words, { en: EN, fr: FR });
   const again = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all', book: '48h' } }));

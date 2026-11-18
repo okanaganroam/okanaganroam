@@ -551,10 +551,11 @@ test('11. bug 12, the safe part: a published list with trips of different length
   list([{ name: 'History walk', price: 'Pay what you want', description: '75 minutes · Every day at 10 AM and 2 PM. All ages.' }, { name: 'Food tasting tour', price: '$129', description: '3 hours · Thursday to Sunday at 4 PM. Tastings are for 19 and over.' }, { name: 'Private walk', price: 'From $400' }]);
   assert.deepEqual(app.tourListVaries(v.id), { length: true, ages: true });
   const en = plain(page(v, 'en')), fr = plain(page(v, 'fr'));
-  assert.match(en, /Time needed Up to 1 hour\. Varies by tour: see Tours & prices\./);
+  // Tour test 11 (2026-11-18): Time needed gives the shortest to the longest trip when they vary.
+  assert.match(en, /Time needed 75 minutes to 3 hours\. Varies by tour: see Tours & prices\./);
   assert.match(en, /Booking Book at least a day ahead\. Varies by tour: see Tours & prices\./);
   assert.match(en, /Ages All ages\. Varies by tour: see Tours & prices\./);
-  assert.match(fr, /Durée Jusqu’à 1 heure\. Varie selon la sortie : voir Sorties et tarifs\./);
+  assert.match(fr, /Durée De 75 minutes à 3 heures\. Varie selon la sortie : voir Sorties et tarifs\./);
   assert.match(fr, /Réservation Réservez au moins la veille\. Varie selon la sortie : voir Sorties et tarifs\./);
   assert.doesNotMatch(en, /Prices From \$35 a person\. Varies/);
   // Nothing stored changes, and the card's length chip is as it was.

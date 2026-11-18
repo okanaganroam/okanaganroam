@@ -169,9 +169,9 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile & ATV tours');
   ok(await change(t, { tour_info: { kinds: ['snowmobile', 'adventure', 'other'] } }));
   // Tour test 7: the chips pre-picked from these words (snowmobile, ziplines, snowshoe) that are left unticked take their
-  // words off; words no pre-picked chip covered (RZR, rafting) stay.
-  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, RZR & rafting');
-  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR & rafting');
+  // words off. Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours');
+  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours & ziplines');
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
   assert.equal(app.tourKindsText(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, never the chip's whole label
   // The card's season word: "Winter" only while she runs in winter alone.

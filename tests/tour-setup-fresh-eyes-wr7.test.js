@@ -111,7 +111,8 @@ test('2. category words: a pre-picked kind he unticks takes its research words o
   assert.doesNotMatch(app.tourKindsText(['snowshoe', 'other'], false, was), /heli/i);
   assert.doesNotMatch(app.tourKindsText(['snowshoe', 'other'], true, was), /h[ée]li/i);
   // A word no chip would have pre-picked stays ("photography").
-  assert.equal(app.tourKindsText(['snowshoe'], false, 'Ski touring & photography'), 'Ski touring & photography');
+  // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(app.tourKindsText(['snowshoe'], false, 'Ski touring & photography'), 'Ski touring');
   // Saved through the setup: the listing's category and the French card both lose heli-skiing.
   const { v, t } = erik();
   const r = ok(await change(t, { tour_info: { kinds: ['snowshoe', 'guide'] } }));
@@ -166,7 +167,7 @@ test('5. card length: a list of 1- to 5-day trips is "1–5 days" (« 1 à 5 jou
   assert.match(plain(card), /1–5 days/); assert.doesNotMatch(plain(card), /8 hr/);
   assert.match(plain(cardOf((await get('/fr/penticton/tours')).text, v.name)), /1 à 5 jours/);
   const p = plain(page(v));
-  assert.match(p, /A full day \(about 8 hours\)\. Varies by tour: see Tours & prices\./);
+  assert.match(p, /Time needed 1 day to 5 days\. Varies by tour: see Tours & prices\./); // tour test 11: the range
   // The list's prices with "$" and the thousands comma (display only).
   assert.match(p, /\$750 per day, up to 4 people/); assert.match(p, /\$1,450/); assert.match(p, /\$2,600/);
   assert.match(plain(page(v, 'fr')), /750 \$ par jour, jusqu’à 4 personnes/); assert.match(plain(page(v, 'fr')), /1 450 \$/);

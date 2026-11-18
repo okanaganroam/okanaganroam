@@ -322,7 +322,7 @@ test('13. sentence capitals on what he types (story, Known for, Good to know, to
   const r = await change(t, { description: 'family ranch in pemberton meadows since 1979. trail rides 1 or 2 hrs or half day with lunch, pony rides for little ones.' });
   ok(r);
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND changes LIKE '%description%' ORDER BY id DESC LIMIT 1").get(v.id);
-  assert.match(JSON.parse(req.changes).description, /^Family ranch in pemberton meadows since 1979\. Trail rides/);
+  assert.match(JSON.parse(req.changes).description, /^Family ranch in Pemberton meadows since 1979\. Trail rides/); // tour test 11: names the site knows get capitals
   const card = app.renderAdminChangeCard({ id: req.id, venue_name: v.name, submitted_at: req.submitted_at || '2026-11-18', listing_url: '/x', changes: JSON.parse(req.changes), previous: {}, note: '' });
   assert.match(card, /Typed all lowercase/);
   // Typed tour names (his own list from the edit page) start with a capital.
