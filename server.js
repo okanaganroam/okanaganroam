@@ -49914,8 +49914,11 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // review (those would be the ones the owner thinks they are confirming). Already checked today: nothing changes.
   if ('hours_checked' in input) {
     if (!COMPLETENESS_TYPES.has(venue.type) || input.hours_checked !== true) errors.form = 'Some of the information could not be read. Please reload the page and try again.';
-    else if (!venue.hours) errors.hours_checked = OWNER_HOURS_CHECKED_ERRORS.none;
+    // Blue Heron (Nov 17 2026): a place with no hours yet saving its first hours from the setup sends hours_checked with
+    // them. New hours in the same save are checked today anyway, so that comes first; "We don't have your hours yet" is
+    // only for a tap on "These hours are right" with nothing stored.
     else if ('hours' in changes) { /* new hours being saved are checked today anyway */ }
+    else if (!venue.hours) errors.hours_checked = OWNER_HOURS_CHECKED_ERRORS.none;
     else if (ownerHoursWaiting(venue.id)) errors.hours_checked = OWNER_HOURS_CHECKED_ERRORS.waiting;
     else if (current.hours_checked !== todayLocal() || (ownerHoursSource(venue.id) !== 'venue_owner')) changes.hours_checked = todayLocal();
   }
