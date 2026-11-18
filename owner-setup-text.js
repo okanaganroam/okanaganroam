@@ -2099,6 +2099,23 @@ Object.assign(fr.tour, {
 // All types: a line of the owner's that the page folds under "More" says so after the save.
 Object.assign(en, { hoursBack: 'We put back the hours you had before. Check them, then tap Next.', foldedMore: 'Look for it under “More” in your Plan your visit box.' });
 Object.assign(fr, { hoursBack: 'Nous avons remis les heures que vous aviez. Vérifiez-les, puis touchez Suivant.', foldedMore: 'Elle se trouve sous « Plus » dans l’encadré Planifiez votre visite.' });
+// Tour test 6 (Whistler fresh eyes, Sophie-Anne, 2026-11-17): a price per bike, per rental or per hour is never saved as
+// a price per person. The box says where it goes (Your tours and prices) with a button that opens it; per boat / per
+// group still goes to Private tours. The hint under the box names both cases.
+Object.assign(en.tour, {
+  tpriceUnit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.',
+  tpriceUnitRentals: 'Rentals only? Put your lowest rental price here (just the number, like 69), and say “per bike” in Your tours and prices.',
+  tpriceUnitGo: 'Open Your tours and prices', tpriceUnitBack: 'Back to your price',
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below. Priced per bike or per rental? Put it in Your tours and prices.',
+  tpriceLeadPickUnit: 'Your card will say “From {x}”.',
+});
+Object.assign(fr.tour, {
+  tpriceUnit: 'Prix par vélo ou par location? Mettez votre prix le plus bas par personne ici; le prix par vélo va dans Vos sorties et tarifs.',
+  tpriceUnitRentals: 'Seulement de la location? Mettez votre prix de location le plus bas ici (seulement le chiffre, par exemple 69), et écrivez « par vélo » dans Vos sorties et tarifs.',
+  tpriceUnitGo: 'Ouvrir Vos sorties et tarifs', tpriceUnitBack: 'Retour à votre prix',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas. Un prix par vélo ou par location? Mettez-le dans Vos sorties et tarifs.',
+  tpriceLeadPickUnit: 'Votre fiche indiquera « À partir de {x} ».',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

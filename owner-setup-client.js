@@ -621,22 +621,32 @@
   // "for 4 people", "/4"), 'hours' (it starts with a trip length), 'many' (a second price or other words), or '' (fine:
   // per person, pp, each, a person, taxes). The private box takes per-boat words (that is what it is for).
   function feeHours(x){ return /^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(String(x == null ? '' : x)); }
+  // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
+  // is its own case ('unit'): never saved as a price per person, and the nudge says where it goes (Your tours and prices).
+  // Boats, rafts, charters and groups stay 'group' (Private tours). "from 1500" / « 1500 $ et plus » read as the number.
+  // (server.js tourPriceWhy, the same rule.)
+  function priceTrim(x){ return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
   function tourPriceWhy(x, priv){
-    var raw = String(x == null ? '' : x).trim(); if (!raw || !/\d/.test(raw)) return '';
+    var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?|hours?|hrs?|heures?|days?|jours?|nights?|nuits?|hr|h)\b/;
+    var TOUR_GROUP_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
+    var raw = priceTrim(x); if (!raw || !/\d/.test(raw)) return '';
     if (feeHours(raw)) return 'hours';
     var head = moneyHead(raw); if (head === raw) return '';
     var rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
-    var group = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|vehicles?|cars?|jeeps?|sleds?|canoes?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|v[ée]hicules?|priv[ée]e?s?)\b/.test(rest)
+    var group = TOUR_GROUP_RE.test(rest)
       || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
     if (/\d/.test(rest)) return 'many';
     var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
       .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
-    return left ? 'many' : '';
+    if (!left) return '';
+    // A price per bike, per rental, per hour… (not in the private box: that one only takes the whole-trip price).
+    if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
+    return 'many';
   }
-  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
   // The number a refused per-boat price starts with ("650 per boat" -> 650), to offer it for the Private tours box.
-  function tourPriceNumber(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
+  function tourPriceNumber(x){ x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
   // Tour test 4: the per-person box read as free: "free", "0", "$0", « gratuit » -> 'free'; "by donation", "pay what you
   // want", « contribution volontaire », « don » -> 'donation'; anything else -> ''. (server.js tourFreeRead, the same rule.)
   function tourFreeRead(x){
@@ -674,7 +684,9 @@
   }
   function tourKindName(k){ var o = (C.tourKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
   // The card's price line as she types it ("Your card will say “From $129”").
-  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
+  // Tour test 6: a rentals-only company (its only kind is Rentals): the card says "From $69" without "a person".
+  function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
+  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1165,6 +1177,7 @@
   }
   function mark(){ var b = base(S.step); if (isStep(b)) S.dirty = b; }
   function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); }
+    if (step === 'menu' && S.menuReturn) { var mr = S.menuReturn; S.menuReturn = ''; S.nudge = ''; return go(mr); }
     // A café's hours always go on to its holidays and closures (the same step); where to after that is decided there.
     if (COMBO && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; S.listBack = true; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
@@ -1194,7 +1207,7 @@
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (COMBO && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (step === 'menu' && S.menuReturn && T.tpriceUnitBack) return T.tpriceUnitBack; if (COMBO && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     // Bug-check (2026-11-12): a café's hours saved but not its holidays: "Next: Holidays and closures", never "Skip".
     if (half(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
@@ -2061,6 +2074,7 @@
         + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
         + (S.nudge && S.nudge === T.tpriceGroup && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
+        + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
@@ -3218,6 +3232,9 @@
     // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
     // Tour test 5: "Put $650 in Private tours" under the per-boat nudge moves the number to the private box and empties the
     // per-person box (nothing is saved until Save).
+    // Tour test 6: "Open Your tours and prices" under the per-bike nudge. What she typed stays in the box (nothing is saved);
+    // the list's Next brings her back to the price.
+    if (k === 'tpriceToMenu') { readTour(); S.menuReturn = 'price'; return go('menu'); }
     if (k === 'tpriceToPriv') {
       var gm = S.groupMove; if (gm == null) return;
       var b1 = el('suTprice'), b2 = el('suTpriv'); if (b1) b1.value = ''; if (b2) b2.value = String(gm);
@@ -3685,7 +3702,8 @@
       if (!pfree && (pp == null || isNaN(pp))) {
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
-        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
+        // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
         S.groupMove = pwhy === 'group' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
       }
       if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }

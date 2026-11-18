@@ -409,7 +409,7 @@ test('8. every price box takes words after the number', async () => {
   // The setup's own reader, as the page runs it.
   // Tour test 5 (2026-11-17): the reader also says why it refuses ("650 per boat"), so it brings tourPriceWhy and feeHours.
   const head = /  function moneyHead\(x\)\{.*\}\n/.exec(CLIENT)[0], read = /  function tourPriceRead\(x, priv\)\{.*\}\n/.exec(CLIENT)[0];
-  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
+  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
   const ctx = {}; vm.createContext(ctx); vm.runInContext(`${head}${why}${read}`, ctx);
   const rd = (x) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)})`, ctx);
   for (const [typed, want] of [['$189.00 per person', 189], ['189 pp', 189], ['189 $ par personne', 189], ['189 $ par personne', 189], ['1 500 $ par personne', 1500], ['$1,500 CAD', 1500], ['CA$189 per person', 189], ['129 each', 129], ['12.50/person', 12.5], ['12,50 $', 12.5], ['3900+', 3900], ['129', 129], ['', null]]) assert.equal(rd(typed), want, typed);

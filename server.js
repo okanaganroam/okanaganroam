@@ -22376,29 +22376,39 @@ function tourFreeRead(x) {
 // same rule): 'group' (per boat / per group / charter / "for 4 people"), 'hours' (it starts with a trip length: "2 hrs
 // $95pp" was saved as $2), 'many' (a second price or other words), or '' (per person, pp, each, taxes). The private box
 // (priv) takes per-boat words.
+// Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
+// is 'unit': never saved as a price per person (Your tours and prices takes it). Vehicles, cars, sleds and canoes moved
+// from the group words to these. "from 1500" / « 1500 $ et plus » read as the number (tourPriceTrim).
+const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?|hours?|hrs?|heures?|days?|jours?|nights?|nuits?|hr|h)\b/;
+const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
+function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
-  const raw = String(x == null ? '' : x).trim();
+  const raw = tourPriceTrim(x);
   if (!raw || !/\d/.test(raw)) return '';
   if (/^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(raw)) return 'hours';
-  const m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(raw);
+  const m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,  ]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-zÀ-ɏ]).*)$/.exec(raw);
   if (!m) return '';
-  const head = m[1].replace(/[.,\s\u00a0\u202f]+$/, '');
+  const head = m[1].replace(/[.,\s  ]+$/, '');
   const rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
   const countRe = /(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g;
-  const group = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|vehicles?|cars?|jeeps?|sleds?|canoes?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|v[ée]hicules?|priv[ée]e?s?)\b/.test(rest)
+  const group = TOUR_GROUP_PRICE_RE.test(rest)
     || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
   if (group) return priv ? (/\d/.test(rest.replace(countRe, '')) ? 'many' : '') : 'group';
   if (/\d/.test(rest)) return 'many';
   const left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
     .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
-  return left ? 'many' : '';
+  if (!left) return '';
+  if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
+  return 'many';
 }
-const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.' };
+const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.' };
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
   if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why], why }; }
   // Tour test 4: "free", "0", "by donation"… in the per-person box (never the private price).
   if (allowFree) { const f = tourFreeRead(x); if (f) return { value: f }; }
+  // Tour test 6: "from 1500" / « 1500 $ et plus » -> 1500.
+  if (typeof x === 'string') x = tourPriceTrim(x);
   // Tour test 3 (Whistler, 2026-11-17): words after the number are dropped ("$189.00 per person", "189 pp", « 189 $ par personne »).
   if (typeof x === 'string') { const m = /^(\s*\$?\s*\d[\d\s.,\u00a0\u202f]*?\d?\s*\$?)\s*(?:(?:\/|\+|\(|[A-Za-z\u00c0-\u024f]).*)$/.exec(x); if (m) x = m[1].replace(/[.,\s\u00a0\u202f]+$/, ''); }
   const t = typeof x === 'number' ? x : typeof x === 'string' && /^\s*\$?\s*\d{1,3}(?:[ ,  ]?\d{3})?(?:[.,]\d{1,2})?\s*\$?\s*$/.test(x)
@@ -22437,6 +22447,7 @@ function tourOpenSeason(venueId) {
 }
 // The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
 // answered, and its row is left as research has it.
+function tourRentalsOnly(t) { const ks = t && Array.isArray(t.kinds) ? t.kinds : []; return ks.length > 0 && ks.every((k) => k === 'rentals'); }
 function tourVisitLines(venue, info) {
   const t = info || venueTourInfo(venue.id);
   const out = {};
@@ -22449,10 +22460,13 @@ function tourVisitLines(venue, info) {
   const price = typeof t.price === 'number' && t.price > 0 ? t.price : null, priv = typeof t.private === 'number' && t.private > 0 ? t.private : null;
   // Tour test 4: "Free." or "Free (pay what you want).", then the private price if any.
   const free = tourFreeOf(t);
+  // Tour test 6 (Whistler, 2026-11-17): a rentals-only company (Rentals is its only kind) prices per bike or per board,
+  // so its line says "From $69." without "a person".
+  const perUnit = tourRentalsOnly(t);
   if (price != null || priv != null || free) {
     out.Prices = {
-      en: [free ? TOUR_FREE_LINES[free][0] : price != null ? `From ${tourMoney(price, false)} a person.` : '', priv != null ? `Private tours from ${tourMoney(priv, false)}.` : ''].filter(Boolean).join(' '),
-      fr: [free ? TOUR_FREE_LINES[free][1] : price != null ? `À partir de ${tourMoney(price, true)} par personne.` : '', priv != null ? `Sorties privées à partir de ${tourMoney(priv, true)}.` : ''].filter(Boolean).join(' '),
+      en: [free ? TOUR_FREE_LINES[free][0] : price != null ? `From ${tourMoney(price, false)}${perUnit ? '' : ' a person'}.` : '', priv != null ? `Private tours from ${tourMoney(priv, false)}.` : ''].filter(Boolean).join(' '),
+      fr: [free ? TOUR_FREE_LINES[free][1] : price != null ? `À partir de ${tourMoney(price, true)}${perUnit ? '' : ' par personne'}.` : '', priv != null ? `Sorties privées à partir de ${tourMoney(priv, true)}.` : ''].filter(Boolean).join(' '),
     };
   }
   if (TOUR_AGES.includes(String(t.age || ''))) {
