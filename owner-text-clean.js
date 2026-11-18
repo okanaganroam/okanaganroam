@@ -175,6 +175,7 @@ function socialTidy(text, opts = {}) {
   const short = !!opts.short;
   const lines = t.split('\n').map((line) => {
     let l = line;
+    const was = line;
     if (short) l = l.replace(EMOJI_RE, ' ').replace(/[️‍]/g, '');
     // The hashtags (and decorative emojis after them) at the end of the line; a line of hashtags only goes.
     for (let i = 0; i < 3; i++) {
@@ -186,7 +187,9 @@ function socialTidy(text, opts = {}) {
     if (short) {
       l = l.replace(/\bb4\b/gi, (m) => (m === 'B4' ? 'Before' : m.charAt(0) === 'B' ? 'Before' : 'before')).replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?');
     }
-    return l.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([,.!?;:)])/g, '$1').replace(/\([ \t]+/g, '(').replace(/[ \t]+$/, '').replace(/^[ \t]+/, '');
+    // Only a line we changed is tidied (French keeps its space before « : » and « ? »).
+    if (l === was) return l;
+    return l.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([,.)])/g, '$1').replace(/\([ \t]+/g, '(').replace(/[ \t]+$/, '').replace(/^[ \t]+/, '');
   });
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
