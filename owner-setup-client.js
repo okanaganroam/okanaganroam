@@ -2333,7 +2333,8 @@
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '12', '16', '19'], T.tages, T.tageQ)
-        + (S.tour.age && S.tour.age !== '19' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
+        // Tour test 8: "Under 18s come with an adult" beside "All ages" only when it was picked (it read like a rule for babies).
+        + (S.tour.age && S.tour.age !== '19' && (S.tour.age !== 'all' || S.tour.adult) ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
       x = doneLine('offer') + q(T.offerQ, ownDogsBiz() && T.offerLeadOwnDogs ? T.offerLeadOwnDogs : T.offerLead) + (S.dogNoPicked && S.noDogs && T.dogLineNoDone ? '<p class="su-sent" id="suDogNoPicked" role="status">' + h(T.dogLineNoDone) + '</p>' : '') + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
         + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.filter(tileShown).map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 && !C.brewery ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
@@ -2498,10 +2499,12 @@
       // Cocktail test 3 (2026-11-14): the pressed size is the one in the "book ahead" sentence, not "for 20" of a room.
       var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1];
       // Tour test 7 (Whistler, 2026-11-17): a booked tour's sizes start at "Up to 4" (a guide takes 4 a day; it started at 6).
+      // Tour test 8 (Whistler, 2026-11-17; Linda, sleds of 2): every tour starts at 4 ("4+" when it has set hours; it showed
+      // only for a tour by booking).
       // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
-        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + (S.groupsBooked && T.groupsChipBooked ? [4].concat(GROUP_SIZES) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
         + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
@@ -2579,7 +2582,10 @@
       // Tour test 4 (Whistler, 2026-11-17): the red nudge stayed after a valid price was typed. In a price box it goes as
       // soon as the box can be read (all types: the tour, private tour, cocktail, flight and tasting prices).
       var bfId = bf.id;
-      bf.addEventListener('input', function(){ bf.removeAttribute('aria-invalid'); if (PRICE_BOXES.indexOf(bfId) >= 0 && S.nudge && priceBoxOk(bfId, bf.value)) { S.nudge = ''; var em2 = screen.querySelector('.su-error'); if (em2 && em2.parentNode) em2.parentNode.removeChild(em2); bf.removeAttribute('aria-describedby'); } }); try { bf.focus({ preventScroll: true }); var nn = bf.value.length; bf.setSelectionRange(nn, nn); } catch (x2) {} bf.scrollIntoView({ block: 'center' }); } }
+      bf.addEventListener('input', function(){ bf.removeAttribute('aria-invalid'); if (PRICE_BOXES.indexOf(bfId) >= 0 && S.nudge && priceBoxOk(bfId, bf.value)) { S.nudge = ''; var em2 = screen.querySelector('.su-error'); if (em2 && em2.parentNode) em2.parentNode.removeChild(em2); bf.removeAttribute('aria-describedby'); } }); try { bf.focus({ preventScroll: true }); var nn = bf.value.length; bf.setSelectionRange(nn, nn); } catch (x2) {} bf.scrollIntoView({ block: 'center' });
+      // Tour test 8 (Whistler, 2026-11-17; large text): a long nudge's first lines went off the top when the box was
+      // centred. The nudge's top stays in view (the box comes just under it).
+      if (e2 && e2.getBoundingClientRect && e2.getBoundingClientRect().top < 8) e2.scrollIntoView({ block: 'start' }); } }
     if (S.step === 'door:pin') doorMap();
     // A closure just added: show its row (it used to sit hidden under the Save button).
     if (S.step === 'closures' && S.added && !e2) { var ad = el('suAdded'); if (ad) ad.scrollIntoView({ block: 'start' }); window.scrollBy(0, -90); }

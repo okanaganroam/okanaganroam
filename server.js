@@ -38764,6 +38764,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
           return day && day.closure ? `closed:${day.closure.note}` : venueDayHoursText(day, fr);
         });
         const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
+        // Tour test 8 (Whistler, 2026-11-17): closed all this week by a closure ("Closed Apr 1 – Jun 14, back Jun 15", the
+        // break between two seasons): the usual hours are folded under it, not "Every day 9 AM – 4:30 PM" right below it.
+        if (tempClosure && tempClosure.from <= clockNow.date && tempClosure.to >= hoursModule.shiftDate(clockNow.date, 6)) {
+          return `<h2>${L('Hours', 'Heures')}</h2>${tempClosureLine}<details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles quand c’est ouvert')}</summary>${list}</details>`;
+        }
         if (texts.every((t) => t === texts[0])) {
           // A week closed every day (a temporary closure) says so, not "closed:" (round 8).
           const first = datedWeek ? dayOnShown(dateOf('mon')) : parsedHours.days.mon;
@@ -39385,7 +39390,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
       menuPicks: picks, formatPrice: menuPriceLabel,
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
-      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(venueMenu.items, 'en', menuKind(venue)) : '',
+      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(menuTripCount(venue, venueMenu), 'en', menuKind(venue)) : '',
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       menuWords: venueTapListWords(venue, false), menuIcon: venueTapListIcon(venue),
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
@@ -52675,7 +52680,9 @@ const MENU_READS_PER_VENUE_PER_DAY = 8;
 const MENU_READS_PER_DAY = Number(process.env.MENU_DAILY_READ_LIMIT) || 200;
 const MENU_INDEX_MIN_ITEMS = 5; // fewer dishes: the /menu page is noindex and left out of the sitemap
 const TOURS_INDEX_MIN_ITEMS = 3; // price lists are short: a handful of tours or rates, each with a real description
-const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300, duration: 60 };
+// Tour test 8 (Whistler, 2026-11-17): a tour price with who it's for ("349 per sled (2 adults, or 1 adult + 2 kids)") was
+// cut at 40 characters; 80 now.
+const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 80, note: 300, duration: 60 };
 const MENU_DIETARY = ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'spicy'];
 const MENU_DIETARY_LABELS = {
   en: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
@@ -52786,7 +52793,16 @@ function menuDurationFr(d) {
   return t;
 }
 function menuPriceWithWords(p, lang = 'en') {
-  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) { let q = p; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word); return q; }
+  // Tour test 8 (Whistler, 2026-11-17): who a price is for, in brackets after it ("349 per sled (2 adults, or 1 adult + 2
+  // kids)"), read as a second number and left the price without its "$". The brackets are kept as typed.
+  const par = /^(.*\S)(\s*\([^()]*\d[^()]*\))$/.exec(String(p));
+  if (par && /^\D*\d/.test(par[1])) { const head = menuPriceWithWords(par[1], lang); return `${head}${par[2]}`; }
+  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) {
+    let q = p;
+    // Tour test 8: "$349 per sled" typed in English, on the French page « 349 $ par traîneau ».
+    if (lang === 'fr') { q = q.replace(/^((?:from|à partir de|dès)\s+)?\$\s?(\d{1,3}(?:,\d{3})+|\d{1,5})(?:\.(\d{1,2}))?(?=\s|$|\/)/i, (w, f, n, c) => `${f || ''}${n.replace(/,/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${c ? `,${c}` : ''} $`); for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word); }
+    return q;
+  }
   // Tour test 7: a group size after the words is fine ("750 per day, up to 4 people" -> "$750 per day, up to 4 people").
   const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*?(?:(?:up to|max(?:imum)?|for up to|jusqu.à|jusqu.a)\s+\d{1,2}\b\D*)?)$/i.exec(p);
   if (!m || (!m[1] && !m[4].trim())) return p;
@@ -53985,7 +54001,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       }).join('');
       return '<div class="mn-item mn-open" data-item="' + key + '">'
         + '<label>' + T.dishName + '<input type="text" data-f="name" maxlength="140" value="' + h(it.name) + '" placeholder="' + h(T.namePh || '') + '"></label>'
-        + '<label>' + T.price + '<input type="text" data-f="price" maxlength="40" inputmode="decimal" value="' + h(it.price) + '" placeholder="' + h(T.pricePh || '') + '"></label>'
+        + '<label>' + T.price + '<input type="text" data-f="price" maxlength="80" inputmode="' + (C.kind === 'tours' ? 'text' : 'decimal') + '" value="' + h(it.price) + '" placeholder="' + h(T.pricePh || '') + '"></label>'
         + (C.kind === 'tours' ? '<label>' + T.duration + '<input type="text" data-f="duration" maxlength="60" value="' + h(it.duration || '') + '" placeholder="' + h(T.durationPh) + '"></label>' : '')
         + '<label>' + T.description + '<textarea data-f="description" maxlength="500" rows="2">' + h(it.description) + '</textarea></label>'
         + '<div class="mn-chips">' + diets + '</div>'
@@ -55042,6 +55058,14 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var t = e.target;
     if (t.hasAttribute('data-f')) { var it = currentItem(); if (it) { it[t.getAttribute('data-f')] = t.value; it.check = false; save(); } }
     if (t.hasAttribute('data-sec-name')) { data.sections[+t.getAttribute('data-sec-name')].name = t.value; save(); }
+  });
+  // Tour test 8 (Whistler, 2026-11-17): a tour price typed as a bare number with words ("349 per sled (2 adults)") gets
+  // its "$" when the box is left (the page reads it right either way; this is what the editor shows and keeps).
+  app.addEventListener('change', function(e){
+    var t = e.target;
+    if (C.kind !== 'tours' || !t.hasAttribute || t.getAttribute('data-f') !== 'price') return;
+    var v = String(t.value || '').trim();
+    if (/^\d/.test(v) && !/[$€£]|\b(?:cad|usd)\b/i.test(v) && !/^\d+\s*(?:hours?|hrs?|h|min|mins|minutes?|days?|nights?)\b/i.test(v)) { t.value = '$' + v; var it = currentItem(); if (it) { it.price = t.value; it.check = false; save(); } }
   });
   app.addEventListener('click', function(e){
     if (!e.target.closest) return;
@@ -57913,7 +57937,16 @@ function priceListOfferCatalog(venue, menu, lang) {
 
 // Tour test 6 (Whistler, 2026-11-17): and a private-group line ("Private group or corporate booking", « Groupes privés »),
 // which is not a trip ("(5 tours)" counted it).
-const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|people|guest|guests|passenger|passengers|rider|riders|adult|child|kid)s?\b|add[- ]?ons?\b|(?:rod|gear|equipment|wetsuit|bike|helmet) rentals?\b|rentals?\b|(?:fishing )?licen[cs]es?\b|personnes? suppl[ée]mentaires?\b|location\b|permis\b|private (?:groups?|charters?|bookings?|events?|parties|tours?)\b|(?:corporate|company) (?:groups?|bookings?|events?)\b|groupes? priv[ée]s?\b|sorties? priv[ée]es?\b|r[ée]servations? priv[ée]es?\b)/i;
+const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|people|guest|guests|passenger|passengers|rider|riders|adult|child|kid)s?\b|add[- ]?ons?\b|(?:rod|gear|equipment|wetsuit|bike|helmet|snowsuit|clothing|boot) rentals?\b|snow ?suits?\b|(?:return )?shuttles?\b|(?:hotel )?(?:pick-?ups?|transfers?)\b|navettes?\b|rentals?\b|(?:fishing )?licen[cs]es?\b|personnes? suppl[ée]mentaires?\b|location\b|permis\b|private (?:groups?|charters?|bookings?|events?|parties|tours?)\b|(?:corporate|company) (?:groups?|bookings?|events?)\b|groupes? priv[ée]s?\b|sorties? priv[ée]es?\b|r[ée]servations? priv[ée]es?\b)/i;
+// Tour test 8 (Whistler, 2026-11-17): the count of trips on a tour's list, the same on the page, the /prices page and the
+// edit page (the page said "(5 tours)", the edit page "6 tours"): add-on lines (an extra person, a shuttle, a snowsuit or
+// gear rental, a licence, private groups) are not trips. Other types: every item.
+function menuTripCount(venue, menu) {
+  if (!menu) return 0;
+  if (!venue || venue.type !== 'tour') return menu.items;
+  const n = ((menu.data || {}).sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length;
+  return n || menu.items;
+}
 // The short menu on the place page: the first few dishes and a link to the full menu page.
 function venueMenuPreviewHtml(venue, menu, lang) {
   if (!menu) return '';
@@ -57923,20 +57956,32 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   // /prices page does: seasonal trips were listed with no season. Tours only: a restaurant's short menu is its first few
   // dishes on purpose (section names there would be "Starters" over one dish).
   const secOf = new Map();
-  for (const s of menu.data.sections) { let first = true; for (const it of s.items) if (picks.length < 5) { picks.push(it); if (first && venue.type === 'tour' && s.name && menu.data.sections.length > 1) secOf.set(it, String(s.name)); first = false; } }
+  // Tour test 8 (Whistler, 2026-11-17): a Winter section with five trips hid the Summer one. A tour's short list takes
+  // from every section (its share of the five, then the rest in order); a section left with no line says "Summer: see all".
+  const secs = menu.data.sections || [];
+  const multi = venue.type === 'tour' && secs.filter((x) => (x.items || []).length).length > 1;
+  const share = multi ? Math.max(1, Math.floor(5 / secs.filter((x) => (x.items || []).length).length)) : 5;
+  const taken = new Map(secs.map((x) => [x, []]));
+  if (multi) { for (const x of secs) for (const it of (x.items || []).slice(0, share)) if ([...taken.values()].reduce((n, l) => n + l.length, 0) < 5) taken.get(x).push(it); }
+  for (const x of secs) for (const it of x.items || []) { if ([...taken.values()].reduce((n, l) => n + l.length, 0) >= 5) break; if (!taken.get(x).includes(it)) taken.get(x).push(it); }
+  const unseen = [];
+  for (const x of secs) {
+    const mine = (x.items || []).filter((it) => taken.get(x).includes(it));
+    if (!mine.length && multi && x.name && (x.items || []).length) unseen.push(String(x.name));
+    mine.forEach((it, i) => { picks.push(it); if (!i && venue.type === 'tour' && x.name && secs.length > 1) secOf.set(it, String(x.name)); });
+  }
   const tours = isPriceList(venue);
   const w = PRICE_LIST_WORDS[menuKind(venue)];
   // Tour test 5 (Whistler, 2026-11-17): "See all tours & prices (4 tours)" counted "Extra person $75" as a tour. Add-on
   // lines (an extra person, rentals, a licence, add-ons) are not trips.
-  const tripCount = venue.type === 'tour' ? (menu.data.sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length : 0;
-  const count = menuDishCountText(venue.type === 'tour' && tripCount ? tripCount : menu.items, lang, menuKind(venue));
+  const count = menuDishCountText(menuTripCount(venue, menu), lang, menuKind(venue));
   const see = tours ? (fr ? (venue.type === 'tour' ? `Voir toutes les sorties et tarifs (${count})` : `Voir tous les tarifs (${count})`) : `See all ${w.en.list} (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
   // Golf pages also carry the researched green-fee table, so the course's own list says where it came from.
   const heading = menuKind(venue) === 'golf' ? (fr ? 'Tarifs de golf, selon le terrain' : 'Green fees & rates from the course') : menuNoun(venue, lang);
   // Tour test 1 (Whistler, 2026-11-16): a tour's list has a ticket beside "Tours & prices" / « Sorties et tarifs ».
   return `<section class="venue-section vm-preview" id="${tours ? 'prices' : 'menu'}">
     <h2>${venue.type === 'tour' ? `<span aria-hidden="true">${venueTapListIcon(venue)}</span> ` : ''}${escapeHtml(heading)}</h2>
-    <ul class="vm-list">${picks.map((it) => (secOf.get(it) ? `<li class="vm-sub">${escapeHtml(secOf.get(it))}</li>` : '') + menuItemHtml(it, lang)).join('')}</ul>
+    <ul class="vm-list">${picks.map((it) => (secOf.get(it) ? `<li class="vm-sub">${escapeHtml(secOf.get(it))}</li>` : '') + menuItemHtml(it, lang)).join('')}${unseen.map((nm) => `<li class="vm-sub">${escapeHtml(nm)}: <a href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${fr ? 'tout voir' : 'see all'}</a></li>`).join('')}</ul>
     <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${escapeHtml(see)} &rarr;</a>
     <p class="vm-meta">${tours ? (fr ? 'Tarifs mis à jour' : 'Prices updated') : (fr ? 'Menu mis à jour' : 'Menu updated')} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
   </section>`;
@@ -57957,8 +58002,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const kindWords = PRICE_LIST_WORDS[menuKind(venue)];
   const noun = menuNoun(venue, lang);
   // Tour test 6: the full list's count leaves out add-on and private-group lines too, like the short list's.
-  const tripN = venue.type === 'tour' ? (menu.data.sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length : 0;
-  const count = menuDishCountText(venue.type === 'tour' && tripN ? tripN : menu.items, lang, menuKind(venue));
+  const count = menuDishCountText(menuTripCount(venue, menu), lang, menuKind(venue));
   const updatedText = tours ? L('Prices updated', 'Tarifs mis à jour') : L('Menu updated', 'Menu mis à jour');
   const title = tours ? (fr
     ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
@@ -62951,6 +62995,9 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .form-field input, body.owner-page .form-field textarea, body.owner-page .form-field select { max-width: 100%; min-width: 0; box-sizing: border-box; }
   @media (max-width: 480px) { body.owner-page .form-row { grid-template-columns: 1fr; } }
   body.owner-page .op-reassure { font-size: 0.9rem; font-weight: 700; color: #1E6B3A; margin: 6px 0 12px; }
+  /* Tour test 8 (Whistler, 2026-11-17; large text): "See your page" and "Create a login" in a sentence were 20-23px tall.
+     Inline links in the edit page's lines get a 32px tap height (padding only: the lines don't move). */
+  body.owner-page main p a:not([class]), body.owner-page main .op-hint a:not([class]) { display: inline-block; padding: 7px 0; margin: -7px 0; }
   body.owner-page .op-more { display: block; margin-top: 12px; background: #fff; border: 1px solid rgba(42,32,25,0.2); border-radius: 10px; padding: 9px 16px; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
   body.owner-page .op-unsent { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; max-width: 560px; margin: 0 auto; background: #1F2A36; color: #fff; border-radius: 14px; padding: 10px 12px 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.45); font-size: 0.9rem; font-weight: 700; }
   body.owner-page .op-unsent[hidden] { display: none; }
@@ -63026,7 +63073,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
     // French (2026-10-18): a price list uses its own French words (PRICE_LIST_WORDS).
     const list = w ? frDecode(w.fr.listHtml) : 'votre menu';
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-    const sub = pub ? `${cap(list)} ${w ? 'sont' : 'est'} en ligne (${menuDishCountText(pub.items, 'fr', menuKind(venue))}). Touchez pour ${w ? 'les' : 'le'} modifier ou ${w ? 'les' : 'le'} remplacer.`
+    const sub = pub ? `${cap(list)} ${w ? 'sont' : 'est'} en ligne (${menuDishCountText(menuTripCount(venue, pub), 'fr', menuKind(venue))}). Touchez pour ${w ? 'les' : 'le'} modifier ou ${w ? 'les' : 'le'} remplacer.`
       : draft && ['pending', 'help'].includes(draft.status) ? `Merci! Nous avons ${list} et ${w ? 'les' : 'le'} mettrons en ligne bientôt.`
         : draft ? `Vous avez commencé à ajouter ${list}. Touchez pour reprendre là où vous étiez.`
           : w ? `Prenez votre liste de prix en photo ou donnez-nous le lien de votre site Web. Nous en faisons ${frDecode(w.fr.blurb)} sur votre page en environ 2 minutes.`
@@ -63035,7 +63082,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
     return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
   }
   const what = w ? w.en.list : 'menu';
-  const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
+  const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(menuTripCount(venue, pub), 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
     : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${w ? 'them' : 'it'} up soon.`
       : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
         : w ? `Snap a photo of your price list, or share the link from your website. We turn it into ${w.en.blurb} on your page in about 2 minutes.`
