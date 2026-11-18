@@ -251,7 +251,7 @@ test('9. French-only lines: the finish screen and the edit pages name them (« C
   // The French edit page names them with a link to the English one; the English edit page says to type them below.
   const frEdit = plain((await get(`/fr/owner/${t}`)).text), enEditHtml = (await get(`/owner/${t}`)).text;
   assert.match(frEdit, /Connu pour, Bon à savoir, Groupes\s: en français seulement/);
-  assert.match((await get(`/fr/owner/${t}`)).text, new RegExp(`href="/owner/${t}#opVisitKnown">Ajouter la version anglaise`));
+  assert.match((await get(`/fr/owner/${t}`)).text, new RegExp(`href="/owner/${t}#opVisitKnown" onclick="[^"]*okanaganLang[^"]*">Ajouter la version anglaise`));
   assert.match(plain(enEditHtml), /In French only, so on your French page only: Known for, Good to know, Groups\. Type the English version in its box below\./);
   // The French Known for screen: the English research line goes when hers is in French (said in one line).
   assert.match(text.fr.knownFrDropsEn, /quitte votre page anglaise/);

@@ -23609,7 +23609,7 @@ test('Tours & prices (2026-10-17): tour operators use the uploader for their pri
     // A tour operator has no /menu page, and the place page links to /prices.
     assert.equal((await get('/kelowna/tours/prices-fixture-tours/menu')).status, 301, 'round 11: /menu goes to its /prices');
     const venuePage = await get('/kelowna/tours/prices-fixture-tours').then((r) => r.text());
-    assert.match(venuePage, /See all tours &amp; prices \(3 tours\)/);
+    assert.match(venuePage, /See all tours &amp; prices \(2 tours\)/); // tour test 6: the "Private Charter" line is not a trip
     assert.doesNotMatch(venuePage, /"hasMenu"/);
     assert.match(await get('/sitemap.xml').then((r) => r.text()), /prices-fixture-tours\/prices<\/loc>/);
   } finally {

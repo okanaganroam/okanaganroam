@@ -52599,7 +52599,7 @@ function menuDurationFr(d) {
   return t;
 }
 function menuPriceWithWords(p, lang = 'en') {
-  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) { let q = p; if (lang === 'fr') for (const [re, word] of MENU_UNIT_WORDS_FR) q = q.replace(re, word); return q; }
+  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) { let q = p; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word); return q; }
   const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*)$/i.exec(p);
   if (!m || (!m[1] && !m[4].trim())) return p;
   if (/^\s*(?:hours?|hrs?|h\b|min|mins|minutes?|days?|nights?|km|kms|miles?|holes?|%|people|persons|guests|pieces?|pcs|oz|ml|l\b|g\b|kg|x\b)/i.test(m[4])) return p;
@@ -63703,7 +63703,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       if (ks.length) {
         const list = ks.map((k) => NAMES[k][fr ? 1 : 0]).join(', ');
         const enHref = `${token ? `${OWNER_LINK_PATH}${token}` : `/owner/account/venue/${venue.id}`}#${ids[ks[0]] || 'visit'}`;
-        frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: en français seulement, donc sur votre page française seulement. <a href="${escapeHtml(enHref)}">Ajouter la version anglaise</a>` : `In French only, so on your French page only: ${escapeHtml(list)}. Type the English version in its box below.`}</p>`;
+        frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: en français seulement, donc sur votre page française seulement. <a href="${escapeHtml(enHref)}" onclick="try{localStorage.setItem('okanaganLang','en')}catch(e){}">Ajouter la version anglaise</a>` : `In French only, so on your French page only: ${escapeHtml(list)}. Type the English version in its box below.`}</p>`;
       }
     } catch (e) { frOnlyEditHtml = ''; }
     const boxes = editKeys.concat(extraKeys.filter((k) => !editKeys.includes(k))).map((k) => `

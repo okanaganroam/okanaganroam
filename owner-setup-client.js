@@ -1575,7 +1575,7 @@
     var ks = ((S.score && S.score.frOnlyKeys) || []).filter(function(k){ return T.frLineNames && T.frLineNames[k]; });
     if (!ks.length || !T.frOnlyNamed || !C.back) return '';
     var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
-    return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '">' + h(T.frOnlyAddEn) + '</a></p>';
+    return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'en\')}catch(e){}">' + h(T.frOnlyAddEn) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
