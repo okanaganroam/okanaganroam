@@ -16727,6 +16727,7 @@ const SEO_PAGE_CSS = `
   .venue-at-a-glance a:hover { text-decoration-thickness: 2px; }
 
   .venue-description { font-size: 1.02rem; line-height: 1.7; margin: 0 0 22px; color: var(--ink); }
+  .venue-desc-lang { margin: 0 0 4px; font-size: .82rem; color: var(--muted, #5b6470); font-style: italic; }
 
   .venue-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
   .venue-cta-row .cta { margin: 0; }
@@ -39075,6 +39076,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     ? require('./data/copper-layout-profile.json') : null;
   // Round 12 (2026-10-20): « du Okanagan Golf Club » in a French description reads « de l’Okanagan Golf Club ».
   if (fr && venue.description_fr) venue = { ...venue, description_fr: frElideOkanagan(venue.description_fr) };
+  // Tour test 12 (Whistler, 2026-11-18; Kayla): her English story is live and the French one is still research's (« Rendez-
+  // vous au bureau… » beside her new meeting spot). Until we translate hers (queued automatically when she sent it), the
+  // French page shows her English story with a small « Description en anglais » note, never the stale research French.
+  const frDescEnglish = fr && ownerFrDescEnglishShown(venue);
   const L = (en, frText) => (fr ? frText : en);
   const num = (n) => (fr ? String(n).replace('.', ',') : String(n)); // French decimal comma: 4,6\u2605
   // A place with a French page: its English page carries only the English description (the French one, hidden, made
@@ -40004,7 +40009,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
        hours and badges (and any check-before-you-go notice), before the description, so they are on the first screen of
        a phone and come first in the tab order. Wider screens keep the description first (renderVenuePageLayoutStyles). -->${venueAdvisoryHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${galleryHtml ? `\n  ${galleryHtml.phone(creditHtml)}` : ''}
-  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  ${frDescEnglish && !editorial ? '<p class="venue-desc-lang" id="venueDescLang">Description en anglais</p>\n  ' : ''}<p class="venue-description"${fr && !(frDescEnglish && !editorial) ? ' lang="fr"' : frDescEnglish && !editorial ? ' lang="en"' : ''}>${editorial ? escapeHtml(editorial.intro) : frDescEnglish ? escapeHtml(venue.description || '') : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -50191,6 +50196,29 @@ function ownerFrDescState(venue) {
     return ownerDescriptionWasHers(venue) || ownerLinkPending(venue.id, 'description') ? 'old' : 'research';
   } catch (e) { return ''; }
 }
+// Tour test 12: the owner's own English story is live and the French description is still research's (not hers, none of
+// hers waiting): the French page shows her English story (« Description en anglais ») until it is translated.
+function ownerFrDescEnglishShown(venue) {
+  try {
+    if (!venue || !String(venue.description_fr || '').trim() || !String(venue.description || '').trim()) return false;
+    return ownerDescriptionWasHers(venue) && !ownerDescriptionWasHers(venue, 'description_fr') && ownerLinkPending(venue.id, 'description_fr') == null;
+  } catch (e) { return false; }
+}
+// Tour test 12: her English story was sent and the French one is research's: the same translation request "Leave it to us"
+// makes (a fr_story help row in /admin/review, and its email), once. Never when she wrote her own French.
+async function queueFrStoryTranslation(venue, contactEmail) {
+  try {
+    if (!venue || !COMPLETENESS_TYPES.has(venue.type)) return false;
+    const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venue.id);
+    if (!v || !String(v.description_fr || '').trim() || ownerDescriptionWasHers(v, 'description_fr') || ownerLinkPending(v.id, 'description_fr') != null) return false;
+    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(v.id, SETUP_FR_STORY_KIND)) return false;
+    const note = 'Their English story changed and the French description is still our research: please write their French description from their new English story (queued automatically).';
+    const id = Number(db.prepare("INSERT INTO venue_menus (venue_id, status, submitted_by, help_kind, help_note, contact_email, submitted_at) VALUES (?, 'help', 'owner:auto', ?, ?, ?, datetime('now'))").run(v.id, SETUP_FR_STORY_KIND, note, contactEmail || null).lastInsertRowid);
+    const m = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    notifyInBackground(`French description for venue #${v.id}`, () => sendMenuHelpEmail(v, m, { note, contactEmail: contactEmail || null, contactPhone: '' }));
+    return true;
+  } catch (e) { console.error(`[owner-portal] French description request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
 function ownerLinkPending(venueId, field) {
   try {
     for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
@@ -51461,6 +51489,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
   ownerMarkFrench(res, 'owner_change_requests', id);
   ownerMarkFrench(res, 'owner_change_requests', liveId);
   if (id && Object.keys(review).length) notifyInBackground(`owner update #${id}`, () => notifyOwnerChange(id));
+  // Tour test 12: a new English story with research's French still up queues its translation (as "Leave it to us").
+  if (typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
   // Tour test 3 (Whistler, 2026-11-17): the category words the kinds just wrote, so the setup's finish preview shows what
   // the page and the cards show (it listed the chips' names).
   let tourWords = null;
