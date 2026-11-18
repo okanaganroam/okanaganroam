@@ -136,10 +136,10 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
   db.prepare("INSERT INTO venue_menus (venue_id, status, data, published_at) VALUES (?, 'published', ?, '2026-11-01')").run(v.id, JSON.stringify({ sections: [{ name: 'Cruises', items: [{ name: 'Sunset cruise', price: '$79' }, { name: 'Two-hour lake tour', price: '$59' }, { name: 'Private charter', price: '$900' }] }] }));
   const en = page(v, 'en');
   assert.match(en, /<h2><span aria-hidden="true">🎟️<\/span> Tours &amp; prices<\/h2>/);
-  assert.match(en, /See all tours &amp; prices \(3/);
+  assert.match(en, /See all tours &amp; prices \(2/); // tour test 6: the "Private charter" line is not counted as a trip
   const fr = page(v, 'fr');
   assert.match(fr, /<h2><span aria-hidden="true">🎟️<\/span> Sorties et tarifs<\/h2>/);
-  assert.match(fr, /Voir toutes les sorties et tarifs \(3/);
+  assert.match(fr, /Voir toutes les sorties et tarifs \(2/);
   assert.doesNotMatch(plain(en), /🍽|🍺/);
   // A link instead (from the setup's "on my website"): the row says Tours & prices.
   assert.deepEqual(app.venueTapListWords(app.getVenue(v.id), false), { label: 'Tours & prices', see: 'See tours & prices', lower: 'tours & prices' });
@@ -150,8 +150,8 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
 
 test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pre-picks, and a summer season drops "Winter"', async () => {
   const { v, t } = await jess();
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing or canyoning');
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade ou canyonisme');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning'); // tour test 6 adds ropes courses
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
   // Pre-picks: snowmobile and the ATV chip.
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.deepEqual(c.suggestKinds, ['snowmobile', 'adventure']);
@@ -169,7 +169,7 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours');
   assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR, rafting & snowshoe tours'.replace('Ziplines, RZR', 'Ziplines, RZR'));
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
-  assert.equal(app.tourKindsText(['adventure'], false, ''), 'ATV, bungee, climbing or canyoning');
+  assert.equal(app.tourKindsText(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, never the chip's whole label
   // The card's season word: "Winter" only while she runs in winter alone.
   const winterOnly = mk('tour', { name: 'Silver Star Snowmobile Tours', cuisine: 'Snowmobile tours', description: 'Guided snowmobile tours.' });
   ok(await change(tokenFor(winterOnly.id), { open_months: '12-15:03-31', tour_info: { year: 'seasonal', kinds: ['snowmobile'] } }));

@@ -621,22 +621,32 @@
   // "for 4 people", "/4"), 'hours' (it starts with a trip length), 'many' (a second price or other words), or '' (fine:
   // per person, pp, each, a person, taxes). The private box takes per-boat words (that is what it is for).
   function feeHours(x){ return /^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(String(x == null ? '' : x)); }
+  // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
+  // is its own case ('unit'): never saved as a price per person, and the nudge says where it goes (Your tours and prices).
+  // Boats, rafts, charters and groups stay 'group' (Private tours). "from 1500" / « 1500 $ et plus » read as the number.
+  // (server.js tourPriceWhy, the same rule.)
+  function priceTrim(x){ return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
   function tourPriceWhy(x, priv){
-    var raw = String(x == null ? '' : x).trim(); if (!raw || !/\d/.test(raw)) return '';
+    var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?|hours?|hrs?|heures?|days?|jours?|nights?|nuits?|hr|h)\b/;
+    var TOUR_GROUP_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
+    var raw = priceTrim(x); if (!raw || !/\d/.test(raw)) return '';
     if (feeHours(raw)) return 'hours';
     var head = moneyHead(raw); if (head === raw) return '';
     var rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
-    var group = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|vehicles?|cars?|jeeps?|sleds?|canoes?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|v[ée]hicules?|priv[ée]e?s?)\b/.test(rest)
+    var group = TOUR_GROUP_RE.test(rest)
       || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
     if (/\d/.test(rest)) return 'many';
     var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
       .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
-    return left ? 'many' : '';
+    if (!left) return '';
+    // A price per bike, per rental, per hour… (not in the private box: that one only takes the whole-trip price).
+    if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
+    return 'many';
   }
-  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
+  function tourPriceRead(x, priv){ if (tourPriceWhy(x, priv)) return NaN; x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
   // The number a refused per-boat price starts with ("650 per boat" -> 650), to offer it for the Private tours box.
-  function tourPriceNumber(x){ var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
+  function tourPriceNumber(x){ x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, '').replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : null; }
   // Tour test 4: the per-person box read as free: "free", "0", "$0", « gratuit » -> 'free'; "by donation", "pay what you
   // want", « contribution volontaire », « don » -> 'donation'; anything else -> ''. (server.js tourFreeRead, the same rule.)
   function tourFreeRead(x){
@@ -674,7 +684,9 @@
   }
   function tourKindName(k){ var o = (C.tourKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
   // The card's price line as she types it ("Your card will say “From $129”").
-  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPick, { x: tourMoney(n) }); }
+  // Tour test 6: a rentals-only company (its only kind is Rentals): the card says "From $69" without "a person".
+  function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
+  function tourPriceLead(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1165,6 +1177,7 @@
   }
   function mark(){ var b = base(S.step); if (isStep(b)) S.dirty = b; }
   function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); }
+    if (step === 'menu' && S.menuReturn) { var mr = S.menuReturn; S.menuReturn = ''; S.nudge = ''; return go(mr); }
     // A café's hours always go on to its holidays and closures (the same step); where to after that is decided there.
     if (COMBO && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; S.listBack = true; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
@@ -1194,7 +1207,7 @@
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (COMBO && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (step === 'menu' && S.menuReturn && T.tpriceUnitBack) return T.tpriceUnitBack; if (COMBO && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     // Bug-check (2026-11-12): a café's hours saved but not its holidays: "Next: Holidays and closures", never "Skip".
     if (half(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
@@ -1286,9 +1299,10 @@
     if (key && (CUR.visit_fr || {})[key]) return C.lang === 'fr' ? '' : frOnlyHint(id + 'Fr');
     var t = String(text || '');
     if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
+    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + T.knownFrDropsEn : '';
     var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
-    return '<p class="su-hint su-enhint" id="' + id + '">' + h(noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + '</p>';
+    return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
   }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
@@ -1469,9 +1483,16 @@
   function weekShort(w, sep){
     var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
     if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
-    var out = [], i = 0;
-    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
-    return out.join(sep || ' · ');
+    // Tour test 6 (Whistler, 2026-11-17): days with the same hours go together, open ones first, closed last: « Lun, jeu–dim
+    // 9 h – 17 h ; mar–mer fermé » (it read « Lun 9 h – 17 h, Mar–Mer fermé, Jeu–Dim 9 h – 17 h »).
+    var runs = [], i = 0;
+    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; runs.push({ t: txt[i], d: j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i]) }); i = j + 1; }
+    var groups = [];
+    runs.forEach(function(r){ var g = groups.filter(function(x){ return x.t === r.t; })[0]; if (g) g.d.push(r.d); else groups.push({ t: r.t, d: [r.d] }); });
+    groups.sort(function(a, b){ return (a.t ? 0 : 1) - (b.t ? 0 : 1); });
+    var low = function(x){ return C.lang === 'fr' ? x.toLowerCase() : x; };
+    var out = groups.map(function(g, gi){ return g.d.map(function(x, k){ return gi || k ? low(x) : x; }).join(', ') + ' ' + (g.t || String(T.closed).toLowerCase()); });
+    return out.join(sep === ', ' || !sep ? (C.lang === 'fr' ? '\u00a0; ' : sep ? '; ' : ' · ') : sep);
   }
   // Winery test 5 (2026-11-12): after saving, one line with every set of hours ("Summer: 11 AM – 5 PM every day · Winter
   // (Nov–Apr): Mon–Thu closed, Fri–Sun Noon – 4 PM"), so both seasons are checked at a glance.
@@ -1547,6 +1568,15 @@
   }
   // Brewery test 3 (Whistler, 2026-11-16): with no French story on the page there is no French page yet (/fr goes to the
   // English one), so the line says what really happens instead of "they show on your French page only".
+  // Tour test 6 (Whistler, 2026-11-17): the French-only lines are named (« Connu pour, Bon à savoir, Groupes : en français
+  // seulement ») with one tap to the English edit page's box for the first of them. Nothing is translated for her.
+  var FR_ONLY_BOX = { known_for: 'opVisitKnown', groups: 'opVisitGroups', good_to_know: 'opVisitGoodToKnow', dogs: 'opVisitDogs', dietary: 'opVisitDietary', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', menu: 'opVisitMenu' };
+  function frOnlyNamed(){
+    var ks = ((S.score && S.score.frOnlyKeys) || []).filter(function(k){ return T.frLineNames && T.frLineNames[k]; });
+    if (!ks.length || !T.frOnlyNamed || !C.back) return '';
+    var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
+    return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'en\')}catch(e){}">' + h(T.frOnlyAddEn) + '</a></p>';
+  }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
     var out = [], seen = {};
@@ -2061,6 +2091,7 @@
         + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
         + (S.nudge && S.nudge === T.tpriceGroup && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
+        + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
@@ -2421,7 +2452,7 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TOUR && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
@@ -2441,7 +2472,10 @@
     } else if (s === 'door') {
       x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
-      x = q(T.doorPhotoQ, T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
+      // Tour test 6 (Whistler, 2026-11-17): no dock, marina or boat words for a tour on land (a zipline office read « le quai
+      // ou la marina… votre bateau »): the water words only when a water kind is picked.
+      var landTour = TOUR && T.doorPhotoLeadLand && !(TI.kinds || S.tour.kinds || []).some(function(k){ return ['boat', 'jetboat', 'paddle', 'fishing', 'raft', 'wildlife'].indexOf(k) >= 0; });
+      x = q(T.doorPhotoQ, landTour ? T.doorPhotoLeadLand : T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';
     } else if (s === 'door:pin') {
       x = (S.door.mapFail ? q(T.mapFailQ, '') : q(T.pinQ, T.pinLead)) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.mapFail ? T.mapFail : S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p>' + (S.door.mapFail ? '' : '<div id="suMap" class="su-map"></div>') + msgs()
@@ -2462,7 +2496,7 @@
           // Brewery test 1 port (2026-11-16): "Add your tap list" stays in view (a no-kitchen brewery never saw it in the fold).
           + (left.some(tapItem) ? '<div class="su-stack" id="suTapOpen">' + left.filter(tapItem).map(leftItem).join('') + '</div>' : '')
           + (left.some(function(o){ return !tapItem(o); }) ? '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.filter(function(o){ return !tapItem(o); }).map(leftItem).join('') + '</div></details>' : '')
-          + frOnlyFinish()
+          + (frOnlyNamed() || frOnlyFinish())
           + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '') + changeLink;
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
@@ -2472,7 +2506,7 @@
         // Distillery test 1 (Whistler, 2026-11-16): "About 100% complete" sat over "To reach 100%" (a cocktail list isn't
         // part of the score without a kitchen, but its tile was still open). At 100 the open tiles are "You can still add".
         + (left.length ? '<h2 class="su-h2" id="suLeftH">' + h((sc.soon < sc.pct ? sc.soon : Math.max(sc.pct, sc.soon || 0)) >= 100 && T.stillAdd ? T.stillAdd : T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
-        + frOnlyFinish()
+        + (frOnlyNamed() || frOnlyFinish())
         // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
         + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
         + preview()
@@ -2620,12 +2654,15 @@
   // Winery test 4 (2026-11-12): the one "no set hours" choice, wineries only.
   // The weekly hours as they are before "no set hours" clears them (null when no day is open), kept for "Add my hours".
   function weekKeep(){ return S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }) ? clone(S.week) : null; }
-  function weekKept(w){ if (!w) return; S.weekKept = w; try { window.sessionStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} }
+  // Tour test 6 (Whistler, 2026-11-17): kept on this device too (localStorage), so "Add my hours" still has them after she
+  // closes the tab and comes back by the link (the tap on "by booking only" saves at once).
+  function weekKept(w){ if (!w) return; S.weekKept = w; try { window.sessionStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} try { window.localStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} }
   function weekRestore(){
     var w = S.weekKept; if (!w) { try { w = JSON.parse(window.sessionStorage.getItem('suWeekKept:' + C.base) || 'null'); } catch (e) { w = null; } }
+    if (!w) { try { w = JSON.parse(window.localStorage.getItem('suWeekKept:' + C.base) || 'null'); } catch (e) { w = null; } }
     if (!w || typeof w !== 'object' || (S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }))) return false;
     S.week = {}; DAYS.forEach(function(d){ S.week[d] = Array.isArray(w[d]) && w[d].length ? clone(w[d]) : null; });
-    S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
+    S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {} try { window.localStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
     S.weekBack = true; return true;
   }
   function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }
@@ -3218,6 +3255,9 @@
     // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
     // Tour test 5: "Put $650 in Private tours" under the per-boat nudge moves the number to the private box and empties the
     // per-person box (nothing is saved until Save).
+    // Tour test 6: "Open Your tours and prices" under the per-bike nudge. What she typed stays in the box (nothing is saved);
+    // the list's Next brings her back to the price.
+    if (k === 'tpriceToMenu') { readTour(); S.menuReturn = 'price'; return go('menu'); }
     if (k === 'tpriceToPriv') {
       var gm = S.groupMove; if (gm == null) return;
       var b1 = el('suTprice'), b2 = el('suTpriv'); if (b1) b1.value = ''; if (b2) b2.value = String(gm);
@@ -3465,7 +3505,7 @@
       // offers (research ticked them on a snowmobile outfitter): saving "Who can come" takes them off, on this save only.
       // Tour test 4 (Whistler, 2026-11-17): and the food-only ones (Vegan, Vegetarian, Gluten-free, Non-alcoholic, Happy
       // hour) a wrong scrape left on a walking tour's page. The list comes from the page's config (C.tourFoodBadges).
-      if (TOUR) (C.tourFoodBadges || ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour']).forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
+      if (TOUR) (C.tourFoodBadges || ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour', 'lake_view']).forEach(function(b){ if (S.savedBadges[b] || (CUR.badges || {})[b]) { sendB[b] = false; S.badges[b] = false; } });
       if (Object.keys(sendB).length) list.push({ badges: sendB });
       // "None of these" (no vegan, vegetarian or gluten-free options): the same answer as the portal's "we don't have one".
       if (!diet && S.noDiet && S.notOffered.indexOf('dietary') < 0) list.push({ not_offered: 'ADD_DIETARY' });
@@ -3685,7 +3725,8 @@
       if (!pfree && (pp == null || isNaN(pp))) {
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
-        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
+        // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
         S.groupMove = pwhy === 'group' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
       }
       if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }

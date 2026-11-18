@@ -641,6 +641,9 @@ function indoorAskedLabel(text, form) {
   if (gallery && museum) return form === 'singular' ? 'Museum or Gallery' : 'Museums & Galleries';
   if (gallery) return form === 'singular' ? 'Art Gallery' : 'Art Galleries';
   if (museum) return form === 'singular' ? 'Museum' : 'Museums';
+  // Tour test 6 (Whistler, 2026-11-17): "E-bike rental" read "Shops in Whistler" (and French « Boutiques et « electriques » »).
+  const rent = /\b(?:(e[- ]?bike|bike|bicycle|kayak|canoe|sup|paddleboard|paddle board|ski|snowboard|snowshoe|boat|equipment|gear)s? )?(?:rentals?|hire)\b/.exec(q);
+  if (rent) { const what = rent[1] ? `${rent[1].replace(/^e[- ]?bike$/, 'E-bike').replace(/^sup$/, 'SUP').replace(/^./, (c) => c.toUpperCase())} ` : ''; return what ? `${what}${form === 'singular' ? 'rental' : 'rentals'}` : form === 'singular' ? 'Rental' : 'Rentals'; }
   if (SHOP_ASKED_RE.test(q)) return form === 'singular' ? 'Shop' : 'Shops';
   if (/\b(?:yoga|pilates)\b/.test(q)) return form === 'singular' ? 'Yoga Studio' : 'Yoga Studios';
   if (/\b(?:spa|spas|nordic spa|sauna|saunas|massage|massages)\b/.test(q)) return form === 'singular' ? 'Spa' : 'Spas';
@@ -985,7 +988,10 @@ function offSeasonBlocked(v, ctx) {
   // Winter-only tours: heli-skiing, cat-skiing, snowmobile, dog-sled and sleigh tours, ice fishing, ski touring courses.
   if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx) && !namesAskedOffSnowKind(v, ctx)) return true;
   // Summer-only tours: bike, rafting, sailing, paddling, kite and horseback tours, unless they say winter or year-round.
-  if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m)) return true;
+  // Tour test 6 (Whistler, 2026-11-17): and the operator's own season answer ("all year", or open on the date) wins, as for
+  // the winter-only words: a zipline park with summer e-bike rentals that runs all year was "closed for the season". A
+  // request for the summer thing itself (a bike tour, rentals, paddling, rafting, riding) keeps the rule.
+  if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m) && !(ownerSeasonOpenOn(v, ctx) && !((ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting', 'horseback'].includes(k))))) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;
   // Outdoor golf in winter only when golf was asked for (it then gets the course's own season caveat).
   if (v.type === 'golf') return !v.indoorGolf && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
@@ -1240,6 +1246,26 @@ function scoreVenue(v, ctx) {
   if (v.type === 'brewery' && ciderAsked(ctx.queryText)) { if (breweryIsCidery(v)) add('cider_asked', 30, 'A cidery, as you asked'); else add('beer_not_cider', -30, null); }
   // Shopping asked for (2026-10-25): shops come before museums and galleries, and gift, book and clothing shops before
   // rental and tuning counters unless rentals were asked for.
+  // Tour test 6 (Whistler, 2026-11-17): a kids' birthday (« fête d'anniversaire pour enfants ») plans an activity the
+  // children can do (a tour or attraction whose ages let them in) before a long hike; a restaurant only when food is asked.
+  if (ctx.kids && /\b(?:birthday|birthdays|anniversaire)\b/.test(ctx.queryText || '')) {
+    if (['tour', 'indoor', 'sport'].includes(v.type) && kidsAllowed(v, ctx)) add('kids_birthday_activity', 35, 'A kids’ activity for the birthday');
+    else if (v.type === 'outdoor' && /\b(?:hard|difficult|strenuous|steep|long|challenging|alpine)\b/.test(normWords(`${v.textDesc || ''} ${v.cuisine || ''}`))) add('kids_birthday_hard_hike', -40, null);
+  }
+  // Tour test 6 (Whistler, 2026-11-17): rentals asked for ("E-bike rental", « location de vélos électriques »): the tours
+  // that rent (an outfitter, a park with e-bikes) before the shops that rent; and the place that rents what was named
+  // (bikes, kayaks, skis) before one that rents something else.
+  const rentalsKind = (ctx.plannerKinds || []).includes('rentals');
+  if (rentalsKind) {
+    const item = (ctx.queryText || '').match(/\b(e[- ]?bike|bike|bicycle|kayak|canoe|sup|paddle ?board|ski|snowboard|snowshoe|boat)s? (?:rentals?|hire)\b/);
+    const own = normWords(`${v.cuisine || ''} ${v.name || ''} ${v.textDesc || ''}`);
+    const w = item ? item[1].replace(/^e[- ]?bike$/, 'bike').replace(/ /g, ' ?') : '';
+    const hasItem = !item || new RegExp(`\\b(?:e ?-?)?${w}s?\\b`).test(own);
+    if (v.type === 'tour' && /\brentals?\b/.test(own)) add('rental_outfitter', 35, hasItem ? 'Rents what you asked for' : null);
+    if (item) add(hasItem ? 'rental_item' : 'rental_other_item', hasItem ? 25 : -40, null);
+    if (v.isShop) add('rental_shop_after_tours', -100, null);
+    if (item) { const w = item[1].replace(/^e-?bike$/, 'bike').replace(/ /g, ' ?'); if (new RegExp(`\\b(?:e-?)?${w}s?\\b`).test(own)) add('rental_item', 25, null); else add('rental_other_item', -40, null); }
+  }
   if (v.isShop && SHOP_ASKED_RE.test(ctx.queryText || '')) {
     const rentalAsked = /\b(?:rentals?|rent|tuning|gear)\b/.test(ctx.queryText || '');
     const rentalShop = /\b(?:rentals?|tuning|repairs?)\b/.test(normWords(v.cuisine || ''));
@@ -1910,7 +1936,7 @@ function placeReasons(v, ctx) {
     const label = i.lakeside ? 'a walk by the lake' : (tripRequirements.LABELS && tripRequirements.LABELS[i.value]) || (i.kind === 'activity' && ACTIVITY_REASON_LABELS[i.value]) || String(i.value).replace(/_/g, ' ');
     // 2026-10-25 (tools audit): an activity is not "a skiing" or "a winter": activities and -ing words take no article.
     const bare = /^(?:a|an) /.test(label) || /s$/.test(label) || (i.kind === 'activity' && !(tripRequirements.LABELS && tripRequirements.LABELS[i.value])) || /ing$/.test(label);
-    const text = `Matches your request for ${bare ? label : `a ${label}`}`;
+    const text = `Matches your request for ${bare ? label : `${/^[aeiou]/i.test(label) && !/^(?:uni|eu)/i.test(label) ? 'an' : 'a'} ${label}`}`;
     if (!out.some((r) => r.text === text)) out.push({ code: 'request', text, weight: 30 });
   }
   if (!['outdoor', 'beach', 'indoor', 'tour', 'sport'].includes(v.type)) return out;
@@ -1953,6 +1979,13 @@ function stopFrom(v, scored, extra, ctx) {
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  // Tour test 6 (Whistler, 2026-11-17): the request names a child's age and the operator's published list has a trip for
+  // older children only ("Treetop course, ages 7+" with a 6-year-old): say so, the lowest such age.
+  if (ctx && v && v.type === 'tour' && kidsYoungest(ctx) != null && Array.isArray(v.tourListAges)) {
+    const older = v.tourListAges.filter((n) => n > kidsYoungest(ctx) && n < 19)[0];
+    const note = older ? `Some activities are ${older}+: check Tours & prices.` : '';
+    if (note && !caveats.includes(note)) caveats.push(note);
+  }
   if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
@@ -6608,7 +6641,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6642,7 +6675,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};

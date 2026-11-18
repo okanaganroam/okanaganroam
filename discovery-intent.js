@@ -245,6 +245,9 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:money|cost|price|expense|budget)s? (?:is |are )?no (?:object|issue|concern|problem|limit)\b/g, ' luxury ').replace(/\bno (?:budget|expense) (?:limit|spared)\b/g, ' luxury ');
   // A nap in the middle of the day is a pacing wish, not a place; a named kind of party is a celebration.
   s = s.replace(/\b(?:with |and )?(?:a |an |the )?(?:nap|naps|naptime|nap time)\b(?: in the middle(?: of the day)?| midday| after lunch)?/g, ' ');
+  // Tour test 6 (Whistler, 2026-11-17): a kids' birthday party is an activity for kids (it planned only a restaurant as a
+  // grown-up celebration): "kids birthday", "birthday party activity for 8-year-olds", « fête d'anniversaire pour enfants ».
+  s = s.replace(/\b(?:kids?|children|childs?|toddlers?) ?s? birthday(?: party| parties)?(?: activit(?:y|ies))?\b|\bbirthday (?:party |parties )?(?:activit(?:y|ies) |ideas? |fun )?(?:for|with) (?:the |my |our |a |an |some )?(?:kids?|children|\d+ ?-?(?:year|yr)[- ]?olds?|(?:\d+ )?(?:boys?|girls?)|son|daughter|little ones)\b/g, ' kids activities ');
   s = s.replace(/\b(?:retirement|birthday|farewell|graduation|engagement|office|staff|company|christmas|holiday|going away|baby shower) (?:party|parties|do)\b/g, ' celebration ');
   s = s.replace(/\bschool (?:group|trip|class|field trip)\b/g, ' kids ');
   // "a sunset dinner" is a dinner, not a lookout plus a dinner. Sites with lake-view listings read it as dinner with a lake view;

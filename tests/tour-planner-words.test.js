@@ -125,7 +125,9 @@ test('the operator’s category words for its kind match the planner kind (infer
   const bad = [];
   for (const [k, kind] of Object.entries(expect)) {
     const v = app.getVenue(ops[k].id);
-    const kinds = tr.inferPlannerKinds({ type: 'tour', name: v.name, description: v.description, cuisine: v.cuisine });
+    // Tour test 6 (2026-11-17): the adventure kind's page word is "Adventure" when her words name nothing narrower (it was
+    // the chip's whole "ATV, bungee…" label); the planner reads her picked kinds too (server.js plannerKinds), as it plans.
+    const kinds = tr.inferPlannerKinds({ type: 'tour', name: v.name, description: v.description, cuisine: v.cuisine, ...(k === 'adventure' ? { tourKinds: app.venueTourInfo(v.id).kinds } : {}) });
     if (!kinds.includes(kind)) bad.push(`${k} (${v.cuisine}) -> ${JSON.stringify(kinds)}`);
   }
   assert.deepEqual(bad, []);
@@ -158,4 +160,16 @@ test('Whistler real-data fixes: snowshoe tour before trails, guided snowshoe in 
   const cs = await names('cat skiing in Penticton on February 10');
   assert.ok(cs.includes(catski.name), JSON.stringify(cs));
   assert.ok(!(tr.extractTripRequirements({ text: 'snowcat tour in penticton' }).items || []).some((i) => i.value === 'heli_ski'));
+});
+
+// Tour test 6 (Whistler, 2026-11-17): rentals by what is rented, adventure parks and kids' birthdays, EN and FR.
+test('tour test 6 words: "e-bike rental", « location de vélos », "adventure park", « parc d’aventure », a kids’ birthday', async () => {
+  const { ops } = await fixtures();
+  const bad = [];
+  const first = async (q, want) => { const got = itemsOf(await plan(q)).map((x) => x.venue.name); if (!got.length || got[0] !== want) bad.push(`"${q}" -> ${JSON.stringify(got)}`); };
+  for (const q of ['e-bike rental in Penticton on July 10', 'bike rentals in Penticton on July 10', 'location de vélos électriques à Penticton le 10 juillet', 'location de vélos à Penticton le 10 juillet', 'kayak rental in Penticton on July 10']) await first(q, ops.rentals.name);
+  for (const q of ['adventure park in Penticton on July 10', 'parc d’aventure à Penticton le 10 juillet', 'ropes course in Penticton on July 10', 'hébertisme à Penticton le 10 juillet']) await first(q, ops.adventure.name);
+  const bday = itemsOf(await plan('kids birthday party activity in Penticton on July 10'));
+  if (!bday.length || !['tour', 'indoor', 'sport'].includes(bday[0].venue.type)) bad.push(`kids birthday -> ${JSON.stringify(bday.map((x) => x.venue.name))}`);
+  assert.deepEqual(bad, []);
 });

@@ -257,9 +257,10 @@ test('3. the dogs follow-up in trip words for a tour (EN + FR); the page line re
 test('4. saving "Who can come" takes the food-only badges off a tour (on that save only)', async () => {
   const { v, t } = dev();
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
-  assert.deepEqual(c.tourFoodBadges, ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour']);
+  // Tour test 6 adds the place badges the tour setup never shows (Lake view…) after these.
+  assert.deepEqual(c.tourFoodBadges.slice(0, 8), ['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour']);
   assert.deepEqual(app.TOUR_FOOD_BADGES_CLEARED, c.tourFoodBadges);
-  assert.match(CLIENT, /if \(TOUR\) \(C\.tourFoodBadges \|\| \['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour'\]\)\.forEach\(function\(b\)\{ if \(S\.savedBadges\[b\] \|\| \(CUR\.badges \|\| \{\}\)\[b\]\) \{ sendB\[b\] = false; S\.badges\[b\] = false; \} \}\);/);
+  assert.match(CLIENT, /if \(TOUR\) \(C\.tourFoodBadges \|\| \['patio', 'live_music', 'sports_tv', 'vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'happy_hour'(?:, 'lake_view')?\]\)\.forEach\(function\(b\)\{ if \(S\.savedBadges\[b\] \|\| \(CUR\.badges \|\| \{\}\)\[b\]\) \{ sendB\[b\] = false; S\.badges\[b\] = false; \} \}\);/);
   assert.equal(cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text).tourFoodBadges, undefined);
   // The badge row of the page: between "See hours" and the buttons.
   const badgeRow = () => { const p = plain(page(v, 'en')); return p.slice(p.indexOf('See hours'), p.indexOf('Open in Google Maps')); };

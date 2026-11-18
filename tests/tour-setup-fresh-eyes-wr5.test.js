@@ -87,7 +87,7 @@ function rob() {
 test('1. price box: "650 per boat" and other worded prices are never trimmed; per boat points to Private tours; "2 hrs $95pp" is refused; per person is fine (EN + FR)', async () => {
   // The setup's own reader, as the page runs it.
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   for (const x of ['650 per boat', '650/boat', '$650 for 4 ppl', '650 per charter', '650 for the whole boat', '$650 per group', '1100 for up to 6']) { assert.equal(why(x), 'group', x); assert.ok(Number.isNaN(rd(x)), x); }
@@ -104,9 +104,9 @@ test('1. price box: "650 per boat" and other worded prices are never trimmed; pe
   assert.equal(text.en.tour.tpriceLeadPick, 'Your card will say “From {x} a person”.');
   assert.equal(text.fr.tour.tpriceLeadPick, 'Votre fiche indiquera « À partir de {x} par personne ».');
   assert.match(text.en.tour.tpriceHours, /starts with a trip length/); assert.match(text.en.tour.tpriceOne, /One price here/);
-  assert.match(text.en.tour.tpriceMore, /Priced per boat\? Use Private tours below\.$/);
+  assert.match(text.en.tour.tpriceMore, /Priced per boat\? Use Private tours below\./);
   assert.match(CLIENT, /if \(k === 'tpriceToPriv'\)/);
-  assert.match(CLIENT, /S\.nudge = pwhy === 'group' && T\.tpriceGroup \? T\.tpriceGroup : pwhy === 'hours'/);
+  assert.match(CLIENT, /S\.nudge = pwhy === 'group' && T\.tpriceGroup \? T\.tpriceGroup : /);
   // The server reads the same way (the edit page sends text): per-person refused with the reason, private takes per boat.
   assert.match(app.cleanTourPrice('650 per boat', true).error, /Private tours/);
   assert.match(app.cleanTourPrice('2 hrs $95pp', true).error, /trip length/);

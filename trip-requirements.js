@@ -32,11 +32,13 @@ const KINDS = {
   paddle_tour: /\b(?:(?:guided )?(?:kayak(?:ing)?|canoe(?:ing)?|sup|paddle ?board(?:ing)?|paddling|paddle) (?:tours?|trips?|excursions?|lessons?|outings?)|guided (?:kayak|canoe|paddl)\w*)\b/,
   // Every tour kind: a rental shop listed as a tour ("Rentals"); "equipment rentals" planned a museum. Only plain rental
   // words: "bike rental", "boat rental" keep what they found before.
-  rentals: /\b(?:(?:equipment|gear|outdoor gear|adventure gear) rentals?|rentals)\b/,
+  // Tour test 6 (Whistler, 2026-11-17): "E-bike rental", "kayak rental", "ski rental" (and « location de vélos électriques »,
+  // which reads "e-bike rental") are rentals too: the rental outfitters first, shops that rent after (it planned ski shops).
+  rentals: /\b(?:(?:equipment|gear|outdoor gear|adventure gear|(?:e-?)?bikes?|bicycles?|kayaks?|canoes?|sups?|paddle ?boards?|skis?|snowboards?|snowshoes?|boats?) (?:rentals?|hire)|rentals)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
-  park: /\bparks?\b/,
+  park: /\b(?<!adventure )(?<!aerial )parks?\b/, // tour test 6: an adventure park is not a park
   horseback: /\b(?:horseback riding|horseback rides?|horseback|horse riding|horse rides?|trail rides?|horse riding tours?)\b/, // 2026-10-25: "a horseback ride"
   sunset: /\b(?:sunset|sunsets)\b/,
   // Every tour kind (2026-11-17): the request's "dog sledding" reaches here as "dog sled" (REQUEST_SYNONYMS); it listed every tour.
@@ -45,6 +47,10 @@ const KINDS = {
   snowshoe_tour: /\b(?:snowshoe tours?|guided snowshoe\w*|snowshoe (?:trips?|outings?|excursions?))\b/,
   // Sea to Sky adventures (2026-10-25): matched in the request and in each tour's own name and description.
   zipline: /\b(?:zip ?lines?|zip ?lining|ziplining|zip trek|ziptrek)\b/,
+  // Tour test 6 (Whistler, 2026-11-17): "adventure park" / « parc d'aventure » planned one hard hike. An adventure park is
+  // a tour whose operator picked the adventure kind (ATV, bungee, climbing, ropes courses…) or any listing whose own name
+  // or category says adventure park, treetop or ropes course.
+  adventure_park: /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top (?:courses?|adventures?|parks?|trekking)|ropes? courses?|high ropes)\b/,
   bungee: /\b(?:bungee|bungy)(?: jumps?| jumping)?\b/,
   rafting: /\b(?:rafting|white ?water rafting|river rafts?|raft trips?|raft tours?)\b/,
   // Tour test 3 (Whistler, 2026-11-17): a tour's own words "Scenic or helicopter flights" / "Helicopter & scenic flights".
@@ -87,8 +93,8 @@ const HELI_SKI_LISTING_RE=/\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|ca
 // Every tour kind (2026-11-17): the setup's tour kinds (venue_tour_info.kinds) -> the planner kinds they are.
 const TOUR_KIND_PLANNER = { fishing: ['fishing_tour'], boat: ['boat_tour'], jetboat: ['boat_tour'], raft: ['rafting'], wildlife: ['wildlife_tour'], zipline: ['zipline'],
   flight: ['scenic_flight'], walking: ['walking_tour'], food: ['food_tour'], wine: ['wine_tour'], farm: ['farm'], snowmobile: ['snowmobile_tour'], dogsled: ['snow_tour'],
-  snowshoe: ['snowshoe_tour'], heli: ['heli_ski'], adventure: ['atv'], horseback: ['horseback'], rentals: ['rentals'], bike: ['bike_tour'], paddle: ['paddle_tour'] };
-const LABELS = {skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
+  snowshoe: ['snowshoe_tour'], heli: ['heli_ski'], adventure: ['atv', 'adventure_park'], horseback: ['horseback'], rentals: ['rentals'], bike: ['bike_tour'], paddle: ['paddle_tour'] };
+const LABELS = {adventure_park:'adventure park',skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
 const WALKING_TRANSPORT = /\b(?:no car|(?:we |i )?(?:do not|don t|dont) drive|(?:rely|relying) on (?:public )?(?:transit|buses|the bus)|public transit|no vehicle|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
@@ -200,6 +206,9 @@ function inferPlannerKinds(v) {
     if (kind==='food_tour'||kind==='walking_tour') return v.type==='tour'&&((Array.isArray(v.tourKinds)&&v.tourKinds.includes(kind==='food_tour'?'food':'walking'))||re.test(text));
     // Every tour kind (2026-11-17): a tour is that kind when its operator picked the matching kind in the setup (Fishing,
     // Boat tours, Rafting…), whatever its name says; fishing trips, heli-skiing and rentals are tours only.
+    // Tour test 6 (Whistler, 2026-11-17): the adventure kind is an ATV tour only when its own words don't name something
+    // else instead (a zipline and treetop park picked it for its ropes course: "We have no ATVs").
+    if (kind==='atv'&&v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.includes('adventure')&&!re.test(text)&&/\b(?:tree ?top|ropes?|adventure parks?|bungee|bungy|climb\w*|canyon\w*|via ferrata|paraglid\w*|skydiv\w*|zip ?lines?)\b/.test(text)) return false;
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     if (kind==='fishing_tour') return v.type==='tour'&&(re.test(text)||/\b(?:fishing|angling)\b/.test(text));
     // From Whistler Roam #188 (2026-11-17, real-data check): heli-skiing is read from the listing's own name and category words (its
@@ -207,8 +216,11 @@ function inferPlannerKinds(v) {
     // listed Canadian Wilderness Adventures ("… snowshoe & snowcat tours") and Coast Range Alpine Yurt (its description
     // names "Coast Range Heli-Skiing's yurt") ahead of the three heli-ski companies.
     if (kind==='heli_ski') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); return HELI_SKI_LISTING_RE.test(own)||(!String(v.cuisine||'').trim()&&HELI_SKI_LISTING_RE.test(text)); }
+    if (kind==='adventure_park') return re.test(norm([v.name,v.cuisine,v.textName].filter(Boolean).join(' ')));
     if (kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||/\bsnowshoe\w*/.test(text));
-    if (kind==='rentals') return v.type==='tour'&&/\brentals?\b/.test(text);
+    // Tour test 6: a shop that rents is a rental place too (after the tours that rent: trip-planner.js scoreVenue).
+    // A place listed outdoors whose own name or category says rentals ("Lakeside Boat Rentals") too.
+    if (kind==='rentals') return (v.type==='tour'&&/\brentals?\b/.test(text))||((v.type==='shop'||v.isShop)&&/\brentals?\b/.test(norm(`${text} ${v.cuisine||''}`)))||(['outdoor','beach','sport'].includes(v.type)&&/\brentals?\b/.test(norm(`${v.name||''} ${v.textName||''} ${v.cuisine||''}`)));
     if (kind==='bike_tour') return v.type==='tour'&&(re.test(text)||/\b(?:e-?bikes?|bikes?|biking|bicycles?|cycling)\b/.test(text));
     if (kind==='paddle_tour') return v.type==='tour'&&(re.test(text)||/\b(?:kayak\w*|canoe\w*|sup|paddle ?board\w*|paddling)\b/.test(text));
     if (['walk','easy_walk'].includes(kind)) {
@@ -691,7 +703,7 @@ function consumedTerms(requirements) {
     if (i.kind === 'feature') add(`${i.value.replace(/_/g, ' ')} meals meal only must verified`);
     if (i.kind === 'activity') add(i.value==='viewpoints'?'sunset viewpoints viewpoint watch place to':i.value);
     // From Whistler Roam #188 (2026-11-17): the new tour kinds' own words too ("cat skiing in Whistler" kept "cat" as a word to find).
-    if (i.kind === 'venue_kind') add(`${LABELS[i.value]} ${i.value==='sunset'?'watch place to':i.value==='cooking'?'classes':i.value==='horseback'?'horse riding':i.value==='scenic_flight'?'helicopter helicopters heli flights flightseeing glacier landing landings float plane planes floatplane seaplane ride rides':i.value==='heli_hike'?'helihiking heli hike hikes':i.value==='food_tour'?'food foodie culinary tasting tours':i.value==='walking_tour'?'walking walk walks tours lights light lantern night evening ghost history historic historical heritage guided winter christmas holiday':i.value==='heli_ski'?'heli ski skis skiing heliski heliskiing heliboarding board boarding cat catski catskiing snowcat snowcats':i.value==='snowshoe_tour'?'snowshoe snowshoes snowshoeing guided tours trips outings excursions':i.value==='fishing_tour'?'fishing charter charters trip trips tours guide guides guided guiding salmon sturgeon sport':i.value==='rentals'?'equipment gear outdoor adventure rental rentals':i.value==='bike_tour'?'guided bike bikes biking e ebike cycling mountain road gravel tours rides trips':i.value==='paddle_tour'?'guided kayak kayaking canoe canoeing sup paddle paddleboard paddling tours trips excursions lessons outings':''}`);
+    if (i.kind === 'venue_kind') add(`${LABELS[i.value]} ${i.value==='sunset'?'watch place to':i.value==='cooking'?'classes':i.value==='horseback'?'horse riding':i.value==='scenic_flight'?'helicopter helicopters heli flights flightseeing glacier landing landings float plane planes floatplane seaplane ride rides':i.value==='heli_hike'?'helihiking heli hike hikes':i.value==='food_tour'?'food foodie culinary tasting tours':i.value==='walking_tour'?'walking walk walks tours lights light lantern night evening ghost history historic historical heritage guided winter christmas holiday':i.value==='heli_ski'?'heli ski skis skiing heliski heliskiing heliboarding board boarding cat catski catskiing snowcat snowcats':i.value==='snowshoe_tour'?'snowshoe snowshoes snowshoeing guided tours trips outings excursions':i.value==='fishing_tour'?'fishing charter charters trip trips tours guide guides guided guiding salmon sturgeon sport':i.value==='rentals'?'equipment gear outdoor adventure rental rentals':i.value==='adventure_park'?'adventure park parks aerial treetop tree top ropes course courses high trekking':i.value==='bike_tour'?'guided bike bikes biking e ebike cycling mountain road gravel tours rides trips':i.value==='paddle_tour'?'guided kayak kayaking canoe canoeing sup paddle paddleboard paddling tours trips excursions lessons outings':''}`);
   }
   return terms;
 }
@@ -739,7 +751,7 @@ function explicitOutingComponents(trip,requirements) {
   if(!scoped)trip=skatingComponents(trip,requirements);
   if(!scoped)return bindNamedVenues(requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip,requirements);
   const text=requirements.text||'',parts=[];
-  const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(k)?'tour':'indoor';
+  const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour'].includes(k)?'tour':'indoor';
   const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false,...extra});
   for(const i of kinds)parts.push(make(i.value==='skating'?['indoor','sport','outdoor']:[typeFor(i.value)],LABELS[i.value],{plannerKinds:[i.value]}));
   for(const i of items.filter(i=>i.kind==='activity'&&i.strength==='must')) {

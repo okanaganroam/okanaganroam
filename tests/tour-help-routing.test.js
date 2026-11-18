@@ -203,3 +203,200 @@ test("other setup types keep their own help: no tour topics, and their usual que
   const win = await setupFor("winery", { cuisine: "Winery" });
   assert.equal(win.en.topic("tour-per-boat"), undefined);
 });
+
+// Tour test 6 (Whistler fresh eyes, Sophie-Anne, Android FR, 2026-11-17): a zipline, treetop course and summer e-bike
+// rental company. French Help missed or misrouted 8 of 20 (one-trip season, boss, "when does it show", storms, walk-ups,
+// lengths, hébertisme, birthdays); English missed "lightning". Her questions, as asked (shot numbers from the report).
+const ASKED6 = [
+  ["6-005", "fr", "je ne suis pas la propriétaire, je peux remplir ça?", ["not-owner","staff"]],
+  ["6-006", "fr", "est-ce que mon patron va voir mes changements?", ["setup-who-sees"]],
+  ["6-009", "fr", "notre bureau est au village mais le parcours est ailleurs, comment je l'explique?", ["tour-meeting"]],
+  ["6-010", "fr", "il y a une navette gratuite entre notre bureau et le parcours", ["tour-meeting"]],
+  ["6-013", "fr", "on a des heures d'intersaison, d'hiver et d'été, trois périodes différentes", ["seasonal-hours","setup-season"]],
+  ["6-014", "fr", "les départs sont aux 30 minutes, où je mets ça?", ["tour-times"]],
+  ["6-028", "fr", "la location de vélos électriques c'est l'été seulement, comment je le dis?", ["tour-one-trip-season"]],
+  ["6-030", "fr", "parcours d'aventure dans les arbres (hébertisme), c'est quel genre?", ["tour-kinds-pick","tour-kinds-other"]],
+  ["6-033", "fr", "tyrolienne 2h30, parcours 1h30, e-bikes 2h ou demi-journée, quelle durée?", ["tour-lengths"]],
+  ["6-035", "fr", "les e-bikes c'est 69$ par vélo, pas par personne", ["tour-per-unit"]],
+  ["6-044", "fr", "il faut réserver la veille, mais sans réservation s'il reste de la place", ["tour-same-day","tour-lead-time"]],
+  ["6-046", "fr", "l'âge minimum est différent pour chaque activité", ["tour-ages-per-trip"]],
+  ["6-047", "fr", "limite de poids de 70 à 275 lb pour la tyrolienne, je l'écris où?", ["tour-weight"]],
+  ["6-048", "fr", "le stationnement est payant au parcours", ["parking-paid"]],
+  ["6-068", "fr", "s'il y a des orages on ferme le parcours", ["tour-weather"]],
+  ["6-072", "fr", "on fait des fêtes d'anniversaire pour les enfants, comment le dire?", ["tour-groups"]],
+  ["6-073", "fr", "on fait des sorties d'entreprise et de la consolidation d'équipe", ["tour-groups"]],
+  ["6-074", "fr", "on vend des cartes-cadeaux", ["tour-gift"]],
+  ["6-088", "fr", "ça paraît quand sur le site?", ["setup-live-when"]],
+  ["6-089", "fr", "est-ce que mon patron va voir ce que j'ai changé?", ["setup-who-sees"]],
+  ["6-192", "en", "will my boss see my changes?", ["setup-who-sees"]],
+  ["6-193", "en", "when does it show on the site?", ["setup-live-when"]],
+  ["6-194", "en", "e-bike rentals are summer only, how do i say that?", ["tour-one-trip-season"]],
+  ["6-195", "en", "lightning closes the course", ["tour-weather"]],
+  ["6-196", "en", "we do kids birthday parties", ["tour-groups"]],
+  // The same questions in other words (the fix list for test 6).
+  ["6+", "fr", "c'est l'été seulement pour les vélos", ["tour-one-trip-season"]],
+  ["6+", "fr", "les vélos seulement l'été, le reste toute l'année", ["tour-one-trip-season"]],
+  ["6+", "fr", "la raquette c'est l'hiver seulement, comment le dire?", ["tour-one-trip-season"]],
+  ["6+", "fr", "mon patron va voir ce que j'ai fait?", ["setup-who-sees"]],
+  ["6+", "fr", "quand est-ce que ça paraît?", ["setup-live-when"]],
+  ["6+", "fr", "quand est-ce que ça paraît sur ma page?", ["setup-live-when"]],
+  ["6+", "fr", "on ferme le parcours quand il y a de la foudre", ["tour-weather"]],
+  ["6+", "fr", "et la météo, on annule s'il y a un orage", ["tour-weather"]],
+  ["6+", "en", "we close the course in a thunderstorm", ["tour-weather"]],
+  ["6+", "en", "thunderstorms close the zipline", ["tour-weather"]],
+  ["6+", "fr", "sans réservation s'il y a des places disponibles", ["tour-same-day","tour-lead-time"]],
+  ["6+", "en", "walk-ups welcome if there is space", ["tour-same-day","tour-lead-time"]],
+  ["6+", "fr", "nos activités ont des durées différentes", ["tour-lengths"]],
+  ["6+", "fr", "2h30 pour la tyrolienne, 1h30 pour le parcours", ["tour-lengths"]],
+  ["6+", "fr", "on a un parcours d'arbre en arbre", ["tour-kinds-pick","tour-kinds-other"]],
+  ["6+", "fr", "hébertisme", ["tour-kinds-pick","tour-kinds-other"]],
+  ["6+", "en", "we have a treetop ropes course, which kind?", ["tour-kinds-pick","tour-kinds-other"]],
+  ["6+", "en", "adventure park, which kind do i pick", ["tour-kinds-pick","tour-kinds-other"]],
+  ["6+", "fr", "navette entre notre bureau et le site", ["tour-meeting"]],
+  ["6+", "en", "free shuttle from our office to the course", ["tour-meeting"]],
+  ["6+", "fr", "on fait des anniversaires d'enfants", ["tour-groups"]],
+  ["6+", "en", "birthday party packages for kids", ["tour-groups"]],
+  ["6+", "en", "our bikes are $69 per bike", ["tour-per-unit"]],
+  ["6+", "en", "price is per bike not per person", ["tour-per-unit"]],
+  ["6+", "en", "we charge per rental", ["tour-per-unit"]],
+  ["6+", "en", "kayak rentals are $40 an hour", ["tour-per-unit"]],
+  ["6+", "fr", "c'est 69 $ par location", ["tour-per-unit"]],
+  ["6+", "fr", "le prix est par vélo", ["tour-per-unit"]],
+  ["6+", "fr", "on fait seulement de la location, pas de sorties", ["tour-per-unit"]],
+];
+// A French rephrasing of every English question from tests 1-5 (ASKED) and of the English "other words" (MORE) that had
+// none: the same topics must come up in French.
+const FR_TWINS = [
+  ["1-005", "on part à 9 h et à 13 h tous les jours, où je mets les heures de départ", ["tour-times"]],
+  ["1-006", "on fait de la motoneige de décembre à mars et du VTT de juin à septembre, fermé entre les deux. comment mettre 2 saisons", ["tour-season","setup-season"]],
+  ["1-013", "deux saisons : motoneige l'hiver et VTT l'été, fermé au printemps et à l'automne", ["tour-season","setup-season","seasonal-hours"]],
+  ["1-025", "pas de VTT ou de jeep dans la liste?", ["tour-kinds-other"]],
+  ["1-026", "on fait des sorties de 2 heures et d'une demi-journée, je peux choisir les deux", ["tour-lengths"]],
+  ["1-030", "l'hiver c'est 189 $ et l'été 149 $, lequel je mets", ["tour-two-prices"]],
+  ["1-031", "les sorties privées à partir de 1200, c'est par personne?", ["tour-private-price","tour-price","tour-per-boat"]],
+  ["1-035", "la veille, mais le jour même ça va parfois s'ils appellent", ["tour-same-day","tour-lead-time"]],
+  ["1-037", "les conducteurs doivent avoir 16 ans avec un permis, les passagers 8 ans et plus avec un adulte. je choisis quoi", ["tour-drivers"]],
+  ["1-050", "s'il y a un danger d'avalanche ou de la fumée de feux de forêt on annule et on rembourse au complet, où je le dis", ["tour-weather"]],
+  ["1-051", "notre boutique est le point de rencontre, puis on les conduit au départ du sentier. comment je le dis", ["tour-meeting"]],
+  ["1-055", "on fait aussi des sorties privées sur réservation", ["tour-groups","tour-private-price","tour-price"]],
+  ["1-056", "avez-vous une place pour les cartes-cadeaux", ["tour-gift"]],
+  ["1-069", "combien de temps avant que ma page montre tout ça", ["setup-live-when"]],
+  ["1-070", "c'est vraiment gratuit ou vous chargez plus tard", ["tour-free"]],
+  ["1-071", "le prix d'été est plus bas, est-ce que la fiche devrait dire 149", ["tour-two-prices"]],
+  ["3-003", "Je suis la gérante du bureau, pas la propriétaire. Est-ce que j'ai le droit de remplir ça?", ["not-owner","staff"]],
+  ["3-004", "Mon patron peut-il voir ce que j'ai fait?", ["setup-who-sees"]],
+  ["3-008", "Notre bureau a des heures fixes mais les vols sont sur réservation. Je choisis lequel?", ["tour-office-hours"]],
+  ["3-009", "L'héliport n'est pas au village, comment dire aux gens où aller?", ["tour-meeting"]],
+  ["3-018", "On a des heures d'hiver ET des heures d'intersaison différentes, fermé le lundi à l'automne. Je peux ajouter les deux?", ["seasonal-hours"]],
+  ["3-035", "Nos vols durent 20 minutes mais l'héliski c'est une journée complète. Quelle durée je choisis?", ["tour-lengths"]],
+  ["3-036", "On fait de l'héli-randonnée l'été, ça va où?", ["tour-one-trip-season"]],
+  ["3-037", "L'héliski c'est seulement l'hiver. Comment je le dis?", ["tour-one-trip-season"]],
+  ["3-052", "L'héliski demande une semaine de préavis mais les vols panoramiques seulement 48 heures. Je choisis quoi?", ["tour-lead-time"]],
+  ["3-053", "Pourquoi mon prix de vol nolisé privé ne s'affiche pas?", ["tour-private-price"]],
+  ["3-055", "Les enfants de moins de 2 ans volent gratuitement sur les genoux, l'héli-randonnée c'est 12 ans et plus et l'héliski 19 ans et plus. Quel âge je choisis?", ["tour-ages-per-trip","tour-age"]],
+  ["3-056", "On a une limite de poids de 300 lb par siège. Je mets ça où?", ["tour-weight"]],
+  ["3-057", "Seuls les vols panoramiques sont accessibles en fauteuil roulant, pas l'héliski. Est-ce que je coche fauteuil roulant?", ["tour-wheelchair"]],
+  ["3-077", "S'il fait mauvais on annule et on rembourse au complet. Où je le dis?", ["tour-weather"]],
+  ["3-078", "Avez-vous un endroit pour les cartes-cadeaux?", ["tour-gift"]],
+  ["3-079", "On fait des mariages et des demandes en mariage. Où je le mentionne?", ["tour-groups"]],
+  ["3-092", "Comment je change quelque chose plus tard?", ["setup-change-later"]],
+  ["3-093", "Mon patron va-t-il recevoir un courriel sur ce que j'ai changé?", ["setup-who-sees"]],
+  ["3-094", "Prenez-vous une commission sur les réservations?", ["tour-free"]],
+  ["4-004", "Je n'ai pas de bureau, juste un point de rencontre sur la place. Est-ce correct?", ["tour-meeting"]],
+  ["4-005", "Les gens vont-ils voir mon numéro de téléphone?", ["phone"]],
+  ["4-011", "Je n'ai pas d'heures de bureau. Mes visites partent à 10 h et 14 h. Je mets quoi ici?", ["tour-times"]],
+  ["4-012", "Mes visites partent à des heures différentes. La visite gourmande c'est seulement du jeudi au dimanche à 16 h", ["tour-times"]],
+  ["4-013", "les gens peuvent se présenter sans réserver pour une visite, est-ce que c'est sur réservation seulement?", ["tour-booking-only","tour-same-day"]],
+  ["4-024", "Une de mes visites est seulement l'hiver, de décembre à février à 18 h. Comment le dire?", ["tour-one-trip-season"]],
+  ["4-030", "Ma visite historique dure une heure et quart et la visite gourmande trois heures. Je touche laquelle?", ["tour-lengths"]],
+  ["4-031", "Les chiens peuvent venir à mes visites à pied mais pas à la visite gourmande. Où je le dis?", ["tour-dogs"]],
+  ["4-034", "Ma visite historique est gratuite, les gens donnent ce qu'ils veulent (contribution volontaire). Je mets quoi comme prix?", ["tour-free-trip"]],
+  ["4-035", "Est-ce que je peux mettre 0?", ["tour-free-trip"]],
+  ["4-046", "Les gens peuvent se présenter sans réserver pour la visite historique mais la visite gourmande doit être réservée la veille. Je choisis quoi?", ["tour-same-day","tour-lead-time"]],
+  ["4-047", "La visite gourmande a de l'alcool donc c'est 19 ans et plus. Les visites à pied sont pour tous les âges. Je choisis quoi?", ["tour-ages-per-trip","tour-age"]],
+  ["4-051", "Il n'y a pas de stationnement, on se rencontre dans le village piéton. Je touche quoi?", ["parking-paid"]],
+  ["4-052", "Est-ce que je peux parler des poussettes? Les enfants sont gratuits pour la visite historique", ["tour-strollers"]],
+  ["4-053", "Certains clients ont des allergies alimentaires ou sont végétariens. Ça va où?", ["tour-allergies"]],
+  ["4-057", "On me parle d'une terrasse mais je fais des visites à pied. J'écris quoi pour les chiens?", ["tour-dogs"]],
+  ["4-072", "J'ai seulement une brochure papier avec mes trois visites. Je peux juste prendre une photo?", ["menu-add"]],
+  ["4-073", "Mes visites partent à des heures différentes, où vont les heures?", ["tour-times"]],
+  ["4-081", "Je peux faire les visites en anglais si les gens le demandent. Où je le dis?", ["tour-languages"]],
+  ["4-082", "C'est quoi le maximum de personnes que je peux prendre? Jamais plus de 12", ["tour-max-group"]],
+  ["4-083", "On part beau temps mauvais temps. Est-ce que je devrais le dire?", ["tour-weather"]],
+  ["4-084", "il n'y a pas de stationnement où on se rencontre", ["parking-paid"]],
+  ["4-089", "Est-ce que j'offre des cartes-cadeaux ici? Je vends des cartes-cadeaux", ["tour-gift"]],
+  ["4-090", "Je fais des visites privées pour les entreprises et les mariages", ["tour-groups"]],
+  ["4-105", "Je pense que j'ai fait une erreur. Comment je la corrige?", ["setup-change-later"]],
+  ["4-106", "Quand est-ce que les gens vont voir ma page?", ["setup-live-when"]],
+  ["4-107", "Le prix dit à partir de 129 $ mais ma visite historique est gratuite. Est-ce une erreur?", ["tour-free-trip"]],
+  ["5-004", "c'est gratuit", ["tour-free"]],
+  ["5-005", "les gens peuvent-ils réserver chez vous", ["tour-book-direct"]],
+  ["5-009", "c'est l'adresse de ma maison. on se rencontre au quai", ["tour-meeting"]],
+  ["5-014", "la saison du saumon de juillet à octobre est occupée mais on sort toute l'année", ["tour-busy-season"]],
+  ["5-028", "je choisis pêche ou bateau? on fait les deux", ["tour-kinds-pick"]],
+  ["5-029", "comment j'ajoute l'observation des baleines aussi", ["tour-kinds-pick"]],
+  ["5-032", "pêche 4-8 h, croisière 2 h", ["tour-lengths"]],
+  ["5-035", "le prix est par bateau pas par personne", ["tour-per-boat"]],
+  ["5-036", "une personne de plus c'est 75 $, où je mets ça", ["tour-several-prices"]],
+  ["5-037", "j'ai 2 prix 650 demi-journée 1100 journée complète", ["tour-several-prices"]],
+  ["5-050", "une semaine d'avance l'été, le jour même ça va l'hiver", ["tour-lead-time"]],
+  ["5-055", "chiens seulement sur les sorties privées", ["tour-dogs"]],
+  ["5-056", "le stationnement est payant à la marina", ["parking-paid"]],
+  ["5-057", "il faut un permis de pêche, je peux en vendre un en ligne", ["tour-licence"]],
+  ["5-065", "ça prend combien de temps avant que ça paraisse", ["setup-live-when"]],
+  ["5-075", "on annule si le vent est trop fort, remboursement complet. où je le dis", ["tour-weather"]],
+  ["5-083", "max 6 par bateau, 2 bateaux pour les plus grands groupes", ["tour-max-group"]],
+  ["5-084", "une sortie de pêche pour 6 personnes, peuvent-ils réserver", ["tour-groups","tour-max-group","tour-book-direct"]],
+  ["5-095", "la page dit à partir de 650 $ par personne mais c'est pour tout le bateau", ["tour-per-boat"]],
+  ["5-096", "c'est quoi un prix de sortie privée", ["tour-private-price","tour-price","tour-per-boat"]],
+  ["more", "650 par bateau jusqu'à 4 personnes", ["tour-per-boat"]],
+  ["more", "le prix est pour tout le groupe", ["tour-per-boat"]],
+  ["more", "on charge par groupe, pas par personne", ["tour-per-boat"]],
+  ["more", "chaque personne de plus c'est 75 $", ["tour-several-prices"]],
+  ["more", "on a plusieurs prix", ["tour-several-prices"]],
+  ["more", "des options comme la location de cannes à pêche", ["tour-several-prices"]],
+  ["more", "période de pointe en juillet et août", ["tour-busy-season"]],
+  ["more", "2-4 h", ["tour-lengths"]],
+  ["more", "les sorties durent de 3 à 5 heures", ["tour-lengths"]],
+  ["more", "chiens à certaines sorties", ["tour-dogs"]],
+  ["more", "ont-ils besoin d'un permis de pêche", ["tour-licence"]],
+  ["more", "on vend des permis de pêche", ["tour-licence"]],
+  ["more", "maximum par bateau", ["tour-max-group"]],
+  ["more", "taille du groupe", ["tour-max-group"]],
+  ["more", "6 personnes par bateau", ["tour-max-group"]],
+  ["more", "prenez-vous les réservations", ["tour-book-direct"]],
+  ["more", "les clients peuvent-ils réserver sur votre site", ["tour-book-direct"]],
+  ["more", "on fait de la pêche et des sorties en bateau", ["tour-kinds-pick"]],
+  ["more", "quels genres je choisis", ["tour-kinds-pick"]],
+  ["more", "les conducteurs doivent avoir 16 ans avec un permis", ["tour-drivers"]],
+  ["more", "est-ce gratuit", ["tour-free"]],
+  ["more", "ma visite à pied est gratuite", ["tour-free-trip"]],
+];
+
+test("tour test 6: every Help question (FR + EN) and its rephrasings land on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ziplines, treetop adventure course & e-bike rentals" });
+  const wrong = [];
+  for (const [k, lang, q, want] of ASKED6) { const r = (lang === "fr" ? fr : en).best(q); if (!want.includes(r.id)) wrong.push(`${k} "${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+
+test("French parity: a French rephrasing of every English question in this suite lands on the same topics", async () => {
+  const { fr } = await setupFor("tour", { cuisine: "Fishing charters & whale watching" });
+  const enKeys = ASKED.filter((x) => x[1] === "en").map((x) => x[0]);
+  const twinKeys = new Set(FR_TWINS.map((x) => x[0]));
+  assert.deepEqual(enKeys.filter((k) => !twinKeys.has(k)), [], "every English question has a French twin");
+  const wrong = [];
+  for (const [k, q, want] of FR_TWINS) { const r = fr.best(q); if (!want.includes(r.id)) wrong.push(`${k} "${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+
+test("bare 'how do I say that' / 'comment le dire' no longer picks the one-trip season answer", async () => {
+  const { en, fr } = await setupFor("tour");
+  for (const k of ["tour-one-trip-season"]) {
+    const t = en.topic(k);
+    assert.ok(!(t.keys || []).includes("how do i say that") && !(t.keysFr || []).includes("comment le dire"), k);
+  }
+  assert.notEqual(fr.best("comment le dire?").id, "tour-one-trip-season");
+  assert.notEqual(en.best("how do i say that?").id, "tour-one-trip-season");
+  assert.match(String(en.topic("tour-per-unit").a), /Your tours and prices/); assert.match(String(fr.topic("tour-per-unit").aFr), /Vos sorties et tarifs/);
+});

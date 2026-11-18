@@ -314,7 +314,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   const kt = app.tourKindsText;
   // Karen: research "Helicopter tours, heli-skiing & heli-hiking", Scenic or helicopter flights + Heli-skiing + Something else.
   assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Heli-skiing, helicopter flights & heli-hiking'); // list order (tour test 5)
-  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Héliski, vols en hélicoptère et heli-hiking'); // list order (tour test 5)
+  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Héliski, vols en hélicoptère et héli-randonnée'); // list order (tour test 5); tour test 6: leftovers in French
   // A chip that covers several things: only the side her words name; all of it when they name none or every side.
   assert.equal(kt(['flight'], false, ''), 'Helicopter & scenic flights');
   assert.equal(kt(['flight'], true, ''), 'Vols en hélicoptère et panoramiques');
@@ -330,7 +330,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   assert.equal(kt(['snowmobile', 'adventure'], true, 'Snowmobile & ATV tours'), 'Motoneige et sorties en quad (VTT)');
   // Unchanged: her own fuller words, the "and" chips, nothing picked.
   assert.equal(kt(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
-  assert.equal(kt(['adventure'], false, ''), 'ATV, bungee, climbing or canyoning');
+  assert.equal(kt(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, not the chip's whole label
   assert.equal(kt(['wildlife'], false, 'Whale watching'), 'Whale watching'); // tour test 5: the chip now says whales, so her own words stay
   assert.equal(kt(['raft'], false, 'Rafting'), 'Rafting');
   assert.equal(kt(['other'], false, 'ATV tours'), '');
@@ -340,7 +340,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   // The whole way through: saved kinds -> the listing's words, the save's answer, the setup's preview, the cards, the pages.
   const { v, t } = karen();
   const saved = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
-  const EN = 'Heli-skiing, helicopter flights & heli-hiking', FR = 'Héliski, vols en hélicoptère et heli-hiking'; // tour test 5: list order; // tour test 4: one capital in the list
+  const EN = 'Heli-skiing, helicopter flights & heli-hiking', FR = 'Héliski, vols en hélicoptère et héli-randonnée'; // tour test 6: leftovers said in French; // tour test 5: list order; // tour test 4: one capital in the list
   assert.equal(app.getVenue(v.id).cuisine, EN);
   if (saved.body.tour_words) assert.deepEqual(saved.body.tour_words, { en: EN, fr: FR });
   const again = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all', book: '48h' } }));
@@ -409,7 +409,7 @@ test('8. every price box takes words after the number', async () => {
   // The setup's own reader, as the page runs it.
   // Tour test 5 (2026-11-17): the reader also says why it refuses ("650 per boat"), so it brings tourPriceWhy and feeHours.
   const head = /  function moneyHead\(x\)\{.*\}\n/.exec(CLIENT)[0], read = /  function tourPriceRead\(x, priv\)\{.*\}\n/.exec(CLIENT)[0];
-  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
+  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
   const ctx = {}; vm.createContext(ctx); vm.runInContext(`${head}${why}${read}`, ctx);
   const rd = (x) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)})`, ctx);
   for (const [typed, want] of [['$189.00 per person', 189], ['189 pp', 189], ['189 $ par personne', 189], ['189 $ par personne', 189], ['1 500 $ par personne', 1500], ['$1,500 CAD', 1500], ['CA$189 per person', 189], ['129 each', 129], ['12.50/person', 12.5], ['12,50 $', 12.5], ['3900+', 3900], ['129', 129], ['', null]]) assert.equal(rd(typed), want, typed);
