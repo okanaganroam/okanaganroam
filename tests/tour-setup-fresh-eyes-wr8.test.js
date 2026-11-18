@@ -207,7 +207,7 @@ test('7. minor: $ for a bracketed price, 80-character prices, one trip count, ev
   assert.doesNotMatch(plain(gp), /Every day 9 AM – 4:30 PM/);
   // The adult chip only beside All ages when picked; a 4+ chip for every tour; the nudge stays in view; taller links.
   assert.match(CLIENT, /S\.tour\.age && S\.tour\.age !== '19' && \(S\.tour\.age !== 'all' \|\| S\.tour\.adult\)/);
-  assert.match(CLIENT, /\(TOUR \? \[4\]\.concat\(GROUP_SIZES\) : GROUP_SIZES\)/);
+  assert.match(CLIENT, /\(TOUR \? \[4\]\.concat\(GROUP_SIZES, T\.groupsChipBig \? \[21\] : \[\]\) : GROUP_SIZES\)/); // tour test 9: and 21+
   assert.match(CLIENT, /if \(e2 && e2\.getBoundingClientRect && e2\.getBoundingClientRect\(\)\.top < 8\) e2\.scrollIntoView\(\{ block: 'start' \}\);/);
   assert.match(SERVER, /body\.owner-page main p a:not\(\[class\]\), body\.owner-page main \.op-hint a:not\(\[class\]\) \{ display: inline-block; padding: 7px 0; margin: -7px 0; \}/);
 });
