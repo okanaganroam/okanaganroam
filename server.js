@@ -21974,6 +21974,26 @@ function visitRowsOwnerCovered(venue, info) {
         return left ? { ...r, text: left } : null;
       }).filter(Boolean);
     }
+    // Tour test 7 (Whistler, 2026-11-17): research's Known for names a kind he unticked ("Heli-skiing and backcountry ski
+    // touring" after he took Heli-skiing off): that part leaves the line ("Backcountry ski touring"; the card's summary
+    // read "Heli-skiing…"). The kinds pre-picked from the listing's words that he didn't keep, as in tourKindsText.
+    // Display only.
+    if (venue.type === 'tour') {
+      const ti = venueTourInfo(venue.id);
+      if (Array.isArray(ti.kinds) && ti.kinds.length && typeof ti.cuisine_was === 'string') {
+        const gone = tourKindSuggestion({ cuisine: ti.cuisine_was, name: '' }).filter((k) => TOUR_KIND_ORDER.includes(k) && !ti.kinds.includes(k));
+        if (gone.length) rows = rows.map((r) => {
+          if (!r || own.has(r.label) || typeof r.text !== 'string' || !/^known for$/i.test(String(r.label || ''))) return r;
+          const parts = r.text.split(/\s*(?:,|;|&|\band\b)\s*/i).map((x) => x.trim()).filter(Boolean);
+          const keep = parts.filter((x) => !gone.some((k) => tourKindCovers(k, x)));
+          if (keep.length === parts.length) return r;
+          changed = true;
+          if (!keep.length) return null;
+          const t2 = keep.length === 1 ? keep[0] : `${keep.slice(0, -1).join(', ')} and ${keep[keep.length - 1]}`;
+          return { ...r, text: t2.charAt(0).toUpperCase() + t2.slice(1) };
+        }).filter(Boolean);
+      }
+    }
     // Tour test 7 (Whistler, 2026-11-17): once the owner said No dogs ("Who can come" saved without Dogs), research's Good to
     // know no longer says "dogs welcome on tours" (it sat under "No dogs" until he rewrote the line). Display only.
     if (venue.type === 'tour' && venueOwnerFeaturesSaved(venue.id) && !venueOwnerFeatures(venue.id).dog_friendly) {
@@ -22878,7 +22898,8 @@ function venueCardHtml(venue, opts = {}) {
   const isTourCard = themed && !venue.redirect_to;
   const noteIsSummary = isTourCard && (venue.type === 'tour' || tourStyle);
   let tourInfo = null;
-  if (isTourCard) { try { tourInfo = venueVisitInfo(venue.id); } catch (e) { tourInfo = null; } }
+  // Tour test 7: as the page shows it (a research Known for without the kinds he unticked).
+  if (isTourCard) { try { tourInfo = venueVisitInfo(venue.id); if (tourInfo && venue.type === 'tour') tourInfo = visitRowsOwnerCovered(venue, tourInfo); } catch (e) { tourInfo = null; } }
   const tourKnown = tourInfo && Array.isArray(tourInfo.rows) ? tourInfo.rows.find((r) => r.label === 'Known for') : null;
   // Restaurant test 2 (Whistler, 2026-11-14): the owner's French Known for (from the French setup) is the French card's
   // line; the English card never shows it (it keeps its English Known for, or the description).
@@ -38998,7 +39019,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // Pub test 8 (2026-11-10): on the page's own clock (opts.now), like its happy hour, specials and nights, so a closure
   // notice shown ahead of time ("Closed Dec 25–26, reopens Dec 27.") sits near the top on the days it applies.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes(opts.now || new Date()).get(venue.id);
-  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  let venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = golfAtAGlanceHtml(venue, fr);
@@ -39221,6 +39242,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const wineryApptToday = venueWineryAppointmentToday(venue, opts.now || new Date());
   const openStatus = wineryApptToday ? { state: 'appointment', text: apptLineFor(venue.type) }
     : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
+  // Tour test 7 (Whistler, 2026-11-17): "Closed between seasons · Reopens Jul 1" says the break and its end; the notice
+  // box under it ("Closed May 1–Jun 30, reopens Jul 1.") said it again.
+  try { if (openStatus && /^Closed between seasons\b/.test(String(openStatus.text || '')) && venueAdvisoryNote !== undefined && /^Closed\b[^.]*\breopens\b/i.test(String(parseAdvisoryNote(venueAdvisoryNote).text || ''))) venueAdvisoryHtml = ''; } catch (e) { /* keep it */ }
   const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
