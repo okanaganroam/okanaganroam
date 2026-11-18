@@ -70641,7 +70641,7 @@ module.exports = {
   findMenuOnWebsite,
   isPrivateAddress,
   normalizeMenuData,
-  menuPriceLabel,
+  menuPriceLabel, menuDurationFr,
   menuPriceNumber,
   publishedMenu, renderVenueMenuPage,
   MENU_DIR,

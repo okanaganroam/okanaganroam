@@ -232,3 +232,75 @@ test('8. a child under an age on her published list: "Some activities are 7+: ch
   assert.equal(tf.t3FrenchText('A kids’ activity for the birthday'), 'Une activité pour les enfants, pour l’anniversaire');
   assert.equal(tf.t3FrenchText('Rents what you asked for'), 'Loue ce que vous avez demandé');
 });
+
+test('9. French-only lines: the finish screen and the edit pages name them (« Connu pour, Bon à savoir, Groupes : en français seulement ») with a link to add the English; the French Known for says the English line goes', async () => {
+  const v = mk('tour', { name: 'Sky Line French Lines Wr6', cuisine: 'Ziplines' });
+  setBox(v.id, { rows: [{ label: 'Known for', text: 'Ziplines over the canyon' }, { label: 'Good to know', text: 'Free parking at the course' }], booking_url: null, source_url: 'https://example.com', checked_at: '2026-11-01' });
+  const t = tokenFor(v.id);
+  ok(await change(t, { tour_info: { kinds: ['zipline'] } }));
+  ok(await change(t, { visit_rows: { known_for: 'Tyroliennes au-dessus du canyon et parcours dans les arbres', good_to_know: 'Les orages ferment le parcours; navette gratuite depuis le bureau', groups: 'Groupes de 10 et plus : réservez; fêtes d’anniversaire', _lang: 'fr' } }, true));
+  const sc = JSON.parse((await get(`/owner/${t}/setup/progress`)).text).score;
+  assert.deepEqual([...sc.frOnlyKeys].sort(), ['good_to_know', 'groups', 'known_for']);
+  assert.equal(sc.frOnly, true);
+  // The finish line (client): names them, links to the English edit page's box.
+  assert.match(CLIENT, /function frOnlyNamed\(\)/);
+  assert.match(CLIENT, /String\(C\.back\)\.replace\(\/\^\\\/fr\(\?=\\\/\)\/, ''\) \+ '#' \+ \(FR_ONLY_BOX\[ks\[0\]\] \|\| 'visit'\)/);
+  assert.equal(text.fr.frLineNames.known_for, 'Connu pour'); assert.equal(text.fr.frLineNames.good_to_know, 'Bon à savoir'); assert.equal(text.fr.frLineNames.groups, 'Groupes');
+  assert.match(text.fr.frOnlyNamed, /^\{list\}\s: en français seulement/); assert.equal(text.fr.frOnlyAddEn, 'Ajouter la version anglaise');
+  assert.match(text.en.frOnlyNamed, /^In French only/); assert.equal(text.en.frOnlyAddEn, 'Add the English version');
+  // The French edit page names them with a link to the English one; the English edit page says to type them below.
+  const frEdit = plain((await get(`/fr/owner/${t}`)).text), enEditHtml = (await get(`/owner/${t}`)).text;
+  assert.match(frEdit, /Connu pour, Bon à savoir, Groupes\s: en français seulement/);
+  assert.match((await get(`/fr/owner/${t}`)).text, new RegExp(`href="/owner/${t}#opVisitKnown">Ajouter la version anglaise`));
+  assert.match(plain(enEditHtml), /In French only, so on your French page only: Known for, Good to know, Groups\. Type the English version in its box below\./);
+  // The French Known for screen: the English research line goes when hers is in French (said in one line).
+  assert.match(text.fr.knownFrDropsEn, /quitte votre page anglaise/);
+  assert.match(CLIENT, /var dropsEn = key === 'known_for' && T\.knownFrDropsEn/);
+  // An English line typed later takes it off the list.
+  ok(await change(t, { visit_rows: { known_for: 'Ziplines over the canyon and a treetop course' } }));
+  const sc2 = JSON.parse((await get(`/owner/${t}/setup/progress`)).text).score;
+  assert.ok(!(sc2.frOnlyKeys || []).includes('known_for'), JSON.stringify(sc2.frOnlyKeys));
+});
+
+test('10. minor: Groups counter, French unit words and lengths on the list, private lines not counted, private "1500 $ et plus", shoulder hours grouped, land meeting-spot words', async () => {
+  // Groups line: a counter like Good to know (180).
+  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 180, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
+  // French price list words and lengths (known words only).
+  const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
+  assert.equal(sp(app.menuPriceLabel('69 per bike', 'fr')), '69 $ par vélo');
+  assert.equal(sp(app.menuPriceLabel('$69 per bike', 'fr')), '$69 par vélo');
+  assert.equal(sp(app.menuPriceLabel('40 per hour', 'fr')), '40 $ de l’heure');
+  assert.equal(app.menuPriceLabel('69 per bike', 'en'), '$69 per bike');
+  assert.equal(app.menuDurationFr('2.5 hours'), '2,5 heures'); assert.equal(app.menuDurationFr('1.5 hours'), '1,5 heure'); assert.equal(app.menuDurationFr('2 hours'), '2 heures');
+  assert.equal(app.menuDurationFr('Half day'), 'Demi-journée'); assert.equal(app.menuDurationFr('Ages 6+'), 'Ages 6+');
+  const { v } = await planFixtures();
+  const frList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'fr' }));
+  assert.match(frList, /69 \$ par vélo/); assert.match(frList, /2,5 heures/); assert.doesNotMatch(frList, /per bike|2\.5 hours/);
+  assert.match(frList, /4 activités/);
+  const enList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'en' }));
+  assert.match(enList, /\$69 per bike/); assert.match(enList, /\(?4 tours|4 activities|4 trips/);
+  for (const x of ['Private group or corporate booking', 'Private groups', 'Groupes privés', 'Sorties privées']) assert.ok(app.TOUR_ADDON_LINE_RE.test(x), x);
+  assert.ok(!app.TOUR_ADDON_LINE_RE.test('Full day private boat'));
+  // The private price box takes "1500 $ et plus" (server, as the edit page sends it).
+  const { t } = sky();
+  ok(await change(t, { tour_info: { private: '1500 $ et plus' } }));
+  assert.equal(app.venueTourInfo(sky().v.id).private, 1500);
+  // Shoulder summary: days with the same hours together, closed last; French joined by « ; ».
+  assert.match(CLIENT, /groups\.sort\(function\(a, b\)\{ return \(a\.t \? 0 : 1\) - \(b\.t \? 0 : 1\); \}\);/);
+  // Meeting spot: no dock or boat words for a tour on land.
+  assert.doesNotMatch(text.en.tour.doorPhotoLeadLand + text.fr.tour.doorPhotoLeadLand, /dock|marina|boat|quai|bateau/i);
+  assert.match(CLIENT, /landTour \? T\.doorPhotoLeadLand : T\.doorPhotoLead/);
+});
+
+test('other setup types still load (EN + FR) with no tour words', async () => {
+  for (const type of ['restaurant', 'pub', 'winery', 'cafe', 'brewery', 'distillery', 'cocktail']) {
+    const t = tokenFor(mk(type, { cuisine: 'Canadian' }).id);
+    for (const p of [`/owner/${t}/setup`, `/fr/owner/${t}/setup`]) {
+      const r = await get(p);
+      assert.equal(r.status, 200, `${type} ${p}`);
+      const c = cfgOf(r.text);
+      assert.ok(Array.isArray(c.steps) && c.steps.length, type);
+      assert.equal(c.tourFoodBadges, undefined, type);
+    }
+  }
+});
