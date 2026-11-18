@@ -2209,6 +2209,23 @@ Object.assign(fr, {
   seaSpringFallTip: 'Astuce : vos heures habituelles valent pour le reste de l’année. Fermé certains jours au printemps et à l’automne aussi? Réglez vos heures habituelles sur vos heures du printemps et de l’automne.',
   seaHolidaysQ: 'Ouvert un jour férié qui tombe un jour de fermeture?', seaHolidays: 'Ouvert les jours fériés (et la semaine de Noël)',
 });
+// Tour test 11 (Whistler, 2026-11-18; Min-jun, sightseeing vans: hotel pickups, a private van per hour with a minimum,
+// he dictates and typed his pickup into the Address box). The pickup option of the meeting-spot questions (Basics and
+// "Where do people meet you?"), the hourly unit and minimum of the Private tours price, and the nudge on the Address box.
+Object.assign(en.tour, {
+  pickupBtn: 'We pick you up (from hotels in the village)', pickupSub: 'Your page says “Pickup: hotels in the village”, with your office for directions',
+  pickupOn: '✓ You pick people up from their hotels. Your address is your office.', pickupOff: 'We don’t pick people up',
+  addrPickup: 'That reads like a pickup, not an address. Type your office’s street address here; then tap “We pick you up (from hotels in the village)”. Tap Save again to keep it as typed.',
+  tprivPerQ: 'Is that price for the whole trip or per hour?', tprivPers: { trip: 'For the whole trip', hour: 'Per hour' },
+  tprivMinQ: 'Minimum hours?', tprivMins: { 2: '2 hours', 3: '3 hours', 4: '4 hours', 5: '5 hours', 6: '6 hours', 8: '8 hours' },
+});
+Object.assign(fr.tour, {
+  pickupBtn: 'Nous allons vous chercher (aux hôtels du village)', pickupSub: 'Votre page indique « Prise en charge : hôtels du village », avec votre bureau pour l’itinéraire',
+  pickupOn: '✓ Vous allez chercher les gens à leur hôtel. Votre adresse est celle de votre bureau.', pickupOff: 'Nous n’allons pas chercher les gens',
+  addrPickup: 'Cela ressemble à une prise en charge, pas à une adresse. Inscrivez ici l’adresse de votre bureau, puis touchez « Nous allons vous chercher (aux hôtels du village) ». Touchez Enregistrer de nouveau pour la garder telle quelle.',
+  tprivPerQ: 'Ce prix est-il pour toute la sortie ou à l’heure?', tprivPers: { trip: 'Pour toute la sortie', hour: 'À l’heure' },
+  tprivMinQ: 'Nombre d’heures minimum?', tprivMins: { 2: '2 heures', 3: '3 heures', 4: '4 heures', 5: '5 heures', 6: '6 heures', 8: '8 heures' },
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

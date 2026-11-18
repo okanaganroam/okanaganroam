@@ -729,3 +729,44 @@ test("tour test 10 answers: three stretches with the spring-and-fall tip, Open o
   assert.match(plain(en.topic("not-owner").a), /Managers, marketing and staff can update the page too/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Stay “all year”/);
 });
+
+// Tour test 11 (Whistler, 2026-11-18; Min-jun, a private sightseeing van company: hotel pickups, Korean and Japanese
+// guides, a private van per hour with a 3-hour minimum, an airport shuttle that isn't a tour; he dictates, no punctuation).
+// His 12 questions as typed (shots 013-015, 042-050), each with a French twin. Help missed 4 (the sightseeing kind twice,
+// the airport shuttle, the card's words) and half-answered 3 (hotel pickup, per van per hour, the shuttle again).
+const ASKED11 = [
+  ["11-013", "we do sightseeing tour by van which one i pick", ["tour-kinds-sightseeing"], "on fait des visites touristiques en van, lequel je choisis"],
+  ["11-014", "airport shuttle can i add", ["tour-airport-shuttle"], "navette aéroport je peux l'ajouter"],
+  ["11-015", "joffre lake day trip what kind", ["tour-kinds-sightseeing"], "excursion d'une journée au lac Joffre, quel genre"],
+  ["11-042", "we pick up from hotel where to write", ["tour-pickup"], "on prend les gens à leur hôtel, où l'écrire"],
+  ["11-043", "how to say we speak korean and japanese", ["tour-languages"], "comment dire qu'on parle coréen et japonais"],
+  ["11-044", "need park pass for joffre where to tell", ["tour-licence"], "il faut un laissez-passer du parc pour Joffre, où le dire"],
+  ["11-045", "airport shuttle can i add", ["tour-airport-shuttle"], "est-ce que je peux ajouter une navette vers l'aéroport"],
+  ["11-046", "price is per van per hour minimum 3 hours", ["tour-private-hourly"], "le prix est par van à l'heure, minimum 3 heures"],
+  ["11-047", "if weather bad we refund where i say", ["tour-weather"], "si la météo est mauvaise on rembourse, où je le dis"],
+  ["11-048", "joffre tour only summer other tours all year", ["tour-one-trip-season"], "la sortie Joffre seulement l'été, les autres toute l'année"],
+  ["11-049", "village lights tour only winter evening", ["tour-one-trip-season"], "la sortie des lumières du village seulement le soir en hiver"],
+  ["11-050", "how i change sightseeing tours and airport shuttles words on my card", ["tour-category-word"], "comment changer les mots visites touristiques et navettes sur ma fiche"],
+];
+test("tour test 11: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Sightseeing tours & airport shuttles" });
+  assert.equal(ASKED11.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED11) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 11 answers: sightseeing kind, pickup option, airport shuttles aren't tours, per hour with a minimum, evening times, card words; no 'your culture' in the story answer", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-kinds-sightseeing").a), /Sightseeing and day trips/); assert.match(plain(fr.topic("tour-kinds-sightseeing").aFr), /Visites touristiques et excursions d’une journée/);
+  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in the village\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Whistler Village/);
+  assert.match(plain(en.topic("tour-airport-shuttle").a), /Airport shuttles and transfers aren’t tours/); assert.match(plain(en.topic("tour-airport-shuttle").a), /story or under Good to know/);
+  assert.match(plain(en.topic("tour-private-hourly").a), /Private van from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
+  assert.match(plain(en.topic("tour-one-trip-season").a), /Only in the evening\? Put the times/);
+  assert.match(plain(en.topic("tour-category-word").a), /Words we found online/);
+  assert.doesNotMatch(plain(en.topic("tour-culture-story").a), /your culture/);
+});

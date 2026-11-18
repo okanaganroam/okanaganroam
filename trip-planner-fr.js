@@ -287,6 +287,12 @@ const PHRASES = [
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
   ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
+  // Tour test 11 (Whistler, 2026-11-18; Min-jun, sightseeing vans): « visite touristique », « excursion d’une journée »,
+  // « route panoramique », « visite en van » and « chutes d’eau » (the place names, « lacs Joffre », are each site's: trip-site.js).
+  ['visites touristiques', 'sightseeing tours'], ['visite touristique', 'sightseeing tour'], ['excursions d une journee', 'day trips'], ['excursion d une journee', 'day trip'],
+  ['excursion a la journee', 'day trip'], ['sortie d une journee', 'day trip'], ['route panoramique', 'scenic drive'], ['routes panoramiques', 'scenic drives'], ['visite en van', 'van tour'],
+  ['visite en fourgonnette', 'van tour'], ['visites en van', 'van tours'], ['chutes d eau', 'waterfalls'],
+  ['prise en charge a l hotel', 'hotel pickup'], ['ramassage a l hotel', 'hotel pickup'], ['cueillette a l hotel', 'hotel pickup'],
   // Tour test 9 (Whistler, 2026-11-18): « visite culturelle autochtone » read as two place words and found nothing.
   ['visite culturelle autochtone', 'indigenous cultural tour'], ['visites culturelles autochtones', 'indigenous cultural tours'], ['visite autochtone', 'indigenous tour'], ['visites autochtones', 'indigenous tours'],
   ['visite culturelle', 'cultural tour'], ['visites culturelles', 'cultural tours'], ['sortie culturelle', 'cultural tour'], ['culture autochtone', 'indigenous culture'], ['cultures autochtones', 'indigenous culture'],

@@ -426,6 +426,15 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Length, ages and booking can differ by tour: see this operator’s Tours & prices\.$/,'La durée, l’âge et la réservation peuvent varier selon la sortie : voyez Sorties et tarifs de cette entreprise.');
  text=text.replace(/^All ages welcome \(the operator’s own answer\)\.$/,'Tous les âges sont bienvenus (réponse de l’entreprise).');
  text=text.replace(/^Ages (\d{1,2}) and up \(the operator’s own answer\)\.$/,(_,n)=>'À partir de '+n+' ans (réponse de l’entreprise).');
+ // Tour test 11 (2026-11-18): a sightseeing tour that goes to the place asked for, its hotel pickup, its own season.
+ const frMonth11=m=>({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'})[m]||m;
+ const frRuns=r=>r==='in summer'?'l’été':r==='in winter'?'l’hiver':r.replace(/^from (\w+) to (\w+)$/,(_,a,b)=>'de '+frMonth11(a)+' à '+frMonth11(b));
+ text=text.replace(/^(.+) without a car: a day trip with (.+), who picks you up at your hotel\.$/,(_,p,n)=>`${p} sans voiture : une excursion d’une journée avec ${n}, qui vous prend à votre hôtel.`);
+ text=text.replace(/^No car needed: (.+) picks you up from hotels in (.+?) and goes to (.+?)(?: \(its “(.+)”\))?\. Book ahead\.$/,(_,n,a,p,t)=>`Pas besoin de voiture : ${n} vous prend aux hôtels de ${a} et va à ${p}${t?` (sa sortie « ${t} »)`:''}. Réservez à l’avance.`);
+ text=text.replace(/^(.+) runs sightseeing trips to (.+?)(?: \(its “(.+)”\))?(?:, with pickup from hotels in (.+))?\.$/,(_,n,p,t,a)=>`${n} propose des visites touristiques vers ${p}${t?` (sa sortie « ${t} »)`:''}${a?`, avec prise en charge aux hôtels de ${a}`:''}.`);
+ text=text.replace(/^Rather not drive\? (.+) runs day trips to (.+?)(?: \(its “(.+)”\))?, with pickup from hotels in (.+)\.$/,(_,n,p,t,a)=>`Vous préférez ne pas conduire? ${n} propose des excursions vers ${p}${t?` (sa sortie « ${t} »)`:''}, avec prise en charge aux hôtels de ${a}.`);
+ text=text.replace(/^(.+)’s “(.+)” runs (in summer|in winter|from \w+ to \w+) only, so it isn’t in this (\w+) plan\.$/,(_,n,t,r,m)=>`La sortie « ${t} » de ${n} n’a lieu que ${frRuns(r)} : elle n’est pas dans ce plan pour ${frMonth11(m)}.`);
+ text=text.replace(/^(.+?) doesn’t list airport shuttles or transfers: they aren’t tours\. Check your hotel or the airport’s ground transportation page\.$/,(_,b)=>`${b} ne répertorie pas les navettes ni les transferts vers l’aéroport : ce ne sont pas des sorties. Renseignez-vous auprès de votre hôtel ou sur la page du transport terrestre de l’aéroport.`);
  // Tour test 7 (2026-11-17): a tour left out for a child under its minimum age.
  text=text.replace(/^(.+) is for ages (\d{1,2}) and up, so it isn’t in this plan for your (\d{1,2})-year-old\.$/,(_,n,a,y)=>`${n} est pour les ${a} ans et plus : nous l’avons laissé de côté pour votre enfant de ${y} ans.`);
  text=text.replace(/^Some activities are (\d{1,2})\+: check Tours & prices\.$/,(_,n)=>'Certaines activités sont pour les '+n+' ans et plus : voyez Sorties et tarifs.');

@@ -4770,7 +4770,10 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const earlyDinner=Math.min(Number.isFinite(stop.dinnerFrom)?stop.dinnerFrom:Infinity,Number.isFinite(stop.keepStart)&&stop.keepStart>=DINNER_EARLIEST?stop.keepStart:Infinity);
         // Pub test 3 (Whistler, 2026-11-14): a meal's own time ("dinner at 7 PM", "lunch at 12:30 pm") is when it starts.
         const askedMeal=!beforeEvent&&requirements.mealMinutes?(isDinnerStop(stop)?requirements.mealMinutes.dinner:isLunchStop(stop)?requirements.mealMinutes.lunch:null):null;
-        const partStart=Number.isFinite(askedMeal)?askedMeal:isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
+        // Tour test 11 (Whistler, 2026-11-18; Min-jun's 9-hour Joffre Lakes trip was planned 1 PM–9 PM): a full-day tour (the
+        // operator's "A full day" or "Several days") starts in the morning, whatever part of the day it was put in.
+        const fullDayTour=candidate.type==='tour'&&(ownTourMin||0)>=360&&!isDinnerStop(stop)&&!isLunchStop(stop)&&!beforeEvent;
+        const partStart=Number.isFinite(askedMeal)?askedMeal:fullDayTour?Math.min(partStart0,540):isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
@@ -6906,7 +6909,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6945,7 +6948,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};

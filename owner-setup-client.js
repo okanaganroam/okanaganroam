@@ -613,7 +613,9 @@
   // The operator's own answers (venue_tour_info) and the price per person, as stored. Research's price and trip length are
   // offered as a starting point only ("We picked this from your page — check it"); nothing is saved until she taps Save.
   S.tour = { kinds: (TI.kinds || []).slice(), length: TI.length || '', book: TI.book || '', bookYes: TI.book ? (TI.book === 'no' ? 'no' : 'yes') : '', age: TI.age || '', adult: TI.adult === true,
-    price: CUR.tour_price == null ? null : CUR.tour_price, priv: typeof TI.private === 'number' ? TI.private : null, noBook: (CUR.not_offered || []).indexOf('booking_link') >= 0 };
+    price: CUR.tour_price == null ? null : CUR.tour_price, priv: typeof TI.private === 'number' ? TI.private : null, noBook: (CUR.not_offered || []).indexOf('booking_link') >= 0,
+    // Tour test 11 (Whistler, 2026-11-18): the private price per hour and its minimum hours.
+    privPer: TI.private_per === 'hour' ? 'hour' : (typeof TI.private === 'number' ? 'trip' : ''), privMin: TI.private_min ? String(TI.private_min) : '' };
   // Tour test 4 (Whistler, 2026-11-17): a free or by-donation tour. The stored answer is the word ('free' / 'donation');
   // here the price is 0 and S.tour.free holds the word. S.savedTourPrice is the stored answer as it is (number or word).
   S.tour.free = '';
@@ -690,7 +692,14 @@
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
     if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
-    if ((x = v('suTpriv')) !== null) S.tour.priv = tourPriceRead(x, true);
+    if ((x = v('suTpriv')) !== null) {
+      S.tour.priv = tourPriceRead(x, true);
+      // Tour test 11: "150 per hour … minimum 3 hours" typed in the box picks Per hour and 3 hours (a tap can change them).
+      var xl = String(x).toLowerCase();
+      if (/(?:per|an?|\/)\s*(?:hour|hr|h)\b|\bhourly\b|(?:par|de l.|[àa] l.)\s*heure|\/\s*h\b/.test(xl) && S.tour.privPer !== 'hour' && !S.tour.privPerTapped) S.tour.privPer = 'hour';
+      var mh = /min(?:imum)?\.?\s*(?:of\s*|de\s*)?(\d{1,2})\s*(?:hours?|hrs?|h|heures?)\b|(\d{1,2})[\s-]*(?:hours?|hrs?|h|heures?)\s*min(?:imum)?\b/.exec(xl);
+      if (mh && !S.tour.privMinTapped) { var mn = String(+(mh[1] || mh[2])); if (['2', '3', '4', '5', '6', '8'].indexOf(mn) >= 0) S.tour.privMin = mn; }
+    }
     if ((x = v('suBookUrl')) !== null && TOUR) S.bookUrl = x;
     if ((x = v('suBring')) !== null) S.tour.bring = x;
   }
@@ -1913,7 +1922,9 @@
         + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), allDone() ? 'go:finish' : 'doneNow2') + '</div>';
     } else if (s === 'basics') {
       x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div><div><span>' + h(T.website) + '</span><span>' + h(siteShown()) + '</span></div></div>'
-        + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'basicsOk') + big('✎', T.changeThem, '', true, 'go:basics:edit') + '</div>' + skip('basics');
+        // Tour test 11 (Whistler, 2026-11-18; Min-jun picks guests up at their hotels): the pickup option of this question.
+        + (TOUR && T.pickupBtn && TI.pickup ? '<p class="su-sent" id="suPickupOn">' + h(T.pickupOn) + '</p>' : '')
+        + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'basicsOk') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:basics') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:basics')) : '') + big('✎', T.changeThem, '', true, 'go:basics:edit') + '</div>' + skip('basics');
     } else if (s === 'basics:edit') {
       x = q(T.basicsEditQ) + msgs() + field('suAddr', T.streetLabel, S.addr != null ? S.addr : CUR.address || '', { max: 200 }) + field('suPhone', T.phoneLabel, S.phone != null ? S.phone : CUR.phone || '', { type: 'tel', max: 40 })
         + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
@@ -2189,6 +2200,9 @@
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
+        // Tour test 11: whole trip or per hour, and the minimum hours of an hourly price.
+        + (T.tprivPers ? '<p class="su-q" id="suPrivPerQ">' + h(T.tprivPerQ) + '</p>' + tchips('privPer', ['trip', 'hour'], T.tprivPers, T.tprivPerQ, 'suPrivPerQ')
+          + (tp.privPer === 'hour' ? '<p class="su-q" id="suPrivMinQ">' + h(T.tprivMinQ) + '</p>' + tchips('privMin', ['2', '3', '4', '5', '6', '8'], T.tprivMins, T.tprivMinQ, 'suPrivMinQ') : '') : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking') {
       // Tours (2026-11-16): the booking link (the edit page's same field), and "Do people need to book ahead?" with how far.
@@ -2577,7 +2591,9 @@
       x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
+      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:door') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:door')) : '') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>'
+        // Tour test 11: the pickup option of the meeting-spot question.
+        + (TOUR && T.pickupBtn && TI.pickup ? '<p class="su-sent" id="suPickupDoor">' + h(T.pickupOn) + '</p>' : '');
     } else if (s === 'door:photo') {
       // Tour test 6 (Whistler, 2026-11-17): no dock, marina or boat words for a tour on land (a zipline office read « le quai
       // ou la marina… votre bateau »): the water words only when a water kind is picked.
@@ -3321,9 +3337,19 @@
     if (k === 'no') return sayNo(v);
     // Café test 1 (2026-11-11): "Yes, that's right" with no website on file is the "We don't have a website" answer too,
     // so the checklist's Website item counts it (it stopped at 97%). Never while a website is on file or waiting.
+    // Tour test 11: "We pick you up (from hotels in the village)" (Basics, or Where do people meet you?): saved with the step.
+    if (/^pickup(?:On|Off):/.test(k) && TOUR) {
+      var pon = /^pickupOn/.test(k), pst = k.split(':')[1];
+      var pls = [{ tour_info: { pickup: pon ? true : null } }];
+      if (pst === 'basics' && pon && !CUR.website && !C.website && S.notOffered.indexOf('website') < 0) pls.push({ not_offered: addNot('website') });
+      return saveAll(pst, pls, pon ? 'live' : null, pon ? null : pst, function(){ if (pon) TI.pickup = true; else delete TI.pickup; });
+    }
     if (k === 'basicsOk') { if (!CUR.website && !C.website && S.notOffered.indexOf('website') < 0) return saveAll('basics', [{ not_offered: addNot('website') }]); return record('basics', 'live'); }
     if (k === 'basicsSave') {
       S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = el('suSite').value;
+      // Tour test 11 (Whistler, 2026-11-18; Min-jun dictated "we pick up from your hotel" into the Address box): a nudge
+      // once, toward the pickup option; Save again keeps it as typed.
+      if (TOUR && T.addrPickup && /\bpick\s*-?\s*ups?\b|\bpicks? (?:you|them|people|guests) up\b|\bhotels?\b|\bwe come to you\b|\bcueillette\b|\bprise en charge\b|\bh[ôo]tels?\b/i.test(S.addr) && S.addrNudged !== S.addr) { S.addrNudged = S.addr; S.nudge = T.addrPickup; S.badField = 'suAddr'; return render(); }
       var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (phoneChanged(S.phone)) ch.phone = S.phone;
       // Website (2026-11-10): typed as "example.com" is fine (the server adds https://); it's checked first, like today.
       var site = S.site.trim();
@@ -3870,6 +3896,13 @@
     }
     if (k === 'priceSave') {
       readTour(); var pp = S.tour.price, pv = S.tour.priv, pfree = S.tour.free;
+      // Tour test 11: the hourly unit and minimum go with the private price (cleared with it).
+      var privExtra = function(list){
+        var per = pv != null && !isNaN(pv) && S.tour.privPer === 'hour' ? 'hour' : null, mn = per && S.tour.privMin ? +S.tour.privMin : null;
+        var o = {}; if (per !== (TI.private_per || null)) o.private_per = per; if (mn !== (TI.private_min || null)) o.private_min = mn;
+        if (Object.keys(o).length) { var last = list.length && list[list.length - 1].tour_info && 'private' in list[list.length - 1].tour_info ? list[list.length - 1].tour_info : null; if (last) Object.keys(o).forEach(function(kk){ last[kk] = o[kk]; }); else list.push({ tour_info: o }); }
+        return function(){ if (per) TI.private_per = per; else delete TI.private_per; if (mn) TI.private_min = mn; else delete TI.private_min; };
+      };
       // Tour test 7 (Whistler, 2026-11-17): a private-only guide may leave the per-person box empty when the private box
       // has a price (the card then says "From $750 / group").
       var privOnly = !pfree && pp == null && pv != null && !isNaN(pv);
@@ -3886,15 +3919,17 @@
       if (pfree) {
         if (pfree !== S.savedTourPrice || CUR.tour_price_waiting != null) pl.push({ tour_price: pfree });
         if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
+        var px1 = privExtra(pl);
         S.savedLine.price = T.tpriceSavedFree || T.tpriceSavedLive;
-        return saveAll('price', pl, null, null, function(){ S.savedTourPrice = pfree; CUR.tour_price = pfree; CUR.tour_price_waiting = null; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
+        return saveAll('price', pl, null, null, function(){ px1(); S.savedTourPrice = pfree; CUR.tour_price = pfree; CUR.tour_price_waiting = null; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
       }
       // Tour test 7 (Whistler, 2026-11-17): the right price saved again over a held one ($2,600 waiting, then $395, the live
       // price) is sent, so the held one is withdrawn and the list no longer says "we'll add it within a day".
       if (pp !== S.savedTourPrice || (CUR.tour_price_waiting != null && pp !== CUR.tour_price_waiting)) pl.push({ tour_price: pp });
       if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
+      var px2 = privExtra(pl);
       S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : T.tpriceSavedLive;
-      return saveAll('price', pl, null, null, function(){ if (pp == null || pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
+      return saveAll('price', pl, null, null, function(){ px2(); if (pp == null || pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
     }
     if (k === 'bookingSave') {
       readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu1 !== null) S.bookUrl = bu1;
@@ -4213,6 +4248,8 @@
       readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
       S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' ? '' : vt;
       if (kt === 'length') S.tour.lengthGuessed = false;
+      if (kt === 'privPer') S.tour.privPerTapped = true;
+      if (kt === 'privMin') S.tour.privMinTapped = true;
       if (kt === 'bookYes' && vt === 'no') S.tour.book = '';
       redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tkind]'), function(b){ b.onclick = function(){
@@ -4266,6 +4303,8 @@
       // group-size chips do, a sentence chip ends with ". " so what is typed next starts a new sentence (saved trimmed).
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
+      // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
+      if (qk === 'good_to_know') { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
