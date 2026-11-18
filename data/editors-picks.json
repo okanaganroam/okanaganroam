@@ -1,61 +1,36 @@
 {
   "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 4 usable picks show (four a week since 2026-11-09); the rest are backups that step in, in order, when a pick is skipped (closed for the season or by a dated closure, not operating, or without its own photo). The row always shows 4 cards and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
-  "updated": "2026-11-09",
+  "updated": "2026-11-18",
   "picks": [
     {
-      "id": 344,
-      "why": "Family-run Sicilian-inspired Italian in Lake Country",
-      "why_fr": "Cuisine italienne familiale d’inspiration sicilienne à Lake Country"
+      "id": 1554,
+      "why": "A cedar sauna floating on Okanagan Lake, with a cold plunge",
+      "why_fr": "Un sauna en cèdre flottant sur le lac Okanagan, avec bain froid"
     },
     {
-      "id": 515,
-      "why": "Penticton pizzeria from well-known Okanagan restaurateurs",
-      "why_fr": "Une pizzeria de Penticton signée par des restaurateurs réputés de l’Okanagan"
+      "id": 234,
+      "why": "Proper schnitzel at a cozy German spot in Penticton",
+      "why_fr": "Un vrai schnitzel dans un chaleureux restaurant allemand de Penticton"
     },
     {
-      "id": 839,
-      "why": "Organic West Kelowna winery best known for its ice wine",
-      "why_fr": "Un vignoble biologique de West Kelowna, réputé pour son vin de glace"
+      "id": 1502,
+      "why": "Square One: original local art, all under $500",
+      "why_fr": "Square One : des œuvres originales d’artistes locaux, toutes à moins de 500 $"
     },
     {
-      "id": 1494,
-      "why": "The Interior’s oldest commercial art gallery, since 1963",
-      "why_fr": "La plus ancienne galerie d’art commerciale de l’Intérieur, depuis 1963"
+      "id": 735,
+      "why": "Stone-milled organic bread and a holiday stollen",
+      "why_fr": "Pain bio moulu sur pierre et stollen des fêtes"
     },
     {
-      "id": 948,
-      "why": "Generous, veggie-packed sandwiches in Vernon",
-      "why_fr": "De généreux sandwichs aux légumes à Vernon"
+      "id": 789,
+      "why": "A Kelowna bakery and café with German breads and baking",
+      "why_fr": "Une boulangerie-café de Kelowna aux pains et pâtisseries allemands"
     },
     {
-      "id": 847,
-      "why": "A design-forward winery and bistro in Okanagan Falls",
-      "why_fr": "Un vignoble-bistro au design soigné à Okanagan Falls"
-    },
-    {
-      "id": 907,
-      "why": "A Kelowna coffee house that’s also a used bookstore",
-      "why_fr": "Un café de Kelowna qui est aussi une librairie d’occasion"
-    },
-    {
-      "id": 897,
-      "why": "Downtown Kelowna’s soup and sandwich stop since the 1970s",
-      "why_fr": "La halte soupes et sandwichs du centre-ville de Kelowna depuis les années 1970"
-    },
-    {
-      "id": 1551,
-      "why": "An indoor playground for ages 1 to 12 in West Kelowna",
-      "why_fr": "Une aire de jeux intérieure à West Kelowna pour les 1 à 12 ans"
-    },
-    {
-      "id": 246,
-      "why": "Fresh bread and local coffee on the Summerland wine trail",
-      "why_fr": "Pain frais et café local sur la route des vins de Summerland"
-    },
-    {
-      "id": 1032,
-      "why": "A local café with homemade bread in Okanagan Falls",
-      "why_fr": "Un café local d’Okanagan Falls, avec pain fait maison"
+      "id": 950,
+      "why": "German sausages, deli and borscht in Vernon",
+      "why_fr": "Saucisses allemandes, épicerie fine et bortsch à Vernon"
     }
   ]
 }
