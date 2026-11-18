@@ -765,8 +765,47 @@ test("tour test 11 answers: sightseeing kind, pickup option, airport shuttles ar
   assert.match(plain(en.topic("tour-kinds-sightseeing").a), /Sightseeing and day trips/); assert.match(plain(fr.topic("tour-kinds-sightseeing").aFr), /Visites touristiques et excursions d’une journée/);
   assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in the village\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Whistler Village/);
   assert.match(plain(en.topic("tour-airport-shuttle").a), /Airport shuttles and transfers aren’t tours/); assert.match(plain(en.topic("tour-airport-shuttle").a), /story or under Good to know/);
-  assert.match(plain(en.topic("tour-private-hourly").a), /Private van from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
+  assert.match(plain(en.topic("tour-private-hourly").a), /from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Only in the evening\? Put the times/);
   assert.match(plain(en.topic("tour-category-word").a), /Words we found online/);
   assert.doesNotMatch(plain(en.topic("tour-culture-story").a), /your culture/);
+});
+
+// Tour test 12 (Whistler, 2026-11-18; Kayla, a bungee and giant swing site: 14+, under 19s need a parent or guardian to sign
+// the waiver; a second jump and a video package as extras; Instagram captions; winter weekends only, weather permitting).
+// Her 12 questions as typed (shots 057-065, 096-097), each with a French twin. Help missed 4 and half-answered 1.
+const ASKED12 = [
+  ["12-057", "where do i put the waiver link", ["tour-waiver"], "où je mets le lien de la décharge"],
+  ["12-058", "video package is extra where", ["tour-extras"], "le forfait vidéo est en extra, où le mettre"],
+  ["12-058b", "can i add gift cards", ["tour-gift", "tour-extras"], "est-ce que je peux ajouter des cartes-cadeaux"],
+  ["12-059", "age 14 but under 19 needs parent", ["tour-age"], "14 ans mais les moins de 19 ans ont besoin d'un parent"],
+  ["12-060", "weather closures how do people know", ["tour-weather", "tour-weather-permitting"], "fermetures météo, comment les gens le savent"],
+  ["12-061", "winter weekends only weather permitting", ["tour-weather-permitting"], "seulement les fins de semaine d'hiver, selon la météo"],
+  ["12-062", "second jump is cheaper how do i show that", ["tour-extras"], "le deuxième saut est moins cher, comment le montrer"],
+  ["12-063", "meeting spot is a gravel lot not our office", ["tour-meeting"], "le point de rencontre est un stationnement de gravier, pas notre bureau"],
+  ["12-064", "how do i get rid of the hashtags", ["tour-hashtags"], "comment enlever les hashtags"],
+  ["12-065", "we charge per hour 2 hour minimum for private groups", ["tour-private-hourly"], "on charge à l'heure, minimum 2 heures pour les groupes privés"],
+  ["12-096", "airport shuttle can i add", ["tour-airport-shuttle"], "navette aéroport je peux l'ajouter"],
+  ["12-097", "there's no 14 option", ["tour-age"], "il n'y a pas de 14 ans"],
+];
+test("tour test 12: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Bungee jumping & giant swing" });
+  assert.equal(ASKED12.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED12) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 12 answers: Extras section, the waiver in Good to know, hashtags tidied, the 14+ chip and the waiver choice, Weather permitting, a generic per-hour noun", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-extras").a), /add a section called Extras/); assert.match(plain(fr.topic("tour-extras").aFr), /section nommée Extras/);
+  assert.match(plain(en.topic("tour-waiver").a), /Good to know/); assert.match(plain(en.topic("tour-waiver").a), /parent or guardian to sign/);
+  assert.match(plain(en.topic("tour-hashtags").a), /Edit the box/); assert.match(plain(en.topic("tour-hashtags").a), /DM us/);
+  assert.match(plain(en.topic("tour-age").a), /14\+/); assert.match(plain(en.topic("tour-age").a), /need a parent or guardian to sign the waiver/); assert.match(plain(fr.topic("tour-age").aFr), /14\+/);
+  assert.match(plain(en.topic("tour-weather-permitting").a), /No, different in winter/); assert.match(plain(en.topic("tour-weather-permitting").a), /Closed/); assert.match(plain(en.topic("tour-weather-permitting").a), /Weather permitting \(these dates\)/);
+  assert.match(plain(en.topic("tour-private-hourly").a), /Private tours from \$150\/hour \(3-hour minimum\)/); assert.doesNotMatch(en.topic("tour-private-hourly").q, /van/i);
 });
