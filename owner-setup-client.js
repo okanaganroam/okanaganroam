@@ -787,6 +787,18 @@
     return whole && a !== b ? a + '-' + b : o.from + ':' + o.to;
   }
   function openText(o){ return o ? fill(T.openNow, { a: mdLabel(o.from), b: mdLabel(o.to) }) : ''; }
+  // Tour test 8: the part of a closure ('MM-DD' to 'MM-DD', across New Year too) inside the open season, when it covers more
+  // than 30% of the season's days -> { from, to } of that part (its first and last closed day in the season), else null.
+  function closeInsideSeason(a, b, sea){
+    var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    var doy = function(md){ return CUM[+md.slice(0, 2) - 1] + Math.min(+md.slice(3), 31) - 1; };
+    var mark = function(x, y){ var o = {}, i = doy(x), j = doy(y), n = 0; while (n++ < 366) { o[i] = true; if (i === j) break; i = (i + 1) % 365; } return o; };
+    var open = mark(sea.from, sea.to), shut = mark(a, b), days = Object.keys(open).length, hit = [];
+    var i = doy(sea.from); for (var n = 0; n < days; n++) { if (shut[i]) hit.push(i); i = (i + 1) % 365; }
+    if (!days || hit.length * 10 <= days * 3) return null;
+    var md = function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
+    return { from: md(hit[0]), to: md(hit[hit.length - 1]) };
+  }
   S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
   // time for the days already open in the usual week, so "open daily in summer" kept Mon and Tue closed). Stored the same
@@ -2035,7 +2047,8 @@
         + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
         // Café test 1 (2026-11-11): "Every year" for her own dates, like the holidays' "This year and next".
         + '<label class="su-tick" style="margin:12px 0 0"><input type="checkbox" id="suCyear"' + (S.addYearly ? ' checked' : '') + '><span>' + h(T.closeYearly) + '</span></label><p class="su-example">' + h(T.closeYearlySub) + '</p>'
-        + '<div class="su-stack">' + big('✓', T.addDates, '', false, 'closureAdd') + '</div>';
+        + (S.closeInside && T.closeInsideKeep ? '<div class="su-stack" id="suCloseInside">' + big('✓', T.closeInsideKeep, '', false, 'closureKeep') + big('✎', T.closeInsideFix, '', true, 'closureFix') + '</div>'
+          : '<div class="su-stack">' + big('✓', T.addDates, '', false, 'closureAdd') + '</div>');
     } else if (s === 'spend' && CK) {
       // Cocktail lounges (Decided 2, 2026-11-13): "About how much is a cocktail?" $12 · $14 · $16 · $18 · Other · We don't
       // serve cocktails. The card shows "From $16"; "We don't serve cocktails" shows no price.
@@ -3437,6 +3450,9 @@
       if (wyc) cl.push(apptPart({ year: wyc }));
       return saveAll('closures', cl, k === 'closuresNone' ? 'no' : null, null, function(){ if (wyc) { S.savedWYear = wyc; S.wine.year = wyc; if (C.distillery) S.savedYear = wyc; } S.added = ''; S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length; });
     }
+    // Tour test 8: "Yes, that's right" adds the closure that covers much of the season; "Fix the dates" goes back to the box.
+    if (k === 'closureKeep') { S.closeInsideOk = S.closeInside; return act('closureAdd'); }
+    if (k === 'closureFix') { S.closeInside = ''; S.nudge = ''; render(); var cfe = el('suCf'); if (cfe) { try { cfe.focus(); } catch (e) {} } return; }
     if (k === 'closureAdd') {
       var cf = el('suCf').value, ctEl = el('suCt'), cn = el('suCn').value.trim(); S.addFrom = cf; S.addNote = cn; if (ctEl) S.addTo = ctEl.value;
       if (!cf) { S.nudge = T.needFirst; return render(); }
@@ -3446,6 +3462,14 @@
       var cnote = cn.replace(/[()&<>]/g, '').slice(0, 60), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
       // Café test 2 (2026-11-11): "Every year" is one yearly rule ({ from: 'MM-DD', to: 'MM-DD', yearly: true }, "Every year:
       // Apr 1 – Apr 24"), not a dated copy for this year and next. Up to a year long, like any closure.
+      // Tour test 8 (Whistler, 2026-11-17; Linda): a mistyped "Every year: Jan 4 – Jun 14" closed most of her Dec 10 – Sep 15
+      // season with no word. A closure covering more than 30% of the open season asks once (keep or fix); a break between
+      // two seasons (about a quarter of it) and holidays don't. Every type with a season.
+      if (S.openSea && T.closeInside && !(S.addYearly && to.slice(0, 4) !== cf.slice(0, 4) && to.slice(5) >= cf.slice(5))) {
+        var ins = closeInsideSeason(cf.slice(5), to.slice(5), S.openSea), ikey = cf + ':' + to;
+        if (ins && S.closeInsideOk !== ikey) { S.closeInside = ikey; S.nudge = fill(T.closeInside, { a: mdLabel(ins.from), b: mdLabel(ins.to) }); S.badField = 'suCf'; return render(); }
+      }
+      S.closeInside = '';
       if (S.addYearly) { var yr = { from: cf.slice(5), to: to.slice(5), note: cnote, yearly: true }; if (to.slice(0, 4) !== cf.slice(0, 4) && yr.to >= yr.from) { S.nudge = T.yearlyTooLong; return render(); }
         if (!S.extra.some(function(c){ return c.yearly && c.from === yr.from && c.to === yr.to; })) S.extra.push(yr); S.added = closureLabel(yr); }
       else { S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : ''); }

@@ -2168,6 +2168,9 @@ Object.assign(fr.tour, {
   dogLineNoDone: 'Nous avons choisi « Pas de chiens des clients » pour vous. Touchez Enregistrer pour le garder.',
   tpriceVehicle: 'Un prix par traîneau, par bateau ou par véhicule? Inscrivez-le dans Vos sorties et tarifs, comme « Balade en traîneau : 349 $ par traîneau (2 adultes) ». Ici, mettez votre prix le plus bas pour une personne.',
 });
+// Tour test 8: a closure that covers much of the open season (every type with a season).
+Object.assign(en, { closeInside: 'Those dates close you {a} – {b}, inside your season. Is that right?', closeInsideKeep: 'Yes, that’s right', closeInsideFix: 'Fix the dates' });
+Object.assign(fr, { closeInside: 'Ces dates vous ferment du {a} au {b}, en pleine saison. Est-ce exact?', closeInsideKeep: 'Oui, c’est exact', closeInsideFix: 'Corriger les dates' });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
