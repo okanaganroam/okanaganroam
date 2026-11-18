@@ -22406,17 +22406,33 @@ function tourFreeRead(x) {
 // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
 // is 'unit': never saved as a price per person (Your tours and prices takes it). Vehicles, cars, sleds and canoes moved
 // from the group words to these. "from 1500" / « 1500 $ et plus » read as the number (tourPriceTrim).
-const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?|hours?|hrs?|heures?|days?|jours?|nights?|nuits?|hr|h)\b/;
+const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
+// Tour test 7 (Whistler, 2026-11-17; Erik, a mountain guide): days, nights and hours are not units. "$750/day", "750 per
+// day", "daily rate" is a day rate for the group ('day': Private tours); a bare "/hour" is an hourly rate ('hourly': Your
+// tours and prices, like a per-unit price; "$30/hour per bike" stays 'unit'); "1450 for 3 days", "3-day", "2 nights" is a
+// trip length, not a group count ('length': type just the price for one person). The private box takes a day or hourly
+// rate ("$750/day", "750 per day up to 4" -> 750). (owner-setup-client.js tourPriceWhy, the same rule.)
+const TOUR_DAY_RATE_RE = /(?:^|[\s\/])(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?)\b|\b(?:daily|nightly)\b|\b(?:tarif|taux) (?:journalier|quotidien)\b/;
+const TOUR_HOUR_RATE_RE = /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\bhoraire\b/;
+const TOUR_RATE_STRIP_RE = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the|[àa] la|[àa] l|de l|pour la|pour une?)\s+)?(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?|hours?|hrs?|hr|h|heures?)\b(?:\s+rate)?|\b(?:daily|nightly|hourly)(?:\s+rate)?\b|\b(?:day|hour) rate\b|\b(?:tarif|taux) (?:journalier|quotidien|horaire)\b|\bhoraire\b/g;
+const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
+const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
 const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
 function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
   const raw = tourPriceTrim(x);
   if (!raw || !/\d/.test(raw)) return '';
   if (/^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(raw)) return 'hours';
+  if (TOUR_LENGTH_HEAD_RE.test(raw)) return 'length';
   const m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,  ]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-zÀ-ɏ]).*)$/.exec(raw);
   if (!m) return '';
   const head = m[1].replace(/[.,\s  ]+$/, '');
-  const rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  let rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (TOUR_LENGTH_PRICE_RE.test(rest)) return 'length';
+  if (!TOUR_UNIT_RE.test(rest) && (TOUR_DAY_RATE_RE.test(rest) || TOUR_HOUR_RATE_RE.test(rest))) {
+    if (priv) rest = rest.replace(TOUR_RATE_STRIP_RE, ' ').replace(/\s+/g, ' ').trim();
+    else if (!TOUR_GROUP_PRICE_RE.test(rest)) return TOUR_DAY_RATE_RE.test(rest) ? 'day' : 'hourly';
+  }
   const countRe = /(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g;
   const group = TOUR_GROUP_PRICE_RE.test(rest)
     || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
@@ -22428,7 +22444,9 @@ function tourPriceWhy(x, priv = false) {
   if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
   return 'many';
 }
-const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.' };
+const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.',
+  day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
+  length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
   if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why], why }; }
