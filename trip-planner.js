@@ -7058,8 +7058,8 @@ function closedDayEnglish(c) {
   const mo = (md) => { const n = Number(String(md || '').slice(0, 2)); return n >= 1 && n <= 12 ? MEN[n - 1] : null; };
   const sea = mo(c.from) && mo(c.to) ? ` (${mo(c.from)}–${mo(c.to)})` : '';
   const days = run && inOrder.length > 2 ? `${EN[inOrder[0]]}–${EN[inOrder[inOrder.length - 1]]}` : WEEKDAYS.filter((d) => c.open.includes(d)).map((d) => EN[d]).join(', ');
-  // Tour test 10: open two days or fewer: "open Sat–Sun only (Dec–Mar)".
-  if (c.open.length <= 2) return `open ${c.open.length === 2 && run ? `${EN[inOrder[0]]}–${EN[inOrder[1]]}` : WEEKDAYS.filter((d) => c.open.includes(d)).map((d) => EN[d]).join(', ')} only${sea}`;
+  // Tour test 10: open two days in a row only: "open Sat–Sun only (Dec–Mar)".
+  if (c.open.length === 2 && run) return `open ${EN[inOrder[0]]}–${EN[inOrder[1]]} only${sea}`;
   return `closed ${ENL[c.day]}${sea} · try ${days}`;
 }
 // The day a place is closed all day in the week used for the trip (its listed hours, or the owner's seasonal week on the

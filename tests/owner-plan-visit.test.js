@@ -117,7 +117,8 @@ test('validation: length, < >, links and unknown keys are refused, in English an
   }
   assert.equal((await post(token, { visit_rows: 'nope' })).status, 400);
   assert.equal((await post(token, { visit_rows: { known_for: 'x'.repeat(180) } })).status, 201, '180 is fine');
-  assert.deepEqual(rows(v.id), [{ label: 'Known for', text: 'x'.repeat(180) }]);
+  // Tour test 10 (2026-11-18): a sentence the owner types starts with a capital.
+  assert.deepEqual(rows(v.id), [{ label: 'Known for', text: 'X' + 'x'.repeat(179) }]);
 });
 
 test('research never replaces, removes or brings back a row the owner wrote or cleared; its other rows still go in', async () => {

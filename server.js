@@ -7300,6 +7300,12 @@ function appliedTripExclusions(plan, intent, taxonomy) {
 // Loaded like the interpreter (discoveryIntentModule): a missing or broken
 // file fails the plan request with its error, never a silent English-only
 // planner.
+// The regions of a plan's stops and listed places (its matches), for the near-towns check.
+function planStopRegions(p) {
+  if (!p) return [];
+  const xs = [...(p.recommendations || []), ...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || [])];
+  return [...new Set(xs.map((x) => x && x.venue && x.venue.region).filter(Boolean))];
+}
 function tripPlannerFrModule() {
   return require('./trip-planner-fr.js');
 }
@@ -7320,12 +7326,6 @@ function buildTripPlannerTaxonomy() {
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
 const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
-// The regions of a plan's stops and listed places (its matches), for the near-towns check.
-function planStopRegions(p) {
-  if (!p) return [];
-  const xs = [...(p.recommendations || []), ...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || [])];
-  return [...new Set(xs.map((x) => x && x.venue && x.venue.region).filter(Boolean))];
-}
 function runTripPlan(args, now = new Date()) {
   const first = runTripPlanCore(args, now);
   let plan = first;
