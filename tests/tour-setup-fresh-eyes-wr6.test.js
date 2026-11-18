@@ -304,3 +304,34 @@ test('other setup types still load (EN + FR) with no tour words', async () => {
     }
   }
 });
+
+// From Whistler Roam #190 (2026-11-17, real-data check there): adventure parks filed as sport listings plan for "adventure
+// park" and kids' birthdays (ahead of a museum); "side-by-side ziplines" is not an ATV tour; when the asked town has none
+// of the kind, the list is the nearest town's and the header names that town (the note says why).
+test('Whistler #190: sport-listed adventure parks plan for "adventure park" and kids’ birthdays; side-by-side ziplines are not ATVs; a borrowed town is named in the header', async () => {
+  await planFixtures();
+  const park = mk('sport', { name: 'Kelowna Aerial Obstacle Course Wr6', region: 'kelowna', latitude: 49.88, longitude: -119.47, address: '1 Water St, Kelowna', cuisine: 'Aerial park', description: 'Treetop obstacle course with rope bridges and a lower kids’ course.', kid_friendly: 1, rating: 4.7, reviews: 300 });
+  const zone = mk('sport', { name: 'Penticton Family Adventure Zone Wr6', cuisine: 'Mini golf & family adventure park', description: 'Mini golf, bungee trampolines, a climbing wall and a ropes course.', kid_friendly: 1, rating: 4.6, reviews: 500 });
+  const museum = mk('indoor', { name: 'Penticton Village Museum Wr6', cuisine: 'Museum', description: 'A small local history museum.', kid_friendly: 1, rating: 4.8, reviews: 900 });
+  for (const f of [park, zone]) assert.ok(app.buildTripPlannerFacts().find((x) => x.id === f.id).activities.includes('adventure'), f.name);
+  assert.ok(names(await plan('adventure park in Kelowna on July 17')).includes(park.name));
+  for (const q of ['adventure park in Penticton on July 17', 'parc d’aventure à Penticton le samedi 17 juillet']) {
+    const got = names(await plan(q));
+    assert.ok(got.includes(zone.name), `${q}: ${JSON.stringify(got)}`);
+  }
+  for (const q of ['Birthday party activity for 8-year-olds in Penticton on July 17', 'fête d’anniversaire pour enfants à Penticton le 17 juillet']) {
+    const got = names(await plan(q));
+    assert.ok(got.includes(zone.name) && (got.indexOf(museum.name) < 0 || got.indexOf(zone.name) < got.indexOf(museum.name)), `${q}: ${JSON.stringify(got)}`);
+  }
+  const fly = { type: 'tour', name: 'Sky Ziplines Wr6', cuisine: 'Zipline tours', description: 'Side-by-side ziplines over the canyon; riders race a friend down the longest lines.' };
+  const kinds = tr.inferPlannerKinds(fly);
+  assert.ok(kinds.includes('zipline') && !kinds.includes('atv'), JSON.stringify(kinds));
+  assert.ok(tr.inferPlannerKinds({ type: 'tour', name: 'Ridge Tours Wr6', cuisine: 'Side-by-side RZR tours', description: 'Side-by-side tours on logging roads.' }).includes('atv'));
+  // No zipline in Summerland: Penticton's are listed, the header names Penticton ("… in Penticton."), and the note says why.
+  mk('tour', { name: 'Summerland Wine Tours Wr6', region: 'summerland', latitude: 49.60, longitude: -119.67, cuisine: 'Wine tours', address: '1 Main St, Summerland' });
+  const p = await plan('zipline in Summerland on July 20');
+  assert.ok(names(p).length && itemsOf(p).every((x) => x.venue.region === 'penticton'), JSON.stringify(itemsOf(p).map((x) => [x.venue.name, x.venue.region])));
+  assert.match(p.summary, / in Penticton\.$/);
+  assert.match(tf.t3FrenchSummary(p.summary), / à Penticton\.$/);
+  assert.ok((p.notes || []).some((x) => /^Nothing in Summerland fits that, so these are (?:nearby in|the nearest, in) Penticton/.test(x)), JSON.stringify(p.notes));
+});

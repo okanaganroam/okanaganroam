@@ -216,6 +216,8 @@ function inferPlannerKinds(v) {
     // listed Canadian Wilderness Adventures ("… snowshoe & snowcat tours") and Coast Range Alpine Yurt (its description
     // names "Coast Range Heli-Skiing's yurt") ahead of the three heli-ski companies.
     if (kind==='heli_ski') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); return HELI_SKI_LISTING_RE.test(own)||(!String(v.cuisine||'').trim()&&HELI_SKI_LISTING_RE.test(text)); }
+    // Whistler #190 (2026-11-17): "side-by-side ziplines" is not a side-by-side ATV.
+    if (kind==='atv'&&/\bside by side zip ?lines?\b/.test(text)&&!re.test(text.replace(/\bside by side zip ?lines?\b/g,' '))) return false;
     if (kind==='adventure_park') return re.test(norm([v.name,v.cuisine,v.textName].filter(Boolean).join(' ')));
     if (kind==='snowshoe_tour') return v.type==='tour'&&(re.test(text)||/\bsnowshoe\w*/.test(text));
     // Tour test 6: a shop that rents is a rental place too (after the tours that rent: trip-planner.js scoreVenue).
