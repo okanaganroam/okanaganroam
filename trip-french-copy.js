@@ -457,6 +457,7 @@ function t3FrenchTextCore(value){
  if(text==='A skating rink')return 'Une patinoire'; // 2026-10-25
  if(text==='On the water')return 'Sur l’eau'; // 2026-10-25
  text=text.replace(/^Nothing in (.+?) itself matched, so this includes (.+) nearby\.$/,(_,a,b)=>'Rien à '+a+' même ne correspondait; ce plan inclut donc '+b.replace(/ and /g,' et ')+', tout près.'); // 2026-10-25
+ text=text.replace(/^This includes (.+), right next to (.+)\.$/,(_,a,b)=>'Ce plan inclut aussi '+a.replace(/ and /g,' et ')+', tout près de '+b+'.'); // tour test 9
  if(text==='A dog beach or off-leash area')return 'Une plage pour chiens ou une aire sans laisse'; // 2026-10-25
  text=text.replace(/^A beach day suits (\w+)$/,(raw,m)=>FR_MONTHS_BY_EN[m]?'Une journée à la plage convient en '+FR_MONTHS_BY_EN[m]:raw); // 2026-10-25
  // Audit fix (2026-10-27): the resort's own opening day.

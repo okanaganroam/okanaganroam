@@ -568,3 +568,90 @@ test("tour test 8 answers: own dogs say No guests’ dogs, per sled is not Priva
   assert.match(plain(en.topic("tour-kinds-kennel").a), /Farm, ranch or kennel visits/); assert.match(plain(en.topic("tour-shuttle").a), /Good to know/);
   assert.match(plain(en.topic("tour-gear").a), /Good to know/);
 });
+
+// Tour test 9 (Whistler, 2026-11-18; Tanis, an Indigenous-owned cultural tour business near Mount Currie and Pemberton,
+// Android). Her questions as typed (shots 006-062), each with a French twin, and rephrasings. Help missed or half-answered
+// 13 of 20: no kind for a cultural walk, "snowcat" on her page, Indigenous-owned, photos of Elders, her town, yearly
+// breaks, a class of 30, how her culture is described, the old French description and typing her tours herself.
+const ASKED9 = [
+  ["9-006", "We are an Indigenous-owned business. Can I change how our culture is described? The listing calls it adventure and war canoe, that is not right.", ["tour-culture-story","tour-indigenous-owned","tour-story-fix"],
+    "Nous sommes une entreprise autochtone. Puis-je changer la façon dont notre culture est décrite? La fiche parle d’aventure et de canot de guerre, ce n’est pas juste."],
+  ["9-007", "Our office is in Pemberton but people meet us in two places. The walk starts at a trailhead near Mount Currie and the canoe goes from Lillooet Lake. Which address do I put?", ["tour-meeting-varies","tour-meeting"],
+    "Notre bureau est à Pemberton, mais on nous rejoint à deux endroits. La marche part d’un sentier près de Mount Currie et le canot part du lac Lillooet. Quelle adresse mettre?"],
+  ["9-011", "We run most of the year but we take a break in April and in November. Is that all year?", ["tour-yearly-break"],
+    "Nous sommes ouverts la plupart de l’année, mais nous prenons une pause en avril et en novembre. Est-ce toute l’année?"],
+  ["9-018", "I dont see Indigenous or cultural tours. Our walk is a cultural walk with Elders storytelling, which one do I pick?", ["tour-kinds-cultural"],
+    "Je ne vois pas de visites autochtones ou culturelles. Notre marche est une marche culturelle avec des récits des aînés, lequel je choisis?"],
+  ["9-021", "Elders and children under 12 come free on our walk. Adults are 65. Where do I say that? Should I type free?", ["tour-strollers","tour-kids-price"],
+    "Les aînés et les enfants de moins de 12 ans viennent gratuitement à notre marche. Les adultes paient 65 $. Où le dire? Est-ce que j’écris gratuit?"],
+  ["9-022", "School groups pay 400 for the whole class, not per student. Where does that go?", ["tour-per-boat","tour-private-price","tour-groups"],
+    "Les groupes scolaires paient 400 $ pour toute la classe, pas par élève. Où ça va?"],
+  ["9-026", "Is there a way to show we are Indigenous-owned? Locally owned is not quite the same thing.", ["tour-indigenous-owned"],
+    "Y a-t-il une façon de montrer que nous sommes une entreprise autochtone? Propriété locale, ce n’est pas tout à fait pareil."],
+  ["9-027", "The walk is all ages but the canoe is 6 and up with a life jacket. Which age do I pick?", ["tour-ages-per-trip","tour-age"],
+    "La marche est pour tous les âges, mais le canot est pour 6 ans et plus avec une veste de sauvetage. Quel âge choisir?"],
+  ["9-030", "Some of our photos have Elders and community members in them. Will you use them on Instagram or other places? I need to know where they go.", ["photos-where"],
+    "Certaines de nos photos montrent des aînés et des membres de la communauté. Allez-vous les utiliser sur Instagram ou ailleurs? Je dois savoir où elles vont."],
+  ["9-040", "I dont have a price sheet. Can I just type our three tours and the prices here?", ["menu-add"],
+    "Je n’ai pas de grille tarifaire. Puis-je simplement taper nos trois sorties et les prix ici?"],
+  ["9-049", "We do school programs for a whole class, about 30 students plus teachers. The biggest choice is 20. What do I do?", ["tour-groups"],
+    "Nous offrons des programmes scolaires pour une classe entière, environ 30 élèves et les enseignants. Le plus grand choix est 20. Que faire?"],
+  ["9-057", "My page says snowcat and ski touring. We only do a snowshoe walk. How do I take snowcat off?", ["tour-kind-one-side"],
+    "Ma page parle de chenillette et de ski de randonnée. Nous faisons seulement une marche en raquettes. Comment enlever la chenillette?"],
+  ["9-058", "It says Whistler but we are in Mount Currie, near Pemberton. Can I change that?", ["setup-town"],
+    "Ça dit Whistler, mais nous sommes à Mount Currie, près de Pemberton. Puis-je changer ça?"],
+  ["9-059", "Can you add Indigenous or cultural to our category? It says walking and history tours. Our culture is not history, it is living.", ["tour-kinds-cultural"],
+    "Pouvez-vous ajouter autochtone ou culturel à notre catégorie? Ça dit visites à pied et historiques. Notre culture n’est pas de l’histoire, elle est vivante."],
+  ["9-062", "I dont speak French. The French one still says war canoe and tribal. Can you just remove it or translate mine?", ["fr-desc-old"],
+    "Je ne parle pas français. La version française dit encore canot de guerre et tribal. Pouvez-vous l’enlever ou traduire la mienne?"],
+  ["9-154", "I'm not good with computers. What if I make a mistake?", ["setup-change-later"],
+    "Je ne suis pas douée avec les ordinateurs. Et si je fais une erreur?"],
+];
+const MORE9 = [
+  ["en","which kind for a cultural tour",["tour-kinds-cultural"]],
+  ["en","we run First Nations cultural walks",["tour-kinds-cultural"]],
+  ["en","how do I take snowcat off my page",["tour-kind-one-side"]],
+  ["en","how do i show we are indigenous owned",["tour-indigenous-owned"]],
+  ["en","where do our photos go",["photos-where"]],
+  ["en","keep a photo off instagram",["photos-where"]],
+  ["en","wrong town on my page",["setup-town"]],
+  ["en","we close every april",["tour-yearly-break","setup-closures","closures"]],
+  ["en","a class of 30",["tour-groups"]],
+  ["en","whole class of 30 students",["tour-groups"]],
+  ["en","change how our culture is described",["tour-culture-story"]],
+  ["en","people meet us at a trailhead, not the office",["tour-meeting","tour-meeting-varies"]],
+  ["en","I don't speak French, remove it or translate mine?",["fr-desc-old"]],
+  ["en","can I type our tours myself",["menu-add"]],
+  ["en","190 per canoe",["tour-per-unit"]],
+  ["en","400 per class",["tour-per-boat"]],
+  ["fr","quel genre pour une visite culturelle",["tour-kinds-cultural"]],
+  ["fr","ou vont nos photos",["photos-where"]],
+  ["fr","je ne parle pas français, traduire la mienne",["fr-desc-old"]],
+  ["fr","une classe entière de 30 élèves",["tour-groups"]],
+];
+test("tour test 9: every Help question (EN + its French twin) and rephrasings land on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Adventure canoe tours" });
+  assert.equal(ASKED9.length, 16);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED9) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  for (const [lang, q, want] of MORE9) { const r = (lang === "fr" ? fr : en).best(q); if (!want.includes(r.id)) wrong.push(`"${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 9 answers: the cultural kind, one side of a kind, Indigenous-owned in the story, photos page-only, the town, yearly breaks, a whole class, French description, typing tours", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-kinds-cultural").a), /Indigenous and cultural tours/); assert.match(plain(fr.topic("tour-kinds-cultural").aFr), /Visites autochtones et culturelles/);
+  assert.doesNotMatch(plain(en.topic("tour-kind-one-side").a), /untick that kind/); assert.match(plain(en.topic("tour-kind-one-side").a), /Keep the kind ticked/);
+  assert.match(plain(en.topic("tour-indigenous-owned").a), /story/); assert.match(plain(en.topic("tour-indigenous-owned").a), /Known for/); assert.match(plain(en.topic("tour-indigenous-owned").a), /no separate badge/);
+  assert.match(plain(en.topic("photos-where").a), /Instagram or Facebook, always credited and tagged/); assert.match(plain(en.topic("photos-where").a), /Message us/);
+  assert.match(plain(en.topic("setup-town").a), /Message us/);
+  assert.match(plain(en.topic("tour-yearly-break").a), /Every year/); assert.doesNotMatch(en.topic("tour-yearly-break").a, /__/); assert.doesNotMatch(fr.topic("tour-yearly-break").aFr, /__/);
+  assert.match(plain(en.topic("tour-groups").a), /21\+ or whole classes/); assert.match(plain(fr.topic("tour-groups").aFr), /21\+ ou classes entières/);
+  assert.match(plain(en.topic("tour-culture-story").a), /Your story and Known for/);
+  assert.match(plain(en.topic("tour-meeting-varies").a), /Where do people meet you\?/);
+  assert.match(plain(en.topic("fr-desc-old").a), /Leave it to us/); assert.match(plain(en.topic("menu-add").a), /Type them in myself/); assert.match(plain(fr.topic("menu-add").aFr), /Je les tape moi-même/);
+});
