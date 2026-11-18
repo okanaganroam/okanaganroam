@@ -529,6 +529,11 @@
   // Café test 4: no "your seats" for a takeout window (the coffee shop's photo hint).
   function photosHint(){ var t = kindText('photos') || T.photosLead; return C.cafe && S.cafe.stay.seats === 'takeout' && T.photosTakeout && /seats|room|places assises|salle/i.test(t) ? T.photosTakeout : t; }
   function wifiSubText(){ return S.cafe.stay.seats === 'takeout' ? T.noWifiSubTakeout : T.noWifiSub; }
+  // Tour test 8 (Whistler, 2026-11-17): a business whose own dogs are the trip (dog sledding picked, or sled dogs, huskies
+  // or a kennel in its own words). Research's "dogs welcome" isn't pre-ticked for guests' dogs, and the lead says so.
+  function ownDogsBiz(){ return TOUR && ((S.tour.kinds || []).indexOf('dogsled') >= 0 || !!C.ownDogs); }
+  // A Dogs line that says guests can't bring their dog (server.js dogsLineSaysNo, the same rule).
+  function dogLineNo(t){ var NO = /\bno (?:guests?[’']?s?[’']? |outside |visiting |pet |other )?dogs\b|\bleave (?:your|their|the) (?:own )?dogs? at home\b|\b(?:guests?|you|people|visitors|customers|clients) (?:can ?not|can[’']?t|cannot|may not|are not allowed to|aren[’']?t allowed to) (?:bring|take) (?:a |their |your |any )?(?:own )?(?:dogs?|pets?)\b|\b(?:dogs?|pets?) (?:are )?not (?:allowed|permitted|welcome)\b|\b(?:our|sled) (?:sled )?dogs only\b|\bpas de chiens\b|\bchiens? (?:non admis|interdits?|pas admis)\b|\blaissez (?:votre|leur) chien\b|\bne (?:peuvent|pouvez) pas (?:amener|emmener) (?:de |leurs? |votre |vos )?(?:chiens?|animaux)\b/i, YES = /\bdogs? (?:are )?welcome\b|\bwelcome (?:on|at|for)\b|\bcan come\b|\bon a leash\b|\bleashed\b|\ballowed on\b|\bdogs? (?:on|ok|okay)\b|\bchiens? bienvenus?\b|\ben laisse\b|\bpeuvent venir\b|\badmis (?:[àa]|sur)\b/i; t = String(t || ''); return !!t.trim() && NO.test(t) && !YES.test(t.replace(NO, ' ')); }
   function dogSubText(){ return S.badges.patio ? T.noDogsSub : T.noDogsSubInside || T.noDogsSub; }
   function servesShown(){ var bake = !S.place || BAKES.indexOf(S.place) >= 0; return C.serves.filter(function(o){ if (S.cafe.serves[o.k]) return true; if (o.k === 'baked_here') return bake; if (o.k === 'made_here') return !bake; if (ICE_ONLY.indexOf(o.k) >= 0) return iceKind(); return true; }); }
   // "5.50" for cents (French "5,50"), "9" for whole dollars.
@@ -627,7 +632,7 @@
   // (server.js tourPriceWhy, the same rule.)
   function priceTrim(x){ return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
   function tourPriceWhy(x, priv){
-    var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
+    var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
     // Tour test 7 (Whistler, 2026-11-17): days, nights and hours are not units: "$750/day" is a day rate for the group
     // ('day': Private tours), a bare "/hour" an hourly rate ('hourly': Your tours and prices), "1450 for 3 days" a trip
     // length ('length': just the price for one person). The private box takes a day or hourly rate (server.js, same rule).
@@ -646,6 +651,8 @@
       if (priv) rest = rest.replace(RATE_STRIP, ' ').replace(/\s+/g, ' ').trim();
       else if (!TOUR_GROUP_RE.test(rest)) return DAY_RE.test(rest) ? 'day' : 'hourly';
     }
+    // Tour test 8: a price per sled, vehicle or bike stays per unit even when it says who fits (server.js, same rule).
+    if (!priv && TOUR_UNIT_RE.test(rest) && !TOUR_GROUP_RE.test(rest)) return 'unit';
     var group = TOUR_GROUP_RE.test(rest)
       || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
@@ -2110,7 +2117,7 @@
         + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
         + (S.nudge && (S.nudge === T.tpriceGroup || S.nudge === T.tpriceDay) && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
-        + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals || S.nudge === T.tpriceHourly) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
+        + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals || S.nudge === T.tpriceHourly || (T.tpriceVehicle && S.nudge === T.tpriceVehicle)) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
         + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
@@ -2302,10 +2309,12 @@
       if (C.cafe && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'wifi' && S.noWifi)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
       var resTicked = !S.done.offer && ((C.researchTicks || []).some(function(k){ return S.badgesAtStart[k]; }) || (S.visitTicked || []).some(function(k){ return S.badges[k]; }));
+      // Tour test 8: research's "dogs welcome" on a sled-dog or kennel business is not pre-ticked (it read as her own dogs).
+      if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       var tourAges = TOUR ? '<h2 class="su-h2" style="margin-top:6px">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '12', '16', '19'], T.tages, T.tageQ)
         + (S.tour.age && S.tour.age !== '19' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1">' + h(T.tadult) + '</button></div>' : '') : '';
-      x = doneLine('offer') + q(T.offerQ, T.offerLead) + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
+      x = doneLine('offer') + q(T.offerQ, ownDogsBiz() && T.offerLeadOwnDogs ? T.offerLeadOwnDogs : T.offerLead) + (S.dogNoPicked && S.noDogs && T.dogLineNoDone ? '<p class="su-sent" id="suDogNoPicked" role="status">' + h(T.dogLineNoDone) + '</p>' : '') + tourAges + (resTicked ? '<p class="su-sent su-research" id="suResearch">' + h(T.researchLine) + '</p>' : '')
         + (S.picnicSuggested && !S.done.offer && S.badges.picnic_area && T.picnicFromFood ? '<p class="su-sent su-research" id="suPicnicFromFood">' + h(T.picnicFromFood) + '</p>' : '') + msgs() + C.offerGroups.map(function(g){ return '<h2 class="su-h2">' + h(g.title) + '</h2><div class="su-tiles">' + g.keys.filter(tileShown).map(function(k){ return '<button type="button" class="su-tile" aria-pressed="' + (S.badges[k] ? 'true' : 'false') + '" data-off="' + k + '"><span class="su-e" aria-hidden="true">' + C.offerIcons[k] + '</span>' + h(C.offerLabels[k]) + '</button>'; }).join('')
           + (g.keys.indexOf('vegan') >= 0 && !C.brewery ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noDiet ? 'true' : 'false') + '" data-off="none_diet"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noneDiet) + '<span class="su-tile-sub">' + h(T.noneDietSub) + '</span></button>' : '')
           + (C.pub && GAMES.some(function(gk){ return g.keys.indexOf(gk) >= 0; }) ? '<button type="button" class="su-tile su-tile-wide" aria-pressed="' + (S.noGames ? 'true' : 'false') + '" data-off="no_games"><span class="su-e" aria-hidden="true">🚫</span>' + h(T.noGames) + '<span class="su-tile-sub">' + h(T.noGamesSub) + '</span></button>' : '')
@@ -2369,6 +2378,7 @@
       // Brewery test 1 (2026-11-12): research's "Dogs on the patio" fills in "Patio only" as a suggestion (saved with the screen).
       if (C.brewery && C.suggestDogNote && !S.dogGuessSet && !S.dogNote && !((CUR.visit_rows || {}).dogs)) { S.dogGuessSet = true; S.dogNote = C.suggestDogNote; S.dogGuessed = true; }
       x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
+        + (S.nudge && S.nudge === T.dogLineNo && T.dogLineNoGo ? '<div class="su-stack su-seaskip" id="suDogNoGo">' + big('🚫', T.dogLineNoGo, '', true, 'dogToNo') + '</div>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:' + (offerNext('offer:dogs') || 'saved:offer') + '">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';
     } else if (s === 'happy:yes' || s === 'specials:yes') {
@@ -3649,8 +3659,16 @@
       readCafe(); if (!S.cafe.sellout) { S.nudge = T.needLine; S.badField = 'suSell'; return render(); }
       return saveAll('sellout', [{ cafe_info: { sellout: S.cafe.sellout } }], null, null, function(){ CI.sellout = S.cafe.sellout; });
     }
+    // Tour test 8: her line says guests can't bring a dog: "No guests' dogs" is the answer (one tap back to Who can come,
+    // with it picked; she saves it there).
+    if (k === 'dogToNo') {
+      S.noDogs = true; S.badges.dog_friendly = false; S.dogNote = ''; S.dogNoPicked = true; S.nudge = '';
+      if (C.offerLabels.service_dogs) { S.badges.service_dogs = true; S.sdogAuto = true; }
+      return go('offer');
+    }
     if (k === 'dogSave') {
       S.dogNote = el('suDog').value.trim();
+      if (TOUR && T.dogLineNo && dogLineNo(S.dogNote) && S.nudge !== T.dogLineNo) { S.nudge = T.dogLineNo; S.badField = 'suDog'; return render(); }
       // Winery test 2 (2026-11-12): an unchanged line is sent too (as long as there is one): saving it says it's right, so it
       // becomes hers and a full Plan your visit box never drops it.
       if (!S.dogNote && !((CUR.visit_rows || {}).dogs || '')) return go(offerNext('offer:dogs') || 'saved:offer');
@@ -3751,7 +3769,7 @@
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
         // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).
-        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceVehicle && /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?)\b/i.test(el('suTprice') ? el('suTprice').value : '') ? T.tpriceVehicle : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
         S.groupMove = pwhy === 'group' || pwhy === 'day' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
       }
       if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }

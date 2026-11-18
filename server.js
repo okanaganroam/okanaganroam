@@ -20414,6 +20414,14 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
 // patio" (« Chiens sur la terrasse »), not "Dogs OK".
 // Tour test 5 (Whistler, 2026-11-17): a tour whose owner said dogs come on some trips only ("On some trips: private
 // charters only"): the card, the planner and its stop say "Dogs on some trips", not a plain Dog-Friendly.
+// Tour test 8 (Whistler, 2026-11-17): an owner's Dogs line that says guests can't bring their dog, with nothing in it
+// that lets a dog come ("Please leave your own dog at home. Our sled dogs only.", « Pas de chiens des clients »). A line
+// that lets dogs on some trips ("Dogs welcome on our walks, not on the food tour") is not one.
+// (owner-setup-client.js dogLineNo, the same rule.)
+const DOGS_LINE_NO_RE = /\bno (?:guests?[’']?s?[’']? |outside |visiting |pet |other )?dogs\b|\bleave (?:your|their|the) (?:own )?dogs? at home\b|\b(?:guests?|you|people|visitors|customers|clients) (?:can ?not|can[’']?t|cannot|may not|are not allowed to|aren[’']?t allowed to) (?:bring|take) (?:a |their |your |any )?(?:own )?(?:dogs?|pets?)\b|\b(?:dogs?|pets?) (?:are )?not (?:allowed|permitted|welcome)\b|\b(?:our|sled) (?:sled )?dogs only\b|\bpas de chiens\b|\bchiens? (?:non admis|interdits?|pas admis)\b|\blaissez (?:votre|leur) chien\b|\bne (?:peuvent|pouvez) pas (?:amener|emmener) (?:de |leurs? |votre |vos )?(?:chiens?|animaux)\b/i;
+const DOGS_LINE_YES_RE = /\bdogs? (?:are )?welcome\b|\bwelcome (?:on|at|for)\b|\bcan come\b|\bon a leash\b|\bleashed\b|\ballowed on\b|\bdogs? (?:on|ok|okay)\b|\bchiens? bienvenus?\b|\ben laisse\b|\bpeuvent venir\b|\badmis (?:[àa]|sur)\b/i;
+const TOUR_OWN_DOGS_RE = /dog ?sled|sled ?dogs?|husk(?:y|ies)|kennel|mushing|\bmushers?\b|tra[iî]neaux? [àa] chiens|chiens de tra[iî]neau|chenil/;
+function dogsLineSaysNo(text) { const t = String(text || ''); return !!t.trim() && DOGS_LINE_NO_RE.test(t) && !DOGS_LINE_YES_RE.test(t.replace(DOGS_LINE_NO_RE, ' ')); }
 function dogsSomeTrips(venue) {
   if (!venue || !venue.id || !venue.dog_friendly || venue.type !== 'tour') return false;
   const info = venueVisitInfo(venue.id);
@@ -22492,7 +22500,7 @@ function tourFreeRead(x) {
 // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
 // is 'unit': never saved as a price per person (Your tours and prices takes it). Vehicles, cars, sleds and canoes moved
 // from the group words to these. "from 1500" / « 1500 $ et plus » read as the number (tourPriceTrim).
-const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
+const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
 // Tour test 7 (Whistler, 2026-11-17; Erik, a mountain guide): days, nights and hours are not units. "$750/day", "750 per
 // day", "daily rate" is a day rate for the group ('day': Private tours); a bare "/hour" is an hourly rate ('hourly': Your
 // tours and prices, like a per-unit price; "$30/hour per bike" stays 'unit'); "1450 for 3 days", "3-day", "2 nights" is a
@@ -22519,6 +22527,9 @@ function tourPriceWhy(x, priv = false) {
     if (priv) rest = rest.replace(TOUR_RATE_STRIP_RE, ' ').replace(/\s+/g, ' ').trim();
     else if (!TOUR_GROUP_PRICE_RE.test(rest)) return TOUR_DAY_RATE_RE.test(rest) ? 'day' : 'hourly';
   }
+  // Tour test 8 (Whistler, 2026-11-17; Linda): a price per sled, vehicle or bike stays per unit even when it says who
+  // fits ("349 per sled (2 adults or 1 adult + 2 kids)" offered "Put $349 in Private tours"): one sled is not a private tour.
+  if (!priv && TOUR_UNIT_RE.test(rest) && !TOUR_GROUP_PRICE_RE.test(rest)) return 'unit';
   const countRe = /(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g;
   const group = TOUR_GROUP_PRICE_RE.test(rest)
     || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
@@ -22533,9 +22544,12 @@ function tourPriceWhy(x, priv = false) {
 const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.',
   day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
   length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
+// Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
+const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?)\b/i;
+TOUR_PRICE_WHY_ERRORS.vehicle = 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.';
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
-  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why], why }; }
+  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why) return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why === 'unit' && TOUR_VEHICLE_WORDS_RE.test(x) ? 'vehicle' : why], why }; }
   // Tour test 4: "free", "0", "by donation"… in the per-person box (never the private price).
   if (allowFree) { const f = tourFreeRead(x); if (f) return { value: f }; }
   // Tour test 6: "from 1500" / « 1500 $ et plus » -> 1500.
@@ -55780,7 +55794,8 @@ function renderOwnerSetupPage(found, opts) {
   if (brewery) offerLabels.nonalcoholic = fr ? 'Boissons sans alcool (pour les conducteurs)' : 'Non-alcoholic drinks (for drivers)';
   if (winery) { offerLabels.kid_friendly = fr ? 'Enfants bienvenus' : 'Kids welcome'; offerLabels.nonalcoholic = fr ? 'Boissons sans alcool (pour les conducteurs et les enfants)' : 'Non-alcoholic drinks (for drivers and kids)'; }
   // Tour test 4 (Whistler, 2026-11-17): "(on some or all trips)", so a guide whose dogs join only the walks can tick it.
-  if (tour) { offerLabels.dog_friendly = fr ? 'Les chiens peuvent venir (à certaines sorties ou à toutes)' : 'Dogs can come along (on some or all trips)'; offerLabels.wheelchair_accessible = fr ? 'Accessible en fauteuil roulant' : 'Wheelchair accessible'; }
+  // Tour test 8 (Whistler, 2026-11-17; Linda, sled dogs): "Dogs can come along" read as her own dogs: "Guests’ own dogs".
+  if (tour) { offerLabels.dog_friendly = fr ? 'Les chiens des clients peuvent venir' : 'Guests’ own dogs can come along'; offerLabels.wheelchair_accessible = fr ? 'Accessible en fauteuil roulant' : 'Wheelchair accessible'; }
   if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (p. ex. un puppuccino ou une coupe pour chien)' : 'Dog treats (e.g. a puppuccino or pup cup)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -55830,6 +55845,9 @@ function renderOwnerSetupPage(found, opts) {
       // Tour test 4 (Whistler, 2026-11-17): research that says "by donation", "pay what you want" or "free" pre-picks no
       // price (the box had 129 from "Food tour $129; history walk by donation"); a note says what to type instead.
       researchFee: tourResearchFreeHint(venue) ? null : tourResearchPrice(venue), researchFreeHint: tourResearchFreeHint(venue), researchLength: tourResearchLength(venue), suggestKinds: (snap.tour_info || {}).kinds ? [] : tourKindSuggestion(venue),
+      // Tour test 8: a business whose own dogs are the trip (sled dogs, huskies, a kennel): research's "dogs welcome" is
+      // not pre-ticked for guests' dogs, and the lead doesn't call dog owners.
+      ownDogs: TOUR_OWN_DOGS_RE.test(`${venue.name || ''} ${venue.cuisine || ''} ${venue.description || ''}`.toLowerCase()),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
     } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
@@ -61216,6 +61234,13 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         // Restaurant test 2: an Undo writes her French lines back too (none, when the old value had none).
         const w = writeOwnerVisitRows(venue.id, opts.undo && value && typeof value === 'object' && !value._fr ? { ...value, _fr: {} } : value, now);
         if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer);
+        // Tour test 8 (Whistler, 2026-11-17; Linda, sled dogs): her own Dogs line says guests can't bring a dog ("Please
+        // leave your own dog at home. Our sled dogs only.") while Dog-Friendly was still on (research ticked it, and Help
+        // told her to keep it): the page showed the badge beside her line. Her own words take it off (never research's).
+        if (!opts.undo && venue.type === 'tour' && value && typeof value === 'object' && dogsLineSaysNo([value.dogs, (value._fr || {}).dogs].filter(Boolean).join(' . '))) {
+          const df = db.prepare('SELECT dog_friendly FROM venues WHERE id = ?').get(venue.id);
+          if (df && Number(df.dog_friendly) === 1) { db.prepare('UPDATE venues SET dog_friendly = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venue.id); log.run(venue.id, 'dog_friendly', '1', '0', meta.reason, meta.batch_id, reviewer); }
+        }
         applied.push(field);
         continue;
       }
