@@ -226,10 +226,13 @@ function inferPlannerKinds(v) {
     // Tour test 7: a tour whose own words say ski touring or backcountry skiing (a heli-ski company only when its own
     // words say ski touring too); avalanche courses (AST); multi-day trips (the operator's "Several days", a list of
     // whole-day trips, or its own hut-trip / multi-day words); mountain guides (its words, or the Mountain guiding kind).
-    if (kind==='ski_touring') return v.type==='tour'&&(re.test(text)||/\bbackcountry (?:ski\w*|lodge|touring|guid\w*)\b/.test(text));
+    // A heli-ski company is a ski-touring one only when its own name or category says ski touring or backcountry too
+    // (Coast Range Heli-Skiing's description mentions touring; it came first for "ski touring in Whistler").
+    if (kind==='ski_touring') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); if (HELI_SKI_LISTING_RE.test(own)&&!re.test(own)&&!/\bbackcountry\b/.test(own)) return false; return re.test(text)||/\bbackcountry (?:ski\w*|lodge|touring|guid\w*)\b/.test(text); }
     if (kind==='avalanche_course') return v.type==='tour'&&(re.test(text)||/\bavalanche\b.{0,40}\b(?:courses?|training|skills)\b|\bast\b/.test(text));
     if (kind==='multi_day_tour') return v.type==='tour'&&(v.tourLength==='multi'||v.tourMultiDay===true||re.test(text)||/\b(?:hut trips?|multi ?day|overnight (?:trips?|tours?|hikes?)|expeditions?|traverses?|\d+ ?day (?:trips?|tours?|treks?))\b/.test(text));
-    if (kind==='mountain_guide') return v.type==='tour'&&(re.test(text)||/\b(?:mountain guid\w*|mountaineer\w*)\b/.test(text));
+    // ("founded by ski mountaineer …" in a jet-boat company's story is not mountaineering.)
+    if (kind==='mountain_guide') return v.type==='tour'&&(re.test(text)||/\bmountain guid\w*\b/.test(text));
     if (kind==='heli_ski') { if (v.type!=='tour') return false; const own=norm([v.name,v.cuisine].filter(Boolean).join(' ')); return HELI_SKI_LISTING_RE.test(own)||(!String(v.cuisine||'').trim()&&HELI_SKI_LISTING_RE.test(text)); }
     // Whistler #190 (2026-11-17): "side-by-side ziplines" is not a side-by-side ATV.
     if (kind==='atv'&&/\bside by side zip ?lines?\b/.test(text)&&!re.test(text.replace(/\bside by side zip ?lines?\b/g,' '))) return false;
@@ -589,7 +592,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // Tour test 7: ski touring, avalanche courses, multi-day trips and mountain guides asked for are those tours, not also the
   // skiing, winter or hiking activities and the outdoor places they bring ("ski touring in Pemberton" planned the ski
   // hill and Whistler heli-skiing). An outdoor place asked for in its own words stays.
-  if(items.some(i=>i.kind==='venue_kind'&&['ski_touring','avalanche_course','multi_day_tour','mountain_guide'].includes(i.value)&&i.strength==='must')){for(let n=items.length-1;n>=0;n--)if(items[n].kind==='activity'&&['skiing','winter','hiking','snowshoeing'].includes(items[n].value)&&!/\b(?:ski (?:hill|resort|day)|lift tickets?|resort skiing|snowshoe\w*|hiking trails?)\b/.test(items[n].sourceText||'')||items[n].kind==='type'&&items[n].value==='outdoor'&&!/\b(?:trails?|walks?|walking|parks?|beach\w*|lakes?|outdoors?|viewpoints?|waterfalls?|nordic|cross country)\b/.test(items[n].sourceText||''))items.splice(n,1);}
+  if(items.some(i=>i.kind==='venue_kind'&&['ski_touring','avalanche_course','multi_day_tour','mountain_guide'].includes(i.value)&&i.strength==='must')){for(let n=items.length-1;n>=0;n--)if(items[n].kind==='activity'&&['skiing','winter','hiking','snowshoeing'].includes(items[n].value)&&!/\b(?:ski (?:hill|resort|day)|lift tickets?|resort skiing|snowshoe\w*|hiking trails?)\b/.test(items[n].sourceText||'')||items[n].kind==='type'&&items[n].value==='outdoor'&&!/\b(?:trails?|walks?|walking|parks?|beach\w*|lakes?|outdoors?|viewpoints?|waterfalls?|nordic|cross country)\b/.test(items[n].sourceText||'')||items[n].kind==='type'&&items[n].value==='tour'&&items[n].strength==='must')items.splice(n,1);}
   if(deadlineMinutes!=null && deadlineMinutes<=18*60 && items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper)\b/.test(i.sourceText))) conflicts.push('Dinner conflicts with the requested return deadline; choose an earlier meal or a later deadline.');
   if(calendar.days>0&&calendar.days<=7)add('days',calendar.days,calendar.source,{dayIndex:null,weekday:null});
   const lengths=new Set(items.filter(i=>i.kind==='days').map(i=>i.value));
