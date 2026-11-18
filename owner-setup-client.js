@@ -666,7 +666,7 @@
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
     if (/\d/.test(rest)) return 'many';
     var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
-      .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+      .replace(/^(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seat|place|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
     if (!left) return '';
     // A price per bike, per rental, per hour… (not in the private box: that one only takes the whole-trip price).
     if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
@@ -1648,7 +1648,9 @@
     var E = C.frDescEn;
     if (C.lang !== 'fr' || !E || !E.lead || !(C.frDescFr === 'old' || C.frDescFr === 'research')) return '';
     var en = location.pathname.replace(/^\/fr(?=\/)/, '');
-    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
+    // Tour test 10 (Whistler, 2026-11-18; Gord): "Leave it to us" queues the French description for us (the same queue as a
+    // Facebook name), then goes back to the English setup. The link still works without the script.
+    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
@@ -1995,7 +1997,7 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
@@ -2033,7 +2035,7 @@
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
-      }).join('')
+      }).join('') + '</div>'
         // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch, one choice (stat holidays like Family Day and
         // Christmas week then show open with this stretch's weekend hours). Only when the stretch has a closed day.
         + (seas && T.seaHolidays && DAYS.some(function(d){ return !(wk[d] || []).length; }) ? '<div class="su-chips" role="group" aria-labelledby="suSeaHolH" style="margin:4px 0 10px"><p class="su-hint" id="suSeaHolH" style="width:100%;margin:0 0 4px">' + h(T.seaHolidaysQ) + '</p><button type="button" class="su-chip su-chip-wide" id="suSeaHol" aria-pressed="' + (S.sea.holidays ? 'true' : 'false') + '" data-act="seaHolidays">' + h(T.seaHolidays) + '</button></div>' : '')
@@ -3364,6 +3366,12 @@
     if (k === 'yearKeep' || k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
     if (k === 'yearDropYes') k = 'yearAll';
     // Brewery test 1 (Whistler, 2026-11-15): a second period; "Copy the hours from …"; removing one of two (asked first).
+    if (k === 'frLeave') {
+      if (S.busy) return; S.busy = true;
+      var enUrl = location.pathname.replace(/^\/fr(?=\/)/, '');
+      return post(C.base + '/menu/help', { note: 'Please write our French description from our English story (tapped “Leave it to us” on the French story screen).', sheet: 'fr_story', contact_email: '', contact_phone: '' })
+        .then(function(){ S.busy = false; location.href = enUrl; }, function(){ S.busy = false; location.href = enUrl; });
+    }
     if (k === 'yearSeasonAdd') { seaAddStart(); return go(seaStepOf(S.seaList.length - 1)); }
     // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch on screen.
     if (k === 'seaHolidays') { readTimes(); S.sea.holidays = !S.sea.holidays; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var hy = window.scrollY; render(); window.scrollTo(0, hy); var hb = el('suSeaHol'); if (hb) hb.focus(); return; }
@@ -4028,7 +4036,7 @@
   function wire(){
     // Tour test 9 (keyboard pass): the closures screen's Save button went off screen under the tiles when tabbed to.
     var csave = screen.querySelector('.su-closures-save'); if (csave) csave.addEventListener('focusin', function(e){ try { e.target.scrollIntoView({ block: 'center' }); } catch (x) {} });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(){ if (!S.busy) act(b.getAttribute('data-act')); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-act]'), function(b){ b.onclick = function(e){ if (b.tagName === 'A' && e && e.preventDefault) e.preventDefault(); if (!S.busy) act(b.getAttribute('data-act')); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('input[data-hh]'), function(inp){ inp.addEventListener('change', function(){ var q2 = inp.getAttribute('data-hh').split(':'); if (q2[1] !== 'what' && S.happy[+q2[0]]) { S.happy[+q2[0]][q2[1]] = inp.value; warnRefresh(); } }); });
     // Restaurant test 2: a special's start and end times check its days' hours as they change.
     Array.prototype.forEach.call(screen.querySelectorAll('input[data-sp$=":text"]'), function(inp){ inp.addEventListener('input', function(){ var c = el('spc' + inp.getAttribute('data-sp').split(':')[0]); if (!c) return; var t = spCount(inp.value); c.textContent = t; c.hidden = !t; }); });
@@ -4255,6 +4263,9 @@
       else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
       else if (saysIt(v, t, sibs)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
+      // Tour test 10 (Whistler, 2026-11-18; Gord): a chip's words ran into his typing ("rain or shine long pants"). As the
+      // group-size chips do, a sentence chip ends with ". " so what is typed next starts a new sentence (saved trimmed).
+      if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });

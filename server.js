@@ -22658,7 +22658,7 @@ function tourPriceWhy(x, priv = false) {
   if (group) return priv ? (/\d/.test(rest.replace(countRe, '')) ? 'many' : '') : 'group';
   if (/\d/.test(rest)) return 'many';
   const left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
-    .replace(/^(?:person|personne|pers|pp|p\.p\.?|ppl|pax|adult|adulte|guest|head|t[êe]te|each|chacun|ea|seat|place)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+    .replace(/^(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seat|place|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
   if (!left) return '';
   if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
   return 'many';
@@ -39496,6 +39496,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // page under "Verified by the business" while her own story waited for our check. No pill until the story shown is
       // hers (or no rewrite is waiting).
       try { if (typeof ownerLinkPending(venue.id, 'description') === 'string' && !ownerDescriptionWasHers(venue)) return ''; } catch (e) { /* keep the pill */ }
+      // Tour test 10 (Whistler, 2026-11-18; Gord): the French page kept research's French description ("tous les âges…
+      // traîneau toute l'année") under « Vérifié par l'entreprise » once his English story was his. In French, no pill while
+      // the French description shown is still research's and his English one is his (or waiting).
+      try { if (fr && ownerFrDescState(venue) === 'old') return ''; } catch (e) { /* keep the pill */ }
       const last = ownerLastUpdatedAt(venue.id);
       const date = last ? ownerUpdatedDate(last, fr) : '';
       return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the business', 'V\u00e9rifi\u00e9 par l\u2019entreprise')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
@@ -48771,6 +48775,24 @@ const OWNER_VISIT_ERRORS = {
   unreadable: 'Some of the information could not be read. Please reload the page and try again.',
 };
 function visitTextMaxFor(type, key) { return type === 'tour' && key === 'good_to_know' ? TOUR_GOOD_TO_KNOW_MAX : VISIT_TEXT_MAX; }
+// Tour test 10 (Whistler, 2026-11-18; Gord typed everything in lower case: "family ranch in pemberton meadows since 1979.
+// trail rides 1 or 2 hrs…"): the first letter of each sentence an owner types (story, Known for, Good to know, a typed
+// tour's name) gets its capital when saved. No other letter or word changes (names like "pemberton" stay as typed: the
+// review card flags a text typed all in lower case). After an abbreviation ("e.g.", "approx.", "St.") nothing changes.
+const SENTENCE_CAPS_SKIP = /(?:^|\s)(?:e\.g|i\.e|etc|approx|vs|st|mt|ave|rd|dr|no|min|max|hrs?|env|p\.ex|c\.-à-d|ex)\.$/i;
+function sentenceCaps(text) {
+  const t = String(text == null ? '' : text);
+  return t.replace(/(^|[.!?…]\s+|\n\s*)([a-zà-ÿ])/g, (all, lead, ch, off) => {
+    if (lead && /^[.]/.test(lead) && SENTENCE_CAPS_SKIP.test(t.slice(0, off + 1))) return all;
+    return lead + ch.toUpperCase();
+  });
+}
+// A text with no capital letter except the ones sentenceCaps gave it (typed all in lower case), for the review card.
+function typedAllLowercase(text) {
+  const t = String(text || '').trim();
+  if (t.length < 20 || !/[a-zà-ÿ]{3}/.test(t)) return false;
+  return !/[A-ZÀ-Þ]/.test(t.replace(/(^|[.!?…]\s+|\n\s*)([A-ZÀ-Þ])/g, '$1'));
+}
 // One line, cleaned: { text } or { error }.
 function ownerVisitText(raw, max = VISIT_TEXT_MAX) {
   if (raw == null) return { text: '' };
@@ -50135,7 +50157,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   // Cocktail test 2 (2026-11-13): the French setup's story is the French description, checked the same way.
   for (const dk of ['description', 'description_fr']) {
     if (!(dk in input)) continue;
-    const text = typeof input[dk] === 'string' ? input[dk].replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
+    // Tour test 10: each sentence starts with a capital (sentenceCaps).
+    const text = typeof input[dk] === 'string' ? sentenceCaps(input[dk].replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()) : '';
     if (text.length < OWNER_DESCRIPTION_MIN || text.length > OWNER_DESCRIPTION_MAX) {
       errors[dk] = `Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`;
     } else if (/[<>]/.test(text)) {
@@ -50361,6 +50384,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       for (const k of Object.keys(x).filter((kk) => kk !== '_lang')) {
         const t = ownerVisitText(x[k], visitTextMaxFor(venue.type, k));
         if (t.error) { errors.visit_rows = t.error; errors.visit_rows_key = k; break; }
+        // Tour test 10: Known for and Good to know start each sentence with a capital (sentenceCaps).
+        if (t.text && (k === 'known_for' || k === 'good_to_know')) t.text = sentenceCaps(t.text);
         if (frSetup) {
           if (t.text === (frWas[k] || cur[k] || '')) continue;
           // A line made only of quick answers (« Sans réservation ») reads in either language: stored as before.
@@ -53211,6 +53236,11 @@ const SETUP_SHEET_WORDS = { happy_hour: 'happy hour', specials: 'weekly specials
 // Café test 2 (2026-11-11): 'menu_social', a menu on their Facebook or Instagram given as a page name: "[FIND LINK] …
 // told us their menu on Facebook or Instagram", never "asked us to type up their menu".
 const SETUP_NOTE_KINDS = ['facebook', 'instagram', 'menu_social'];
+// Tour test 10 (Whistler, 2026-11-18; Gord): "Leave it to us" on the French story screen queued nothing. It is now a note
+// in the same queue (the admin review's Menus list, with an email to info@): write their French description from their
+// English story. No pages; never published by itself.
+const SETUP_FR_STORY_KIND = 'fr_story';
+SETUP_SHEET_WORDS[SETUP_FR_STORY_KIND] = 'French description';
 // -> { facebook: true, instagram: true } for names sent and still waiting for us.
 function setupSocialNotes(venueId) {
   const out = {};
@@ -53371,11 +53401,13 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
   const items = menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
+    _subject: kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
+      : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
-    'Status': kind === 'help' && menu.help_kind ? `Sent from the easy setup: their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind}. Nothing is on the site yet: read the pages (or their website) and add it to their listing from /admin/review.`
+    'Status': kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? 'Sent from the French easy setup ("Leave it to us"). Nothing is on the site yet: write their French description from their English story, save it on their listing, then press Done in /admin/review.'
+      : kind === 'help' && menu.help_kind ? `Sent from the easy setup: their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind}. Nothing is on the site yet: read the pages (or their website) and add it to their listing from /admin/review.`
       : kind === 'help' ? 'They pressed "Can you do it for me?". Nothing is on the site yet: open the menu editor, read the pages, then publish.'
       : kind === 'pending' ? 'PENDING REVIEW. Sent from their private link, so it is not on the site until you publish it.'
         : 'LIVE NOW. Published by a signed-in owner. Open the review page to take it down if needed.',
@@ -53794,6 +53826,9 @@ async function handleMenuApi(req, res, ctx, action, arg) {
       return send(409, { ok: false, error: 'This menu was already sent. Reload the page to see where it is.' });
     }
     const data = normalizeMenuData(body.data);
+    // Tour test 10 (Whistler, 2026-11-18; Gord typed "pony rides", "overnite pack trip (summer)"): an operator's typed tour
+    // names start with a capital (sentenceCaps; no other letter changes). Not on our own admin edits.
+    if (venue && venue.type === 'tour' && ctx.mode !== 'admin') for (const sec of data.sections || []) for (const it of sec.items || []) if (it && typeof it.name === 'string') it.name = sentenceCaps(it.name);
     db.prepare("UPDATE venue_menus SET data = ?, status = CASE WHEN status = 'draft' THEN 'ready' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(JSON.stringify(data), menu.id);
     if (action === 'save') return send(200, { ok: true, saved: true });
     // Tour test 2 (Whistler, 2026-11-16): a tour's list has trips, not dishes.
@@ -53826,8 +53861,10 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     // A find-link note (Facebook / Instagram name) is its own request for every type with the easy setup (2026-11-10:
     // a pub's note fell through to its menu-help row and overwrote it). A note kind from any other type is refused,
     // never folded into the menu row.
-    if (SETUP_NOTE_KINDS.includes(body.sheet) && !COMPLETENESS_TYPES.has(venue.type)) return send(400, { ok: false, error: generic });
-    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) || SETUP_NOTE_KINDS.includes(body.sheet) ? body.sheet : null;
+    if ((SETUP_NOTE_KINDS.includes(body.sheet) || body.sheet === SETUP_FR_STORY_KIND) && !COMPLETENESS_TYPES.has(venue.type)) return send(400, { ok: false, error: generic });
+    const sheet = SETUP_SHEET_KINDS.includes(body.sheet) || SETUP_NOTE_KINDS.includes(body.sheet) || body.sheet === SETUP_FR_STORY_KIND ? body.sheet : null;
+    // Tour test 10: one French-description request at a time (a second tap is the same request).
+    if (sheet === SETUP_FR_STORY_KIND && db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status = 'help' LIMIT 1").get(venue.id, sheet)) return send(200, { ok: true, already: true });
     const note = typeof body.note === 'string' ? body.note.replace(/[<>]/g, '').trim().slice(0, 1000) : '';
     const contact = ctx.found.account ? { email: ctx.found.account.email } : ownerOptionalEmail(body.contact_email);
     if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
@@ -55668,6 +55705,16 @@ function setupProgress(venueId) {
     const r = db.prepare('SELECT state FROM owner_setup_progress WHERE venue_id = ?').get(venueId);
     const o = r ? JSON.parse(r.state) : {};
     for (const [k, v] of Object.entries((o && o.done) || {})) if (ALL_SETUP_STEPS.includes(k) && SETUP_STATUSES.includes(v)) done[k] = v;
+    // Tour test 10 (Whistler, 2026-11-18; Gord): tours typed on the edit page ("Type them in myself") and sent, or published,
+    // left "Your tours and prices · not done yet". A list of the owner's own waiting for our check is 'day', a live one of
+    // his (never research's) 'live'.
+    if (!['live', 'day'].includes(done.menu) && ALL_SETUP_STEPS.includes('menu')) {
+      try {
+        const pub = publishedMenu(venueId);
+        if (pub && !menuIsUnconfirmedResearch(pub) && (pub.data.sections || []).some((x) => (x.items || []).length)) done.menu = 'live';
+        else if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND status = 'pending' AND help_kind IS NULL AND (source IS NULL OR source != 'research') LIMIT 1").get(venueId)) done.menu = 'day';
+      } catch (e) { /* as stored */ }
+    }
     const out = { done };
     if (o && o.blocks && typeof o.blocks === 'object') out.blocks = o.blocks;
     if (o && o.done_for_now) out.done_for_now = true;
@@ -58141,6 +58188,14 @@ const OWNER_SETUP_CSS = `
   body.owner-setup .su-rightsask { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #7A5A12; }
   /* Small phones (iPhone SE): a day's Change and Mark closed share one line under its hours. */
   @media (max-width: 380px) { body.owner-setup .su-hrow .su-hoffrow { flex-basis: auto; margin: 0 0 0 auto; padding-top: 0; border-top: 0; } }
+  /* Tour test 10 (Whistler, 2026-11-18; Gord on a landscape tablet, 1024 wide): the 7-day hours list took a lot of
+     scrolling in a narrow column. From 900px wide the hours screen is wider and its closed rows sit two to a line (a day
+     opened to change takes the whole line). Phones and portrait tablets are unchanged. */
+  @media (min-width: 900px) {
+    body.owner-setup .su-wrap:has(.su-hdays) { max-width: 760px; }
+    body.owner-setup .su-hdays { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; align-items: start; }
+    body.owner-setup .su-hdays > .su-hopen { grid-column: 1 / -1; }
+  }
   /* Short screens (an SE is 568px tall): the header and the Save bar scroll with the page, so the question gets the room. */
   @media (max-height: 640px) { body.owner-setup .su-head { position: static; } body.owner-setup .su-sticky { position: static; box-shadow: none; } }
 `;
@@ -62527,6 +62582,7 @@ function renderAdminChangeCard(r) {
       ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? `<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…)${FRENCH_INDEXABLE ? ', listed in the sitemap with hreflang links' : ' (kept out of search like every French page for now: noindex, no hreflang, not in the sitemap)'}. Untick it to keep the English page only.</div>` : ''}
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
       ${['description', 'description_fr'].filter((f) => f in r.changes && descriptionShrank(r.previous[f], r.changes[f])).map((f) => `<div class="rv-warn rv-shrank">${f === 'description_fr' ? 'French description: the' : 'The'} new text is much shorter than the old one (${String(r.changes[f] || '').trim().length} characters, was ${String(r.previous[f] || '').trim().length}). Check it wasn’t typed over by mistake.</div>`).join('')}
+      ${['description', 'description_fr'].some((f) => f in r.changes && typedAllLowercase(r.changes[f])) || ('visit_rows' in r.changes && r.changes.visit_rows && typeof r.changes.visit_rows === 'object' && ['known_for', 'good_to_know'].some((k) => typedAllLowercase(r.changes.visit_rows[k]))) ? '<div class="rv-warn rv-lowercase">Typed all lowercase: each sentence now starts with a capital, but names (towns, places) may still need one. Fix them in the box before approving.</div>' : ''}
       ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
     </article>`;
@@ -62621,13 +62677,13 @@ function renderAdminMenuCard(m) {
   const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(m.venue_id);
   const pages = menuFiles(m.id);
   const items = menuItemCount(parseMenuData(m.data));
-  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email', [SETUP_FR_STORY_KIND]: 'French description' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -63060,9 +63116,9 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
     for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name', [SETUP_FR_STORY_KIND]: fr ? 'Votre description en français : nous l’écrivons' : 'Your French description: we’ll write it' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       // Tour test 2 (Whistler, 2026-11-16): a tour sent its tours and prices, not a menu.
-      const tt = vrow && vrow.type === 'tour' ? ({ [MENU_EMAIL_KIND]: fr ? 'Vous enverrez vos sorties et tarifs par courriel' : 'You’ll email us your tours and prices', menu_social: fr ? 'Vos sorties et tarifs sur Facebook ou Instagram' : 'Your tours and prices on Facebook or Instagram' }[m.help_kind] || (!['happy_hour', 'specials', 'facebook', 'instagram'].includes(m.help_kind) ? (fr ? 'Sorties et tarifs envoyés' : 'Tours and prices sent to us') : t)) : t;
+      const tt = vrow && vrow.type === 'tour' ? ({ [MENU_EMAIL_KIND]: fr ? 'Vous enverrez vos sorties et tarifs par courriel' : 'You’ll email us your tours and prices', menu_social: fr ? 'Vos sorties et tarifs sur Facebook ou Instagram' : 'Your tours and prices on Facebook or Instagram' }[m.help_kind] || (!['happy_hour', 'specials', 'facebook', 'instagram', SETUP_FR_STORY_KIND].includes(m.help_kind) ? (fr ? 'Sorties et tarifs envoyés' : 'Tours and prices sent to us') : t)) : t;
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: tt });
     }
   } catch (e) { /* no menus table */ }
