@@ -149,3 +149,86 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   assert.equal(kt(['bike'], false, ''), 'Bike and e-bike tours');
   assert.equal(kt(['bike'], true, 'Guided bike tours'), 'Sorties à vélo');
 });
+
+// The planner fixtures: Sophie-Anne's park with her answers saved and her published list (treetop 7+), a rental
+// outfitter, a ski-and-bike rental shop, a hard hike, a restaurant.
+let planCache = null;
+async function planFixtures() {
+  if (planCache) return planCache;
+  const { v, t } = sky();
+  ok(await change(t, { tour_info: { kinds: ['bike', 'zipline', 'adventure'], length: '2-3h', age: '6', adult: true, year: 'all' }, tour_price: 79 }));
+  db.prepare("INSERT INTO venue_menus (venue_id, status, data, published_at) VALUES (?, 'published', ?, '2026-11-17')").run(v.id, JSON.stringify({ sections: [
+    { name: 'Zipline & treetop park', items: [{ name: 'Zipline tour', price: '$159 per person', duration: '2.5 hours', description: 'Ages 6+, 70–275 lb. Departures every 30 minutes.' }, { name: 'Treetop adventure course', price: '$79 per person', duration: '1.5 hours', description: 'Ages 7+.' }] },
+    { name: 'E-bike rentals (summer only)', items: [{ name: 'E-bike rental, 2 hours', price: '69 per bike', duration: '2 hours', description: 'Riders 16+ with ID.' }, { name: 'E-bike rental, half day', price: '109 per bike', duration: '4 hours' }] },
+    { name: 'Private groups', items: [{ name: 'Private group or corporate booking', price: 'From 1500', description: 'Birthday parties and team days.' }] }] }));
+  const rent = mk('tour', { name: 'Valley E-Bike Rentals Wr6', cuisine: 'E-bike rentals', description: 'E-bike and bike rentals by the hour or the day.', rating: 4.5, reviews: 80 });
+  ok(await change(tokenFor(rent.id), { tour_info: { kinds: ['rentals', 'bike'], length: '2-3h', year: 'all' } }));
+  const shop = mk('shop', { name: 'Penticton Ski & Bike Rentals Wr6', cuisine: 'Ski and bike rentals', description: 'Ski, snowboard and bike rentals and tuning.', rating: 4.9, reviews: 400 });
+  const trail = mk('outdoor', { name: 'Hard Lake Trail Wr6', cuisine: '', description: 'A long, hard hike to an alpine lake.', activities: ['hiking'], rating: 4.9, reviews: 900 });
+  const resto = mk('restaurant', { name: 'Caramba Wr6', cuisine: 'Italian', description: 'A lively family restaurant, great for birthdays.', rating: 4.6, reviews: 700, kid_friendly: 1 });
+  planCache = { v, t, rent, shop, trail, resto };
+  return planCache;
+}
+
+const tf = require('../trip-french-copy.js');
+test('3. Build My Trip rentals: "E-bike rental", « location de vélos électriques », bike / kayak rentals plan the outfitters that rent first, shops after; headers say what is rented (EN + FR)', async () => {
+  const { v, rent, shop } = await planFixtures();
+  for (const q of ['E-bike rental in Penticton on August 10', 'location de vélos électriques à Penticton le 12 août', 'bike rental in Penticton on July 10', 'e-bike rentals in Penticton on July 10']) {
+    const p = await plan(q), got = names(p);
+    assert.ok(got.includes(v.name) && got.includes(rent.name), `${q}: ${JSON.stringify(got)}`);
+    assert.ok(got.indexOf(shop.name) < 0 || got.indexOf(shop.name) > Math.max(got.indexOf(v.name), got.indexOf(rent.name)), `${q}: shop after the outfitters ${JSON.stringify(got)}`);
+    assert.match(p.summary, /^(?:E-bike|Bike) rentals in Penticton/, q);
+    assert.doesNotMatch(p.summary, /Shops|electriques/i, q);
+  }
+  assert.equal(tf.t3FrenchSummary('E-bike rentals in Penticton.'), 'Location de vélos électriques à Penticton.');
+  assert.equal(tf.t3FrenchSummary('Bike rentals in Penticton on Saturday.'), 'Location de vélos à Penticton samedi.');
+  // A shop is still found when it is the only place that rents (ski rentals in January).
+  assert.ok(names(await plan('ski rentals in Penticton on January 10')).includes(shop.name));
+  // Plain shopping still plans the shop.
+  assert.ok(names(await plan('bike shop in Penticton')).includes(shop.name));
+});
+
+test('4. "adventure park" / « parc d’aventure » / "ropes course" plan the adventure-kind park (not a hike); her park is not an ATV tour', async () => {
+  const { v, trail } = await planFixtures();
+  for (const q of ['adventure park in Penticton on July 10', 'parc d’aventure à Penticton le samedi 10 juillet', 'ropes course in Penticton on July 10', 'treetop course in Penticton on July 10', 'parcours dans les arbres à Penticton le 10 juillet']) {
+    const got = names(await plan(q));
+    assert.equal(got[0], v.name, `${q}: ${JSON.stringify(got)}`);
+    assert.ok(!got.includes(trail.name), `${q}: ${JSON.stringify(got)}`);
+  }
+  const kinds = tr.inferPlannerKinds({ type: 'tour', name: v.name, cuisine: app.getVenue(v.id).cuisine, description: '', tourKinds: ['bike', 'zipline', 'adventure'] });
+  assert.ok(kinds.includes('adventure_park') && !kinds.includes('atv'), JSON.stringify(kinds));
+  assert.ok(tr.inferPlannerKinds({ type: 'tour', name: 'Quad Co', cuisine: 'ATV tours', tourKinds: ['adventure'] }).includes('atv'));
+  assert.ok(tr.inferPlannerKinds({ type: 'sport', name: 'Okanagan Aerial Adventure Park', cuisine: 'Aerial park' }).includes('adventure_park'));
+  // "park" alone is still a park; an adventure park is not a park.
+  assert.ok(!(tr.extractTripRequirements({ text: 'adventure park in penticton' }).items || []).some((i) => i.kind === 'venue_kind' && i.value === 'park'));
+  assert.ok((tr.extractTripRequirements({ text: 'a park in penticton' }).items || []).some((i) => i.kind === 'venue_kind' && i.value === 'park'));
+});
+
+test('5. a kids’ birthday plans a kid-friendly activity (ages respected), not only a restaurant (EN + FR)', async () => {
+  const { v, trail } = await planFixtures();
+  for (const q of ['Birthday party activity for 8-year-olds in Penticton on July 17', 'fête d’anniversaire pour enfants à Penticton le 17 juillet', 'kids birthday in Penticton on July 17']) {
+    const p = await plan(q), got = names(p);
+    assert.equal(got[0], v.name, `${q}: ${JSON.stringify(got)}`);
+    assert.ok(!got.slice(0, 1).includes(trail.name), q);
+    assert.doesNotMatch(p.summary, /celebration/, q);
+  }
+  // A 4-year-old: her park is 6+, so it is not planned.
+  assert.ok(!names(await plan('birthday party for my 4-year-old in Penticton on July 17')).includes(v.name));
+  // A birthday dinner is still a dinner.
+  assert.ok(names(await plan('birthday dinner in Penticton on July 17')).length);
+});
+
+test('8. a child under an age on her published list: "Some activities are 7+: check Tours & prices" (EN + FR)', async () => {
+  const { v } = await planFixtures();
+  assert.deepEqual(app.tourPlannerFacts(v.id).tourListAges, [6, 7, 16]);
+  for (const q of ['treetop course in Penticton with a 6-year-old on July 14', 'parcours dans les arbres à Penticton avec un enfant de 6 ans le 14 juillet']) {
+    const it = itemsOf(await plan(q)).find((x) => x.venue.name === v.name);
+    assert.ok(it && (it.caveats || []).includes('Some activities are 7+: check Tours & prices.'), `${q}: ${JSON.stringify(it && it.caveats)}`);
+  }
+  // A 10-year-old: only the 16+ rentals are older; a 17-year-old: no note.
+  const ten = itemsOf(await plan('ziplining in Penticton with a 10-year-old on July 14')).find((x) => x.venue.name === v.name);
+  assert.ok(ten && ten.caveats.includes('Some activities are 16+: check Tours & prices.'), JSON.stringify(ten && ten.caveats));
+  assert.equal(tf.t3FrenchText('Some activities are 7+: check Tours & prices.'), 'Certaines activités sont pour les 7 ans et plus : voyez Sorties et tarifs.');
+  assert.equal(tf.t3FrenchText('A kids’ activity for the birthday'), 'Une activité pour les enfants, pour l’anniversaire');
+  assert.equal(tf.t3FrenchText('Rents what you asked for'), 'Loue ce que vous avez demandé');
+});

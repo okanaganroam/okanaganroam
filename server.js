@@ -6853,7 +6853,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()),
       textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`),
       ...(v.type === 'shop' ? { isShop: true } : {}),
-      features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
+      features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:adventure|adventures|aventure|tree ?top|ropes? course\w*|zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
       ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
@@ -21886,7 +21886,7 @@ function visitRowsWithoutEchoedTastingPrice(info) {
 function tourListVaries(venueId) { const x = tourListInfo(venueId); return { length: x.length, ages: x.ages }; }
 // Tour test 5: the same reading with the trip lengths in minutes (for the card's range).
 function tourListInfo(venueId) {
-  const out = { length: false, ages: false, mins: [] };
+  const out = { length: false, ages: false, mins: [], listAges: [] };
   try {
     const m = publishedMenu(venueId);
     if (!m || menuIsUnconfirmedResearch(m)) return out;
@@ -21903,6 +21903,9 @@ function tourListInfo(venueId) {
       else if (/\b(?:full|all)[- ]day\b|\bjourn[ée]e (?:compl[èe]te|enti[èe]re)\b/.test(t)) mins.push(480);
       const a = /\ball ages\b|\btous les [âa]ges\b/.test(t) ? 'all' : (/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus)/.exec(t) || /\bages? (\d{1,2})\b/.exec(t) || [])[1];
       if (a) ages.push(String(a));
+      // Tour test 6 (Whistler, 2026-11-17): every "N+" / "ages N and up" / « N ans et plus » on the list (a trip card with a
+      // 6-year-old said only "Ages 6 and up" when the treetop course on her list is 7+).
+      for (const mm of t.matchAll(/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus|ans \+)|\bages? (\d{1,2})\s*(?:\+|and (?:over|up|older)|to)\b|\b[àa] partir de (\d{1,2}) ans\b/g)) { const n = Number(mm[1] || mm[2] || mm[3]); if (n >= 2 && n <= 19 && !out.listAges.includes(n)) out.listAges.push(n); }
     }
     out.length = mins.length >= 2 && new Set(mins).size >= 2;
     out.ages = ages.length >= 2 && new Set(ages).size >= 2;
@@ -22593,6 +22596,8 @@ function tourPlannerFacts(venueId) {
     // Tour test 4, bug 12 (safe part): the operator's own list names trips of different lengths or ages, so the one
     // booking / age answer on a trip card says it can differ by tour.
     ...((TOUR_BOOK.includes(t.book) || TOUR_AGES.includes(String(t.age || ''))) && (() => { const v = tourListVaries(venueId); return v.length || v.ages; })() ? { tourVaries: true } : {}),
+    // Tour test 6: the ages her published list names ("Ages 7+"), for the kids note on a trip card.
+    ...(() => { const a = tourListInfo(venueId).listAges; return a && a.length ? { tourListAges: a.slice().sort((x, y) => x - y) } : {}; })(),
     // Tour test 4: the kinds the operator picked ('food', 'walking'…), so "food tour" and "walking tour" find it.
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
   };
