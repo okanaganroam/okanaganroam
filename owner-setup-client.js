@@ -1612,6 +1612,13 @@
     var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
     return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'en\')}catch(e){}">' + h(T.frOnlyAddEn) + '</a></p>';
   }
+  // Tour test 8 (Whistler, 2026-11-17): her English story is new and the French description is still our research's. One
+  // line with a link to the French story box (the French setup's story screen); nothing is translated.
+  function frDescOld(){
+    if (C.lang === 'fr' || !T.frDescOld || !(C.frDesc === 'old' || (C.frDesc === 'research' && (S.done.story || S.storySentNow)))) return '';
+    var href = location.pathname.replace(/^\/(?:fr\/)?owner\//, '/fr/owner/') + '#story';
+    return '<p class="su-hint" id="suFrDescOld">' + h(T.frDescOld) + ' <a class="su-link" id="suFrDescGo" lang="fr" href="' + h(href) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'fr\')}catch(e){}">' + h(T.frDescGo) + '</a></p>';
+  }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
     var out = [], seen = {};
@@ -2462,7 +2469,7 @@
       }).join('') + (S.nights.length < 7 ? '<button type="button" class="su-more" data-act="add:nights">' + h(T.addEvent) + '</button>' : '') + '<div class="su-stack">' + big('✓', T.saveEvents, '', false, 'musicSave') + '</div>';
     } else if (s === 'story') {
       var L2 = S.story.length, sb2 = S.storyReturn ? sportsBit() : '';
-      x = doneLine('story') + q(T.storyQ, T.storyLead) + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' + (C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyReplaceLink ? '<p class="su-hint" id="suStoryReplaceRow"><button type="button" class="su-link" id="suStoryReplace">' + h(T.storyReplaceLink) + '</button></p>' : '') : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
+      x = doneLine('story') + q(T.storyQ, T.storyLead) + frDescOld() + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' + (C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyReplaceLink ? '<p class="su-hint" id="suStoryReplaceRow"><button type="button" class="su-link" id="suStoryReplace">' + h(T.storyReplaceLink) + '</button></p>' : '') : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
         + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
@@ -2539,7 +2546,7 @@
           // Brewery test 1 port (2026-11-16): "Add your tap list" stays in view (a no-kitchen brewery never saw it in the fold).
           + (left.some(tapItem) ? '<div class="su-stack" id="suTapOpen">' + left.filter(tapItem).map(leftItem).join('') + '</div>' : '')
           + (left.some(function(o){ return !tapItem(o); }) ? '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.filter(function(o){ return !tapItem(o); }).map(leftItem).join('') + '</div></details>' : '')
-          + (frOnlyNamed() || frOnlyFinish())
+          + (frOnlyNamed() || frOnlyFinish()) + frDescOld()
           + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '') + changeLink;
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
@@ -2549,7 +2556,7 @@
         // Distillery test 1 (Whistler, 2026-11-16): "About 100% complete" sat over "To reach 100%" (a cocktail list isn't
         // part of the score without a kitchen, but its tile was still open). At 100 the open tiles are "You can still add".
         + (left.length ? '<h2 class="su-h2" id="suLeftH">' + h((sc.soon < sc.pct ? sc.soon : Math.max(sc.pct, sc.soon || 0)) >= 100 && T.stillAdd ? T.stillAdd : T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
-        + (frOnlyNamed() || frOnlyFinish())
+        + (frOnlyNamed() || frOnlyFinish()) + frDescOld()
         // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
         + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
         + preview()

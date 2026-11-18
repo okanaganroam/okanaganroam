@@ -49528,6 +49528,17 @@ function ownerDescriptionWasHers(venue, field = 'description') {
 }
 // A link the owner sent that is still waiting for review (pub test 9, 2026-11-10: the setup's booking link box shows
 // it): the newest pending request that names `field` ('booking_url'), or ''.
+// Tour test 8 (Whistler, 2026-11-17; Linda): she rewrote her English story, and the French page kept our research's
+// description (« … motoneige… Chiens bienvenus ! » next to « Pas de chiens »). Nothing is translated for her: the setup,
+// the edit page and the finish screen say so in one line with a link to the French story box. -> 'old' when the French
+// description is research's and her English one is hers (or waiting for our check), 'research' when it is research's
+// only, '' otherwise.
+function ownerFrDescState(venue) {
+  try {
+    if (!venue || !String(venue.description_fr || '').trim() || ownerDescriptionWasHers(venue, 'description_fr') || ownerLinkPending(venue.id, 'description_fr')) return '';
+    return ownerDescriptionWasHers(venue) || ownerLinkPending(venue.id, 'description') ? 'old' : 'research';
+  } catch (e) { return ''; }
+}
 function ownerLinkPending(venueId, field) {
   try {
     for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
@@ -55894,7 +55905,9 @@ function renderOwnerSetupPage(found, opts) {
     // Brewery test 4 (2026-11-13): the story she sent that is waiting for our check (the box shows it, not the old text),
     // and whether the page's description is research's (her first tap in the box selects it, so typing replaces it).
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
-    storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '',
+    // Tour test 8: the French description is still research's ('old' once her English story is hers), every type.
+    frDesc: fr ? '' : ownerFrDescState(venue), storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
     // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs
@@ -64611,6 +64624,7 @@ ${renderGolfHeaderHtml()}
         <p class="op-hint">${L(`A few sentences about what makes your ${venue.type === 'tour' ? 'trips worth booking' : 'place worth a visit'}. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui ${venue.type === 'tour' ? 'donne envie de réserver vos sorties' : 'rend votre endroit intéressant'}. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>${completeOn ? `
         <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('✓ Long enough for your score', '✓ Assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
+        ${!fr && ownerFrDescState(venue) === 'old' ? `<p class="op-hint" id="opFrDescOld">Your French description is the old one from our research: <a href="${escapeHtml(ownerPath(token ? `${OWNER_LINK_PATH}${token}/setup` : `/owner/account/venue/${venue.id}/setup`, 'fr'))}#story" lang="fr" onclick="try{localStorage.setItem('okanaganLang','fr')}catch(e){}">update it?</a></p>` : ''}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 

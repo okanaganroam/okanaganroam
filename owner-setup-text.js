@@ -2171,6 +2171,8 @@ Object.assign(fr.tour, {
 // Tour test 8: a closure that covers much of the open season (every type with a season).
 Object.assign(en, { closeInside: 'Those dates close you {a} – {b}, inside your season. Is that right?', closeInsideKeep: 'Yes, that’s right', closeInsideFix: 'Fix the dates' });
 Object.assign(fr, { closeInside: 'Ces dates vous ferment du {a} au {b}, en pleine saison. Est-ce exact?', closeInsideKeep: 'Oui, c’est exact', closeInsideFix: 'Corriger les dates' });
+// Tour test 8: the French description still research's after her English story (every type; English pages only).
+Object.assign(en, { frDescOld: 'Your French description is the old one from our research:', frDescGo: 'update it?' });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
