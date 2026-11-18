@@ -844,6 +844,8 @@
     o.storedKind = o.kind; o.src = s; o.dirty = false; o.monthsWas = JSON.stringify(o.months);
     // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch (stored holidays: true).
     o.holidays = s.holidays === true;
+    // Tour test 12 (Dayton approved): "Weather permitting" inside the stretch (stored weather: true; tours only).
+    o.weather = s.weather === true;
     return o;
   }
   (function(){
@@ -2059,6 +2061,9 @@
         // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch, one choice (stat holidays like Family Day and
         // Christmas week then show open with this stretch's weekend hours). Only when the stretch has a closed day.
         + (seas && T.seaHolidays && DAYS.some(function(d){ return !(wk[d] || []).length; }) ? '<div class="su-chips" role="group" aria-labelledby="suSeaHolH" style="margin:4px 0 10px"><p class="su-hint" id="suSeaHolH" style="width:100%;margin:0 0 4px">' + h(T.seaHolidaysQ) + '</p><button type="button" class="su-chip su-chip-wide" id="suSeaHol" aria-pressed="' + (S.sea.holidays ? 'true' : 'false') + '" data-act="seaHolidays">' + h(T.seaHolidays) + '</button></div>' : '')
+        // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting; Dayton approved): "Weather
+        // permitting" inside the stretch, one choice (tours only): the planner, the status line and the hours block say so.
+        + (seas && TOUR && T.seaWeather ? '<div class="su-chips" role="group" style="margin:4px 0 10px"><button type="button" class="su-chip su-chip-wide" id="suSeaWeather" aria-pressed="' + (S.sea.weather ? 'true' : 'false') + '" data-act="seaWeather">' + h(T.seaWeather) + '</button></div>' : '')
         // Tour test 10: summer first, then a winter stretch: the usual hours are the rest of the year (spring and fall here).
         + (seas && S.seaI >= 1 && T.seaSpringFallTip && S.seaList[0] && S.seaList[0].on && (S.seaList[0].kind === 'summer' || (S.seaList[0].months || {})[7]) ? '<p class="su-hint" id="suSeaSpringFall">' + h(T.seaSpringFallTip) + '</p>' : '')
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>'
@@ -2858,7 +2863,7 @@
       for (var si = 0; si < S.seaList.length; si++) {
         var so = S.seaList[si], s0 = so.src;
         if (!so.on) continue;
-        if (s0 && !so.dirty && (s0.holidays === true) === !!so.holidays) { list.push(s0); continue; }
+        if (s0 && !so.dirty && (s0.holidays === true) === !!so.holidays && (s0.weather === true) === !!so.weather) { list.push(s0); continue; }
         var r = monthRun(so.months);
         if (so.exact) { var xo = seaOut({ on: true, exact: so.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
         else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
@@ -2877,6 +2882,7 @@
         var keepDates = same && JSON.stringify(so.months) === so.monthsWas;
         list.push({ from: so.exact ? so.exact.from : keepDates ? s0.from : pad(r.a) + '-01', to: so.exact ? so.exact.to : keepDates ? s0.to : pad(r.b) + '-' + LAST[r.b - 1], label: same && s0.label ? s0.label : '', hours: sw });
         if (so.holidays) list[list.length - 1].holidays = true;
+        if (so.weather && TOUR) list[list.length - 1].weather = true;
       }
       // Tour test 10: any two of three; the message names the other one (the one not on screen when it can).
       for (var oa = 0; oa < list.length; oa++) for (var ob = oa + 1; ob < list.length; ob++) if (mdOverlap(list[oa], list[ob])) { var oz = list[oa === S.seaI ? ob : oa]; S.nudge = fill(T.seasonOverlap, { a: mdLabel(oz.from), b: mdLabel(oz.to) }); S.overlapNudge = S.nudge; return render(); }
@@ -2941,7 +2947,7 @@
   function seaStaleFix(i){
     var x = (S.seaStale || []).filter(function(z){ return z.i === i; })[0], list = (CUR.hours_seasons || []).map(function(z){ return z; }); if (!x || !list[i] || S.busy) return;
     var w = parseWeek(list[i].hours), hw = {}; x.days.forEach(function(d){ w[d] = clone(S.week[d]); }); DAYS.forEach(function(d){ hw[d] = w[d] || []; });
-    var hol0 = list[i].holidays === true; list[i] = { from: list[i].from, to: list[i].to, label: list[i].label || '', hours: hw }; if (hol0) list[i].holidays = true;
+    var hol0 = list[i].holidays === true, wx0 = list[i].weather === true; list[i] = { from: list[i].from, to: list[i].to, label: list[i].label || '', hours: hw }; if (hol0) list[i].holidays = true; if (wx0) list[i].weather = true;
     S.busy = true; render();
     change({ hours_seasons: list }).then(function(r){
       S.busy = false; if (!r) return render();
@@ -3413,6 +3419,7 @@
     if (k === 'yearSeasonAdd') { seaAddStart(); return go(seaStepOf(S.seaList.length - 1)); }
     // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch on screen.
     if (k === 'seaHolidays') { readTimes(); S.sea.holidays = !S.sea.holidays; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var hy = window.scrollY; render(); window.scrollTo(0, hy); var hb = el('suSeaHol'); if (hb) hb.focus(); return; }
+    if (k === 'seaWeather') { readTimes(); S.sea.weather = !S.sea.weather; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var wy = window.scrollY; render(); window.scrollTo(0, wy); var wb = el('suSeaWeather'); if (wb) wb.focus(); return; }
     if (k === 'hoursSaveAdd') { S.seaAddNext = true; hoursSave(); S.seaAddNext = false; return; }
     if (k === 'seaCopy') { readTimes(); var co = seaOtherOf(S.seaI); if (co && co.week) { S.sea.week = clone(co.week); S.sea.open = {}; S.seaTouched = true; S.nudge = ''; mark(); var cy = window.scrollY; render(); window.scrollTo(0, cy); } return; }
     if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; return go('hours:yeardrop'); }

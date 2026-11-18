@@ -2207,6 +2207,7 @@ Object.assign(en, {
   seaAdd3: '+ Add a third stretch with different hours', seaAdd3Sub: 'Like summer, winter, and your usual hours for spring and fall. You pick the dates next',
   seaAddLink3: 'A third stretch with different hours too? Save these and add it',
   seaSpringFallTip: 'Tip: your usual hours are the rest of the year. Closed some days in spring and fall too? Set your usual hours to your spring and fall hours.',
+  seaWeather: 'Weather permitting (these dates)',
   seaHolidaysQ: 'Open on a holiday that falls on a closed day?', seaHolidays: 'Open on holidays (stat holidays and Christmas week)',
 });
 Object.assign(fr, {
@@ -2214,6 +2215,7 @@ Object.assign(fr, {
   seaAdd3: '+ Ajouter une troisième période aux heures différentes', seaAdd3Sub: 'Comme l’été, l’hiver, et vos heures habituelles pour le printemps et l’automne. Vous choisissez les dates ensuite',
   seaAddLink3: 'Une troisième période aux heures différentes aussi? Enregistrez celles-ci et ajoutez-la',
   seaSpringFallTip: 'Astuce : vos heures habituelles valent pour le reste de l’année. Fermé certains jours au printemps et à l’automne aussi? Réglez vos heures habituelles sur vos heures du printemps et de l’automne.',
+  seaWeather: 'Selon la météo (ces dates)',
   seaHolidaysQ: 'Ouvert un jour férié qui tombe un jour de fermeture?', seaHolidays: 'Ouvert les jours fériés (et la semaine de Noël)',
 });
 // Tour test 11 (Whistler, 2026-11-18; Min-jun, sightseeing vans: hotel pickups, a private van per hour with a minimum,

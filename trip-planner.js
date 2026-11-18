@@ -1905,6 +1905,15 @@ const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
 // Tour test 3 (Whistler, 2026-11-17): "All ages" is said too when the request names an age ("with our 10-year-old").
+const TOUR_WEATHER_NOTE = 'Runs weather permitting at this time of year (the operator’s own answer).';
+// The trip's own day as 'MM-DD' (a month alone reads as its 15th), or null.
+function tripMdOf(ctx) {
+  const iso = ctx.requirements && /^\d{4}-\d{2}-\d{2}$/.test(ctx.requirements.startDate || '') ? ctx.requirements.startDate : null;
+  if (iso) return iso.slice(5, 10);
+  const m = tripMonthOf(ctx);
+  if (m && !(ctx.tripDate && Number(String(ctx.tripDate).slice(5, 7)) === m)) return `${String(m).padStart(2, '0')}-15`;
+  return ctx.tripDate && /^\d{4}-\d{2}-\d{2}/.test(String(ctx.tripDate)) ? String(ctx.tripDate).slice(5, 10) : null;
+}
 const tourAdultNote = (r) => (r.waiver ? `Under ${r.age}s need a parent or guardian to sign the waiver.` : `Under ${r.age}s come with an adult.`);
 const tourAgeNote = (age) => (age === 'all' ? 'All ages welcome (the operator’s own answer).' : age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
@@ -2125,6 +2134,13 @@ function stopFrom(v, scored, extra, ctx) {
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting): on the dates of a stretch the
+  // operator runs weather permitting, the stop says so.
+  if (ctx && v && v.type === 'tour' && Array.isArray(v.tourWeather) && v.tourWeather.length) {
+    const md = tripMdOf(ctx);
+    const inR = (x, a, b) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
+    if (md && v.tourWeather.some((z) => inR(md, z.from, z.to)) && !caveats.includes(TOUR_WEATHER_NOTE)) caveats.push(TOUR_WEATHER_NOTE);
+  }
   // Tour test 12 (Whistler, 2026-11-18; Kayla, 14+, under 19s need a parent or guardian to sign the waiver): the operator's
   // own rule for younger guests, on the stop of a trip with kids or teens younger than the rule's age (or of unknown age).
   if (ctx && v && v.type === 'tour' && v.tourAdultRule && (ctx.kids || kidsYoungest(ctx) != null) && (kidsYoungest(ctx) == null || kidsYoungest(ctx) < v.tourAdultRule.age)) {

@@ -22605,9 +22605,7 @@ const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-com
 //   adult_age    '19'         Tour test 12 (Whistler, 2026-11-18; Kayla, a bungee site: 14+, under 19s need a parent or
 //                             guardian to sign the waiver; Dayton approved): the "under 18s" rule is for under 19s.
 //   adult_waiver true         … and they need a parent or guardian to sign the waiver (not "come with an adult").
-//   weather  true             Tour test 12: "Weather permitting" on the different-in-winter / stretch hours (a planner
-//                             note on those dates, "Open now · weather permitting", and the hours block, EN + FR).
-const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather'];
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup'];
 const TOUR_KINDS_MAX = 3;
 const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
@@ -22987,7 +22985,7 @@ function cleanTourInfoPart(key, x) {
   if (key === 'private_min') return Number.isInteger(x) && x >= 2 && x <= 12 ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'pickup') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_age') return String(x) === '19' ? { value: '19' } : { error: TOUR_INFO_ERROR };
-  if (key === 'adult_waiver' || key === 'weather') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'adult_waiver') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   return { error: TOUR_INFO_ERROR };
 }
 // "$129" / "129 $", "$1,500" / "1 500 $".
@@ -23167,9 +23165,10 @@ function tourPlannerFacts(venueId) {
   const t = venueTourInfo(venueId);
   return {
     ...(TOUR_AGES.includes(String(t.age || '')) ? { tourMinAge: String(t.age) } : {}),
+    // Tour test 12: the stretches the owner runs weather permitting (a note on the trip card on those dates).
+    ...(() => { const w = venueWeatherStretches(venueId); return w.length ? { tourWeather: w } : {}; })(),
     // Tour test 12: the rule for younger guests ("Under 19s need a parent or guardian to sign the waiver"), for the trip card.
     ...(() => { const ad = tourAdultRule(t); return ad ? { tourAdultRule: { age: ad.age, waiver: ad.waiver } } : {}; })(),
-    ...(t.weather === true ? { tourWeather: true } : {}),
     ...(TOUR_BOOK.includes(t.book) ? { tourBookAhead: t.book } : {}),
     ...(TOUR_LENGTHS.includes(t.length) ? { tourLength: t.length } : {}),
     // Tour test 3 (Whistler, 2026-11-17): the operator's own "Yes, all year" answer, so Build My Trip's winter-words rule
@@ -37960,7 +37959,7 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
   if (!hoursModule || !parsed || !parsed.known) return '';
   const x = hoursExtrasMap().get(venueId);
   const seasons = ((x && x.seasons) || []).filter((z) => z && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to) && z.hours)
-    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days, holidays: z.holidays === true }));
+    .map((z) => ({ from: z.from, to: z.to, days: hoursModule.parseHours(z.hours).days, holidays: z.holidays === true, weather: z.weather === true }));
   // Restaurant test 1 (Whistler, 2026-11-14): the owner's yearly closures of a week or more (a spring and a fall shoulder
   // season, "04-19" to "05-14" every year) are part of the year too: "Apr 19 – May 14: Closed every year".
   const MD_DAYS = (md) => { const m = Number(md.slice(0, 2)), d = Number(md.slice(3, 5)); return Math.round((Date.UTC(2028, m - 1, d) - Date.UTC(2028, 0, 1)) / 86400000); };
@@ -38002,10 +38001,25 @@ function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
     const when = ws.length > 2 ? `${ws.slice(0, -1).join(', ')}${and}${ws[ws.length - 1]}` : ws.join(and);
     if (k <= -2) { const note = String(yearlyShut[-2 - k].note || '').trim(); return `<li><span>${escapeHtml(when)}</span><span>${fr ? 'Fermé chaque année' : 'Closed every year'}${note && !fr ? ` (${escapeHtml(note)})` : ''}</span></li>`; }
     // Tour test 10: a stretch that is "Open on holidays" says so ("Mon–Fri Closed · Sat, Sun 10 AM – 4 PM · Holidays too").
-    const hol = k >= 0 && seasons[k].holidays && stretchHasClosedDay(seasons[k].days) ? (fr ? ' · Jours fériés et semaine de Noël aussi' : ' · Holidays and Christmas week too') : '';
+    const hol = (k >= 0 && seasons[k].holidays && stretchHasClosedDay(seasons[k].days) ? (fr ? ' · Jours fériés et semaine de Noël aussi' : ' · Holidays and Christmas week too') : '')
+      // Tour test 12: a stretch that runs weather permitting says so.
+      + (k >= 0 && seasons[k].weather ? (fr ? ' · Selon la météo' : ' · Weather permitting') : '');
     return `<li><span>${escapeHtml(when)}</span><span>${escapeHtml(weekText(k < 0 ? parsed.days : seasons[k].days) + hol)}</span></li>`;
   });
   return `<div class="venue-hours-year"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list">${lines.join('')}</ul></div>`;
+}
+// Tour test 12 (Whistler, 2026-11-18; Kayla): the owner's stretches marked "Weather permitting": [{ from, to }] ('MM-DD').
+function venueWeatherStretches(venueId) {
+  try {
+    const x = hoursExtrasMap().get(venueId);
+    return ((x && x.seasons) || []).filter((z) => z && z.weather === true && /^\d{2}-\d{2}$/.test(z.from) && /^\d{2}-\d{2}$/.test(z.to)).map((z) => ({ from: z.from, to: z.to }));
+  } catch (e) { return []; }
+}
+function venueWeatherToday(venueId, now = new Date()) {
+  const ws = venueWeatherStretches(venueId);
+  if (!ws.length || !hoursModule) return false;
+  const md = todayLocal(now).slice(5, 10);
+  return ws.some((z) => hoursModule.mdInRange(md, z.from, z.to));
 }
 function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   if (!hoursModule || !pageHours || hasAdvisory) return null;
@@ -39822,7 +39836,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // box under it ("Closed May 1–Jun 30, reopens Jul 1.") said it again.
   try { if (openStatus && /^Closed between seasons\b/.test(String(openStatus.text || '')) && venueAdvisoryNote !== undefined && /^Closed\b[^.]*\breopens\b/i.test(String(parseAdvisoryNote(venueAdvisoryNote).text || ''))) venueAdvisoryHtml = ''; } catch (e) { /* keep it */ }
   const openStatusHtml = showStatusHtml || (openStatus
-    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
+    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${venue.type === 'tour' && openStatus.state !== 'appointment' && venueWeatherToday(venue.id, opts.now || new Date()) ? escapeHtml(fr ? ' · selon la météo' : ' · weather permitting') : ''}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
   // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
   const happyHourHtml = happyHour && happyHour.live
@@ -50903,7 +50917,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         if (!w.ok) { errors.hours_seasons = w.detail; break; }
         // Tour test 10 (Dayton approved): "Open on holidays" inside a stretch (hours.js holidayOn), a single choice.
         if (x.holidays != null && typeof x.holidays !== 'boolean') { errors.hours_seasons = 'The seasonal hours could not be read. Please reload the page and try again.'; break; }
-        out.push({ from, to, label, hours: JSON.parse(w.json), ...(x.holidays === true ? { holidays: true } : {}) });
+        // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting; Dayton approved): "Weather
+        // permitting" inside a stretch, one choice (tours only).
+        if (x.weather != null && (typeof x.weather !== 'boolean' || (x.weather && venue.type !== 'tour'))) { errors.hours_seasons = 'The seasonal hours could not be read. Please reload the page and try again.'; break; }
+        out.push({ from, to, label, hours: JSON.parse(w.json), ...(x.holidays === true ? { holidays: true } : {}), ...(x.weather === true ? { weather: true } : {}) });
       }
       // Brewery test 1 (Whistler, 2026-11-15): two sets (a spring and a fall shoulder season) may not share a day; the engine
       // would only ever use the first.
@@ -51245,7 +51262,6 @@ function ownerValueText(field, value) {
     if (o.length) parts.push(`How long: ${TOUR_LENGTH_LINES[o.length] ? TOUR_LENGTH_LINES[o.length][0].replace(/\.$/, '') : o.length}`);
     if (o.book) parts.push(TOUR_BOOK_LINES[o.book] ? TOUR_BOOK_LINES[o.book][0].replace(/\.$/, '') : o.book);
     if (o.age) { const ad = tourAdultRule(o); parts.push(`${TOUR_AGE_LINES[o.age] ? TOUR_AGE_LINES[o.age][0].replace(/\.$/, '') : o.age}${ad ? `, ${ad.en.charAt(0).toLowerCase()}${ad.en.slice(1).replace(/\.$/, '')}` : ''}`); }
-    if (o.weather) parts.push('Weather permitting');
     if (o.private) parts.push(`Private tours from ${tourMoney(Number(o.private), false)}`);
     if (o.visit === 'appointment') parts.push('By booking only (no set hours)');
     if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
@@ -65964,7 +65980,7 @@ ${ownerFooterHtml(fr)}
     var labEl = document.getElementById('opSeasonalLabel'), lab = labEl.value.trim();
     if (labEl.getAttribute('data-shown') !== null && lab === labEl.getAttribute('data-shown')) lab = labEl.getAttribute('data-stored');
     // Tour test 10: its "Open on holidays" (set in the setup) is kept.
-    var first = { label: lab, from: from, to: to, hours: w.week }; if (((initial.hours_seasons || [])[0] || {}).holidays === true) first.holidays = true;
+    var first = { label: lab, from: from, to: to, hours: w.week }; if (((initial.hours_seasons || [])[0] || {}).holidays === true) first.holidays = true; if (((initial.hours_seasons || [])[0] || {}).weather === true) first.weather = true;
     return { list: [first].concat(rest) };
   }
   function closuresValue(){
