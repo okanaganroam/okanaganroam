@@ -287,6 +287,14 @@ const PHRASES = [
   ['visite guidee a velo', 'guided bike tour'], ['visites guidees a velo', 'guided bike tours'], ['visite a velo', 'bike tour'], ['tour de velo', 'bike tour'], ['sortie a velo', 'bike tour'], ['sortie en velo', 'bike tour'],
   ['visite de ferme', 'farm tour'], ['visites de ferme', 'farm tours'], ['visite a la ferme', 'farm tour'], ['autocueillette', 'u-pick'],
   ['heliski', 'heli-skiing'], ['ski heliporte', 'heli-skiing'], ['ski en chenillette', 'cat skiing'],
+  // Tour test 7 (Whistler, 2026-11-17): ski touring, backcountry skiing, mountaineering, avalanche courses and hut trips.
+  // « randonnée alpine » (an alpine trip) asks for a mountain guide; « ski de randonnée alpine » is ski touring.
+  ['ski de randonnee', 'ski touring'], ['ski de randonnee alpine', 'ski touring'], ['ski hors piste', 'backcountry skiing'], ['ski de haute route', 'ski touring'], ['planche a neige hors piste', 'backcountry snowboarding'],
+  ['randonnee alpine', 'mountaineering'], ['randonnees alpines', 'mountaineering'], ['randonnee alpine guidee', 'guided mountaineering'], ['alpinisme', 'mountaineering'],
+  ['guide de montagne', 'mountain guide'], ['guides de montagne', 'mountain guides'], ['escalade alpine', 'alpine climbing'],
+  ['cours d avalanche', 'avalanche course'], ['cours sur les avalanches', 'avalanche course'], ['cours de securite en avalanche', 'avalanche course'], ['formation avalanche', 'avalanche training'], ['formation en avalanche', 'avalanche training'], ['formation sur les avalanches', 'avalanche training'],
+  ['randonnee de plusieurs jours', 'multi-day hike'], ['randonnees de plusieurs jours', 'multi-day hikes'], ['sortie de plusieurs jours', 'multi-day tour'], ['sorties de plusieurs jours', 'multi-day tours'],
+  ['nuit en refuge', 'hut trip'], ['sejour en refuge', 'hut trip'], ['sortie en refuge', 'hut trip'], ['randonnee en refuge', 'hut trip'], ['refuge', 'hut trip'], ['refuges', 'hut trips'],
   ['location d equipement', 'equipment rentals'], ['location de materiel', 'equipment rentals'],
   ['jouer au golf', 'golf'], ['terrain de golf', 'golf course'], ['terrains de golf', 'golf courses'],
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],

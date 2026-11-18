@@ -6858,7 +6858,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
+      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}), ...(v.type === 'tour' ? (({ tourLength, tourMultiDay }) => ({ tourLength, tourMultiDay }))(tourPlannerFacts(v.id)) : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
       nights: nightsFact(v),
       specials: specialsFact(v),
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
@@ -22641,6 +22641,9 @@ function tourPlannerFacts(venueId) {
     ...((TOUR_BOOK.includes(t.book) || TOUR_AGES.includes(String(t.age || ''))) && (() => { const v = tourListVaries(venueId); return v.length || v.ages; })() ? { tourVaries: true } : {}),
     // Tour test 6: the ages her published list names ("Ages 7+"), for the kids note on a trip card.
     ...(() => { const a = tourListInfo(venueId).listAges; return a && a.length ? { tourListAges: a.slice().sort((x, y) => x - y) } : {}; })(),
+    // Tour test 7 (Whistler, 2026-11-17): a list of whole-day trips ("Hut trip, 3 days") is a multi-day operator too, for
+    // "hut trip" and "multi-day" requests (as the operator's own "Several days").
+    ...(tourListInfo(venueId).mins.some((m) => m >= 1440) ? { tourMultiDay: true } : {}),
     // Tour test 4: the kinds the operator picked ('food', 'walking'…), so "food tour" and "walking tour" find it.
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
   };
