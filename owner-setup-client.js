@@ -3138,12 +3138,12 @@
   function socialPart(n){
     var ig = n === 'instagram', ch = S.socNo[n], id = ig ? 'suIg' : 'suFb', d = S.done[n];
     var now = d === 'live' || d === 'day' ? '<p class="su-sent">' + h(C.socialSent[n] && d === 'day' ? T.socialSent : T.alreadyDone) + '</p>' : '';
-    return '<h2 class="su-h2">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
+    return '<h2 class="su-h2" id="suSocQ' + n + '">' + h(ig ? 'Instagram' : 'Facebook') + '</h2>' + now
       + (ig && S.igFromMenu && S.ig ? '<p class="su-sent su-research" id="suIgFromMenu">' + h(fill(T.igFromMenu, { x: S.ig })) + '</p>' : '')
       + (!ig && !ch && S.fbFromWebsite && S.fb && S.fb !== S.socSaved.facebook && T.fbFromWebsite ? '<p class="su-sent su-research" id="suFbFromSite">' + h(T.fbFromWebsite) + '</p>' : '')
       + (ig && !ch && S.igFromWebsite && S.ig && S.ig !== S.socSaved.instagram && T.igFromWebsite ? '<p class="su-sent su-research" id="suIgFromSite">' + h(T.igFromWebsite) + '</p>' : '')
       + (ch ? '' : '<p class="su-hint">' + h(ig ? T.igLead : T.fbWhy) + '</p><label class="su-q" for="' + id + '">' + h(ig ? T.igLabel : T.fbLabel) + '</label><input class="su-field" id="' + id + '" type="text" autocapitalize="none" autocomplete="off" value="' + h(ig ? S.ig : S.fb) + '">')
-      + '<div class="su-chips" role="group" aria-label="' + h(ig ? 'Instagram' : 'Facebook') + '" style="margin-top:10px">'
+      + '<div class="su-chips" role="group" aria-labelledby="suSocQ' + n + '" style="margin-top:10px">'
       + [['no', ig ? T.igNo : T.fbNo], ['unsure', T.socialUnsure]].map(function(o){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ch === o[0] ? 'true' : 'false') + '" data-soc="' + n + ':' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>';
   }
   function readSocial(){ var a = el('suIg'), b = el('suFb'); if (a) S.ig = a.value.trim(); if (b) S.fb = b.value.trim(); }
