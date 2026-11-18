@@ -3450,7 +3450,7 @@
       if (cpv.none) { S.savedLine.spend = T.cpriceSavedNone; return saveAll('spend', S.savedCp === 'none' ? [] : [{ cocktail_price: 'none' }], 'no', null, function(){ S.savedCp = 'none'; CUR.cocktail_price = 'none'; cpv.guessed = false; }); }
       if (cpv.fee == null || isNaN(cpv.fee) || cpv.fee <= 0 || cpv.fee > 500) { S.nudge = cpv.other ? T.feeNeed : T.cpriceNeed; if (cpv.other) S.badField = 'suCfee'; return render(); }
       S.savedLine.spend = cpv.fee > (C.feeLiveMax || 40) && cpv.fee !== S.savedCp ? T.cpriceSavedDay : T.cpriceSavedLive;
-      return saveAll('spend', cpv.fee === S.savedCp ? [] : [{ cocktail_price: cpv.fee }], null, null, function(){ cpv.guessed = false; if (cpv.fee <= (C.feeLiveMax || 40)) { S.savedCp = cpv.fee; CUR.cocktail_price = cpv.fee; } else CUR.cocktail_price_waiting = cpv.fee; });
+      return saveAll('spend', cpv.fee === S.savedCp && !(CUR.cocktail_price_waiting != null && cpv.fee !== CUR.cocktail_price_waiting) ? [] : [{ cocktail_price: cpv.fee }], null, null, function(){ cpv.guessed = false; if (cpv.fee <= (C.feeLiveMax || 40)) { S.savedCp = cpv.fee; CUR.cocktail_price = cpv.fee; CUR.cocktail_price_waiting = null; } else CUR.cocktail_price_waiting = cpv.fee; });
     }
     if (k === 'cuisineSave') { if (!S.place) { S.nudge = T.placeNeed; return render(); } S.savedLine.cuisine = T.savedCuisine; return saveAll('cuisine', foodAgain([{ cuisines: S.cuis, place_type: S.place }])); }
     if (k === 'take') return el('suTake').click();
@@ -3689,7 +3689,9 @@
       // "We don't do flights" takes the price back too; a price takes back "no flights".
       if (fb2.noFlights && S.savedFlight != null) fl.push({ flight_fee: null });
       if (Object.keys(bi2).length) fl.push({ brewery_info: bi2 });
-      if (!fb2.noFlights && ff !== S.savedFlight) fl.push({ flight_fee: ff });
+      // Tour test 7 (Whistler, 2026-11-17): a value saved over one still waiting for our check (a typo of $2,600, then
+      // the right $395 again) is sent even when it is the live one, so the waiting one is withdrawn (server: reverts).
+      if (!fb2.noFlights && (ff !== S.savedFlight || (CUR.flight_fee_waiting != null && ff !== CUR.flight_fee_waiting))) fl.push({ flight_fee: ff });
       S.savedLine.flights = !fb2.noFlights && ff > C.feeLiveMax && ff !== S.savedFlight ? T.flightSavedDay : T.flightSavedLive;
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
@@ -3749,15 +3751,17 @@
       var pl = [];
       // Tour test 4: a free or by-donation tour is saved as the word; it is live at once ("Free" on the card and the page).
       if (pfree) {
-        if (pfree !== S.savedTourPrice) pl.push({ tour_price: pfree });
+        if (pfree !== S.savedTourPrice || CUR.tour_price_waiting != null) pl.push({ tour_price: pfree });
         if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
         S.savedLine.price = T.tpriceSavedFree || T.tpriceSavedLive;
         return saveAll('price', pl, null, null, function(){ S.savedTourPrice = pfree; CUR.tour_price = pfree; CUR.tour_price_waiting = null; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
       }
-      if (pp !== S.savedTourPrice) pl.push({ tour_price: pp });
+      // Tour test 7 (Whistler, 2026-11-17): the right price saved again over a held one ($2,600 waiting, then $395, the live
+      // price) is sent, so the held one is withdrawn and the list no longer says "we'll add it within a day".
+      if (pp !== S.savedTourPrice || (CUR.tour_price_waiting != null && pp !== CUR.tour_price_waiting)) pl.push({ tour_price: pp });
       if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
       S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : T.tpriceSavedLive;
-      return saveAll('price', pl, null, null, function(){ if (pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
+      return saveAll('price', pl, null, null, function(){ if (pp == null || pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
     }
     if (k === 'bookingSave') {
       readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? el('suBookUrl').value.trim() : null; if (bu1 !== null) S.bookUrl = bu1;
@@ -3808,7 +3812,7 @@
       readWine(); var tf = S.wine.fee;
       if (tf == null || isNaN(tf) || tf < 0 || tf > 500) { S.nudge = T.feeNeed; if (S.wine.feeOther) S.badField = 'suFee'; return render(); }
       var tl = [];
-      if (tf !== S.savedFee) tl.push({ tasting_fee: tf });
+      if (tf !== S.savedFee || (CUR.tasting_fee_waiting != null && tf !== CUR.tasting_fee_waiting)) tl.push({ tasting_fee: tf });
       var wv0 = tf !== 0 && S.wine.waived && S.wine.waived !== (WI.waived || '') ? S.wine.waived : '';
       if (wv0) tl.push({ winery_info: { waived: wv0 } });
       S.savedLine.tastings = tf > C.feeLiveMax && tf !== S.savedFee ? T.feeSavedDay : T.feeSavedLive;
