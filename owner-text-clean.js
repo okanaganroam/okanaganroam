@@ -111,7 +111,7 @@ function knownNameCaps(text, known, opts = {}) {
   if (!t) return t;
   const k = known || { phrases: [], words: ['BC'] };
   const fix = (name) => {
-    const re = new RegExp(`(?<![A-Za-zÀ-ÿ’'@./-])${escRe(name).replace(/\\? /g, '\\s+')}(?![A-Za-zÀ-ÿ’'-])`, 'gi');
+    const re = new RegExp(`(?<![A-Za-zÀ-ÿ’'@#./-])${escRe(name).replace(/\\? /g, '\\s+')}(?![A-Za-zÀ-ÿ’'-])`, 'gi');
     // Only words typed all lower case or with just a first capital ("joffre lakes", "Joffre lakes"); "JOFFRE" stays.
     t = t.replace(re, (m) => (m.split(/\s+/).every((w) => w === w.toLowerCase() || w === w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) ? m.replace(/\S+/g, (w, o) => name.split(/\s+/)[m.slice(0, o).split(/\s+/).length - 1] || w) : m));
   };
@@ -141,7 +141,8 @@ function nameMisspellings(text, known) {
   const seen = new Set();
   const targets = [...(k.phrases || []).map((p) => p.split(/\s+/)), ...(k.words || []).map((w) => [w])].filter((ws) => ws[0].length >= 5);
   for (let i = 0; i < tokens.length; i++) {
-    const w = tokens[i].toLowerCase();
+    // Tour test 12: a possessive or a quote mark is not part of the word ("Whistler's" is Whistler).
+    const w = tokens[i].toLowerCase().replace(/[’']s$/, '').replace(/^[’']+|[’']+$/g, '');
     if (w.length < 5 || lowerKnown.has(w) || LANGUAGE_NAMES.some((x) => x.toLowerCase() === w)) continue;
     for (const ws of targets) {
       const head = ws[0].toLowerCase();
@@ -161,4 +162,44 @@ function nameMisspellings(text, known) {
   return out;
 }
 
-module.exports = { dictatedPunctuation, dictationLeftovers, knownNameCaps, buildKnownNames, placeCoreName, nameMisspellings, editDistance, LANGUAGE_NAMES, PLACE_COMMON_WORDS };
+// Tour test 12 (Whistler, 2026-11-18; Kayla pastes her Instagram captions: "160ft canyon jump 🤯 #sendit", "online waiver
+// b4 you arrive!! Closed in high winds ⚠️ #safetyfirst", "bday groups get 10% off 🎉 DM us"). The same on every Roam site.
+// socialTidy: a run of #hashtags at the end of a line goes (every text); on the short live lines (Known for, Good to know,
+// Groups, tour names, the meeting point) the decorative emojis go too, "b4" becomes "before" and "!!" one "!". The story
+// and tour descriptions keep their emojis except a run at the very end of a line (conservative). "DM us" stays (flagged).
+const EMOJI_RE = /(?:[\u{1F1E6}-\u{1F1FF}]{2}|(?![©®™‼⁉])\p{Extended_Pictographic})(?:️|‍(?:\p{Extended_Pictographic})?|[\u{1F3FB}-\u{1F3FF}]|⃣)*/gu;
+const TRAIL_TAGS_RE = /(?:[ \t]*[,;·•|-]?[ \t]*#[\p{L}][\p{L}\p{N}_]*)+[ \t]*$/u;
+function socialTidy(text, opts = {}) {
+  let t = String(text == null ? '' : text);
+  if (!t) return t;
+  const short = !!opts.short;
+  const lines = t.split('\n').map((line) => {
+    let l = line;
+    if (short) l = l.replace(EMOJI_RE, ' ').replace(/[️‍]/g, '');
+    // The hashtags (and decorative emojis after them) at the end of the line; a line of hashtags only goes.
+    for (let i = 0; i < 3; i++) {
+      const before = l;
+      l = l.replace(new RegExp(`(?:[ \\t]*${EMOJI_RE.source})+[ \\t]*$`, 'u'), (m) => (short || /#/.test(before) || i > 0 || !opts.keepTrailingEmoji ? '' : m));
+      l = l.replace(TRAIL_TAGS_RE, '');
+      if (l === before) break;
+    }
+    if (short) {
+      l = l.replace(/\bb4\b/gi, (m) => (m === 'B4' ? 'Before' : m.charAt(0) === 'B' ? 'Before' : 'before')).replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?');
+    }
+    return l.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([,.!?;:)])/g, '$1').replace(/\([ \t]+/g, '(').replace(/[ \t]+$/, '').replace(/^[ \t]+/, '');
+  });
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+// What is still there for the admin card: { hashtags: ['#sendit'], emojis: true, dm: true } (empty parts left out).
+function socialFlags(text) {
+  const t = String(text || '');
+  const out = {};
+  const tags = [...new Set((t.match(/(?:^|[^\p{L}\p{N}_&/#])(#[\p{L}][\p{L}\p{N}_]*)/gu) || []).map((m) => m.replace(/^[^#]*/, '')))];
+  if (tags.length) out.hashtags = tags;
+  if ((t.match(EMOJI_RE) || []).length) out.emojis = true;
+  if (/\b(?:DM|dm|Dm)\s+(?:us|me)\b|\bslide (?:into|in) (?:our|my) DMs?\b|\blink in (?:our )?bio\b/i.test(t)) out.dm = true;
+  if (/\bb4\b/i.test(t)) out.b4 = true;
+  return out;
+}
+
+module.exports = { socialTidy, socialFlags, EMOJI_RE, dictatedPunctuation, dictationLeftovers, knownNameCaps, buildKnownNames, placeCoreName, nameMisspellings, editDistance, LANGUAGE_NAMES, PLACE_COMMON_WORDS };

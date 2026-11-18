@@ -49171,8 +49171,12 @@ function groupsChipStops(text) {
   }
   return t;
 }
+// Tour test 12 (Whistler, 2026-11-18; Kayla pastes Instagram captions): first the social-media leftovers (socialTidy): a
+// trailing run of #hashtags everywhere; on the short live lines (opts.short: Known for, Good to know, Groups, tour names,
+// a tour's meeting point) the decorative emojis too and "b4". "DM us" stays and is flagged on the admin card.
 function ownerTextClean(text, opts = {}) {
-  let t = ownerTextCleanLib.dictatedPunctuation(String(text == null ? '' : text), { multiline: !!opts.multiline });
+  let t = ownerTextCleanLib.socialTidy(String(text == null ? '' : text), { short: !!opts.short });
+  t = ownerTextCleanLib.dictatedPunctuation(t, { multiline: !!opts.multiline });
   if (opts.groups) t = groupsChipStops(t);
   if (opts.caps !== false) t = sentenceCaps(t);
   return ownerTextCleanLib.knownNameCaps(t, ownerKnownNames(), { fr: !!opts.fr });
@@ -49180,16 +49184,29 @@ function ownerTextClean(text, opts = {}) {
 // For the admin card: dictation words left standing, and close misspellings of a known place ("Jeffrey lakes").
 function ownerTextFlags(texts) {
   const left = new Set(), miss = [];
+  const social = { hashtags: [], emojis: false, dm: false, b4: false };
   for (const t of texts || []) {
     if (typeof t !== 'string' || !t) continue;
+    // Tour test 12: what social media left (hashtags, emojis, "DM us").
+    const sf = ownerTextCleanLib.socialFlags(t);
+    for (const h of sf.hashtags || []) if (!social.hashtags.includes(h)) social.hashtags.push(h);
+    if (sf.emojis) social.emojis = true; if (sf.dm) social.dm = true; if (sf.b4) social.b4 = true;
     ownerTextCleanLib.dictationLeftovers(t).forEach((w) => left.add(w));
     for (const m of ownerTextCleanLib.nameMisspellings(t, ownerKnownNames())) if (!miss.some((x) => x.said.toLowerCase() === m.said.toLowerCase())) miss.push(m);
   }
-  return { leftovers: [...left], misspellings: miss };
+  return { leftovers: [...left], misspellings: miss, social };
+}
+// Tour test 12: the admin card's line for social-media text.
+const SOCIAL_FLAG_TITLE = 'Hashtags / emojis / ‘DM us’ from social media';
+function socialFlagHtml(s) {
+  if (!s || !(s.hashtags.length || s.emojis || s.dm || s.b4)) return '';
+  const bits = [s.hashtags.length ? `hashtags ${s.hashtags.slice(0, 6).map((x) => `“${adminReviewEsc(x)}”`).join(', ')}` : '', s.emojis ? 'emojis' : '', s.dm ? '“DM us” (visitors can’t DM from our page: point them to the phone or booking link)' : '', s.b4 ? '“b4”' : ''].filter(Boolean);
+  return `<div class="rv-warn rv-social">${SOCIAL_FLAG_TITLE}: ${bits.join('; ')}. Trailing hashtags and the short lines’ emojis are tidied on save; fix the rest in the box before approving.</div>`;
 }
 function ownerTextFlagsHtml(texts) {
   const f = ownerTextFlags(texts);
   return (f.leftovers.length ? `<div class="rv-warn rv-dictation">Spoken punctuation left in: ${f.leftovers.map((w) => `“${adminReviewEsc(w)}”`).join(', ')}. Fix it in the box before approving (the owner may have dictated it).</div>` : '')
+    + socialFlagHtml(f.social)
     + (f.misspellings.length ? `<div class="rv-warn rv-spelling">Check the spelling: ${f.misspellings.map((m) => `“${adminReviewEsc(m.said)}” may be ${adminReviewEsc(m.name)}`).join('; ')}. Nothing was changed automatically.</div>` : '');
 }
 // A text with no capital letter except the ones sentenceCaps gave it (typed all in lower case), for the review card.
@@ -50580,7 +50597,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     else if (name !== current.name) changes.name = name;
   }
   if ('address' in input) {
-    const address = typeof input.address === 'string' ? input.address.trim().replace(/\s+/g, ' ') : '';
+    let address = typeof input.address === 'string' ? input.address.trim().replace(/\s+/g, ' ') : '';
+    // Tour test 12: a tour's address is often its meeting point in words ("gravel lot off Hwy 99 🚗"): cleaned like the
+    // short lines (no emojis or hashtags, a capital to start).
+    if (venue.type === 'tour' && address) address = ownerTextClean(address, { short: true });
     if (address.length < 6 || address.length > 200 || /[<>]/.test(address)) errors.address = 'Please enter the full street address, like 1475 Fairview Rd, Penticton.';
     else if (address !== current.address) changes.address = address;
   }
@@ -50796,7 +50816,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         // Tour test 10: Known for and Good to know start each sentence with a capital (sentenceCaps).
         // Tour test 11: every line is cleaned of dictated punctuation and gets the names this site knows; Groups too gets
         // its sentence capitals (also after a quick-answer phrase: "Private tours available. Our van…").
-        if (t.text) t.text = ownerTextClean(t.text, { fr: frSetup, groups: k === 'groups', caps: k === 'known_for' || k === 'good_to_know' || k === 'groups' }).slice(0, visitTextMaxFor(venue.type, k));
+        if (t.text) t.text = ownerTextClean(t.text, { fr: frSetup, groups: k === 'groups', caps: k === 'known_for' || k === 'good_to_know' || k === 'groups', short: true }).slice(0, visitTextMaxFor(venue.type, k));
         if (frSetup) {
           if (t.text === (frWas[k] || cur[k] || '')) continue;
           // A line made only of quick answers (« Sans réservation ») reads in either language: stored as before.
@@ -54250,7 +54270,7 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     // typed tours' names and descriptions are cleaned of dictated punctuation and get the names this site knows.
     if (venue && venue.type === 'tour' && ctx.mode !== 'admin') for (const sec of data.sections || []) for (const it of sec.items || []) {
       if (!it) continue;
-      if (typeof it.name === 'string' && it.name) it.name = ownerTextClean(it.name);
+      if (typeof it.name === 'string' && it.name) it.name = ownerTextClean(it.name, { short: true });
       if (typeof it.description === 'string' && it.description) it.description = ownerTextClean(it.description);
     }
     db.prepare("UPDATE venue_menus SET data = ?, status = CASE WHEN status = 'draft' THEN 'ready' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(JSON.stringify(data), menu.id);
@@ -54682,7 +54702,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       + stripHtml(it)
       + (it.check ? '<span class="mn-flag">' + T.checkThis + '</span>' : '')
       // Tour test 11 (Whistler, 2026-11-18): a gentle nudge on a typed tour named shuttle or transfer (it stays if they keep it).
-      + (C.kind === 'tours' && it.name && /\b(?:shuttles?|transfers?|transportation|limo(?:usine)?s?|taxis?|navettes?|transferts?)\b/i.test(it.name) ? '<span class="mn-flag mn-flag-soft">' + (C.lang === 'fr' ? 'Les navettes et les transferts ne sont pas des sorties : parlez-en dans votre histoire ou dans « Bon à savoir ».' : 'Airport shuttles and transfers aren’t tours: mention them in your story or Good to know.') + '</span>' : '') + '</button>';
+      + (C.kind === 'tours' && it.name && /\b(?:shuttles?|transfers?|transportation|limo(?:usine)?s?|taxis?|navettes?|transferts?)\b/i.test(it.name) ? '<span class="mn-flag mn-flag-soft">' + (C.lang === 'fr' ? 'Les navettes et les transferts ne sont pas des sorties : parlez-en dans votre histoire ou dans « Bon à savoir ».' : 'Airport shuttles and transfers aren’t tours: mention them in your story or Good to know.') + '</span>' : '')
+      // Tour test 12: text pasted from social media (hashtags, emojis, "DM us").
+      + (C.kind === 'tours' && /(?:^|\s)#[A-Za-zÀ-ÿ]|\b(?:DM|dm) (?:us|me)\b|\p{Extended_Pictographic}/u.test((it.name || '') + ' ' + (it.description || '')) ? '<span class="mn-flag mn-flag-soft mn-flag-social">' + (C.lang === 'fr' ? 'Mots-clics, émojis ou « DM us » des réseaux sociaux : nous retirons ceux de la fin à l’enregistrement; modifiez le reste ici.' : 'Hashtags / emojis / ‘DM us’ from social media: we tidy the ones at the end when you save; edit the rest here.') + '</span>' : '') + '</button>';
   }
   // The dish's name and price as they look in the owner's photo, under what was read, so checking is "does it match?".
   function stripHtml(it){
@@ -63042,7 +63064,7 @@ function renderAdminChangeCard(r) {
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
       ${['description', 'description_fr'].filter((f) => f in r.changes && descriptionShrank(r.previous[f], r.changes[f])).map((f) => `<div class="rv-warn rv-shrank">${f === 'description_fr' ? 'French description: the' : 'The'} new text is much shorter than the old one (${String(r.changes[f] || '').trim().length} characters, was ${String(r.previous[f] || '').trim().length}). Check it wasn’t typed over by mistake.</div>`).join('')}
       ${['description', 'description_fr'].some((f) => f in r.changes && typedAllLowercase(r.changes[f])) || ('visit_rows' in r.changes && r.changes.visit_rows && typeof r.changes.visit_rows === 'object' && ['known_for', 'good_to_know'].some((k) => typedAllLowercase(r.changes.visit_rows[k]))) ? '<div class="rv-warn rv-lowercase">Typed all lowercase: each sentence now starts with a capital, but names (towns, places) may still need one. Fix them in the box before approving.</div>' : ''}
-      ${ownerTextFlagsHtml([r.changes.description, r.changes.description_fr, ...(r.changes.visit_rows && typeof r.changes.visit_rows === 'object' ? Object.entries(r.changes.visit_rows).filter(([k]) => k !== '_lang' && k !== '_fr').map(([, v]) => v) : [])])}
+      ${ownerTextFlagsHtml([r.changes.description, r.changes.description_fr, r.changes.address, ...(r.changes.visit_rows && typeof r.changes.visit_rows === 'object' ? Object.entries(r.changes.visit_rows).filter(([k]) => k !== '_lang' && k !== '_fr').map(([, v]) => v) : [])])}
       ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
     </article>`;
@@ -63107,6 +63129,13 @@ function renderAdminStaleDealsCard(r) {
       <p class="rv-text">${adminReviewEsc(deals.map(happyHourDealLine).join('; '))}</p>
     </article>`;
 }
+// Tour test 12: the free text of a change (story, address, the Plan your visit lines, French too), for the social flag.
+function ownerChangeTexts(ch) {
+  const out = [];
+  const walk = (x, d) => { if (d > 3 || x == null) return; if (typeof x === 'string') out.push(x); else if (Array.isArray(x)) x.forEach((y) => walk(y, d + 1)); else if (typeof x === 'object') Object.values(x).forEach((y) => walk(y, d + 1)); };
+  for (const k of ['description', 'description_fr', 'address', 'visit_rows']) if (ch && k in ch) walk(ch[k], 0);
+  return out;
+}
 // A signed-in owner's change that went live straight away (2026-10-18): what it replaced, who, and Undo.
 function renderAdminInstantCard(r) {
   const rows = Object.keys(r.changes).map((f) => {
@@ -63119,6 +63148,7 @@ function renderAdminInstantCard(r) {
       <h3>${adminReviewEsc(r.venue_name)}</h3>
       <p class="rv-meta">Live change #${r.id} · ${adminReviewEsc(adminReviewTime(r.submitted_at))} by ${adminReviewEsc(String(r.reviewed_by || '').replace(/^owner:/, '') || r.contact_email || 'owner')}${r.contact_name ? ` (${adminReviewEsc(r.contact_name)})` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <table class="rv-diff"><tr><th>Change</th><th>Before</th><th>Now</th></tr>${rows}</table>
+      ${r.undone_at ? '' : socialFlagHtml(ownerTextFlags(ownerChangeTexts(r.changes)).social)}
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
       ${done || `<div class="rv-actions"><input type="text" name="reason" maxlength="300" placeholder="Reason (sent to the owner)"><button type="button" class="rv-btn rv-reject" data-act="undo">Undo</button></div><p class="rv-meta">Puts back what was there before (fields changed again since are left alone). With a reason, the owner is emailed it and sees it under Your updates; without one, they aren\u2019t emailed.</p><p class="rv-result" hidden></p>`}
     </article>`;
