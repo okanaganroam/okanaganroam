@@ -1057,6 +1057,9 @@ function longDayHikeMinutes(v) {
 function specialistOutdoorBlocked(v, ctx) {
   // Backcountry and heli outfitters (2026-10-25: Whitecap Alpine on a hiking trip) only when that is what was asked.
   if (v.type === 'tour' && /\b(?:backcountry|heli ski\w*|heli|heliskiing|cat skiing|ski touring|avalanche|mountaineering|glacier)\b/.test(normWords(v.cuisine || '')) && !/\b(?:sightseeing|tours?|flights?|ice cave)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx) && !/\b(?:backcountry|heli|ski touring|avalanche|mountaineering|glacier|guided|guide|guides|ast)\b/.test(ctx.queryText || '')
+    // From Whistler Roam #188 (2026-11-17, real-data check): heli- or cat-skiing asked for keeps the heli and cat-ski companies ("cat
+    // skiing in Whistler on February 10" left out all three and planned one in Brackendale).
+    && !(ctx.plannerKinds || []).includes('heli_ski') && !/\b(?:cat ?ski\w*|catski\w*|snowcats?|heliski\w*)\b/.test(ctx.queryText || '')
     // Every tour kind (2026-11-17): a snowshoe tour asked for keeps the operator whose own words are "Snowshoe & ski touring".
     && !(/\bsnowshoe\w*/.test(ctx.queryText || '') && /\bsnowshoe\w*/.test(normWords(v.cuisine || '')))) return true;
   if (v.type !== 'outdoor' || (ctx.pinnedIds && ctx.pinnedIds.has(v.id)) || namedInRequest(v, ctx)) return false;
