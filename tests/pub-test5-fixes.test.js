@@ -231,7 +231,8 @@ test('6: holiday tiles cover every BC stat holiday with the right dates, next fi
   const s = scriptOf(await text(`/owner/${tokenFor(mk('pub').id)}/setup`));
   const list = holidaysAt(s, '2026-11-10');
   assert.deepEqual(JSON.parse(JSON.stringify(list.map((o) => `${o.key} ${o.date}`))), ['remembrance 2026-11-11', 'xmasEve 2026-12-24', 'xmas 2026-12-25', 'boxing 2026-12-26', 'nye 2026-12-31', 'nyd 2027-01-01',
-    'family 2027-02-15', 'goodFri 2027-03-26', 'easterMon 2027-03-29', 'victoria 2027-05-24', 'canada 2027-07-01', 'bcDay 2027-08-02', 'labour 2027-09-06', 'truth 2027-09-30', 'thanks 2027-10-11']);
+    // Tour test 9 (2026-11-18): National Indigenous Peoples Day, June 21.
+    'family 2027-02-15', 'goodFri 2027-03-26', 'easterMon 2027-03-29', 'victoria 2027-05-24', 'indigenous 2027-06-21', 'canada 2027-07-01', 'bcDay 2027-08-02', 'labour 2027-09-06', 'truth 2027-09-30', 'thanks 2027-10-11']);
   const by = Object.fromEntries(list.map((o) => [o.key, o]));
   assert.equal(by.thanks.next, '2028-10-09', 'Thanksgiving next year is its own 2nd Monday');
   assert.equal(by.victoria.next, '2028-05-22'); assert.equal(by.goodFri.next, '2028-04-14'); assert.equal(by.remembrance.next, '2027-11-11');

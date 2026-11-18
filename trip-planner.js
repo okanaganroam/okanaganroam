@@ -996,6 +996,18 @@ function namesAskedOffSnowKind(v, ctx) {
   const own = tripRequirements.inferPlannerKinds({ type: 'tour', name: '', description: '', cuisine: v.cuisine });
   return asked.some((k) => own.includes(k));
 }
+const WATER_TOUR_PLANNER_KINDS = ['paddle_tour', 'rafting', 'boat_tour'];
+const WATER_TOUR_KINDS = ['paddle', 'raft', 'boat', 'jetboat'];
+function tourWaterOff(v, m, ctx) {
+  if (Array.isArray(v.tourWaterMonths) && v.tourWaterMonths.length) return !v.tourWaterMonths.includes(m);
+  if (![11, 12, 1, 2, 3].includes(m)) return false;
+  const kinds = Array.isArray(v.tourKinds) ? v.tourKinds : [];
+  const sub = normWords(v.cuisine || '');
+  if (!kinds.some((k) => WATER_TOUR_KINDS.includes(k)) && !/\b(?:kayak\w*|canoe\w*|sup|paddl\w*|raft\w*|jet ?boat\w*|boat\w*|cruise\w*)\b/.test(sub)) return false;
+  if (/\b(?:winter|year round|all year|eagle\w*)\b/.test(sub)) return false;
+  if (kinds.length && kinds.every((k) => WATER_TOUR_KINDS.includes(k) || k === 'other') && ownerSeasonOpenOn(v, ctx)) return false;
+  return true;
+}
 function offSeasonBlocked(v, ctx) {
   if (namedInRequest(v, ctx) || (ctx.pinnedIds && ctx.pinnedIds.has(v.id))) return false;
   const m = tripMonthOf(ctx);
@@ -1011,6 +1023,12 @@ function offSeasonBlocked(v, ctx) {
   }
   // Winter-only tours: heli-skiing, cat-skiing, snowmobile, dog-sled and sleigh tours, ice fishing, ski touring courses.
   if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx) && !namesAskedOffSnowKind(v, ctx)) return true;
+  // Tour test 9 (Whistler, 2026-11-18; Tanis): a canoe, kayak, rafting or boat tour asked for is checked against its own
+  // season, as outdoor paddling is. A summer-only canoe on a list ("Summer: Canoe paddle", "Canoe (June to September)")
+  // was planned on January 16 by a cultural-tour company open all year. Its list's months for its water trips win; with
+  // none, a company whose other kinds run in winter isn't planned for a water trip from November to March, while one
+  // that only runs water trips keeps its own season answer.
+  if (v.type === 'tour' && (ctx.plannerKinds || []).some((k) => WATER_TOUR_PLANNER_KINDS.includes(k)) && tourWaterOff(v, m, ctx)) return true;
   // Summer-only tours: bike, rafting, sailing, paddling, kite and horseback tours, unless they say winter or year-round.
   // Tour test 6 (Whistler, 2026-11-17): and the operator's own season answer ("all year", or open on the date) wins, as for
   // the winter-only words: a zipline park with summer e-bike rentals that runs all year was "closed for the season". A
@@ -6722,7 +6740,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6756,7 +6774,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
@@ -7412,7 +7430,10 @@ function planTripCore(input) {
     // "closed for the season".
     const onlyDay = ctx.tripDate && offSeason.every((st) => { const f = facts.find((x) => x.id === st.venue.id); return f && f.ownerClosures && !seasonClosedOnTrip({ ...f, ownerClosures: undefined }, { date: ctx.tripDate }); });
     const dayText = ctx.tripDate ? `${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]} ${Number(ctx.tripDate.slice(8, 10))}` : '';
-    if (onlyDay) result.warnings.push(names.length === 1 ? `${names[0]} matches but is closed on ${dayText}. Ask again with another date to plan it.` : `These places match but are closed on ${dayText}: ${listText(names)}. Ask again with another date to plan them.`);
+    // Tour test 9 (Whistler, 2026-11-18; Tanis, closed every November): a closure longer than the day says when it opens
+    // again ("It reopens December 1."), as a season does.
+    const dayReopen = (() => { if (!onlyDay || names.length !== 1) return ''; const f = facts.find((x) => x.id === offSeason[0].venue.id); const ro = f && reopensAfter(f, ctx.tripDate); if (!ro) return ''; const next = new Date(`${ctx.tripDate}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1); return ro > next.toISOString().slice(0, 10) ? ` It reopens ${MONTH_NAMES[Number(ro.slice(5, 7)) - 1]} ${Number(ro.slice(8, 10))}.` : ''; })();
+    if (onlyDay) result.warnings.push(names.length === 1 ? `${names[0]} matches but is closed on ${dayText}.${dayReopen} Ask again with another date to plan it.` : `These places match but are closed on ${dayText}: ${listText(names)}. Ask again with another date to plan them.`);
     else {
     const reopens = reopen ? ` ${names.length === 1 ? 'It' : reopen.name} reopens ${MONTH_NAMES[Number(reopen.seasonReopens.slice(5, 7)) - 1]} ${Number(reopen.seasonReopens.slice(8, 10))}.` : '';
     result.warnings.push(names.length === 1

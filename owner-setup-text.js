@@ -2174,6 +2174,24 @@ Object.assign(fr, { closeInside: 'Ces dates vous ferment du {a} au {b}, en plein
 // Tour test 8: the French description still research's after her English story (every type; English pages only).
 Object.assign(en, { frDescOld: 'Your French description is the old one from our research:', frDescGo: 'update it?' });
 Object.assign(fr, { frDescOld: 'Votre description en français est l’ancienne, tirée de nos recherches :', frDescGo: 'la mettre à jour?' });
+// Tour test 9 (Whistler fresh eyes, Tanis, an Indigenous-owned cultural tour business, 2026-11-18): the French story
+// screen's English lead, the "21+ or whole classes" group size, "Type them in myself" on Your tours and prices, the
+// closure ✕ that names its dates, the photo lead for cultural tours, and the official holiday names.
+Object.assign(en, { frDescEnLead: 'Not a French speaker? Paste your English story, or tap Leave it to us.', frDescLeave: 'Leave it to us', closeRemove: 'Remove {x}' });
+// (The French setup shows the English words, passed as SETUP_CFG.frDescEn; these French ones are the key's twins.)
+Object.assign(fr, { frDescEnLead: 'Vous ne parlez pas français? Collez votre histoire en anglais, ou touchez Laissez-nous faire.', frDescLeave: 'Laissez-nous faire', closeRemove: 'Retirer {x}' });
+Object.assign(en.holidays, { truth: 'National Day for Truth and Reconciliation', indigenous: 'National Indigenous Peoples Day' });
+Object.assign(fr.holidays, { truth: 'Journée nationale de la vérité et de la réconciliation', indigenous: 'Journée nationale des peuples autochtones' });
+Object.assign(en.tour, {
+  groupsChipBig: '21+ or whole classes', groupsLineBig: 'Groups of 21 or more, like whole classes: please book ahead', groupsLineBigBooked: 'Groups of 21 or more, like whole classes',
+  menuType: 'Type them in myself', menuTypeSub: 'Each tour and its price, one line at a time',
+  photosLeadCultural: 'Your guides, the places you share, a walk or a canoe on the water. Three photos is perfect.',
+});
+Object.assign(fr.tour, {
+  groupsChipBig: '21+ ou classes entières', groupsLineBig: 'Groupes de 21 personnes ou plus, comme des classes entières : réservez à l’avance', groupsLineBigBooked: 'Groupes de 21 personnes ou plus, comme des classes entières',
+  menuType: 'Je les tape moi-même', menuTypeSub: 'Chaque sortie et son prix, une ligne à la fois',
+  photosLeadCultural: 'Vos guides, les lieux que vous faites découvrir, une marche ou un canot sur l’eau. Trois photos, c’est parfait.',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

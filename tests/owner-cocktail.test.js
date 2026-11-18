@@ -832,7 +832,7 @@ test('groups (test 3): a size chip keeps a room or capacity from research; a qui
   // Quick answers on research's untouched line: Buyouts keeps the room for 20; Private room itself is already said.
   assert.deepEqual([...ctx.groupsKeep('Private room for 20', 'Buyouts', G)], ['Private room for 20']);
   assert.deepEqual([...ctx.groupsKeep('Groups welcome, call ahead', 'Private room', G)], [], 'a line with nothing the chip lacks is replaced');
-  assert.match(s, /S\.brew\.groups = groupsKeep\(S\.brew\.groups\)\.concat\(\[fill\(T\.groupsLine, \{ n: \+b\.getAttribute\('data-bgroup'\) \}\)\]\)\.join\('\. '\);/);
+  assert.match(s, /S\.brew\.groups = groupsKeep\(S\.brew\.groups\)\.concat\(\[groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\)\]\)\.join\('\. '\) \+ '\. ';/ /* tour test 9: ". " after the size */);
   assert.match(s, /v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);/);
   // Un-pressing Private room inside "Private room for 20" takes the sentence, never leaving "for 20".
   assert.match(s, /if \(inLonger\) v = sentencesOf\(v\)\.filter\(function\(x\)\{ return !has\(x, t\); \}\)\.join\(sep\);/);

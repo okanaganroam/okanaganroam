@@ -7319,14 +7319,24 @@ function runTripPlan(args, now = new Date()) {
   const first = runTripPlanCore(args, now);
   let plan = first;
   try {
-    const m = /\b(?:near|around|close to|nearby)\s+([a-z .'’-]+?)(?:\s+(?:in|on|this|next|for|with)\b|[,.!?]|$)/i.exec(String(args.text || ''));
+    // Tour test 9 (Whistler, 2026-11-18; Tanis in Mount Currie, 6 km from Pemberton): « près de », « proche de » and
+    // « autour de » too, and a list of places ("Places that fit") always takes in the towns right around it (TRIP_SITE
+    // nearTowns: Pemberton and Mount Currie on Whistler), not only when the town itself had nothing. A day plan still
+    // widens only when it came back empty.
+    const m = /\b(?:near|around|close to|nearby|pr[eè]s de|proche de|autour de)\s+([a-zà-ÿ .'’-]+?)(?:\s+(?:in|on|this|next|for|with|le|la|les|en|ce|cet|cette|pour|avec|au|du)\b|[,.!?]|$)/i.exec(String(args.text || ''));
     const town = m && Object.keys(REGION_LABELS).find((r) => REGION_LABELS[r].toLowerCase() === m[1].trim().toLowerCase());
-    if (town && TRIP_NEAR_TOWNS[town] && tripPlanEmpty(first) && !args.swap && !args.pinned) {
+    const listPlan = (p) => !!p && (p.kind === 'recommendations' || p.kind === 'discover');
+    if (town && TRIP_NEAR_TOWNS[town] && TRIP_NEAR_TOWNS[town].length && (tripPlanEmpty(first) || listPlan(first)) && !args.swap && !args.pinned) {
+      const frReq = /^pr|^proche|^autour/i.test(m[0].trim());
       const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
-      const wider = runTripPlanCore({ ...args, text: String(args.text).replace(m[0].replace(/[,.!?]$/, ''), `in ${towns.slice(0, -1).join(', ')} and ${towns.slice(-1)}${m[0].match(/\s+(in|on|this|next|for|with)$/i) ? m[0].match(/\s+(in|on|this|next|for|with)$/i)[0] : ''}`) }, now);
-      if (!tripPlanEmpty(wider)) {
+      const tail = (m[0].match(/\s+(in|on|this|next|for|with|le|la|les|en|ce|cet|cette|pour|avec|au|du)$/i) || [''])[0];
+      const wider = runTripPlanCore({ ...args, text: String(args.text).replace(m[0].replace(/[,.!?]$/, ''), frReq ? `à ${towns.slice(0, -1).join(', ')} et ${towns.slice(-1)}${tail}` : `in ${towns.slice(0, -1).join(', ')} and ${towns.slice(-1)}${tail}`) }, now);
+      const nearIds = new Set(TRIP_NEAR_TOWNS[town]);
+      const firstIds = new Set((first.recommendations || []).map((x) => x && x.venue && x.venue.id));
+      const addsNear = (wider.recommendations || []).some((x) => x && x.venue && nearIds.has(x.venue.region) && !firstIds.has(x.venue.id));
+      if (!tripPlanEmpty(wider) && (tripPlanEmpty(first) || (listPlan(wider) && addsNear))) {
         const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
-        const note = `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.`;
+        const note = tripPlanEmpty(first) ? `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${REGION_LABELS[town]}.`;
         wider.notes = [note].concat(wider.notes || []);
         wider.contextNotes = [note].concat(wider.contextNotes || []);
         wider.query = first.query;
@@ -7526,7 +7536,9 @@ function tripFullVenueNames(text, taxonomy) {
     // without its bracket part was not recognised), and the full name goes in at that place.
     const flat = out.split('').map((ch) => { const d = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return d.length === 1 ? d : ch; }).join('');
     const m = re.exec(flat);
-    if (m) out = out.slice(0, m.index) + e.full + out.slice(m.index + m[0].length);
+    // Tour test 9 (Whistler, 2026-11-18): a name just put in is held whole, so a shorter name inside it isn't expanded too
+    // ("Owl Creek Cultural Tours" became "Owl Creek Recreation Site Cultural Tours (test)" and planned the campsite).
+    if (m) { out = `${out.slice(0, m.index)}\u0002${keep.length}\u0002${out.slice(m.index + m[0].length)}`; keep.push(e.full); }
   }
   for (const e of oneWord) {
     const lower = norm(out);
@@ -12134,7 +12146,16 @@ function getRelatedVenues(venue, limit = 6) {
     .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
   const cuisine = String(venue.cuisine || '').toLowerCase();
-  const score = new Map(rows.map((v) => [v.id, foodDrinkRecommendedScore(v) + (cuisine && String(v.cuisine || '').toLowerCase() === cuisine ? 0.25 : 0)]));
+  // Tour test 9 (Whistler, 2026-11-18; Tanis): "Other tours" under a cultural tour listed heli-ski and snowmobile operators.
+  // A tour of the same kind (its operator's kinds, else the same Tours filter) comes first.
+  let sameTour = () => 0;
+  if (venue.type === 'tour') {
+    try {
+      const mine = (venueTourInfo(venue.id).kinds || []).filter((k) => k !== 'other'), act = tourActivityOf(venue);
+      sameTour = (v) => { const k = (venueTourInfo(v.id).kinds || []); return (mine.some((x) => k.includes(x)) ? 2 : 0) + (act && tourActivityOf(v) === act ? 1 : 0); };
+    } catch (e) { sameTour = () => 0; }
+  }
+  const score = new Map(rows.map((v) => [v.id, foodDrinkRecommendedScore(v) + (cuisine && String(v.cuisine || '').toLowerCase() === cuisine ? 0.25 : 0) + sameTour(v) * 10]));
   return rows.sort((a, b) => score.get(b.id) - score.get(a.id) || String(a.name).localeCompare(String(b.name))).slice(0, limit);
 }
 
@@ -21934,6 +21955,43 @@ function tourListInfo(venueId) {
   } catch (e) { /* no list */ }
   return out;
 }
+// Tour test 9 (Whistler, 2026-11-18; Tanis): the months her water trips run, from her published list: a section named for a
+// season or months ("Summer", "June–September", « Été ») or the trip's own words ("Canoe paddle (June to September)").
+// -> [6, 7, 8, 9] or null (no water trip on the list, or one without months: nothing is assumed).
+const TOUR_WATER_ITEM_RE = /\b(?:canoe\w*|kayak\w*|paddl\w*|sup|raft\w*|jet ?boat\w*|boats?|boating|cruises?|canots?|bateaux?|croisi[eè]res?|pagaie)\b/i;
+const TOUR_MONTH_WORDS = [['jan', 1], ['feb', 2], ['fév', 2], ['fev', 2], ['mar', 3], ['apr', 4], ['avr', 4], ['may', 5], ['mai', 5], ['jun', 6], ['juin', 6], ['jul', 7], ['juil', 7], ['aug', 8], ['ao', 8], ['sep', 9], ['oct', 10], ['nov', 11], ['dec', 12], ['déc', 12]];
+function tourTextMonths(text) {
+  const t = String(text || '').toLowerCase();
+  const mon = (w) => { const x = TOUR_MONTH_WORDS.find(([p]) => w.startsWith(p)); return x ? x[1] : 0; };
+  const span = (a, b) => { const out = []; for (let i = a, n = 0; n < 12; i = i % 12 + 1, n++) { out.push(i); if (i === b) break; } return out; };
+  const MW = '(janv?\\w*|f[ée]v\\w*|feb\\w*|mar\\w*|apr\\w*|avr\\w*|ma[iy]|jui?n\\w*|jui?l\\w*|ao[uû]\\w*|aug\\w*|sept?\\w*|oct\\w*|nov\\w*|d[ée]c\\w*)';
+  const r = new RegExp(`\\b${MW}\\.?\\s*(?:-|–|—|to|through|until|thru|à|au|a)\\s*${MW}\\b`, 'i').exec(t);
+  if (r && mon(r[1]) && mon(r[2])) return span(mon(r[1]), mon(r[2]));
+  const out = new Set();
+  if (/\bsummer\b|(?:^|[^a-zà-ÿ])[ée]t[ée](?![a-zà-ÿ])/.test(t)) [6, 7, 8, 9].forEach((m) => out.add(m));
+  if (/\bwinter\b|\bhiver\b/.test(t)) [12, 1, 2, 3].forEach((m) => out.add(m));
+  if (/\bspring\b|\bprintemps\b/.test(t)) [4, 5, 6].forEach((m) => out.add(m));
+  if (/\b(?:fall|autumn)\b|\bautomne\b/.test(t)) [9, 10, 11].forEach((m) => out.add(m));
+  return out.size ? [...out].sort((a, b) => a - b) : null;
+}
+function tourWaterMonths(venueId) {
+  try {
+    const m = publishedMenu(venueId);
+    if (!m || menuIsUnconfirmedResearch(m)) return null;
+    const months = new Set(); let water = 0;
+    for (const sec of m.data.sections || []) {
+      for (const it of sec.items || []) {
+        const own = `${it.name || ''} ${it.description || ''} ${it.duration || ''}`;
+        if (!TOUR_WATER_ITEM_RE.test(`${own} ${sec.name || ''}`)) continue;
+        water++;
+        const got = tourTextMonths(own) || tourTextMonths(sec.name) || tourTextMonths(sec.note);
+        if (!got) return null;
+        got.forEach((x) => months.add(x));
+      }
+    }
+    return water && months.size && months.size < 12 ? [...months].sort((a, b) => a - b) : null;
+  } catch (e) { return null; }
+}
 const TOUR_VARIES_NOTE = { en: 'Varies by tour: see Tours & prices.', fr: 'Varie selon la sortie : voir Sorties et tarifs.' };
 // The page's box with those notes on the operator's own answer lines (display only; nothing stored changes).
 function tourRowsVaryNotes(venue, info) {
@@ -22264,6 +22322,10 @@ const TOUR_KIND_LABELS_OWNER = {
   // courses (a list entry, not a new field; its page words are TOUR_KIND_PUBLIC.guide).
   guide: ['Mountain guiding, mountaineering or avalanche courses', 'Guide de montagne, alpinisme ou cours d’avalanche'],
   flight: ['Scenic or helicopter flights', 'Vols panoramiques ou en hélicoptère'], walking: ['Walking or history tours', 'Visites à pied ou historiques'], food: ['Food tours', 'Visites gourmandes'],
+  // Tour test 9 (Whistler, 2026-11-18; Tanis, an Indigenous-owned cultural tour business; Dayton approved): no chip fitted
+  // a cultural walk with Elders' storytelling ("Walking & history tours" went public: "our culture is not history, it is
+  // living"). A list entry, not a new field; its page words are TOUR_KIND_PUBLIC.cultural, its filter Culture.
+  cultural: ['Indigenous and cultural tours', 'Visites autochtones et culturelles'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm, ranch or kennel visits', 'Visites de ferme, de ranch ou de chenil'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
 // Tour test 3 (Whistler, 2026-11-17): the first length is "Up to 1 hour" (a 20-minute flight read "About 1 hour").
@@ -22283,9 +22345,9 @@ function tourCuisineFr(text) {
   if (!tourCuisineFrMap) {
     tourCuisineFrMap = new Map();
     try {
-      for (const r of db.prepare("SELECT v.cuisine AS c, v.description AS d, t.info AS info FROM venue_tour_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'tour' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
+      for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, v.description AS d, t.info AS info FROM venue_tour_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'tour' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
-        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', r.d || '') : '';
+        const fr = o && Array.isArray(o.kinds) ? tourKindsText(o.kinds, true, o.cuisine_was || '', tourStoryWords(r.id, r.d)) : '';
         if (fr && fr !== r.c) tourCuisineFrMap.set(String(r.c), fr);
       }
     } catch (e) { /* no table yet */ }
@@ -22322,6 +22384,8 @@ function tourKindCovers(k, part) { const h = TOUR_KIND_HINTS.find(([key]) => key
 // shown ("Helicopter tours" -> "Helicopter flights", never "scenic"; "heli-skiing" -> "Heli-skiing", never "cat-skiing");
 // when they name none or all, the kind's whole words. A site that renames a chip (Whistler) overrides this map's
 // `words`, not the code.
+// Tour test 9: the words that say a listing is Indigenous (never guessed from "native" or "tribal": research's words).
+const TOUR_INDIGENOUS_RE = /\bindigenous|first nations?\b|autochtone|premi[eè]res nations|\bm[ée]tis\b|\binuit\b/;
 const TOUR_TREETOP_RE = /tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre|parcours (?:dans les arbres|a[ée]rien)/;
 const TOUR_KIND_PUBLIC = {
   heli: { words: ['Heli-skiing', 'Héliski'], sides: [[/heli[- ]?(?:ski|board)/, 'Heli-skiing', 'Héliski'], [/cat[- ]?ski|snowcat ski/, 'Cat-skiing', 'Ski en chenillette (cat-ski)']] },
@@ -22330,7 +22394,11 @@ const TOUR_KIND_PUBLIC = {
   snowshoe: { words: ['Snowshoe & ski touring', 'Raquette et ski de randonnée'],
     sides: [[/snowshoe/, 'Snowshoeing', 'Raquette'], [/ski touring|backcountry (?:ski|guiding)|splitboard|heli-touring/, 'Ski touring', 'Ski de randonnée'], [/snowcat(?! ski| access)/, 'Snowcat tours', 'Sorties en chenillette']] },
   paddle: { words: ['Kayak, canoe & SUP', 'Kayak, canot et planche à pagaie'], sides: [[/kayak/, 'Kayaking', 'Kayak'], [/canoe/, 'Canoeing', 'Canot'], [/\bsup\b|paddle ?board/, 'Paddleboarding', 'Planche à pagaie']] },
-  walking: { words: ['Walking & history tours', 'Visites à pied et historiques'], sides: [[/walking|ghost/, 'Walking tours', 'Visites à pied'], [/histor|heritage|indigenous cultur/, 'History tours', 'Visites historiques']] },
+  // Tour test 9 (Whistler, 2026-11-18; Tanis): "indigenous cultur" no longer reads as "History tours" (it is the cultural kind).
+  walking: { words: ['Walking & history tours', 'Visites à pied et historiques'], sides: [[/walking|ghost/, 'Walking tours', 'Visites à pied'], [/histor|heritage/, 'History tours', 'Visites historiques']] },
+  // Tour test 9: the cultural kind says "Indigenous" only when the listing's own words (its category, else its story)
+  // say Indigenous or First Nations; otherwise "Cultural tours" / « Visites culturelles ».
+  cultural: { words: ['Cultural tours', 'Visites culturelles'], eachSide: true, sides: [[TOUR_INDIGENOUS_RE, 'Indigenous cultural tours', 'Visites culturelles autochtones']] },
   // Tour test 5 (Whistler, 2026-11-17): the chip says "Wildlife, whale and bear viewing" (whales had no chip); the page
   // keeps its short words, and a listing's own "Whale watching" now stays (the chip's name has "whale").
   wildlife: { words: ['Wildlife and bear viewing', 'Observation de la faune et des ours'] },
@@ -22417,7 +22485,10 @@ function tourKindsText(kinds, fr = false, was = '', story = '') {
     // Tour test 7: the guide kind always says its public word ("Mountain guiding", or "Avalanche courses" when that is all).
     const own = fr || k === 'guide' ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     // Tour test 8: a kind whose sides may come from the story (farm: "kennel visits with puppies") when its category names none.
-    const mineOrStory = !mine.length && (TOUR_KIND_PUBLIC[k] || {}).storySides && story ? [String(story)] : mine;
+    // Tour test 9 (Whistler, 2026-11-18; Tanis): every kind with sides does this now. Her card read "Snowshoe, snowcat &
+    // ski touring" for a snowshoe storytelling walk: when the category names none of a kind's sides, the story (and her
+    // Known for line) decides which sides show; only when neither names any does the kind's whole label show.
+    const mineOrStory = !mine.length && Array.isArray((TOUR_KIND_PUBLIC[k] || {}).sides) && story ? [String(story)] : mine;
     (own.length ? own : tourKindPublic(k, fr, mineOrStory)).forEach(push);
   }
   // Tour test 6 (Whistler, 2026-11-17): a part no picked kind covers is kept in English on English pages only. On French
@@ -22457,7 +22528,7 @@ function writeVenueTourInfo(venueId, info) {
   if (TOUR_FREE_WORDS.includes(clean.free)) clean.price = 0; else { delete clean.free; if (!(clean.price > 0)) delete clean.price; }
   let v = null; try { v = db.prepare('SELECT cuisine, description FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
   const was0 = 'cuisine_was' in cur ? cur.cuisine_was : (v && v.cuisine != null ? String(v.cuisine) : '');
-  const words = tourKindsText(clean.kinds, false, was0, v && v.description ? String(v.description) : '');
+  const words = tourKindsText(clean.kinds, false, was0, tourStoryWords(venueId, v && v.description));
   if (v && words) {
     clean.cuisine_was = was0;
     if ((v.cuisine || '') !== words) db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(words, venueId);
@@ -22468,6 +22539,17 @@ function writeVenueTourInfo(venueId, info) {
   else db.prepare('INSERT INTO venue_tour_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(venueId, JSON.stringify(clean));
   clearVenueTourInfoCache();
   try { clearVenueCuisinesCache(); } catch (e) { /* not loaded yet */ }
+}
+// Tour test 9 (Whistler, 2026-11-18): the words that say which side of a chip a tour does when its category says none:
+// its story and its Known for line.
+function tourStoryWords(venueId, description) {
+  let known = ''; try { known = String(ownerVisitRows(venueId).known_for || ''); } catch (e) { known = ''; }
+  return [description ? String(description) : '', known].filter(Boolean).join(' ; ');
+}
+// Tour test 9: her story or Known for, once live, may name a side of a picked chip ("snowshoe storytelling walk"): the
+// category words are worked out again (nothing else changes).
+function refreshTourKindWords(venueId) {
+  try { const i = venueTourInfo(venueId); if (Array.isArray(i.kinds) && i.kinds.length) writeVenueTourInfo(venueId, i); } catch (e) { /* keep the words */ }
 }
 // The answers without the price and the kept research words (what the instant 'tour_info' field holds).
 function tourInfoAnswers(venueId) { const o = { ...venueTourInfo(venueId) }; delete o.price; delete o.free; delete o.cuisine_was; return o; }
@@ -22500,7 +22582,7 @@ function tourFreeRead(x) {
 // Tour test 6 (Whistler, 2026-11-17): a price per UNIT ("69 par vélo", "$69/bike", "$40 per hour", "kayak rental $45")
 // is 'unit': never saved as a price per person (Your tours and prices takes it). Vehicles, cars, sleds and canoes moved
 // from the group words to these. "from 1500" / « 1500 $ et plus » read as the number (tourPriceTrim).
-const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
+const TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|rafts?|radeaux?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
 // Tour test 7 (Whistler, 2026-11-17; Erik, a mountain guide): days, nights and hours are not units. "$750/day", "750 per
 // day", "daily rate" is a day rate for the group ('day': Private tours); a bare "/hour" is an hourly rate ('hourly': Your
 // tours and prices, like a per-unit price; "$30/hour per bike" stays 'unit'); "1450 for 3 days", "3-day", "2 nights" is a
@@ -22511,7 +22593,7 @@ const TOUR_HOUR_RATE_RE = /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b
 const TOUR_RATE_STRIP_RE = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the|[àa] la|[àa] l|de l|pour la|pour une?)\s+)?(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?|hours?|hrs?|hr|h|heures?)\b(?:\s+rate)?|\b(?:daily|nightly|hourly)(?:\s+rate)?\b|\b(?:day|hour) rate\b|\b(?:tarif|taux) (?:journalier|quotidien|horaire)\b|\bhoraire\b/g;
 const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
 const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
-const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|rafts?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?)\b/;
+const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
 function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
   const raw = tourPriceTrim(x);
@@ -22545,7 +22627,7 @@ const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in 
   day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
   length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
 // Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
-const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?)\b/i;
+const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i;
 TOUR_PRICE_WHY_ERRORS.vehicle = 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.';
 function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
   if (x === null) return { value: null };
@@ -22592,6 +22674,27 @@ function tourOpenSeason(venueId) {
 }
 // The lines the answers write, in both languages: { label: { en, fr } | '' (remove the row) }. A label left out is not
 // answered, and its row is left as research has it.
+// Tour test 9 (Whistler, 2026-11-18; Tanis): "Season: All year." sat above her April and November closures. Her yearly
+// breaks of a week or more ("every year" closures; holidays are single days) are named: whole months by name ("April and
+// November", « en avril et en novembre »), other stretches by their dates. -> { en, fr } or null.
+function tourYearlyBreaksText(venueId) {
+  try {
+    const LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const md = (x) => { const [m, d] = String(x).split('-').map(Number); return { m, d }; };
+    const len = (a, b) => { const A = Date.UTC(2001, a.m - 1, a.d), B = Date.UTC(b.m < a.m || (b.m === a.m && b.d < a.d) ? 2002 : 2001, b.m - 1, b.d); return Math.round((B - A) / 86400000) + 1; };
+    const raw = ((venueHoursExtras(venueId) || {}).raw || []).filter((c) => c && hoursModule && hoursModule.isYearlyClosure(c));
+    const breaks = raw.map((c) => ({ a: md(c.from), b: md(c.to || c.from) })).filter((x) => len(x.a, x.b) >= 7)
+      .sort((x, y) => x.a.m - y.a.m || x.a.d - y.a.d);
+    if (!breaks.length) return null;
+    const enM = MONTH_NAMES.en, frM = MONTH_NAMES.fr;
+    const parts = breaks.map(({ a, b }) => (a.m === b.m && a.d === 1 && b.d >= LAST[b.m - 1] - (b.m === 2 ? 1 : 0)
+      ? { en: enM[a.m - 1], fr: `en ${frM[a.m - 1]}` }
+      : { en: `${wineryMd(`${String(a.m).padStart(2, '0')}-${String(a.d).padStart(2, '0')}`, false)} – ${wineryMd(`${String(b.m).padStart(2, '0')}-${String(b.d).padStart(2, '0')}`, false)}`,
+        fr: `du ${wineryMd(`${String(a.m).padStart(2, '0')}-${String(a.d).padStart(2, '0')}`, true)} ${frAuDay(wineryMd(`${String(b.m).padStart(2, '0')}-${String(b.d).padStart(2, '0')}`, true))}` }));
+    const join = (xs, and) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} ${and} ${xs[xs.length - 1]}`);
+    return { en: join(parts.map((x) => x.en), 'and'), fr: join(parts.map((x) => x.fr), 'et') };
+  } catch (e) { return null; }
+}
 function tourRentalsOnly(t) { const ks = t && Array.isArray(t.kinds) ? t.kinds : []; return ks.length > 0 && ks.every((k) => k === 'rentals'); }
 function tourVisitLines(venue, info) {
   const t = info || venueTourInfo(venue.id);
@@ -22600,7 +22703,7 @@ function tourVisitLines(venue, info) {
   // Tour test 1 (Whistler, 2026-11-16): with its break when a yearly closure splits it ("Dec 15 – Mar 31 and Jun 1 – Sep 30.").
   const parts = open ? (openSeasonStretches(venue.id, (venueLinks(venue.id) || {}).open_months) || [open]) : null;
   if (parts) out.Season = { en: `${parts.map((r) => `${wineryMd(r.from, false)} – ${wineryMd(r.to, false)}`).join(' and ')}.`, fr: `${parts.map((r, i) => `${i ? 'du' : 'Du'} ${wineryMd(r.from, true)} ${frAuDay(wineryMd(r.to, true))}`).join(' et ')}.`.replace(/\.\.$/, '.') };
-  else if (t.year === 'all') out.Season = { en: 'All year.', fr: 'Toute l’année.' };
+  else if (t.year === 'all') { const ex = tourYearlyBreaksText(venue.id); out.Season = ex ? { en: `All year except ${ex.en}.`, fr: `Toute l’année sauf ${ex.fr}.` } : { en: 'All year.', fr: 'Toute l’année.' }; }
   if (TOUR_LENGTHS.includes(t.length)) out['Time needed'] = { en: TOUR_LENGTH_LINES[t.length][0], fr: TOUR_LENGTH_LINES[t.length][1] };
   const price = typeof t.price === 'number' && t.price > 0 ? t.price : null, priv = typeof t.private === 'number' && t.private > 0 ? t.private : null;
   // Tour test 4: "Free." or "Free (pay what you want).", then the private price if any.
@@ -22726,6 +22829,8 @@ function tourPlannerFacts(venueId) {
     ...(tourListInfo(venueId).mins.some((m) => m >= 1440) ? { tourMultiDay: true } : {}),
     // Tour test 4: the kinds the operator picked ('food', 'walking'…), so "food tour" and "walking tour" find it.
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
+    // Tour test 9: the months her list's water trips run (a summer-only canoe is never planned in January).
+    ...(() => { const w = tourWaterMonths(venueId); return w ? { tourWaterMonths: w } : {}; })(),
   };
 }
 // Tour test 4 (Whistler, 2026-11-17): the live tours as the planner's kind check reads them (the operator's own kinds,
@@ -29083,7 +29188,7 @@ const TOUR_ACTIVITIES = [
   { slug: 'farm', label: 'Farms & Food', pattern: /farm|u-pick|orchard|food tour|petting|goat|fruit|mushroom|flower/i, banner: { src: '/images/tours/activity-farm.jpg', alt: 'A woman and a girl picking apples in an orchard', pos: 35 }, heading: 'Farms & Food Experiences in the Okanagan', intro: 'U-pick orchards, farm visits, food tours and foraging — a taste of the valley straight from where it grows.' },
   { slug: 'adventure', label: 'Adventure', pattern: /canyon|helicopter|heli|zipline|zip tour|atv|utv|4x4|skydiv|paraglid|balloon|climb|kart|riding|stables|horse|adventure park/i, banner: { src: '/images/tours/activity-adventure.jpg', alt: 'A woman flying along a zipline through the forest', pos: 40 }, heading: 'Adventure Experiences in the Okanagan', intro: 'Ziplines, heli flights, canyoning, paragliding, ATV tours, horseback rides and more — for when you want your heart racing.' },
   { slug: 'winter', label: 'Winter', pattern: /snowshoe|sleigh|catski|snowcat|snowmobile|dog sled|ice[- ]fishing|winter ebike|winter e-bike/i, banner: { src: '/images/tours/activity-winter.jpg', alt: 'A team of huskies racing through the snow', pos: 45 }, heading: 'Winter Experiences in the Okanagan', intro: 'Dog sledding, sleigh rides, snowmobile and snowcat tours, snowshoeing and ice fishing — the best of the valley’s snowy season.' },
-  { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
+  { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling|indigenous|first nations|cultural tour/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
 ];
 // Rule order matters: winter first (a winter e-bike tour is a winter tour).
 const TOUR_ACTIVITY_ORDER = ['winter', 'wine', 'lake', 'bike', 'farm', 'adventure', 'culture'];
@@ -29098,7 +29203,7 @@ const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
 // and words (tourActivityOf), and ALSO under a filter when its operator picked a kind of that filter in the setup (a
 // fishing charter whose name says nothing about boats is under Lake & Boats). No new filter, page or sitemap entry.
 const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle: 'lake', fishing: 'lake', raft: 'lake', bike: 'bike', farm: 'farm', food: 'farm',
-  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture' };
+  zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', walking: 'culture', cultural: 'culture' };
 // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
@@ -39317,6 +39422,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
       // the "Updated by the business" line.
       if (!venueIsClaimed(venue.id)) return '';
+      // Tour test 9 (Whistler, 2026-11-18; Tanis): research's description ("native war canoe… tribal culture") stayed on the
+      // page under "Verified by the business" while her own story waited for our check. No pill until the story shown is
+      // hers (or no rewrite is waiting).
+      try { if (typeof ownerLinkPending(venue.id, 'description') === 'string' && !ownerDescriptionWasHers(venue)) return ''; } catch (e) { /* keep the pill */ }
       const last = ownerLastUpdatedAt(venue.id);
       const date = last ? ownerUpdatedDate(last, fr) : '';
       return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the business', 'V\u00e9rifi\u00e9 par l\u2019entreprise')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
@@ -48670,7 +48779,9 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const parked = (cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).filter((r) => r && r.owned);
   for (const slot of SLOTS) {
     if (!rows.some((r) => slot.labels.includes(r.label))) { const pk = parked.find((r) => slot.labels.includes(r.label)); if (pk) rows.push({ label: pk.label, text: pk.text }); }
-    const next = typeof (value || {})[slot.key] === 'string' ? value[slot.key] : '';
+    // Tour test 9: a line this save doesn't name is left exactly as it is (a save holds only the lines it changed).
+    if (!value || !(slot.key in value)) continue;
+    const next = typeof value[slot.key] === 'string' ? value[slot.key] : '';
     let i = visitSlotRowIndex(slot, rows, owned);
     // A "good to know" line of hers (not about groups) takes research's Good to know line's place, never a second one.
     if (i < 0 && next && visitGroupsSlot(slot) && visitSlotNewLabel(slot, next) === 'Good to know') i = rows.findIndex((r) => r.label === 'Good to know');
@@ -50189,7 +50300,12 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         const row = vrows[visitSlotRowIndex(slot, vrows, ownedNow)];
         return !!row && !ownedNow.has(row.label);
       });
-      if (!errors.visit_rows && (OWNER_VISIT_KEYS.some((k) => next[k] !== cur[k]) || confirm.length || frChanged)) changes.visit_rows = confirm.length ? { ...next, _confirm: confirm } : next;
+      // Tour test 9 (Whistler, 2026-11-18; Tanis): the save holds only the lines this save changed or confirmed (and her
+      // French lines when they changed). It held every line, so saving Known for re-sent research's Good to know ("Bring a
+      // swimsuit. Drinks at the bar…") as part of her answer, and the review showed it as hers.
+      const sentKeys = OWNER_VISIT_KEYS.filter((k) => (next[k] || '') !== (cur[k] || '') || confirm.includes(k));
+      const sent = { ...Object.fromEntries(sentKeys.map((k) => [k, next[k] || ''])), ...(frChanged ? { _fr: next._fr } : {}) };
+      if (!errors.visit_rows && (sentKeys.length || frChanged)) changes.visit_rows = confirm.length ? { ...sent, _confirm: confirm } : sent;
     }
   }
   if ('price_range' in input) {
@@ -50749,6 +50865,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
       }
       all = { ...before, ...review };
       if (before.badges && review.badges) all.badges = { ...before.badges, ...review.badges };
+      // Tour test 9: Plan your visit lines held for review add up the same way (each save holds only its own lines).
+      if (before.visit_rows && review.visit_rows && typeof before.visit_rows === 'object' && typeof review.visit_rows === 'object') all.visit_rows = { ...before.visit_rows, ...review.visit_rows };
       prev = { ...beforePrev, ...reviewPrev };
       if (beforePrev.badges && reviewPrev.badges) prev.badges = { ...beforePrev.badges, ...reviewPrev.badges };
       allNote = [waiting.note, Object.keys(review).length ? note : null].filter(Boolean).join('\n\n').slice(0, 2000) || null;
@@ -55145,6 +55263,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
   });
   render();
+  // Tour test 9 (Whistler, 2026-11-18): the setup's "Type them in myself" opens this screen at #type: typing starts at once
+  // (only from the start screen, where that button is).
+  try { if (location.hash === '#type') { var tyb = app.querySelector('[data-act="type"]'); if (tyb) tyb.click(); } } catch (e) { /* no page address */ }
 })();`;
 
 // The site header in French for the French menu screen (2026-10-18): the same translation French twin pages use
@@ -55931,7 +56052,7 @@ function renderOwnerSetupPage(found, opts) {
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '',
     // Tour test 8: the French description is still research's ('old' once her English story is hers), every type.
-    frDesc: fr ? '' : ownerFrDescState(venue), storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
     // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs
@@ -55979,6 +56100,8 @@ function renderOwnerSetupPage(found, opts) {
     // "Nothing changed" answers (by a few words, so the page never carries review wording).
     nothing: ['Nothing has changed yet', 'nothing new to send'],
     menuBase: `${opts.base}/menu`,
+    // Tour test 9: the French story screen's English line (for an owner who doesn't read French).
+    frDescEn: fr ? { lead: OWNER_SETUP_STRINGS.en.frDescEnLead, leave: OWNER_SETUP_STRINGS.en.frDescLeave } : null,
     badgeChip: portalCompleteness.badgeChipHtml(fr), t,
     // Owner stats (pub test 9, 2026-11-10): the short "your page in the last 30 days" box on the finish screen.
     statsHtml: (() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { short: true, id: 'suStats', listKind: venue.type === 'tour' ? 'tours' : isPriceList(venue) ? 'prices' : '' }); } catch (e) { return ''; } })(),
@@ -56021,7 +56144,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS, SETUP_SEASON_HELP_TOPIC] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC], [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), SETUP_SEASON_HELP_TOPIC] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC], [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC].map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -56114,6 +56237,12 @@ function setupClosuresHelpTopic(type) {
   return { ...base, pages: ['setup'],
     a: `<p>Right here in setup: <strong>${en.step}</strong> (tap <strong>${en.change}</strong> if it’s done).${en.screen ? ` After your hours comes <strong>${en.screen}</strong>.` : ''} Tap each holiday you’re closed, or <strong>${en.add}</strong> for any other day or stretch, then save. It’s on your page right away, and your page says Closed on those days.</p><p>${en.early}</p>`,
     aFr: `<p>Ici même, dans la configuration : <strong>${fr.step}</strong> (touchez <strong>${fr.change}</strong> si c’est fait).${fr.screen ? ` Après vos heures vient <strong>${fr.screen}</strong>.` : ''} Touchez chaque jour férié où vous êtes fermé, ou <strong>${fr.add}</strong> pour une autre journée ou période, puis enregistrez. C’est sur votre page tout de suite, et votre page indique Fermé ces jours-là.</p><p>${fr.early}</p>` };
+}
+// Tour test 9: the closure screen's own words in a tour topic (filled in once the setup words are loaded).
+function tourYearlyBreakWords(t) {
+  if (!t || t.id !== 'tour-yearly-break') return t;
+  const en = setupClosureWords('tour', 'en'), fr = setupClosureWords('tour', 'fr');
+  return { ...t, a: t.a.replace('__STEP__', en.step).replace('__ADD__', en.add), aFr: t.aFr.replace('__STEPFR__', fr.step).replace('__ADDFR__', fr.add) };
 }
 // Tour test 8 (Whistler, 2026-11-17; Linda): "I put the wrong date for when we are closed, how do I change it" got the
 // events answer (Change and Cancel on a sent event). Every setup type: the closure screen's ✕ and its add button.
@@ -56221,6 +56350,58 @@ const HELP_PHONE_EXAMPLE = '250-555-0123';
 const TOUR_HELP_SEASONAL_TRIP = { en: 'Snowshoe tours (December to March): from $95', fr: 'Sorties en raquettes (de décembre à mars) : à partir de 95 $' };
 const TOUR_SETUP_HELP_TOPICS = [
   SETUP_NO_WEBSITE_HELP_TOPIC,
+  // Tour test 9 (Whistler, 2026-11-18; Tanis, an Indigenous-owned cultural tour business near Mount Currie and Pemberton,
+  // Android). Help missed or half-answered 13 of 20: no kind for a cultural walk (the untick answer), "snowcat" on her page
+  // (untick would take the snowshoe off too), Indigenous-owned (the badges answer), photos of Elders on Instagram, her town,
+  // yearly breaks, a class of 30, how her culture is described, the old French description, typing her tours herself.
+  { id: 'tour-kinds-cultural', pages: ['setup', 'edit'], over: ['tour-kinds-pick', 'tour-kinds-other', 'tour-category-word', 'tour-kinds-guide', 'tour-kinds-kennel', 'cuisine', 'features', 'description', 'story', 'tour-story-fix'],
+    q: 'Which kind for a cultural or Indigenous tour?', qFr: 'Quel genre pour une visite culturelle ou autochtone?',
+    keys: ['indigenous', 'indigenous tour', 'indigenous tours', 'indigenous or cultural', 'cultural tour', 'cultural tours', 'cultural walk', 'cultural walks', 'cultural experience', 'first nations', 'first nation', 'elders', 'elder', 'storytelling', 'our culture', 'culture is not history', 'not history', 'it is living', 'living culture', 'add indigenous', 'add cultural', 'which kind for a cultural', 'cultural'],
+    keysFr: ['autochtone', 'autochtones', 'visite autochtone', 'visite culturelle', 'visites culturelles', 'culturelle', 'culturel', 'premieres nations', 'premiere nation', 'aines', 'contes', 'recits', 'notre culture', 'pas de l histoire', 'culture vivante', 'quel genre pour une visite culturelle'],
+    a: '<p>In <strong>What you offer</strong>, tick <strong>Indigenous and cultural tours</strong> (under <strong>More kinds</strong> if it isn’t in the first row). Your page says “Indigenous cultural tours” when your story or category says Indigenous or First Nations, and “Cultural tours” otherwise.</p><p>Picked <strong>Walking or history tours</strong> before? Untick it if it isn’t what you do and tap <strong>Save these</strong>. Up to 3 kinds: a cultural walk, a canoe trip and a snowshoe walk is fine.</p>',
+    aFr: '<p>Dans <strong>Ce que vous offrez</strong>, cochez <strong>Visites autochtones et culturelles</strong> (sous <strong>Autres genres</strong> si ce n’est pas dans la première rangée). Votre page indique « Visites culturelles autochtones » quand votre histoire ou votre catégorie dit autochtone ou Premières Nations, et « Visites culturelles » sinon.</p><p>Vous aviez choisi <strong>Visites à pied ou historiques</strong>? Décochez-le si ce n’est pas ce que vous faites et touchez <strong>Enregistrer</strong>. Jusqu’à 3 genres : une marche culturelle, une sortie en canot et une marche en raquettes, c’est correct.</p>' },
+  { id: 'tour-kind-one-side', pages: ['setup', 'edit'], over: ['tour-category-word', 'tour-kinds-pick', 'tour-kinds-other', 'tour-story-fix', 'cuisine', 'description', 'story'],
+    q: 'My page names more than we do (like snowcat or ski touring)', qFr: 'Ma page nomme plus que ce que nous faisons (comme la chenillette ou le ski de randonnée)',
+    keys: ['snowcat', 'take snowcat off', 'says snowcat', 'snowcat and ski touring', 'ski touring', 'we only do a snowshoe', 'only do a snowshoe walk', 'only snowshoe', 'just snowshoeing', 'only one of them', 'only part of it', 'part of the kind', 'we only do one'],
+    keysFr: ['chenillette', 'enlever la chenillette', 'ski de randonnee', 'seulement la raquette', 'seulement une marche en raquettes', 'juste la raquette', 'seulement une partie'],
+    a: '<p>Keep the kind ticked: unticking it would take off what you do too. Your page shows only the parts of a kind that your own words name. Say what you do in your story or in <strong>Known for</strong>, like <em>Snowshoe storytelling walk on winter weekends</em>: once it’s on your page, your page says just that (“Snowshoeing”), not snowcat or ski touring.</p><p>Still there after that? Tap <strong>Message us</strong> and we’ll take it off.</p>',
+    aFr: '<p>Gardez ce genre coché : le décocher enlèverait aussi ce que vous faites. Votre page ne montre que les parties d’un genre que vos propres mots nomment. Dites ce que vous faites dans votre histoire ou dans <strong>Connu pour</strong>, comme <em>Marche contée en raquettes les fins de semaine d’hiver</em> : une fois sur votre page, elle n’indique que cela (« Raquette »), pas la chenillette ni le ski de randonnée.</p><p>Toujours là après? Touchez <strong>Écrivez-nous</strong> et nous l’enlèverons.</p>' },
+  { id: 'tour-indigenous-owned', pages: ['setup', 'edit'], over: ['features', 'badges', 'badge-wrong', 'tour-kinds-cultural', 'tour-certs', 'description', 'story', 'tour-story-fix', 'local-owned'],
+    q: 'Show that we’re Indigenous-owned', qFr: 'Montrer que nous sommes une entreprise autochtone',
+    keys: ['indigenous owned', 'indigenous-owned', 'show we are indigenous', 'show we re indigenous', 'show that we are indigenous', 'first nations owned', 'nation owned', 'owned by the nation', 'locally owned is not', 'not quite the same', 'indigenous business', 'indigenous badge'],
+    keysFr: ['entreprise autochtone', 'appartenant a des autochtones', 'propriete autochtone', 'detenue par des autochtones', 'montrer que nous sommes autochtones', 'appartenant a la nation', 'badge autochtone'],
+    a: '<p>Say it in your own words in your story, on <strong>Your story and Known for</strong>, like <em>Indigenous-owned and guided by members of our Nation.</em> A short line in <strong>Known for</strong> shows at the top of “Plan your visit” and on your card. There’s no separate badge for it: your own words say it best.</p><p>Tick <strong>Indigenous and cultural tours</strong> in <strong>What you offer</strong> too: with Indigenous in your story, your page says “Indigenous cultural tours”.</p>',
+    aFr: '<p>Dites-le dans vos mots, dans votre histoire, à <strong>Votre histoire et Connu pour</strong>, comme <em>Entreprise autochtone, guidée par des membres de notre Nation.</em> Une courte ligne dans <strong>Connu pour</strong> paraît en haut de « Planifiez votre visite » et sur votre fiche. Il n’y a pas de badge à part : vos propres mots le disent le mieux.</p><p>Cochez aussi <strong>Visites autochtones et culturelles</strong> dans <strong>Ce que vous offrez</strong> : avec « autochtone » dans votre histoire, votre page indique « Visites culturelles autochtones ».</p>' },
+  { id: 'tour-culture-story', pages: ['setup', 'edit'], over: ['tour-story-fix', 'description', 'story', 'tour-category-word', 'setup-change-later', 'tour-kinds-pick', 'tour-kinds-cultural'],
+    q: 'Change how our culture is described', qFr: 'Changer la façon dont notre culture est décrite',
+    keys: ['how our culture is described', 'culture is described', 'describe our culture', 'describes our culture', 'calls it', 'the listing calls it', 'listing calls it', 'war canoe', 'tribal', 'that is not right', 'not right', 'change how', 'the way we are described', 'how we are described'],
+    keysFr: ['decrit notre culture', 'notre culture est decrite', 'decrire notre culture', 'la fiche dit', 'canot de guerre', 'tribal', 'tribale', 'ce n est pas juste', 'pas correct', 'la facon dont nous sommes decrits'],
+    a: '<p>Your story is yours to write. On <strong>Your story and Known for</strong>, tap <strong>Clear it and write my own</strong> and tell visitors about your culture and your tours in your own words. Tap Save: your story replaces the words we found online after we check it, usually within a day. Your <strong>Known for</strong> line is on your page right away.</p><p>Your French page has its own story: the link under your story opens it.</p>',
+    aFr: '<p>Votre histoire, c’est à vous de l’écrire. À <strong>Votre histoire et Connu pour</strong>, touchez <strong>L’effacer et écrire le mien</strong> et parlez de votre culture et de vos sorties dans vos mots. Touchez Enregistrer : votre histoire remplace les mots trouvés en ligne après notre vérification, habituellement en moins d’une journée. Votre ligne <strong>Connu pour</strong> paraît sur votre page tout de suite.</p><p>Votre page en anglais a sa propre histoire : écrivez-la aussi dans la configuration en anglais.</p>' },
+  { id: 'photos-where', pages: ['setup', 'edit'], over: ['photo-add', 'photo-pending', 'photos-when', 'photo-main', 'photo-order', 'photo-remove'],
+    q: 'Where are our photos used?', qFr: 'Où nos photos sont-elles utilisées?',
+    keys: ['where they go', 'where do they go', 'where do our photos go', 'where are our photos used', 'use them on instagram', 'on instagram', 'on facebook', 'other places', 'will you use them', 'will you use our photos', 'social media', 'elders', 'community members', 'ceremonies', 'consent', 'permission', 'page only', 'only on my page', 'keep a photo off', 'not on instagram', 'don t post', 'dont post'],
+    keysFr: ['ou vont nos photos', 'ou vont elles', 'sur instagram', 'sur facebook', 'reseaux sociaux', 'allez vous les utiliser', 'utiliser nos photos', 'aines', 'membres de la communaute', 'ceremonies', 'consentement', 'permission', 'seulement sur ma page', 'pas sur instagram', 'ne pas publier'],
+    a: '<p>Your photos show on your page here. We may also share one on our Instagram or Facebook, always credited and tagged to you.</p><p>Want a photo kept to your page only (like Elders, community members or a ceremony)? Tap <strong>Message us</strong> and tell us which one: it stays on your page and nowhere else. And only add photos you’re happy to share.</p>',
+    aFr: '<p>Vos photos paraissent sur votre page ici. Il se peut aussi que nous en partagions une sur notre Instagram ou notre Facebook, toujours avec votre nom et une identification.</p><p>Vous voulez qu’une photo reste seulement sur votre page (des aînés, des membres de la communauté, une cérémonie)? Touchez <strong>Écrivez-nous</strong> et dites-nous laquelle : elle reste sur votre page et nulle part ailleurs. Et n’ajoutez que des photos que vous êtes à l’aise de partager.</p>' },
+  { id: 'setup-town', pages: ['setup', 'edit'], over: ['address', 'tour-meeting', 'basics', 'setup-change-later', 'tour-meeting-varies'],
+    q: 'Our town is wrong', qFr: 'Notre ville n’est pas la bonne',
+    keys: ['it says whistler', 'wrong town', 'our town', 'change the town', 'change our town', 'the town is wrong', 'we are in', 'we re in', 'not in whistler', 'not in kelowna', 'wrong place', 'it says kelowna', 'it says penticton', 'it says vernon', 'listed in the wrong town', 'move us to'],
+    keysFr: ['mauvaise ville', 'notre ville', 'changer la ville', 'la ville est fausse', 'nous sommes a', 'nous sommes plutot a', 'pas a whistler', 'pas a kelowna', 'ca dit whistler', 'ca dit kelowna', 'mauvais endroit'],
+    a: '<p>Tap <strong>Message us</strong> and tell us the town you’re in: we move your page there, usually within a day. Your address in <strong>Basics</strong> stays as it is.</p>',
+    aFr: '<p>Touchez <strong>Écrivez-nous</strong> et dites-nous dans quelle ville vous êtes : nous y déplaçons votre page, habituellement en moins d’une journée. Votre adresse dans <strong>L’essentiel</strong> reste la même.</p>' },
+  { id: 'tour-yearly-break', pages: ['setup', 'edit'], over: ['setup-season', 'tour-season', 'seasonal-hours', 'closures', 'hours', 'tour-one-trip-season', 'setup-closure-fix'],
+    q: 'We close for a break every year (like April and November)', qFr: 'Nous fermons pour une pause chaque année (comme en avril et en novembre)',
+    keys: ['take a break', 'a break in', 'break in april', 'break in november', 'closed in april', 'closed in november', 'close in april', 'close in november', 'every april', 'every november', 'most of the year', 'run most of the year', 'is that all year', 'yearly break', 'yearly breaks', 'yearly closure', 'every year we close', 'shoulder season', 'off season break', 'two breaks'],
+    keysFr: ['une pause en', 'pause en avril', 'pause en novembre', 'ferme en avril', 'ferme en novembre', 'fermes en avril', 'fermes en novembre', 'chaque avril', 'chaque novembre', 'la plupart de l annee', 'est ce toute l annee', 'pause annuelle', 'fermeture annuelle', 'deux pauses'],
+    a: '<p>Yes, that’s all year: keep <strong>Yes, all year</strong>. Then add each break as a closure on <strong>__STEP__</strong>: tap <strong>__ADD__</strong>, pick the first day and how long, and tick <strong>Every year</strong> (like April 1 to 30, then November 1 to 30). Your page says “All year except April and November”, and Closed during the breaks.</p>',
+    aFr: '<p>Oui, c’est toute l’année : gardez <strong>Oui, toute l’année</strong>. Ajoutez ensuite chaque pause comme une fermeture à <strong>__STEPFR__</strong> : touchez <strong>__ADDFR__</strong>, choisissez le premier jour et la durée, et cochez <strong>Chaque année</strong> (comme du 1er au 30 avril, puis du 1er au 30 novembre). Votre page indique « Toute l’année sauf en avril et en novembre », et Fermé pendant les pauses.</p>' },
+  { id: 'fr-desc-old', pages: ['setup', 'edit'], over: ['french', 'tour-languages', 'description', 'story', 'tour-story-fix', 'tour-category-word', 'tour-culture-story'],
+    q: 'I don’t speak French: our French description', qFr: 'Je ne parle pas français : notre description en français',
+    keys: ['dont speak french', 'don t speak french', 'do not speak french', 'i don t read french', 'i dont read french', 'not a french speaker', 'the french one', 'french one still says', 'french description', 'french version', 'translate mine', 'translate it', 'remove it or translate', 'just remove it', 'french page says', 'french still says'],
+    keysFr: ['je ne parle pas francais', 'la version francaise', 'description en francais', 'la description francaise', 'traduire la mienne', 'la traduire', 'l enlever', 'la francaise dit encore'],
+    a: '<p>No French needed. Tap <strong>update it?</strong> under your story: it opens the French story box. Paste your English story there and save, or tap <strong>Leave it to us</strong> and the French one stays as it is for now.</p><p>Something wrong in the French one? Tap <strong>Message us</strong> and tell us what: we fix it.</p>',
+    aFr: '<p>Pas besoin de parler français. Touchez <strong>la mettre à jour?</strong> sous votre histoire : la case de l’histoire en français s’ouvre. Collez-y votre histoire en anglais et enregistrez, ou touchez <strong>Leave it to us</strong> et la version française reste telle quelle pour l’instant.</p><p>Quelque chose cloche dans la version française? Touchez <strong>Écrivez-nous</strong> et dites-nous quoi : nous la corrigeons.</p>' },
   // Tour test 8 (Whistler, 2026-11-17; Linda, a dog-sledding and summer kennel-visit business, iPhone SE with large text).
   // Help missed or misrouted 9 of 22: "the dogs are OUR dogs, the sled dogs" got "tick Dogs can come along"; kennel visits
   // and "we don't do u-pick" got the untick-a-kind answer; a kids' price "put the lowest one" (her card would say From $20);
@@ -56262,8 +56443,8 @@ const TOUR_SETUP_HELP_TOPICS = [
   // Each of these now has its own short answer (tests/tour-help-routing.test.js asks every question from tests 1-5).
   { id: 'tour-per-boat', pages: ['setup', 'edit'], over: ['tour-price', 'tour-private-price', 'tour-free', 'tour-free-trip', 'tour-groups', 'tour-two-prices', 'price-range', 'cost', 'avg-spend', 'tour-booking-only'], noRelated: ['price-range', 'avg-spend', 'cost'],
     q: 'Priced per day, per group or per boat?', qFr: 'Un prix par jour, par groupe ou par bateau?',
-    keys: ['per day', 'a day for up to', 'day rate', 'daily rate', 'prices are per day', 'price is per day', 'per day not per person', 'a day for up to', 'per guiding day', 'guiding day', 'per night', 'full day rate', 'private guiding is', 'per boat', 'a boat', 'whole boat', 'the whole boat', 'for the whole boat', 'its for the whole boat', 'boat price', 'price per boat', 'priced per boat', 'per charter', 'per group', 'for the group', 'whole group', 'for the whole group', 'priced per group', 'price per group', 'not per person', 'isnt per person', 'not a person', 'not by the person', 'per raft', 'whole raft', 'per helicopter', 'per jeep', 'for the boat'],
-    keysFr: ['par jour', 'tarif journalier', 'tarif a la journee', 'a la journee', 'par journee', 'prix par jour', 'journee de guide', 'par nuit', 'par bateau', 'tout le bateau', 'pour tout le bateau', 'le bateau au complet', 'prix du bateau', 'par groupe', 'pour tout le groupe', 'tout le groupe', 'pour le groupe', 'pas par personne', 'par embarcation', 'tout le raft', 'par helicoptere'],
+    keys: ['per day', 'a day for up to', 'day rate', 'daily rate', 'prices are per day', 'price is per day', 'per day not per person', 'a day for up to', 'per guiding day', 'guiding day', 'per night', 'full day rate', 'private guiding is', 'per boat', 'a boat', 'whole boat', 'the whole boat', 'for the whole boat', 'its for the whole boat', 'boat price', 'price per boat', 'priced per boat', 'per charter', 'per group', 'for the group', 'whole group', 'for the whole group', 'priced per group', 'price per group', 'not per person', 'isnt per person', 'not a person', 'not by the person', 'per raft', 'whole raft', 'per helicopter', 'per jeep', 'for the boat', 'per class', 'whole class', 'for the whole class', 'not per student', 'per school group'],
+    keysFr: ['par jour', 'tarif journalier', 'tarif a la journee', 'a la journee', 'par journee', 'prix par jour', 'journee de guide', 'par nuit', 'par bateau', 'tout le bateau', 'pour tout le bateau', 'le bateau au complet', 'prix du bateau', 'par groupe', 'pour tout le groupe', 'tout le groupe', 'pour le groupe', 'pas par personne', 'par embarcation', 'tout le raft', 'par helicoptere', 'par classe', 'toute la classe', 'pas par eleve'],
     // Tour test 7 (Whistler, 2026-11-17; Erik, a mountain guide): a day rate for the group is this answer too, in group
     // words (it spoke of boats).
     a: '<p>A price for the <strong>whole group</strong> (a guiding day, a charter, the whole boat) goes in <strong>Private tours</strong>, the box under Price. A day rate is fine there: type just the number, like 750, and your page says “Private tours from $750”.</p><p><strong>Price</strong> is per person, because your card says “From $95 <strong>a person</strong>”. Put your lowest trip for one person (a seat on a shared trip or a course). Only run private days? Leave Price empty: your card then shows the private price.</p><p>Say “a day, up to 4 people” and every other trip and extra in <strong>Your tours and prices</strong>.</p>',
@@ -56322,10 +56503,10 @@ const TOUR_SETUP_HELP_TOPICS = [
     aFr: '<p>Inscrivez chaque cours avec ses dates dans <strong>Vos sorties et tarifs</strong>, comme <em>AST 1 : 10-11 janv., 7-8 févr. · 395 $</em>. Une photo de votre calendrier de cours ou un lien vers celui-ci suffit.</p><p>N’ajoutez pas les jours de cours sous Jours fériés et fermetures : votre page dirait « Fermé » ces jours-là.</p>' },
   { id: 'tour-meeting-varies', pages: ['setup', 'edit'], over: ['tour-meeting', 'address', 'arrival', 'tour-one-trip-season', 'tour-weather'],
     q: 'We meet at different places for different trips', qFr: 'Le point de rencontre change selon la sortie',
-    keys: ['different trailheads', 'meet at different', 'different meeting', 'different meeting spots', 'different meeting places', 'meeting place varies', 'meeting spot varies', 'varies by trip', 'depends on the trip', 'depending on conditions', 'depends on conditions', 'which address do i put', 'which address', 'several trailheads', 'many trailheads', 'different spots', 'changes every trip', 'meet somewhere different'],
+    keys: ['different trailheads', 'meet at different', 'different meeting', 'different meeting spots', 'different meeting places', 'meeting place varies', 'meeting spot varies', 'varies by trip', 'depends on the trip', 'depending on conditions', 'depends on conditions', 'which address do i put', 'which address', 'several trailheads', 'many trailheads', 'different spots', 'changes every trip', 'meet somewhere different', 'meet us in two places', 'two places', 'the walk starts at', 'canoe goes from', 'people meet us in'],
     keysFr: ['differents departs de sentier', 'differents points de rencontre', 'le point de rencontre change', 'lieu de rencontre change', 'selon la sortie', 'selon les conditions', 'quelle adresse', 'quelle adresse mettre', 'plusieurs departs de sentier', 'plusieurs points de rencontre'],
-    a: '<p>Keep your office (or your usual spot) as your address in <strong>Basics</strong>: that’s where people find you first.</p><p>Name the meeting places under <strong>Good to know</strong>, like <em>Courses meet at our Pemberton office; ski tours meet at a trailhead we send you the day before.</em> Or give each trip its meeting place in <strong>Your tours and prices</strong>.</p>',
-    aFr: '<p>Gardez votre bureau (ou votre endroit habituel) comme adresse dans <strong>L’essentiel</strong> : c’est là qu’on vous trouve d’abord.</p><p>Nommez les points de rencontre sous <strong>Bon à savoir</strong>, comme <em>Les cours ont lieu à notre bureau; pour le ski de randonnée, le départ du sentier vous est envoyé la veille.</em> Ou indiquez le point de rencontre de chaque sortie dans <strong>Vos sorties et tarifs</strong>.</p>' },
+    a: '<p>Keep your office (or your usual spot) as your address in <strong>Basics</strong>: that’s where people find you first.</p><p>Name the meeting places under <strong>Good to know</strong>, like <em>Courses meet at our Pemberton office; ski tours meet at a trailhead we send you the day before.</em> Or give each trip its meeting place in <strong>Your tours and prices</strong>.</p><p>People meet you somewhere other than the office? Next time you’re at that spot, use <strong>Where do people meet you?</strong> in “More about your tours”: one photo on the spot, and the map walks people right to it.</p>',
+    aFr: '<p>Gardez votre bureau (ou votre endroit habituel) comme adresse dans <strong>L’essentiel</strong> : c’est là qu’on vous trouve d’abord.</p><p>Nommez les points de rencontre sous <strong>Bon à savoir</strong>, comme <em>Les cours ont lieu à notre bureau; pour le ski de randonnée, le départ du sentier vous est envoyé la veille.</em> Ou indiquez le point de rencontre de chaque sortie dans <strong>Vos sorties et tarifs</strong>.</p><p>On vous rejoint ailleurs qu’au bureau? La prochaine fois que vous êtes à cet endroit, utilisez <strong>Où vous rejoint-on?</strong> dans « Plus de détails sur votre entreprise » : une photo sur place, et la carte y mène les gens.</p>' },
   { id: 'tour-category-word', pages: ['setup', 'edit'], over: ['tour-kinds-pick', 'tour-kinds-other', 'tour-kinds-guide', 'cuisine', 'description', 'setup-change-later'],
     q: 'A wrong word is in my category', qFr: 'Un mauvais mot est dans ma catégorie',
     keys: ['my category', 'category says', 'my category says', 'wrong category', 'wrong word', 'remove a word', 'remove a wrong word', 'take a word off', 'get it off my page', 'off my page', 'i do not do', 'i don t do', 'i dont do', 'we don t do', 'we dont do', 'we do not do', 'i unticked it', 'unticked it', 'untick', 'unticked', 'still says', 'still shows', 'take off', 'get rid of'],
@@ -56402,7 +56583,7 @@ const TOUR_SETUP_HELP_TOPICS = [
     // Tour test 8: "under 4 are free on the kennel visit" got the site-is-free answer; a kids' PRICE has its own answer now.
     q: 'Strollers, and kids who come free', qFr: 'Les poussettes, et les enfants qui viennent gratuitement',
     keys: ['stroller', 'strollers', 'bring strollers', 'pram', 'prams', 'buggy', 'baby carrier', 'babies', 'baby', 'toddler', 'toddlers', 'kids are free', 'kids free', 'kids come free', 'children are free', 'children free', 'kids go free', 'under 12 free', 'free for kids', 'free for children', 'are free on', 'under 4 are free', 'under 4 free', 'under 3 free', 'under 5 free', 'under 6 free', 'kids under 4 free', 'kids under 3 free', 'kids under 5 free', 'kids under 6 free', 'babies are free', 'babies free', 'babies come free', 'toddlers free', 'little ones free'],
-    keysFr: ['poussette', 'poussettes', 'porte bebe', 'bebe', 'bebes', 'tout petits', 'enfants gratuits', 'gratuit pour les enfants', 'les enfants ne paient pas', 'enfants viennent gratuitement', 'gratuit pour les moins de', 'moins de 4 ans', 'moins de 3 ans', 'moins de 5 ans', 'gratuits pour les moins de', 'sont gratuits', 'bebes gratuits', 'gratuit pour les bebes'],
+    keysFr: ['poussette', 'poussettes', 'porte bebe', 'bebe', 'bebes', 'tout petits', 'enfants gratuits', 'gratuit pour les enfants', 'les enfants ne paient pas', 'enfants viennent gratuitement', 'gratuit pour les moins de', 'moins de 4 ans', 'moins de 3 ans', 'moins de 5 ans', 'gratuits pour les moins de', 'sont gratuits', 'bebes gratuits', 'gratuit pour les bebes', 'viennent gratuitement', 'enfants de moins de 12 ans viennent', 'aines et les enfants', 'est ce que j ecris gratuit'],
     a: '<p>Say it in one line under <strong>Good to know</strong> (in “More about your tours”), like <em>Strollers are fine on the history walk. Kids under 12 come free.</em> It shows in “Plan your visit” on your page.</p><p>A kids’ price also fits on each trip’s line in <strong>Your tours and prices</strong>. The age that can come is on <strong>Who can come</strong>.</p>',
     aFr: '<p>Dites-le en une ligne sous <strong>Bon à savoir</strong> (dans « Plus de détails sur votre entreprise »), comme <em>Les poussettes passent bien à la marche historique. Gratuit pour les moins de 12 ans.</em> Elle paraît dans « Planifiez votre visite » sur votre page.</p><p>Le prix pour enfants se met aussi sur la ligne de chaque sortie dans <strong>Vos sorties et tarifs</strong>. L’âge minimum est dans <strong>Qui peut venir</strong>.</p>' },
   // Allergies and dietary needs on a food tour (it got the restaurant's Plan your visit answer).
@@ -56519,10 +56700,10 @@ const TOUR_SETUP_HELP_TOPICS = [
     a: '<p>Say it in your story, in <strong>Your story and Known for</strong>, like <em>Gift certificates make a great present: buy them on our website.</em> There’s no separate box for gift cards or certificates, to keep it short.</p>',
     aFr: '<p>Dites-le dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Nos certificats-cadeaux font un beau présent : achetez-les sur notre site Web.</em> Il n’y a pas de case à part pour les cartes-cadeaux ou les certificats-cadeaux, pour rester court.</p>' },
   { id: 'tour-groups', pages: ['setup', 'edit'], over: ['booking-link'], q: 'Groups and private bookings', qFr: 'Groupes et réservations privées',
-    keys: ['groups', 'group', 'big groups', 'group booking', 'private booking', 'private bookings', 'corporate', 'team building', 'school groups', 'weddings', 'bachelor', 'bachelorette', 'stag', 'buyout', 'whole boat', 'charter the boat', 'private walk', 'private walks', 'company walk', 'company walks', 'private and company', 'company outing', 'company outings', 'private tour for', 'private group', 'birthday', 'birthdays', 'birthday party', 'birthday parties', 'kids birthday', 'kids birthday parties', 'kids birthdays', 'birthday packages', 'proposals', 'weddings and proposals'],
-    keysFr: ['groupes', 'groupe', 'grands groupes', 'reservation de groupe', 'reservation privee', 'entreprise', 'consolidation d equipe', 'groupes scolaires', 'mariages', 'enterrement de vie', 'anniversaire', 'anniversaires', 'fete d anniversaire', 'fetes d anniversaire', 'anniversaires d enfants', 'des sorties privees', 'des visites privees', 'visites privees pour', 'entreprises', 'sorties d entreprise', 'mariage', 'demandes en mariage'],
-    a: '<p>Open <strong>Groups and private bookings</strong> in “More about your tours”. Tap a size (“Groups of 10 or more: please book ahead”) and add a line in your own words, like <em>Private charters for up to 12. Team building on request.</em> Your booking link has its own screen, <strong>Booking</strong>.</p><p>A private tour price (or a day rate for the group) goes in <strong>Private tours</strong>, the box under Price.</p>',
-    aFr: '<p>Ouvrez <strong>Groupes et réservations privées</strong> dans « Plus de détails sur votre entreprise ». Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Sorties privées jusqu’à 12 personnes. Activités d’équipe sur demande.</em> Votre lien de réservation a son propre écran, <strong>Réservations</strong>.</p><p>Le prix d’une sortie privée (ou un tarif à la journée pour le groupe) va dans <strong>Sorties privées</strong>, la case sous Prix.</p>' },
+    keys: ['groups', 'group', 'big groups', 'group booking', 'private booking', 'private bookings', 'corporate', 'team building', 'school groups', 'weddings', 'bachelor', 'bachelorette', 'stag', 'buyout', 'whole boat', 'charter the boat', 'private walk', 'private walks', 'company walk', 'company walks', 'private and company', 'company outing', 'company outings', 'private tour for', 'private group', 'birthday', 'birthdays', 'birthday party', 'birthday parties', 'kids birthday', 'kids birthday parties', 'kids birthdays', 'birthday packages', 'proposals', 'weddings and proposals', 'whole class', 'a whole class', 'class of', 'school programs', 'school program', 'students', 'biggest choice is 20', 'biggest choice', 'more than 20', 'over 20', 'bigger than 20', '30 students', 'field trips', 'school trips'],
+    keysFr: ['groupes', 'groupe', 'grands groupes', 'reservation de groupe', 'reservation privee', 'entreprise', 'consolidation d equipe', 'groupes scolaires', 'mariages', 'enterrement de vie', 'anniversaire', 'anniversaires', 'fete d anniversaire', 'fetes d anniversaire', 'anniversaires d enfants', 'des sorties privees', 'des visites privees', 'visites privees pour', 'entreprises', 'sorties d entreprise', 'mariage', 'demandes en mariage', 'classe entiere', 'une classe entiere', 'classes entieres', 'programmes scolaires', 'eleves', 'plus de 20', 'le plus grand choix', 'sorties scolaires', '30 eleves'],
+    a: '<p>Open <strong>Groups and private bookings</strong> in “More about your tours”. Tap a size (“Groups of 10 or more: please book ahead”) and add a line in your own words, like <em>Private charters for up to 12. Team building on request.</em> Bigger than 20, like a whole class? Tap <strong>21+ or whole classes</strong>, then add your school programs in your own words. Your booking link has its own screen, <strong>Booking</strong>.</p><p>A private tour price (or a day rate for the group) goes in <strong>Private tours</strong>, the box under Price.</p>',
+    aFr: '<p>Ouvrez <strong>Groupes et réservations privées</strong> dans « Plus de détails sur votre entreprise ». Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Sorties privées jusqu’à 12 personnes. Activités d’équipe sur demande.</em> Plus de 20, comme une classe entière? Touchez <strong>21+ ou classes entières</strong>, puis décrivez vos programmes scolaires dans vos mots. Votre lien de réservation a son propre écran, <strong>Réservations</strong>.</p><p>Le prix d’une sortie privée (ou un tarif à la journée pour le groupe) va dans <strong>Sorties privées</strong>, la case sous Prix.</p>' },
   // The tour version of the setup's "how long until it shows" (it replaces the general one, which names happy hour).
   { id: 'setup-live-when', pages: ['setup'], over: ['easy-setup', 'live-speed', 'photos-when', 'photo-pending', 'cost'], noRelated: ['cost'],
     q: 'How long until it shows on my page?', qFr: 'Combien de temps avant que ce soit sur ma page?',
@@ -56563,10 +56744,10 @@ const TOUR_SETUP_HELP_TOPICS = [
     aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez l’âge le plus jeune qui peut venir (celui des passagers, comme <strong>6+</strong>). Mettez la règle des conducteurs en une ligne sous <strong>Bon à savoir</strong> : <em>Conducteurs de 16 ans et plus avec un permis valide.</em></p>' },
   // "Your tours and prices" (Dayton approved, 2026-11-16): the general menu topic in tour words, so no "menu" chip shows.
   { id: 'menu-add', pages: ['setup', 'edit', 'menu'], q: 'How do I add my tours and prices?', qFr: 'Comment ajouter mes sorties et tarifs?',
-    keys: ['menu', 'prices', 'price list', 'rates', 'rates sheet', 'rate sheet', 'tours and prices', 'brochure', 'add my prices', 'all my tours', 'every tour', 'upload', 'scan', 'type it in'],
-    keysFr: ['menu', 'liste de prix', 'tarifs', 'grille tarifaire', 'sorties et tarifs', 'visites et tarifs', 'brochure', 'ajouter mes prix', 'toutes mes sorties', 'televerser', 'brochure papier', 'une brochure papier', 'prendre une photo de ma brochure'],
-    a: '<p>In <strong>Set up your page</strong>, open <strong>Your tours and prices</strong> (the first of the extra details). Take a photo of your rates sheet or brochure, upload your price list, or give us the link to your prices page. We type it up; it shows on your page as “Tours &amp; prices” within a day.</p>',
-    aFr: '<p>Dans <strong>Configurez votre page</strong>, ouvrez <strong>Vos sorties et tarifs</strong> (le premier des détails facultatifs). Photographiez votre grille tarifaire ou votre brochure, téléversez votre liste de prix, ou donnez-nous le lien de votre page de prix. Nous la retranscrivons; elle paraît sur votre page sous « Sorties et tarifs » d’ici un jour.</p>' },
+    keys: ['menu', 'prices', 'price list', 'rates', 'rates sheet', 'rate sheet', 'tours and prices', 'brochure', 'add my prices', 'all my tours', 'every tour', 'upload', 'scan', 'type it in', 'type them in', 'type our', 'just type', 'type our tours', 'type the prices', 'price sheet', 'no price sheet', 'dont have a price sheet', 'type them myself'],
+    keysFr: ['menu', 'liste de prix', 'tarifs', 'grille tarifaire', 'sorties et tarifs', 'visites et tarifs', 'brochure', 'ajouter mes prix', 'toutes mes sorties', 'televerser', 'brochure papier', 'une brochure papier', 'prendre une photo de ma brochure', 'les taper', 'taper nos sorties', 'taper les prix', 'pas de grille', 'les taper moi meme'],
+    a: '<p>In <strong>Set up your page</strong>, open <strong>Your tours and prices</strong> (the first of the extra details). Take a photo of your rates sheet or brochure, upload your price list, or give us the link to your prices page. We type it up; it shows on your page as “Tours &amp; prices” within a day.</p><p>No price sheet? Tap <strong>Type them in myself</strong>: add each tour with its price, one line at a time, then tap Publish.</p>',
+    aFr: '<p>Dans <strong>Configurez votre page</strong>, ouvrez <strong>Vos sorties et tarifs</strong> (le premier des détails facultatifs). Photographiez votre grille tarifaire ou votre brochure, téléversez votre liste de prix, ou donnez-nous le lien de votre page de prix. Nous la retranscrivons; elle paraît sur votre page sous « Sorties et tarifs » d’ici un jour.</p><p>Pas de grille tarifaire? Touchez <strong>Je les tape moi-même</strong> : ajoutez chaque sortie avec son prix, une ligne à la fois, puis touchez Publier.</p>' },
   { id: 'tour-free', pages: ['setup', 'edit'], over: ['cost'], q: 'Is this free? Do you take a booking fee?', qFr: 'Est-ce gratuit? Prenez-vous des frais de réservation?',
     keys: ['free', 'is this free', 'cost me', 'fee', 'fees', 'booking fee', 'commission', 'commissions', 'pay', 'charge', 'subscription', 'how much does this cost', 'catch', 'really free', 'is it really free', 'actually free', 'whats the catch', 'what is the catch', 'hidden fee', 'hidden fees', 'hidden cost', 'hidden costs', 'no catch'],
     keysFr: ['gratuit', 'est ce gratuit', 'frais', 'frais de reservation', 'commission', 'payer', 'abonnement', 'combien ca coute', 'vraiment gratuit', 'c est vraiment gratuit', 'est ce vraiment gratuit', 'attrape', 'c est quoi l attrape', 'quelle est l attrape', 'ou est l attrape', 'piege', 'frais caches', 'couts caches', 'caches', 'une commission', 'commission sur', 'commission sur les reservations', 'chargez plus tard', 'vous chargez'],
@@ -57342,7 +57523,7 @@ function tourResearchLength(venue) {
 // What you offer screen's starting picks ("We picked these from your page"). Saved only when the owner taps Save.
 const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<!(?:dog|husky|huskies) )\bsled tours?\b|(?<!(?:dog|husky|huskies) )\bsleds?\b(?! dogs?)/], ['dogsled', /dog ?sled|sled dogs?|husk(?:y|ies) (?:tours?|rides?|sled)|mushing/], ['jetboat', /jet ?boat/],
   ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
-  ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
+  ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['cultural', /indigenous|first nations?|cultural (?:tours?|walks?|experiences?|programs?|centres?|centers?|visits?)|storytell|autochtone|premi[eè]res nations|visites? culturelles?/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
   ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|backcountry guiding|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard|kennel|pupp(?:y|ies) (?:visits?|cuddles|tours?)|meet the (?:dogs|huskies|puppies)|ranch (?:visits?|tours?)/], ['rentals', /rentals?/]];
 function tourKindSuggestion(venue) {
@@ -59468,6 +59649,16 @@ const OWNER_HELP_SCRIPT = String.raw`
   // Distillery test 3 (2026-11-13): a link in an answer to a part of this page ("#tours-events") closes the help so that part shows.
   panel.addEventListener('click', function(e){ var a = e.target.closest ? e.target.closest('a[href^="#"]') : null; if (a && a.getAttribute('href').length > 1) { panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); } });
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  // Tour test 9 (keyboard pass): Tab left the open Help dialog for the page behind it. Tab and Shift+Tab now go round
+  // inside it while it is open.
+  panel.addEventListener('keydown', function(e){
+    if (e.key !== 'Tab' || panel.hidden) return;
+    var f = Array.prototype.filter.call(panel.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), textarea:not([disabled]), select:not([disabled]), [tabindex="0"]'), function(x){ return x.offsetParent !== null && !x.classList.contains('ohb-hp'); });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
   // Esc closes it from anywhere while it is open (the focus may be on the page behind it).
   if (typeof document.addEventListener === 'function') document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !(panel.contains && panel.contains(e.target))) close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
@@ -61301,7 +61492,10 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       // "Plan your visit" lines (2026-11-08): the five lines become exactly these (an Undo writes the old ones back).
       if (field === 'visit_rows') {
         // Restaurant test 2: an Undo writes her French lines back too (none, when the old value had none).
-        const w = writeOwnerVisitRows(venue.id, opts.undo && value && typeof value === 'object' && !value._fr ? { ...value, _fr: {} } : value, now);
+        // Tour test 9: an Undo of one line (`_keepFr`) leaves her French lines alone.
+        const keepFr = value && typeof value === 'object' && value._keepFr;
+        const vv = keepFr ? Object.fromEntries(Object.entries(value).filter(([k]) => k !== '_keepFr')) : value;
+        const w = writeOwnerVisitRows(venue.id, opts.undo && !keepFr && vv && typeof vv === 'object' && !vv._fr ? { ...vv, _fr: {} } : vv, now);
         if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer);
         // Tour test 8 (Whistler, 2026-11-17; Linda, sled dogs): her own Dogs line says guests can't bring a dog ("Please
         // leave your own dog at home. Our sled dogs only.") while Dog-Friendly was still on (research ticked it, and Help
@@ -61389,6 +61583,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         if ((venue[f] || null) !== next[f]) log.run(venue.id, f, venue[f] == null ? null : String(venue[f]), next[f], meta.reason, meta.batch_id, reviewer);
       }
     }
+    // Tour test 9 (Whistler, 2026-11-18): a tour's story or Known for going live may say which side of a picked chip it does.
+    if (venue.type === 'tour' && (chosen.includes('description') || chosen.includes('visit_rows')) && !chosen.includes('tour_info')) refreshTourKindWords(venue.id);
     db.exec('RELEASE owner_approve');
   } catch (err) {
     try { db.exec('ROLLBACK TO owner_approve'); db.exec('RELEASE owner_approve'); } catch (_) { /* already gone */ }
@@ -61551,7 +61747,8 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'avg_spend') return !!a && !!b && a.source === 'owner' && a.amount === b.amount;
   if (field === 'not_offered') return JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   if (field === 'cuisines') return JSON.stringify(a || []) === JSON.stringify(b || []);
-  if (field === 'visit_rows') return OWNER_VISIT_KEYS.every((k) => ((a || {})[k] || '') === ((b || {})[k] || '') && (((a || {})._fr || {})[k] || '') === (((b || {})._fr || {})[k] || ''));
+  // Tour test 9: a save holds only the lines it changed (b); only those are compared (her French lines when it has them).
+  if (field === 'visit_rows') return OWNER_VISIT_KEYS.filter((k) => !b || typeof b !== 'object' || k in b || (b._fr && k in b._fr)).every((k) => ((a || {})[k] || '') === ((b || {})[k] || '') && (!(b && b._fr) || (((a || {})._fr || {})[k] || '') === (((b || {})._fr || {})[k] || '')));
   // Winery test 1 (2026-11-12): the winery answers are stored in WINERY_INFO_PARTS order, the request in the order the
   // owner's saves merged them ("year" before "food"): compared with sorted keys, so an Undo of a winery answer works.
   if (field === 'winery_info') { const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v)); return canon(a || {}) === canon(b || {}); }
@@ -61578,6 +61775,14 @@ function undoOwnerInstantChange(id, reviewer, now = new Date(), reason = '') {
         if (current.badges[k] === on) b[k] = !!(req.previous.badges || {})[k]; else skipped.push(k);
       }
       if (Object.keys(b).length) restore.badges = b;
+      continue;
+    }
+    // Tour test 9: an Undo of Plan your visit lines puts back only the lines that save changed (and her French lines when
+    // it changed them); the others may have been saved since.
+    if (f === 'visit_rows' && val && typeof val === 'object' && req.previous[f] && typeof req.previous[f] === 'object') {
+      if (!ownerFieldEquals(f, current[f], val)) { skipped.push(f); continue; }
+      const prevRows = req.previous[f];
+      restore[f] = { ...Object.fromEntries(Object.keys(val).filter((k) => OWNER_VISIT_KEYS.includes(k)).map((k) => [k, prevRows[k] || ''])), ...(val._fr ? { _fr: prevRows._fr || {} } : { _keepFr: true }) };
       continue;
     }
     if (ownerFieldEquals(f, current[f], val)) restore[f] = req.previous[f]; else skipped.push(f);
@@ -64671,7 +64876,7 @@ ${renderGolfHeaderHtml()}
         <p class="op-hint">${L(`A few sentences about what makes your ${venue.type === 'tour' ? 'trips worth booking' : 'place worth a visit'}. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui ${venue.type === 'tour' ? 'donne envie de réserver vos sorties' : 'rend votre endroit intéressant'}. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>${completeOn ? `
         <p class="op-hint op-desc-goal" id="opDescGoal" data-min="${portalCompleteness.DESCRIPTION_MIN}" data-ok="${escapeHtml(L('✓ Long enough for your score', '✓ Assez long pour votre pointage'))}" data-low="${escapeHtml(L('{n}/{min}: {left} more characters for your score', '{n}/{min} : encore {left} caractères pour votre pointage'))}"></p>` : ''}
-        ${!fr && ownerFrDescState(venue) === 'old' ? `<p class="op-hint" id="opFrDescOld">Your French description is the old one from our research: <a href="${escapeHtml(ownerPath(token ? `${OWNER_LINK_PATH}${token}/setup` : `/owner/account/venue/${venue.id}/setup`, 'fr'))}#story" lang="fr" onclick="try{localStorage.setItem('okanaganLang','fr')}catch(e){}">update it?</a></p>` : ''}
+        ${!fr && ownerFrDescState(venue) === 'old' ? `<p class="op-hint" id="opFrDescOld">Your French description is the old one from our research: <a href="${escapeHtml(ownerPath(token ? `${OWNER_LINK_PATH}${token}/setup` : `/owner/account/venue/${venue.id}/setup`, 'fr'))}#story" lang="fr">update it?</a></p>` : ''}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
@@ -65799,7 +66004,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour', ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour', ...(venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }
@@ -71119,7 +71324,7 @@ module.exports = {
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
-  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
+  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, tourTextMonths, tourWaterMonths, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,

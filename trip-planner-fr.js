@@ -283,6 +283,10 @@ const PHRASES = [
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
   ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
+  // Tour test 9 (Whistler, 2026-11-18): « visite culturelle autochtone » read as two place words and found nothing.
+  ['visite culturelle autochtone', 'indigenous cultural tour'], ['visites culturelles autochtones', 'indigenous cultural tours'], ['visite autochtone', 'indigenous tour'], ['visites autochtones', 'indigenous tours'],
+  ['visite culturelle', 'cultural tour'], ['visites culturelles', 'cultural tours'], ['sortie culturelle', 'cultural tour'], ['culture autochtone', 'indigenous culture'], ['cultures autochtones', 'indigenous culture'],
+  ['premieres nations', 'first nations'], ['premiere nation', 'first nations'], ['autochtones', 'indigenous'], ['autochtone', 'indigenous'], ['sortie scolaire', 'school field trip'],
   ['sortie en raquettes', 'snowshoe tour'], ['sorties en raquettes', 'snowshoe tours'], ['excursion en raquettes', 'snowshoe tour'], ['sortie de raquette', 'snowshoe tour'], ['raquette guidee', 'guided snowshoeing'],
   // From Whistler Roam #188 (2026-11-17, real-data check): « randonnée guidée en raquettes » read as a hike plus the word « guidée »
   // and found nothing. Guided is the tour; a plain « randonnée en raquettes » stays snowshoeing (the trails).
