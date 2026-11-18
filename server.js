@@ -38857,8 +38857,12 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique') : label.singular;
 
   // Map link (built here so the address row can carry it).
-  const mapsUrl = (venue.latitude && venue.longitude)
-    ? `https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`
+  // Tour test 8 (Whistler, 2026-11-17; Linda): an approved meeting / storefront spot is where people go, so "Open in Google
+  // Maps" uses it (her listing's pin stayed at her house, 29 km away, after we approved the staging area). The pin itself
+  // is never moved here (Build My Trip distances and /map's own arrival dot are unchanged).
+  const mapsAt = venueMapsPoint(venue);
+  const mapsUrl = mapsAt
+    ? `https://www.google.com/maps/search/?api=1&query=${mapsAt.lat},${mapsAt.lng}`
     : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
   const builtInDirections = mapDirectionsAvailable()&&mapDestination(venuePagePath(venue),new Date()) ? roamDirectionsHref(venuePagePath(venue),fr?'fr':'en') : null;
   // Good to Know (2026-10-14): type, town and rating are already in the line
@@ -41865,6 +41869,14 @@ function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
 // Venue page map card (2026-11-11): the same pre-rendered town maps, with the venue pinned from its own coordinates
 // (roam-polish.js mapCard). No tile, script or API request. '' when the town has no map, the place has no coordinates
 // or the pin would fall outside the picture.
+// Where "Open in Google Maps" sends people: the approved arrival (meeting / storefront) spot, else the listing's pin.
+function venueMapsPoint(venue) {
+  try {
+    const a = venue && venue.id ? arrivalPoints.latest(venue.id, 'approved') : null;
+    if (a && Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lng)) && Math.abs(Number(a.lat)) <= 90 && Math.abs(Number(a.lng)) <= 180) return { lat: Math.round(Number(a.lat) * 1e6) / 1e6, lng: Math.round(Number(a.lng) * 1e6) / 1e6 };
+  } catch (e) { /* no table yet */ }
+  return venue && venue.latitude && venue.longitude ? { lat: venue.latitude, lng: venue.longitude } : null;
+}
 function venueMapCardHtml(venue, mapsUrl, fr) {
   try {
     const header = tripV3MapHeaders()[venue.region];
@@ -62115,7 +62127,7 @@ function renderAdminChangeCard(r) {
       <p class="rv-meta">Update #${r.id} · sent ${adminReviewEsc(adminReviewTime(r.submitted_at))}${r.contact_name ? ` by ${adminReviewEsc(r.contact_name)}` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
-      ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically).</div>' : ''}
+      ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically). An approved meeting or storefront spot is what \u201cOpen in Google Maps\u201d uses.</div>' : ''}
       ${'description_fr' in r.changes && !String(r.previous.description_fr || '').trim() ? `<div class="rv-warn">French description: this place has none yet, so approving it gives the place a French page (/fr/…)${FRENCH_INDEXABLE ? ', listed in the sitemap with hreflang links' : ' (kept out of search like every French page for now: noindex, no hreflang, not in the sitemap)'}. Untick it to keep the English page only.</div>` : ''}
       ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
       ${['description', 'description_fr'].filter((f) => f in r.changes && descriptionShrank(r.previous[f], r.changes[f])).map((f) => `<div class="rv-warn rv-shrank">${f === 'description_fr' ? 'French description: the' : 'The'} new text is much shorter than the old one (${String(r.changes[f] || '').trim().length} characters, was ${String(r.previous[f] || '').trim().length}). Check it wasn’t typed over by mistake.</div>`).join('')}
