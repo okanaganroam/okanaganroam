@@ -205,7 +205,8 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   assert.equal(app.cardPriceFor(w.id), 'Free tasting');
   // The setup: the box keeps the words, the lead and the preview say Free, the save sends the word.
   assert.match(CLIENT, /if \(CUR\.tour_price === 'free' \|\| CUR\.tour_price === 'donation'\) \{ S\.tour\.free = CUR\.tour_price; S\.tour\.price = 0; \}/);
-  assert.match(CLIENT, /if \(pfree !== S\.savedTourPrice\) pl\.push\(\{ tour_price: pfree \}\);/);
+  // Tour test 7 (2026-11-17): also sent when a held price is waiting, so it is withdrawn.
+  assert.match(CLIENT, /if \(pfree !== S\.savedTourPrice \|\| CUR\.tour_price_waiting != null\) pl\.push\(\{ tour_price: pfree \}\);/);
   assert.match(CLIENT, /return S\.tour\.free && T\.tpriceLeadFree \? T\.tpriceLeadFree :/);
   assert.match(CLIENT, /S\.savedTourPrice === 'free' \|\| S\.savedTourPrice === 'donation' \? \(T\.tfreeCard \|\| 'Free'\)/);
   assert.match(CLIENT, /field\('suTprice', T\.tpriceLabel, boxVal\('suTprice', tp\.price\), \{ max: 40 \}\) \+ \(T\.tpriceFreeTip \? '<p class="su-hint" id="suFreeTip">'/);

@@ -232,7 +232,7 @@ test('9. minor: Closed between seasons line (EN + FR), Help focus and Esc, Up to
   assert.match(hours.hoursStatusLabel(hours.statusAt(p2, { weekday: 'sat', minutes: 600, date: '2027-12-25' }), { weekday: 'sat', minutes: 600, date: '2027-12-25' }).text, /^Closed today \(Christmas\)/);
   // Help: the input takes the focus (again if the page took it), Esc closes it from anywhere.
   assert.match(SERVER, /function open\(\)\{ panel\.hidden = false; btn\.hidden = true; btn\.setAttribute\('aria-expanded', 'true'\); if \(!started\) begin\(\); focusInput\(\);/);
-  assert.match(SERVER, /document\.addEventListener\('keydown', function\(e\)\{ if \(e\.key === 'Escape' && !panel\.hidden && !panel\.contains\(e\.target\)\) close\(\); \}\);/);
+  assert.match(SERVER, /document\.addEventListener\('keydown', function\(e\)\{ if \(e\.key === 'Escape' && !panel\.hidden && !\(panel\.contains && panel\.contains\(e\.target\)\)\) close\(\); \}\);/);
   // Groups: a booked tour's smallest chip is "Up to 4".
   assert.match(CLIENT, /\(S\.groupsBooked && T\.groupsChipBooked \? \[4\]\.concat\(GROUP_SIZES\) : GROUP_SIZES\)/);
   // The two-season hint after the first season (EN + FR).

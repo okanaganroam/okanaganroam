@@ -59261,7 +59261,7 @@ const OWNER_HELP_SCRIPT = String.raw`
   // Tour test 7 (Whistler, 2026-11-17): opened with Enter on a desktop, the focus was left on the page (the button it was
   // on is hidden), so typing went nowhere and Esc did nothing. The input takes it, again if the page took it back.
   function focusInput(){ try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); } }
-  function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); focusInput(); setTimeout(focusInput, 30); setTimeout(function(){ if (!panel.hidden && !panel.contains(document.activeElement)) focusInput(); }, 200); }
+  function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); focusInput(); setTimeout(focusInput, 30); setTimeout(function(){ if (!panel.hidden && !(panel.contains && panel.contains(document.activeElement))) focusInput(); }, 200); }
   function close(){ panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
   btn.addEventListener('click', open);
   document.getElementById('ohbClose').addEventListener('click', close);
@@ -59269,7 +59269,7 @@ const OWNER_HELP_SCRIPT = String.raw`
   panel.addEventListener('click', function(e){ var a = e.target.closest ? e.target.closest('a[href^="#"]') : null; if (a && a.getAttribute('href').length > 1) { panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); } });
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
   // Esc closes it from anywhere while it is open (the focus may be on the page behind it).
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !panel.contains(e.target)) close(); });
+  if (typeof document.addEventListener === 'function') document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !(panel.contains && panel.contains(e.target))) close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
   window.__ohbMatch = match; window.__ohbBest = best;
 })();

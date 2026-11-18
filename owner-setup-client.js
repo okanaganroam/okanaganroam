@@ -3696,8 +3696,8 @@
       // "We don't do flights" takes the price back too; a price takes back "no flights".
       if (fb2.noFlights && S.savedFlight != null) fl.push({ flight_fee: null });
       if (Object.keys(bi2).length) fl.push({ brewery_info: bi2 });
-      // Tour test 7 (Whistler, 2026-11-17): a value saved over one still waiting for our check (a typo of $2,600, then
-      // the right $395 again) is sent even when it is the live one, so the waiting one is withdrawn (server: reverts).
+      // Tour test 7 (Whistler, 2026-11-17): a value saved over a held one (a typo of $2,600, then the right $395 again) is
+      // sent even when it is the live one, so the held one is withdrawn (server: reverts).
       if (!fb2.noFlights && (ff !== S.savedFlight || (CUR.flight_fee_waiting != null && ff !== CUR.flight_fee_waiting))) fl.push({ flight_fee: ff });
       S.savedLine.flights = !fb2.noFlights && ff > C.feeLiveMax && ff !== S.savedFlight ? T.flightSavedDay : T.flightSavedLive;
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
