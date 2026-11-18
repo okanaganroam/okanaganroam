@@ -230,11 +230,12 @@ test('3. the dogs follow-up in trip words for a tour (EN + FR); the page line re
   assert.equal(c.t.dogEx, 'Dogs on a leash welcome on our walks, not on the food tour.');
   assert.deepEqual(c.t.quick.dogs, ['On every trip', 'On some trips', 'On a leash']);
   assert.deepEqual(c.t.dogChipLabels, ['On every trip', 'On some trips (say which)', 'On a leash']);
-  assert.equal(c.offerLabels.dog_friendly, 'Dogs can come along (on some or all trips)');
+  // Tour test 8 (2026-11-17): "Guests’ own dogs" (a sled-dog business read it as her own dogs).
+  assert.equal(c.offerLabels.dog_friendly, 'Guests’ own dogs can come along');
   assert.match(f.t.dogQ, /^À quelles sorties les chiens peuvent-ils venir\s?\?$/);
   assert.deepEqual(f.t.quick.dogs, ['À toutes les sorties', 'À certaines sorties', 'En laisse']);
   assert.deepEqual(f.t.dogChipLabels, ['À toutes les sorties', 'À certaines sorties (dites lesquelles)', 'En laisse']);
-  assert.equal(f.offerLabels.dog_friendly, 'Les chiens peuvent venir (à certaines sorties ou à toutes)');
+  assert.equal(f.offerLabels.dog_friendly, 'Les chiens des clients peuvent venir');
   for (const o of [c, f]) assert.doesNotMatch(JSON.stringify([o.t.dogQ, o.t.dogEx, o.t.quick.dogs, o.t.dogChipLabels]), /patio|inside|water bowl|terrasse|intérieur|bols/i);
   assert.match(CLIENT, /var shown = key === 'dogs' && TOUR && T\.dogChipLabels && T\.dogChipLabels\.length === l\.length \? T\.dogChipLabels : l;/);
   // The chips as sentences on the page, in both languages; her own words stay as typed.
@@ -429,7 +430,7 @@ test('8. Help for tours (EN + FR): times, free, dogs, lengths, strollers, allerg
   for (const id of ['tour-times', 'hours']) { assert.doesNotMatch(a(id), /lunch|dinner|midnight/i, id); assert.doesNotMatch(aFr(id), /midi et soir|minuit/i, id); }
   assert.match(a('tour-free-trip'), /type the word free in the price box \(or 0 , or by donation \/ pay what you want \)/);
   assert.match(aFr('tour-free-trip'), /écrivez le mot gratuit dans la case du prix/);
-  assert.match(a('tour-dogs'), /tick Dogs can come along \(on some or all trips\)/); assert.doesNotMatch(a('tour-dogs'), /edit page|Badges/);
+  assert.match(a('tour-dogs'), /tick Guests’ own dogs can come along/); assert.doesNotMatch(a('tour-dogs'), /edit page|Badges/);
   assert.match(a('tour-lengths'), /tap your shortest trip.*Your tours and prices/);
   for (const id of ['tour-strollers', 'tour-allergies', 'tour-languages']) { assert.match(a(id), /Good to know \(in “More about your tours”\)/, id); assert.match(aFr(id), /Bon à savoir/, id); }
   assert.match(a('tour-max-group'), /Groups and private bookings.*Never more than 12 people/);

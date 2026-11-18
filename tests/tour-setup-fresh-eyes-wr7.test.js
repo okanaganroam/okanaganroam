@@ -237,7 +237,8 @@ test('9. minor: Closed between seasons line (EN + FR), Help focus and Esc, Up to
   assert.match(SERVER, /function open\(\)\{ panel\.hidden = false; btn\.hidden = true; btn\.setAttribute\('aria-expanded', 'true'\); if \(!started\) begin\(\); focusInput\(\);/);
   assert.match(SERVER, /document\.addEventListener\('keydown', function\(e\)\{ if \(e\.key === 'Escape' && !panel\.hidden && !\(panel\.contains && panel\.contains\(e\.target\)\)\) close\(\); \}\);/);
   // Groups: a booked tour's smallest chip is "Up to 4".
-  assert.match(CLIENT, /\(S\.groupsBooked && T\.groupsChipBooked \? \[4\]\.concat\(GROUP_SIZES\) : GROUP_SIZES\)/);
+  // Tour test 8 (2026-11-17): every tour starts at 4 ("4+", or "Up to 4" by booking).
+  assert.match(CLIENT, /\(TOUR \? \[4\]\.concat\(GROUP_SIZES\) : GROUP_SIZES\)/);
   // The two-season hint after the first season (EN + FR).
   assert.equal(text.en.tour.twoSeasonHint, 'Two seasons with a break? Make one season from the first day to the last, then add the break below and tick Every year.');
   assert.match(text.fr.tour.twoSeasonHint, /^Deux saisons avec une pause/);
