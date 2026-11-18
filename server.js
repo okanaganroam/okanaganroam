@@ -29019,7 +29019,8 @@ const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
 // which has none, to Adventure.
-const TOUR_GUIDE_WORDS_RE = /\b(?:mountain guid\w*|guiding|mountaineer\w*|avalanche (?:courses?|skills|training|safety)|ast ?[12]\b|acmg|ifmga|glaciers?|alpine climb\w*|alpinism)\b/i;
+// "Guiding" and "glacier" only beside mountain words: a fishing guide or a heli flight's glacier landing is not one.
+const TOUR_GUIDE_WORDS_RE = /\b(?:mountain guid\w*|(?:alpine|ski|climbing|backcountry|mountain) guiding|guided (?:climbs?|ascents?|mountaineering)|mountaineer\w*|avalanche (?:courses?|skills|training|safety)|ast ?[12]\b|acmg|ifmga|glacier (?:travel|trips?|mountaineering|climb\w*|hikes?|hiking|treks?|skills|school|courses?)|alpine climb\w*|alpinism)\b/i;
 const TOUR_ACTIVITY_ALSO = { adventure: TOUR_GUIDE_WORDS_RE };
 function tourInActivity(venue, slug) {
   if (tourActivityOf(venue) === slug) return true;
