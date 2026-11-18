@@ -189,9 +189,10 @@ test('B2 + B3 + Minor: departure-time help, no lunch/dinner or after-midnight wo
   assert.equal(c.t.twoTimesMax, 'Up to two times a day.');
   assert.doesNotMatch(c.t.twoTimesMax, /Breakfast/);
   assert.match(c.t.departHint, /from your first departure to when the last trip gets back/);
-  assert.equal(c.t.noDogsSub, 'Not on any trip');
-  assert.equal(c.t.noDogsSubInside, 'Not on any trip');
-  assert.equal(cfgOf((await get(`/fr/owner/${t}/setup`)).text).t.noDogsSub, 'Sur aucune sortie');
+  // Tour test 8 (2026-11-17): the No dogs tile says guests' dogs ("No guests’ dogs" / not on any trip).
+  assert.equal(c.t.noDogsSub, 'Guests can’t bring their dog on any trip');
+  assert.equal(c.t.noDogsSubInside, 'Guests can’t bring their dog on any trip');
+  assert.equal(cfgOf((await get(`/fr/owner/${t}/setup`)).text).t.noDogsSub, 'Les clients ne peuvent amener leur chien à aucune sortie');
   // A restaurant keeps its words.
   const r = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.equal(r.t.addSecond, '+ Add a second time (lunch & dinner)');

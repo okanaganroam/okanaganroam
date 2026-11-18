@@ -228,7 +228,8 @@ test('8. a child under an age on her published list: "Some activities are 7+: ch
   assert.deepEqual(app.tourPlannerFacts(v.id).tourListAges, [6, 7, 16]);
   for (const q of ['treetop course in Penticton with a 6-year-old on July 14', 'parcours dans les arbres à Penticton avec un enfant de 6 ans le 14 juillet']) {
     const it = itemsOf(await plan(q)).find((x) => x.venue.name === v.name);
-    assert.ok(it && (it.caveats || []).includes('Some activities are 7+: check Tours & prices.'), `${q}: ${JSON.stringify(it && it.caveats)}`);
+    // Tour test 8 (2026-11-17): the list item that matches the asked activity says its own age instead.
+    assert.ok(it && ((it.caveats || []).includes('Some activities are 7+: check Tours & prices.') || (it.caveats || []).some((c) => /“Treetop adventure course” is for 7 and up/.test(c))), `${q}: ${JSON.stringify(it && it.caveats)}`);
   }
   // A 10-year-old: only the 16+ rentals are older; a 17-year-old: no note.
   const ten = itemsOf(await plan('ziplining in Penticton with a 10-year-old on July 14')).find((x) => x.venue.name === v.name);
@@ -273,7 +274,8 @@ test('10. minor: Groups counter, French unit words and lengths on the list, priv
   // French price list words and lengths (known words only).
   const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
   assert.equal(sp(app.menuPriceLabel('69 per bike', 'fr')), '69 $ par vélo');
-  assert.equal(sp(app.menuPriceLabel('$69 per bike', 'fr')), '$69 par vélo');
+  // Tour test 8 (2026-11-17): a price typed "$69" reads the French way on the French page too.
+  assert.equal(sp(app.menuPriceLabel('$69 per bike', 'fr')), '69 $ par vélo');
   assert.equal(sp(app.menuPriceLabel('40 per hour', 'fr')), '40 $ de l’heure');
   assert.equal(app.menuPriceLabel('69 per bike', 'en'), '$69 per bike');
   assert.equal(app.menuDurationFr('2.5 hours'), '2,5 heures'); assert.equal(app.menuDurationFr('1.5 hours'), '1,5 heure'); assert.equal(app.menuDurationFr('2 hours'), '2 heures');

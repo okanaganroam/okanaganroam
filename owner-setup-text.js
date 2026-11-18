@@ -2150,6 +2150,30 @@ Object.assign(fr.tour, {
   menuSentToast: '✓ Vos sorties et tarifs sont envoyés. Nous les vérifions d’abord, puis les ajoutons à votre page d’ici un jour.',
   twoSeasonHint: 'Deux saisons avec une pause? Faites une seule saison du premier au dernier jour, puis ajoutez la pause plus bas et cochez Chaque année.',
 });
+// Tour test 8 (Whistler fresh eyes, Linda, a dog-sledding and summer kennel-visit business, 2026-11-17): the dogs
+// answers say guests' dogs (she read "Dogs can come along" as her sled dogs and kept it ticked); a Dogs line that says
+// guests can't bring one points to "No guests’ dogs"; the per-sled price nudge; the closure inside the season; the French
+// description left from our research.
+Object.assign(en.tour, {
+  noDogs: 'No guests’ dogs', noDogsSub: 'Guests can’t bring their dog on any trip', noDogsSubInside: 'Guests can’t bring their dog on any trip',
+  offerLeadOwnDogs: 'Families check this before they book. Dogs here means guests’ own dogs, not yours.',
+  dogLineNo: 'That says guests can’t bring their dog. Tap “No guests’ dogs” instead, so your page says No dogs.', dogLineNoGo: 'No guests’ dogs',
+  dogLineNoDone: 'We picked “No guests’ dogs” for you. Tap Save these to keep it.',
+  tpriceVehicle: 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.',
+});
+Object.assign(fr.tour, {
+  noDogs: 'Pas de chiens des clients', noDogsSub: 'Les clients ne peuvent amener leur chien à aucune sortie', noDogsSubInside: 'Les clients ne peuvent amener leur chien à aucune sortie',
+  offerLeadOwnDogs: 'Les familles le vérifient avant de réserver. Les chiens, ici, ce sont ceux des clients, pas les vôtres.',
+  dogLineNo: 'Cette ligne dit que les clients ne peuvent pas amener leur chien. Touchez plutôt « Pas de chiens des clients », pour que votre page indique Pas de chiens.', dogLineNoGo: 'Pas de chiens des clients',
+  dogLineNoDone: 'Nous avons choisi « Pas de chiens des clients » pour vous. Touchez Enregistrer pour le garder.',
+  tpriceVehicle: 'Un prix par traîneau, par bateau ou par véhicule? Inscrivez-le dans Vos sorties et tarifs, comme « Balade en traîneau : 349 $ par traîneau (2 adultes) ». Ici, mettez votre prix le plus bas pour une personne.',
+});
+// Tour test 8: a closure that covers much of the open season (every type with a season).
+Object.assign(en, { closeInside: 'Those dates close you {a} – {b}, inside your season. Is that right?', closeInsideKeep: 'Yes, that’s right', closeInsideFix: 'Fix the dates' });
+Object.assign(fr, { closeInside: 'Ces dates vous ferment du {a} au {b}, en pleine saison. Est-ce exact?', closeInsideKeep: 'Oui, c’est exact', closeInsideFix: 'Corriger les dates' });
+// Tour test 8: the French description still research's after her English story (every type; English pages only).
+Object.assign(en, { frDescOld: 'Your French description is the old one from our research:', frDescGo: 'update it?' });
+Object.assign(fr, { frDescOld: 'Votre description en français est l’ancienne, tirée de nos recherches :', frDescGo: 'la mettre à jour?' });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

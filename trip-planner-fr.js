@@ -276,6 +276,13 @@ const PHRASES = [
   ['peche', 'fishing trip'], ['bateau nolise', 'boat charter'], ['bateaux nolises', 'boat charters'], ['nolisement', 'charter'], ['croisiere', 'cruise'], ['croisieres', 'cruises'],
   // Every tour kind (2026-11-17): dog sledding, snowshoe tours, jet boats, bike tours, farm visits, heli-skiing, rentals.
   ['traineau a chiens', 'dog sledding'], ['traineaux a chiens', 'dog sledding'], ['tour de traineau a chiens', 'dog sledding'], ['balade en traineau a chiens', 'dog sledding'],
+  // Tour test 8 (Whistler, 2026-11-17): « chiens de traîneau » read as a dog in the party; « huskys », « chenil » and
+  // « visite des chiots » found nothing.
+  ['chiens de traineau', 'dog sledding'], ['chien de traineau', 'dog sledding'], ['sortie en chiens de traineau', 'dog sledding'], ['balade en traineau', 'sled ride'], ['tour de traineau', 'sled ride'],
+  ['huskys', 'huskies'], ['huskies', 'huskies'], ['husky', 'husky'], ['conduire son attelage', 'mushing'], ['conduire un attelage', 'mushing'], ['meneur de chiens', 'mushing'],
+  ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
+  ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
+  ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
   ['sortie en raquettes', 'snowshoe tour'], ['sorties en raquettes', 'snowshoe tours'], ['excursion en raquettes', 'snowshoe tour'], ['sortie de raquette', 'snowshoe tour'], ['raquette guidee', 'guided snowshoeing'],
   // From Whistler Roam #188 (2026-11-17, real-data check): « randonnée guidée en raquettes » read as a hike plus the word « guidée »
   // and found nothing. Guided is the tour; a plain « randonnée en raquettes » stays snowshoeing (the trails).

@@ -477,7 +477,8 @@ test('10. the venue page’s short "Tours & prices" list keeps its section names
   const rp = page(r, 'en');
   assert.ok(rp.includes('Soup') && rp.includes('Pasta'));
   assert.doesNotMatch(rp, /class="vm-sub"/);
-  assert.match(SERVER, /if \(first && venue\.type === 'tour' && s\.name && menu\.data\.sections\.length > 1\) secOf\.set\(it, String\(s\.name\)\);/);
+  // Tour test 8 (2026-11-17): a tour's short list takes lines from every section, each section's first line under its name.
+  assert.match(SERVER, /if \(!i && venue\.type === 'tour' && x\.name && secs\.length > 1\) secOf\.set\(it, String\(x\.name\)\);/);
 });
 
 test('11. a card says a holiday closure once (Dec 25); a notice shown ahead of time stays', () => {

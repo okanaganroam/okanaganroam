@@ -383,6 +383,11 @@ const TYPE_ALIASES = {
   // the trip planner's taxonomy has no tour type, so there it still means
   // wineries. "wine" on its own is untouched.
   tour: ['tour', 'tours', 'wine tour', 'wine tours', 'boat tour', 'boat tours', 'cruise', 'cruises', 'lake cruise', 'lake cruises', 'guided', 'guided tour', 'guided tours', 'experience', 'experiences', 'cooking class', 'cooking classes', 'sleigh ride', 'sleigh rides', 'dog sledding', 'dog sled', 'food tour', 'food tours',
+    // Tour test 8 (Whistler, 2026-11-17; a dog-sledding and kennel-tour business): "sled dog tour", "husky sled ride",
+    // "mushing", "puppy visit" and "kennel tour" are tours (they read as travelling with a dog, or as nothing).
+    'dog sleds', 'dog sled ride', 'dog sled rides', 'dog sled tour', 'dog sled tours', 'sled dog', 'sled dogs', 'sled dog tour', 'sled dog tours', 'sled dog ride', 'sled dog rides',
+    'husky', 'huskies', 'husky ride', 'husky rides', 'husky sled ride', 'husky sled rides', 'husky tour', 'husky tours', 'sled ride', 'sled rides', 'dog mushing', 'mushing', 'mush',
+    'kennel', 'kennels', 'kennel tour', 'kennel tours', 'kennel visit', 'kennel visits', 'puppy visit', 'puppy visits', 'puppy tour', 'puppy tours',
     // Sea to Sky adventures (2026-10-25).
     'zipline', 'ziplines', 'ziplining', 'zip line', 'zip lines', 'zip lining', 'zip trek', 'bungee', 'bungees', 'bungy', 'bungee jump', 'bungee jumping', 'atv', 'atvs', 'atv tour', 'atv tours', 'rzr', 'off road tour', 'rafting', 'white water rafting', 'whitewater rafting', 'river rafting', 'float plane', 'floatplane', 'seaplane', 'scenic flight', 'scenic flights', 'helicopter tour', 'helicopter tours', 'heli tour', 'heli tours', 'heli skiing', 'heliskiing', 'snowmobile tour', 'snowmobile tours', 'snowmobiling', 'horseback riding', 'horseback ride', 'trail ride', 'trail rides', 'via ferrata', 'adrenaline', 'thrill', 'thrills', 'adventure tour', 'adventure tours'],
   // Sports & Recreation (2026-10-12). Only phrases no other list uses, so
@@ -1403,7 +1408,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   for (const l of lengths) for (let k = l.start; k < l.end && k < tokens.length; k++) preClaimed[k] = true;
   // 3. Phrase matching over the remaining tokens.
   const masked = tokens.map((tok, i) => (preClaimed[i] ? '\u0000' : tok));
-  const { accepted, claimed } = matchPhrases(masked, table);
+  const matchedPhrases = matchPhrases(masked, table);
+  const claimed = matchedPhrases.claimed;
+  const accepted = withoutNameDogHits(matchedPhrases.accepted, masked, t);
   // 3b. Stage 3.1: polarity. Negated phrases and words go to intent.excluded,
   // never to the positive fields below.
   const neg = findNegations(masked, accepted, claimed);
@@ -1999,6 +2006,44 @@ const TRIP_DAYPARTS = {
   evening: ['at night', 'in the evening', 'this evening', 'evening', 'night', 'tonight'],
 };
 const TRIP_DOG_PARTY = ['dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pup', 'puppy', 'pets'];
+// Tour test 8 (Whistler, 2026-11-17): a dog word inside a listing's own name ("Callaghan Sled Dogs on February 3") is the
+// name, not a dog in the party: it planned dog-friendly spots and left the named place out. The token positions of the
+// dog words of every listing name (at least two words, up to its last dog word) found in the request.
+const NAME_DOG_WORDS = new Set(['dog', 'dogs', 'doggy', 'doggie', 'pup', 'pups', 'puppy', 'puppies']);
+const DOG_NAMES_CACHE = new WeakMap();
+function dogNamePrefixes(t) {
+  const venues = Array.isArray(t.venues) ? t.venues : [];
+  if (DOG_NAMES_CACHE.has(venues)) return DOG_NAMES_CACHE.get(venues);
+  const out = [];
+  for (const v of venues) {
+    if (!v || typeof v.name !== 'string') continue;
+    const words = normalizeDiscoveryText(v.name).split(' ').filter(Boolean);
+    let last = -1;
+    words.forEach((w, k) => { if (NAME_DOG_WORDS.has(w)) last = k; });
+    if (last >= 1) out.push(words.slice(0, last + 1));
+  }
+  DOG_NAMES_CACHE.set(venues, out);
+  return out;
+}
+function dogWordsInNames(tokens, t) {
+  const out = new Set();
+  for (const name of dogNamePrefixes(t)) {
+    for (let i = 0; i + name.length <= tokens.length; i++) {
+      if (name.every((w, k) => tokens[i + k] === w)) name.forEach((w, k) => { if (NAME_DOG_WORDS.has(w)) out.add(i + k); });
+    }
+  }
+  return out;
+}
+// A dog-friendly hit that lies wholly on a name's dog words is dropped (the words stay claimed).
+function withoutNameDogHits(accepted, tokens, t) {
+  const inName = dogWordsInNames(tokens, t);
+  if (!inName.size) return accepted;
+  return accepted.filter((hit) => {
+    if (!hit.assign.some((a) => a.field === 'feature' && a.value === 'dog_friendly')) return true;
+    for (let k = hit.start; k < hit.end; k++) if (!inName.has(k)) return true;
+    return false;
+  });
+}
 const TRIP_KID_PARTY = ['kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'young kids', 'young children', 'little kids', 'little ones', 'small kids', 'baby', 'babies', 'infant', 'with a baby', 'grandkids'];
 const TRIP_LIST_JOINERS = new Set(['and', 'or']);
 const TRIP_DETERMINERS = new Set(['a', 'an', 'the', 'some', 'one']);
@@ -2108,7 +2153,9 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   const route = findTripRoute(tokens, regionPhrase);
   if (route) out.unknownPlaces = route.unknown.slice();
   const masked = tokens.map((tok, i) => (route && i >= route.start && i < route.end ? '\u0000' : tok));
-  const { accepted: allAccepted, claimed: tripClaimed } = matchPhrases(masked, table);
+  const tripMatched = matchPhrases(masked, table);
+  const tripClaimed = tripMatched.claimed;
+  const allAccepted = withoutNameDogHits(tripMatched.accepted, masked, t);
   // Stage 3.1: a negated part ("a winery, no breweries, and dinner") is never
   // a trip component; the base intent already reports its clause.
   const negT = findNegations(masked, allAccepted, tripClaimed);

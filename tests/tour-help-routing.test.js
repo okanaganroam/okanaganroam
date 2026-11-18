@@ -470,3 +470,101 @@ test("tour test 7 answers: group words for a day rate (no boat), private-only sa
   assert.match(plain(en.topic("tour-meeting-varies").a), /Keep your office/);
   assert.match(plain(en.topic("tour-kinds-guide").a), /Mountain guiding, mountaineering or avalanche courses/);
 });
+
+// Tour test 8 (Whistler, 2026-11-17; Linda, a dog-sledding and summer kennel-visit business, iPhone SE with large text).
+// Her 22 questions as typed (shots 006-183; 006, 181 and 183 from the report), each with a French twin, and rephrasings.
+// She found 9 good; they still land where they did.
+const ASKED8 = [
+  ["8-006", "I'm not good with computers. What if I make a mistake?", ["setup-change-later"],
+    "Je ne suis pas douée avec les ordinateurs. Et si je fais une erreur?"],
+  ["8-008", "that is our house in pemberton. people meet us at the staging area up the callaghan valley road, not our house", ["tour-meeting"],
+    "C’est notre maison à Pemberton. Les gens nous rejoignent à l’aire de départ sur le chemin de la vallée, pas à la maison"],
+  ["8-012", "we have two seasons. dog sledding in winter dec 10 to march 31 and kennel visits with puppies in summer june 15 to sept 15. closed in between", ["tour-season","setup-season"],
+    "Nous avons deux saisons : traîneau à chiens l’hiver du 10 déc. au 31 mars et visites du chenil avec les chiots l’été du 15 juin au 15 sept. Fermé entre les deux"],
+  ["8-013", "sled tours leave at 9, 11:30 and 2 in winter. summer visits are at 10 and 1. how do i put departure times?", ["tour-times"],
+    "Les sorties en traîneau partent à 9 h, 11 h 30 et 14 h l’hiver. L’été, les visites sont à 10 h et 13 h. Comment mettre les heures de départ?"],
+  ["8-039", "in summer we do kennel visits and puppy cuddles, not sledding. which one do i pick?", ["tour-kinds-kennel"],
+    "L’été, nous faisons des visites du chenil et des câlins aux chiots, pas de traîneau. Lequel je choisis?"],
+  ["8-044", "is farm visits right for our kennel tours? we dont do u-pick. people come meet the sled dogs and cuddle puppies", ["tour-kinds-kennel"],
+    "Visites de ferme, est-ce bon pour nos visites du chenil? On ne fait pas d’autocueillette. Les gens viennent rencontrer les chiens et câliner les chiots"],
+  ["8-051", "our price is per sled not per person. $349 a sled, 2 adults or 1 adult and 2 kids. what does it mean per bike??", ["tour-per-unit"],
+    "Notre prix est par traîneau, pas par personne. 349 $ le traîneau, 2 adultes ou 1 adulte et 2 enfants. Pourquoi ça parle de vélo?"],
+  ["8-052", "how do i put a kids price? extra child is $49 on the sled, $20 for summer visits", ["tour-kids-price"],
+    "Comment mettre un prix pour enfants? L’enfant supplémentaire est 49 $ sur le traîneau, 20 $ pour les visites d’été"],
+  ["8-053", "under 4 are free on the kennel visit. where do i say that", ["tour-strollers"],
+    "Les moins de 4 ans sont gratuits à la visite du chenil. Où le dire?"],
+  ["8-054", "kids under 4 come free", ["tour-strollers"],
+    "Gratuit pour les enfants de moins de 4 ans"],
+  ["8-060", "winter sledding you have to book a week ahead. summer kennel visits people can just come by. which do i pick?", ["tour-lead-time"],
+    "L’hiver, il faut réserver une semaine à l’avance pour le traîneau. L’été, les gens peuvent passer sans réserver pour le chenil. Je choisis quoi?"],
+  ["8-063", "can people bring their dog?", ["tour-dogs"],
+    "Les gens peuvent-ils amener leur chien?"],
+  ["8-064", "the dogs are OUR dogs, the sled dogs. guests can't bring their own dogs. it says dogs can come along, is that right?", ["tour-own-dogs"],
+    "Les chiens sont NOS chiens, les chiens de traîneau. Les clients ne peuvent pas amener leurs chiens. Ça dit que les chiens peuvent venir, est-ce correct?"],
+  ["8-065", "kids 3 and up can ride in the sled, you have to be 16 to drive (mush) your own team, summer visits are all ages. what age do i pick?", ["tour-drivers","tour-age","tour-ages-per-trip"],
+    "Les enfants de 3 ans et plus montent dans le traîneau, il faut 16 ans pour conduire son attelage, les visites d’été sont pour tous les âges. Quel âge choisir?"],
+  ["8-084", "the story says snowmobile and dogs welcome. we dont do snowmobiles and guests cant bring dogs. how do i fix a mistake?", ["tour-story-fix"],
+    "L’histoire dit motoneige et chiens bienvenus. On ne fait pas de motoneige et les clients ne peuvent pas amener de chiens. Comment corriger une erreur?"],
+  ["8-088", "we have a shuttle from whistler village but it costs $25 extra. where do i put that?", ["tour-shuttle"],
+    "Nous avons une navette depuis le village, mais elle coûte 25 $ en plus. Où le mettre?"],
+  ["8-089", "do you have a place for snowsuit rental? people need warm clothes", ["tour-gear"],
+    "Avez-vous une place pour la location d’habits de neige? Les gens ont besoin de vêtements chauds"],
+  ["8-090", "if its extreme cold, like minus 25, we cancel and give a refund. how do i say that?", ["tour-weather"],
+    "S’il fait un froid extrême, comme moins 25, nous annulons et remboursons. Comment le dire?"],
+  ["8-091", "one of our sleds is adapted for a wheelchair. it has to be booked ahead. is that wheelchair accessible?", ["tour-wheelchair"],
+    "Un de nos traîneaux est adapté pour un fauteuil roulant. Il faut le réserver. Est-ce accessible en fauteuil roulant?"],
+  ["8-181", "how do i fix a mistake?", ["setup-change-later"],
+    "Comment corriger une erreur?"],
+  ["8-182", "i put the wrong date for when we are closed, how do i change it", ["setup-closure-fix"],
+    "J’ai mis la mauvaise date pour notre fermeture, comment la changer?"],
+  ["8-183", "I'm not good with computers, can someone just do it for me?", ["setup-change-later"],
+    "Je ne suis pas douée avec les ordinateurs, quelqu’un peut-il le faire pour moi?"],
+];
+const MORE8 = [
+  ["en","what if i mess it up",["setup-change-later"]],
+  ["en","can you do it for me",["setup-change-later"]],
+  ["en","i'm not very technical",["setup-change-later"]],
+  ["en","our huskies are the dogs, not guests' dogs",["tour-own-dogs"]],
+  ["en","guests can't bring their dog",["tour-own-dogs","tour-dogs"]],
+  ["en","which kind for puppy visits",["tour-kinds-kennel"]],
+  ["en","which kind for kennel visits",["tour-kinds-kennel"]],
+  ["en","$349 per sled",["tour-per-unit"]],
+  ["en","price per snowmobile",["tour-per-unit"]],
+  ["en","$49 per child",["tour-kids-price"]],
+  ["en","babies are free",["tour-strollers"]],
+  ["en","kids under 5 free",["tour-strollers"]],
+  ["en","we rent snowsuits and boots",["tour-gear"]],
+  ["en","hotel pickup costs extra",["tour-shuttle"]],
+  ["en","I typed the wrong dates for our closure",["setup-closure-fix"]],
+  ["en","how do i delete a closure",["setup-closure-fix"]],
+  ["fr","prix par motoneige",["tour-per-unit"]],
+  ["fr","49 $ par enfant",["tour-kids-price"]],
+  ["fr","quel genre pour les visites de chiots",["tour-kinds-kennel"]],
+  ["fr","pouvez-vous le faire pour moi",["setup-change-later"]],
+];
+test("tour test 8: every Help question (EN + its French twin) and rephrasings land on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Dog sledding & snowmobile tours" });
+  assert.equal(ASKED8.length, 22);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED8) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  for (const [lang, q, want] of MORE8) { const r = (lang === "fr" ? fr : en).best(q); if (!want.includes(r.id)) wrong.push(`"${q}" -> ${r.id} (want ${want.join(" or ")})`); }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 8 answers: own dogs say No guests’ dogs, per sled is not Private tours, kids price keeps the adult price, mistakes offer the email", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-own-dogs").a), /Your own dogs don’t count here\. .*If guests can’t bring their dog, tap No guests’ dogs/);
+  assert.match(plain(fr.topic("tour-own-dogs").aFr), /Pas de chiens des clients/);
+  assert.match(plain(en.topic("tour-dogs").a), /Guests’ own dogs can come along/); assert.doesNotMatch(plain(en.topic("tour-dogs").a), /Dogs can come along \(on some/);
+  assert.match(plain(en.topic("tour-per-unit").a), /Sled ride: \$349 per sled/); assert.match(plain(en.topic("tour-per-unit").a), /not a private tour/);
+  assert.match(plain(en.topic("tour-kids-price").a), /Keep Price for one adult/); assert.doesNotMatch(plain(en.topic("tour-kids-price").a), /lowest/);
+  assert.match(plain(en.topic("setup-change-later").a), /Change an answer/); assert.match(plain(en.topic("setup-change-later").a), /Would you rather have us do it\?/);
+  assert.match(plain(fr.topic("setup-change-later").aFr), /Vous préférez que nous le fassions/);
+  assert.match(plain(en.topic("setup-closure-fix").a), /✕ next to the wrong dates/); assert.match(plain(en.topic("setup-closure-fix").a), /When you run/);
+  assert.match(plain(en.topic("tour-kinds-kennel").a), /Farm, ranch or kennel visits/); assert.match(plain(en.topic("tour-shuttle").a), /Good to know/);
+  assert.match(plain(en.topic("tour-gear").a), /Good to know/);
+});
