@@ -6410,6 +6410,8 @@ function tooYoungNotes(result, input) {
   for (const v of out) {
     const text = `${v.name} is for ages ${v.tourMinAge} and up, so it isn’t in this plan for your ${young}-year-old.`;
     if (!(result.notes || []).includes(text)) result.notes = [text].concat(result.notes || []);
+    // Up front with what the visitor asked for (the page's Planning notes), not only under How this plan was made.
+    if (!(result.contextNotes || []).includes(text)) result.contextNotes = [text].concat(result.contextNotes || []);
   }
 }
 // A focus reported missing before the late-afternoon stops were added (2026-10-25: "Nothing matching breweries" on a plan
