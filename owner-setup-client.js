@@ -1299,9 +1299,10 @@
     if (key && (CUR.visit_fr || {})[key]) return C.lang === 'fr' ? '' : frOnlyHint(id + 'Fr');
     var t = String(text || '');
     if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
+    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + T.knownFrDropsEn : '';
     var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
-    return '<p class="su-hint su-enhint" id="' + id + '">' + h(noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + '</p>';
+    return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
   }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
@@ -1482,9 +1483,16 @@
   function weekShort(w, sep){
     var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
     if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
-    var out = [], i = 0;
-    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; out.push((j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i])) + ' ' + (txt[i] || String(T.closed).toLowerCase())); i = j + 1; }
-    return out.join(sep || ' · ');
+    // Tour test 6 (Whistler, 2026-11-17): days with the same hours go together, open ones first, closed last: « Lun, jeu–dim
+    // 9 h – 17 h ; mar–mer fermé » (it read « Lun 9 h – 17 h, Mar–Mer fermé, Jeu–Dim 9 h – 17 h »).
+    var runs = [], i = 0;
+    while (i < 7) { var j = i; while (j + 1 < 7 && txt[j + 1] === txt[i]) j++; runs.push({ t: txt[i], d: j > i ? dayName(DAYS[i]) + '–' + dayName(DAYS[j]) : dayName(DAYS[i]) }); i = j + 1; }
+    var groups = [];
+    runs.forEach(function(r){ var g = groups.filter(function(x){ return x.t === r.t; })[0]; if (g) g.d.push(r.d); else groups.push({ t: r.t, d: [r.d] }); });
+    groups.sort(function(a, b){ return (a.t ? 0 : 1) - (b.t ? 0 : 1); });
+    var low = function(x){ return C.lang === 'fr' ? x.toLowerCase() : x; };
+    var out = groups.map(function(g, gi){ return g.d.map(function(x, k){ return gi || k ? low(x) : x; }).join(', ') + ' ' + (g.t || String(T.closed).toLowerCase()); });
+    return out.join(sep === ', ' || !sep ? (C.lang === 'fr' ? '\u00a0; ' : sep ? '; ' : ' · ') : sep);
   }
   // Winery test 5 (2026-11-12): after saving, one line with every set of hours ("Summer: 11 AM – 5 PM every day · Winter
   // (Nov–Apr): Mon–Thu closed, Fri–Sun Noon – 4 PM"), so both seasons are checked at a glance.
@@ -1560,7 +1568,16 @@
   }
   // Brewery test 3 (Whistler, 2026-11-16): with no French story on the page there is no French page yet (/fr goes to the
   // English one), so the line says what really happens instead of "they show on your French page only".
-  function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
+  // Tour test 6 (Whistler, 2026-11-17): the French-only lines are named (« Connu pour, Bon à savoir, Groupes : en français
+  // seulement ») with one tap to the English edit page's box for the first of them. Nothing is translated for her.
+  var FR_ONLY_BOX = { known_for: 'opVisitKnown', groups: 'opVisitGroups', good_to_know: 'opVisitGoodToKnow', dogs: 'opVisitDogs', dietary: 'opVisitDietary', reservations: 'opVisitReservations', takeout: 'opVisitTakeout', menu: 'opVisitMenu' };
+  function frOnlyNamed(){
+    var ks = ((S.score && S.score.frOnlyKeys) || []).filter(function(k){ return T.frLineNames && T.frLineNames[k]; });
+    if (!ks.length || !T.frOnlyNamed || !C.back) return '';
+    var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
+    return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '">' + h(T.frOnlyAddEn) + '</a></p>';
+  }
+  function frOnlyFinish(){ var named = frOnlyNamed(); if (named) return named; var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   function leftList(){
     var out = [], seen = {};
     // Never an item she already answered or sent (pub fresh-eyes, 2026-11-10: Takeout ticked on "What you offer" and a
@@ -2435,7 +2452,7 @@
       x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
         + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
         + '<div class="su-chips" role="group" aria-label="' + h(T.groupsQ) + '" id="suGroupSizes">' + GROUP_SIZES.map(function(n){ var on = sentencesOf(gl).indexOf(fill(T.groupsLine, { n: n })) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180 }) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TOUR && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
@@ -2455,7 +2472,10 @@
     } else if (s === 'door') {
       x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>';
     } else if (s === 'door:photo') {
-      x = q(T.doorPhotoQ, T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
+      // Tour test 6 (Whistler, 2026-11-17): no dock, marina or boat words for a tour on land (a zipline office read « le quai
+      // ou la marina… votre bateau »): the water words only when a water kind is picked.
+      var landTour = TOUR && T.doorPhotoLeadLand && !(TI.kinds || S.tour.kinds || []).some(function(k){ return ['boat', 'jetboat', 'paddle', 'fishing', 'raft', 'wildlife'].indexOf(k) >= 0; });
+      x = q(T.doorPhotoQ, landTour ? T.doorPhotoLeadLand : T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';
     } else if (s === 'door:pin') {
       x = (S.door.mapFail ? q(T.mapFailQ, '') : q(T.pinQ, T.pinLead)) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.mapFail ? T.mapFail : S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p>' + (S.door.mapFail ? '' : '<div id="suMap" class="su-map"></div>') + msgs()
@@ -2634,12 +2654,15 @@
   // Winery test 4 (2026-11-12): the one "no set hours" choice, wineries only.
   // The weekly hours as they are before "no set hours" clears them (null when no day is open), kept for "Add my hours".
   function weekKeep(){ return S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }) ? clone(S.week) : null; }
-  function weekKept(w){ if (!w) return; S.weekKept = w; try { window.sessionStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} }
+  // Tour test 6 (Whistler, 2026-11-17): kept on this device too (localStorage), so "Add my hours" still has them after she
+  // closes the tab and comes back by the link (the tap on "by booking only" saves at once).
+  function weekKept(w){ if (!w) return; S.weekKept = w; try { window.sessionStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} try { window.localStorage.setItem('suWeekKept:' + C.base, JSON.stringify(w)); } catch (e) {} }
   function weekRestore(){
     var w = S.weekKept; if (!w) { try { w = JSON.parse(window.sessionStorage.getItem('suWeekKept:' + C.base) || 'null'); } catch (e) { w = null; } }
+    if (!w) { try { w = JSON.parse(window.localStorage.getItem('suWeekKept:' + C.base) || 'null'); } catch (e) { w = null; } }
     if (!w || typeof w !== 'object' || (S.week && DAYS.some(function(d){ return S.week[d] && S.week[d].length; }))) return false;
     S.week = {}; DAYS.forEach(function(d){ S.week[d] = Array.isArray(w[d]) && w[d].length ? clone(w[d]) : null; });
-    S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
+    S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {} try { window.localStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
     S.weekBack = true; return true;
   }
   function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }

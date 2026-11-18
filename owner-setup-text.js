@@ -2116,6 +2116,19 @@ Object.assign(fr.tour, {
   tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas. Un prix par vélo ou par location? Mettez-le dans Vos sorties et tarifs.',
   tpriceLeadPickUnit: 'Votre fiche indiquera « À partir de {x} ».',
 });
+Object.assign(en.tour, { doorPhotoLeadLand: 'Stand where people meet you (the office, the trailhead, the start of the course), with your sign or vehicle in the picture if you can. Your device will ask to share your location, so visitors get directions to this spot.' });
+Object.assign(fr.tour, { doorPhotoLeadLand: 'Placez-vous là où l’on vous rejoint (le bureau, le départ du sentier, le début du parcours), avec votre enseigne ou votre véhicule dans la photo si possible. Votre appareil vous demandera de partager votre position, pour que les visiteurs obtiennent l’itinéraire jusqu’à ce point.' });
+// Tour test 6 (Whistler fresh eyes, 2026-11-17): the finish screen names the French-only lines, with one tap to add the
+// English version on the edit page; the French Known for screen says the English research line goes when hers is French.
+Object.assign(en, {
+  frLineNames: { known_for: 'Known for', good_to_know: 'Good to know', groups: 'Groups', dogs: 'Dogs', dietary: 'Dietary', reservations: 'Reservations', takeout: 'Takeout', menu: 'Menu' },
+  frOnlyNamed: 'In French only, so on your French page only: {list}.', frOnlyAddEn: 'Add the English version',
+});
+Object.assign(fr, {
+  frLineNames: { known_for: 'Connu pour', good_to_know: 'Bon à savoir', groups: 'Groupes', dogs: 'Chiens', dietary: 'Note alimentaire', reservations: 'Réservations', takeout: 'À emporter', menu: 'Menu' },
+  frOnlyNamed: '{list} : en français seulement, donc sur votre page française seulement.', frOnlyAddEn: 'Ajouter la version anglaise',
+  knownFrDropsEn: 'Si vous l’écrivez en français, cette ligne en anglais quitte votre page anglaise : ajoutez-en une en anglais sur votre page de modification.',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

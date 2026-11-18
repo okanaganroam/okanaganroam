@@ -52581,9 +52581,25 @@ function menuPriceAmount(n, lang = 'en') {
 // "$129 per person" (French "129 $ par personne") and "From 89" as "From $89". Left as typed: anything with a "$"
 // (or another currency), more than one number ("75 / 45 child", "2 for 30"), or a number that is a count or a
 // length ("3 hours", "18 holes").
-const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de']];
+// Tour test 6 (Whistler, 2026-11-17): the unit words of a typed-up list (« 69 $ per bike » on the French page) are said in
+// French too: per bike, per e-bike, per hour, per day, per rental, per kayak, per boat… (known words only).
+const MENU_UNIT_WORDS_FR = [[/\bper e-?bike\b/i, 'par vélo électrique'], [/\bper bike\b/i, 'par vélo'], [/\bper bicycle\b/i, 'par vélo'], [/\bper hour\b|\/ ?(?:hr|hour)\b/i, 'de l’heure'], [/\bper day\b/i, 'par jour'],
+  [/\bper half[- ]day\b/i, 'par demi-journée'], [/\bper rental\b/i, 'par location'], [/\bper kayak\b/i, 'par kayak'], [/\bper canoe\b/i, 'par canot'], [/\bper (?:sup|paddle ?board)\b/i, 'par planche'],
+  [/\bper boat\b/i, 'par bateau'], [/\bper vehicle\b/i, 'par véhicule'], [/\bper sled\b/i, 'par traîneau'], [/\bper snowmobile\b/i, 'par motoneige'], [/\bper couple\b/i, 'par couple'], [/\bper family\b/i, 'par famille'], [/\bper room\b/i, 'par chambre']];
+const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de'], ...MENU_UNIT_WORDS_FR];
+// A typed-up trip length in French (« 2.5 hours » -> « 2,5 heures », "half day" -> « demi-journée »): known words only.
+function menuDurationFr(d) {
+  const t = String(d || '').trim();
+  let m = /^(\d{1,2}(?:[.,]\d{1,2})?)\s*(?:-|to|–)\s*(\d{1,2}(?:[.,]\d{1,2})?)\s*(hours?|hrs?|h)$/i.exec(t);
+  if (m) return `${m[1].replace('.', ',')} à ${m[2].replace('.', ',')} heures`;
+  m = /^(\d{1,2}(?:[.,]\d{1,2})?)\s*(hours?|hrs?|h|minutes?|mins?|days?|nights?)$/i.exec(t);
+  if (m) { const n = m[1].replace('.', ','), one = Number(m[1].replace(',', '.')) < 2; const u = /^h/i.test(m[2]) ? (one ? 'heure' : 'heures') : /^min/i.test(m[2]) ? 'minutes' : /^d/i.test(m[2]) ? (one ? 'jour' : 'jours') : (one ? 'nuit' : 'nuits'); return `${n} ${u}`; }
+  if (/^half[- ]day$/i.test(t)) return 'Demi-journée';
+  if (/^(?:full|all)[- ]day$/i.test(t)) return 'Journée complète';
+  return t;
+}
 function menuPriceWithWords(p, lang = 'en') {
-  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) return p;
+  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) { let q = p; if (lang === 'fr') for (const [re, word] of MENU_UNIT_WORDS_FR) q = q.replace(re, word); return q; }
   const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*)$/i.exec(p);
   if (!m || (!m[1] && !m[4].trim())) return p;
   if (/^\s*(?:hours?|hrs?|h\b|min|mins|minutes?|days?|nights?|km|kms|miles?|holes?|%|people|persons|guests|pieces?|pcs|oz|ml|l\b|g\b|kg|x\b)/i.test(m[4])) return p;
@@ -55321,12 +55337,15 @@ function setupScore(found) {
   // finish screen and the portal always agree on what is left (fresh-eyes 2026-11-10).
   // Brewery test 2 (Whistler, 2026-11-16): any answer in French only (a special, an event or its detail, a Plan your visit
   // line)? The setup's last screen then says once that it shows on the French page only until an English one is added.
-  let frOnly = false;
+  let frOnly = false, frOnlyKeys = [];
+  // Tour test 6 (Whistler, 2026-11-17): which Plan your visit lines are French only (her French line, no English one),
+  // so the last screen can name them (« Connu pour, Bon à savoir, Groupes ») with a link to add the English.
+  try { const frl = ownerVisitFrLines(venueVisitInfo(venue.id)), enl = ownerVisitRows(venue.id); frOnlyKeys = Object.keys(frl).filter((k) => !String(enl[k] || '').trim()); } catch (e) { frOnlyKeys = []; }
   try {
     frOnly = (live.specials || []).some((x) => x && !x.title && x.title_fr) || (live.weekly_nights || []).some((x) => x && ((!x.title && x.title_fr) || (x.detail_fr && !x.detail)))
       || Object.keys(ownerVisitFrLines(venueVisitInfo(venue.id))).length > 0;
   } catch (e) { frOnly = false; }
-  return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)), ...(frOnly ? { frOnly: true } : {}),
+  return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)), ...(frOnly ? { frOnly: true } : {}), ...(frOnlyKeys.length ? { frOnlyKeys } : {}),
     // Winery test 3 (2026-11-12): and what will be missing once what she sent is checked (a short story replacing a
     // long description), so "Nearly there" can name it.
     left: r.missing.filter((it) => !it.waiting).concat(r.lost || []).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
@@ -57534,7 +57553,8 @@ function menuSchema(venue, menu, lang) {
 function menuItemHtml(it, lang) {
   const labels = MENU_DIETARY_LABELS[lang === 'fr' ? 'fr' : 'en'];
   const tags = it.dietary.map((d) => `<span class="vm-tag">${escapeHtml(labels[d])}</span>`).join('');
-  return `<li class="vm-item"><div class="vm-line"><span class="vm-name">${escapeHtml(it.name)}</span>${it.price ? `<span class="vm-price">${escapeHtml(menuPriceLabel(it.price, lang))}</span>` : ''}</div>${it.duration || it.description ? `<p class="vm-desc">${escapeHtml([it.duration, it.description].filter(Boolean).join(' \u00b7 '))}</p>` : ''}${tags ? `<p class="vm-tags">${tags}</p>` : ''}</li>`;
+  const dur = it.duration && lang === 'fr' ? menuDurationFr(it.duration) : it.duration;
+  return `<li class="vm-item"><div class="vm-line"><span class="vm-name">${escapeHtml(it.name)}</span>${it.price ? `<span class="vm-price">${escapeHtml(menuPriceLabel(it.price, lang))}</span>` : ''}</div>${dur || it.description ? `<p class="vm-desc">${escapeHtml([dur, it.description].filter(Boolean).join(' \u00b7 '))}</p>` : ''}${tags ? `<p class="vm-tags">${tags}</p>` : ''}</li>`;
 }
 const VENUE_MENU_CSS = `<style>
   .vm-preview { margin: 22px 0 8px; }
@@ -57583,7 +57603,9 @@ function priceListOfferCatalog(venue, menu, lang) {
   };
 }
 
-const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|people|guest|guests|passenger|passengers|rider|riders|adult|child|kid)s?\b|add[- ]?ons?\b|(?:rod|gear|equipment|wetsuit|bike|helmet) rentals?\b|rentals?\b|(?:fishing )?licen[cs]es?\b|personnes? suppl[ée]mentaires?\b|location\b|permis\b)/i;
+// Tour test 6 (Whistler, 2026-11-17): and a private-group line ("Private group or corporate booking", « Groupes privés »),
+// which is not a trip ("(5 tours)" counted it).
+const TOUR_ADDON_LINE_RE = /^(?:(?:each |per )?(?:extra|additional) (?:person|people|guest|guests|passenger|passengers|rider|riders|adult|child|kid)s?\b|add[- ]?ons?\b|(?:rod|gear|equipment|wetsuit|bike|helmet) rentals?\b|rentals?\b|(?:fishing )?licen[cs]es?\b|personnes? suppl[ée]mentaires?\b|location\b|permis\b|private (?:groups?|charters?|bookings?|events?|parties|tours?)\b|(?:corporate|company) (?:groups?|bookings?|events?)\b|groupes? priv[ée]s?\b|sorties? priv[ée]es?\b|r[ée]servations? priv[ée]es?\b)/i;
 // The short menu on the place page: the first few dishes and a link to the full menu page.
 function venueMenuPreviewHtml(venue, menu, lang) {
   if (!menu) return '';
@@ -57626,7 +57648,9 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const tours = isPriceList(venue);
   const kindWords = PRICE_LIST_WORDS[menuKind(venue)];
   const noun = menuNoun(venue, lang);
-  const count = menuDishCountText(menu.items, lang, menuKind(venue));
+  // Tour test 6: the full list's count leaves out add-on and private-group lines too, like the short list's.
+  const tripN = venue.type === 'tour' ? (menu.data.sections || []).flatMap((x) => x.items || []).filter((it) => !TOUR_ADDON_LINE_RE.test(String(it.name || '').trim())).length : 0;
+  const count = menuDishCountText(venue.type === 'tour' && tripN ? tripN : menu.items, lang, menuKind(venue));
   const updatedText = tours ? L('Prices updated', 'Tarifs mis à jour') : L('Menu updated', 'Menu mis à jour');
   const title = tours ? (fr
     ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
@@ -63669,6 +63693,19 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     const answersHtml = answerLines.length ? `
         <div class="op-visit-answers" id="opVisitAnswers">${answerLines.map((x) => `<p class="op-visit-ans"><strong>${x.label}:</strong> ${x.text ? escapeHtml(x.text) : `<span class="op-hint">${L('Not answered yet', 'Pas encore répondu')}</span>`}</p>`).join('')}
         <p class="op-hint">${L('These lines come from your answers. To change one, open <a href="' + escapeHtml(setupHref) + '">Set up your page</a> and tap Change an answer.', 'Ces lignes viennent de vos réponses. Pour en changer une, ouvrez <a href="' + escapeHtml(setupHref) + '">Configurez votre page</a> et touchez Modifier une réponse.')}</p></div>` : '';
+    // Tour test 6 (Whistler, 2026-11-17): the lines she wrote in French only (« Connu pour, Bon à savoir, Groupes ») are named,
+    // with the English edit page's box one tap away (on the English page, the boxes are right below). No translation.
+    let frOnlyEditHtml = '';
+    try {
+      const frl = ownerVisitFrLines(venueVisitInfo(venue.id)), enl = ownerVisitRows(venue.id);
+      const NAMES = { known_for: ['Known for', 'Connu pour'], good_to_know: ['Good to know', 'Bon à savoir'], groups: ['Groups', 'Groupes'], dogs: ['Dogs', 'Chiens'], dietary: ['Dietary', 'Note alimentaire'], reservations: ['Reservations', 'Réservations'], takeout: ['Takeout', 'À emporter'], menu: ['Menu', 'Menu'] };
+      const ks = Object.keys(frl).filter((k) => NAMES[k] && !String(enl[k] || '').trim());
+      if (ks.length) {
+        const list = ks.map((k) => NAMES[k][fr ? 1 : 0]).join(', ');
+        const enHref = `${token ? `${OWNER_LINK_PATH}${token}` : `/owner/account/venue/${venue.id}`}#${ids[ks[0]] || 'visit'}`;
+        frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: en français seulement, donc sur votre page française seulement. <a href="${escapeHtml(enHref)}">Ajouter la version anglaise</a>` : `In French only, so on your French page only: ${escapeHtml(list)}. Type the English version in its box below.`}</p>`;
+      }
+    } catch (e) { frOnlyEditHtml = ''; }
     const boxes = editKeys.concat(extraKeys.filter((k) => !editKeys.includes(k))).map((k) => `
         <div class="form-field op-visit-field"><label for="${ids[k]}">${escapeHtml(words[k][0])}</label>
           <span class="op-hint" id="${ids[k]}Hint">${escapeHtml(words[k][1])}</span>
@@ -63677,7 +63714,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       <details class="op-fold op-sec" id="visit" data-task="more"${filled < countAll ? ' open' : ''} data-done="${escapeHtml(L('Saved. Your page’s “Plan your visit” box is updated.', 'Enregistré. La case « Planifiez votre visite » de votre page est à jour.'))}" data-wrong="${escapeHtml(L('Sorry, that could not be saved. Please reload the page and try again.', 'Désolé, cela n’a pas pu être enregistré. Rechargez la page et réessayez.'))}">
       <summary><span class="lyv-section-label" id="opVisitLabel">${L('Plan your visit', 'Planifier la visite')}${waitChip('visit_rows')}</span> <span class="op-fold-hint" id="opVisitHint">${filled ? L(`${filled} of ${countAll} lines filled in`, `${filled} ligne${filled === 1 ? '' : 's'} sur ${countAll} remplie${filled === 1 ? '' : 's'}`) : venue.type === 'cafe' ? L('Known for, dietary note and more', 'Connu pour, note alimentaire et plus') : brew ? L('Known for, tastings, food and more', 'Connu pour, dégustations, nourriture et plus') : L('Known for, reservations, takeout and more', 'Connu pour, réservations, à emporter et plus')}</span></summary>
       <p class="op-hint">${L('These short lines show in the &ldquo;Plan your visit&rdquo; box on your page. One line each, plain words, no links. Leave a box empty to leave that line off.', 'Ces courtes lignes paraissent dans la case « Planifiez votre visite » de votre page. Une ligne chacune, des mots simples, sans liens. Laissez une case vide pour ne pas afficher cette ligne.')}</p>
-      <div class="form-row full op-visit-rows">${boxes}
+      ${frOnlyEditHtml}<div class="form-row full op-visit-rows">${boxes}
       </div>${answersHtml}
       <p class="op-hint">${L('Your booking link goes under &ldquo;Name, address &amp; links&rdquo;: it adds a Reserve button.', 'Votre lien de réservation va sous « Nom, adresse et liens » : il ajoute un bouton Réserver.')}</p>
       <button type="button" class="op-btn" id="opVisitSave">${L('Save these lines', 'Enregistrer ces lignes')}</button> <span class="op-live-note">${L('Saves now and goes live', 'Enregistré et en ligne tout de suite')}</span>
