@@ -38732,8 +38732,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const parts0 = os0 ? (openSeasonStretches(venue.id, om0) || [os0]) : null;
     const when0 = parts0 ? parts0.map((r) => hoursExtraRangeText(r.from, r.to, fr)).join(fr ? ' et ' : ' and ') : '';
     const yearM = /<div class="venue-hours-year">[\s\S]*?<\/ul><\/div>/.exec(hoursHtml);
+    // Tour test 7 (Whistler, 2026-11-17): with an owner season, the dates are already the line above ("Open December 15 –
+    // April 30 and July 1 – September 15 each year"): the block is the one booking line, not a table that said the dates
+    // a third time (its narrow cell wrapped "Book ahead · tours / by reservation" at desktop widths).
     const block = when0
-      ? `<div class="venue-hours-year venue-hours-year-appt"><p class="venue-hours-year-h"><strong>${fr ? 'Heures selon la saison' : 'Hours through the year'}</strong></p><ul class="hours-list venue-hours-year-list"><li><span>${escapeHtml(when0)}</span><span>${escapeHtml(apptText)}</span></li></ul></div>`
+      ? `<p class="venue-hours-season venue-hours-appt venue-hours-year-appt">${escapeHtml(apptText)}</p>`
       : yearM
       ? yearM[0].replace('class="venue-hours-year"', 'class="venue-hours-year venue-hours-year-appt"').replace(/<li><span>([^<]*)<\/span><span>(?!Closed every year|Fermé chaque année)[^<]*<\/span><\/li>/g, (m0, w0) => `<li><span>${w0}</span><span>${escapeHtml(apptText)}</span></li>`)
       : `<p class="venue-hours-season venue-hours-appt">${escapeHtml(apptText)}</p>`;
