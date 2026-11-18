@@ -21974,6 +21974,17 @@ function visitRowsOwnerCovered(venue, info) {
         return left ? { ...r, text: left } : null;
       }).filter(Boolean);
     }
+    // Tour test 7 (Whistler, 2026-11-17): once the owner said No dogs ("Who can come" saved without Dogs), research's Good to
+    // know no longer says "dogs welcome on tours" (it sat under "No dogs" until he rewrote the line). Display only.
+    if (venue.type === 'tour' && venueOwnerFeaturesSaved(venue.id) && !venueOwnerFeatures(venue.id).dog_friendly) {
+      const DOGS_YES = /\bdogs? (?:are |is )?(?:welcome|allowed|friendly|ok|okay)\b|\bdog[- ]friendly\b|\bbring (?:your|the) (?:dogs?|pups?)\b|\bpets? (?:are )?(?:welcome|allowed)\b|\bchiens? (?:sont )?(?:bienvenus?|admis|accept[ée]s?)\b/i;
+      rows = rows.map((r) => {
+        if (!r || own.has(r.label) || typeof r.text !== 'string' || !/^(?:good to know|know before you go|tips?|dogs?|pets?)$/i.test(String(r.label || '')) || !DOGS_YES.test(r.text)) return r;
+        changed = true;
+        const left = r.text.split(/(?<=[.;!?])\s+/).filter((x) => !DOGS_YES.test(x)).join(' ').trim().replace(/;$/, '.');
+        return left ? { ...r, text: left } : null;
+      }).filter(Boolean);
+    }
     if (brewSetupType(venue.type) && (info.winery_labels || []).includes('Food')) {
       rows = rows.map((r) => {
         const m = r && r.label === 'Food' && typeof r.text === 'string' ? /^[A-Z][a-z]+(?: [a-z]+)? from our own kitchen(.*)$/.exec(r.text) : null;

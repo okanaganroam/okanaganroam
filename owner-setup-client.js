@@ -1164,6 +1164,9 @@
     if (how === 'day' && !S.sentExplained && !S.savedLine[step]) { S.sentExplained = step; line = many ? T.sentMeansMany : T.sentMeans; }
     // Café test 2 (Whistler, 2026-11-15): a French-only special or event says where it shows (once; frOnlyTell).
     var foldedNote = S.foldedNow && how === 'live' && T.foldedMore ? ' ' + T.foldedMore : ''; S.foldedNow = false;
+    // Tour test 7 (Whistler, 2026-11-17): a sent price list says what was sent ("✓ Your tours and prices are sent."), as the
+    // list's own screen does; it read only "✓ Sent." on the list it went back to.
+    if (TOUR && step === 'menu' && how === 'day' && T.menuSentToast && !S.savedLine.menu) { if (!S.sentExplained) S.sentExplained = step; return T.menuSentToast; }
     return '✓ ' + String(title).replace(/[\s\u00a0\u202f]*[.!]$/, '') + '. ' + line + foldedNote + (S.frOnlyNote === step && T.frPageOnly ? ' ' + T.frPageOnly : '');
   }
   var toastEl = document.createElement('p'); toastEl.id = 'suToast'; toastEl.className = 'su-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite');
