@@ -23085,7 +23085,10 @@ function tourOwnSays(own, part) {
 }
 function tourStoryWords(venueId, description) {
   let known = ''; try { known = String(ownerVisitRows(venueId).known_for || ''); } catch (e) { known = ''; }
-  return [description ? String(description) : '', known].filter(Boolean).join(' ; ');
+  // Tour test 15 (Whistler, 2026-11-18; Dave's card read "Snowshoe, snowcat & ski touring · Canoe · Kayak rentals" until his
+  // story went live): the names of his own typed tours ("Guided snowshoe tour") say which side of a chip he runs too.
+  let own = ''; try { const m = publishedMenu(venueId); if (m && !menuIsUnconfirmedResearch(m)) own = (m.data.sections || []).flatMap((x) => (x.items || []).map((it) => it && it.name)).filter(Boolean).join(' ; '); } catch (e) { own = ''; }
+  return [description ? String(description) : '', known, own].filter(Boolean).join(' ; ');
 }
 // Tour test 9: her story or Known for, once live, may name a side of a picked chip ("snowshoe storytelling walk"): the
 // category words are worked out again (nothing else changes).
@@ -54318,6 +54321,8 @@ function publishMenu(menuId, reviewer) {
   db.prepare("UPDATE venue_menus SET status = 'superseded', updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'published' AND id <> ?").run(menu.venue_id, menuId);
   db.prepare("UPDATE venue_menus SET status = 'published', published_at = datetime('now'), reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(reviewer, menuId);
   db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(menu.venue_id);
+  // Tour test 15: his typed tours may name which side of a kind he runs (the category words are worked out again).
+  try { if ((db.prepare('SELECT type FROM venues WHERE id = ?').get(menu.venue_id) || {}).type === 'tour') refreshTourKindWords(menu.venue_id); } catch (e) { /* keep the words */ }
   return { ok: true, venue_id: menu.venue_id };
 }
 function rejectMenu(menuId, reviewer, reason) {
