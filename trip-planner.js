@@ -1335,6 +1335,9 @@ function scoreVenue(v, ctx) {
 
   // A place the visitor named (2026-10-25: "lunch at Araxi" got another restaurant) wins its slot in every kind of plan.
   if (namedInRequest(v, ctx)) add('named', 60, 'You asked for this place');
+  // Tour test 13 (Whistler, 2026-11-18; Matthias): a plain "scenic flight" puts the planes and helicopters before a tandem
+  // paragliding operator (a scenic flight too, labelled paragliding on its stop).
+  if (paraglideForScenic(v, ctx) && !namedInRequest(v, ctx)) add('air_sport', -45, null);
   // An indoor kind named in the request (2026-10-25: "yoga and wine" got an art gallery): places of that kind first.
   const kindWord = (ctx.queryText || '').match(INDOOR_KIND_RE);
   if (kindWord && ['indoor', 'outdoor', 'beach'].includes(v.type) && normWords(v.cuisine || '').replace(/skatepark/g, 'skate park').includes(kindWord[1].replace(/skatepark/, 'skate park').replace(/^skate ?park$/, 'skate park'))) add('kind_asked', 45, null);
@@ -1906,6 +1909,12 @@ const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
 // Tour test 3 (Whistler, 2026-11-17): "All ages" is said too when the request names an age ("with our 10-year-old").
 const TOUR_WEATHER_NOTE = 'Runs weather permitting at this time of year (the operator’s own answer).';
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): on a "scenic flight" plan, his stop says what it is.
+const PARAGLIDE_SCENIC_NOTE = 'Paragliding: a tandem flight with a pilot, not a plane or helicopter.';
+function paraglideForScenic(v, ctx) {
+  const asked = (ctx && Array.isArray(ctx.plannerKinds)) ? ctx.plannerKinds : [];
+  return !!(v && v.type === 'tour' && asked.includes('scenic_flight') && !asked.includes('paragliding') && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding'));
+}
 // The trip's own day as 'MM-DD' (a month alone reads as its 15th), or null.
 function tripMdOf(ctx) {
   const iso = ctx.requirements && /^\d{4}-\d{2}-\d{2}$/.test(ctx.requirements.startDate || '') ? ctx.requirements.startDate : null;
@@ -2134,6 +2143,10 @@ function stopFrom(v, scored, extra, ctx) {
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  // Tour test 13: a paragliding operator on a "scenic flight" plan is labelled paragliding, and an air-sport operator's
+  // own "who can fly" line (weight, run a few steps) is on its stop.
+  if (paraglideForScenic(v, ctx) && !caveats.includes(PARAGLIDE_SCENIC_NOTE)) caveats.push(PARAGLIDE_SCENIC_NOTE);
+  if (v && v.type === 'tour' && v.tourFitNote && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding')) { const fn = `Good to know (the operator’s own words): ${v.tourFitNote}`; if (!caveats.includes(fn)) caveats.push(fn); }
   // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting): on the dates of a stretch the
   // operator runs weather permitting, the stop says so.
   if (ctx && v && v.type === 'tour' && Array.isArray(v.tourWeather) && v.tourWeather.length) {
@@ -6876,6 +6889,9 @@ function planTripUnchecked(input) {
   // viewing tour near Squamish on July 20" found only listings with exactly those words and left the rafting company
   // that runs bear tours as "Another listing". The wildlife tour kind covers those words.
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'wildlife_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && WILDLIFE_TOUR_WORDS_RE.test(normWords(f.term))));
+  // Tour test 13 (Whistler, 2026-11-18; Matthias): the paragliding kind covers its own words ("paragliding" came back as
+  // a category word to match, “paragliding” in the summary).
+  if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'paragliding' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !tripRequirements.KINDS.paragliding.test(normWords(f.term)) && !/^(?:tandem|gliding|glide|flights?)$/.test(normWords(f.term)));
   // Every tour kind (2026-11-17, after Whistler tour test 5): a fishing trip, heli-skiing or a snowshoe tour is that kind of
   // tour, not also the fishing, skiing or snowshoeing activity ("Fishing charter in Squamish" planned 8 lakes and beaches).
   {
@@ -6932,7 +6948,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour','paragliding'].includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6971,7 +6987,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour','paragliding'].includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};

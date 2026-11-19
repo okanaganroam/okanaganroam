@@ -640,7 +640,9 @@
   // is its own case ('unit'): never saved as a price per person, and the nudge says where it goes (Your tours and prices).
   // Boats, rafts, charters and groups stay 'group' (Private tours). "from 1500" / « 1500 $ et plus » read as the number.
   // (server.js tourPriceWhy, the same rule.)
-  function priceTrim(x){ return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
+  // Tour test 13 (Matthias): the Swiss "189.-" / "189.–" and "CHF 189" read as 189 (server.js tourPriceSwiss, the same rule).
+  function priceSwiss(x){ return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
+  function priceTrim(x){ return priceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
   function tourPriceWhy(x, priv){
     var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|rafts?|radeaux?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
     // Tour test 7 (Whistler, 2026-11-17): days, nights and hours are not units: "$750/day" is a day rate for the group
@@ -656,7 +658,9 @@
     if (feeHours(raw)) return 'hours';
     if (/^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i.test(raw)) return 'length';
     var head = moneyHead(raw); if (head === raw) return '';
-    var rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Tour test 13: a note in brackets with no numbers and no group, unit or rate words ("(Classic tandem)") is the tour's
+    // name, not a price rule (server.js tourPriceLabelDrop).
+    var rest = raw.slice(raw.indexOf(head) + head.length).replace(/\(([^()\d]*)\)/g, function(all, inner){ var lo = inner.toLowerCase(); return TOUR_GROUP_RE.test(lo) || TOUR_UNIT_RE.test(lo) || DAY_RE.test(lo) || HOUR_RE.test(lo) ? all : ' '; }).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     // Tour test 12 (Kayla: "$139 per jump 🔥 2nd jump same day $69"): per jump / per person / pp right after the first amount,
     // then another price: the first is the price for one person ('first'; the rest goes in Your tours and prices).
     // "same day" is never a day rate. (server.js tourPriceWhy, the same rule.)
@@ -674,11 +678,13 @@
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
     if (/\d/.test(rest)) return 'many';
     var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
-      .replace(/^(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seat|place|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+      // Tour test 13: per flight / ride / jump / trip / seat, with an adjective ("per tandem flight"), is per person.
+      .replace(/^(?:(?:tandem|classic|standard|solo|single|basic|regular|shared|scenic|intro|introductory|discovery|biplace|duo)\s+)*(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?)(?![a-zà-ÿ])\.?/, '').replace(/[\s.,+\/-]+/g, '');
     if (!left) return '';
     // A price per bike, per rental, per hour… (not in the private box: that one only takes the whole-trip price).
     if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
-    return 'many';
+    // Tour test 13: one price and words we can't read ('words'), not "One price here" (server.js, the same rule).
+    return 'words';
   }
   function tourPriceRead(x, priv){ var why0 = tourPriceWhy(x, priv); if (why0 && why0 !== 'first') return NaN; x = priceTrim(x); var t = moneyHead(x).replace(/^(?:CA|C)(?=\$)/i, '').replace(/[$\s\u00a0\u202f]/g, ''); if (!t) return null; t = t.replace(/,(\d{3})(?!\d)/, '$1').replace(',', '.'); return /^\d{1,5}(\.\d{1,2})?$/.test(t) && +t > 0 ? +t : NaN; }
   // The number a refused per-boat price starts with ("650 per boat" -> 650), to offer it for the Private tours box.
@@ -3986,7 +3992,7 @@
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
         // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).
-        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceVehicle && /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i.test(el('suTprice') ? el('suTprice').value : '') ? T.tpriceVehicle : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : T.tpriceNeed;
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceVehicle && /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i.test(el('suTprice') ? el('suTprice').value : '') ? T.tpriceVehicle : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : pwhy === 'words' && T.tpriceWords ? T.tpriceWords : T.tpriceNeed;
         S.groupMove = pwhy === 'group' || pwhy === 'day' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
       }
       if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }

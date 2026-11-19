@@ -6888,7 +6888,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}), ...(v.type === 'tour' ? (({ tourLength, tourMultiDay }) => ({ tourLength, tourMultiDay }))(tourPlannerFacts(v.id)) : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
+      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(knownForById.has(v.id) ? { knownFor: knownForById.get(v.id) } : {}), ...(v.type === 'tour' && tourPlannerFacts(v.id).tourItems ? { tourItems: tourPlannerFacts(v.id).tourItems } : {}), ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}), ...(v.type === 'tour' ? (({ tourLength, tourMultiDay }) => ({ tourLength, tourMultiDay }))(tourPlannerFacts(v.id)) : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
       nights: nightsFact(v),
       specials: specialsFact(v),
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
@@ -22655,6 +22655,11 @@ const TOUR_KIND_LABELS_OWNER = {
   // tours filter). A list entry, not a new field; its page words are TOUR_KIND_PUBLIC.sightseeing, its filter Wildlife &
   // Nature on Whistler (TOUR_KIND_ACTIVITY), its planner kind sightseeing_tour.
   sightseeing: ['Sightseeing and day trips', 'Visites touristiques et excursions d’une journée'],
+  // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding in Pemberton): no chip fitted paragliding (he picked
+  // scenic flights and his page said "Helicopter & scenic flights"). A list entry, not a new field; its page words are
+  // TOUR_KIND_PUBLIC.paraglide, its filters Air & Heli plus Adventure (TOUR_KIND_ACTIVITY, TOUR_ACTIVITY_ALSO), its
+  // planner kind paragliding (trip-requirements.js).
+  paraglide: ['Paragliding, skydiving or hang gliding', 'Parapente, parachutisme ou deltaplane'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm, ranch or kennel visits', 'Visites de ferme, de ranch ou de chenil'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
 // Tour test 3 (Whistler, 2026-11-17): the first length is "Up to 1 hour" (a 20-minute flight read "About 1 hour").
@@ -22715,6 +22720,9 @@ function tourKindCovers(k, part) { const h = TOUR_KIND_HINTS.find(([key]) => key
 // `words`, not the code.
 // Tour test 9: the words that say a listing is Indigenous (never guessed from "native" or "tribal": research's words).
 const TOUR_INDIGENOUS_RE = /\bindigenous|first nations?\b|autochtone|premi[eè]res nations|\bm[ée]tis\b|\binuit\b/;
+// Tour test 13 (Matthias): paragliding in his words, English or French ("paraglide", « parapente », « vol biplace »).
+const TOUR_PARAGLIDE_SIDE_RE = /paraglid|parapent|para-?glid|tandem (?:para)?glid/;
+const TOUR_AIR_SPORT_RE = /paraglid|para-?glid|parapent|skydiv|sky ?dives?|parachut|hang[- ]?glid|deltaplane|speed[- ]?fl(?:y|ying)\b|speed[- ]?riding|paramotor/i;
 const TOUR_TREETOP_RE = /tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre|parcours (?:dans les arbres|a[ée]rien)/;
 const TOUR_KIND_PUBLIC = {
   heli: { words: ['Heli-skiing', 'Héliski'], sides: [[/heli[- ]?(?:ski|board)/, 'Heli-skiing', 'Héliski'], [/cat[- ]?ski|snowcat ski/, 'Cat-skiing', 'Ski en chenillette (cat-ski)']] },
@@ -22752,6 +22760,9 @@ const TOUR_KIND_PUBLIC = {
   // Tour test 11: "Sightseeing tours" / "Day trips" (each that the listing's words name), else both.
   sightseeing: { words: ['Sightseeing tours & day trips', 'Visites touristiques et excursions d’une journée'], eachSide: true, sides: [[/(?<!heli[- ]?)sightsee|visites? touristiques?/, 'Sightseeing tours', 'Visites touristiques'],
     [/day[- ]trips?|day tours?|excursions?/, 'Day trips', 'Excursions d’une journée']] },
+  // Tour test 13: the air sports the listing's own words name ("Tandem paragliding" -> "Paragliding"), else all three.
+  paraglide: { words: ['Paragliding, skydiving & hang gliding', 'Parapente, parachutisme et deltaplane'], eachSide: true, sides: [[TOUR_PARAGLIDE_SIDE_RE, 'Paragliding', 'Parapente'],
+    [/skydiv|sky ?dive|parachut/, 'Skydiving', 'Parachutisme'], [/hang[- ]?glid|deltaplane|delta-plane/, 'Hang gliding', 'Deltaplane'], [/speed[- ]?fl(?:y|ying)|speed[- ]?riding/, 'Speed flying', 'Speed riding']] },
   bike: { sides: [[/e-?bike (?:rentals?|hire)|location de v[ée]los? [ée]lectriques?/, 'E-bike rentals', 'Location de vélos électriques'], [/(?<!e-)(?<!e)\bbikes? (?:rentals?|hire)|location de v[ée]los?(?! [ée]lec)/, 'Bike rentals', 'Location de vélos'],
     [/\b(?:tours?|rides?|guided|sorties?)\b/, 'Bike tours', 'Sorties à vélo']] },
 };
@@ -22949,7 +22960,15 @@ const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?
 const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
 const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
 const TOUR_PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
-function tourPriceTrim(x) { return String(x == null ? '' : x).trim().replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): the Swiss "189.-" / "189.–" and "CHF 189" read as 189.
+function tourPriceSwiss(x) { return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
+// Tour test 13: per flight / ride / jump / trip / tour / seat / passenger / person / pp, with an adjective ("per tandem
+// flight", "a classic ride"), is a price per person. A note in brackets with no numbers and no group, unit or rate words
+// ("(Classic tandem)") is the tour's name, not a price rule.
+const TOUR_PER_ONE_ADJ = '(?:(?:tandem|classic|standard|solo|single|basic|regular|shared|scenic|intro|introductory|discovery|biplace|duo)\\s+)*';
+const TOUR_PER_ONE_NOUNS = '(?:persons?|personnes?|pers|pp|p\\.p\\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?)';
+function tourPriceLabelDrop(rest) { return rest.replace(/\(([^()\d]*)\)/g, (all, inner) => (TOUR_GROUP_PRICE_RE.test(inner.toLowerCase()) || TOUR_UNIT_RE.test(inner.toLowerCase()) || TOUR_DAY_RATE_RE.test(inner.toLowerCase()) || TOUR_HOUR_RATE_RE.test(inner.toLowerCase()) ? all : ' ')); }
+function tourPriceTrim(x) { return tourPriceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
   const raw = tourPriceTrim(x);
   if (!raw || !/\d/.test(raw)) return '';
@@ -22958,7 +22977,7 @@ function tourPriceWhy(x, priv = false) {
   const m = /^((?:\$|CA\$|C\$)?\s*\d[\d\s.,  ]*?\d?\s*\$?)\s*(?:(?:CAD|CA|dollars?)\b\s*)?(?:(?:\/|\+|\(|[A-Za-zÀ-ɏ]).*)$/.exec(raw);
   if (!m) return '';
   const head = m[1].replace(/[.,\s  ]+$/, '');
-  let rest = raw.slice(raw.indexOf(head) + head.length).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  let rest = tourPriceLabelDrop(raw.slice(raw.indexOf(head) + head.length)).toLowerCase().replace(/[’']/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
   // Tour test 12 (Whistler, 2026-11-18; Kayla: "$139 per jump 🔥 2nd jump same day $69"): per jump / per person / pp right
   // after the first amount, then another price: the first is the price for one person ('first', saved; the setup nudges
   // "Second-jump or combo prices? Add them in Your tours and prices."). "same day" is never a day rate.
@@ -22978,13 +22997,15 @@ function tourPriceWhy(x, priv = false) {
   if (group) return priv ? (/\d/.test(rest.replace(countRe, '')) ? 'many' : '') : 'group';
   if (/\d/.test(rest)) return 'many';
   const left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
-    .replace(/^(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seat|place|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?)\b\.?/, '').replace(/[\s.,+\/-]+/g, '');
+    .replace(new RegExp('^' + TOUR_PER_ONE_ADJ + TOUR_PER_ONE_NOUNS + '(?![a-zà-ÿ])\\.?'), '').replace(/[\s.,+\/-]+/g, '');
   if (!left) return '';
   if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
-  return 'many';
+  // Tour test 13: one price and words we can't read is not "one price here" (it is one price): 'words'.
+  return 'words';
 }
 const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.',
   day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
+  words: 'We read the price but not the words after it. Type just the number, like 189, or “189 per person”.',
   length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
 // Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
 const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i;
@@ -23223,9 +23244,23 @@ function tourCardPrice(venueId) {
 }
 // The card's duration chip (tourCardFacts reads "Time needed"); and Build My Trip's facts: the minimum age, how far ahead
 // to book and how long a trip takes, from the operator's own answers (null when not answered).
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding: "Passengers 25–110 kg, able to run a few steps"): the
+// sentences of the operator's OWN Good to know that say who can fly (weight, running a few steps), for the trip card.
+// Never research's line.
+function tourFitNote(venueId) {
+  try {
+    const info = venueVisitInfo(venueId) || {};
+    if (!(Array.isArray(info.owner_labels) && info.owner_labels.includes('Good to know'))) return '';
+    const row = (info.rows || []).find((r) => r && r.label === 'Good to know');
+    const parts = String((row && row.text) || '').split(/(?<=[.!?])\s+/).filter((x) => /\b(?:weigh\w*|weight|kg|lbs?|pounds|run (?:a few|some) steps|able to run|run a few|running)\b/i.test(x));
+    const out = parts.join(' ').trim();
+    return out.length > 4 && out.length <= 220 ? out : '';
+  } catch (e) { return ''; }
+}
 function tourPlannerFacts(venueId) {
   const t = venueTourInfo(venueId);
   return {
+    ...(() => { const f = tourFitNote(venueId); return f ? { tourFitNote: f } : {}; })(),
     ...(TOUR_AGES.includes(String(t.age || '')) ? { tourMinAge: String(t.age) } : {}),
     // Tour test 12: the stretches the owner runs weather permitting (a note on the trip card on those dates).
     ...(() => { const w = venueWeatherStretches(venueId); return w.length ? { tourWeather: w } : {}; })(),
@@ -29657,7 +29692,9 @@ const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle
   zipline: 'adventure', adventure: 'adventure', guide: 'adventure', flight: 'adventure', horseback: 'adventure', heli: 'winter', snowmobile: 'winter', dogsled: 'winter', snowshoe: 'winter', sleigh: 'winter', walking: 'culture', cultural: 'culture',
   // Tour test 11 (Whistler, 2026-11-18; Min-jun's day trips to lakes and waterfalls): Wildlife & Nature, the nearest
   // existing filter (no new chip: Okanagan maps it to its own nearest filter when ported).
-  sightseeing: 'wildlife' };
+  sightseeing: 'wildlife',
+  // Tour test 13 (Matthias): paragliding is under Air & Heli, and ALSO under Adventure (TOUR_ACTIVITY_ALSO).
+  paraglide: 'air' };
 // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
@@ -29668,7 +29705,9 @@ const TOUR_GUIDE_WORDS_RE = /\b(?:mountain guid\w*|(?:alpine|ski|climbing|backco
 // bare "ACMG" / "IFMGA" (a heli or yurt company flying guests in with ACMG guides, a hiking company's ACMG hiking guides)
 // are not a guiding company: its own words must say mountaineering, mountain guiding or the other services.
 const TOUR_GUIDE_WORDS_STRICT_RE = new RegExp(TOUR_GUIDE_WORDS_RE.source.replace('mountaineer\\w*', 'mountaineering').replace('|acmg|ifmga', ''), 'i');
-const TOUR_ACTIVITY_ALSO = { adventure: TOUR_GUIDE_WORDS_STRICT_RE };
+// Tour test 13 (Whistler, 2026-11-18; Matthias): a tour whose own words say paragliding, skydiving or hang gliding is ALSO
+// under Adventure (its kind puts it under Air & Heli).
+const TOUR_ACTIVITY_ALSO = { adventure: TOUR_GUIDE_WORDS_STRICT_RE, adventure: TOUR_AIR_SPORT_RE };
 function tourInActivity(venue, slug) {
   if (tourActivityOf(venue) === slug) return true;
   if (!venue || venue.type !== 'tour' || !slug) return false;
@@ -58329,10 +58368,13 @@ const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<
   ['sleigh', /sleigh|horse[- ]drawn|(?:promenades?|balades?|tours?) en tra[iî]neaux?(?! [àa] chiens)|tra[iî]neaux? tir[ée]s? par des chevaux/], ['jetboat', /jet ?boat/],
   ['boat', /(?<!jet )\bboat tours?|cruise|charters?|pontoon|sailing|yacht/], ['horseback', /horse(?![- ]drawn)|riding|stables|trail rides?/], ['fishing', /fishing|fly fish/], ['wildlife', /bear|wildlife|whale|eagle|birding/],
   ['bike', /\bbik(?:e|ing)|e-?bike|cycling/], ['zipline', /zip ?line|zip tour/], ['wine', /wine|winery|vineyard/], ['cultural', /indigenous|first nations?|cultural (?:tours?|walks?|experiences?|programs?|centres?|centers?|visits?)|storytell|autochtone|premi[eè]res nations|visites? culturelles?/], ['walking', /walking|ghost|history|heritage/], ['snowshoe', /snowshoe|ski touring|backcountry ski/],
-  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|backcountry guiding|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|paraglid|skydiv|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
+  ['paddle', /kayak|canoe|\bsup\b|paddle/], ['raft', /raft/], ['guide', /mountain guid|backcountry guiding|mountaineer|alpinis|avalanche (?:courses?|skills|training|safety)|\bast ?[12]\b|\bacmg\b|\bifmga\b|glacier (?:travel|trips?|climb\w*|mountaineering)/], ['adventure', /bungee|climb|via ferrata|canyon|\batvs?\b|\bquads?\b|side[- ]by[- ]sides?|\bjeeps?\b|off[- ]?road|\brzr\b|tree ?top|ropes? courses?|high ropes|adventure park|aerial (?:park|course)|h[ée]bertisme|parc d.aventure|arbre en arbre/], ['flight', /floatplane|scenic flights?|heli(?:copter)?[- ]?(?:sightseeing|tours?|flights?)/],
   ['food', /food tour|culinary|tasting tour/], ['farm', /farm|u-?pick|orchard|kennel|pupp(?:y|ies) (?:visits?|cuddles|tours?)|meet the (?:dogs|huskies|puppies)|ranch (?:visits?|tours?)/], ['rentals', /rentals?/],
   // Tour test 11: ground sightseeing and day trips (never heli-sightseeing: that's a flight).
-  ['sightseeing', /(?<!heli[- ]?)sightsee|day[- ]trips?|day tours?|van tours?|scenic drives?|visites? touristiques?|excursions? d.une journ[ée]e/]];
+  ['sightseeing', /(?<!heli[- ]?)sightsee|day[- ]trips?|day tours?|van tours?|scenic drives?|visites? touristiques?|excursions? d.une journ[ée]e/],
+  // Tour test 13 (Matthias): paragliding, skydiving and hang gliding are their own kind (research's "Tandem paragliding"
+  // pre-picked the ATV, bungee… chip).
+  ['paraglide', TOUR_AIR_SPORT_RE]];
 function tourKindSuggestion(venue) {
   const t = `${venue.cuisine || ''} ${venue.name || ''}`.toLowerCase();
   const out = [];

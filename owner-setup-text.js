@@ -2080,6 +2080,7 @@ Object.assign(en.tour, {
   tpriceGroupMove: 'Put {x} in Private tours', tpriceGroupMoved: 'Moved to Private tours. Now type a price for one person, like 95.',
   tpriceHours: 'That starts with a trip length. Type just the price, like 95.',
   tpriceOne: 'One price here: your lowest for one person, like 95. Other prices and extras go in “Your tours and prices”.',
+  tpriceWords: 'We read the price but not the words after it. Type just the number, like 189, or “189 per person”.',
   tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below.',
 });
 Object.assign(fr.tour, {
@@ -2088,6 +2089,7 @@ Object.assign(fr.tour, {
   tpriceGroupMove: 'Mettre {x} dans Sorties privées', tpriceGroupMoved: 'Déplacé dans Sorties privées. Écrivez maintenant un prix pour une personne, par exemple 95.',
   tpriceHours: 'Ça commence par une durée. Écrivez seulement le prix, par exemple 95.',
   tpriceOne: 'Un seul prix ici : votre plus bas pour une personne, par exemple 95. Les autres prix et les extras vont dans « Vos sorties et tarifs ».',
+  tpriceWords: 'Nous lisons le prix, mais pas les mots qui suivent. Écrivez seulement le chiffre, par exemple 189, ou « 189 par personne ».',
   tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas.',
 });
 // Tour test 5: by-booking tours' Groups question (everyone books), the meeting-spot examples with a dock or marina.

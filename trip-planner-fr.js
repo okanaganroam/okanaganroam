@@ -22,7 +22,7 @@ const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+const STRONG = new Set(('parapente parapentes parachutisme deltaplane helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
   + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
@@ -287,6 +287,10 @@ const PHRASES = [
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
   ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
+  // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): « parapente », « parachutisme », « deltaplane »
+  // found nothing in the planner (only search read them).
+  ['vol en parapente biplace', 'tandem paragliding'], ['parapente biplace', 'tandem paragliding'], ['vol en parapente', 'paragliding'], ['vols en parapente', 'paragliding'], ['parapentes', 'paragliding'], ['parapente', 'paragliding'],
+  ['saut en parachute', 'skydiving'], ['sauts en parachute', 'skydiving'], ['parachutisme', 'skydiving'], ['saut en tandem', 'tandem skydiving'], ['deltaplanes', 'hang gliding'], ['deltaplane', 'hang gliding'], ['vol libre', 'paragliding'],
   // Tour test 11 (Whistler, 2026-11-18; Min-jun, sightseeing vans): « visite touristique », « excursion d’une journée »,
   // « route panoramique », « visite en van » and « chutes d’eau » (the place names, « lacs Joffre », are each site's: trip-site.js).
   ['visites touristiques', 'sightseeing tours'], ['visite touristique', 'sightseeing tour'], ['excursions d une journee', 'day trips'], ['excursion d une journee', 'day trip'],
